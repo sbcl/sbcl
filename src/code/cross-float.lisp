@@ -652,16 +652,23 @@
              (if (not prototypep) 'single-float (flonum-format prototype))))
       (flonum-from-rational (rational number) format))))
 
-;;; Produce a float with the format and magnitude of FLOAT2 and sign of FLOAT1.
+;;; Produce a float with the magnitude of FLOAT2 and sign of FLOAT1.
 (defun float-sign (float1 &optional (float2 (float 1 float1) float2p))
   (validate-args float1 float2)
   (with-memoized-math-op (float-sign (cons float1 (if float2p (list float2))))
-    (let ((res (if (= (float-sign-bit float2) (float-sign-bit float1))
-                   float2
-                   (sb-xc:- float2))))
-      (if (eq (flonum-format float1) 'double-float)
-          (coerce res 'double-float)
-          res))))
+    (typecase float2
+      (single-float
+       (let* ((sign (float-sign-bit float1))
+              (exponent (%single-exponent-bits float2))
+              (mantissa (%single-mantissa-bits float2))
+              (bits (%single-bits-from sign exponent mantissa)))
+         (coerce (make-flonum bits 'single-float) (flonum-format float1))))
+      (double-float
+       (let* ((sign (float-sign-bit float1))
+              (exponent (%double-exponent-bits float2))
+              (mantissa (%double-mantissa-bits float2))
+              (bits (%double-bits-from sign exponent mantissa)))
+         (make-flonum bits 'double-float))))))
 
 (macrolet ((define (name float-fun)
              `(progn
