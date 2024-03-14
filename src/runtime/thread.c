@@ -1356,6 +1356,7 @@ void wake_thread(struct thread_instance* lispthread)
 }
 #endif
 
+#ifdef LISP_FEATURE_ULTRAFUTEX
 extern int futex_wake(int *lock_word, int n);
 void lispmutex_wake_waiter()
 {
@@ -1370,3 +1371,4 @@ void lispmutex_wake_waiter()
     *word = 0; // slam 0 in, meaning uncontested
     futex_wake(word, 1);
 }
+#endif

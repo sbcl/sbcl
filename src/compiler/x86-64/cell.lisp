@@ -625,6 +625,7 @@
           for tls-index = (load-time-tls-offset symbol)
           for tls-cell = (thread-tls-ea tls-index)
           do
+          #+ultrafutex
           (when (eq symbol '*current-mutex*)
             (let ((uncontested (gen-label)))
               (inst mov temp tls-cell) ; load the current value

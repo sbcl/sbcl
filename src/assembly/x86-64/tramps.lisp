@@ -298,6 +298,8 @@
       (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax)))
   (inst ret 24)) ; remove 3 stack args
 
+#+ultrafutex
+(progn
 (define-assembly-routine (mutex-wake-waiter (:return-style :raw)) ()
   (with-registers-preserved (lisp)
     (inst call (make-fixup "lispmutex_wake_waiter" :foreign)))) ; no args!
@@ -312,4 +314,4 @@
   (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
   uncontested
   (inst pop rax-tn))
-
+) ; end PROGN

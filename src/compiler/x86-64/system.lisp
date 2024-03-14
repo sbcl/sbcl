@@ -512,6 +512,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     ;; to make an assembly routine that preserves all registers.
     (invoke-asm-routine 'call 'switch-to-arena vop)))
 
+#+ultrafutex
 (define-vop (quick-try-mutex)
   (:translate quick-try-mutex)
   (:policy :fast-safe)
