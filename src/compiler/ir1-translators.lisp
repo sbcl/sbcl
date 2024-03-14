@@ -63,6 +63,27 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                        else-ctran)
                    next result else))))
 
+(def-ir1-translator jump-table ((index &rest targets) start next result)
+  (aver targets)
+  (let* ((index-ctran (make-ctran))
+         (index-lvar (make-lvar))
+         (node (make-jump-table :index index-lvar)))
+    (setf (lvar-dest index-lvar) node)
+    (ir1-convert start index-ctran index-lvar index)
+    (link-node-to-previous-ctran node index-ctran)
+
+    (let ((start-block (ctran-block index-ctran)))
+      (setf (block-last start-block) node)
+      (ctran-starts-block next)
+      (setf (jump-table-targets node)
+            (loop for target in targets
+                  for ctran = (make-ctran)
+                  for block = (ctran-starts-block ctran)
+                  do
+                  (ir1-convert ctran next result target)
+                  (link-blocks start-block block)
+                  collect block)))))
+
 ;;; To get even remotely sensible results for branch coverage
 ;;; tracking, we need good source paths. If the macroexpansions
 ;;; interfere enough the TEST of the conditional doesn't actually have

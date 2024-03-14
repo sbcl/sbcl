@@ -3350,14 +3350,14 @@
          (cons :oword
                (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
                        (ldb (byte 64 0) (double-float-bits (realpart value))))))
-        (:fixup
-         (cons :fixup value))))))
+        ((:fixup :jump-table)
+         (cons type value))))))
 
 (defun inline-constant-value (constant)
   (let ((label (gen-label))
         (size  (ecase (car constant)
                  ((:byte :word :dword :qword) (car constant))
-                 ((:oword :fixup) :qword))))
+                 ((:oword :fixup :jump-table) :qword))))
     (values label (cons size label))))
 
 (defun size-nbyte (size)
@@ -3368,7 +3368,7 @@
     ;; :DWORD for 8, and :QWORD for 16.
     (:word  2)
     (:dword 4)
-    ((:qword :fixup) 8)
+    ((:qword :fixup :jump-table) 8)
     (:oword 16)))
 
 (defun sort-inline-constants (constants)
@@ -3390,16 +3390,19 @@
           label
           (cond ((typep val '(cons (eql :layout-id)))
                  `(.layout-id ,(cadr val)))
+
                 ((eql type :fixup)
                  ;; Use the DWORD emitter which knows how to emit fixups
                  `(dword ,(apply #'make-fixup val)))
+                ((eq type :jump-table)
+                 `(.lispword ,@(coerce val 'list)))
                 (t
-               ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
-               ;; But it works fine to emit as a sequence of bytes
-               ;; FIXME: missing support for big-endian. Do we care?
-               `(.byte ,@(loop repeat size
-                               collect (prog1 (ldb (byte 8 0) val)
-                                         (setf val (ash val -8))))))))))
+                 ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
+                 ;; But it works fine to emit as a sequence of bytes
+                 ;; FIXME: missing support for big-endian. Do we care?
+                 `(.byte ,@(loop repeat size
+                                 collect (prog1 (ldb (byte 8 0) val)
+                                           (setf val (ash val -8))))))))))
 
 (defun sb-vm:fixup-code-object (code offset value kind flavor)
   (declare (type index offset) (ignore flavor))
@@ -3408,7 +3411,7 @@
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
-       (setf (sap-ref-word sap offset) value))
+       (incf (sap-ref-word sap offset) value))
       (:layout-id
        (setf (signed-sap-ref-32 sap offset) value))
       (:cond-branch

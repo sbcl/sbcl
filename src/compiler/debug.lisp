@@ -479,6 +479,10 @@
      (check-dest (if-test node) node)
      (unless (eq (block-last (node-block node)) node)
        (barf "IF not at block end: ~S" node)))
+    (jump-table
+     (check-dest (jump-table-index node) node)
+     (unless (eq (block-last (node-block node)) node)
+       (barf "JUMP-TABLE not at block end: ~S" node)))
     (cset
      (check-dest (set-value node) node))
     (cast
@@ -1038,6 +1042,11 @@
            (print-lvar (if-test node))
            (print-ctran (block-start (if-consequent node)))
            (print-ctran (block-start (if-alternative node))))
+          (jump-table
+           (write-string "jump-table ")
+           (print-lvar (jump-table-index node))
+           (loop for target in (jump-table-targets node)
+                 do  (print-ctran (block-start target))))
           (bind
            (write-string "bind ")
            (print-leaf (bind-lambda node))

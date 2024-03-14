@@ -153,3 +153,13 @@
   (def fast-if-eq-integer/c fast-if-eql-integer/c 2)
   (def fast-if-eq-signed fast-if-eql/signed 5)
   (def fast-if-eq-unsigned fast-if-eql/unsigned 5))
+
+(define-vop (jump-table)
+  (:args (index :scs (any-reg descriptor-reg)))
+  (:info targets)
+  (:temporary (:sc unsigned-reg) table)
+  (:generator 0
+    (inst adr table (cdr (register-inline-constant :jump-table (coerce targets 'vector))))
+    (inst add table table (lsl index 2))
+    (inst ldr table (@ table))
+    (inst br table)))

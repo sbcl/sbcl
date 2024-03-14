@@ -1476,8 +1476,14 @@
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
+(defstruct (multiple-successors-node
+            (:constructor nil)
+            (:include node)
+            (:copier nil)
+            (:conc-name node-)))
+
 ;;; Naturally, the IF node always appears at the end of a block.
-(defstruct (cif (:include node)
+(defstruct (cif (:include multiple-successors-node)
                 (:conc-name if-)
                 (:predicate if-p)
                 (:constructor make-if)
@@ -1494,6 +1500,16 @@
   (test :prin1 (lvar-uses test))
   consequent
   alternative)
+
+(defstruct (jump-table (:include multiple-successors-node)
+                       (:copier nil))
+  (index (missing-arg) :type lvar)
+  (targets nil :type list)
+  (target-constraints nil))
+
+(defprinter (jump-table :identity t)
+  index
+  targets)
 
 (defstruct (cset (:include valued-node
                            (derived-type (make-single-value-type

@@ -698,6 +698,14 @@
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
                              test-ref () node t)))
 
+(defun ir2-convert-jump-table (node block)
+  (declare (type ir2-block block) (type jump-table node))
+  (let ((index (jump-table-index node)))
+    (emit-template node block (template-or-lose 'jump-table)
+                   (reference-tn (lvar-tn node block index) nil)
+                   nil (list (loop for target in (jump-table-targets node)
+                                   collect (block-label target))))))
+
 ;;; Return a list of types that we can pass to LVAR-RESULT-TNS
 ;;; describing the result types we want for a template call. We are really
 ;;; only interested in the number of results required: in normal case
@@ -2344,7 +2352,7 @@
   (let* ((2block (block-info block))
          (last (block-last block))
          (succ (block-succ block)))
-    (unless (if-p last)
+    (unless (multiple-successors-node-p last)
       (aver (singleton-p succ))
       (let ((target (first succ)))
         (cond ((eq target (component-tail (block-component block)))
@@ -2424,6 +2432,9 @@
         (cif
          (when (lvar-info (if-test node))
            (ir2-convert-if node 2block)))
+        (jump-table
+         (when (lvar-info (jump-table-index node))
+           (ir2-convert-jump-table node 2block)))
         (bind
          (let ((fun (bind-lambda node)))
            (when (eq (lambda-home fun) fun)

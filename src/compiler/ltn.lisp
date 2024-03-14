@@ -478,6 +478,12 @@
       (annotate-ordinary-lvar test)))
   (values))
 
+(defun ltn-analyze-jump-table (node)
+  (declare (type jump-table node))
+  (setf (node-tail-p node) nil)
+  (annotate-ordinary-lvar (jump-table-index node))
+  (values))
+
 ;;; If there is a value lvar, then annotate it for unknown values. In
 ;;; this case, the exit is non-local, since all other exits are
 ;;; deleted or degenerate by this point.
@@ -1035,6 +1041,7 @@
          (:known
           (ltn-analyze-known-call node))))
       (cif (ltn-analyze-if node))
+      (jump-table (ltn-analyze-jump-table node))
       (creturn) ;; delay to FLUSH-FULL-CALL-TAIL-TRANSFERS
       ((or bind entry))
       (exit (ltn-analyze-exit node))
