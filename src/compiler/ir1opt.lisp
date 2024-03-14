@@ -1733,7 +1733,7 @@
                       (let ((opt (pop optional)))
                         (push (pop args) new-args)
                         (push (ensure-car opt) new-optional)))
-                (setf new-ll (append new-ll new-optional))
+                (setf new-ll (append new-ll (nreverse new-optional)))
                 (when optional
                   (setf aux (append optional aux))))
               (let (new-keys)
