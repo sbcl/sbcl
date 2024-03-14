@@ -588,7 +588,7 @@
   (with-memoized-math-op (coerce (list object type))
     (if (realp object)
         (if (and (floatp object)
-                 (eq (flonum-%value object) :minus-zero)
+                 (flonum-minus-zero-p object)
                  (member type '(double-float single-float)))
             (make-flonum :minus-zero type)
             (let ((actual-type (if (member type '(double-float long-float))
@@ -629,7 +629,7 @@
 ;;; This is simple enough that it's not necessary to memoize all calls.
 (defun xfloat-zerop (x)
   (if (floatp x)
-      (or (eql (flonum-%bits x) 0) (eq (flonum-%value x) :minus-zero))
+      (or (eql (flonum-%bits x) 0) (flonum-minus-zero-p x))
       (error "non-number?"))) ; or complex (not handled)
 
 (macrolet ((define (name float-fun)
@@ -681,7 +681,7 @@
                                   'double-float
                                   'single-float)))
                     (if (and (floatp number)
-                             (eq (flonum-%value number) :minus-zero))
+                             (flonum-minus-zero-p number))
                         (values 0
                                 (make-flonum (if  (< divisor 0)
                                                   0

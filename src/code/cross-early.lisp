@@ -144,6 +144,15 @@
            (cl:1+ (cl:/ (%double-mantissa-bits flonum) scale))
            (cl:/ (%double-mantissa-bits flonum) scale))))))
 
+(defun flonum-minus-zero-p (flonum)
+  (etypecase flonum
+    (single-float (and (cl:= (%single-sign-bit flonum) 1)
+                       (cl:= (%single-exponent-bits flonum) 0)
+                       (cl:= (%single-mantissa-bits flonum) 0)))
+    (double-float (and (cl:= (%double-sign-bit flonum) 1)
+                       (cl:= (%double-exponent-bits flonum) 0)
+                       (cl:= (%double-mantissa-bits flonum) 0)))))
+
 (deftype real () '(or cl:rational float))
 (declaim (inline realp))
 (defun realp (x) (cl:typep x 'real))
