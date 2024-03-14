@@ -1172,6 +1172,7 @@
 (defknown (sxhash psxhash) (t) hash-code (foldable flushable))
 (defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 (defknown sb-impl::install-hash-table-lock (hash-table) sb-thread:mutex ())
+(defknown sb-vm::quick-try-mutex (sb-thread:mutex) boolean)
 ;; To avoid emitting code to test for nil-function-returned
 (defknown (sb-impl::signal-corrupt-hash-table
            sb-impl::signal-corrupt-hash-table-bucket)

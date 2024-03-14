@@ -1724,8 +1724,9 @@
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
-                      (memq (fixup-flavor src) '(:layout-id :layout :immobile-symbol
-                                                 :card-table-index-mask))))
+                      (memq (fixup-flavor src)
+                            '(:layout-id :layout :immobile-symbol :symbol-tls-index
+                              :card-table-index-mask))))
              (emit-prefixes segment dst nil size :lock (lockp prefix))
              (cond ((accumulator-p dst)
                     (emit-byte segment

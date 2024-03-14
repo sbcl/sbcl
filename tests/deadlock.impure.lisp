@@ -1,4 +1,5 @@
 #-sb-thread (invoke-restart 'run-tests::skip-file)
+#+ultrafutex (invoke-restart 'run-tests::skip-file)
 
 (import '(sb-thread:join-thread
           sb-thread:make-mutex

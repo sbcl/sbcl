@@ -511,3 +511,15 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     ;; but since this needs pseudo-atomic decoration anyway, it saves code size
     ;; to make an assembly routine that preserves all registers.
     (invoke-asm-routine 'call 'switch-to-arena vop)))
+
+(define-vop (quick-try-mutex)
+  (:translate quick-try-mutex)
+  (:policy :fast-safe)
+  (:args (m :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset 0) old) ; RAX
+  (:temporary (:sc unsigned-reg) new)
+  (:conditional :z)
+  (:generator 1
+    (inst mov :byte new 1)
+    (zeroize old)
+    (inst cmpxchg :lock :byte (mutex-slot m state) new)))

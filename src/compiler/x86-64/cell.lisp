@@ -617,6 +617,7 @@
   (:temporary (:sc unsigned-reg) temp bsp)
   (:temporary (:sc complex-double-reg) zero)
   (:info symbols)
+  (:vop-var vop)
   (:generator 0
     (load-binding-stack-pointer bsp)
     (inst xorpd zero zero)
@@ -624,6 +625,15 @@
           for tls-index = (load-time-tls-offset symbol)
           for tls-cell = (thread-tls-ea tls-index)
           do
+          (when (eq symbol '*current-mutex*)
+            (let ((uncontested (gen-label)))
+              (inst mov temp tls-cell) ; load the current value
+              (inst mov :qword (mutex-slot temp %owner) 0)
+              (inst dec :lock :byte (mutex-slot temp state))
+              (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
+              (invoke-asm-routine 'call 'mutex-wake-waiter vop)
+              (emit-label uncontested)))
+
           (inst sub bsp (* binding-size n-word-bytes))
 
           ;; Load VALUE from stack, then restore it to the TLS area.
@@ -661,6 +671,16 @@
     #+sb-thread
     (progn
       (inst mov :dword symbol (ea (* binding-symbol-slot n-word-bytes) bsp))
+      ;; Maybe I should say that PROGV can never be allowed to bind *CURRENT-MUTEX*
+      ;; and I can eliminate this code here. However, UNWIND-TO-FRAME-AND-CALL
+      ;; still has to do this check.  Maybe one extra arg it needed to this function
+      ;; indicating whether it is an ordinary PROGV versus extra magical.
+      #+ultrafutex
+      (let ((notmutex (gen-label)))
+        (inst cmp :dword symbol (make-fixup '*current-mutex* :symbol-tls-index))
+        (inst jmp :ne notmutex)
+        (inst call (ea (make-fixup 'mutex-unlock :assembly-routine*)))
+        (emit-label notmutex))
       (inst test :dword symbol symbol))
     #-sb-thread
     (progn
@@ -686,6 +706,9 @@
   (:temporary (:sc unsigned-reg) symbol value bsp)
   (:temporary (:sc complex-double-reg) zero)
   (:generator 0
+    ;; Perhaps this vop should become an unbind-to-here asm routine especially for
+    ;; #+ultrafutex due to extra steps to unwind through a held mutex. On other other,
+    ;; the vop is fairly rare, used only by PROGV (and the debugger)
     (unbind-to-here where symbol value bsp zero)))
 
 ;;;; closure indexing

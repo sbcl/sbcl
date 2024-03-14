@@ -450,3 +450,11 @@
   `(if (sb-c::code-immobile-p ,vop)
        :dword
        :qword))
+
+;;; This is not "very" arch-specific apart from use of the EA macro
+(defmacro mutex-slot (base-reg slot-name)
+  (let* ((slots (dd-slots (find-defstruct-description 'sb-thread:mutex)))
+         (slot (find slot-name slots :key #'dsd-name :test #'string=))
+         (word-index (+ instance-slots-offset (dsd-index slot))))
+    `(ea ,(- (ash word-index word-shift) instance-pointer-lowtag)
+         ,base-reg)))

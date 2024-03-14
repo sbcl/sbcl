@@ -297,3 +297,19 @@
       ;; store newval into object
       (inst mov (ea (- other-pointer-lowtag) rdi rdx n-word-bytes) rax)))
   (inst ret 24)) ; remove 3 stack args
+
+(define-assembly-routine (mutex-wake-waiter (:return-style :raw)) ()
+  (with-registers-preserved (lisp)
+    (inst call (make-fixup "lispmutex_wake_waiter" :foreign)))) ; no args!
+
+(define-assembly-routine (mutex-unlock (:return-style :raw)) ()
+  ;; There are no registers reserved for this asm routine
+  (inst push rax-tn)
+  (inst mov rax-tn (thread-tls-ea (load-time-tls-offset '*current-mutex*)))
+  (inst mov :qword (mutex-slot rax-tn %owner) 0)
+  (inst dec :lock :byte (mutex-slot rax-tn state))
+  (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
+  (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
+  uncontested
+  (inst pop rax-tn))
+

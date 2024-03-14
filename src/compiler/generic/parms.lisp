@@ -207,6 +207,7 @@
        *pinned-objects*
        (*gc-pin-code-pages* 0)
        ;; things needed for non-local-exit
+       (*current-mutex* 0)
        (*current-catch-block* 0)
        (*current-unwind-protect-block* 0)))
   #'equal)

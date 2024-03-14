@@ -811,6 +811,32 @@ returns NIL each time."
       (declare (dynamic-extent #'cas))
       (%%wait-for #'cas stop-sec stop-usec)))))
 
+#+ultrafutex
+(progn
+(declaim (inline fast-futex-wait))
+(defun fast-futex-wait (word-addr oldval to-sec to-usec)
+  (with-alien ((%wait (function int unsigned
+                                #+freebsd unsigned #-freebsd (unsigned 32)
+                                long unsigned-long)
+                      :extern "futex_wait"))
+    (alien-funcall %wait word-addr oldval to-sec to-usec)))
+(declaim (sb-ext:maybe-inline %wait-for-mutex-algorithm-3))
+(defun %wait-for-mutex-algorithm-3 (mutex)
+  #+nil ; in case I want to count calls to this function
+  (let ((sap (int-sap (thread-primitive-thread *current-thread*)))
+        (disp (ash sb-vm::thread-slow-path-allocs-slot sb-vm:word-shift)))
+    (incf (sap-ref-word sap disp)))
+  (symbol-macrolet ((val (mutex-state mutex)))
+    (let* ((mutex (sb-ext:truly-the mutex mutex))
+           (c (sb-ext:cas val 0 1))) ; available -> taken
+      (unless (= c 0) ; Got it right off the bat?
+        (unless (= c 2)
+          (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2)))
+        (loop while (/= c 0)
+              do (with-pinned-objects (mutex)
+                   (fast-futex-wait (mutex-state-address mutex) 2 -1 0))
+                 (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2))))))))
+
 #+mutex-benchmarks
 (symbol-macrolet ((val (mutex-state mutex)))
   (export '(wait-for-mutex-algorithm-2
@@ -820,15 +846,6 @@ returns NIL each time."
   (declaim (sb-ext:maybe-inline %wait-for-mutex-algorithm-2
                                 %wait-for-mutex-algorithm-3))
   (sb-ext:define-load-time-global *grab-mutex-calls-performed* 0)
-  ;; Like futex-wait but without garbage having to do with re-invoking
-  ;; a wake on account of async unwind while releasing the mutex.
-  (declaim (inline fast-futex-wait))
-  (defun fast-futex-wait (word-addr oldval to-sec to-usec)
-    (with-alien ((%wait (function int unsigned
-                                  #+freebsd unsigned #-freebsd (unsigned 32)
-                                  long unsigned-long)
-                        :extern "futex_wait"))
-      (alien-funcall %wait word-addr oldval to-sec to-usec)))
 
   (defun %wait-for-mutex-algorithm-2 (mutex)
     (incf *grab-mutex-calls-performed*)
@@ -842,17 +859,6 @@ returns NIL each time."
               (fast-futex-wait (mutex-state-address mutex) 2 -1 0)))
           ;; Try to get it, still marking it as contested.
           (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)))))) ; win
-  (defun %wait-for-mutex-algorithm-3 (mutex)
-    (incf *grab-mutex-calls-performed*)
-    (let* ((mutex (sb-ext:truly-the mutex mutex))
-           (c (sb-ext:cas val 0 1))) ; available -> taken
-      (unless (= c 0) ; Got it right off the bat?
-        (unless (= c 2)
-          (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2)))
-        (loop while (/= c 0)
-              do (with-pinned-objects (mutex)
-                   (fast-futex-wait (mutex-state-address mutex) 2 -1 0))
-                 (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2))))))
 
   (defun wait-for-mutex-algorithm-2 (mutex)
     (declare (inline %wait-for-mutex-algorithm-2))

@@ -145,6 +145,24 @@ HOLDING-MUTEX-P."
                     (barrier (:write)))))
                (exec)))))))
 
+;;; Ultra-fast futex.
+;;; TODO: decide on a good way to expose ultrafutex.  Maybe a lexenv policy
+;;; that alters WITH-MUTEX to expand using partial inlined algorithm 3
+;;; provided that none of the keyword args were supplied.
+;;; For the time being I am restricting it by a feature.
+(defvar sb-vm::*current-mutex*)
+#+ultrafutex
+(progn
+(export 'with-ultrafutex)
+(defmacro with-ultrafutex ((mutex) &body body)
+  `(let ((m (the mutex ,mutex)))
+     (unless (sb-vm::quick-try-mutex m)
+       (%wait-for-mutex-algorithm-3 m))
+     ;; unbinding the special = releasing the mutex
+     (let ((sb-vm::*current-mutex* m))
+       (setf (mutex-%owner m) (current-vmthread-id))
+       ,@body))))
+
 (defmacro with-mutex ((mutex &key (wait-p t) timeout (value nil valuep))
                             &body body)
   "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
@@ -163,6 +181,11 @@ Historically WITH-MUTEX also accepted a VALUE argument, which when provided
 was used as the new owner of the mutex instead of the current thread. This is
 no longer supported: if VALUE is provided, it must be either NIL or the
 current thread."
+
+  #+ultrafutex
+  (when (and (eq wait-p t) (not timeout))
+    (return-from with-mutex `(with-ultrafutex (,mutex) ,@body)))
+
   `(dx-flet ((with-mutex-thunk () ,@body))
      (call-with-mutex
       #'with-mutex-thunk
@@ -266,6 +289,16 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (defun call-with-recursive-lock (function mutex waitp timeout)
     (declare (function function))
     (declare (dynamic-extent function))
+    ;; If you want ultrafast futexes, then you surely don't want the rigmarole
+    ;; associated with enabling and disabling interrupts.
+    ;; Shame on you if you both enable #+ultrafutex and call INTERRUPT-THREAD in
+    ;; production, when INTERRUPT-THREAD's docstring literally says don't.
+    #+ultrafutex
+    (when (and waitp (null timeout))
+      (return-from call-with-recursive-lock
+        (if (holding-mutex-p mutex)
+            (funcall function)
+            (with-ultrafutex (mutex) (funcall function)))))
     (let ((had-it (holding-mutex-p mutex))
           (got-it nil))
       (without-interrupts
