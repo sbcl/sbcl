@@ -173,6 +173,11 @@
       (setf (flonum-%value flonum) value))
     flonum))
 
+(defun flonum-from-rational (rational format)
+  (ecase format
+    (single-float (make-flonum (%single-bits-from-rational rational) format))
+    (double-float (make-flonum (%double-bits-from-rational rational) format))))
+
 (defun make-single-float (bits)
   (declare (type (signed-byte 32) bits))
   (make-flonum bits 'single-float))
@@ -402,10 +407,7 @@
                 (ecase format
                   (single-float (values (make-flonum :minus-zero 'single-float) (length string)))
                   (double-float (values (make-flonum :minus-zero 'double-float) (length string))))
-                (let ((result
-                        (ecase format
-                          (single-float (make-flonum (%single-bits-from-rational rational) 'single-float))
-                          (double-float (make-flonum (%double-bits-from-rational rational) 'double-float)))))
+                (let ((result (flonum-from-rational rational format)))
                   (values result (length string))))))
       (declare (ignore nchars))
       flonum)))
@@ -594,12 +596,8 @@
             (let ((actual-type (if (member type '(double-float long-float))
                                    'double-float
                                    'single-float))
-                  (source-value (realnumify object)))
-              (make-flonum (cl:coerce source-value
-                                      (ecase actual-type
-                                        (single-float 'cl:single-float)
-                                        (double-float 'cl:double-float)))
-                           actual-type)))
+                  (source-value (rational object)))
+              (flonum-from-rational source-value actual-type)))
         (error "Can't COERCE ~S ~S" object type))))
 
 (macrolet ((define (name)
