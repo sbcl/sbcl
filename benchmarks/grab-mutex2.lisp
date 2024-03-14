@@ -67,7 +67,7 @@
 
 (defun compute-speed-ratio (n-threads count)
   (let ((et-normal (normal-way *mutex* n-threads count))
-        (et-system (system-way *mutex* n-threads count))
+        (et-system (system-mutex-way *mutex* n-threads count))
         (et-ultrafast (ultrafast-way *mutex* n-threads count)))
     (format t "Ratios=~F and ~F~%"
             (/ et-normal et-ultrafast)
