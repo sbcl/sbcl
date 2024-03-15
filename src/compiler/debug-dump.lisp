@@ -836,7 +836,7 @@
                (or (and (not (cdr entries))
                         (sb-c::entry-info-name (car entries)))
                    (component-name component)))
-       :package (sb-xc:package-name *package*)
+       :package *package*
        :fun-map fun-map
        :contexts (compact-vector *contexts*)))))
 

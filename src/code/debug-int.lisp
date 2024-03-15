@@ -188,9 +188,9 @@
                       (:copier nil))
   ;; string name of the variable.
   (name (missing-arg) :type simple-string)
-  ;; string name of package. NIL when the variable's name is
+  ;; package containing the variable. NIL when the variable's name is
   ;; uninterned.
-  (package nil :type (or null simple-string))
+  (package nil :type (or null package))
   ;; a unique integer identification relative to other variables with the same
   ;; symbol
   (id 0 :type index :read-only t)
@@ -200,7 +200,7 @@
   (print-unreadable-object (debug-var stream :type t :identity t)
     (format stream
             "~A:~A ~W"
-            (debug-var-package debug-var)
+            (sb-xc:package-name (debug-var-package debug-var))
             (debug-var-name debug-var)
             (debug-var-id debug-var))))
 
@@ -1549,11 +1549,11 @@ register."
                       (sb-xc:package-name (sb-xc:symbol-package symbol)))))
     (delete-if (if (stringp package)
                    (lambda (var)
-                     (let ((p (debug-var-package var)))
+                     (let ((p (sb-xc:package-name (debug-var-package var))))
                        (or (not (stringp p))
                            (string/= p package))))
                    (lambda (var)
-                     (stringp (debug-var-package var))))
+                     (stringp (sb-xc:package-name (debug-var-package var)))))
                vars)))
 
 ;;; Return a list of DEBUG-VARs in DEBUG-FUN whose names contain
@@ -1946,7 +1946,7 @@ register."
                           (minimal default-package)
                           ((logtest sb-c::compiled-debug-var-packaged
                                     flags)
-                           (sb-c::read-var-string packed-vars i))
+                           (find-package (sb-c::read-var-string packed-vars i)))
                           ((logtest sb-c::compiled-debug-var-uninterned
                                     flags)
                            nil)
@@ -2282,8 +2282,7 @@ register."
 
 ;;;; operations on debug variables
 
-;;; Return the symbol from interning DEBUG-VAR-NAME in the package
-;;; named by DEBUG-VAR-PACKAGE.
+;;; Return the symbol from interning DEBUG-VAR-NAME in the package DEBUG-VAR-PACKAGE.
 (defun debug-var-symbol (debug-var)
   (let ((package (debug-var-package debug-var)))
     (if package

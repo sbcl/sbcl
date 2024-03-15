@@ -398,9 +398,9 @@
              (:include debug-info)
              (:copier nil)
              (:pure t))
-  ;; The name of the package that DEBUG-FUN-VARS were dumped relative
+  ;; The package that DEBUG-FUN-VARS were dumped relative
   ;; to. Locations that aren't packaged are in this package.
-  (package (missing-arg) :type simple-string)
+  (package (missing-arg) :type package)
   ;; COMPILED-DEBUG-FUNs linked through COMPILED-DEBUG-FUN-NEXT
   (fun-map (missing-arg) :type compiled-debug-fun)
   ;; Location contexts
