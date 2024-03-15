@@ -124,8 +124,7 @@ sb-kernel::
                              (float (eql x y))
                              (string (string= x y)))))
                   (unless (eqal actual result)
-                    (#+sb-devel-xfloat cerror #+sb-devel-xfloat ""
-                     #-sb-devel-xfloat format #-sb-devel-xfloat t
+                    (cerror "Continue"
                      "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
                      expr actual)))))))))))
 
