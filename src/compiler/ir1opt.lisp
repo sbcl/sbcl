@@ -467,6 +467,10 @@
                       (flush-dest (if-test last))
                       (when (unlink-node last)
                         (return)))
+                     (jump-table
+                      (flush-dest (jump-table-index last))
+                      (when (unlink-node last)
+                        (return)))
                      (exit
                       (when (maybe-delete-exit last)
                         (return)))))

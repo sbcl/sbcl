@@ -1476,7 +1476,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 
 
            "BRANCH-IF" "MULTIWAY-BRANCH-IF-EQ"
-           "JUMP-TABLE"
+           "JUMP-TABLE" "CASE-TO-JUMP-TABLE"
            ;; for SB-COVER
 
            "*CODE-COVERAGE-INFO*" "CODE-COVERAGE-RECORD-MARKED"

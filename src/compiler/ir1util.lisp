@@ -1346,6 +1346,14 @@
            (when (eq (if-consequent last)
                      (if-alternative last))
              (reoptimize-component (block-component block) t)))))
+      (jump-table
+       (setf (jump-table-targets last)
+             (loop for (index . target) in (jump-table-targets last)
+                   collect (cons index (if (eq target old)
+                                           new
+                                           target))))
+       (unless (memq new (block-succ block))
+         (link-blocks block new)))
       (t
        (unless (memq new (block-succ block))
          (link-blocks block new)))))
@@ -1907,6 +1915,7 @@
     (etypecase node
       (ref (delete-ref node))
       (cif (flush-dest (if-test node)))
+      (jump-table (flush-dest (jump-table-index node)))
       ;; The next two cases serve to maintain the invariant that a LET
       ;; always has a well-formed COMBINATION, REF and BIND. We delete
       ;; the lambda whenever we delete any of these, but we must be

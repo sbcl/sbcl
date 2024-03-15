@@ -155,11 +155,18 @@
   (def fast-if-eq-unsigned fast-if-eql/unsigned 5))
 
 (define-vop (jump-table)
-  (:args (index :scs (any-reg descriptor-reg)))
-  (:info targets)
+  (:args (index :scs (any-reg descriptor-reg) :target offset))
+  (:info targets otherwise min max)
   (:temporary (:sc unsigned-reg) table)
+  (:temporary (:sc any-reg :from (:argument 0)) offset)
   (:generator 0
     (inst adr table (cdr (register-inline-constant :jump-table (coerce targets 'vector))))
+    (unless (zerop min)
+      (inst sub offset index (add-sub-immediate (fixnumize min)))
+      (setf index offset))
+    (when otherwise
+      (inst cmp index (add-sub-immediate (fixnumize (- max min))))
+      (inst b :hi otherwise))
     (inst add table table (lsl index 2))
     (inst ldr table (@ table))
     (inst br table)))

@@ -1064,4 +1064,3 @@
   (funcall
    (compile nil
             `(lambda () (sb-kernel:%make-funcallable-instance ,n)))))
-

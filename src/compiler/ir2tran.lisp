@@ -698,13 +698,29 @@
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
                              test-ref () node t)))
 
+(defun prepare-jump-table-targets (index targets)
+  (let* ((otherwise (assoc 'otherwise targets))
+         (targets (sort (remove otherwise targets) #'< :key #'car))
+         (min (caar targets))
+         (max (caar (last targets)))
+         (otherwise (and otherwise
+                         (block-label (cdr otherwise))))
+         (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+    (loop for (index . target) in targets
+          do (setf (aref vector (- index min)) (block-label target)))
+    (list vector (cond ((csubtypep (lvar-type index) (specifier-type `(integer ,min ,max)))
+                        (aver (not (position otherwise vector))))
+                       (otherwise)
+                       (t
+                        (bug "Fall through")))
+          min max)))
+
 (defun ir2-convert-jump-table (node block)
   (declare (type ir2-block block) (type jump-table node))
   (let ((index (jump-table-index node)))
     (emit-template node block (template-or-lose 'jump-table)
                    (reference-tn (lvar-tn node block index) nil)
-                   nil (list (loop for target in (jump-table-targets node)
-                                   collect (block-label target))))))
+                   nil (prepare-jump-table-targets index (jump-table-targets node)))))
 
 ;;; Return a list of types that we can pass to LVAR-RESULT-TNS
 ;;; describing the result types we want for a template call. We are really

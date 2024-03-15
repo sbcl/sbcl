@@ -458,6 +458,7 @@
 ;;; FIXME: maybe we don't need this one any more, given that
 ;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?
 (define-walker-template named-lambda walk-named-lambda)
+(define-walker-template sb-c::jump-table (nil eval repeat ((quote repeat (eval)))))
 #|
 ;;; To find templateized symbols that aren't special operators:
 (do-all-symbols (s)

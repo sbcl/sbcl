@@ -462,7 +462,7 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                 adjust_word_at(fdefns_start+i, adj);
 #endif
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || \
-    defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
+    defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64
             // Fixup absolute jump table
             lispobj* jump_table = code_jumptable_start(code);
             int count = jumptable_count(jump_table);

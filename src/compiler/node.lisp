@@ -1502,10 +1502,10 @@
   alternative)
 
 (defstruct (jump-table (:include multiple-successors-node)
+                       (:constructor make-jump-table (index))
                        (:copier nil))
   (index (missing-arg) :type lvar)
-  (targets nil :type list)
-  (target-constraints nil))
+  (targets nil :type list))
 
 (defprinter (jump-table :identity t)
   index

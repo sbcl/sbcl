@@ -158,3 +158,7 @@ compiled with this declaration in effect.")
 (define-optimization-quality store-closure-debug-pointer
     0
   ("no" "no" "yes" "yes"))
+
+(define-optimization-quality jump-table
+    3
+  ("no" "no" "no" "yes"))

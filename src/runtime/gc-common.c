@@ -385,7 +385,7 @@ trans_code(struct code *code)
     sword_t displacement = l_new_code - l_code;
 
 #if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || \
-    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
     // Fixup absolute jump tables. These aren't recorded in code->fixups
     // because we don't need to denote an arbitrary set of places in the code.
     // The count alone suffices. A GC immediately after creating the code

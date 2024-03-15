@@ -9,8 +9,9 @@
   (let ((evaluator-expansion
          (macroexpand-1 '(case x (a 1) (b 2) (c (print'hi)) (d 3))))
         (compiler-expansion
-         (macroexpand-1 '(case x (a 1) (b 2) (c (print'hi)) (d 3))
-                        (sb-kernel:make-null-lexenv))))
+          (funcall (compile nil `(lambda ()
+                                   (macrolet ((x (x) `',(macroexpand-1 x)))
+                                     (x (case x (a 1) (b 2) (c (print'hi)) (d 3)))))))))
     (assert (eq (car (fourth evaluator-expansion)) 'cond))
     (when (gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-parsed-vops*)
       (assert (eq (car compiler-expansion) 'let*)))))

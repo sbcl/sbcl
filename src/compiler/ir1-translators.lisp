@@ -67,7 +67,7 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
   (aver targets)
   (let* ((index-ctran (make-ctran))
          (index-lvar (make-lvar))
-         (node (make-jump-table :index index-lvar)))
+         (node (make-jump-table index-lvar)))
     (setf (lvar-dest index-lvar) node)
     (ir1-convert start index-ctran index-lvar index)
     (link-node-to-previous-ctran node index-ctran)
@@ -76,13 +76,41 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
       (setf (block-last start-block) node)
       (ctran-starts-block next)
       (setf (jump-table-targets node)
-            (loop for target in targets
+            (loop for (index . target) in targets
                   for ctran = (make-ctran)
                   for block = (ctran-starts-block ctran)
                   do
-                  (ir1-convert ctran next result target)
+                  (ir1-convert-progn-body ctran next result target)
                   (link-blocks start-block block)
-                  collect block)))))
+                  collect (cons index block))))))
+
+;;; then or else can be already converted blocks
+(def-ir1-translator if-to-blocks ((test then &optional else) start next result)
+  (flet ((to-block (x)
+           (if (block-p x)
+               (values nil x)
+               (let ((ctran (make-ctran)))
+                 (values ctran (ctran-starts-block ctran))))))
+    (multiple-value-bind (then-ctran then-block) (to-block then)
+      (multiple-value-bind (else-ctran else-block) (to-block else)
+        (let* ((pred-ctran (make-ctran))
+               (pred-lvar (make-lvar))
+               (node (make-if :test pred-lvar
+                              :consequent then-block
+                              :alternative else-block)))
+          (setf (lvar-dest pred-lvar) node)
+          (ir1-convert start pred-ctran pred-lvar test)
+          (link-node-to-previous-ctran node pred-ctran)
+
+          (let ((start-block (ctran-block pred-ctran)))
+            (setf (block-last start-block) node)
+            (ctran-starts-block next)
+            (link-blocks start-block then-block)
+            (link-blocks start-block else-block))
+          (when then-ctran
+            (ir1-convert then-ctran next result then))
+          (when else-ctran
+            (ir1-convert else-ctran next result else)))))))
 
 ;;; To get even remotely sensible results for branch coverage
 ;;; tracking, we need good source paths. If the macroexpansions
@@ -1204,7 +1232,7 @@ care."
       (info :function :macro-function 'with-source-form)
       (lambda (whole env)
         (declare (ignore env))
-                `(progn ,@(cddr whole))))
+        `(progn ,@(cddr whole))))
 
 ;;;; SETQ
 

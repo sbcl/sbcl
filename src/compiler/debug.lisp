@@ -1045,8 +1045,9 @@
           (jump-table
            (write-string "jump-table ")
            (print-lvar (jump-table-index node))
-           (loop for target in (jump-table-targets node)
-                 do  (print-ctran (block-start target))))
+           (loop for (index . target) in (jump-table-targets node)
+                 do (format t "~a>" index)
+                    (print-ctran (block-start target))))
           (bind
            (write-string "bind ")
            (print-leaf (bind-lambda node))
