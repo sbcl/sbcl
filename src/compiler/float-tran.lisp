@@ -1984,6 +1984,28 @@
     (deftransform %unary-fround ((x) (double-float))
       `(%unary-fround/double x))))
 
+#+round-float
+(deftransform fround ((number &optional divisor) (double-float &optional t))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-double number :round)))
+         (values res (- number res)))
+      `(let* ((divisor (%double-float divisor))
+              (res (round-double (/ number (%double-float divisor)) :round)))
+         (values res (- number (* res divisor))))))
+
+#+round-float
+(deftransform fround ((number &optional divisor) (single-float &optional (or null single-float rational)))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-single number :round)))
+         (values res (- number res)))
+      `(let* ((divisor (%single-float divisor))
+              (res (round-single (/ number divisor) :round)))
+         (values res (- number (* res divisor))))))
+
 ;;;; TESTS
 
 ;;; Dumping of double-float literals in genesis got some bits messed up,
@@ -2041,25 +2063,3 @@
                 below (code-header-words code)
                 thereis (typep (code-header-ref code index) 'complex))))
   (fmakunbound 'more-folding))
-
-#+round-float
-(deftransform fround ((number &optional divisor) (double-float &optional t))
-  (if (or (not divisor)
-          (and (constant-lvar-p divisor)
-               (= (lvar-value divisor) 1)))
-      `(let ((res (round-double number :round)))
-         (values res (- number res)))
-      `(let* ((divisor (%double-float divisor))
-              (res (round-double (/ number (%double-float divisor)) :round)))
-         (values res (- number (* res divisor))))))
-
-#+round-float
-(deftransform fround ((number &optional divisor) (single-float &optional (or null single-float rational)))
-  (if (or (not divisor)
-          (and (constant-lvar-p divisor)
-               (= (lvar-value divisor) 1)))
-      `(let ((res (round-single number :round)))
-         (values res (- number res)))
-      `(let* ((divisor (%single-float divisor))
-              (res (round-single (/ number divisor) :round)))
-         (values res (- number (* res divisor))))))

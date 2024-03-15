@@ -165,7 +165,7 @@
 (defparameter *shadows*
   '("FLOAT" "SHORT-FLOAT" "SINGLE-FLOAT" "DOUBLE-FLOAT" "LONG-FLOAT"
     "REAL" "COMPLEX" "NUMBER"
-    ;; "RATIONAL" is here for the same reason are the preceding:
+    ;; "RATIONAL" is here for the same reason as the preceding:
     ;; we don't want to mess up all tests of the form (IF (EQ X 'RATIONAL) ...)
     ;; or worry about the package of the symbol we're testing (since identity matters).
     ;; But we also need to logically shadow #'RATIONAL which would not be legal

@@ -57,34 +57,6 @@
     (output-part (complexnum-imag self) stream)
     (write-char #\) stream)))
 
-(defun compute-mantissa (significand exponent nbits)
-  (flet ((show-bits ()
-           #+nil
-           (format t "~&shift: ~b ~d ~s~%"
-                   significand
-                   exponent
-                   (if (minusp exponent)
-                       (/ (cl:coerce significand 'cl:long-float) (ash 1 (- exponent)))
-                       (* (cl:coerce significand 'cl:long-float) (ash 1 exponent))))))
-    (show-bits)
-    (let ((shift-out 0))
-      (loop while (> (integer-length significand) nbits)
-            do (setq shift-out (logand significand 1)
-                     significand (ash significand -1)
-                     exponent (1+ exponent))
-               (show-bits))
-      (when (= shift-out 1)
-        ;; Rounding is complicated. Thankfully I can cross-check the answer.
-        (incf significand)
-        (when (> (integer-length significand) nbits) ; Shift once moe
-          (setq significand (ash significand -1)
-                exponent (1+ exponent))))
-      ;; - unset the implied 1 bit of the mantissa.
-      ;; - move the binary point. CL's notion of the point is to the right
-      ;;   of the LSB, but IEEE format has it to the left of the MSB.
-      (values (cl:ldb (cl:byte (1- nbits) 0) significand)
-              (+ exponent (1- nbits))))))
-
 #+host-quirks-sbcl
 (defun get-float-bits (x)
   (etypecase x
@@ -96,59 +68,24 @@
     (cl:single-float
      (host-sb-kernel:single-float-bits x))))
 
-;;; Convert host float X to target representation.
+;;; Convert flonum exceptional symbols to target representation.
 ;;; TOTAL-BITS is the size in bits.
 ;;; PRECISION includes the hidden bit.
-;;; The exceptional symbols for X are acceptable.
 (defun float-to-bits (x total-bits precision)
-  (when (and (cl:floatp x) (cl:= x 0))
-    (return-from float-to-bits 0))
   (flet ((set-sign (sign unsigned-result) ; SIGN is -1 or 0
            (logior (ash sign (1- total-bits)) unsigned-result)))
     ;; The sign consumes 1 bit, but the significand has 1 hidden bit,
     ;; so it nets out the same in terms of how many remain for the exponent.
-    (let* ((exponent-bits (- total-bits precision))
-           (exp-max (1- (ash 1 (1- exponent-bits))))
-           (exp-min (cl:- (1- exp-max))))
-      (when (symbolp x)
-        (return-from float-to-bits
-          (ecase x
-            ((:-infinity :+infinity)
-             (set-sign (if (eq x :-infinity) -1 0)
-                       (ash (1- (ash 1 exponent-bits)) ; all 1s
-                            ;; shift left by the number of represented
-                            ;; significand bits. i.e. exclude the hidden bit.
-                            (1- precision))))
-            (:minus-zero
-             (set-sign -1 0)))))
-      (assert (cl:= (cl:float-radix x) 2))
-      ;; If the proxy object (the host's floating-point number) does not have
-      ;; at least the number of bits we need, conversion to bits will fail.
-      ;; Though that's not strictly true - we might get away with less precision
-      ;; in the host for certain values - this is the easiest thing to assert.
-      (assert (cl:>= (cl:float-precision x) precision))
-      (multiple-value-bind (host-significand host-exponent sign)
-          (cl:integer-decode-float x)
-        (multiple-value-bind (target-significand target-exponent)
-            (compute-mantissa host-significand host-exponent precision)
-          (assert (cl:<= exp-min target-exponent exp-max)) ; exponent range
-          (let ((answer (set-sign (if (minusp sign) -1 0)
-                                  (logior (ash (cl:+ target-exponent exp-max) ; exp.bias = Emax
-                                               (1- precision))
-                                          target-significand))))
-            ;; When self-hosted we can cross-check against the authoritative answer
-            ;; assuming the host doesn't have a counteracting bug.
-            #+host-quirks-sbcl
-            (let ((authoritative-answer
-                   (get-float-bits (ecase total-bits
-                                    (32 (cl:coerce x 'cl:single-float))
-                                    (64 (cl:coerce x 'cl:double-float))))))
-              (unless (= answer authoritative-answer)
-                (error "discrepancy in float-bits ~s:~% ~v,'0b expect~% ~v,'0b got~%"
-                       x
-                       total-bits (cl:ldb (cl:byte total-bits 0) authoritative-answer)
-                       total-bits (cl:ldb (cl:byte total-bits 0) answer))))
-            answer))))))
+    (let* ((exponent-bits (- total-bits precision)))
+      (ecase x
+        ((:-infinity :+infinity)
+         (set-sign (if (eq x :-infinity) -1 0)
+                   (ash (1- (ash 1 exponent-bits)) ; all 1s
+                        ;; shift left by the number of represented
+                        ;; significand bits. i.e. exclude the hidden bit.
+                        (1- precision))))
+        (:minus-zero
+         (set-sign -1 0))))))
 
 ;;; To ensure that target numbers compare by EQL correctly under the host's
 ;;; definition of EQL (so that we don't have to intercept it and all else
@@ -163,14 +100,12 @@
                     (single-float (assert (typep value '(signed-byte 32))))
                     (double-float (assert (typep value '(signed-byte 64)))))
                   value)
-                 ((or cl:float keyword)
+                 (keyword
                   (ecase format
                     (single-float (float-to-bits value 32 24))
                     (double-float (float-to-bits value 64 53))))))
          (flonum (ensure-gethash (cons bits format) *interned-numbers*
                                  (%make-flonum bits format))))
-    (unless (integerp value)
-      (setf (flonum-%value flonum) value))
     flonum))
 
 (defun flonum-from-rational (rational format)
@@ -196,11 +131,9 @@
 
 ;;; Preload the interned flonum table
 (dolist (format '(single-float double-float))
-  (let ((x (make-flonum 0 format)))
-    (setf (flonum-%value x) (cl:coerce 0 (intern (string format) "CL"))))
+  (make-flonum 0 format)
   (let ((sign (ash -1 (1- (float-format-bits format)))))
-    (let ((x (make-flonum sign format)))
-      (setf (flonum-%value x) :minus-zero)))
+    (make-flonum sign format))
   (make-flonum :+infinity format)
   (make-flonum :-infinity format))
 
@@ -241,8 +174,7 @@
                                        (native-flonum-value value)
                                        value))
                                  values))
-            (#+sb-devel-xfloat cerror #+sb-devel-xfloat "Ignore"
-             #-sb-devel-xfloat format #-sb-devel-xfloat t
+            (format t
              "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
              key values
@@ -434,80 +366,6 @@
 (defun float-sign-bit-set-p (float)
   (declare (type float float))
   (= (float-sign-bit float) 1))
-
-(defun calculate-flonum-value (x &optional (nan-errorp t) &aux (bits (flonum-%bits x)))
-  ;; Convert the bits of a target float to an object with which we can perform
-  ;; arithmetic in the host.  This will of course be an IEEE-standard float,
-  ;; constructed using only standard functions.
-  ;; When self-hosted, cross-check the result against the authoritative answer.
-  (flet ((bits-to-float (bits format-nbits precision host-type
-                         &aux (mantissa-nbits (1- precision))) ; less the hidden bit
-           (let* ((exp-nbits (- format-nbits mantissa-nbits 1))
-                  (max-exp   (1- (ash 1 exp-nbits)))
-                  (exp       (cl:ldb (cl:byte exp-nbits mantissa-nbits) bits))
-                  (mantissa  (cl:ldb (cl:byte mantissa-nbits 0) bits)))
-             (when (= exp max-exp) ; infinity or NaN
-               (if (and (= exp max-exp) (not (zerop mantissa)) (not nan-errorp))
-                   (return-from calculate-flonum-value :nan)
-                   (error "Can't cast bits to float: ~x" bits)))
-             (when (= exp 0) ; denormal or 0
-               (decf exp (+ (cl:floor max-exp 2) (1- mantissa-nbits)))
-               (let ((value (cl:scale-float (cl:coerce mantissa host-type) exp)))
-                 (return-from calculate-flonum-value
-                   (if (logbitp (1- format-nbits) bits) (cl:- value) value))))
-             (let ((mantissa (logior (ash 1 mantissa-nbits) ; hidden bit
-                                     mantissa)))
-               ;; Subtract the exponent bias and account for discrepancy in binary
-               ;; point placement in the IEEE representation and the CL function
-               (decf exp (+ (cl:floor max-exp 2) mantissa-nbits))
-               (let ((value (cl:scale-float (cl:coerce mantissa host-type) exp)))
-                 (if (logbitp (1- format-nbits) bits) (cl:- value) value))))))
-    (ecase (flonum-format x)
-      (single-float
-       (let ((value (bits-to-float bits 32 24 'cl:single-float)))
-         #+host-quirks-sbcl ; check with EQL, not =, to ensure same type and value
-         (assert (eql (host-sb-kernel:make-single-float bits) value))
-         value))
-      (double-float
-       (let ((value (bits-to-float bits 64 53 'cl:double-float)))
-         #+host-quirks-sbcl ; ditto
-         (assert (eql (host-sb-kernel:make-double-float
-                       (ash bits -32) (cl:ldb (cl:byte 32 0) bits))
-                      value))
-         value)))))
-
-;;; Cast target number to a host real number.
-;;; HOST-REALIZE sounds like it would be a cute name for this, but it's too cute.
-(declaim (inline realnumify realnumify* collapse-zeros))
-
-;;; Turn X into a number that the host can operate on.
-;;; Works on rationals and "uninteresting" floats.
-(defun realnumify (x)
-  (cond ((rationalp x) x)
-        ((floatp x)
-         (let ((value (flonum-%value x)))
-           (cond ((cl:floatp value) value)
-                 ((null value) ; must not be one of the exceptional symbols
-                  (setf (flonum-%value x) (calculate-flonum-value x)))
-                 (t ; infinity or minus-zero
-                  (error "~S (~D) has no portable value" value x)))))
-        (t (error "Got host float"))))
-
-(defun realnumify* (args) (mapcar #'realnumify args))
-
-(defun collapse-zeros (a b)
-  (values (if (zerop a) 0 (realnumify a))
-          (if (zerop b) 0 (realnumify b))))
-
-;;; Use these predicate to guard operations that we wish to implement
-;;; but for which full support for signed zeros and infinities is incomplete.
-(declaim (inline operable-float-p inoperable-float-p operable-num-p))
-(defun operable-float-p (x)
-  (and (floatp x) (cl:floatp (flonum-%value x))))
-(defun inoperable-float-p (x)
-  (and (floatp x) (not (cl:floatp (flonum-%value x)))))
-(defun operable-num-p (arg)
-  (or (rationalp arg) (operable-float-p arg)))
 
 (defun pick-result-format (&rest args)
   (flet ((target-num-fmt (num)
@@ -794,7 +652,6 @@
   (validate-args f)
   (scale-float f ex))
 
-;;;;
 (defun float-infinity-p (flonum)
   (typecase flonum
     (single-float
@@ -1022,13 +879,6 @@
 (defconstant most-positive-long-float most-positive-double-float)
 (defconstant most-negative-long-float most-negative-double-float)
 
-(defun substitute-minus-zero (list)
-  (substitute $0.0d0
-              (make-flonum :minus-zero 'double-float)
-              (substitute $0.0f0
-                          (make-flonum :minus-zero 'single-float)
-                          list)))
-
 (macrolet ((def (name lambda-list)
              `(defun ,(intern (string name) "SB-XC") ,lambda-list
                 (declare (ignorable ,@lambda-list))
@@ -1072,11 +922,9 @@
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
   (with-memoized-math-op (log (cons number (if base-p (list base))))
-    (let ((format (pick-result-format number (if base-p base 0))))
+    (let ((format (pick-float-result-format number (if base-p base 0))))
       (if (zerop number)
-          (make-flonum :-infinity (if (eq format 'rational)
-                                      'single-float
-                                      format))
+          (make-flonum :-infinity format)
           (ecase base
             ((nil)
              (let ((table '((1 . $0f0)
@@ -1111,36 +959,6 @@
              (let ((table '(($2d0 . $0.3010299956639812d0))))
                (or (cdr (assoc number table))
                    (error "missing entry for (LOG ~A 10)" number)))))))))
-
-(macrolet ((intercept (symbols lambda-list body-form)
-             `(progn ,@(mapcar (lambda (symbol)
-                                 `(defun ,(intern (string symbol) "SB-XC") ,lambda-list
-                                    (declare (dynamic-extent args))
-                                    ,(subst (intern (string symbol) "CL") :me body-form)))
-                               symbols)))
-           (dispatch (f irrational)
-             `(if (every #'rationalp args)
-                  (apply #',f args)
-                  (with-memoized-math-op (,f args) ,irrational)))
-           (dispatch-float (f irrational)
-             `(with-memoized-math-op (,f args) ,irrational))
-           (flonums-eql-p ()
-             `(let ((x (car args)) (y (cadr args)))
-                (and (floatp x) (floatp y) (eql (flonum-%bits x) (flonum-%bits y)))))
-           (two-zeros-p ()
-             `(and (eql nargs 2) (zerop (car args)) (zerop (cadr args))))
-           (same-sign-infinities-p ()
-             `(and (eql nargs 2)
-                   (floatp (car args))
-                   (floatp (cadr args))
-                   (member (flonum-%value (car args)) '(:-infinity :+infinity))
-                   (eq (flonum-%value (cadr args)) (flonum-%value (car args)))))
-           (infinity-p (n kind)
-             `(let ((arg (nth ,n args)))
-                (and (floatp arg)
-                     (eq (flonum-%value arg) ,kind)))))
-
-) ; end MACROLET
 
 ;;; The full logic of MAYBE-EXACT-RECIPROCAL is defined in 'float-tran'
 ;;; but we don't want to use that in the cross-compiler (yet, if ever)

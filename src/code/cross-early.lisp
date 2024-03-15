@@ -36,9 +36,6 @@
                   (:predicate floatp))
   ;; the bits are canonical as regards hash-consing
   (%bits (error "unspecified %BITS") :type integer :read-only t)
-  ;; the numerical value is used for computation.
-  ;; values that might not be exposed in the host use a symbol instead.
-  (%value nil :type (or null cl:float (member :+infinity :-infinity :minus-zero)))
   ;; SHORT-FLOAT and LONG-FLOAT are not choices here,
   ;; since we're trying to exactly model the supported target float formats.
   (format nil :type (member single-float double-float) :read-only t))
@@ -194,7 +191,7 @@
 (declaim (inline sequencep))
 (defun sequencep (x) (cl:typep x 'sequence))
 
-;;; ZEROP is needer sooner than the rest of the cross-float. (Not sure why exactly)
+;;; ZEROP is needed sooner than the rest of the cross-float. (Not sure why exactly)
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (xfloat-zerop x)))
 
