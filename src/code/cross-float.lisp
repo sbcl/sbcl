@@ -708,23 +708,17 @@
           ((eql x $1.0d0) $2.718281828459045d0))))
 
 (defun expt (base power)
-  (cond ((and (rationalp base) (integerp power))
-         (cl:expt base power))
-        (t
-         (if (zerop power)
-             (coerce 1 (flonum-format base))
-             (with-memoized-math-op (expt (list base power))
-               (cond ((and (eql base $2f0) (eql power 63))
-                      #.(make-flonum #x5F000000 'single-float))
-                     ((and (eql base $2d0) (eql power 63))
-                      #.(make-flonum #x43E0000000000000 'double-float))
-                     ((and (eql base $10d0) (>= power 322))
-                      #.(make-flonum :+infinity 'double-float))
-                     ((and (eql base $10d0) (eql power -309))
-                      #.(make-flonum #xB8157268FDAF 'double-float))
-                     (t
-                      (make-flonum (cl:expt (realnumify base) power)
-                                   (pick-result-format base power)))))))))
+  (cond
+    ((not (integerp power))
+     (error "Unimplemented: EXPT with non-integer power"))
+    ((rationalp base) (cl:expt base power))
+    (t
+     (with-memoized-math-op (expt (list base power))
+       (if (zerop power)
+           (coerce 1 (flonum-format base))
+           (flonum-from-rational
+            (cl:expt (rational base) power)
+            (pick-result-format base power)))))))
 
 (defun %unary-truncate (number)
   (typecase number
