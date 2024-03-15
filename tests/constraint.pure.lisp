@@ -189,16 +189,15 @@
 
 (with-test (:name :type-constraint-joining-terminates)
   (checked-compile
-   sb-c::
    `(lambda (name vop)
       (block foo
-        (do* ((block (vop-block vop) (ir2-block-prev block))
-              (last vop (ir2-block-last-vop block)))
+        (do* ((block (sb-c::vop-block vop) (sb-c::ir2-block-prev block))
+              (last vop (sb-c::ir2-block-last-vop block)))
              (nil)
-          (aver (eq (ir2-block-block block) (ir2-block-block (vop-block vop))))
-          (do ((current last (vop-prev current)))
+          (sb-c::aver (eq (sb-c::ir2-block-block block) (sb-c::ir2-block-block (sb-c::vop-block vop))))
+          (do ((current last (sb-c::vop-prev current)))
               ((null current))
-            (when (eq (vop-name current) name)
+            (when (eq (sb-c::vop-name current) name)
               (return-from foo current))))))))
 
 (with-test (:name :type-constraint-joining-conflicts)
