@@ -755,11 +755,7 @@
 (defun scale-float (f ex)
   (validate-args f)
   (with-memoized-math-op (scale-float (list f ex))
-    (make-flonum (cl:scale-float (let ((val (realnumify f)))
-                                   (assert (cl:floatp val))
-                                   val)
-                                 ex)
-                 (flonum-format f))))
+    (flonum-from-rational (cl:* (rational f) (expt 2 ex)) (flonum-format f))))
 
 (defun scale-single-float (f ex)
   (validate-args f)
