@@ -83,6 +83,23 @@
   (:translate symbol-global-value))
 (define-vop (fast-symbol-global-value fast-symbol-value)
   (:translate symbol-global-value))
+
+(define-vop (symbol-hash)
+  (:policy :fast-safe)
+  (:translate symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 2
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    ;; Clear the 3 highest bits, ensuring the result is positive fixnum
+    (inst bic res res #xE0000000)))
+
+(define-vop (symbol-name-hash symbol-hash)
+  (:translate symbol-name-hash)
+  (:generator 2
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst mov res (lsr res 3)))) ; shift out the 3 pseudorandom bits
 
 ;;;; Fdefinition (fdefn) objects.
 

@@ -122,7 +122,7 @@
   ;; of those sets do NOT have any collisions on SYMBOL-HASH.
   (let ((expectation
          #+64-bit .95
-         #+x86 .70))
+         #-64-bit .70))
     (assert (> (summarize-colliding-hashes nil) expectation))))
 
 (with-test (:name :fast-slot-name-mapper-small)
