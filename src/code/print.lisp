@@ -1762,18 +1762,9 @@ variable: an unreadable object representing the error is printed instead.")
           (let* ((ex (locally (declare (optimize (safety 0)))
                        (the fixnum
                          (round (* exponent
-                                   ;; this is the closest double float
-                                   ;; to (log 2 10), but expressed so
-                                   ;; that we're not vulnerable to the
-                                   ;; host lisp's interpretation of
-                                   ;; arithmetic.  (FIXME: it turns
-                                   ;; out that sbcl itself is off by 1
-                                   ;; ulp in this value, which is a
-                                   ;; little unfortunate.)
-                                    #-long-float
-                                    (make-double-float 1070810131 1352628735)
-                                    #+long-float
-                                    (error "(log 2 10) not computed"))))))
+                                   #-long-float (log $2d0 10)
+                                   #+long-float
+                                   (error "(log 2 10) not computed"))))))
                  (x (if (minusp ex)
                         (if (float-denormalized-p x)
                             #-long-float

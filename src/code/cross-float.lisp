@@ -773,12 +773,40 @@
           (make-flonum :-infinity (if (eq format 'rational)
                                       'single-float
                                       format))
-          (make-flonum (if base-p
-                           (cl:log (realnumify number) (realnumify base))
-                           (cl:log (realnumify number)))
-                       (if (eq format 'rational) ; neither arg was floating-point
-                           'single-float
-                           format))))))
+          (ecase base
+            ((nil)
+             (let ((table '((1 . $0f0)
+                            (10 . $2.3025851f0)
+                            (#x1fffffff . $20.101269f0)
+                            (#x20000000 . $20.101269f0)
+                            (#x20000001 . $20.101269f0)
+                            (#xfffffffffffffff . $41.58883f0)
+                            (#x1000000000000000 . $41.58883f0)
+                            (#x1000000000000001 . $41.58883f0)
+                            (#x3fffffffffffffff . $42.975124f0)
+                            (#x4000000000000000 . $42.975124f0)
+                            (#x4000000000000001 . $42.975124f0)
+                            ($0.9999999999999999d0 . $-1.1102230246251565d-16)
+                            ($1d0 . $0d0)
+                            ($2d0 . $0.6931471805599453d0)
+                            ($2.718281828459045d0 . $1d0)
+                            ($5.36870911d8 . $20.10126823437577d0)
+                            ($5.36870912d8 . $20.101268236238415d0)
+                            ($2.147483647d9 . $21.487562596892644d0)
+                            ($2.147483648d9 . $21.487562597358306d0)
+                            ($1.152921504606847d18 . $41.58883083359672d0)
+                            ($4.611686018427388d18 . $42.97512519471661d0)
+                            ($9.223372036854776d18 . $43.66827237527655d0))))
+               (or (cdr (assoc number table))
+                   (error "missing entry for (LOG ~A)" number))))
+            ((2 $2f0 $2d0)
+             (let ((table '(($2.718281828459045d0 . $1.4426950408889634d0))))
+               (or (cdr (assoc number table))
+                   (error "missing entry for (LOG ~A 2)" number))))
+            ((10 $10f0 $10d0)
+             (let ((table '(($2d0 . $0.3010299956639812d0))))
+               (or (cdr (assoc number table))
+                   (error "missing entry for (LOG ~A 10)" number)))))))))
 
 ;;;;
 
