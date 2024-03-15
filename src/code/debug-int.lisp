@@ -1906,10 +1906,10 @@ register."
 (defun assign-minimal-var-names (vars)
   (declare (simple-vector vars))
   (let* ((len (length vars))
-         (width (length (format nil "~W" (1- len)))))
+         (width (length (format nil "~D" (1- len))))) ; use base 10 in both places!
     (dotimes (i len)
       (setf (compiled-debug-var-name (svref vars i))
-            (format nil "ARG-~V,'0D" width i)))))
+            (possibly-base-stringize-to-heap (format nil "ARG-~V,'0D" width i))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector
