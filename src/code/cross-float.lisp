@@ -671,32 +671,31 @@
          (make-flonum bits 'double-float))))))
 
 (macrolet ((define (name float-fun)
-             `(progn
-                (declaim (inline ,name))
-                (defun ,name (number &optional (divisor 1))
-                  (if (and (rationalp number) (rationalp divisor))
-                      (,(intern (string name) "CL") number divisor)
-                      (,float-fun number divisor)))
-                (defun ,float-fun (number divisor)
-                  (let ((type (if (or (eq (flonum-format number) 'double-float)
-                                      (and (floatp divisor)
-                                           (eq (flonum-format divisor) 'double-float)))
-                                  'double-float
-                                  'single-float)))
-                    (if (and (floatp number)
-                             (flonum-minus-zero-p number))
-                        (values 0
-                                (make-flonum (if  (< divisor 0)
-                                                  0
-                                                  :minus-zero)
-                                             type))
-                        (with-memoized-math-op (,name (list number divisor))
-                          (multiple-value-bind (q r)
-                              (,(intern (string name) "CL")
-                               (realnumify number)
-                               (realnumify divisor))
-                            (values q
-                                    (make-flonum r type))))))))))
+             (let ((clname (intern (string name) "CL")))
+               `(progn
+                  (declaim (inline ,name))
+                  (defun ,name (number &optional (divisor 1))
+                    (if (and (rationalp number) (rationalp divisor))
+                        (,clname number divisor)
+                        (,float-fun number divisor)))
+                  (defun ,float-fun (number divisor)
+                    (let ((type (if (or (and (floatp number)
+                                             (eq (flonum-format number) 'double-float))
+                                        (and (floatp divisor)
+                                             (eq (flonum-format divisor) 'double-float)))
+                                    'double-float
+                                    'single-float)))
+                      (with-memoized-math-op (,name (list number divisor))
+                        (if (and (floatp number)
+                                 (flonum-minus-zero-p number))
+                            (values 0
+                                    (make-flonum (if (< divisor 0)
+                                                     0
+                                                     :minus-zero)
+                                                 type))
+                            (multiple-value-bind (q r)
+                                (,clname (rational number) (rational divisor))
+                              (values q (flonum-from-rational r type)))))))))))
   (define floor xfloat-floor)
   (define ceiling xfloat-ceiling)
   (define truncate xfloat-truncate)
