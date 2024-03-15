@@ -609,21 +609,7 @@ After:
 ; 48:       488D141B         LEA RDX, [RBX+RBX]
 |#
 
-;;; Predict whether the compiler will generate better or worse code on its own
-;;; when compared to SB-VM::CALC-PHASH. Do this by counting the arithmetic
-;;; operations that require an extra instruction when performed on tagged words.
-;;; These are as follows:
-;;;   {<< U32+ U32- +=} - ANDed with (FIXNUMIZE UINT-MAX)
-;;;   {>>}              - ANDed with (LOGNOT FIXNUM-TAG-MASK)
-(defun phash-count-32-bit-modular-ops (expr &aux (count 0))
-  (sb-int:named-let recurse ((expr expr))
-    (cond ((listp expr)
-           (mapc #'recurse expr))
-          ((find expr '(sb-c::>> sb-c::<< sb-c::u32+ sb-c::u32- sb-c::+=))
-           (incf count))))
-  count)
-
-#+x86-64
+#+nil
 (defun test-uint32-arithmetic (lambda inputs print &optional (n-random-inputs 100))
   ;; As ugly as it is to have all the FIFTH and THIRD here,
   ;; it works because LAMBDA has a known shape which is always this
@@ -701,10 +687,12 @@ After:
                 ;; instruction count delta
                 (- (length g-inst-model) (length f-inst-model)))))))
 
-;;; TODO: I think this test could be sped up by not calling the hash generator.
-;;; We already have the lambda expressions to try; the intent of the test is to
-;;; check the 32-bit codegen, not the hash generator.
-(with-test (:name :32-bit-codegen :skipped-on (:or (:not :x86-64) (:not :slow) :interpreter))
+;;; This tested the 32-bit code generator, but now that it's enabled,
+;;; the perfect hash function itself it tested (in COMPILE-PERFECT-HASH) which means
+;;; that both the function and the codegen have to be correct.  But I still want to
+;;; keep the logic that guesses whether 32-bit untagged arithmetic in UNSIGNED-REG
+;;; is better than arithmetic on tagged words.
+(with-test (:name :32-bit-codegen :skipped-on :sbcl)
   (flet ((test-file (filename)
            (let ((tests (with-open-file (f filename)
                           (let ((*read-base* 16)) (read f))))
@@ -785,7 +773,7 @@ After:
 ; 42:       31D1             XOR ECX, EDX
 ; 44:       488D1409         LEA RDX, [RCX+RCX]
 |#
-(with-test (:name :32-bit-codegen-big :skipped-on (:or (:not :x86-64) :interpreter))
+(with-test (:name :32-bit-codegen-big :skipped-on :sbcl)
   (with-open-file (stream "../tools-for-build/unicode-phash.lisp-expr")
     (loop
      (let ((keys (let ((*read-base* 16)) (read stream nil))))

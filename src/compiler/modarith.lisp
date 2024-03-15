@@ -514,9 +514,10 @@
 ;;; with :DWORD.  See CALC-PHASH in src/compiler/x86-64/arith.
 ;;; TABLES should be an alist specify the values of TAB and SCRAMBLE
 ;;; as output by MAKE-PERFECT-HASH-LAMBDA.
-#+x86-64 ; should be: 64-bit
+#+x86-64
 (progn
 (export '(phash-convert-to-2-operand-code phash-renumber-temps))
+(defglobal *enable-32-bit-codegen* t)
 (defun phash-convert-to-2-operand-code (expr tables &aux (temp-counter 0) temps statements)
   (labels ((scan-for-shr (x)
              (typecase x
@@ -574,14 +575,14 @@
              (case (car expr)
                ((let) ; there will be exactly one binding
                 (destructuring-bind (((name value)) . body) (cdr expr)
-                  (aver (member name '(val a b)))
+                  (aver (member name '(val newval a b)))
                   (convert-operand value name)
                   (convert-list body)))
                (t
                 (convert-arith expr))))
            (convert-operand (x &optional name)
              (cond ((cadr (assoc x tables :test 'eq)))
-                   ((typep x '(or symbol fixnum array)) x)
+                   ((typep x '(or symbol (unsigned-byte 32) array)) x)
                    (t (convert-arith x name))))
            (convert-arith (expr &optional name &aux (operator (car expr)))
              (case operator
@@ -657,4 +658,42 @@
                  (when (and (eq (car statement) 'move)
                             (eq (cadr statement) (caddr statement)))
                    (setf (svref statements i) 'nop)))))
-    (values (remove 'nop statements) temps-used))))
+    (values (remove 'nop statements) temps-used)))
+
+;;; Predict whether the compiler will generate better or worse code on its own
+;;; when compared to SB-VM::CALC-PHASH. Do this by counting the arithmetic
+;;; operations that require an extra instruction when performed on tagged words.
+;;; These are as follows:
+;;;   {<< U32+ U32- +=} - ANDed with (FIXNUMIZE UINT-MAX)
+;;;   {>> >>=}          - ANDed with (LOGNOT FIXNUM-TAG-MASK)
+(defun phash-count-32-bit-modular-ops (expr &aux (count 0))
+  (named-let recurse ((expr expr))
+    (cond ((listp expr)
+           (mapc #'recurse expr))
+          ((find expr '(<< u32+ u32- += >> >>=))
+           (incf count))))
+  count)
+
+(defun optimize-for-calc-phash (form env)
+  (aver (eq (cadr form) 'val))
+  (let ((scramble (lexenv-find 'scramble vars :lexenv env))
+        (tab (lexenv-find 'tab vars :lexenv env))
+        (calculation (cddr form)))
+    (unless (and *enable-32-bit-codegen*
+                 (or scramble tab
+                     (>= (phash-count-32-bit-modular-ops calculation) 2)))
+      (return-from optimize-for-calc-phash form)) ; decline
+    (let (tables)
+      (when scramble
+        (aver (typep scramble '(cons (eql macro))))
+        (push `(scramble ,(cdr scramble)) tables))
+      (when tab
+        (aver (typep tab '(cons (eql macro))))
+        (push `(tab ,(cdr tab)) tables))
+      (multiple-value-bind (steps n-temps)
+          (phash-renumber-temps
+           (phash-convert-to-2-operand-code calculation tables))
+        (if (<= n-temps 4) ; always, I think?
+            `(sb-vm::calc-phash val ,n-temps ,steps)
+            form)))))
+)

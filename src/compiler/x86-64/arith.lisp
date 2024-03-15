@@ -4020,15 +4020,14 @@
           (declare (ignore arg3))
           (when (eq op 'move) ; MOVE becomes MOV
             (setf op 'mov (first stmt) op))
-          (setf arg1 (typecase arg1
-                       (symbol (tn-from-metasyntactic-var arg1))
-                       (t arg1)))
-          (setf arg2 (typecase arg2
-                       ((and symbol (not null)) (tn-from-metasyntactic-var arg2))
-                       (array (emit-constant arg2))
-                       (t arg2)))
-          (setf (second stmt) arg1
-                (third stmt) arg2)
+          (when (symbolp arg1)
+            (setf arg1 (tn-from-metasyntactic-var arg1)
+                  (second stmt) arg1))
+          (when (setf arg2 (typecase arg2
+                             ((and symbol (not null)) (tn-from-metasyntactic-var arg2))
+                             (array (emit-constant arg2))
+                             (t arg2)))
+            (setf (third stmt) arg2))
           ;; ANDing with #xFF or #xFFFF is MOVZX, and might subsume a MOV too,
           ;; but MOV / AND #xFF is so rare that I couldn't make it occur.
           (when (and (eq op 'and) (or (eql arg2 #xFF) (eql arg2 #xFFFF)))
@@ -4040,7 +4039,7 @@
     ;; Emit instructions
     (dotimes (i (length steps))
       (destructuring-bind (&whole stmt op dest &optional src arg3) (svref steps i)
-        (cond ((eq op 'neg) ; unary op
+        (cond ((eq op 'sb-c::neg) ; unary op
                (inst neg :dword dest))
               ((eq op 'aref)
                (let* ((disp (- (ash vector-data-offset word-shift)
@@ -4054,7 +4053,7 @@
               ((or (eq op 'movzx) (and (eq op 'mov) (constant-tn-p src)))
                (apply #'inst* stmt)) ; zero-extending or 64-bit move
               ((eq i 0)
-               (aver (string= op 'shr))
+               (aver (eq op 'sb-c::shr))
                ;; fixnum-untagging MOV is 64-bit to avoid losing 1 bit,
                ;; unless I can show that the expression doesn't care about bit 31
                (inst* op dest src))

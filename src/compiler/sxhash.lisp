@@ -281,10 +281,6 @@
                    ,(if tables `(symbol-macrolet ,tables ,calc) calc))
                 returned-string)))))
 
-;;; I have work-in-progress which causes the compiler to emit unsigned-word operations
-;;; with a dword operand size on x86-64, which avoids insertion of ANDs that mask
-;;; fixnum-represented 32-bit numbers to a 33 physical-bits, as the compiler would
-;;; otherwise choose, as it is biased to favoring ANY-REG storage class.
 (sb-xc:defmacro uint32-modularly (input &body exprs &environment env)
   (declare (ignore input env)) ; might use ENV to detect compiled vs interpreted code
   (let ((uint-max #xFFFFFFFF))
@@ -315,6 +311,10 @@
                      `(setq ,(cadr expr) (,(car subst) ,(cadr expr) ,(caddr expr))))
                     (t (cons subst (cdr expr)))))))) ; simply a name change
       `(progn ,@(rewrite exprs)))))
+;;; Neither sb-xc:define-compiler-macro nor (setf sb-xc:compiler-macro-function) exists
+#+x86-64
+(setf (info :function :compiler-macro-function 'uint32-modularly)
+      #'sb-c::optimize-for-calc-phash)
 
 ;;; The CASE macro can use this predicate to decide whether to expand in a way
 ;;; that selects a clause via a perfect hash versus the customary expansion
