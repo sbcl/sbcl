@@ -607,9 +607,9 @@
             (dump-1-var fun var tn minimal *byte-buffer*
                         name
                         (and prev-name (eq prev-name name)))
-             (setf prev-name name)
-             (setf (gethash var var-locs) i)
-             (incf i))
+            (setf prev-name name)
+            (setf (gethash var var-locs) i)
+            (incf i))
       (compact-vector *byte-buffer*))))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS of

@@ -1660,10 +1660,6 @@ register."
 ;;; (VALUES NIL T) means there were no arguments, but (VALUES NIL NIL)
 ;;; means there was no argument information.
 (defun parse-compiled-debug-fun-lambda-list (debug-fun)
-  ;; workaround type inference bogosity that made this file not recompilable.
-  ;; debug-fun-debug-vars was getting derived as returning :unparsed which is not
-  ;; a sequence which causes compilation of COERCE to warn.
-  (declare (notinline debug-fun-debug-vars))
   (let ((args (sb-c::compiled-debug-fun-arguments
                (compiled-debug-fun-compiler-debug-fun debug-fun))))
     (cond
