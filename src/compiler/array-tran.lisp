@@ -274,6 +274,10 @@
                                              (specifier-type 'base-char))
                                             (character
                                              (specifier-type 'character))
+                                            #+sb-xc-host
+                                            (symbol
+                                             (specifier-type 'symbol))
+                                            #-sb-xc-host
                                             (symbol
                                              (unless symbols
                                                (setf symbols (alloc-xset)))
