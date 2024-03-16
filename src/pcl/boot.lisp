@@ -2824,10 +2824,8 @@ bootstrapping.
           for gf = (gdefinition fspec) do
           (labels ((translate-source-location (function)
                      ;; This is lifted from sb-introspect, OAOO and all that.
-                     (let* ((code (fun-code-header (sb-kernel::%fun-fun function)))
-                            (debug-fun
-                              (sb-di::debug-fun-from-pc code
-                                                        (sb-di::function-start-pc-offset function))))
+                     (let ((code (fun-code-header (sb-kernel::%fun-fun function)))
+                           (debug-fun (sb-di::fun-debug-fun function)))
                        (sb-c::%make-definition-source-location
                         (sb-c::debug-source-namestring
                          (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))

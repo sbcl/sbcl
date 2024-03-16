@@ -79,10 +79,6 @@ For example, the debug source for a function compiled from a file will
 include the pathname of the file and the position of the definition."
   'sb-c::debug-source)
 
-(deftype debug-function ()
-  "Debug function represent static compile-time information about a function."
-  'sb-di::compiled-debug-fun)
-
 (declaim (ftype (sfunction (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
   (let* ((function-object (%fun-fun function))
@@ -96,11 +92,6 @@ include the pathname of the file and the position of the definition."
 (declaim (ftype (sfunction (debug-info) debug-source) debug-info-source))
 (defun debug-info-source (debug-info)
   (sb-c::debug-info-source debug-info))
-
-(declaim (ftype (sfunction (function) debug-function) function-debug-function))
-(defun function-debug-function (function)
-  (sb-di::debug-fun-from-pc (fun-code-header (%fun-fun function))
-                            (sb-di::function-start-pc-offset function)))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a valid function name, ie. one that can be passed to
@@ -459,7 +450,7 @@ If an unsupported TYPE is requested, the function will return NIL.
 
 (defun find-function-definition-source (function)
   (let* ((debug-source (debug-info-source (function-debug-info function)))
-         (debug-fun (function-debug-function function))
+         (debug-fun (sb-di::fun-debug-fun function))
          (tlf (sb-c::compiled-debug-fun-tlf-number
                (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)))
          ;; The form number for a function can be found by getting the form
