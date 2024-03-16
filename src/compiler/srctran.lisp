@@ -7047,9 +7047,8 @@
     (setf (jump-table-targets jump-table) new-targets)
     (reoptimize-node jump-table)))
 
-(defun expand-hash-case-for-jump-table (key-lists targets &optional constants default errorp)
-  (let* ((keys (apply #'append key-lists))
-         (phash-lexpr (or (perfectly-hashable keys)
+(defun expand-hash-case-for-jump-table (keys key-lists targets &optional constants default errorp)
+  (let* ((phash-lexpr (or (perfectly-hashable keys)
                           (return-from expand-hash-case-for-jump-table (values nil nil))))
          (temp '#1=#:key)               ; GENSYM considered harmful
          (object-hash (sb-c::prehash-for-perfect-hash temp keys))
@@ -7095,36 +7094,63 @@
                                        (not (and (constant-lvar-p default)
                                                  (null (lvar-value default)))))
                                   `(funcall default))))
-                    `(if-to-blocks
-                      (and (< h ,(length key-vector))
-                           (eq (aref ,key-vector h) #1#))
-                      h
-                      ,(cdr (assoc 'otherwise targets)))))
+                    (let ((otherwise (cdr (assoc 'otherwise targets))))
+                      (if otherwise
+                          `(if-to-blocks
+                            (and (< h ,(length key-vector))
+                                 (eq (aref ,key-vector h) #1#))
+                            h
+                            ,otherwise)
+                          `(truly-the (mod ,(length key-vector)) h)))))
             new-targets)))
 
-(deftransform case-to-jump-table ((key keys &optional constants default errorp) * * :node node)
-  (let* ((keys (lvar-value keys))
+(defun cull-jump-table-targets (key key-lists targets)
+  (let ((type (lvar-type key))
+        (keys))
+    (loop for key-list in key-lists
+          for target in targets
+          for new-list = (loop for key in key-list
+                               when (ctypep key type)
+                               collect key
+                               and
+                               do (push key keys))
+          when new-list
+          collect new-list into new-lists
+          and
+          collect target into new-targets
+          finally (return (values new-lists
+                                  (append new-targets
+                                          (unless (csubtypep type (specifier-type `(member ,@keys)))
+                                            (list (assoc 'otherwise targets))))
+                                  keys)))))
+
+(deftransform case-to-jump-table ((key key-lists &optional constants default errorp) * * :node node)
+  (let* ((key-lists (lvar-value key-lists))
          (jump-table (node-dest node))
          (constants (and constants
                          (lvar-value constants))))
     (if constants
-        (expand-hash-case-for-jump-table keys nil constants default (lvar-value errorp))
-        (multiple-value-bind (code new-targets)
-            (expand-hash-case-for-jump-table keys (jump-table-targets jump-table))
-          (cond (code
-                 (change-jump-table-targets jump-table new-targets)
-                 code)
-                (t
-                 (labels ((convert (targets)
-                            (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
-                              (declare (ignore index rest))
-                              (let ((key (pop keys)))
-                                (cond ((eq next-index 'otherwise)
-                                       `(if-to-blocks (memq key ',key)
-                                                      ,target
-                                                      ,next-target))
-                                      (t
-                                       `(if-to-blocks (memq key ',key)
-                                                      ,target
-                                                      ,(convert (cdr targets)))))))))
-                   (convert (jump-table-targets jump-table)))))))))
+        (expand-hash-case-for-jump-table (flatten-list key-lists) key-lists nil constants default (lvar-value errorp))
+        (multiple-value-bind (key-lists targets keys) (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
+          (multiple-value-bind (code new-targets)
+              (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
+                   (expand-hash-case-for-jump-table keys key-lists targets))
+            (cond (code
+                   (change-jump-table-targets jump-table new-targets)
+                   code)
+                  (t
+                   (labels ((convert (targets)
+                              (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
+                                (declare (ignore index rest))
+                                (let ((key (pop key-lists)))
+                                  (cond ((eq next-index 'otherwise)
+                                         `(if-to-blocks (memq key ',key)
+                                                        ,target
+                                                        ,next-target))
+                                        (t
+                                         `(if-to-blocks (memq key ',key)
+                                                        ,target
+                                                        ,(convert (cdr targets)))))))))
+                     (if (cdr targets)
+                         (convert targets)
+                         `(if-to-blocks t ,(cdar targets)))))))))))

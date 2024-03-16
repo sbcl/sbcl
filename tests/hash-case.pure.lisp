@@ -15,3 +15,16 @@
     (assert (eq (car (fourth evaluator-expansion)) 'cond))
     (when (gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-parsed-vops*)
       (assert (eq (car compiler-expansion) 'let*)))))
+
+(with-test (:name :type-derivation)
+  (when (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)
+   (assert-type
+    (lambda (x)
+      (declare ((member a b c d) x))
+      (case x
+        (a (print 1))
+        (b (print 2))
+        (c (print 4))
+        (d (print 3))
+        (e (print 5))))
+    (integer 1 4))))
