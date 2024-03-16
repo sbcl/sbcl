@@ -1182,11 +1182,17 @@ invoked. In that case it will store into PLACE and start over."
                                                         ',errorp)
                               `(sb-c:jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
                                                 ,@(loop for (nil . form) in tested
+                                                        for keys in key-lists
                                                         for i from 0
-                                                        collect `(,i ,@form))
-                                                (otherwise ,@(if errorp
-                                                                 `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
-                                                                 (cdr default))))))))
+                                                        collect `(,i
+                                                                  (sb-c::%type-constraint ,keyform-value '(member ,@keys))
+                                                                  ,@form))
+                                                (otherwise
+                                                 ,@(if default
+                                                       `((sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))))
+                                                 ,@(if errorp
+                                                       `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
+                                                       (cdr default))))))))
                   (binding*
                       ((lexpr (and (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
                                        constants)

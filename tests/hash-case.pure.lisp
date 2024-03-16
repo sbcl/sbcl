@@ -43,4 +43,22 @@
            (d (print 4))
            (e (print 6))
            (g (print 5)))))
-     (or null (integer 3 6)))))
+     (or null (integer 3 6)))
+    (assert-type
+     (lambda (x)
+       (case x
+         (a
+          (if (eq x 'a)
+              1
+              10))
+         ((b k)
+          (if (eq x 'a)
+              11
+              2))
+         (c 3)
+         (d 4)
+         (e 5)
+         (t (if (eq x 'd)
+                30
+                6))))
+     (integer 1 6))))

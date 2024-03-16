@@ -950,7 +950,7 @@
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (sfunction (t) cblock) block-or-lose))
 (defun block-or-lose (thing)
-  (ctypecase thing
+  (etypecase thing
     (cblock thing)
     (ir2-block (ir2-block-block thing))
     (vop (block-or-lose (vop-block thing)))
