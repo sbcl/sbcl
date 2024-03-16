@@ -2032,7 +2032,7 @@
                   (values 'integer nil))
                  (rational
                   (values 'rational nil))
-                 ((or single-float double-float #+long-float long-float)
+                 ((single-float double-float #+long-float long-float)
                   (values 'float rem-type))
                  (float
                   (values 'float nil))
@@ -2223,7 +2223,7 @@
                       (values 'integer nil))
                      (rational
                       (values 'rational nil))
-                     ((or single-float double-float #+long-float long-float)
+                     ((single-float double-float #+long-float long-float)
                       (values 'float result-type))
                      (float
                       (values 'float nil))
