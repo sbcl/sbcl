@@ -28,3 +28,19 @@
         (d (print 3))
         (e (print 5))))
     (integer 1 4))))
+
+(with-test (:name :type-derivation-constraints)
+  (when (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)
+    (assert-type
+     (lambda (x)
+       (declare ((not (member b)) x)
+                (optimize speed))
+       (unless (eq x 'a)
+         (case x
+           (a (print 1))
+           (b (print 2))
+           (c (print 3))
+           (d (print 4))
+           (e (print 6))
+           (g (print 5)))))
+     (or null (integer 3 6)))))

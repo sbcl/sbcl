@@ -1581,13 +1581,24 @@
 (defun delay-ir1-transform (node &rest reasons)
   (let ((assoc (assoc node *delayed-ir1-transforms*)))
     (cond ((not assoc)
+           (setf *delayed-ir1-transforms*
+                 (acons node reasons *delayed-ir1-transforms*))
+           (throw 'give-up-ir1-transform :delayed))
+          ((cdr assoc)
+           (dolist (reason reasons)
+             (pushnew reason (cdr assoc)))
+           (throw 'give-up-ir1-transform :delayed)))))
+
+(defun delay-ir1-transform-p (node &rest reasons)
+  (let ((assoc (assoc node *delayed-ir1-transforms*)))
+    (cond ((not assoc)
             (setf *delayed-ir1-transforms*
                     (acons node reasons *delayed-ir1-transforms*))
-            (throw 'give-up-ir1-transform :delayed))
+           t)
           ((cdr assoc)
             (dolist (reason reasons)
               (pushnew reason (cdr assoc)))
-            (throw 'give-up-ir1-transform :delayed)))))
+            t))))
 
 (defun delay-ir1-optimizer (node &rest reasons)
   (let ((assoc (assoc node *delayed-ir1-transforms*)))

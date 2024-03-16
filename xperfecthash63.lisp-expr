@@ -3006,5 +3006,14 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(74748736 965CD62A 971A1DF1 A0FAB3A5 A2195041 B34F601E)
+ "(REAL FLOAT DOUBLE-FLOAT SINGLE-FLOAT OR RATIONAL)"
+ "(  (& (^ val (>> val 13)) 7))")
+(#(2 3 5 8 9 A B C)
+ "(3 12 2 5 10 11 8 9)"
+ "(  (& (+ (>> val 0) (>> val 1) (>> val 2)) 7))")
+(#(71A5A23 140C6C3A 7A372C76 89072FE6)
+ "(:RESULT-TYPES :ARG-TYPES :ARG-CHECK :GUARD)"
+ "(  (& (>> val 19) 3) )")
 )
 ;; EOF

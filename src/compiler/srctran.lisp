@@ -7118,39 +7118,53 @@
           collect new-list into new-lists
           and
           collect target into new-targets
-          finally (return (values new-lists
+          finally (return (values (if (equal new-lists key-lists)
+                                      key-lists
+                                      new-lists)
                                   (append new-targets
                                           (unless (csubtypep type (specifier-type `(member ,@keys)))
                                             (list (assoc 'otherwise targets))))
                                   keys)))))
 
-(deftransform case-to-jump-table ((key key-lists &optional constants default errorp) * * :node node)
-  (let* ((key-lists (lvar-value key-lists))
+(deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
+  (let* ((key-lists (lvar-value key-lists-lvar))
          (jump-table (node-dest node))
          (constants (and constants
                          (lvar-value constants))))
-    (if constants
-        (expand-hash-case-for-jump-table (flatten-list key-lists) key-lists nil constants default (lvar-value errorp))
-        (multiple-value-bind (key-lists targets keys) (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
-          (multiple-value-bind (code new-targets)
-              (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
-                   (expand-hash-case-for-jump-table keys key-lists targets))
-            (cond (code
-                   (change-jump-table-targets jump-table new-targets)
-                   code)
-                  (t
-                   (labels ((convert (targets)
-                              (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
-                                (declare (ignore index rest))
-                                (let ((key (pop key-lists)))
-                                  (cond ((eq next-index 'otherwise)
-                                         `(if-to-blocks (memq key ',key)
-                                                        ,target
-                                                        ,next-target))
-                                        (t
-                                         `(if-to-blocks (memq key ',key)
-                                                        ,target
-                                                        ,(convert (cdr targets)))))))))
-                     (if (cdr targets)
-                         (convert targets)
-                         `(if-to-blocks t ,(cdar targets)))))))))))
+    (cond (constants
+           (expand-hash-case-for-jump-table (flatten-list key-lists) key-lists nil constants default (lvar-value errorp)))
+          ((not jump-table)
+           nil)
+          (t
+           (multiple-value-bind (key-lists targets keys) (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
+             (flet ((give-up ()
+                      (labels ((convert (targets)
+                                 (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
+                                   (declare (ignore index next-index))
+                                   (let ((key (pop key-lists)))
+                                     (cond ((not rest)
+                                            `(if-to-blocks (memq key ',key)
+                                                           ,target
+                                                           ,next-target))
+                                           (t
+                                            `(if-to-blocks (memq key ',key)
+                                                           ,target
+                                                           ,(convert (cdr targets)))))))))
+                        (if (cdr targets)
+                            (convert targets)
+                            `(if-to-blocks t ,(cdar targets))))))
+               (cond ((not (sb-impl::should-attempt-hash-based-case-dispatch keys))
+                      (give-up))
+                     ((delay-ir1-transform-p node :constraint)
+                      (change-ref-leaf (lvar-uses key-lists-lvar) (find-constant key-lists))
+                      (setf (node-reoptimize node) nil)
+                      (change-jump-table-targets jump-table targets)
+                      (throw 'give-up-ir1-transform :delayed))
+                     (t
+                      (multiple-value-bind (code new-targets)
+                          (expand-hash-case-for-jump-table keys key-lists targets)
+                        (cond (code
+                               (change-jump-table-targets jump-table new-targets)
+                               code)
+                              (t
+                               (give-up))))))))))))
