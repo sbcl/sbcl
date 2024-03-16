@@ -640,7 +640,11 @@
   :give-up)
 
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t) * :node node)
-  (if (eq (combination-info node) 'array-in-bounds-p)
+  (if (or (eq (combination-info node) 'array-in-bounds-p)
+          (let ((index (type-approximate-interval (lvar-type index)))
+                (dim (type-approximate-interval (lvar-type dimension))))
+            (and index dim
+                 (interval-< index dim))))
       ;; It's in bounds but it may be of the wrong type
       `(progn (the (and fixnum unsigned-byte) index)
               (values))

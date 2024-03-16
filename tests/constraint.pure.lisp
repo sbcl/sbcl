@@ -1172,6 +1172,16 @@
                      nil))
              0)))
 
+(with-test (:name :constant-vector)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (fixnum x))
+                        (and (<= x 2)
+                             (aref #(1 2 3) x)))
+                     nil))
+             0)))
+
 (with-test (:name :map-equality-constraints)
   (checked-compile-and-assert
    ()
