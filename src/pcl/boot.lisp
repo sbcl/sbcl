@@ -2824,26 +2824,19 @@ bootstrapping.
           for gf = (gdefinition fspec) do
           (labels ((translate-source-location (function)
                      ;; This is lifted from sb-introspect, OAOO and all that.
-                     (let* ((function-object (sb-kernel::%fun-fun function))
-                            (function-header (sb-kernel:fun-code-header function-object))
-                            (debug-info (sb-kernel:%code-debug-info function-header))
-                            (debug-source (sb-c::debug-info-source debug-info))
-                            (debug-fun (debug-info-debug-function function debug-info))
-                            (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+                     (let* ((code (fun-code-header (sb-kernel::%fun-fun function)))
+                            (debug-fun
+                              (sb-di::debug-fun-from-pc code
+                                                        (sb-di::function-start-pc-offset function))))
                        (sb-c::%make-definition-source-location
-                        (sb-c::debug-source-namestring debug-source)
-                        tlf
-                        (sb-c::compiled-debug-fun-form-number debug-fun))))
-                   (debug-info-debug-function (function debug-info)
-
-                     (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
-                           (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
-                       (or (loop for fmap-entry = map then next
-                                 for next = (sb-c::compiled-debug-fun-next fmap-entry)
-                                 when (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
-                                 return fmap-entry
-                                 while next)
-                           map)))
+                        (sb-c::debug-source-namestring
+                         (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))
+                        (sb-c::compiled-debug-fun-tlf-number
+                         (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))
+                        (sb-di::code-location-form-number
+                         (aref (sb-di::debug-block-code-locations
+                                (aref (sb-di::debug-fun-debug-blocks debug-fun) 0))
+                               0)))))
                    (make-method (spec)
                      (destructuring-bind
                          (lambda-list specializers qualifiers fun-name) spec

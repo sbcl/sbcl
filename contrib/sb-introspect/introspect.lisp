@@ -81,7 +81,7 @@ include the pathname of the file and the position of the definition."
 
 (deftype debug-function ()
   "Debug function represent static compile-time information about a function."
-  'sb-c::compiled-debug-fun)
+  'sb-di::compiled-debug-fun)
 
 (declaim (ftype (sfunction (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
@@ -97,11 +97,10 @@ include the pathname of the file and the position of the definition."
 (defun debug-info-source (debug-info)
   (sb-c::debug-info-source debug-info))
 
-(declaim (ftype (sfunction (t debug-info) debug-function) debug-info-debug-function))
-(defun debug-info-debug-function (function debug-info)
-  (sb-di::compiled-debug-fun-from-pc debug-info
-                                     (sb-di::function-start-pc-offset function)
-                                     t))
+(declaim (ftype (sfunction (function) debug-function) function-debug-function))
+(defun function-debug-function (function)
+  (sb-di::debug-fun-from-pc (fun-code-header (%fun-fun function))
+                            (sb-di::function-start-pc-offset function)))
 
 (defun valid-function-name-p (name)
   "True if NAME denotes a valid function name, ie. one that can be passed to
@@ -459,10 +458,17 @@ If an unsupported TYPE is requested, the function will return NIL.
             (type-of object)))))
 
 (defun find-function-definition-source (function)
-  (let* ((debug-info (function-debug-info function))
-         (debug-source (debug-info-source debug-info))
-         (debug-fun (debug-info-debug-function function debug-info))
-         (tlf (if debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
+  (let* ((debug-source (debug-info-source (function-debug-info function)))
+         (debug-fun (function-debug-function function))
+         (tlf (sb-c::compiled-debug-fun-tlf-number
+               (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)))
+         ;; The form number for a function can be found by getting the form
+         ;; number of the first location of the first block.
+         (form-number
+           (sb-di::code-location-form-number
+            (aref (sb-di::debug-block-code-locations
+                   (aref (sb-di::debug-fun-debug-blocks debug-fun) 0))
+                  0))))
     (make-definition-source
      :pathname
      (when (stringp (debug-source-namestring debug-source))
@@ -471,7 +477,7 @@ If an unsupported TYPE is requested, the function will return NIL.
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))
      :form-path (if tlf (list tlf))
-     :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
+     :form-number form-number
      :file-write-date (debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
 

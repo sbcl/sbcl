@@ -185,7 +185,6 @@
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
   ;; ELSEWHERE-PC -
-  ;; FORM-NUMBER
   ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
@@ -193,7 +192,7 @@
   (next))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc
-                        form-number offset
+                        offset
                         closure-save
                         #+unwind-to-frame-and-call-vop bsp-save
                         #-fp-and-pc-standard-save lra-saved-pc
@@ -204,7 +203,6 @@
     ;; need not skip over all the other packed fields.
     (write-var-integer offset bytes)
     (write-var-integer elsewhere-pc bytes)
-    (write-var-integer form-number bytes)
     (write-var-integer (- start-pc offset) bytes)
     #+unwind-to-frame-and-call-vop
     (write-var-integer (if bsp-save (1+ (sc+offset-offset bsp-save)) 0)
@@ -231,7 +229,6 @@
                 (unless (logtest byte #x80) (return accumulator))))))
       (let* ((offset (decode-varint))
              (elsewhere-pc (decode-varint))
-             (form-number (decode-varint))
              (start-pc (+ offset (decode-varint)))
              #+unwind-to-frame-and-call-vop
              ;; 0 -> NULL, 1 -> 0, ...
@@ -246,7 +243,7 @@
                              (unless (zerop i)
                                (make-sc+offset sb-vm:control-stack-sc-number (1- i))))))
         (values start-pc elsewhere-pc
-                form-number offset
+                offset
                 closure-save
                 #-fp-and-pc-standard-save lra-saved-pc
                 #-fp-and-pc-standard-save cfp-saved-pc
@@ -263,7 +260,6 @@
   (def
     compiled-debug-fun-start-pc
     compiled-debug-fun-elsewhere-pc
-    compiled-debug-fun-form-number
     compiled-debug-fun-offset
     ;; Most compiled-debug-funs don't need these
     compiled-debug-fun-closure-save

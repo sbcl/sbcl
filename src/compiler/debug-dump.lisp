@@ -729,7 +729,6 @@
              (cdf-encode-locs
               (label-position (ir2-environment-environment-start 2env))
               (label-position (ir2-environment-elsewhere-start 2env))
-              (source-path-form-number (node-source-path (lambda-bind fun)))
               (label-position (block-label (lambda-block fun)))
               (when (ir2-environment-closure-save-tn 2env)
                 (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
