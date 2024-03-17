@@ -584,24 +584,18 @@
                                 (t '#:|unknown|)))))
             (values type nbytes))))))
 
-;;; Return a name for PC-OFFS in CODE. PC-OFFSET is relative
-;;; to CODE-INSTRUCTIONS.
-(defun pc-offs-to-fun-name (pc-offs code &aux (di (%code-debug-info code)))
-  (if (hash-table-p di) ; assembler routines
+;;; Return a name for PC-OFFSET in CODE. PC-OFFSET is relative to
+;;; CODE-INSTRUCTIONS.
+(defun pc-offset-to-fun-name (pc-offset code)
+  (if (eq sb-vm::*assembler-routines* code)
       (block nil
-       (maphash (lambda (k v) ; FIXME: OAOO violation, at least twice over
-                  (when (<= (car v) pc-offs (cadr v))
-                    (return k)))
-                di))
-      (let* ((funmap (sb-c::compiled-debug-info-fun-map di)))
-        (unless (sb-c::compiled-debug-fun-next funmap)
-          (aver (typep funmap 'sb-c::compiled-debug-fun-toplevel))
-          (return-from pc-offs-to-fun-name :toplevel))
-        (loop for fun = funmap then next
-              for next = (sb-c::compiled-debug-fun-next fun)
-              when (or (not next)
-                       (< (sb-c::compiled-debug-fun-offset next) pc-offs))
-              return (sb-c::compiled-debug-fun-name fun)))))
+        (maphash (lambda (k v) ; FIXME: OAOO violation, at least twice over
+                   (when (<= (car v) pc-offset (cadr v))
+                     (return k)))
+                 (%code-debug-info code)))
+      (sb-c::compiled-debug-fun-name
+       (sb-di::compiled-debug-fun-compiler-debug-fun
+        (sb-di::debug-fun-from-pc code pc-offset)))))
 
 (defun aprof-collect (stream)
   (sb-disassem:get-inst-space) ; for effect
@@ -633,7 +627,7 @@
             (let ((pc (+ (get-lisp-obj-address code)
                           (- sb-vm:other-pointer-lowtag)
                           pc-offset))
-                  (name (pc-offs-to-fun-name
+                  (name (pc-offset-to-fun-name
                          ;; Relativize to CODE-INSTRUCTIONS, not the base address
                          (- pc-offset (ash (code-header-words code) sb-vm:word-shift))
                          code)))
