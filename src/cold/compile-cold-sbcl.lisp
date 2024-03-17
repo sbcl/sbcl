@@ -30,7 +30,7 @@
 ;;; in the cross-compiler was confusing as hell.
 ;;; Consider any toplevel form in make-host-2 - it will have constants in it,
 ;;; and we need to know if each constant is dumpable. So we call DUMPABLE-LEAFLIKE-P
-;;; which invokes SB-XC:TYPEP. But SB-XC:TYPEP may know nothing of DEBUG-NAME-MARKER
+;;; which invokes SB-XC:TYPEP. But SB-XC:TYPEP may know nothing of a particular struct type
 ;;; until that DEFSTRUCT is seen. So how did it ever work? Well, for starters,
 ;;; if it's an unknown type, we need to signal a PARSE-UNKNOWN-TYPE condition.
 ;;; To signal that, we check whether that condition is in *HANDLED-CONDITIONS*.

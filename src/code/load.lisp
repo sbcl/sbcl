@@ -787,12 +787,6 @@
         (incf ptr)))
     res))
 
-;;; Symbol-like entities
-(define-fop 49 :not-host (fop-debug-name-marker ((:operands kind)))
-  (ecase kind
-   (1 sb-c::*debug-name-sharp*)
-   (2 sb-c::*debug-name-ellipsis*)))
-
 (define-fop 45 :not-host (fop-layout ((:operands depthoid flags length)
                                        name bitmap inherits))
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives

@@ -884,7 +884,9 @@ have been evaluated."
                            forms
                            vars
                            :post-binding-lexenv post-binding-lexenv
-                           :debug-name (debug-name 'let bindings))))
+                           :debug-name (debug-name 'let
+                                                   (mapcar #'leaf-source-name
+                                                           vars)))))
                  (reference-leaf start ctran fun-lvar fun)))
              (ir1-convert-combination-args fun-lvar ctran next result values
                                            :arg-source-forms bindings))))))

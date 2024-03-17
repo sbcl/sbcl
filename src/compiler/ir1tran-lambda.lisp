@@ -131,7 +131,8 @@
                                           :post-binding-lexenv post-binding-lexenv
                                           :debug-name (debug-name
                                                        '&aux-bindings
-                                                       aux-vars)
+                                                       (mapcar #'leaf-source-name
+                                                               aux-vars))
                                           :value-source-forms (rest value-source-forms))))
         (reference-leaf start ctran fun-lvar fun)
         (ir1-convert-combination-args fun-lvar ctran next result

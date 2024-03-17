@@ -477,11 +477,6 @@
               (dump-object 'values-specifier-type file)
               (dump-object (type-specifier x) file)
               (dump-fop 'fop-funcall file 1))
-             (sb-c::debug-name-marker ; these are atoms, much like symbols
-              (dump-fop 'fop-debug-name-marker file
-                        (cond ((eq x sb-c::*debug-name-sharp*) 1)
-                              ((eq x sb-c::*debug-name-ellipsis*) 2)
-                              (t (bug "Bogus debug name marker")))))
              (instance
               (multiple-value-bind (slot-names slot-names-p)
                   (gethash x (fasl-output-saved-slot-names file))

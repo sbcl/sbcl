@@ -158,60 +158,13 @@
                (setf (bit seen h) 1)))
     f))
 
-(defstruct (debug-name-marker (:print-function print-debug-name-marker)
-                              (:copier nil)))
-(declaim (freeze-type debug-name-marker))
-
-(defvar *debug-name-level* 4)
-(defvar *debug-name-length* 12)
-(defvar *debug-name-punt*)
-(define-load-time-global *debug-name-sharp* (make-debug-name-marker))
-(define-load-time-global *debug-name-ellipsis* (make-debug-name-marker))
-
-(defun print-debug-name-marker (marker stream level)
-  (declare (ignore level))
-  (cond ((eq marker *debug-name-sharp*)
-         (write-char #\# stream))
-        ((eq marker *debug-name-ellipsis*)
-         (write-string "..." stream))
-        (t
-         (write-string "???" stream))))
-
 (declaim (ftype (sfunction () list) name-context))
 (defun debug-name (type thing &optional context)
-  (let ((*debug-name-punt* nil))
-    (labels ((walk (x)
-               (typecase x
-                 (cons
-                  (if (plusp *debug-name-level*)
-                      (let ((*debug-name-level* (1- *debug-name-level*)))
-                        (do ((tail (cdr x) (cdr tail))
-                             (name (cons (walk (car x)) nil)
-                                   (cons (walk (car tail)) name))
-                             (n (1- *debug-name-length*) (1- n)))
-                            ((or (not (consp tail))
-                                 (not (plusp n))
-                                 *debug-name-punt*)
-                             (cond (*debug-name-punt*
-                                    (setf *debug-name-punt* nil)
-                                    (nreverse name))
-                                   ((atom tail)
-                                    (nconc (nreverse name) (walk tail)))
-                                   (t
-                                    (setf *debug-name-punt* t)
-                                    (nconc (nreverse name) (list *debug-name-ellipsis*)))))))
-                      *debug-name-sharp*))
-                 ((or symbol number string)
-                  x)
-                 (t
-                  ;; wtf?? This looks like a source of sensitivity to the cross-compiler host
-                  ;; in addition to which it seems generally a stupid idea.
-                  (type-of x)))))
-      (let ((name (list* type (walk thing) (when context (name-context)))))
-        (when (legal-fun-name-p name)
-          (bug "~S is a legal function name, and cannot be used as a ~
-                debug name." name))
-        name))))
+  (let ((name (list* type thing (when context (name-context)))))
+    (when (legal-fun-name-p name)
+      (bug "~S is a legal function name, and cannot be used as a ~
+            debug name." name))
+    name))
 
 ;;; Bound during eval-when :compile-time evaluation.
 (defvar *compile-time-eval* nil)
