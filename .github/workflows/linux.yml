@@ -27,7 +27,9 @@ jobs:
         sudo apt-get -qq install sbcl libcapstone-dev
     - name: instal host gcc-multilib
       if: matrix.arch == 'x86'
-      run: sudo apt-get -qq --no-install-recommends install gcc-multilib
+      run:  |
+        sudo sysctl -w vm.mmap_rnd_compat_bits=8
+        sudo apt-get -qq --no-install-recommends install gcc-multilib
 
     - name: backend-sub-features
       if: matrix.subfeatures == 'sse4'
