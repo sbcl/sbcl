@@ -18,16 +18,26 @@
 
 (with-test (:name :type-derivation)
   (when (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)
-   (assert-type
-    (lambda (x)
-      (declare ((member a b c d) x))
-      (case x
-        (a (print 1))
-        (b (print 2))
-        (c (print 4))
-        (d (print 3))
-        (e (print 5))))
-    (integer 1 4))))
+    (assert-type
+     (lambda (x)
+       (declare ((member a b c d) x))
+       (case x
+         (a (print 1))
+         (b (print 2))
+         (c (print 4))
+         (d (print 3))
+         (e (print 5))))
+     (integer 1 4))
+    (assert-type
+     (lambda (x)
+       (declare ((member a b c d) x))
+       (case x
+         (a 1)
+         (b 2)
+         (c 4)
+         (d 3)
+         (e 5)))
+     (integer 1 4))))
 
 (with-test (:name :type-derivation-constraints)
   (when (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)

@@ -7083,17 +7083,17 @@
                     (h (,phash-lexpr ,object-hash)))
                ;; EQL reduces to EQ for all object this expanders accepts as keys
                ,(if constants
-                    `(if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
-                         ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
-                            (if all-equal
-                                `',(aref result-vector 0)
-                                `(aref ,result-vector h)))
-                         ,(if errorp
-                              `(ecase-failure #1# ,(coerce keys 'simple-vector))
-                              (if (and default
-                                       (not (and (constant-lvar-p default)
-                                                 (null (lvar-value default)))))
-                                  `(funcall default))))
+                    (if (eq default :exact)
+                        `(aref ,result-vector (truly-the (mod ,(length result-vector)) h))
+                        `(if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
+                             ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
+                                (if all-equal
+                                    `',(aref result-vector 0)
+                                    `(aref ,result-vector h)))
+                             ,(if errorp
+                                  `(ecase-failure #1# ,(coerce errorp 'simple-vector))
+                                  (if default
+                                      `(funcall default)))))
                     (let ((otherwise (cdr (assoc 'otherwise targets))))
                       (if otherwise
                           `(if-to-blocks
@@ -7126,30 +7126,79 @@
                                             (list (assoc 'otherwise targets))))
                                   keys)))))
 
+(defun cull-jump-table-constant-targets (key key-lists constants)
+  (let ((type (lvar-type key))
+        (keys))
+    (loop for key-list in key-lists
+          for constant across constants
+          for new-list = (loop for key in key-list
+                               when (ctypep key type)
+                               collect key
+                               and
+                               do (push key keys))
+          when new-list
+          collect new-list into new-lists
+          and
+          collect constant into new-constants
+          finally (return (if (equal new-lists key-lists)
+                              (values key-lists constants
+                                      keys
+                                      nil)
+                              (values new-lists (coerce new-constants 'vector)
+                                      keys
+                                      (csubtypep type (specifier-type `(member ,@keys)))))))))
+
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
          (jump-table (node-dest node))
          (constants (and constants
                          (lvar-value constants))))
     (cond (constants
-           (expand-hash-case-for-jump-table (flatten-list key-lists) key-lists nil constants default (lvar-value errorp)))
+           (delay-ir1-transform node :constraint)
+           (multiple-value-bind (new-key-lists constants keys exact)
+               (cull-jump-table-constant-targets key key-lists constants)
+             (let ((default (and default
+                                 (not (and (constant-lvar-p default)
+                                           (null (lvar-value default))))))
+                   (original-keys (and (lvar-value errorp)
+                                       (flatten-list key-lists))))
+               (or (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
+                        (expand-hash-case-for-jump-table keys new-key-lists nil
+                                                         constants (if exact
+                                                                       :exact
+                                                                       default)
+                                                         original-keys))
+                   (labels ((convert (constants)
+                              (destructuring-bind (&optional constant &rest rest) constants
+                                (let ((key (pop new-key-lists)))
+                                  (cond (rest
+                                         `(if (memq key ',key)
+                                              ',constant
+                                              ,(convert rest)))
+                                        (exact
+                                         `',constant)
+                                        (original-keys
+                                         `(ecase-failure key ,(coerce original-keys 'simple-vector)))
+                                        (default
+                                         `(funcall default)))))))
+                     (convert (coerce constants 'list)))))))
           ((not jump-table)
            nil)
           (t
-           (multiple-value-bind (key-lists targets keys) (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
+           (multiple-value-bind (key-lists targets keys)
+               (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
              (flet ((give-up ()
                       (labels ((convert (targets)
                                  (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
                                    (declare (ignore index next-index))
                                    (let ((key (pop key-lists)))
-                                     (cond ((not rest)
-                                            `(if-to-blocks (memq key ',key)
-                                                           ,target
-                                                           ,next-target))
-                                           (t
-                                            `(if-to-blocks (memq key ',key)
-                                                           ,target
-                                                           ,(convert (cdr targets)))))))))
+                                     (if rest
+                                         `(if-to-blocks (memq key ',key)
+                                                        ,target
+                                                        ,(convert (cdr targets)))
+                                         `(if-to-blocks (memq key ',key)
+                                                        ,target
+                                                        ,next-target))))))
                         (if (cdr targets)
                             (convert targets)
                             `(if-to-blocks t ,(cdar targets))))))
