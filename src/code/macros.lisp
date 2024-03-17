@@ -1188,8 +1188,7 @@ invoked. In that case it will store into PLACE and start over."
                                                                   (sb-c::%type-constraint ,keyform-value '(member ,@keys))
                                                                   ,@form))
                                                 (otherwise
-                                                 ,@(if default
-                                                       `((sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))))
+                                                 (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
                                                  ,@(if errorp
                                                        `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
                                                        (cdr default))))))))

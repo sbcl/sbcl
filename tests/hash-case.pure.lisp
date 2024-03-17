@@ -37,7 +37,21 @@
          (c 4)
          (d 3)
          (e 5)))
-     (integer 1 4))))
+     (integer 1 4))
+    (assert-type
+     (lambda (x)
+       (case x
+         (a
+          (error "x"))
+         ((b k)
+          (if (eq x 'a)
+              11
+              2))
+         (c 3)
+         (d 4)
+         (e 5))
+       (eq x 'a))
+     null)))
 
 (with-test (:name :type-derivation-constraints)
   (when (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)
