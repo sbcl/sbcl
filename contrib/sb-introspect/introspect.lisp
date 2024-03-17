@@ -452,14 +452,7 @@ If an unsupported TYPE is requested, the function will return NIL.
   (let* ((debug-source (debug-info-source (function-debug-info function)))
          (debug-fun (sb-di::fun-debug-fun function))
          (tlf (sb-c::compiled-debug-fun-tlf-number
-               (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)))
-         ;; The form number for a function can be found by getting the form
-         ;; number of the first location of the first block.
-         (form-number
-           (sb-di::code-location-form-number
-            (aref (sb-di::debug-block-code-locations
-                   (aref (sb-di::debug-fun-debug-blocks debug-fun) 0))
-                  0))))
+               (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))))
     (make-definition-source
      :pathname
      (when (stringp (debug-source-namestring debug-source))
@@ -468,7 +461,8 @@ If an unsupported TYPE is requested, the function will return NIL.
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))
      :form-path (if tlf (list tlf))
-     :form-number form-number
+     :form-number (sb-di::code-location-form-number
+                   (sb-di::debug-fun-start-location debug-fun))
      :file-write-date (debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
 

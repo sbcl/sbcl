@@ -2832,9 +2832,7 @@ bootstrapping.
                         (sb-c::compiled-debug-fun-tlf-number
                          (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))
                         (sb-di::code-location-form-number
-                         (aref (sb-di::debug-block-code-locations
-                                (aref (sb-di::debug-fun-debug-blocks debug-fun) 0))
-                               0)))))
+                         (sb-di::debug-fun-start-location debug-fun)))))
                    (make-method (spec)
                      (destructuring-bind
                          (lambda-list specializers qualifiers fun-name) spec
