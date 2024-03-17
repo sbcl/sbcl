@@ -709,7 +709,7 @@
     (loop for (index . target) in targets
           do (setf (aref vector (- index min)) (block-label target)))
     (list vector (cond ((csubtypep (lvar-type index) (specifier-type `(integer ,min ,max)))
-                        (aver (not (position otherwise vector))))
+                        nil)
                        (otherwise)
                        (t
                         (bug "Fall through")))

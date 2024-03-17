@@ -7150,10 +7150,34 @@
 
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
+         (original-keys (flatten-list key-lists))
          (jump-table (node-dest node))
+         (jump-table (and (jump-table-p jump-table)
+                          jump-table))
          (constants (and constants
                          (lvar-value constants))))
-    (cond (constants
+    (cond ((and jump-table
+                ;; No hashing required
+                (suitable-jump-table-keys-p original-keys))
+           (let* ((otherwise (assoc 'otherwise (jump-table-targets jump-table)))
+                  new-targets)
+             (loop for key-list in key-lists
+                   for (nil . target) in (jump-table-targets jump-table)
+                   for new-list = (loop for key in key-list
+                                        for value = (if (characterp key)
+                                                        (char-code key)
+                                                        key)
+                                        do (push (cons value target) new-targets)))
+             (change-jump-table-targets jump-table (nreconc new-targets (list otherwise)))
+
+             (if (characterp (first original-keys))
+                 `(if-to-blocks (characterp key)
+                                (char-code key)
+                                ,(cdr otherwise))
+                 `(if-to-blocks (fixnump key)
+                                key
+                                ,(cdr otherwise)))))
+          (constants
            (delay-ir1-transform node :constraint)
            (multiple-value-bind (new-key-lists constants keys exact)
                (cull-jump-table-constant-targets key key-lists constants)
@@ -7161,7 +7185,7 @@
                                  (not (and (constant-lvar-p default)
                                            (null (lvar-value default))))))
                    (original-keys (and (lvar-value errorp)
-                                       (flatten-list key-lists))))
+                                       original-keys)))
                (or (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
                         (expand-hash-case-for-jump-table keys new-key-lists nil
                                                          constants (if exact

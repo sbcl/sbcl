@@ -1150,9 +1150,6 @@ invoked. In that case it will store into PLACE and start over."
         ;; clause selection. i.e. Only try hashing if the keys are not already "nice"
         ;; for the multiway-branch-if-eq vop
         (cond ((and (eq test 'eql)
-                    ;; Try hash-based only if the keys are not _already_
-                    ;; nice for a jump table exactly as they are.
-                    (not (sb-c::suitable-jump-table-keys-p keys))
                     (should-attempt-hash-based-case-dispatch keys))
                (let ((constants
                        (when (every (lambda (clause) (constantp `(progn ,@(cdr clause)) lexenv))
@@ -1193,9 +1190,13 @@ invoked. In that case it will store into PLACE and start over."
                                                        `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
                                                        (cdr default))))))))
                   (binding*
-                      ((lexpr (and (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
-                                       constants)
-                                   (sb-c::perfectly-hashable keys))
+                      ((lexpr (and
+                               ;; Try hash-based only if the keys are not _already_
+                               ;; nice for a jump table exactly as they are.
+                               (not (sb-c::suitable-jump-table-keys-p keys))
+                               (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
+                                   constants)
+                               (sb-c::perfectly-hashable keys))
                               :exit-if-null))
                     ;; Put each group of keys into canonical form: no intra-clause duplicates
                     ;; and no key shadowed by an earlier clause. TBH we should do this always.

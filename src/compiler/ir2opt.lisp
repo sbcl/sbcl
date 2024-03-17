@@ -746,7 +746,7 @@
            #+(or ppc ppc64)
            (and (typep (sb-vm:fixnumize min) '(signed-byte 16))
                 (typep (sb-vm:fixnumize (- max min)) '(signed-byte 16)))
-           #+(or x86 x86-64) t))
+           #+(or x86 x86-64 arm64) t))
     (let* ((min (reduce #'min keys))
            (max (reduce #'max keys))
            (table-size (1+ (- max min)))
