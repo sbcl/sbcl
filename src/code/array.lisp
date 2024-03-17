@@ -1826,7 +1826,7 @@ function to be removed without further warning."
 ;;; dispatching when called. It expects arguments that match PARAMS.
 ;;;
 (defmacro sb-impl::!define-array-dispatch (style dispatch-name params nil-array &body body)
-  #-(or x86 x86-64) (setq style :call)
+  #-(or x86 x86-64 arm64) (setq style :call)
   (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
         (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
     (declare (ignorable table-name))
