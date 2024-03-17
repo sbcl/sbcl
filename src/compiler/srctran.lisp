@@ -7158,7 +7158,10 @@
                          (lvar-value constants))))
     (cond ((and jump-table
                 ;; No hashing required
-                (suitable-jump-table-keys-p original-keys))
+                (or (suitable-jump-table-keys-p original-keys)
+                    (and (policy node (= jump-table 3))
+                         (or (every #'fixnump original-keys)
+                             (every #'characterp original-keys)))))
            (let* ((otherwise (assoc 'otherwise (jump-table-targets jump-table)))
                   new-targets)
              (loop for key-list in key-lists

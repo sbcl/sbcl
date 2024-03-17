@@ -160,5 +160,5 @@ compiled with this declaration in effect.")
   ("no" "no" "yes" "yes"))
 
 (define-optimization-quality jump-table
-    3
-  ("no" "no" "no" "yes"))
+  1
+  ("no" "auto" "yes" "without-hashing"))

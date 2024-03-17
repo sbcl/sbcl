@@ -1141,7 +1141,7 @@ invoked. In that case it will store into PLACE and start over."
     ;; Try hash-based dispatch only if expanding for the compiler
     (when (and (neq errorp 'cerror)
                (boundp 'sb-c::*current-component*)
-               (sb-c:policy lexenv (= sb-c:jump-table 3)))
+               (sb-c:policy lexenv (> sb-c:jump-table 0)))
       (let* ((default (if (eq (caar clauses) 't) (car clauses)))
              (normal-clauses (reverse (if default (cdr clauses) clauses))))
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
