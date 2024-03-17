@@ -2399,7 +2399,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defmacro define-cold-fop ((name &optional arglist) &rest forms)
   #+c-headers-only (declare (ignore name arglist forms))
   #-c-headers-only
-  (let* ((code (get name 'opcode))
+  (let* ((code (gethash name *fop-name-to-opcode*))
          (argc (aref (car **fop-signatures**)
                      (or code
                          (error "~S is not a defined FOP." name))))

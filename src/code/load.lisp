@@ -440,6 +440,7 @@
                  (error ,(format nil "Not-host fop invoked: ~A" name)))))
        (!%define-fop ',name ,fop-code ,(length operands) ,(if pushp 1 0)))))
 
+(defglobal *fop-name-to-opcode* (make-hash-table))
 (defun !%define-fop (name opcode n-operands pushp)
   (declare (type (mod 4) n-operands))
   (let ((function (svref **fop-funs** opcode)))
@@ -453,7 +454,7 @@
       (when (and existing-opcode (/= existing-opcode opcode))
         (error "multiple codes for fop name ~S: ~D and ~D"
                name opcode existing-opcode)))
-    (setf (get name 'opcode) opcode
+    (setf (gethash name *fop-name-to-opcode*) opcode
           (svref **fop-funs** opcode) (symbol-function name)
           (aref (car **fop-signatures**) opcode) n-operands
           (sbit (cdr **fop-signatures**) opcode) pushp))

@@ -280,15 +280,23 @@
   (when arg3p (dump-varint arg3 fasl-output)))
 
 ;;; Dump the FOP code for the named FOP to the specified FASL-OUTPUT.
-(defmacro dump-fop (fs-expr file &rest args)
-  (let* ((fs (eval fs-expr))
-         (val (or (get fs 'opcode)
+;;; This macro is supposed to look functional in that it evals its args,
+;;; but it wants to evaluate the first arg at compile-time. For this reason
+;;; it should really not be a quoted symbol, but I think this used to actually
+;;; be a function which had to look up the fop's opcode every time called.
+(defmacro dump-fop (fop-symbol file &rest args)
+  (let* ((fop-symbol
+          ;; EVAL is too much. Just ascertain we have a quoted symbol
+          (if (typep fop-symbol '(cons (eql quote) (cons symbol null)))
+              (cadr fop-symbol)
+              (error "Bad 1st arg to DUMP-FOP: ~S" fop-symbol)))
+         (val (or (gethash fop-symbol *fop-name-to-opcode*)
                   (error "compiler bug: ~S is not a legal fasload operator."
-                         fs-expr)))
+                         fop-symbol)))
          (fop-argc (aref (car **fop-signatures**) val)))
     (cond
       ((not (eql (length args) fop-argc))
-       (error "~S takes ~D argument~:P" fs fop-argc))
+       (error "~S takes ~D argument~:P" fop-symbol fop-argc))
       ((eql fop-argc 0)
        `(dump-byte ,val ,file))
       (t
@@ -570,15 +578,16 @@
                (dump-fop 'fop-nthcdr file i))
             (declare (type index i)))))
 
-      (dump-byte (ecase (circularity-type info)
-                   (:rplaca     #.(get 'fop-rplaca 'opcode))
-                   (:rplacd     #.(get 'fop-rplacd 'opcode))
-                   (:svset      #.(get 'fop-svset 'opcode))
-                   (:struct-set #.(get 'fop-structset 'opcode))
-                   (:slot-set
-                    (dump-object (circularity-slot-name info) file)
-                    #.(get 'fop-slotset 'opcode)))
-                 file)
+      (macrolet ((fop-op (symbol) (gethash symbol *fop-name-to-opcode*)))
+        (dump-byte (ecase (circularity-type info)
+                     (:rplaca     (fop-op fop-rplaca))
+                     (:rplacd     (fop-op fop-rplacd))
+                     (:svset      (fop-op fop-svset))
+                     (:struct-set (fop-op fop-structset))
+                     (:slot-set
+                      (dump-object (circularity-slot-name info) file)
+                      (fop-op fop-slotset)))
+                   file))
       (dump-varint (gethash (circularity-object info) table) file)
       (dump-varint (circularity-index info) file))))
 
