@@ -13,7 +13,6 @@
 
 ;;; A DEFINITION-SOURCE-LOCATION contains two packed fixnums in the INDICES slot,
 ;;; and unless there is a non-nil plist, does not store the plist.
-;;; Packed representation is: header + layout, namestring, indices, (padding)
 (def!struct (definition-source-location
              (:constructor %make-basic-definition-source-location
                            (namestring indices))
