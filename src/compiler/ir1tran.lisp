@@ -530,8 +530,7 @@
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
            (res (ir1-convert-lambda-body
-                 forms ()
-                 :debug-name (debug-name 'top-level-form #+sb-xc-host nil #-sb-xc-host form))))
+                 forms () :debug-name "top level form")))
       (setf (functional-entry-fun res) res
             (functional-arg-documentation res) ()
             (functional-kind res) (functional-kind-attributes toplevel))
