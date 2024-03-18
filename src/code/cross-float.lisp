@@ -446,10 +446,15 @@
                   (max-exp   (1- (ash 1 exp-nbits)))
                   (exp       (cl:ldb (cl:byte exp-nbits mantissa-nbits) bits))
                   (mantissa  (cl:ldb (cl:byte mantissa-nbits 0) bits)))
-             (when (or (= exp max-exp) (= exp 0)) ; infinity or NaN, denormal or 0
+             (when (= exp max-exp) ; infinity or NaN
                (if (and (= exp max-exp) (not (zerop mantissa)) (not nan-errorp))
                    (return-from calculate-flonum-value :nan)
                    (error "Can't cast bits to float: ~x" bits)))
+             (when (= exp 0) ; denormal or 0
+               (decf exp (+ (cl:floor max-exp 2) (1- mantissa-nbits)))
+               (let ((value (cl:scale-float (cl:coerce mantissa host-type) exp)))
+                 (return-from calculate-flonum-value
+                   (if (logbitp (1- format-nbits) bits) (cl:- value) value))))
              (let ((mantissa (logior (ash 1 mantissa-nbits) ; hidden bit
                                      mantissa)))
                ;; Subtract the exponent bias and account for discrepancy in binary
