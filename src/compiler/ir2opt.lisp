@@ -398,7 +398,9 @@
                  ;; and do not correspond to any predecessors.
                  (setf (first info) (map 'vector
                                          (lambda (x)
-                                           (follow-jumps x nil))
+                                           (if (label-p x)
+                                               (follow-jumps x nil)
+                                               x))
                                          (first info)))
                  (when (second info)
                    (setf (second info) (follow-jumps (second info) nil)))))

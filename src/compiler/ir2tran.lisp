@@ -705,7 +705,7 @@
          (max (caar (last targets)))
          (otherwise (and otherwise
                          (block-label (cdr otherwise))))
-         (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+         (vector (make-array (1+ (- max min)) :initial-element (or otherwise 0))))
     (loop for (index . target) in targets
           do (setf (label-usedp
                     (setf (aref vector (- index min)) (block-label target)))
