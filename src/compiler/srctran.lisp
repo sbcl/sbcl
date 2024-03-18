@@ -7171,7 +7171,8 @@
                                                         (char-code key)
                                                         key)
                                         do (push (cons value target) new-targets)))
-             (change-jump-table-targets jump-table (nreconc new-targets (list otherwise)))
+             (change-jump-table-targets jump-table (nreconc new-targets (and otherwise
+                                                                             (list otherwise))))
 
              (if (characterp (first original-keys))
                  `(if-to-blocks (characterp key)
