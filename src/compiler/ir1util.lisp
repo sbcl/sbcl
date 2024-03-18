@@ -1350,12 +1350,13 @@
        (setf (jump-table-targets last)
              (if (eq new (component-tail comp))
                  (delete old (jump-table-targets last) :key #'cdr :test #'eq)
-                 (loop for (index . target) in (jump-table-targets last)
-                       collect (cons index (if (eq target old)
-                                               new
-                                               target)))))
-       (unless (memq new (block-succ block))
-         (link-blocks block new)))
+                 (prog1
+                     (loop for (index . target) in (jump-table-targets last)
+                           collect (cons index (if (eq target old)
+                                                   new
+                                                   target)))
+                   (unless (memq new (block-succ block))
+                     (link-blocks block new))))))
       (t
        (unless (memq new (block-succ block))
          (link-blocks block new)))))
