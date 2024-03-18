@@ -1356,7 +1356,10 @@
                                                    new
                                                    target)))
                    (unless (memq new (block-succ block))
-                     (link-blocks block new))))))
+                     (link-blocks block new)))))
+       (unless (cdr (block-succ block))
+         (flush-dest (jump-table-index last))
+         (unlink-node last)))
       (t
        (unless (memq new (block-succ block))
          (link-blocks block new)))))
