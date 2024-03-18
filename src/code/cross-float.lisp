@@ -903,6 +903,98 @@
 (define-flonum-extremizer sb-xc:max sb-xc:>)
 (define-flonum-extremizer sb-xc:min sb-xc:<)
 
+(defun wrap-two-arg-fun (fun value)
+  (lambda (&optional (x nil xp) y)
+    (if xp (funcall fun x y) value)))
+
+(defun sb-xc:+ (&rest args)
+  (flet ((two-arg-+ (x y)
+           (let ((format (pick-result-format x y)))
+             (cond
+               ((eql format 'rational) (cl:+ x y))
+               ((and (and (floatp x) (flonum-minus-zero-p x))
+                     (and (floatp y) (flonum-minus-zero-p y)))
+                (make-flonum :minus-zero format))
+               (t (flonum-from-rational (cl:+ (rational x) (rational y)) format))))))
+    (if (every #'rationalp args)
+        (apply #'cl:+ args)
+        (with-memoized-math-op (+ args)
+          (reduce (wrap-two-arg-fun #'two-arg-+ 0) args)))))
+
+(defun sb-xc:- (arg &rest rest &aux (args (cons arg rest)))
+  (flet ((one-arg-- (x)
+           (etypecase x
+             (rational (cl:- x))
+             (single-float (make-flonum (logxor (ash -1 31) (flonum-%bits x)) 'single-float))
+             (double-float (make-flonum (logxor (ash -1 63) (flonum-%bits x)) 'double-float))))
+         (two-arg-- (x y)
+           (let ((format (pick-result-format x y)))
+             (cond
+               ((eql format 'rational) (cl:- x y))
+               ((and (and (floatp x) (flonum-minus-zero-p x))
+                     (and (zerop y) (or (not (floatp y)) (not (flonum-minus-zero-p y)))))
+                (make-flonum :minus-zero format))
+               (t (flonum-from-rational (cl:- (rational x) (rational y)) format))))))
+    (if (every #'rationalp args)
+        (apply #'cl:- args)
+        (with-memoized-math-op (- args)
+          (if (null rest)
+              (one-arg-- arg)
+              (reduce #'two-arg-- args))))))
+
+(defun sgn (thing)
+  ;; return 1 or -1 if the sign bit of THING (as if converted to
+  ;; FLONUM) is unset or set respectively.
+  (typecase thing
+    ((eql 0) 1)
+    (rational (signum thing))
+    (float (if (float-sign-bit-set-p thing) -1 1))))
+
+(defun sb-xc:* (&rest args)
+  (flet ((two-arg-* (x y)
+           (let ((format (pick-result-format x y)))
+             (cond
+               ((eql format 'rational) (cl:* x y))
+               ((or (and (floatp x) (flonum-minus-zero-p x))
+                    (and (floatp y) (flonum-minus-zero-p y)))
+                (if (cl:= (sgn x) (sgn y))
+                    (coerce 0 format)
+                    (make-flonum :minus-zero format)))
+               (t (flonum-from-rational (cl:* (rational x) (rational y)) format))))))
+    (if (every #'rationalp args)
+        (apply #'cl:* args)
+        (with-memoized-math-op (* args)
+          (reduce (wrap-two-arg-fun #'two-arg-* 1) args)))))
+
+(defun sb-xc:/ (arg &rest rest &aux (args (cons arg rest)))
+  (flet ((one-arg-/ (x)
+           (cond
+             ((rationalp x) (cl:/ x))
+             ((zerop x)
+              (if (cl:= (float-sign-bit x) 1)
+                  (make-flonum :-infinity (flonum-format x))
+                  (make-flonum :+infinity (flonum-format x))))
+             (t (flonum-from-rational (cl:/ (rational x)) (flonum-format x)))))
+         (two-arg-/ (x y)
+           (let ((format (pick-result-format x y)))
+             (cond
+               ((eql format 'rational) (cl:/ x y))
+               ((and (zerop x) (zerop y))
+                (error "can't represent NaN for (/ 0 0)"))
+               ((zerop y)
+                (error "can't represent Inf for (/ x 0)"))
+               ((zerop x)
+                (if (cl:= (sgn x) (sgn y))
+                    (coerce 0 format)
+                    (make-flonum :minus-zero format)))
+               (t (flonum-from-rational (cl:/ (rational x) (rational y)) format))))))
+    (if (every #'rationalp args)
+        (apply #'cl:/ args)
+        (with-memoized-math-op (/ args)
+          (if (null rest)
+              (one-arg-/ arg)
+              (reduce #'two-arg-/ args))))))
+
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
 (defmacro sb-vm::with-float-traps-masked (traps &body body)
@@ -976,13 +1068,6 @@
                 (and (floatp arg)
                      (eq (flonum-%value arg) ,kind)))))
 
-  ;; Simple case of using the interceptor to return a float.
-  ;; As above, no funky values allowed.
-  (intercept (+) (&rest args)
-    (dispatch :me
-     (make-flonum (apply #':me (realnumify* args))
-                  (apply #'pick-result-format args))))
-
   (intercept (acos acosh asin asinh atan atanh conjugate cos cosh phase sin sinh tan tanh) (&rest args)
     (dispatch-float :me
      (make-flonum (apply #':me (realnumify* args))
@@ -1002,39 +1087,6 @@
           (dispatch :me
                     (make-flonum (funcall #':me (realnumify x))
                                  (pick-result-format x))))))
-
-  (intercept (*) (&rest args)
-    (dispatch :me
-              (let ((res (make-flonum (apply #':me (realnumify* (substitute-minus-zero args)))
-                                      (apply #'pick-result-format args))))
-                (if (evenp (+ (count $-0.0d0 args)
-                              (count $-0.0 args)))
-                    res
-                    (sb-xc:- res)))))
-
-  (intercept (/) (&rest args)
-    (if (and (= (length args) 2)
-             ;; ugly hack to avoid tripping up overflow trap
-             (eql (first args) $1.3407807929942596d154)
-             (eql (second args) $8.90029543402881d-308))
-        (make-flonum :+infinity (apply #'pick-result-format args))
-        (dispatch :me
-                  (let ((res (make-flonum (apply #':me (realnumify* (substitute-minus-zero args)))
-                                          (apply #'pick-result-format args))))
-                    (if (evenp (+ (count $-0.0d0 args)
-                                  (count $-0.0 args)))
-                        res
-                        (sb-xc:- res))))))
-
-  (intercept (-) (&rest args)
-    (dispatch :me
-              (if (cdr args)
-                  (make-flonum (apply #':me (realnumify* args))
-                               (apply #'pick-result-format args))
-                  (let* ((x (car args)) (format (flonum-format x)))
-                    (make-flonum (logxor (ash -1 (1- (float-format-bits format)))
-                                         (flonum-%bits x))
-                                 format)))))
 
 ) ; end MACROLET
 
@@ -1203,10 +1255,25 @@
   (assert (eq (make-flonum :minus-zero format) (make-flonum :minus-zero format)))
   (assert (eq (make-flonum :+infinity format) (make-flonum :+infinity format)))
   (assert (eq (make-flonum :-infinity format) (make-flonum :-infinity format)))
-  (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
-  (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
+  (assert (eq (sb-xc:+ (make-flonum :minus-zero format) (coerce 0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:+ (coerce 0 format) (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:+ (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (make-flonum :minus-zero format)))
   (assert (eq (sb-xc:- (coerce 0 format)) (make-flonum :minus-zero format)))
   (assert (eq (sb-xc:- (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
+  (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
+  (assert (eq (sb-xc:- (coerce 0 format) (coerce 0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:- (coerce 0 format) (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:- (make-flonum :minus-zero format) (coerce 0 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:- (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:* (coerce 0 format) (coerce 0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:* (make-flonum :minus-zero format) (coerce 0 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:* (coerce 0 format) (make-flonum :minus-zero format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:* (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:/ (make-flonum :minus-zero format) (coerce -1 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:/ (make-flonum :minus-zero format) (coerce 1 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:/ (coerce 0 format) (coerce -1 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:/ (coerce 0 format) (coerce 1 format)) (coerce 0 format)))
   (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (realnumify x)
