@@ -809,6 +809,24 @@
                    (error "missing entry for (LOG ~A 10)" number)))))))))
 
 ;;;;
+(defun float-infinity-p (flonum)
+  (typecase flonum
+    (single-float
+     (and (cl:= (%single-exponent-bits flonum) #xff) (cl:= (%single-mantissa-bits flonum) 0)))
+    (double-float
+     (and (cl:= (%double-exponent-bits flonum) #x7ff) (cl:= (%double-mantissa-bits flonum) 0)))))
+
+(defun float-nan-p (flonum)
+  (typecase flonum
+    (single-float
+     (and (cl:= (%single-exponent-bits flonum) #xff) (cl:/= (%single-mantissa-bits flonum) 0)))
+    (double-float
+     (and (cl:= (%double-exponent-bits flonum) #x7ff) (cl:/= (%double-mantissa-bits flonum) 0)))))
+
+(defun float-infinity-or-nan-p (flonum)
+  (typecase flonum
+    (single-float (cl:= (%single-exponent-bits flonum) #xff))
+    (double-float (cl:= (%double-exponent-bits flonum) #x7ff))))
 
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
@@ -833,17 +851,6 @@
 (defun %make-double-float (bits)
   (declare (type (signed-byte 64) bits))
   (make-flonum bits 'double-float))
-
-(defun float-infinity-p (x)
-  (member (flonum-%value x) '(:-infinity :+infinity)))
-
-(defun float-nan-p (x)
-  (and (null (flonum-%value x)) (eq (calculate-flonum-value x nil) :nan)))
-
-;;; Infinity and NaN have the same exponent value, but this definition avoids
-;;; making use of that fact, unlike the real definition which does.
-(defun float-infinity-or-nan-p (x)
-  (or (float-infinity-p x) (float-nan-p x)))
 
 (defconstant most-positive-single-float $+3.40282347F38)
 (defconstant most-negative-single-float $-3.40282347F38)
@@ -1198,15 +1205,21 @@
                  (make-flonum :minus-zero 'double-float))))
 (assert (not (eq (make-flonum :+infinity 'single-float) $0s0)))
 (dolist (format '(single-float double-float))
+  (assert (zerop (coerce 0 format)))
   (assert (zerop (make-flonum :minus-zero format)))
   (assert (float-infinity-p (make-flonum :+infinity format)))
+  (assert (float-infinity-or-nan-p (make-flonum :+infinity format)))
+  (assert (not (float-nan-p (make-flonum :+infinity format))))
   (assert (float-infinity-p (make-flonum :-infinity format)))
+  (assert (float-infinity-or-nan-p (make-flonum :-infinity format)))
+  (assert (not (float-nan-p (make-flonum :-infinity format))))
   (assert (eq (make-flonum :minus-zero format) (make-flonum :minus-zero format)))
   (assert (eq (make-flonum :+infinity format) (make-flonum :+infinity format)))
   (assert (eq (make-flonum :-infinity format) (make-flonum :-infinity format)))
   (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
   (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
   (assert (eq (sb-xc:- (coerce 0 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:- (make-flonum :minus-zero format)) (coerce 0 format)))
   (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (realnumify x)
@@ -1215,7 +1228,9 @@
     (let ((nan (make-single-float #b01111111101000000000000000000000)))
       ;;                             [ exp  ]
       (assert-not-number nan)
-      (assert (float-nan-p nan)))
+      (assert (float-nan-p nan))
+      (assert (float-infinity-or-nan-p nan))
+      (assert (not (float-infinity-p nan))))
     (dolist (symbol '(:+infinity :-infinity :minus-zero))
       (assert-not-number (make-flonum symbol format))))))
 
