@@ -2020,15 +2020,27 @@
                 thereis (typep (code-header-ref code index) 'complex))))
   (fmakunbound test))
 
-;;; An example that we can't cross-compile: CTYPE-OF-NUMBER tries to compute
-;;; low/high bounds so that it can return (COMPLEX (SINGLE-FLOAT <LOW> <HIGH>))
-;;; but we haven't taught the MIN,MAX interceptors how to operate on infinity.
-#+nil
 (defun more-folding ()
   (values (complex single-float-positive-infinity single-float-positive-infinity)
           (complex single-float-negative-infinity single-float-positive-infinity)
           (complex single-float-negative-infinity single-float-negative-infinity)
           (complex single-float-positive-infinity single-float-negative-infinity)))
+
+#-sb-xc-host
+(multiple-value-bind (a b c d) (funcall 'more-folding)
+  (assert (sb-ext:float-infinity-p (realpart a)))
+  (assert (sb-ext:float-infinity-p (imagpart a)))
+  (assert (sb-ext:float-infinity-p (realpart b)))
+  (assert (sb-ext:float-infinity-p (imagpart b)))
+  (assert (sb-ext:float-infinity-p (realpart c)))
+  (assert (sb-ext:float-infinity-p (imagpart c)))
+  (assert (sb-ext:float-infinity-p (realpart d)))
+  (assert (sb-ext:float-infinity-p (imagpart d)))
+  (let ((code (fun-code-header (symbol-function 'more-folding))))
+    (aver (loop for index from sb-vm:code-constants-offset
+                below (code-header-words code)
+                thereis (typep (code-header-ref code index) 'complex))))
+  (fmakunbound 'more-folding))
 
 #+round-float
 (deftransform fround ((number &optional divisor) (double-float &optional t))

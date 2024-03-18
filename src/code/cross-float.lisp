@@ -861,14 +861,15 @@
              (if (cl:< ra rb) -1 1))))))
 
 (defmacro define-flonum-comparator (name form)
-  `(defun ,name (&rest args)
-     (if (every #'rationalp args)
-         (apply #',(intern (string name) "CL") args)
-         (with-memoized-math-op (,name args)
-           (loop for (a b) on args
-                 while b
-                 always (let ((c (numeric-compare a b)))
-                         ,form))))))
+  (let ((clname (intern (string name) "CL")))
+    `(defun ,name (&rest args)
+       (if (every #'rationalp args)
+           (apply #',clname args)
+           (with-memoized-math-op (,clname args)
+             (loop for (a b) on args
+                   while b
+                   always (let ((c (numeric-compare a b)))
+                            ,form)))))))
 
 (define-flonum-comparator sb-xc:< (eql c -1))
 (define-flonum-comparator sb-xc:<= (or (eql c -1) (eql c 0)))
@@ -887,6 +888,20 @@
               always (loop for b in rest
                            for c = (numeric-compare a b)
                            always (cl:/= c 0))))))
+
+(defmacro define-flonum-extremizer (name comparator)
+  (let ((clname (intern (string name) "CL")))
+    `(defun ,name (arg &rest rest &aux (args (cons arg rest)))
+       (if (every #'rationalp args)
+           (apply #',clname args)
+           (with-memoized-math-op (,clname args)
+             (let ((ret arg))
+               (dolist (a rest ret)
+                 (when (,comparator a ret)
+                   (setf ret a)))))))))
+
+(define-flonum-extremizer sb-xc:max sb-xc:>)
+(define-flonum-extremizer sb-xc:min sb-xc:<)
 
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
@@ -963,7 +978,7 @@
 
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
-  (intercept (max min +) (&rest args)
+  (intercept (+) (&rest args)
     (dispatch :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-result-format args))))
