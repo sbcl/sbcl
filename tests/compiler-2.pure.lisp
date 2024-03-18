@@ -2682,7 +2682,7 @@
     (((expt 2 (1- sb-vm:n-word-bits)) #xFFFFFF) -1)
     (((1- (expt 2 (1- sb-vm:n-word-bits))) #xFFFFFF) -16777216)))
 
-#+#.(cl:if (cl:gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-template-names*)
+#+#.(cl:if (cl:gethash 'sb-c:jump-table sb-c::*backend-template-names*)
            '(:and)
            '(:or))
 (with-test (:name :typecase-to-case-preserves-type)

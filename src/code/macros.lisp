@@ -947,56 +947,6 @@ invoked. In that case it will store into PLACE and start over."
                           `((etypecase-failure ,temp ',type-specs))
                           (cdr default)))))))))
 
-(defun expand-hash-case (normal-clauses key-lists constants default errorp keyform phash-lexpr)
-  (let* ((keys (apply #'append key-lists))
-         (temp '#1=#:key) ; GENSYM considered harmful
-         (object-hash (sb-c::prehash-for-perfect-hash temp keys))
-         (hashfn
-          (sb-c::compile-perfect-hash
-           `(lambda (,temp) (,phash-lexpr ,object-hash))
-           (coerce keys 'vector)))
-         ;; If constants: (length normal-clauses) = (length constants), but the key count
-         ;; determines the value array length since we map 1:1 from key to value
-         ;; rather than key to clause number. The compiler will do the right thing with EQ
-         ;; value elements. (I hope other Lisps are ok with it when cross-compiling)
-         (result-vector
-          (make-array (length (if constants keys key-lists))
-                      :initial-element nil))
-         (key-vector (make-array (length keys)
-                                 :element-type
-                                 (cond #+sb-unicode ((every #'base-char-p keys) 'base-char)
-                                       ((every #'characterp keys) 'character)
-                                       (t 't)))))
-    (loop for key-list in key-lists
-          for index from 0
-          do (dolist (key key-list)
-               (let ((phash (funcall hashfn key)))
-                 (setf (aref key-vector phash) key)
-                 (if constants
-                     (setf (aref result-vector phash) (aref constants index))
-                     (push phash (aref result-vector index))))))
-    (when (simple-vector-p keys)
-      (setq keys (sb-c::coerce-to-smallest-eltype keys)))
-    `(let* ((#1# ,keyform)
-            (h (,phash-lexpr ,object-hash)))
-       ;; EQL reduces to EQ for all object this expanders accepts as keys
-       (if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
-           ,(if constants
-                (let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
-                  (if all-equal
-                      `',(aref result-vector 0)
-                      `(aref ,result-vector h)))
-                `(case (truly-the (mod ,(length key-vector)) h)
-                   ,@(loop for clause in normal-clauses for index from 0
-                           collect (cons (aref result-vector index) (cdr clause)))
-                   ;; UNREACHABLE is needed to ensure that we don't derive a type
-                   ;; that conflicts with an assertion. The compiler thinks that despite
-                   ;; TRULY-THE on H, it might not match a clause of the new CASE form.
-                   (t (unreachable))))
-           ,(if errorp
-                `(ecase-failure #1# ,(coerce keys 'simple-vector))
-                (if default `(progn ,@(cdr default))))))))
-
 (defun should-attempt-hash-based-case-dispatch (keys)
   ;; Guess a good minimum table size, with a slight bias against using the xperfecthash files.
   ;; If there are a mixture of key types, penalize slightly be requiring a larger minimum
@@ -1142,78 +1092,49 @@ invoked. In that case it will store into PLACE and start over."
     (when (and (neq errorp 'cerror)
                (boundp 'sb-c::*current-component*)
                (sb-c:policy lexenv (> sb-c:jump-table 0))
-               (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
-                   (sb-c::vop-existsp :named sb-c:jump-table)))
+               (sb-c::vop-existsp :named sb-c:jump-table))
       (let* ((default (if (eq (caar clauses) 't) (car clauses)))
              (normal-clauses (reverse (if default (cdr clauses) clauses))))
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
-        ;; depending on constant-ness of results. A set of keys that in and of itself
-        ;; forms a jump table warrants no examination as to suitability for hash-based
-        ;; clause selection. i.e. Only try hashing if the keys are not already "nice"
-        ;; for the multiway-branch-if-eq vop
+        ;; depending on constant-ness of results.
         (cond ((and (eq test 'eql)
                     (should-attempt-hash-based-case-dispatch keys))
-               (let ((constants
-                       (when (every (lambda (clause) (constantp `(progn ,@(cdr clause)) lexenv))
-                                    normal-clauses)
-                         ;; TODO: use specialized vector if possible
-                         (map 'simple-vector
-                              (lambda (clause)
-                                (constant-form-value `(progn ,@(cdr clause)) lexenv))
-                              normal-clauses))))
-                (sb-c::if-vop-existsp (:named sb-c::jump-table)
-                  (let* ((seen (alloc-xset))
-                         (tested (if default (butlast specified-clauses) specified-clauses))
-                         (key-lists
-                           (loop for clause in tested
-                                 collect (mapcan (lambda (key)
-                                                   (unless (xset-member-p key seen)
-                                                     (add-to-xset key seen)
-                                                     (list key)))
-                                                 (ensure-list (car clause))))))
-
-                    (return-from case-body
-                      `(let ((,keyform-value ,keyform))
-                         ,(if constants
-                              `(sb-c:case-to-jump-table ,keyform-value ',key-lists ',constants
-                                                        ,(if default
-                                                             `(lambda () ,@(cdr default)))
-                                                        ',errorp)
-                              `(sb-c:jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
-                                                ,@(loop for (nil . form) in tested
-                                                        for keys in key-lists
-                                                        for i from 0
-                                                        collect `(,i
-                                                                  (sb-c::%type-constraint ,keyform-value '(member ,@keys))
-                                                                  ,@form))
-                                                (otherwise
-                                                 (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
-                                                 ,@(if errorp
-                                                       `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
-                                                       (cdr default))))))))
-                  (binding*
-                      ((lexpr (and
-                               ;; Try hash-based only if the keys are not _already_
-                               ;; nice for a jump table exactly as they are.
-                               (not (sb-c::suitable-jump-table-keys-p keys))
-                               (sb-c::perfectly-hashable keys))
-                              :exit-if-null))
-                    ;; Put each group of keys into canonical form: no intra-clause duplicates
-                    ;; and no key shadowed by an earlier clause. TBH we should do this always.
-                    ;; Re-scan the original clauses to extract unique keys rather than parsing
-                    ;; the clauses built up that contain EQL calls.
-                    (let ((seen (alloc-xset))
-                          (key-lists nil))
-                      (dolist (clause (if default (butlast specified-clauses) specified-clauses))
-                        (push (mapcan (lambda (key)
-                                        (unless (xset-member-p key seen)
-                                          (add-to-xset key seen)
-                                          (list key)))
-                                      (ensure-list (car clause)))
-                              key-lists))
-                      (return-from case-body
-                        (expand-hash-case normal-clauses (nreverse key-lists) constants
-                                          default errorp keyform lexpr)))))))
+               (let* ((constants
+                        (when (every (lambda (clause) (constantp `(progn ,@(cdr clause)) lexenv))
+                                     normal-clauses)
+                          ;; TODO: use specialized vector if possible
+                          (map 'simple-vector
+                               (lambda (clause)
+                                 (constant-form-value `(progn ,@(cdr clause)) lexenv))
+                               normal-clauses)))
+                      (seen (alloc-xset))
+                      (tested (if default (butlast specified-clauses) specified-clauses))
+                      (key-lists
+                        (loop for clause in tested
+                              collect (mapcan (lambda (key)
+                                                (unless (xset-member-p key seen)
+                                                  (add-to-xset key seen)
+                                                  (list key)))
+                                              (ensure-list (car clause))))))
+                 (return-from case-body
+                   `(let ((,keyform-value ,keyform))
+                      ,(if constants
+                           `(sb-c:case-to-jump-table ,keyform-value ',key-lists ',constants
+                                                     ,(if default
+                                                          `(lambda () ,@(cdr default)))
+                                                     ',errorp)
+                           `(sb-c:jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
+                                             ,@(loop for (nil . form) in tested
+                                                     for keys in key-lists
+                                                     for i from 0
+                                                     collect `(,i
+                                                               (sb-c::%type-constraint ,keyform-value '(member ,@keys))
+                                                               ,@form))
+                                             (otherwise
+                                              (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
+                                              ,@(if errorp
+                                                    `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
+                                                    (cdr default)))))))))
               ((eq test 'typep)
                (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
                                               default errorp)

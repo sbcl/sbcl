@@ -1167,23 +1167,19 @@
       (princ #\}))
     (pprint-newline :linear)
     (when (vop-codegen-info vop)
-      (case (vop-name vop)
-       (multiway-branch-if-eq
-        (princ (vop-codegen-info vop)))
-       (t
-        (princ (%with-output-to-string (stream)
-                 ;; Current print depth varies based on whether PRINT-VOP
-                 ;; is called by DESCRIBE-IR2-COMPONENT or TRACE-INSTRUCTION,
-                 ;; so any fixed value of *PRINT-LEVEL* changes its effect
-                 ;; depending on the call context. Resetting depth to 0 seems
-                 ;; like the best way to get consistent output.
-                 ;; We shouldn't bind the printer limits to NIL, because
-                 ;; hairy internal objects such as ENVIRONMENT can be printed.
-                 ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
-                 (let (#-sb-xc-host (*current-level-in-print* 0)
-                       (*print-level* 2)
-                       (*print-length* 15))
-                   (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))))
+      (princ (%with-output-to-string (stream)
+               ;; Current print depth varies based on whether PRINT-VOP
+               ;; is called by DESCRIBE-IR2-COMPONENT or TRACE-INSTRUCTION,
+               ;; so any fixed value of *PRINT-LEVEL* changes its effect
+               ;; depending on the call context. Resetting depth to 0 seems
+               ;; like the best way to get consistent output.
+               ;; We shouldn't bind the printer limits to NIL, because
+               ;; hairy internal objects such as ENVIRONMENT can be printed.
+               ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
+               (let (#-sb-xc-host (*current-level-in-print* 0)
+                     (*print-level* 2)
+                     (*print-length* 15))
+                 (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))
       (pprint-newline :linear))
     (when (vop-results vop)
       (princ "=> ")
@@ -1270,8 +1266,9 @@
 (defun print-all-blocks (thing)
   (do-blocks (block (block-component (block-or-lose thing)))
     (handler-case (print-nodes block)
-      (error (condition)
-        (format t "~&~A...~%" condition))))
+      ;; (error (condition)
+      ;;   (format t "~&~A...~%" condition))
+      ))
   (values))
 
 (defvar *list-conflicts-table*)

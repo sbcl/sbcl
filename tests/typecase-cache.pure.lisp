@@ -1,4 +1,4 @@
-(unless (cl:gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-template-names*)
+(unless (cl:gethash 'sb-c:jump-table sb-c::*backend-template-names*)
   (invoke-restart 'run-tests::skip-file))
 
 (defstruct animal)

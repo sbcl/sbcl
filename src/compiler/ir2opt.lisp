@@ -389,17 +389,19 @@
                    (unchain-jumps prev))))
               (branch-if
                (unchain-jumps last))
-              (multiway-branch-if-eq
-               ;; codegen-info = (labels else-label key-type keys original-comparator)
+              (jump-table
+               ;; codegen-info = (targets otherwise ...)
                (let ((info (vop-codegen-info last)))
                  ;; Don't delete the branches when they reach zero
                  ;; predecessors as multiway-branch-if-eq inserts
                  ;; extra jumps which are not in the original ir2
                  ;; and do not correspond to any predecessors.
-                 (setf (car info) (mapcar (lambda (x)
-                                            (follow-jumps x nil))
-                                          (car info))
-                       (cadr info) (follow-jumps (cadr info) nil))))
+                 (setf (first info) (map 'vector
+                                         (lambda (x)
+                                           (follow-jumps x nil))
+                                         (first info)))
+                 (when (second info)
+                   (setf (second info) (follow-jumps (second info) nil)))))
               (t
                (when (conditional-p last)
                  (unchain-jumps last)))))))
@@ -596,275 +598,6 @@
                     (change-tn-ref-tn args x)
                     (setf (tn-ref-load-tn args) nil)))))))
         nil))))
-
-;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
-;;; of the test is an immediate value, then return the conditional vop.
-;;; There may optionally be a MOVE vop prior to the conditional test,
-;;; and optionally an unconditional BRANCH after the conditional branch.
-(defun ends-in-branch-if-eq-imm-p (2block)
-  ;; This test occurs in two flavors: for backends in which IF-EQ takes codegen
-  ;; args for TARGET and NOT-P, such as ppc64; and backends in which IF-EQ returns
-  ;; its result in the flags without causing control flow, such as x86.
-  ;; Rather than make this feature-dependent, we'll can look at whether the
-  ;; VOP-INFO-RESULT-TYPES of IF-EQ is :CONDITIONAL versus (:CONDITIONAL <flag>).
-  (let ((vop (let ((last-vop (ir2-block-last-vop 2block)))
-               ;; Final BRANCH can be ignored. Finding the if/else chain is based on successors.
-               ;; It's fair to assume that the branch corresponds to the "other" successor.
-               (when (and last-vop (eq (vop-name last-vop) 'branch))
-                 (setq last-vop (vop-prev last-vop)))
-               ;; See if we're looking at a BRANCH-IF
-               (if (and last-vop (eq (vop-name last-vop) 'branch-if))
-                 (vop-prev last-vop)
-                 last-vop))))
-    (when (and vop
-               (or (and (eq (vop-name vop) 'if-eq)
-                        (let ((comparand (tn-ref-tn (tn-ref-across (vop-args vop)))))
-                          (and (eq (tn-kind comparand) :constant)
-                               ;; a load-time-value constant TN has no leaf
-                               (tn-leaf comparand)
-                               (typep (tn-value comparand) '(or fixnum character)))))
-                   ;; Thanks to schizophrenic compiler transforms,
-                   ;; character comparisons can show up as either of
-                   ;; the first two vops.
-                   (member (vop-name vop) '(sb-vm::fast-char=/character/c
-                                            sb-vm::fast-if-eq-character/c
-                                            sb-vm::fast-if-eq-fixnum/c))))
-      ;; Do some extra work when the IF is preceded by a MOVE
-      (let ((test (tn-ref-tn (vop-args vop)))
-            (prev (vop-prev vop)))
-        ;; If: - The arg to IF is the result of a move
-        ;;     - The result of the move goes nowhere but the IF
-        ;; then the move is into a TN that is dead as soon as the
-        ;; IF happens; a multiway branch is potentially ok.
-        (if (and prev
-                 (eq (vop-name prev) 'move)
-                 (and (eq (tn-ref-tn (vop-results prev)) test)
-                      (null (tn-ref-next (tn-writes test)))  ; exactly 1 write
-                      (null (tn-ref-next (tn-reads test))))) ; exactly 1 read
-            prev
-            vop)))))
-
-;;; Return T if and only if 2BLOCK has exactly two successors
-(defun exactly-two-successors-p (2block)
-  (let ((successors (cdr (gethash 2block *2block-info*))))
-    (singleton-p (cdr successors))))
-
-;;; Compute the longest chain of if/else operations starting at VOP.
-;;; This is a simple task, as all we have to do is follow the 'else' of each IF.
-;;; Primary return value is (((value . block) ...) drop-thru vop-name).
-;;; Secondary value is a list of blocks to delete.
-;;; If code coverage is enabled, it should theoretically be possible to find
-;;; the if-else chain, but in practice it won't happen, because each else block
-;;; is cluttered up by the coverage noise prior to performing the next comparison.
-;;; It's probably just as well, because the coverage report would have no idea
-;;; how to decode the recorded information from the multiway branch vop.
-;;; Not to mention, SB-ASSEM::%MARK-USED-LABELS does not understand that labels
-;;; in the branch table are all used. So there's that to contend with too.
-(defun longest-if-else-chain (start-vop)
-  (let (chain
-        blocks-to-delete
-        (test-var (tn-ref-tn (vop-args start-vop)))
-        (vop start-vop))
-    (loop
-     (binding* ((block (vop-block vop))
-                (conditional (if (eq (vop-name vop) 'move) (vop-next vop) vop))
-                (codegen-info
-                 (vop-codegen-info
-                  (ecase (vop-name conditional)
-                   ((if-eq
-                     sb-vm::fast-if-eq-fixnum/c
-                     sb-vm::fast-if-eq-character/c
-                     sb-vm::fast-char=/character/c)
-                    (if (eq (vop-info-result-types (vop-info conditional)) :conditional)
-                        conditional ; this vop (IF-EQ) is a branching vop
-                        (let ((next (vop-next conditional)))
-                          (aver (eq (vop-name next) 'branch-if))
-                          next))))))
-                ;; codegen-info = (label negate-p [flags])
-                (target-block (gethash (car codegen-info) *2block-info*))
-                ;; successors are listed in an indeterminate order (I think)
-                (successors (cdr (gethash block *2block-info*)))
-                (drop-thru (car (if (eq (car successors) target-block)
-                                    (cdr successors)
-                                    successors)))
-                ((then-block else-block)
-                 (if (cadr codegen-info)
-                     (values drop-thru target-block)
-                     (values target-block drop-thru))))
-       ;; If the ELSE block was the branch target (a negated branch),
-       ;; then the THEN block might have no label as it is a dropthru.
-       ;; Label it now in case of that.
-       (or (ir2-block-%label then-block)
-           (setf (ir2-block-%label then-block) (gen-label)))
-       (when chain
-         (push block blocks-to-delete))
-       (let ((val (if (eq (vop-name conditional) 'if-eq)
-                      ;; if-eq takes a constant TN
-                      (tn-value (tn-ref-tn (tn-ref-across (vop-args conditional))))
-                      ;; "-eq-/C" vops take a codegen arg
-                      (car (vop-codegen-info conditional))))
-             (else-block-predecessors (ir2block-predecessors else-block))
-             (else-vop (ir2-block-start-vop else-block)))
-         (push (cons val then-block) chain)
-         ;; If ELSE block has more than one predecessor, that's OK,
-         ;; but the chain must stop at this IF.
-         (unless (and (and (singleton-p else-block-predecessors)
-                           (eq (car else-block-predecessors) block))
-                      else-vop
-                      (eq (ends-in-branch-if-eq-imm-p (vop-block else-vop))
-                          else-vop)
-                      (eq (tn-ref-tn (vop-args else-vop)) test-var)
-                      (exactly-two-successors-p else-block))
-           (unless (cdr chain) ; does this IF start a chain of length at least 2?
-             (return-from longest-if-else-chain (values nil nil)))
-           ;; The else block could have been the fallthru of the last IF,
-           ;; so it may not have needed a label, but now it does need one.
-           (or (ir2-block-%label else-block)
-               (setf (ir2-block-%label else-block) (gen-label)))
-           ;; the chain is order-insensitive but more understandable
-           ;; if returned in the order that tests appeared in source.
-           (return (values (list (nreverse chain)
-                                 else-block
-                                 (vop-name conditional))
-                           blocks-to-delete)))
-         (setq vop (ir2-block-start-vop else-block)))))))
-
-;;; Return T if KEYS are all of a type that is _directly_ amenable to being
-;;; the branch selector in the multiway branch vop, and are within a sufficiently
-;;; dense range that the resulting table of assembler labels would be reasonably full.
-;;; Finally, ensure that any operand encoding restrictions would be adhered to.
-(defun suitable-jump-table-keys-p (keys)
-  (unless keys
-    (return-from suitable-jump-table-keys-p nil))
-  (cond ((every #'fixnump keys))
-        ((every #'characterp keys) (setq keys (mapcar #'char-code keys)))
-        (t (return-from suitable-jump-table-keys-p nil)))
-  ;; There could be a backend-aware aspect to the decision about whether to
-  ;; convert to a jump table.
-  (flet ((can-encode (min max)
-           (declare (ignorable min max))
-           #+(or ppc ppc64)
-           (and (typep (sb-vm:fixnumize min) '(signed-byte 16))
-                (typep (sb-vm:fixnumize (- max min)) '(signed-byte 16)))
-           #+(or x86 x86-64 arm64) t))
-    (let* ((min (reduce #'min keys))
-           (max (reduce #'max keys))
-           (table-size (1+ (- max min)))
-           ;; TOOD: this size could be reduced now. For spread-out fixnum keys,
-           ;; we'll use a perfect hash, making the table exactly sized.
-           ;; So the situation where low load factor is beneficial are few.
-           (size-limit (* (length keys) 2)))
-      ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
-      ;; for 4 entries, which is excessive.
-      (and (<= table-size size-limit)
-           (can-encode min max)))))
-
-;;; FIXME: notwithstanding the above function being used by the CASE macroexpander,
-;;; something is definitely still going wrong in how it co-operates with
-;;; IR2 optimization, because the following functions have very different codegen.
-;;; In each example, the CASE macro expands using a perfect hash, expecting to dispatch
-;;; via multiway branch. But only examples 1 and 3 do. I think we're incorrectly
-;;; counting the number of ways the table would branch. Printing inserted into
-;;; SHOULD-USE-JUMP-TABLE-P indicated the wrong number in (LENGTH CHOICES).
-;;;
-;;; Example 1: this shows that 4 keys suffices to get a jump table
-;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) (:d 'hey))) ; 4-entry jump table
-;;; Example 2: this seems to think there are not at least 4 ways?
-;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e f) :feep))) ; No table
-;;; Example 3: why does this one work?
-;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e f g) :feep))) ; 7-entry table
-;;; Example 4: super weird because no matter how you count - clauses or jump table lines -
-;;;            there are at _least_ 4 ways, which we established above to be adequate.
-;;; * (defun f (x) (case x (a 1) (b 2) (c (print'hi)) ((d e) :feep) ((f g) 'wat))) ; No table
-;;;
-;;; In light of this failing, could we insert something lexical (i.e. in LEXENV)
-;;; to force the decision to use a jump table when IR2 gets around to this?
-
-;;; Decide whether CHAIN can be implemented as a multiway branch.
-;;; As a further enhancement, it would be nice if we could factor out the
-;;; parts that can be, if any can be.
-;;; e.g. (case x (1 :a) (2 :b) (3 :c) (zot 'y)) ; with any order of tests
-;;; could be expressed as (if (eq x 'zot) y [multiway-branch])
-(defun should-use-jump-table-p (chain &aux (choices (car chain)))
-  ;; Dup keys could exist. REMOVE-DUPLICATES from-end can handle that:
-  ;;  "the one occurring earlier in sequence is discarded, unless from-end
-  ;;   is true, in which case the one later in sequence is discarded."
-  (let ((choices (remove-duplicates choices :key #'car :from-end t)))
-    ;; Convert to multiway only if at least 4 key comparisons would be needed.
-    (unless (>= (length choices) 4)
-      (return-from should-use-jump-table-p nil))
-    (when (suitable-jump-table-keys-p (mapcar #'car choices))
-      ;; Return the new choices
-      (cons choices (cdr chain)))))
-
-(defun convert-if-else-chains (component)
-  (do-ir2-blocks (2block component)
-    (let ((head (ends-in-branch-if-eq-imm-p 2block)))
-      (when (and head (exactly-two-successors-p 2block))
-        (binding* (((chain delete-blocks) (longest-if-else-chain head))
-                   (culled-chain (should-use-jump-table-p chain) :exit-if-null)
-                   (node (vop-node head))
-                   (src-ref (vop-args head)))
-          (flet ((delete-test (vop)
-                   ;; delete 1 to 4 vops starting at VOP, depending on whether
-                   ;; there is an initial MOVE and/or final BRANCH,
-                   ;; and whether IF-EQ requires a following BRANCH-IF.
-                   (awhen (vop-next vop) (delete-vop it))
-                   (awhen (vop-next vop) (delete-vop it))
-                   (awhen (vop-next vop) (delete-vop it))
-                   (delete-vop vop)))
-            (delete-test head)
-            ;; Delete vops that are bypassed
-            (dolist (2block delete-blocks)
-              (delete-test (ir2-block-start-vop 2block))
-              ;; there had better be no vops remaining
-              (aver (null (ir2-block-start-vop 2block)))
-              ;; The block can't be reached, and goes nowhere.
-              (update-block-succ 2block nil)))
-          (destructuring-bind (clauses else-block test-vop-name) culled-chain
-            (let* ((key-type (if (characterp (caar clauses)) 'character 'fixnum))
-                   (clause-keyfn (if (eq key-type 'character)
-                                     (lambda (x) (char-code (car x)))
-                                     #'car))
-                   ;; Sort and unzip the alist
-                   (ordered (sort (copy-list clauses) #'< :key clause-keyfn))
-                   (keys (mapcar clause-keyfn ordered))
-                   (blocks (mapcar #'cdr ordered))
-                   (labels (mapcar #'ir2-block-%label blocks))
-                   (otherwise (ir2-block-%label else-block)))
-              ;; Sometimes an IR1 optimization hampers detection of the original comparands
-              ;; making it seem like not all branches were covered. If we have this in source:
-              ;;   (CASE (TRULY-THE (MOD 4 X)) (1 ...) (2 ...) (3 ...) (0 'THING))
-              ;; then we will see IF nodes testing all of 1, 2, 3, 0, and an otherwise of NIL.
-              ;; But if the 0 case returns NIL, then the final branch of the COND resembles
-              ;; ((EQL #:G1 '0) NIL NIL) which is flushed because both consequents of the IF
-              ;; do the same thing. So then we'll only see IF nodes for 1, 2, 3.
-              ;; This is bad because it doesn't allow elision of the bounds check on the
-              ;; multiway branch. So if the derived type has one more possibility at either end,
-              ;; add it in directing flow to the OTHERWISE label.
-              ;; This could be unkindly construed as a kludge.
-              (let ((key-derived-type (tn-ref-type src-ref)))
-                (when (and (eq key-type 'fixnum)
-                           (typep key-derived-type 'numeric-type)
-                           (csubtypep key-derived-type (specifier-type 'fixnum)))
-                  (let ((min (car keys))
-                        (max (car (last keys))))
-                    (when (eql min (1+ (numeric-type-low key-derived-type)))
-                      (push (numeric-type-low key-derived-type) keys)
-                      (push otherwise labels))
-                    (when (eql max (1- (numeric-type-high key-derived-type)))
-                      (setf keys (nconc keys (list (numeric-type-high key-derived-type))))
-                      (setf labels (nconc labels (list otherwise)))))))
-              (dolist (label labels)
-                (setf (label-usedp label) t))
-              (emit-and-insert-vop node 2block
-                                   (template-or-lose 'multiway-branch-if-eq)
-                                   (reference-tn (tn-ref-tn src-ref) nil) nil nil
-                                   (list labels otherwise key-type keys test-vop-name))
-              ;; De-duplicate the successor blocks and update the flowgraph.
-              ;; The ELSE block could be identical to any of the THEN blocks.
-              (update-block-succ
-               2block (remove-duplicates (cons else-block blocks))))))))))
 
 (defun component-remove-constant (constant constants)
   (let ((index (position constant constants)))
@@ -1669,10 +1402,6 @@
            ;; purpose of helping figure out what changes were made to IR2.
            (format t "~&Before IR2-optimize:~%")
            (print-ir2-blocks component)))
-       ;; Look for if/else chains before cmovs, because a cmov
-       ;; affects whether the last if/else is recognizable.
-       (when-vop-existsp (:named multiway-branch-if-eq)
-         (convert-if-else-chains component))
        (run-vop-optimizers component)
        (delete-unused-ir2-blocks component))))
 

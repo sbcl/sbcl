@@ -6933,9 +6933,6 @@
                                                       'a)
                                             ,max)))
                       (return-from or-eq-transform t))))
-                #+ (or ppc ppc64 x86 x86-64) ;; breaks jump-tables
-                (when (>= (length chain) 4)
-                  (return-from or-eq-transform))
                 ;; Turn into a bit mask
                 (let (min max)
                   (when (and (> (length constants) 2)
@@ -7046,6 +7043,36 @@
           do (unlink-blocks block succ))
     (setf (jump-table-targets jump-table) new-targets)
     (reoptimize-node jump-table)))
+
+;;; Return T if KEYS are all of a type that is _directly_ amenable to being
+;;; the branch selector in the jump-table vop, and are within a sufficiently
+;;; dense range that the resulting table of assembler labels would be reasonably full.
+;;; Finally, ensure that any operand encoding restrictions would be adhered to.
+(defun suitable-jump-table-keys-p (keys)
+  (unless keys
+    (return-from suitable-jump-table-keys-p nil))
+  (cond ((every #'fixnump keys))
+        ((every #'characterp keys) (setq keys (mapcar #'char-code keys)))
+        (t (return-from suitable-jump-table-keys-p nil)))
+  ;; There could be a backend-aware aspect to the decision about whether to
+  ;; convert to a jump table.
+  (flet ((can-encode (min max)
+           (declare (ignorable min max))
+           #+(or ppc ppc64)
+           (and (typep (sb-vm:fixnumize min) '(signed-byte 16))
+                (typep (sb-vm:fixnumize (- max min)) '(signed-byte 16)))
+           #+(or x86 x86-64 arm64) t))
+    (let* ((min (reduce #'min keys))
+           (max (reduce #'max keys))
+           (table-size (1+ (- max min)))
+           ;; TOOD: this size could be reduced now. For spread-out fixnum keys,
+           ;; we'll use a perfect hash, making the table exactly sized.
+           ;; So the situation where low load factor is beneficial are few.
+           (size-limit (* (length keys) 2)))
+      ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
+      ;; for 4 entries, which is excessive.
+      (and (<= table-size size-limit)
+           (can-encode min max)))))
 
 (defun expand-hash-case-for-jump-table (keys key-lists targets &optional constants default errorp)
   (let* ((phash-lexpr (or (perfectly-hashable keys)
