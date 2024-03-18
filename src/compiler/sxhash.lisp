@@ -230,7 +230,7 @@
                               (function (* char) int system-area-pointer int))
                              (logior (if minimal 1 0) (if fast 2 0))
                              (sb-sys:vector-sap array) (length array))))))
-                  (let* ((string 
+                  (let* ((string
                            (or (findit minimal)
                                (and minimal
                                     (= (length array) (power-of-two-ceiling (length array)))

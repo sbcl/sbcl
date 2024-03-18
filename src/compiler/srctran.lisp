@@ -7051,9 +7051,9 @@
   (let* ((phash-lexpr (or (perfectly-hashable keys)
                           (return-from expand-hash-case-for-jump-table (values nil nil))))
          (temp '#1=#:key)               ; GENSYM considered harmful
-         (object-hash (sb-c::prehash-for-perfect-hash temp keys))
+         (object-hash (prehash-for-perfect-hash temp keys))
          (hashfn
-           (sb-c::compile-perfect-hash
+           (compile-perfect-hash
             `(lambda (,temp) (,phash-lexpr ,object-hash))
             (coerce keys 'vector)))
          (result-vector
@@ -7078,7 +7078,7 @@
                         (push (cons phash target) new-targets)
                         (push phash (aref result-vector index)))))))
     (when (simple-vector-p keys)
-      (setq keys (sb-c::coerce-to-smallest-eltype keys)))
+      (setq keys (coerce-to-smallest-eltype keys)))
     (values `(let* ((#1# key)
                     (h (,phash-lexpr ,object-hash)))
                ;; EQL reduces to EQ for all object this expanders accepts as keys
