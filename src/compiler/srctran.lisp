@@ -7177,7 +7177,7 @@
 
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
-         (original-keys (flatten-list key-lists))
+         (original-keys (reduce #'append key-lists))
          (jump-table (node-dest node))
          (jump-table (and (jump-table-p jump-table)
                           jump-table))
