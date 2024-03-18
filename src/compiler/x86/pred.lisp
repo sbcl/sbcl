@@ -45,43 +45,30 @@
                 (first flags))
             dest))))
 
-(define-vop (multiway-branch-if-eq)
-  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:info labels otherwise key-type keys test-vop-name)
-  (:temporary (:sc unsigned-reg) index)
-  (:ignore test-vop-name)
-  (:generator 10
-    (let* ((min (car keys)) ; keys are sorted
-           (max (car (last keys)))
-           (vector (make-array (1+ (- max min)) :initial-element otherwise)))
-      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
-            keys labels)
-      (ecase key-type
-       (fixnum
-         (inst test x fixnum-tag-mask)
-         (inst jmp :ne otherwise)
-         (if (= min 0)
-             (inst mov index x)
-             (inst lea index (make-ea :dword :base x :disp (fixnumize (- min)))))
-         (inst cmp index (fixnumize (- max min)))
-         (inst jmp :a otherwise)
-         (let ((table (register-inline-constant :jump-table vector)))
-           (inst jmp (make-ea :dword :disp (ea-disp table)
-                              :index index :scale 1))))
-       (character
-         (inst mov index x)
-         (inst and index widetag-mask)
-         (inst cmp index character-widetag)
-         (inst jmp :ne otherwise)
-         (inst mov index x)
-         (inst shr index n-widetag-bits)
-         (inst sub index min)
-         (inst cmp index (- max min))
-         (inst jmp :a otherwise)
-         (let ((table (register-inline-constant :jump-table vector)))
-           (inst jmp (make-ea :dword :disp (ea-disp table)
-                              :index index :scale 4))))))))
+(define-vop (jump-table)
+  (:args (index :scs (signed-reg unsigned-reg any-reg descriptor-reg)
+                :target offset))
+  (:info targets otherwise min max)
+  (:temporary (:sc any-reg :from (:argument 0)) offset)
+  (:generator 0
+    (let ((fixnump (sc-is index any-reg descriptor-reg)))
+      (flet ((fix (x)
+               (if fixnump
+                   (fixnumize x)
+                   x)))
+        (unless (zerop min)
+          (let ((diff (- (fix min))))
+            (cond ((location= offset index)
+                   (inst add offset diff))
+                  (t
+                   (inst lea offset (make-ea :dword :base index :disp diff))
+                   (setf index offset)))))
+        (when otherwise
+          (inst cmp index (fix (- max min)))
+          (inst jmp :a otherwise))
+        (let ((table (register-inline-constant :jump-table targets)))
+          (inst jmp (make-ea :dword :disp (ea-disp table)
+                                    :index index :scale (if fixnump 1 4))))))))
 
 (defun convert-conditional-move-p (dst-tn)
   (when (memq :cmov *backend-subfeatures*)
