@@ -27,43 +27,49 @@
   (:generator 0
      (error "BRANCH-IF not yet implemented")))
 
-(define-vop (multiway-branch-if-eq)
-  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:info labels otherwise key-type keys test-vop-name)
-  (:temporary (:sc unsigned-reg) index)
+(define-vop (jump-table)
+  (:args (index :scs (signed-reg unsigned-reg any-reg)
+                :target offset))
+  (:info targets otherwise min max)
+  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc any-reg :from (:argument 0)) offset)
   (:temporary (:sc interior-reg :offset lip-offset) lip)
-  (:ignore test-vop-name)
-  (:generator 10
-    (let* ((min (car keys)) ; keys are sorted
-           (max (car (last keys)))
-           (vector (make-array (1+ (- max min)) :initial-element otherwise)))
-      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
-            keys labels)
-      (ecase key-type
-        (fixnum
-         (inst andi. index x fixnum-tag-mask)
-         (inst b? :ne otherwise)
-         (inst addi index x (fixnumize (- min)))
-         (inst cmplwi index (fixnumize (- max min)))
-         (inst b? :gt otherwise)
-         (let ((s (- word-shift n-fixnum-tag-bits)))
-           (unless (zerop s)
-             (inst slwi index index s))))
-        (character
-         (inst andi. index x widetag-mask)
-         (inst cmpwi index character-widetag)
-         (inst b? :ne otherwise)
-         (inst srwi index x n-widetag-bits)
-         (inst addi index index (- min))
-         (inst cmplwi index (- max min))
-         (inst b? :gt otherwise)
-         (inst slwi index index word-shift)))
-      (let ((table-label (register-inline-constant vector :jump-table)))
-        (inst addi index index (make-fixup nil :code-object table-label)))
-      (inst lwzx lip code-tn index)
-      (inst mtctr lip)
-      (inst bctr))))
+  (:generator 0
+    (let ((fixnump (sc-is index any-reg)))
+      (flet ((fix (x)
+               (if fixnump
+                   (fixnumize x)
+                   x)))
+        (unless (zerop min)
+          (let ((start (- (fix min))))
+            (cond ((typep start '(signed-byte 16))
+                   (inst addi offset index start))
+                  (t
+                   (inst lr temp start)
+                   (inst add offset index temp)))
+            (setf index offset)))
+        (when otherwise
+          (let ((diff (fix (- max min))))
+            (cond ((typep diff '(signed-byte 16))
+                   (inst cmplwi index diff))
+                  (t
+                   (inst lr temp diff)
+                   (inst cmplw index temp))))
+          (inst b? :gt otherwise))
+        (cond (fixnump
+               (let ((s (- word-shift n-fixnum-tag-bits)))
+                 (unless (zerop s)
+                   (inst slwi offset index s)
+                   (setf index offset))))
+              (t
+               (inst slwi offset index word-shift)
+               (setf index offset)))
+
+        (let ((table-label (register-inline-constant targets :jump-table)))
+          (inst addi offset index (make-fixup nil :code-object table-label))
+          (inst lwzx lip code-tn offset)
+          (inst mtctr lip)
+          (inst bctr))))))
 
 (defun convert-conditional-move-p (dst-tn)
   (declare (ignore dst-tn))
