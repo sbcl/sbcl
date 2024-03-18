@@ -7226,12 +7226,12 @@
                    (labels ((convert (constants)
                               (destructuring-bind (&optional constant &rest rest) constants
                                 (let ((key (pop new-key-lists)))
-                                  (cond (rest
+                                  (cond (exact
+                                         `',constant)
+                                        (constant
                                          `(if (memq key ',key)
                                               ',constant
                                               ,(convert rest)))
-                                        (exact
-                                         `',constant)
                                         (original-keys
                                          `(ecase-failure key ,(coerce original-keys 'simple-vector)))
                                         (default
