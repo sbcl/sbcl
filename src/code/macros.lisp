@@ -1141,7 +1141,9 @@ invoked. In that case it will store into PLACE and start over."
     ;; Try hash-based dispatch only if expanding for the compiler
     (when (and (neq errorp 'cerror)
                (boundp 'sb-c::*current-component*)
-               (sb-c:policy lexenv (> sb-c:jump-table 0)))
+               (sb-c:policy lexenv (> sb-c:jump-table 0))
+               (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
+                   (sb-c::vop-existsp :named sb-c:jump-table)))
       (let* ((default (if (eq (caar clauses) 't) (car clauses)))
              (normal-clauses (reverse (if default (cdr clauses) clauses))))
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
@@ -1194,8 +1196,6 @@ invoked. In that case it will store into PLACE and start over."
                                ;; Try hash-based only if the keys are not _already_
                                ;; nice for a jump table exactly as they are.
                                (not (sb-c::suitable-jump-table-keys-p keys))
-                               (or (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq)
-                                   constants)
                                (sb-c::perfectly-hashable keys))
                               :exit-if-null))
                     ;; Put each group of keys into canonical form: no intra-clause duplicates
@@ -1214,8 +1214,7 @@ invoked. In that case it will store into PLACE and start over."
                       (return-from case-body
                         (expand-hash-case normal-clauses (nreverse key-lists) constants
                                           default errorp keyform lexpr)))))))
-              ((and (eq test 'typep)
-                    (sb-c::vop-existsp :named sb-c:multiway-branch-if-eq))
+              ((eq test 'typep)
                (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
                                               default errorp)
                  (return-from case-body it))))))
