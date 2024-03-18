@@ -1671,7 +1671,8 @@
            (print-ir2-blocks component)))
        ;; Look for if/else chains before cmovs, because a cmov
        ;; affects whether the last if/else is recognizable.
-       #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
+       (when-vop-existsp (:named multiway-branch-if-eq)
+         (convert-if-else-chains component))
        (run-vop-optimizers component)
        (delete-unused-ir2-blocks component))))
 

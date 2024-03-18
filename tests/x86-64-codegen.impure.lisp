@@ -352,25 +352,25 @@
       (ecase y
         (-2 'a) (2 'b) (3 'c) (4 (error "no")) (5 'd) (6 'e) (7 'wat) (8 '*) (9 :hi))
       (case z
-        (#\a :a) (#\b :b) (#\e :c) (#\f :d) (#\g :e) (#\h :f) (t nil))))
+        (#\a :a) (#\b :b) (#\e :c) (#\f (print :d)) (#\g :e) (#\h :f) (t nil))))
 
 (defun try-case-known-fixnum (x)
   (declare (optimize (sb-c:verify-arg-count 0)))
   (case (the fixnum x)
-    (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah)))
+    (0 :a) (1 :b) (2 :c) (5 (print :d)) (6 :c) (-1 :blah)))
 (defun try-case-maybe-fixnum (x)
   (when (typep x 'fixnum)
     (case x
-      (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah))))
+      (0 :a) (1 :b) (2 :c) (5 :d) (6 (print :c)) (-1 :blah))))
 
 (defun try-case-known-char (x)
   (declare (optimize (sb-c:verify-arg-count 0)))
   (case (the character x)
-    (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :b)))
+    (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e (print :e)) (#\f :b)))
 (defun try-case-maybe-char (x)
   (declare (optimize (sb-c:verify-arg-count 0)))
   (when (characterp x)
-    (case x (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :a))))
+    (case x (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f (print :a)))))
 
 (defun expect-n-comparisons (fun-name howmany)
   (let ((lines
@@ -382,6 +382,7 @@
 
 (with-test (:name :multiway-branch-generic-eq)
   ;; there's 1 test of NIL, 1 test of character-widetag, and 2 limit checks
+  ;; and 1 for comparing the key
   (expect-n-comparisons 'bbb 4)
   (loop for ((x y z) . expect) in '(((t 3 nil) . c)
                                     ((t 9 nil) . :hi)
@@ -403,14 +404,14 @@
              (checked-compile '(lambda (b)
                                 (case b
                                   ((0) :a) ((0) :b) ((0) :c) ((1) :d)
-                                  ((2) :e) ((3) :f)))
+                                  ((2) :e) ((3) (print :f))))
                               :allow-style-warnings t))))
-    (assert (search "MULTIWAY-BRANCH" s)))
+    (assert (search "JUMP-TABLE" s)))
   ;; There are too few cases after duplicate removal to be considered multiway
   (let ((s (with-output-to-string (sb-c::*compiler-trace-output*)
-             (checked-compile '(lambda (b) (case b ((0) :a) ((0) :b) ((0) :c) ((1) :d)))
+             (checked-compile '(lambda (b) (case b ((0) :a) ((0) :b) ((0) :c) ((1) (print :d))))
                               :allow-style-warnings t))))
-    (assert (not (search "MULTIWAY-BRANCH" s)))))
+    (assert (not (search "JUMP-TABLE" s)))))
 
 ;;; Don't crash on large constants
 ;;; https://bugs.launchpad.net/sbcl/+bug/1850701
@@ -521,7 +522,7 @@
                  (with-output-to-string (s) (disassemble f :stream s))
                  #\newline)))
     ;; There is not a conditional branch per symbol
-    (assert (= (count-assembly-labels lines) 2))))
+    (assert (= (count-assembly-labels lines) 1))))
 
 ;;; Assert that the ECASE-FAILURE vop emits a trap and that we don't call ERROR
 ;;; (cutting down on the code size for each ECASE)

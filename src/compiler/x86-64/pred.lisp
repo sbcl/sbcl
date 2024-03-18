@@ -77,70 +77,33 @@
              (dolist (flag flags)
                (inst jmp flag dest)))))))
 
-(define-vop (multiway-branch-if-eq)
-  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
-  ;; also, could probably tighten up the TN lifetime to avoid a move
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:info labels otherwise key-type keys test-vop-name)
+(define-vop (jump-table)
+  (:args (index :scs (signed-reg unsigned-reg any-reg descriptor-reg)
+                :target offset))
+  (:info targets otherwise min max)
+  (:temporary (:sc any-reg :from (:argument 0)) offset)
   (:temporary (:sc unsigned-reg) table)
-  (:temporary (:sc unsigned-reg) temp)
-  (:arg-refs x-tn-ref)
-  (:generator 10
-    (let* ((key-derived-type (tn-ref-type x-tn-ref))
-           (ea)
-           (min (car keys)) ; keys are sorted
-           (max (car (last keys)))
-           (vector (make-array (1+ (- max min)) :initial-element otherwise))
-           ;; This fixnumize won't overflow because ir2opt won't use
-           ;; a multiway-branch unless all keys are char or fixnum.
-           ;; But what if MIN is MOST-NEGATIVE-FIXNUM ????
-           (-min (fixnumize (- min))))
-      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
-            keys labels)
-      (ecase key-type
-        (fixnum
-           (cond
-             ((and (typep (* min (- sb-vm:n-word-bytes)) '(signed-byte 32))
-                   (typep key-derived-type 'numeric-type)
-                   (csubtypep key-derived-type (specifier-type 'fixnum))
-                   ;; There could be some dead code if the ranges don't line up.
-                   (>= (numeric-type-low key-derived-type) min)
-                   (<= (numeric-type-high key-derived-type) max))
-              (setq ea (ea (* min (- sb-vm:n-word-bytes)) table x 4)))
-             (t
-              ;; First exclude out-of-bounds values because there's no harm
-              ;; in doing that up front regardless of the argument's lisp type.
-              (typecase -min
-                ;; TODO: if min is 0, use X directly, don't move into temp
-                ((eql 0) (move temp x))
-                ((signed-byte 32) (inst lea temp (ea -min x)))
-                (t (inst mov temp x)
-                   (inst add :qword temp (constantize -min))))
-              (inst cmp temp (constantize (fixnumize (- max min))))
-              (inst jmp :a otherwise)
-              ;; We have to check the type here because a chain of EQ tests
-              ;; does not impose a type constraint.
-              ;; If type of X was derived as fixnum, then elide this test.
-              (unless (eq test-vop-name 'sb-vm::fast-if-eq-fixnum/c)
-                (inst test :byte x fixnum-tag-mask)
-                (inst jmp :ne otherwise))
-              (setq ea (ea table temp 4))))
-            (inst lea table (register-inline-constant :jump-table vector))
-            (inst jmp ea))
-        (character
-           ;; Same as above, but test the widetag before shifting it out.
-           (unless (member test-vop-name '(fast-char=/character/c
-                                           fast-if-eq-character/c))
-             (inst cmp :byte x character-widetag)
-             (inst jmp :ne otherwise))
-           (inst mov :dword temp x)
-           (inst shr :dword temp n-widetag-bits)
-           (unless (= min 0)
-             (inst sub :dword temp min))
-           (inst cmp temp (- max min))
-           (inst jmp :a otherwise)
-           (inst lea table (register-inline-constant :jump-table vector))
-           (inst jmp (ea table temp 8)))))))
+  (:generator 0
+    (let ((fixnump (sc-is index any-reg descriptor-reg)))
+      (flet ((fix (x)
+               (if fixnump
+                   (fixnumize x)
+                   x)))
+        (unless (zerop min)
+          (let ((diff (- (fix min))))
+            (unless (typep diff '(signed-byte 32))
+              (inst mov table diff)
+              (setf diff table))
+            (cond ((location= offset index)
+                   (inst add offset diff))
+                  (t
+                   (inst lea offset (ea diff index))
+                   (setf index offset)))))
+        (when otherwise
+          (inst cmp index (fix (- max min)))
+          (inst jmp :a otherwise))
+        (inst lea table (register-inline-constant :jump-table targets))
+        (inst jmp (ea table index (if fixnump 4 8)))))))
 
 (defun convert-conditional-move-p (dst-tn)
   (sc-case dst-tn

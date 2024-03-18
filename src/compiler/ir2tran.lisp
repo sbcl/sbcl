@@ -707,7 +707,9 @@
                          (block-label (cdr otherwise))))
          (vector (make-array (1+ (- max min)) :initial-element otherwise)))
     (loop for (index . target) in targets
-          do (setf (aref vector (- index min)) (block-label target)))
+          do (setf (label-usedp
+                    (setf (aref vector (- index min)) (block-label target)))
+                   t))
     (list vector (cond ((csubtypep (lvar-type index) (specifier-type `(integer ,min ,max)))
                         nil)
                        (otherwise)
