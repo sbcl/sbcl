@@ -7126,7 +7126,7 @@
                           `(if-to-blocks
                             (and (< h ,(length key-vector))
                                  (eq (aref ,key-vector h) #1#))
-                            h
+                            (truly-the (mod ,(length key-vector)) h)
                             ,otherwise)
                           `(truly-the (mod ,(length key-vector)) h)))))
             new-targets)))
