@@ -595,13 +595,17 @@
       (dovector (layouts (cdr cache-cell))
         (dolist (test-layout layouts)
           (when (sb-c::%structure-is-a layout test-layout) ; success, to try memoize it
-            (let ((key (list layout))) ; insert this object's layout
+            (let ((key (list layout)))  ; insert this object's layout
               (unless (try-update-cache cache key clause-index)
                 (setf (car cache-cell)
                       (copy-and-expand-cache cache key clause-index))))
             (return-from %struct-typecase-miss clause-index)))
-        (incf clause-index))))
-  0)
+        (incf clause-index))
+      (let ((key (list layout)))
+       (unless (try-update-cache cache key 0)
+         (setf (car cache-cell)
+               (copy-and-expand-cache cache key 0))))
+      0)))
 
 ;;;; For debugging & collecting statistics.
 
