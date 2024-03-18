@@ -1348,10 +1348,12 @@
              (reoptimize-component (block-component block) t)))))
       (jump-table
        (setf (jump-table-targets last)
-             (loop for (index . target) in (jump-table-targets last)
-                   collect (cons index (if (eq target old)
-                                           new
-                                           target))))
+             (if (eq new (component-tail comp))
+                 (delete old (jump-table-targets last) :key #'cdr :test #'eq)
+                 (loop for (index . target) in (jump-table-targets last)
+                       collect (cons index (if (eq target old)
+                                               new
+                                               target)))))
        (unless (memq new (block-succ block))
          (link-blocks block new)))
       (t
