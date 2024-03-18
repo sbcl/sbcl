@@ -833,6 +833,61 @@
     (single-float (cl:= (%single-exponent-bits flonum) #xff))
     (double-float (cl:= (%double-exponent-bits flonum) #x7ff))))
 
+;;; Four possible return values.  NIL if the numbers (rationals or
+;;; flonums) are incomparable (either is a NaN).  Otherwise: -1, 0, 1
+;;; if A is less than, equal to or greater than B.
+(defun numeric-compare (a b)
+  (cond
+    ((or (and (floatp a) (float-nan-p a))
+         (and (floatp b) (float-nan-p b)))
+     nil)
+    ((and (and (floatp a) (float-infinity-p a))
+          (and (floatp b) (float-infinity-p b)))
+     (let ((sa (float-sign-bit a))
+           (sb (float-sign-bit b)))
+       (if (cl:= sa sb)
+           0
+           ;; sign bit is 1 if flonum is negative
+           (if (cl:< sa sb) 1 -1))))
+    ((and (floatp a) (float-infinity-p a))
+     (if (cl:= (float-sign-bit a) 1) -1 1))
+    ((and (floatp b) (float-infinity-p b))
+     (if (cl:= (float-sign-bit b) 1) 1 -1))
+    ((eql a b) 0)
+    (t (let ((ra (rational a))
+             (rb (rational b)))
+         (if (cl:= ra rb)
+             0
+             (if (cl:< ra rb) -1 1))))))
+
+(defmacro define-flonum-comparator (name form)
+  `(defun ,name (&rest args)
+     (if (every #'rationalp args)
+         (apply #',(intern (string name) "CL") args)
+         (with-memoized-math-op (,name args)
+           (loop for (a b) on args
+                 while b
+                 always (let ((c (numeric-compare a b)))
+                         ,form))))))
+
+(define-flonum-comparator sb-xc:< (eql c -1))
+(define-flonum-comparator sb-xc:<= (or (eql c -1) (eql c 0)))
+(define-flonum-comparator sb-xc:= (eql c 0))
+(define-flonum-comparator sb-xc:>= (or (eql c 0) (eql c 1)))
+(define-flonum-comparator sb-xc:> (eql c 1))
+
+;;; what should (/= NaN NaN) return?  I'm not convinced that we have a
+;;; consistent story.  On the other hand it looks like we never call
+;;; /= in cross-compilation, let alone /= on NaNs.
+(defun sb-xc:/= (&rest args)
+  (if (every #'rationalp args)
+      (apply #'cl:/= args)
+      (with-memoized-math-op (/= args)
+        (loop for (a . rest) on args
+              always (loop for b in rest
+                           for c = (numeric-compare a b)
+                           always (cl:/= c 0))))))
+
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
 (defmacro sb-vm::with-float-traps-masked (traps &body body)
@@ -906,12 +961,6 @@
                 (and (floatp arg)
                      (eq (flonum-%value arg) ,kind)))))
 
-  ;; Simple case of using the interceptor to return a boolean.  If
-  ;; infinity leaks in, the host will choke since those are
-  ;; represented as symbols.
-  (intercept (= /=) (&rest args)
-    (dispatch :me (apply #':me (realnumify* (substitute-minus-zero args)))))
-
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
   (intercept (max min +) (&rest args)
@@ -971,88 +1020,6 @@
                     (make-flonum (logxor (ash -1 (1- (float-format-bits format)))
                                          (flonum-%bits x))
                                  format)))))
-
-  (intercept (<) (&rest args  &aux (nargs (length args)))
-    (dispatch :me
-      (if (and (eql nargs 2) (or (flonums-eql-p) (two-zeros-p)))
-          nil ; if eql, or both = 0, then not '<'
-          (apply #':me (realnumify* (substitute-minus-zero args))))))
-
-  ;; '>' needs to permit some of the "inoperable" floats because making any constant
-  ;; (as in 'early-float') calls CTYPE-OF -> CTYPE-OF-NUMBER -> MAKE-NUMERIC-TYPE
-  ;; which calls '>' to check for properly ordered low and high bounds.
-  ;; (The resulting object is equivalent to *EMPTY-TYPE* if bounds are reversed)
-  (intercept (>) (&rest args &aux (nargs (length args)))
-    (dispatch :me
-      (if (and (eql nargs 2) (or (flonums-eql-p) (two-zeros-p)))
-          nil ; if eql, or both = 0, then not '>'
-          (apply #':me (realnumify* (substitute-minus-zero args))))))
-
-  (intercept (>=) (&rest args  &aux (nargs (length args)))
-    (dispatch :me
-      (cond ((and (eql nargs 2)
-                  (destructuring-bind (a b) args
-                    ;; from src/code/irrat
-                    ;; This is, of course, completely heinous, but so is the practice
-                    ;; of creating the number from bits in the first place.
-                    (and (eql a #.(make-flonum #x3FE62E42FEFA39EF 'double-float))
-                         (eql b $2.0d0))))
-             nil)
-            ((two-zeros-p) t) ; signed zeros are equal
-            ((same-sign-infinities-p) t) ; infinities are =
-            ((and (eql nargs 2)
-                  (infinity-p 0 :+infinity))
-             t)
-            ((and (eql nargs 2)
-                  (infinity-p 1 :+infinity))
-             nil)
-            ((and (eql nargs 2)
-                  (infinity-p 0 :-infinity))
-             nil)
-            ((and (eql nargs 2)
-                  (infinity-p 1 :-infinity))
-             t)
-            ((and (eql nargs 2) (zerop (cadr args)))
-             ;; Need this case if the first arg is represented as bits
-             (if (rationalp (car args))
-                 (plusp (car args))
-                 (not (float-sign-bit-set-p (car args))))) ; anything positive is >= 0
-            ((eql nargs 2)
-             (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
-               (:me a b)))
-            (t
-             (apply #':me (realnumify* args))))))
-
-  (intercept (<=) (&rest args  &aux (nargs (length args)))
-    (dispatch :me
-      (cond ((two-zeros-p) t) ; signed zeros are equal
-            ((same-sign-infinities-p) t) ; infinities are =
-            ((and (eql nargs 2)
-                  (infinity-p 0 :+infinity))
-             nil)
-            ((and (eql nargs 2)
-                  (infinity-p 1 :+infinity))
-             t)
-            ((and (eql nargs 2)
-                  (infinity-p 0 :-infinity))
-             t)
-            ((and (eql nargs 2)
-                  (infinity-p 1 :-infinity))
-             nil)
-            ((and (eql nargs 2) (zerop (cadr args)))
-             ;; Need this case if the first arg is represented as bits
-             (if (floatp (car args))
-                 (float-sign-bit-set-p (car args)) ; anything negative is <= 0
-                 (minusp (car args))))
-            ((eql nargs 2)
-             (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
-               (:me a b)))
-            ((eql nargs 1)
-             t)
-            (t
-             (loop for (a . rest) on args
-                   always (or (not rest)
-                              (sb-xc:<= a (car rest))))))))
 
 ) ; end MACROLET
 
