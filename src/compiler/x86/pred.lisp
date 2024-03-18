@@ -46,12 +46,12 @@
             dest))))
 
 (define-vop (jump-table)
-  (:args (index :scs (signed-reg unsigned-reg any-reg descriptor-reg)
+  (:args (index :scs (signed-reg unsigned-reg any-reg)
                 :target offset))
   (:info targets otherwise min max)
   (:temporary (:sc any-reg :from (:argument 0)) offset)
   (:generator 0
-    (let ((fixnump (sc-is index any-reg descriptor-reg)))
+    (let ((fixnump (sc-is index any-reg)))
       (flet ((fix (x)
                (if fixnump
                    (fixnumize x)
