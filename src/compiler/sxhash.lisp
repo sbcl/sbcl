@@ -181,7 +181,10 @@
         (return-from ub32-collection-uniquep nil))
       (add-to-xset x dedup))))
 
+;;; This cache is not used for cross-compiling because there's already
+;;; another cache-like layer (the journal files)
 (defglobal *phash-lambda-cache* nil)
+
 ;;; MINIMAL (the default) returns a a function that returns an output
 ;;; in the range 0..N-1 for N possible symbols. If non-minimal, the output
 ;;; range is the power-of-2-ceiling of N.
@@ -194,61 +197,70 @@
 ;;; of the generated function. So you pretty much don't want to supply it.
 ;;; Indeed one should avoid passing either optional arg to this function.
 (defun make-perfect-hash-lambda (array &optional objects
-                                       (minimal t) (fast nil) (cacheable t))
+                                       (minimal t) (fast nil)
+                                       (cacheable #-sb-xc-host t))
   (declare (type (simple-array (unsigned-byte 32) (*)) array))
-  (declare (ignorable objects minimal fast cacheable))
+  (declare (ignorable objects minimal fast))
   (when (or (< (length array) 3) ; one or two keys - why are you doing this?
             (>= (length array) (ash 1 31))) ; insanity if this many
     (return-from make-perfect-hash-lambda))
   (unless (ub32-collection-uniquep array)
     (return-from make-perfect-hash-lambda))
   ;; no dups present
-  (let* ((returned-string) ; this is solely for some regression tests
-         (expr
-          #+sb-xc-host
-          (let ((string (sb-cold::emulate-generate-perfect-hash-sexpr array objects)))
-            (setq returned-string string)
+  (let* ((cache *phash-lambda-cache*)
+         ;; LOGXOR is commutative and associative, which matters to
+         ;; EMULATE-GENERATE-PERFECT-HASH-SEXPR. Cross-compiling sorts the key array
+         ;; to make the xperfecthash files insensitive to the exact manner by which
+         ;; consumers of this function provide the keys. It's not important for the
+         ;; target compiler- the cache only helps repeated calls, in contrast
+         ;; to the cross-compiler which lives or dies by the journal file.
+         (digest (reduce #'logxor array))
+         (invert-keys)
+         ;; The cross-compiler records the string directly. Regression tests look for
+         ;; certain comments in the string to assert coverage of the generator.
+         (string)
+         (expr))
+    #+sb-xc-host
+    (setq string (sb-cold::emulate-generate-perfect-hash-sexpr array objects digest)
             ;; don't rebind anything except *PACKAGE* for read-from-string,
             ;; especially as we need to keep our #\A charmacro
-            (let ((*package* #.(find-package "SB-C"))) (read-from-string string)))
-          #-sb-xc-host
-          (let* ((digest (reduce #'logxor array))
-                 (cache-key (cons digest array))
-                 (cache *phash-lambda-cache*))
-            (unless cache
-              ;; A race that clobbers the global is benign. At worst it discards
-              ;; work done some in another thread to cache something.
-              (setf cache (make-hash-table :test 'equalp :synchronized t)
-                    *phash-lambda-cache* cache))
-            (or (gethash cache-key cache)
-                (flet ((findit (minimal)
-                         (sb-unix::newcharstar-string
-                          (sb-sys:with-pinned-objects (array)
-                            (alien-funcall
-                             (extern-alien
-                              "lisp_perfhash_with_options"
-                              (function (* char) int system-area-pointer int))
-                             (logior (if minimal 1 0) (if fast 2 0))
-                             (sb-sys:vector-sap array) (length array))))))
-                  (let* ((string
-                           (or (findit minimal)
-                               (and minimal
-                                    (= (length array) (power-of-two-ceiling (length array)))
-                                    ;; Try again as non-minimal because it's equivalent on 2^N keys.
-                                    ;; This should NOT be needed but it works around a deficiency
-                                    ;; in C which I am not smart enough to fix.
-                                    (findit nil))
-                               (return-from make-perfect-hash-lambda nil)))
-                         (expr (with-standard-io-syntax
-                                 (let ((*package* #.(find-package "SB-C")))
-                                   (read-from-string string)))))
-                    (when cacheable (setf (gethash cache-key cache) expr))
-                    (setf returned-string string)
-                    expr))))))
+          expr (let ((*package* #.(find-package "SB-C"))) (read-from-string string)))
+    #-sb-xc-host
+    (flet ((generate-ph (keys)
+             (sb-unix::newcharstar-string
+              (sb-sys:with-pinned-objects (array)
+                (alien-funcall
+                 (extern-alien
+                  "lisp_perfhash_with_options"
+                  (function (* char) int system-area-pointer int))
+                 (logior (if minimal 1 0) (if fast 2 0))
+                 (sb-sys:vector-sap keys) (length keys))))))
+      (unless cache
+        ;; A race that clobbers the global is benign. At worst it discards
+        ;; work done some in another thread to cache something.
+        (setf cache (make-hash-table :test 'equalp :synchronized t)
+              *phash-lambda-cache* cache))
+      (dx-let ((cache-key (cons digest array)))
+        ;; Purposely return empty-string if we hit the cache
+        (awhen (gethash cache-key cache)
+          (return-from make-perfect-hash-lambda (values it ""))))
+      (setq string (generate-ph array))
+      ;; generator might have trouble with 0 key
+      (when (and (not string) (position 0 array))
+        (setq string (generate-ph (map '(simple-array (unsigned-byte 32) (*))
+                                       (lambda (x) (logxor x #xFFFFFFFF))
+                                       array)))
+        (unless string
+          (return-from make-perfect-hash-lambda (values nil nil)))
+        (when string
+          (setq invert-keys t)))
+      ;; string won't account for inverted keys but that's fine
+      ;; as the resulting expression will
+      (setq expr (with-standard-io-syntax
+                     (let ((*package* #.(find-package "SB-C")))
+                       (read-from-string string)))))
     (let ((tables))
-      ;; Hoist the constants into symbol-macrolets rather than LETs
-      ;; because my work-in-progress 32-bit-modular-arithmetic optimizer
-      ;; needs them that way. Stop if we see the binding of A or B.
+      ;; Change array constants into symbol-macrolets
       (dotimes (i 2)
         (unless (typep expr '(cons (cons (eql let))))
           (return))
@@ -267,19 +279,25 @@
                          (mapcar #'recurse expr)))
                     (t
                      expr))))
+      ;; Inject 32-bit LOGNOT if keys need to be bitwise inverted
+      (when invert-keys
+        (setq expr `((^= val #xFFFFFFFF) ,@expr)))
       (let* ((result-type `(mod ,(power-of-two-ceiling (length array))))
-             (calc `(the ,result-type (uint32-modularly val ,@expr))))
+             (calc `(the ,result-type (uint32-modularly val ,@expr)))
+             (lambda
         ;; Noting that the output of Bob's perfect hash generator was originally
         ;; intended to be compiled into C, and we've adapted it to Lisp,
         ;; it is not necessary to insert array-bounds-checks
         ;; even if users declaim that optimization quality to be 3.
-        (values `(lambda (val)
+                `(lambda (val)
                    (declare (optimize (safety 0) (speed 3) (debug 0)
                                       (sb-c:insert-array-bounds-checks 0)
                                       (sb-c:store-source-form 0)))
                    (declare (type (unsigned-byte 32) val))
-                   ,(if tables `(symbol-macrolet ,tables ,calc) calc))
-                returned-string)))))
+                   ,(if tables `(symbol-macrolet ,tables ,calc) calc))))
+        (when cacheable
+          (setf (gethash (cons digest array) cache) lambda))
+        (values lambda string)))))
 
 (sb-xc:defmacro uint32-modularly (input &body exprs &environment env)
   (declare (ignore input env)) ; might use ENV to detect compiled vs interpreted code

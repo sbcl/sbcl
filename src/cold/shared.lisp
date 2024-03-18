@@ -1008,7 +1008,7 @@
           (error "hash generator duplicates: ~D" errors))))))
 (compile 'preload-perfect-hash-generator)
 
-(defun emulate-generate-perfect-hash-sexpr (array identifier)
+(defun emulate-generate-perfect-hash-sexpr (array identifier digest)
   (declare #-use-host-hash-generator (ignore identifier))
   (let (computed)
     (declare (ignorable computed))
@@ -1016,7 +1016,6 @@
     ;; comparing as sets can be done using EQUALP.
     ;; Sort nondestructively in case something else looks at the value as supplied.
     (let* ((canonical-array (sort (copy-seq array) #'<))
-           (digest (reduce #'logxor canonical-array))
            (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
                          :test #'equalp)))
       (when match

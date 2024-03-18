@@ -4057,6 +4057,8 @@
                ;; fixnum-untagging MOV is 64-bit to avoid losing 1 bit,
                ;; unless I can show that the expression doesn't care about bit 31
                (inst* op dest src))
+              ((and (eq op 'sb-c::xor) (eql src #xFFFFFFFF))
+               (inst not :dword dest))
               (t
                (inst* op :dword dest src)))))
     ;; Move result and re-tag. Restrict the output to 31 significant bits,
