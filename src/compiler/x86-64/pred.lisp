@@ -89,21 +89,28 @@
                (if fixnump
                    (fixnumize x)
                    x)))
-        (unless (zerop min)
-          (let ((diff (- (fix min))))
-            (unless (typep diff '(signed-byte 32))
-              (inst mov table diff)
-              (setf diff table))
-            (cond ((location= offset index)
-                   (inst add offset diff))
-                  (t
-                   (inst lea offset (ea diff index))
-                   (setf index offset)))))
-        (when otherwise
-          (inst cmp index (fix (- max min)))
-          (inst jmp :a otherwise))
-        (inst lea table (register-inline-constant :jump-table targets))
-        (inst jmp (ea table index (if fixnump 4 8)))))))
+        (let (disp)
+          (unless (zerop min)
+            (let ((byte-disp (- (* min n-word-bytes))))
+              (if (and (not otherwise)
+                       (typep byte-disp '(signed-byte 32)))
+                  (setf disp byte-disp)
+                  (let ((diff (- (fix min))))
+                    (unless (typep diff '(signed-byte 32))
+                      (inst mov table diff)
+                      (setf diff table))
+                    (cond ((location= offset index)
+                           (inst add offset diff))
+                          (t
+                           (inst lea offset (ea diff index))
+                           (setf index offset)))))))
+          (when otherwise
+            (inst cmp index (fix (- max min)))
+            (inst jmp :a otherwise))
+          (inst lea table (register-inline-constant :jump-table targets))
+          (inst jmp (if disp
+                        (ea disp table index (if fixnump 4 8))
+                        (ea table index (if fixnump 4 8)))))))))
 
 (defun convert-conditional-move-p (dst-tn)
   (sc-case dst-tn
