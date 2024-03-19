@@ -164,9 +164,6 @@ ownership of the table. If HASH-TABLE is not synchronized, BODY will
 execute with other WITH-LOCKED-HASH-TABLE bodies excluded -- exclusion
 of hash-table accesses not surrounded by WITH-LOCKED-HASH-TABLE is
 unspecified."
-  ;; Needless to say, this also excludes some internal bits, but
-  ;; getting there is too much detail when "unspecified" says what
-  ;; is important -- unpredictable, but harmless.
   `(sb-thread:with-recursive-lock ((hash-table-lock ,hash-table))
      ,@body))
 

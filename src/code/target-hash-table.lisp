@@ -1469,8 +1469,7 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
        ;; It would be ideal if we were consistent about all tables NOT having
        ;; synchronization unless created with ":SYNCHRONIZED T"
        ;; but it looks tricky to support concurrent gethash on weak tables,
-       ;; so we mostly default to locking, except where there is an outer scope
-       ;; providing mutual exclusion such as WITH-FINALIZER-STORE.
+       ;; so we default to locking.
        (if (hash-table-synchronized-p hash-table)
            ;; Use the private slot accessor for the lock because it's known
            ;; to have a mutex.
