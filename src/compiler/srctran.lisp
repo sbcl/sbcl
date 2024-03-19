@@ -7228,11 +7228,11 @@
                                                                        default)
                                                          original-keys))
                    (labels ((convert (constants)
-                              (destructuring-bind (&optional constant &rest rest) constants
+                              (destructuring-bind (&optional (constant nil constant-p) &rest rest) constants
                                 (let ((key (pop new-key-lists)))
                                   (cond (exact
                                          `',constant)
-                                        (constant
+                                        (constant-p
                                          `(if (memq key ',key)
                                               ',constant
                                               ,(convert rest)))
