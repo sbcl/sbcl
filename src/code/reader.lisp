@@ -20,6 +20,9 @@
 
 (defvar *readtable*)
 
+(define-load-time-global *standard-readtable* (make-readtable))
+(declaim (readtable *standard-readtable*))
+
 (defun !readtable-cold-init ()
   (setq *empty-extended-char-table* (make-hash-table :rehash-size 1 :test #'eq)
         *readtable* (make-readtable)))

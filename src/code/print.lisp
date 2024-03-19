@@ -59,9 +59,6 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 
-;; duplicate defglobal because this file is compiled before "reader"
-(define-load-time-global *standard-readtable* nil)
-
 (define-load-time-global sb-pretty::*standard-pprint-dispatch-table* nil)
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
