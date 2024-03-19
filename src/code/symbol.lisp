@@ -611,11 +611,12 @@ distinct from the global value. Can also be SETF."
 
 (macrolet ((signal-type-error (action-description)
              `(let ((spec (type-specifier type)))
-                (error 'simple-type-error
-                       :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
-                       :format-arguments (list ,action-description symbol new-value spec)
-                       :datum new-value
-                       :expected-type spec))))
+                (cerror "Proceed anyway"
+                        'simple-type-error
+                        :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
+                        :format-arguments (list ,action-description symbol new-value spec)
+                        :datum new-value
+                        :expected-type spec))))
 ;;; This function is to be called just before a change which would affect the
 ;;; symbol value. We don't absolutely have to call this function before such
 ;;; changes, since such changes to constants are given as undefined behavior,
