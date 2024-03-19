@@ -51,7 +51,25 @@
        (d 4)
        (e 5))
      (eq x 'a))
-   null))
+   null)
+  (assert-type
+   (lambda (a)
+     (declare ((integer 1 5) a))
+     (case a
+       (1 1)
+       ((2 4) (print 2))
+       (3 2)
+       (5 3)))
+   (integer 1 3))
+  (assert-type
+   (lambda (a)
+     (declare ((integer 1 5) a))
+     (case a
+       (1 1)
+       ((2 4) 2)
+       (3 2)
+       (5 3)))
+   (integer 1 3)))
 
 (with-test (:name :type-derivation-constraints)
   (assert-type

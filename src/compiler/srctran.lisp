@@ -7171,13 +7171,16 @@
           collect new-list into new-lists
           and
           collect constant into new-constants
-          finally (return (if (equal new-lists key-lists)
-                              (values key-lists constants
-                                      keys
-                                      nil)
-                              (values new-lists (coerce new-constants 'vector)
-                                      keys
-                                      (csubtypep type (specifier-type `(member ,@keys)))))))))
+          finally (return (let ((exact (csubtypep type (specifier-type `(member ,@keys)))))
+                            (if (equal new-lists key-lists)
+                                (values key-lists
+                                        constants
+                                        keys
+                                        exact)
+                                (values new-lists
+                                        (coerce new-constants 'vector)
+                                        keys
+                                        exact)))))))
 
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
@@ -7187,32 +7190,7 @@
                           jump-table))
          (constants (and constants
                          (lvar-value constants))))
-    (cond ((and jump-table
-                ;; No hashing required
-                (or (suitable-jump-table-keys-p original-keys)
-                    (and (policy node (= jump-table 3))
-                         (or (every #'fixnump original-keys)
-                             (every #'characterp original-keys)))))
-           (let* ((otherwise (assoc 'otherwise (jump-table-targets jump-table)))
-                  new-targets)
-             (loop for key-list in key-lists
-                   for (nil . target) in (jump-table-targets jump-table)
-                   for new-list = (loop for key in key-list
-                                        for value = (if (characterp key)
-                                                        (char-code key)
-                                                        key)
-                                        do (push (cons value target) new-targets)))
-             (change-jump-table-targets jump-table (nreconc new-targets (and otherwise
-                                                                             (list otherwise))))
-
-             (if (characterp (first original-keys))
-                 `(if-to-blocks (characterp key)
-                                (char-code key)
-                                ,(cdr otherwise))
-                 `(if-to-blocks (fixnump key)
-                                key
-                                ,(cdr otherwise)))))
-          (constants
+    (cond (constants
            (delay-ir1-transform node :constraint)
            (multiple-value-bind (new-key-lists constants keys exact)
                (cull-jump-table-constant-targets key key-lists constants)
@@ -7269,6 +7247,29 @@
                       (setf (node-reoptimize node) nil)
                       (change-jump-table-targets jump-table targets)
                       (throw 'give-up-ir1-transform :delayed))
+                     ((or (suitable-jump-table-keys-p original-keys)
+                          (and (policy node (= jump-table 3))
+                               (or (every #'fixnump original-keys)
+                                   (every #'characterp original-keys))))
+                      ;; No hashing required
+                      (let* ((otherwise (assoc 'otherwise (jump-table-targets jump-table)))
+                             new-targets)
+                        (loop for key-list in key-lists
+                              for (nil . target) in (jump-table-targets jump-table)
+                              for new-list = (loop for key in key-list
+                                                   for value = (if (characterp key)
+                                                                   (char-code key)
+                                                                   key)
+                                                   do (push (cons value target) new-targets)))
+                        (change-jump-table-targets jump-table (nreconc new-targets (and otherwise
+                                                                                        (list otherwise))))
+                        (if (characterp (first original-keys))
+                            `(if-to-blocks (characterp key)
+                                           (char-code key)
+                                           ,(cdr otherwise))
+                            `(if-to-blocks (fixnump key)
+                                           key
+                                           ,(cdr otherwise)))))
                      (t
                       (multiple-value-bind (code new-targets)
                           (expand-hash-case-for-jump-table keys key-lists targets)
