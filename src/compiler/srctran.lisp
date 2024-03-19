@@ -7230,7 +7230,8 @@
                    (labels ((convert (constants)
                               (destructuring-bind (&optional (constant nil constant-p) &rest rest) constants
                                 (let ((key (pop new-key-lists)))
-                                  (cond (exact
+                                  (cond ((and (not rest)
+                                              exact)
                                          `',constant)
                                         (constant-p
                                          `(if (memq key ',key)
