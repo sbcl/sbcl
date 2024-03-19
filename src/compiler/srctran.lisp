@@ -6893,17 +6893,19 @@
       (values (nreverse chain) characterp))))
 
 
-(defun contiguous-sequence (values)
-  (let ((values (sort (copy-list values) #'<)))
+(defun contiguous-sequence (values &optional (key #'identity))
+  (let ((values (sort (copy-list values) #'< :key key)))
     (when (loop for (a next) on values
                 always (or (not next)
-                           (= (1+ a) next)))
-      (values (car values)
-              (car (last values))))))
+                           (= (1+ (funcall key a))
+                              (funcall key next))))
+      (values (funcall key (car values))
+              (funcall key (car (last values)))))))
 
-(defun bit-test-sequence (values)
+(defun bit-test-sequence (values &optional (key #'identity))
   (let (min max)
-    (when (and (loop for c in values
+    (when (and (loop for v in values
+                     for c = (funcall key v)
                      always (>= c 0) ;; negative numbers can be handled too
                      maximize c into max*
                      minimize c into min*
@@ -7224,6 +7226,28 @@
                                         keys
                                         exact)))))))
 
+(defun values-for-or-eq-transform (key-lists)
+  (and (= (length key-lists) 1)
+       (let (fixnump
+             characterp)
+         (loop for value in (first key-lists)
+               unless
+               (cond (fixnump
+                      (fixnump value))
+                     (characterp
+                      (characterp value))
+                     ((fixnump value)
+                      (setf fixnump t))
+                     ((characterp value)
+                      (setf characterp t)))
+               do (return-from values-for-or-eq-transform))
+         (or (contiguous-sequence (first key-lists) (if characterp
+                                                        #'char-code
+                                                        #'identity))
+             (bit-test-sequence (first key-lists) (if characterp
+                                                      #'char-code
+                                                      #'identity))))))
+
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
          (original-keys (reduce #'append key-lists))
@@ -7242,6 +7266,7 @@
                    (original-keys (and (lvar-value errorp)
                                        original-keys)))
                (or (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
+                        (not (values-for-or-eq-transform new-key-lists))
                         (expand-hash-case-for-jump-table keys new-key-lists nil
                                                          constants (if exact
                                                                        :exact
@@ -7282,7 +7307,8 @@
                         (if (cdr targets)
                             (convert targets)
                             `(if-to-blocks t ,(cdar targets))))))
-               (cond ((not (sb-impl::should-attempt-hash-based-case-dispatch keys))
+               (cond ((or (not (sb-impl::should-attempt-hash-based-case-dispatch keys))
+                          (values-for-or-eq-transform key-lists))
                       (give-up))
                      ((delay-ir1-transform-p node :constraint)
                       (change-ref-leaf (lvar-uses key-lists-lvar) (find-constant key-lists))
