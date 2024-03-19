@@ -153,7 +153,15 @@
 
 ;;; the [1] and [2] here refer to ANSI glossary entries for "whitespace".
 (defun whitespace[1]p (char)
-  (test-attribute char +char-attr-whitespace+ *standard-readtable*))
+  ;; From *standard-readtable*
+  (case (char-code char)
+    (#.(list tab-char-code
+             (char-code #\Newline)
+             (char-code #\Space)
+             form-feed-char-code
+             return-char-code)
+     t)))
+
 (defun whitespace[2]p (char rt)
   (test-attribute char +char-attr-whitespace+ rt t))
 
