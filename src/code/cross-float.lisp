@@ -706,6 +706,38 @@
   (define truncate xfloat-truncate)
   (define round xfloat-round))
 
+(defun sgn (thing)
+  ;; return 1 or -1 if the sign bit of THING (as if converted to
+  ;; FLONUM) is unset or set respectively.
+  (typecase thing
+    ((eql 0) 1)
+    (rational (signum thing))
+    (float (if (float-sign-bit-set-p thing) -1 1))))
+
+(macrolet ((define (name clname)
+             `(progn
+                (defun ,name (number &optional (divisor 1 divisorp))
+                  (let ((type (if (or (and (floatp number)
+                                           (eq (flonum-format number) 'double-float))
+                                      (and (floatp divisor)
+                                           (eq (flonum-format divisor) 'double-float)))
+                                  'double-float
+                                  'single-float))
+                        (format (pick-result-format number divisor)))
+                    (with-memoized-math-op (,name (list* number (and divisorp (list divisor))))
+                      (multiple-value-bind (q r)
+                          (,clname (rational number) (rational divisor))
+                        (let ((remainder (if (eql format 'rational) r (flonum-from-rational r format))))
+                          (if (cl:= q 0)
+                              (if (cl:/= (sgn number) (sgn divisor))
+                                  (values (make-flonum :minus-zero type) remainder)
+                                  (values (coerce 0 type) remainder))
+                              (values (flonum-from-rational q type) remainder))))))))))
+  (define fceiling cl:ceiling)
+  (define ffloor cl:floor)
+  (define fround cl:round)
+  (define ftruncate cl:truncate))
+
 (defun exp (x)
   (validate-args x)
   (with-memoized-math-op (exp x)
@@ -942,14 +974,6 @@
               (one-arg-- arg)
               (reduce #'two-arg-- args))))))
 
-(defun sgn (thing)
-  ;; return 1 or -1 if the sign bit of THING (as if converted to
-  ;; FLONUM) is unset or set respectively.
-  (typecase thing
-    ((eql 0) 1)
-    (rational (signum thing))
-    (float (if (float-sign-bit-set-p thing) -1 1))))
-
 (defun sb-xc:* (&rest args)
   (flet ((two-arg-* (x y)
            (let ((format (pick-result-format x y)))
@@ -1088,13 +1112,6 @@
     (dispatch-float :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-float-result-format args))))
-
-  (intercept (fceiling ffloor fround ftruncate) (&rest args)
-             (dispatch :me
-                       (multiple-value-bind (a b) (apply #':me (realnumify* args))
-                         (let ((format (apply #'pick-result-format args)))
-                          (values (make-flonum a format)
-                                  (make-flonum b format))))))
 
 ) ; end MACROLET
 
@@ -1282,6 +1299,14 @@
   (assert (eq (sb-xc:/ (make-flonum :minus-zero format) (coerce 1 format)) (make-flonum :minus-zero format)))
   (assert (eq (sb-xc:/ (coerce 0 format) (coerce -1 format)) (make-flonum :minus-zero format)))
   (assert (eq (sb-xc:/ (coerce 0 format) (coerce 1 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:fceiling -1/2) (make-flonum :minus-zero 'single-float)))
+  (assert (eq (sb-xc:fceiling (coerce -1/2 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:ffloor -1/2) (coerce -1 'single-float)))
+  (assert (eq (sb-xc:ffloor (coerce -1/2 format)) (coerce -1 format)))
+  (assert (eq (sb-xc:ftruncate -1/2) (make-flonum :minus-zero 'single-float)))
+  (assert (eq (sb-xc:ftruncate (coerce -1/2 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:fround -1/2) (make-flonum :minus-zero 'single-float)))
+  (assert (eq (sb-xc:fround (coerce -1/2 format)) (make-flonum :minus-zero format)))
   (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (realnumify x)
