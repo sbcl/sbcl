@@ -7320,10 +7320,10 @@
                                (or (every #'fixnump original-keys)
                                    (every #'characterp original-keys))))
                       ;; No hashing required
-                      (let* ((otherwise (assoc 'otherwise (jump-table-targets jump-table)))
-                             new-targets)
+                      (let ((otherwise (assoc 'otherwise targets))
+                            new-targets)
                         (loop for key-list in key-lists
-                              for (nil . target) in (jump-table-targets jump-table)
+                              for (nil . target) in targets
                               for new-list = (loop for key in key-list
                                                    for value = (if (characterp key)
                                                                    (char-code key)
