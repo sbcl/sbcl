@@ -995,6 +995,22 @@
               (one-arg-/ arg)
               (reduce #'two-arg-/ args))))))
 
+(defun %sqrt (rational)
+  (flet ((%%sqrt (rational initial)
+           (let ((current initial))
+             ;; why 7? our initial "guess" has at least ~1 bit of
+             ;; precision (for e.g. RATIONAL = 2), and each iteration
+             ;; gives 2n+1 bits, so 7 gives ~127 bits, which should be
+             ;; enough for everybody.
+             (dotimes (i 7 current)
+               (setf current (cl:/ (cl:+ current (cl:/ rational current)) 2))))))
+    (%%sqrt rational (cl:/ (isqrt (numerator rational)) (isqrt (denominator rational))))))
+
+(defun sb-xc:sqrt (arg)
+  (let ((format (if (rationalp arg) 'single-float (flonum-format arg))))
+    (with-memoized-math-op (sqrt (list arg))
+      (flonum-from-rational (%sqrt (rational arg)) format))))
+
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
 (defmacro sb-vm::with-float-traps-masked (traps &body body)
@@ -1079,14 +1095,6 @@
                          (let ((format (apply #'pick-result-format args)))
                           (values (make-flonum a format)
                                   (make-flonum b format))))))
-
-  (intercept (sqrt) (&rest args)
-    (destructuring-bind (x) args
-      (if (zerop x)
-          x
-          (dispatch :me
-                    (make-flonum (funcall #':me (realnumify x))
-                                 (pick-result-format x))))))
 
 ) ; end MACROLET
 
