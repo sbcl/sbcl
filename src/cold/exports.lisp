@@ -1965,7 +1965,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%UNARY-TRUNCATE" "UNARY-TRUNCATE"
            "%UNARY-TRUNCATE/SINGLE-FLOAT"
            "%UNARY-TRUNCATE/DOUBLE-FLOAT"
-           "%UNARY-FTRUNCATE"
+           "%UNARY-FROUND" "%UNARY-FTRUNCATE"
            "UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
            "UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
            "%UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"

@@ -4,6 +4,9 @@ changes relative to sbcl-2.4.2:
   * enhancement: when dumping debug information to fasl files, the system
     respects the SOURCE_DATE_EPOCH environment variable (if set) as the latest
     timestamp to be used.
+  * bug fix: float rounders (FTRUNCATE and related functions) handle minus
+    zero more consistently, returning minus zero as the primary value when
+    rounding to zero from a negative value.
 
 changes in sbcl-2.4.2 relative to sbcl-2.4.1:
   * bug fix: restore the ability to inherit from both SEQUENCE and

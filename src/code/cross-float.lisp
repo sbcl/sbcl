@@ -717,6 +717,13 @@
     ((or single-float double-float #+long-float long-float)
      (error "Unimplemented."))))
 
+(defun %unary-fround (number)
+  (typecase number
+    (integer number)
+    (ratio (values (fround (numerator number) (denominator number))))
+    ((or single-float double-float #+long-float long-float)
+     (error "Unimplemented."))))
+
 (defun cis (number)
   (declare (ignore number))
   (error "Unimplemented."))

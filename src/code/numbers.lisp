@@ -620,14 +620,42 @@
           (values (+ tru 1) (- rem divisor))
           (values tru rem))))
 
-;;; FIXME: this probably needs treatment similar to the use of
-;;; %UNARY-FTRUNCATE for FTRUNCATE.
   (defun fround (number &optional (divisor 1))
     "Same as ROUND, but returns first value as a float."
     (declare (explicit-check))
-    (multiple-value-bind (res rem)
-        (round number divisor)
-      (values (float res (if (floatp rem) rem $1.0)) rem))))
+    (macrolet ((fround-float (rtype)
+                 `(let* ((float-div (coerce divisor ',rtype))
+                         (res (%unary-fround (/ number float-div))))
+                    (values res
+                            (- number
+                               (* (coerce res ',rtype) float-div))))))
+      (number-dispatch ((number real) (divisor real))
+        (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
+         (multiple-value-bind (q r)
+             (round number divisor)
+           (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
+                                  (and (not (minusp number)) (minusp divisor))))
+               (values $-0f0 r)
+               (values (float q) r))))
+        (((foreach single-float double-float #+long-float long-float)
+          (or rational single-float))
+         (if (eql divisor 1)
+             (let ((res (%unary-fround number)))
+               (values res (- number (coerce res '(dispatch-type number)))))
+             (fround-float (dispatch-type number))))
+        #+long-float
+        ((long-float (or single-float double-float long-float))
+         (fround-float long-float))
+        #+long-float
+        (((foreach double-float single-float) long-float)
+         (fround-float long-float))
+        ((double-float (or single-float double-float))
+         (fround-float double-float))
+        ((single-float double-float)
+         (fround-float double-float))
+        (((foreach fixnum bignum ratio)
+          (foreach single-float double-float #+long-float long-float))
+         (fround-float (dispatch-type divisor)))))))
 
 #+round-float
 (macrolet ((def (name mode docstring)
