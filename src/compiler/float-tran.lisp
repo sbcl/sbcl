@@ -1869,8 +1869,7 @@
 #-round-float
 (progn
   (defknown %unary-ftruncate (real) float (movable foldable flushable))
-  (defknown %unary-ftruncate/single (single-float) single-float
-      (movable foldable flushable))
+  #-64-bit
   (defknown %unary-ftruncate/double (double-float) double-float
       (movable foldable flushable))
 
@@ -1884,7 +1883,7 @@
            (t
             x)))
 
-  #-32-bit
+  #+64-bit
   (deftransform %unary-ftruncate ((x) (double-float))
     `(cond ((or (typep x '(double-float ($-1d0) ($0d0)))
                 (eql x $-0d0))
@@ -1895,33 +1894,34 @@
            (t
             x)))
 
-  #+(and (not sb-xc-host) 32-bit)
-  (defun %unary-ftruncate/double (x)
-    (declare (muffle-conditions compiler-note))
-    (declare (type double-float x))
-    (declare (optimize speed (safety 0)))
-    (let* ((high (double-float-high-bits x))
-           (low (double-float-low-bits x))
-           (exp (ldb sb-vm:double-float-hi-exponent-byte high))
-           (biased (the double-float-exponent
-                        (- exp sb-vm:double-float-bias))))
-      (declare (type (signed-byte 32) high)
-               (type (unsigned-byte 32) low))
-      (cond
-        ((= exp sb-vm:double-float-normal-exponent-max) x)
-        ((<= biased 0) (* x $0d0))
-        ((>= biased (float-digits x)) x)
-        (t
-         (let ((frac-bits (- (float-digits x) biased)))
-           (cond ((< frac-bits 32)
-                  (setf low (logandc2 low (- (ash 1 frac-bits) 1))))
-                 (t
-                  (setf low 0)
-                  (setf high (logandc2 high (- (ash 1 (- frac-bits 32)) 1)))))
-           (make-double-float high low))))))
-  #+32-bit
-  (deftransform %unary-ftruncate ((x) (double-float))
-    `(%unary-ftruncate/double x)))
+  #-64-bit
+  (progn
+    #-sb-xc-host
+    (defun %unary-ftruncate/double (x)
+      (declare (muffle-conditions compiler-note))
+      (declare (type double-float x))
+      (declare (optimize speed (safety 0)))
+      (let* ((high (double-float-high-bits x))
+             (low (double-float-low-bits x))
+             (exp (ldb sb-vm:double-float-hi-exponent-byte high))
+             (biased (the double-float-exponent
+                          (- exp sb-vm:double-float-bias))))
+        (declare (type (signed-byte 32) high)
+                 (type (unsigned-byte 32) low))
+        (cond
+          ((= exp sb-vm:double-float-normal-exponent-max) x)
+          ((<= biased 0) (* x $0d0))
+          ((>= biased (float-digits x)) x)
+          (t
+           (let ((frac-bits (- (float-digits x) biased)))
+             (cond ((< frac-bits 32)
+                    (setf low (logandc2 low (- (ash 1 frac-bits) 1))))
+                   (t
+                    (setf low 0)
+                    (setf high (logandc2 high (- (ash 1 (- frac-bits 32)) 1)))))
+             (make-double-float high low))))))
+    (deftransform %unary-ftruncate ((x) (double-float))
+      `(%unary-ftruncate/double x))))
 
 ;;;; TESTS
 
