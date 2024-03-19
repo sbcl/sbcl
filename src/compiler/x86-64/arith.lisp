@@ -743,6 +743,66 @@
     (inst sbb high high)
     (wordpair-to-bignum r twodigit low high node)
     DONE))
+
+(define-vop (%negate/unsigned=>integer)
+  (:translate %negate)
+  (:args (x :scs (unsigned-reg) :target low))
+  (:arg-types unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) low)
+  (:temporary (:sc unsigned-reg :from :eval) high twodigit)
+  (:temporary (:sc complex-double-reg :offset 0) scratch)
+  (:ignore scratch)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 8
+    (move low x)
+    (inst neg low)
+    (inst mov :byte twodigit 1)
+
+    (inst jmp :c negative)
+    (inst jmp :s allocate)
+    (inst jmp positive)
+    negative
+    (inst jmp :ns allocate)
+    positive
+
+    (move r low)
+    (inst shl r 1)
+    (inst jmp :no DONE)
+    (zeroize twodigit)
+    allocate
+    (inst sbb high high)
+    (wordpair-to-bignum r twodigit low high node)
+    DONE))
+
+(define-vop (%negate/signed=>integer)
+  (:translate %negate)
+  (:args (x :scs (signed-reg) :target low))
+  (:arg-types signed-num)
+  (:temporary (:sc signed-reg :from (:argument 0)) low)
+  (:temporary (:sc signed-reg :from :eval) high twodigit)
+  (:temporary (:sc complex-double-reg :offset 0) scratch)
+  (:ignore scratch)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 7
+    (move low x)
+    (inst neg low)
+    (inst mov :byte twodigit 1)
+    (inst jmp :o allocate)
+    (move r low)
+    (inst shl r 1)
+    (inst jmp :no DONE)
+    (zeroize twodigit)
+    allocate
+    (inst cmc)
+    (inst sbb high high)
+    (wordpair-to-bignum r twodigit low high node)
+    DONE))
 
 (define-vop (overflow*-fixnum)
   (:translate overflow*)

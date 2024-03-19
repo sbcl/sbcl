@@ -1832,6 +1832,61 @@
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
+
+(define-vop (%negate/unsigned=>integer)
+  (:translate %negate)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:temporary (:sc unsigned-reg) high low)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 10
+    (inst negs low x)
+    (inst mov header (bignum-header-for-length 2))
+    (inst csetm high :cc)
+    (inst b :cc negative)
+    (inst b :mi allocate)
+    (inst b positive)
+    negative
+    (inst b :pl allocate)
+    positive
+    (inst adds r low low)
+    (inst b :vc done)
+    (inst mov header (bignum-header-for-length 1))
+    allocate
+    (with-fixed-allocation
+        (r lr nil (+ 2 bignum-digits-offset))
+      (storew-pair header 0 low bignum-digits-offset tmp-tn)
+      (storew high tmp-tn 2))
+    DONE))
+
+(define-vop (%negate/signed=>integer)
+  (:translate %negate)
+  (:args (x :scs (signed-reg)))
+  (:arg-types signed-num)
+  (:temporary (:sc signed-reg) high low)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 10
+    (inst negs low x)
+    (inst csetm high :cs)
+    (inst mov header (bignum-header-for-length 2))
+    (inst b :vs allocate)
+    (inst adds r low low)
+    (inst b :vc done)
+    (inst mov header (bignum-header-for-length 1))
+    allocate
+    (with-fixed-allocation
+        (r lr nil (+ 2 bignum-digits-offset))
+      (storew-pair header 0 low bignum-digits-offset tmp-tn)
+      (storew high tmp-tn 2))
+    DONE))
 
 (define-vop (overflow*-fixnum)
   (:translate overflow*)
