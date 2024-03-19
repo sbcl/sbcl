@@ -411,18 +411,16 @@ sufficiently motivated to do lengthy fixes."
                              (push source (gethash namestring source-ht)))
                             ((neq source canonical-repr)
                              (setf (compiled-debug-info-source obj)
-                                   canonical-repr)))))))
-               (loop for debug-fun = (compiled-debug-info-fun-map obj) then next
-                     for next = (sb-c::compiled-debug-fun-next debug-fun)
-                     do
-                     (binding* ((name (compiled-debug-fun-name debug-fun))
-                                ((new foundp) (gethash name name-ht)))
-                       (cond ((not foundp)
-                              (setf (gethash name name-ht) name))
-                             ((neq name new)
-                              (%instance-set debug-fun (get-dsd-index compiled-debug-fun name)
-                                             new))))
-                     while next))
+                                   canonical-repr))))))))
+              (compiled-debug-fun
+               (let ((name (compiled-debug-fun-name obj)))
+                 (multiple-value-bind (new foundp)
+                     (gethash name name-ht)
+                   (cond ((not foundp)
+                          (setf (gethash name name-ht) name))
+                         ((neq name new)
+                          (%instance-set obj (get-dsd-index compiled-debug-fun name)
+                                         new))))))
               (sb-lockless::linked-list
                ;; In the normal course of execution, incompletely deleted nodes
                ;; exist only for a brief moment, as the next operation on the list by
