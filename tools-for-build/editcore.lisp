@@ -294,7 +294,7 @@
         (named-let recurse ((x name))
           (cond ((typep x '(cons (eql lambda)))
                  (let ((args (second x)))
-                   `(lambda ,(if args sb-c::*debug-name-sharp* "()")
+                   `(lambda ,(if args #\# "()")
                       ,@(recurse (cddr x)))))
                 ((eq x :in) "in")
                 ((and (typep x '(or string symbol))
