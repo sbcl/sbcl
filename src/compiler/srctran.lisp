@@ -7137,7 +7137,9 @@
     (loop for key-list in key-lists
           for target in targets
           for new-list = (loop for key in key-list
-                               when (ctypep key type)
+                               when (multiple-value-bind (p really) (ctypep key type)
+                                      (or p
+                                          (not really)))
                                collect key
                                and
                                do (push key keys))
@@ -7159,7 +7161,9 @@
     (loop for key-list in key-lists
           for constant across constants
           for new-list = (loop for key in key-list
-                               when (ctypep key type)
+                               when (multiple-value-bind (p really) (ctypep key type)
+                                      (or p
+                                          (not really)))
                                collect key
                                and
                                do (push key keys))
