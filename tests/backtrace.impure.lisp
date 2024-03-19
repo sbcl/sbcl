@@ -222,7 +222,7 @@
                                    (error "foo"))))
            (with-timeout 0.1
              (sb-thread:condition-wait q m)))))
-     `((sb-thread:condition-wait ,q ,m :timeout nil)))))
+     `((sb-thread::%condition-wait ,q ,m t nil nil nil nil nil nil)))))
 
 ;;; Division by zero was a common error on PPC. It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,

@@ -2276,8 +2276,11 @@
 
 #+sb-thread
 (progn
-(defknown (sb-thread::call-with-mutex sb-thread::call-with-recursive-lock)
+(defknown (sb-thread::call-with-mutex-timed sb-thread::call-with-recursive-lock-timed)
     ((function ()) t t t) *)
+(defknown (sb-thread::call-with-mutex sb-thread::call-with-recursive-lock
+           sb-thread::fast-call-with-mutex sb-thread::fast-call-with-recursive-lock)
+    ((function ()) t) *)
 (defknown (sb-thread::call-with-system-mutex
            sb-thread::call-with-system-mutex/allow-with-interrupts
            sb-thread::call-with-system-mutex/without-gcing

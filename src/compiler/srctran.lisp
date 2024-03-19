@@ -6496,7 +6496,12 @@
 
 #+sb-thread
 (progn
-  (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
+  (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex))
+    (let ((type (lvar-fun-type function t t)))
+      (when (fun-type-p type)
+        (fun-type-returns type))))
+
+  (defoptimizer (sb-thread::call-with-mutex-timed derive-type) ((function mutex waitp timeout))
     (let ((type (lvar-fun-type function t t)))
       (when (fun-type-p type)
         (let ((null-p (not (and (constant-lvar-p waitp)
@@ -6507,8 +6512,13 @@
                                  (values-specifier-type '(values null &optional)))
               (fun-type-returns type))))))
 
-  (setf (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-recursive-lock))
-        (fun-info-derive-type (fun-info-or-lose 'sb-thread::call-with-mutex)))
+  (macrolet ((copy (to from)
+               `(setf (fun-info-derive-type (fun-info-or-lose ',to))
+                      (fun-info-derive-type (fun-info-or-lose ',from)))))
+    (copy sb-thread::call-with-recursive-lock-timed sb-thread::call-with-mutex-timed)
+    (copy sb-thread::call-with-recursive-lock sb-thread::call-with-mutex)
+    (copy sb-thread::fast-call-with-mutex sb-thread::call-with-mutex)
+    (copy sb-thread::fast-call-with-recursive-lock sb-thread::call-with-recursive-lock))
 
   (defoptimizer (sb-thread::call-with-system-mutex derive-type) ((function mutex))
     (let ((type (lvar-fun-type function t t)))

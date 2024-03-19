@@ -744,8 +744,10 @@ returns NIL each time."
                 (zerop (sb-ext:compare-and-swap (mutex-%owner mutex) 0
                                                 (current-vmthread-id))))))))
 
+;;; memory aid: this is "pthread_mutex_timedlock" without the pthread
+;;; and no messing about with *DEADLINE* or deadlocks. It's just locking.
 #+sb-thread
-(defun %%wait-for-mutex (mutex to-sec to-usec stop-sec stop-usec)
+(defun %mutex-timedlock (mutex to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (declare (ignorable to-sec to-usec))
@@ -784,7 +786,7 @@ returns NIL each time."
                            ;;  0 = normal wakeup
                            ;;  1 = ETIMEDOUT ***DONE***
                            ;;  2 = EINTR, a spurious wakeup
-                           (return-from %%wait-for-mutex nil)))
+                           (return-from %mutex-timedlock nil)))
                      (when (= 0 (setq c (sb-ext:cas val 0 2))) (return)) ; win
                      ;; Update timeout
                      (setf (values to-sec to-usec)
@@ -826,6 +828,9 @@ returns NIL each time."
   (let ((sap (int-sap (thread-primitive-thread *current-thread*)))
         (disp (ash sb-vm::thread-slow-path-allocs-slot sb-vm:word-shift)))
     (incf (sap-ref-word sap disp)))
+  ;; #+ultrafutex does not support deadlines for now. It might eventually,
+  ;; but would have to fall back to the older code if there is a deadline.
+  (aver (null sb-impl::*deadline*))
   (symbol-macrolet ((val (mutex-state mutex)))
     (let* ((mutex (sb-ext:truly-the mutex mutex))
            (c (sb-ext:cas val 0 1))) ; available -> taken
@@ -893,21 +898,25 @@ returns NIL each time."
           (futex-wake (mutex-state-address mutex) 1))))))
 
 #+sb-thread
-(defun %wait-for-mutex (mutex timeout to-sec to-usec stop-sec stop-usec deadlinep
-                        &aux (self *current-thread*))
-  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (with-deadlocks (self mutex timeout)
-    (with-interrupts (check-deadlock))
-    (tagbody
+(macrolet ((guts ()
+   `(tagbody
      :again
        (return-from %wait-for-mutex
-         (or (%%wait-for-mutex mutex to-sec to-usec stop-sec stop-usec)
+         (or (%mutex-timedlock mutex to-sec to-usec stop-sec stop-usec)
              (when deadlinep
                (signal-deadline)
                ;; FIXME: substract elapsed time from timeout...
                (setf (values to-sec to-usec stop-sec stop-usec deadlinep)
                      (decode-timeout timeout))
                (go :again)))))))
+  (defun deadlock-aware-mutex-wait
+      (mutex timeout to-sec to-usec stop-sec stop-usec deadlinep &aux (self *current-thread*))
+    (block %wait-for-mutex
+      (with-deadlocks (self mutex timeout)
+        (with-interrupts (check-deadlock))
+        (guts))))
+  (defun mutex-wait (mutex timeout to-sec to-usec stop-sec stop-usec deadlinep)
+    (block %wait-for-mutex (guts))))
 
 (define-deprecated-function :early "1.0.37.33" get-mutex (grab-mutex)
     (mutex &optional new-owner (waitp t) (timeout nil))
@@ -917,7 +926,7 @@ returns NIL each time."
   (or (%try-mutex mutex)
       #+sb-thread
       (when waitp
-        (multiple-value-call #'%wait-for-mutex mutex timeout (decode-timeout timeout)))))
+        (multiple-value-call #'deadlock-aware-mutex-wait mutex timeout (decode-timeout timeout)))))
 
 (declaim (ftype (sfunction (mutex &key (:waitp t) (:timeout (or null (real 0)))) boolean) grab-mutex))
 (defun grab-mutex (mutex &key (waitp t) (timeout nil))
@@ -959,7 +968,15 @@ Notes:
   (or (%try-mutex mutex)
       #+sb-thread
       (when waitp
-        (multiple-value-call #'%wait-for-mutex mutex timeout (decode-timeout timeout)))))
+        (multiple-value-call #'deadlock-aware-mutex-wait mutex timeout (decode-timeout timeout)))))
+
+(declaim (ftype (sfunction (mutex) boolean) grab-mutex-no-check-deadlock))
+#+sb-thread ; WITH-MUTEX will never expand to call this if #-sb-thread
+(defun grab-mutex-no-check-deadlock (mutex)
+  ;; Always wait with infinite timeout, never examine the waiting-for graph.
+  ;; This _does_ support *DEADLINE* hence the DECODE-TIMEOUT call.
+  (or (%try-mutex mutex)
+      (multiple-value-call #'mutex-wait mutex nil (decode-timeout nil))))
 
 (declaim (ftype (sfunction (mutex &key (:if-not-owner (member :punt :warn :error :force))) null)
                 release-mutex))
@@ -1051,8 +1068,11 @@ IF-NOT-OWNER is :FORCE)."
     nil))
 
 (defmethod print-object ((waitqueue waitqueue) stream)
-  (print-unreadable-object (waitqueue stream :type t :identity t)
-    (format stream "~@[~A~]" (waitqueue-name waitqueue))))
+  (acond ((waitqueue-name waitqueue)
+          (print-unreadable-object (waitqueue stream :type t :identity t)
+            (write-string it stream)))
+         (t
+          (print-unreadable-object (waitqueue stream :type t :identity t)))))
 
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
@@ -1065,11 +1085,11 @@ IF-NOT-OWNER is :FORCE)."
   #-sb-futex
   protected)
 
-(declaim (sb-ext:maybe-inline %condition-wait))
 (defun %condition-wait (queue mutex
+                        check-deadlock
                         timeout to-sec to-usec stop-sec stop-usec deadlinep)
   #-sb-thread
-  (declare (ignore queue mutex to-sec to-usec stop-sec stop-usec deadlinep))
+  (declare (ignore queue mutex check-deadlock to-sec to-usec stop-sec stop-usec deadlinep))
   #-sb-thread
   (sb-ext:wait-for nil :timeout timeout) ; Yeah...
   #+sb-thread
@@ -1158,7 +1178,8 @@ IF-NOT-OWNER is :FORCE)."
            (when (eq :ok status)
              (unless (or (%try-mutex mutex)
                          (allow-with-interrupts
-                           (%wait-for-mutex mutex timeout to-sec to-usec
+                           (funcall (if check-deadlock #'deadlock-aware-mutex-wait #'mutex-wait)
+                                            mutex timeout to-sec to-usec
                                             stop-sec stop-usec deadlinep)))
                (setf status :timeout))))
           ;; Unwinding because futex-wait and %wait-for-mutex above
@@ -1180,6 +1201,16 @@ IF-NOT-OWNER is :FORCE)."
          ;; The only case we return normally without re-acquiring
          ;; the mutex is when there is a :TIMEOUT that runs out.
          (bug "%CONDITION-WAIT: invalid status on normal return: ~S" status))))))
+
+(sb-c::define-source-transform condition-wait (queue mutex &key timeout &environment env)
+  ;; As with mutexes, a timeout may make deadlock detection irrelevant
+  (if (or timeout (deadlock-detection-policy-p env))
+      `(values (deadlock-aware-condvar-wait ,queue ,mutex ,timeout))
+      `(values (condvar-wait ,queue ,mutex))))
+(defun deadlock-aware-condvar-wait (queue mutex timeout)
+  (multiple-value-call #'%condition-wait queue mutex t timeout (decode-timeout timeout)))
+(defun condvar-wait (queue mutex)
+  (multiple-value-call #'%condition-wait queue mutex nil nil (decode-timeout nil)))
 
 (declaim (ftype (sfunction (waitqueue mutex &key (:timeout (or null (real 0)))) boolean) condition-wait))
 (defun condition-wait (queue mutex &key timeout)
@@ -1221,12 +1252,9 @@ associated data:
       (push data *data*)
       (condition-notify *queue*)))
 "
-  (locally (declare (inline %condition-wait))
-    (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
-        (decode-timeout timeout)
-      (values
-       (%condition-wait queue mutex timeout
-                        to-sec to-usec stop-sec stop-usec deadlinep)))))
+  ;; %CONDITION-WAIT can return 3 values. In most situations the values are never used,
+  ;; but the semaphore implementation uses them.
+  (values (deadlock-aware-condvar-wait queue mutex timeout)))
 
 (declaim (ftype (sfunction (waitqueue &optional (and fixnum (integer 1))) null)
                 condition-notify))
@@ -1376,6 +1404,9 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
                           (%condition-wait
                            (semaphore-queue semaphore)
                            (semaphore-mutex semaphore)
+                           ;; I would think deadlock detection can be skipped. The mutex
+                           ;; is not visible to clients of the semaphore
+                           t
                            timeout to-sec to-usec stop-sec stop-usec deadlinep)
                         (when (or (not wakeup-p)
                                   (and (eql remaining-sec 0)

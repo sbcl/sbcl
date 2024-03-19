@@ -114,6 +114,18 @@ HOLDING-MUTEX-P."
           (function with-recursive-spinlock :replacement with-recursive-lock)
           (function with-spinlock :replacement with-mutex)))
 
+;;; The rationale for choosing a mutex acquire/release variant is as follows:
+;;; *) If you're using a timeout, then the timeout will break any deadlock cycle
+;;;    so it doesn't really matter if deadlock detection is performed or not,
+;;;    and you need to pass more arguments, so call the most general variant.
+;;; *) If your policy is other than maximum speed and minimum safety,
+;;;    then you want the deadlock detection as it always was.
+;;; *) Otherwise, you want no additional overhead on acquire/release
+;;; *) If #-sb-thread, none of this matters, and only one variant exists
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun deadlock-detection-policy-p (env)
+  (sb-c::policy env (or (< speed 3) (> safety 0)))))
+
 ;;; Needed to pacify deadlock detection if inerrupting wait-for-mutex,
 ;;; otherwise it would appear that if there is a lock grabbed inside
 ;;; of BODY it would appear backwards--waiting on a lock while holding
@@ -156,6 +168,11 @@ HOLDING-MUTEX-P."
 (export 'with-ultrafutex)
 (defmacro with-ultrafutex ((mutex) &body body)
   `(let ((m (the mutex ,mutex)))
+     ;; I think there could be a technique that is better - bind *CURRENT-MUTEX* before
+     ;; acquiring it. This gives assurance that unwinding can always unlock the mutex if held,
+     ;; provided we can correctly identify that this is the owning thread. How to do that?
+     ;; Well if either HOLDING-MUTEX-P *or* if the OWNER is 0, there's no chance that
+     ;; a different thread owns it.
      (unless (sb-vm::quick-try-mutex m)
        (%wait-for-mutex-algorithm-3 m))
      ;; unbinding the special = releasing the mutex
@@ -163,8 +180,10 @@ HOLDING-MUTEX-P."
        (setf (mutex-%owner m) (current-vmthread-id))
        ,@body))))
 
+;;; What insanity is this? :WAIT-P has a hyphen here but :WAITP in GRAB-MUTEX doesn't.
+;;; Yet both are intended for users.
 (defmacro with-mutex ((mutex &key (wait-p t) timeout (value nil valuep))
-                            &body body)
+                            &body body &environment env)
   "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
 and the MUTEX is not immediately available, sleep until it is available.
 
@@ -182,15 +201,16 @@ was used as the new owner of the mutex instead of the current thread. This is
 no longer supported: if VALUE is provided, it must be either NIL or the
 current thread."
 
+  ;; ultrafutex does not use the CALL-WITH pattern, merely a special binding
   #+ultrafutex
   (when (and (eq wait-p t) (not timeout))
     (return-from with-mutex `(with-ultrafutex (,mutex) ,@body)))
 
   `(dx-flet ((with-mutex-thunk () ,@body))
-     (call-with-mutex
-      #'with-mutex-thunk
-      ,mutex
-      ,wait-p
+     ,(cond
+        (#-sb-thread t ; always use this variant as it makes no difference
+         #+sb-thread (or valuep timeout (neq wait-p t)) ; general variant, with deadlock detection
+         `(call-with-mutex-timed #'with-mutex-thunk ,mutex ,wait-p
       ;; Users should not pass VALUE. If they do, the overhead of validity checking
       ;; is at the call site so that normal invocations of CALL-WITH-MUTEX receive
       ;; only the useful arguments.
@@ -203,9 +223,25 @@ current thread."
                 (unless (or (null value) (eq *current-thread* value))
                   (error "~S called with non-nil :VALUE that isn't the current thread."
                          'with-mutex))))
-           timeout))))
+           timeout)))
+        ((deadlock-detection-policy-p env) ; no timeout, with deadlock detection
+         `(call-with-mutex #'with-mutex-thunk ,mutex))
+        (t
+         `(fast-call-with-mutex #'with-mutex-thunk ,mutex)))))
 
-(defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body)
+;;; Our mutexes don't really have an attribute of "recursive"/"nonrecursive".
+;;; This is not a conventional API. Because of it, it's hard to ensure
+;;; that a "recursive mutex" goes to the correct acquire/release functions.
+;;; Another big reason not to use a recursive mutex is that condition-wait
+;;; is totally screwed if a single call to RELEASE does not actually imply
+;;; release. Unfortunately we can't assert that you didn't pass a recursive
+;;; mutex to condition-wait.
+;;;
+;;; It's totally unclear to me why we bother with any of the interrupt stuff
+;;; when already holding the lock. Is it because "actual" recursive use is
+;;; considered very rare, so you almost always need an acquire/release?
+(defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body
+                               &environment env)
   "Acquire MUTEX for the dynamic scope of BODY.
 
 If WAIT-P is true (the default), and the MUTEX is not immediately available or
@@ -222,12 +258,15 @@ WITH-RECURSIVE-LOCK returns the values of BODY.
 
 Unlike WITH-MUTEX, which signals an error on attempt to re-acquire an already
 held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
+
   `(dx-flet ((with-recursive-lock-thunk () ,@body))
-     (call-with-recursive-lock
-      #'with-recursive-lock-thunk
-      ,mutex
-      ,wait-p
-      ,timeout)))
+     ,(cond (#-sb-thread t
+             #+sb-thread (or timeout (neq wait-p t))
+             `(call-with-recursive-lock-timed #'with-recursive-lock-thunk ,mutex ,wait-p ,timeout))
+            ((deadlock-detection-policy-p env)
+             `(call-with-recursive-lock #'with-recursive-lock-thunk ,mutex))
+            (t
+             `(fast-call-with-recursive-lock #'with-recursive-lock-thunk ,mutex)))))
 
 (macrolet ((def (name &optional variant)
              `(defun ,(if variant (symbolicate name "/" variant) name)
@@ -256,12 +295,12 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
 #-sb-thread
 (progn
-  (defun call-with-mutex (function mutex waitp timeout)
+  (defun call-with-mutex-timed (function mutex waitp timeout)
     (declare (ignore mutex waitp timeout)
              (function function))
     (funcall function))
 
-  (defun call-with-recursive-lock (function mutex waitp timeout)
+  (defun call-with-recursive-lock-timed (function mutex waitp timeout)
     (declare (ignore mutex waitp timeout)
              (function function))
     (funcall function))
@@ -273,42 +312,56 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
 #+sb-thread
 (progn
-  (defun call-with-mutex (function mutex waitp timeout)
-    (declare (function function))
-    (declare (dynamic-extent function))
-    (let ((got-it nil))
-      (without-interrupts
-        (unwind-protect
-             (when (setq got-it (allow-with-interrupts
-                                  (grab-mutex mutex :waitp waitp
-                                                    :timeout timeout)))
-               (with-local-interrupts (funcall function)))
-          (when got-it
-            (release-mutex mutex))))))
+  (macrolet ((def (name args grab)
+               `(defun ,name ,args
+                  (declare (function function))
+                  (declare (dynamic-extent function))
+                  (let ((got-it nil))
+                    (without-interrupts
+                        (unwind-protect
+                             (when (setq got-it (allow-with-interrupts ,grab))
+                               (with-local-interrupts (funcall function)))
+                          (when got-it
+                            (release-mutex mutex))))))))
 
-  (defun call-with-recursive-lock (function mutex waitp timeout)
-    (declare (function function))
-    (declare (dynamic-extent function))
-    ;; If you want ultrafast futexes, then you surely don't want the rigmarole
-    ;; associated with enabling and disabling interrupts.
-    ;; Shame on you if you both enable #+ultrafutex and call INTERRUPT-THREAD in
-    ;; production, when INTERRUPT-THREAD's docstring literally says don't.
+    ;; No timeout. Probably 99.75% of grab-mutex calls are to this variant
+    (def call-with-mutex (function mutex) (grab-mutex mutex))
+    ;; most general case
+    (def call-with-mutex-timed (function mutex waitp timeout)
+      (grab-mutex mutex :waitp waitp :timeout timeout))
+    ;; Variant which which elides deadlock checking.
+    ;; No #+/- ultrafutex needed here because WITH-MUTEX expands differently
+    ;; for inlined mutex acquisition.
+    (def fast-call-with-mutex (function mutex) (grab-mutex-no-check-deadlock mutex)))
+
+  (macrolet ((def (name args grab)
+               `(defun ,name ,args
+                  (declare (function function))
+                  (declare (dynamic-extent function))
+                  (let ((had-it (holding-mutex-p mutex))
+                        (got-it nil))
+                    (without-interrupts
+                        (unwind-protect
+                             (when (or had-it
+                                       (setf got-it (allow-with-interrupts ,grab)))
+                               (with-local-interrupts (funcall function)))
+                          (when got-it
+                            (release-mutex mutex))))))))
+
+    ;; These are the analogous entry points to CALL-WITH-MUTEX variants
+    ;; but allow for recursive use of the mutex.
+    (def call-with-recursive-lock (function mutex) (grab-mutex mutex))
+    (def call-with-recursive-lock-timed (function mutex waitp timeout)
+      (grab-mutex mutex :waitp waitp :timeout timeout))
+    #-ultrafutex
+    (def fast-call-with-recursive-lock (function mutex)
+      (grab-mutex-no-check-deadlock mutex))
     #+ultrafutex
-    (when (and waitp (null timeout))
-      (return-from call-with-recursive-lock
-        (if (holding-mutex-p mutex)
-            (funcall function)
-            (with-ultrafutex (mutex) (funcall function)))))
-    (let ((had-it (holding-mutex-p mutex))
-          (got-it nil))
-      (without-interrupts
-        (unwind-protect
-             (when (or had-it
-                       (setf got-it (allow-with-interrupts
-                                     (grab-mutex mutex :waitp waitp :timeout timeout))))
-               (with-local-interrupts (funcall function)))
-          (when got-it
-            (release-mutex mutex))))))
+    (defun fast-call-with-recursive-lock (function mutex)
+      (declare (function function) (dynamic-extent function))
+      (if (holding-mutex-p mutex)
+          (funcall function)
+          (with-ultrafutex (mutex) (funcall function)))))
 
   (defun call-with-recursive-system-lock (function lock)
     (declare (function function))
