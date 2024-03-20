@@ -101,6 +101,7 @@ find . \( \
         -name '*.o' -o \
         -name '*.so' -o \
         -name '*.d' -o \
+        -name '*.dSYM' -o \
         -name 'foo.c' -o \
         -name 'test-lab' -o \
         -name 'encodings.texi-temp' -o \
