@@ -24,7 +24,6 @@ SBCL_PAXCTL ?= :
 LINKFLAGS += -g
 DEPEND_FLAGS = -MM
 GREP = grep
-LD = ld
 
 # By default, don't make and use a library, just use the object files.
 LIBSBCL = $(OBJS)
