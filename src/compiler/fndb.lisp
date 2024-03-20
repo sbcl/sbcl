@@ -1533,6 +1533,11 @@
           (:junk-allowed t))
   (values (or integer null ()) index))
 
+(defknown (sb-impl::parse-integer10 sb-impl::parse-integer16)
+    (string index sequence-end t)
+    (values (or integer null ()) index)
+    (no-verify-arg-count))
+
 (defknown read-byte (stream &optional t t) t ()
   :derive-type (read-elt-type-deriver nil 'integer nil))
 

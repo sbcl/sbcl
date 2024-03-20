@@ -1877,61 +1877,85 @@ extended <package-name>::<form-in-package> syntax."
 
 ;;;; PARSE-INTEGER
 
-(defun parse-integer (string &key (start 0) end (radix 10) junk-allowed)
-  "Examine the substring of string delimited by start and end
+(macrolet ((def (radix)
+             `(flet ((parse-error (format-control)
+                       (error 'simple-parse-error
+                              :format-control format-control
+                              :format-arguments (list string))))
+                (with-array-data ((string string :offset-var offset)
+                                  (start start)
+                                  (end end)
+                                  :check-fill-pointer t)
+                  (let ((radix ,(or radix 'radix))
+                        (index (do ((i start (1+ i)))
+                                   ((= i end)
+                                    (if junk-allowed
+                                        (return-from ,(symbolicate 'parse-integer
+                                                                   (if radix (princ-to-string radix) ""))
+                                          (values nil end))
+                                        (parse-error "no non-whitespace characters in string ~S.")))
+                                 (declare (fixnum i))
+                                 (unless (whitespace[1]p (char string i)) (return i))))
+                        (minusp nil)
+                        (found-digit nil))
+                    (declare (fixnum index)
+                             (inline digit-char-p))
+                    (let ((char (char string index)))
+                      (cond ((char= char #\-)
+                             (setq minusp t)
+                             (incf index))
+                            ((char= char #\+)
+                             (incf index))))
+                    (let ((final-result 0))
+                      (macrolet ((compute (type)
+                                   `(let ((result 0))
+                                      (declare (type ,type result))
+                                      (loop
+                                       (when (= index end) (return nil))
+                                       (let* ((char (char string index))
+                                              (weight (digit-char-p char radix)))
+                                         (cond (weight
+                                                (setq result (truly-the ,type
+                                                                        (+ weight
+                                                                           (truly-the ,type (* result radix))))
+                                                      found-digit t))
+                                               (junk-allowed (return nil))
+                                               ((whitespace[1]p char)
+                                                (loop
+                                                 (incf index)
+                                                 (when (= index end) (return))
+                                                 (unless (whitespace[1]p (char string index))
+                                                   (parse-error "junk in string ~S")))
+                                                (return nil))
+                                               (t
+                                                (parse-error "junk in string ~S"))))
+                                       (incf index))
+                                      (setf final-result
+                                            (if minusp
+                                                (- result)
+                                                result)))))
+                        ,(if radix
+                             `(if (<= (- end index) (floor (log most-positive-word ,radix)))
+                                  (compute word)
+                                  (compute t))
+                             `(compute t)))
+                      (values
+                       (if found-digit
+                           final-result
+                           (if junk-allowed
+                               nil
+                               (parse-error "no digits in string ~S")))
+                       (- index offset))))))))
+  (defun parse-integer (string &key (start 0) end (radix 10) junk-allowed)
+    "Examine the substring of string delimited by start and end
   (default to the beginning and end of the string)  It skips over
   whitespace characters and then tries to parse an integer. The
   radix parameter must be between 2 and 36."
-  (flet ((parse-error (format-control)
-           (error 'simple-parse-error
-                  :format-control format-control
-                  :format-arguments (list string))))
-    (with-array-data ((string string :offset-var offset)
-                      (start start)
-                      (end end)
-                      :check-fill-pointer t)
-      (let ((index (do ((i start (1+ i)))
-                       ((= i end)
-                        (if junk-allowed
-                            (return-from parse-integer (values nil end))
-                            (parse-error "no non-whitespace characters in string ~S.")))
-                     (declare (fixnum i))
-                     (unless (whitespace[1]p (char string i)) (return i))))
-            (minusp nil)
-            (found-digit nil)
-            (result 0))
-        (declare (fixnum index))
-        (let ((char (char string index)))
-          (cond ((char= char #\-)
-                 (setq minusp t)
-                 (incf index))
-                ((char= char #\+)
-                 (incf index))))
-        (loop
-         (when (= index end) (return nil))
-         (let* ((char (char string index))
-                (weight (digit-char-p char radix)))
-           (cond (weight
-                  (setq result (+ weight (* result radix))
-                        found-digit t))
-                 (junk-allowed (return nil))
-                 ((whitespace[1]p char)
-                  (loop
-                   (incf index)
-                   (when (= index end) (return))
-                   (unless (whitespace[1]p (char string index))
-                     (parse-error "junk in string ~S")))
-                  (return nil))
-                 (t
-                  (parse-error "junk in string ~S"))))
-         (incf index))
-        (values
-         (if found-digit
-             (if minusp (- result) result)
-             (if junk-allowed
-                 nil
-                 (parse-error "no digits in string ~S")))
-         (- index offset))))))
+    (def nil))
+  (defun parse-integer10 (string start end junk-allowed)
+    (def 10))
+  (defun parse-integer16 (string start end junk-allowed)
+    (def 16)))
 
 ;;;; reader initialization code
 

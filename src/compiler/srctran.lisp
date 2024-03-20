@@ -6587,6 +6587,15 @@
           (t
            (give-up-ir1-transform)))))
 
+(deftransform parse-integer ((string &key (start 0) end radix junk-allowed)
+                             (t &key (:radix (constant-arg (or null (member 10 16)))) &allow-other-keys))
+  `(,(if (and radix
+              (= (lvar-value radix) 16))
+         'sb-impl::parse-integer16
+         'sb-impl::parse-integer10)
+    string start end junk-allowed))
+
+
 (defun prev-node (node &key type (cast t))
   (let (ctran)
     (tagbody

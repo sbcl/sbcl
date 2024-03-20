@@ -234,6 +234,7 @@
                      (+ 3 (misc-index char)))))
     (when (logbitp 6 digit) ; decimalp flag
       (ldb (byte 4 0) digit))))
+(proclaim `(ftype ,(type-specifier (global-ftype 'ucd-decimal-digit)) ucd-decimal-digit))
 
 (defun char-code (char)
   "Return the integer code of CHAR."
