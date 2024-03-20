@@ -6934,16 +6934,24 @@
                                                                     fixnum)))
       (multiple-value-bind (chain characterp) (find-or-chain node op)
         (when (cdr chain)
-          (let ((constants (loop for (node) in chain
-                                 for (nil b) = (combination-args node)
-                                 collect (if characterp
-                                             (char-code (lvar-value b))
-                                             (lvar-value b))))
-                (type-check (if characterp
-                                (not (csubtypep (lvar-type a) (specifier-type 'character)))
-                                (not (csubtypep (lvar-type a) (specifier-type 'character))))))
-            (flet ((type-check (form)
-                     (if type-check
+          (let* ((constants (loop for (node) in chain
+                                  for (nil b) = (combination-args node)
+                                  collect (if characterp
+                                              (char-code (lvar-value b))
+                                              (lvar-value b))))
+                 (type-check (if characterp
+                                 (not (csubtypep (lvar-type a) (specifier-type 'character)))
+                                 (not (csubtypep (lvar-type a) (specifier-type 'character)))))
+                 (range-check (if (and type-check
+                                       (not characterp)
+                                       (vop-existsp :translate check-range<=))
+                                  'check-range<=
+                                  '<=)))
+            (flet ((type-check (check-fixnum form)
+                     (if (and type-check
+                              (or (not (vop-existsp :translate check-range<=))
+                                  characterp
+                                  check-fixnum))
                          `(when (,(if characterp
                                       'characterp
                                       'fixnump)
@@ -6974,19 +6982,18 @@
                                                   form
                                                   'or-eq-transform))))))
               ;; Transform contiguous ranges into range<=.
-              (when (or (and (vop-existsp :translate range<)
-                             (not type-check))
+              (when (or (vop-existsp :translate range<)
                         (> (length constants) 2))
                 (multiple-value-bind (min max)
                     (contiguous-sequence constants)
                   (when min
                     (replace-chain `(lambda (a b)
                                       (declare (ignore b))
-                                      ,(type-check
-                                        `(<= ,min ,(if characterp
-                                                       '(char-code a)
-                                                       'a)
-                                             ,max))))
+                                      ,(type-check nil
+                                                   `(,range-check ,min ,(if characterp
+                                                                            '(char-code a)
+                                                                            'a)
+                                                                  ,max))))
                     (return-from or-eq-transform t))))
               ;; Turn into a bit mask
               (multiple-value-bind (min max)
@@ -6999,11 +7006,12 @@
                   (replace-chain `(lambda (a b)
                                     (declare (ignore b))
                                     ,(type-check
+                                      (>= max sb-vm:n-word-bits)
                                       `(let ((a ,(if characterp
                                                      '(char-code a)
                                                      'a)))
                                          ,(cond ((< max sb-vm:n-word-bits)
-                                                 `(and (<= 0 a ,max)
+                                                 `(and (,range-check 0 a ,max)
                                                        (logbitp (truly-the (integer 0 ,max) a)
                                                                 ,(reduce (lambda (x y) (logior x (ash 1 y)))
                                                                          constants :initial-value 0))))
