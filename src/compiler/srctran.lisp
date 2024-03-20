@@ -6941,7 +6941,7 @@
                                               (lvar-value b))))
                  (type-check (if characterp
                                  (not (csubtypep (lvar-type a) (specifier-type 'character)))
-                                 (not (csubtypep (lvar-type a) (specifier-type 'character)))))
+                                 (not (csubtypep (lvar-type a) (specifier-type 'fixnum)))))
                  (range-check (if (and type-check
                                        (not characterp)
                                        (vop-existsp :translate check-range<=))
@@ -7043,8 +7043,10 @@
                       (pop chain)
                       (destructuring-bind (a b) (combination-args node)
                         (destructuring-bind (a2 b2) (combination-args next-node)
-                          (let ((c1 (lvar-value b))
-                                (c2 (lvar-value b2)))
+                          (let* ((c1 (lvar-value b))
+                                (c2 (lvar-value b2))
+                                (c1-orig c1)
+                                (c2-orig c2))
                             (when (and (if characterp
                                            (and (characterp c1)
                                                 (characterp c2)
@@ -7064,34 +7066,34 @@
                                     (list a b2))
                               (flush-dest a2)
                               (flush-dest b)
-                              (when type-check
-                                ;; Tag and operate on tagged values returned by get-lisp-obj-address
-                                (if characterp
-                                    (setf c1 (+ (ash c1 sb-vm:n-widetag-bits) sb-vm:character-widetag)
-                                          c2 (+ (ash c2 sb-vm:n-widetag-bits) sb-vm:character-widetag))
-                                    (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
-                                          c2 (ash c2 sb-vm:n-fixnum-tag-bits))))
-                              (let ((min (min c1 c2))
-                                    (max (max c1 c2))
-                                    (value (cond (type-check
-                                                  '(get-lisp-obj-address a))
-                                                 (characterp
-                                                  '(char-code a))
-                                                 (t
-                                                  'a))))
-                                (transform-call next-node
-                                                `(lambda (a b)
-                                                   (declare (ignore b))
-                                                   ,(cond ((%one-bit-diff-p c1 c2)
-                                                           (if (zerop min)
-                                                               `(not (logtest ,value (lognot ,(logxor c1 c2))))
-                                                               `(eq (logandc2 ,value
-                                                                              ,(logxor c1 c2))
-                                                                    ,min)))
-                                                          (t
-                                                           `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
-                                                                          (lognot ,(- max min)))))))
-                                                'or-eq-transform))))))))))
+                              (let* ((value (cond (type-check
+                                                   ;; Operate on tagged values
+                                                   (setf c1 (get-lisp-obj-address c1-orig)
+                                                         c2 (get-lisp-obj-address c2-orig))
+                                                   '(get-lisp-obj-address a))
+                                                  (characterp
+                                                   '(char-code a))
+                                                  (t
+                                                   'a)))
+                                     (min (min c1 c2))
+                                     (max (max c1 c2)))
+                                (flet ((cut-constant (x)
+                                         (if type-check
+                                             (ldb (byte sb-vm:n-word-bits 0) x)
+                                             x)))
+                                  (transform-call next-node
+                                                  `(lambda (a b)
+                                                     (declare (ignore b))
+                                                     ,(cond ((%one-bit-diff-p c1 c2)
+                                                             (if (zerop min)
+                                                                 `(not (logtest ,value ,(cut-constant (lognot (logxor c1 c2)))))
+                                                                 `(eq (logandc2 ,value
+                                                                                ,(logxor c1 c2))
+                                                                      ,min)))
+                                                            (t
+                                                             `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
+                                                                            ,(cut-constant (lognot (- max min))))))))
+                                                  'or-eq-transform)))))))))))
           (unless (node-prev node)
             ;; Don't proceed optimizing this node
             t))))))

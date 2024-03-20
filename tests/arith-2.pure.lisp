@@ -446,17 +446,18 @@
    ((0) 0)
    ((1) 1)))
 
-(with-test (:name :or-chain-types)
+(with-test (:name :or-chain-tagging)
   (checked-compile-and-assert
    ()
-   `(lambda (b)
-      (declare ((integer -1 1) b))
-      (case b
-        ((-1 0) 0)
-        (t 1)))
-   ((-1) 0)
-   ((0) 0)
-   ((1) 1)))
+   `(lambda (x)
+      (or (eq x -6)
+          (eq x -2)))
+   ((-6) t)
+   ((-2) t)
+   ((6) nil)
+   ((2) nil)
+   ((-12) nil)
+   ((-4) nil)))
 
 (with-test (:name :range<=-same)
   (checked-compile-and-assert

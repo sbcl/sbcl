@@ -80,3 +80,13 @@
   (let ((count (ldb (byte (1- (integer-length sb-vm:n-word-bits)) 0) count)))
     #+big-endian (ash number (- count))
     #+little-endian (logand (ash number count) most-positive-word)))
+
+(defun get-lisp-obj-address (x)
+  (etypecase x
+    (character
+     (dpb (char-code x)
+          (byte (- sb-vm:n-word-bits
+                   sb-vm:n-widetag-bits) sb-vm:n-widetag-bits)
+          sb-vm:character-widetag))
+    (fixnum
+     (ldb (byte sb-vm:n-word-bits 0) (ash x sb-vm:n-fixnum-tag-bits)))))
