@@ -1093,6 +1093,8 @@ invoked. In that case it will store into PLACE and start over."
                (boundp 'sb-c::*current-component*)
                #+sb-fasteval
                (not (typep lexenv 'sb-interpreter:basic-env))
+               #+sb-eval
+               (not (typep lexenv 'sb-eval::eval-lexenv))
                (sb-c:policy lexenv (> sb-c:jump-table 0))
                (sb-c::vop-existsp :named sb-c:jump-table))
       (let* ((default (if (eq (caar clauses) 't) (car clauses)))

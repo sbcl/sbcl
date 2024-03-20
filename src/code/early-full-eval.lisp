@@ -16,6 +16,7 @@
 ;; this stuff is split out into its own file.  Also, it lets the
 ;; INTERPRETED-FUNCTION type be declared before it is used in
 ;; compiler/main and code/deftypes-for-target.
+#-sb-xc-host
 (sb-kernel:!defstruct-with-alternate-metaclass
  interpreted-function
  ;; DEBUG-NAME and DEBUG-LAMBDA-LIST are initially a copies of the proper

@@ -98,6 +98,18 @@
   ;; flushed in some circumstances.
   (flushable nil :type list))
 
+#+sb-eval
+(defstruct (sb-eval::eval-lexenv
+            (:include lexenv)
+            (:copier nil)
+            (:constructor sb-eval::make-eval-lexenv
+                (funs vars blocks tags
+                 type-restrictions
+                 flushable
+                 lambda cleanup handled-conditions
+                 disabled-package-locks %policy user-data
+                 parent))))
+
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))
 

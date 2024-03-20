@@ -113,7 +113,7 @@
                              (cdr (assoc (car binding) new-symbol-expansions))))
                  (cons (car binding)
                        :bogus))))
-    (let ((lexenv (sb-c::internal-make-lexenv
+    (let ((lexenv (make-eval-lexenv
                    (nconc-2 (mapcar #'to-native-funs new-funs)
                             (sb-c::lexenv-funs old-lexenv))
                    (nconc-2 (mapcar #'to-native-vars new-vars)
@@ -194,7 +194,7 @@
 
 (defun make-null-environment ()
   (%make-env nil nil nil nil nil nil nil nil
-             (sb-c::internal-make-lexenv
+             (make-eval-lexenv
               nil nil nil
               nil nil nil nil nil nil nil
               sb-c::*policy*
