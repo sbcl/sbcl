@@ -1,71 +1,72 @@
-;;;; This file implements the copy propagation phase of the compiler,
-;;;; which uses global flow analysis to eliminate unnecessary copying
-;;;; of variables.
+#| This file implements the copy propagation phase of the compiler,
+ which uses global flow analysis to eliminate unnecessary copying
+ of variables.
 
-;;;; This software is part of the SBCL system. See the README file for
-;;;; more information.
-;;;;
-;;;; This software is derived from the CMU CL system, which was
-;;;; written at Carnegie Mellon University and released into the
-;;;; public domain. The software is in the public domain and is
-;;;; provided with absolutely no warranty. See the COPYING and CREDITS
-;;;; files for more information.
+ This software is part of the SBCL system. See the README file for
+ more information.
 
+ This software is derived from the CMU CL system, which was
+ written at Carnegie Mellon University and released into the
+ public domain. The software is in the public domain and is
+ provided with absolutely no warranty. See the COPYING and CREDITS
+ files for more information.
+|#
 (in-package "SB-C")
+#|
+ In copy propagation, we manipulate sets of TNs. We only consider
+ TNs whose sole write is by a MOVE VOP. This allows us to use a
+ degenerate version of reaching definitions: since each such TN has
+ only one definition, the TN can stand for the definition. We can
+ get away with this simplification, since the TNs that would be
+ subject to copy propagation are nearly always single-writer
+ (mostly temps allocated to ensure evaluation order is perserved).
+ Only TNs written by MOVEs are interesting, since all we do with
+ this information is delete spurious MOVEs.
 
-;;; In copy propagation, we manipulate sets of TNs. We only consider
-;;; TNs whose sole write is by a MOVE VOP. This allows us to use a
-;;; degenerate version of reaching definitions: since each such TN has
-;;; only one definition, the TN can stand for the definition. We can
-;;; get away with this simplification, since the TNs that would be
-;;; subject to copy propagation are nearly always single-writer
-;;; (mostly temps allocated to ensure evaluation order is perserved).
-;;; Only TNs written by MOVEs are interesting, since all we do with
-;;; this information is delete spurious MOVEs.
-;;;
-;;; There are additional semantic constraints on whether a TN can be
-;;; considered to be a copy. See TN-IS-A-COPY-OF.
-;;;
-;;; If a TN is in the IN set for a block, that TN is a copy of a TN
-;;; which still has the same value it had at the time the move was
-;;; done. Any reference to a TN in the IN set can be replaced with a
-;;; reference to the TN moved from. When we delete all reads of such a
-;;; TN, we can delete the MOVE VOP. IN is computed as the intersection
-;;; of OUT for all the predecessor blocks.
-;;;
-;;; In this flow analysis scheme, the KILL set is the set of all
-;;; interesting TNs where the copied TN is modified by the block (in
-;;; any way.)
-;;;
-;;; GEN is the set of all interesting TNs that are copied in the block
-;;; (whose write appears in the block.)
-;;;
-;;; OUT is (union (difference IN KILL) GEN)
+ There are additional semantic constraints on whether a TN can be
+ considered to be a copy. See TN-IS-A-COPY-OF.
 
-;;; If TN is subject to copy propagation, then return the TN it is a copy
-;;; of, otherwise NIL.
-;;;
-;;; We also only consider TNs where neither the TN nor the copied TN
-;;; are wired or restricted. If we extended the life of a wired or
-;;; restricted TN, register allocation might fail, and we can't
-;;; substitute arbitrary things for references to wired or restricted
-;;; TNs, since the reader may be expencting the argument to be in a
-;;; particular place (as in a passing location.)
-;;;
-;;; The TN must be a :NORMAL TN. Other TNs might have hidden
-;;; references or be otherwise bizarre.
-;;;
-;;; A TN is also inelegible if we want to preserve it to facilitate
-;;; debugging.
-;;;
-;;; The SCs of the TN's primitive types is a subset of the SCs of the
-;;; copied TN. Moves between TNs of different primitive type SCs may
-;;; need to be changed into coercions, so we can't squeeze them out.
-;;; The reason for testing for subset of the SCs instead of the same
-;;; primitive type is that this test lets T be substituted for LIST,
-;;; POSITIVE-FIXNUM for FIXNUM, etc. Note that more SCs implies fewer
-;;; possible values, or a subtype relationship, since more SCs implies
-;;; more possible representations.
+ If a TN is in the IN set for a block, that TN is a copy of a TN
+ which still has the same value it had at the time the move was
+ done. Any reference to a TN in the IN set can be replaced with a
+ reference to the TN moved from. When we delete all reads of such a
+ TN, we can delete the MOVE VOP. IN is computed as the intersection
+ of OUT for all the predecessor blocks.
+
+ In this flow analysis scheme, the KILL set is the set of all
+ interesting TNs where the copied TN is modified by the block (in
+ any way.)
+
+ GEN is the set of all interesting TNs that are copied in the block
+ (whose write appears in the block.)
+
+ OUT is (union (difference IN KILL) GEN)
+
+ If TN is subject to copy propagation, then return the TN it is a copy
+ of, otherwise NIL.
+
+ We also only consider TNs where neither the TN nor the copied TN
+ are wired or restricted. If we extended the life of a wired or
+ restricted TN, register allocation might fail, and we can't
+ substitute arbitrary things for references to wired or restricted
+ TNs, since the reader may be expencting the argument to be in a
+ particular place (as in a passing location.)
+
+ The TN must be a :NORMAL TN. Other TNs might have hidden
+ references or be otherwise bizarre.
+
+ A TN is also inelegible if we want to preserve it to facilitate
+ debugging.
+
+ The SCs of the TN's primitive types is a subset of the SCs of the
+ copied TN. Moves between TNs of different primitive type SCs may
+ need to be changed into coercions, so we can't squeeze them out.
+ The reason for testing for subset of the SCs instead of the same
+ primitive type is that this test lets T be substituted for LIST,
+ POSITIVE-FIXNUM for FIXNUM, etc. Note that more SCs implies fewer
+ possible values, or a subtype relationship, since more SCs implies
+ more possible representations.
+|#
 (defun tn-is-copy-of (tn)
   (declare (type tn tn))
   (declare (inline subsetp))
