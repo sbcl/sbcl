@@ -50,7 +50,7 @@
       (load "src/cold/compile-cold-sbcl.lisp")
       (let ((cache (math-journal-pathname :output)))
         (when (probe-file cache)
-          (copy-file-from-file "xfloat-math.lisp-expr" cache)
+          (copy-file-from-file "output/xfloat-math.lisp-expr" cache)
           (format t "~&Math journal: replaced from ~S~%" cache)))
       ;; Enforce absence of unexpected forward-references to warm loaded code.
       ;; Looking into a hidden detail of this compiler seems fair game.

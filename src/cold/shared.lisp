@@ -898,10 +898,11 @@
   ;; on top of the source file. For more than one, we could either merge them
   ;; or just ignore any modifications.
   (let* ((base "xfloat-math.lisp-expr")
+         (final (concatenate 'string "output/" base))
          (local (concatenate 'string *host-obj-prefix* base)))
     (pathname
      (ecase direction
-       (:input (if (probe-file local) local base))
+       (:input (if (probe-file local) local final))
        (:output local)))))
 
 (defun count-lines-of (pathname &aux (n 0))

@@ -1060,6 +1060,8 @@
 ;;; $ /path/to/host/sbcl
 ;;; * (load "load-xc")
 ;;; * (sb-impl:merge-all-xfloat-files)
+;;; Check:
+;;; $ ./make-target-2.sh
 (export 'merge-all-xfloat-files)
 (defun merge-all-xfloat-files ()
   (let ((ht sb-cold::*math-ops-memoization*)
@@ -1074,7 +1076,7 @@
               (format t "~D new entr~@:P from ~S~%" delta pathname))))))
     (if (zerop total-delta)
         (format t "~&Nothing new~%")
-        (with-open-file (stream "xfloat-math.lisp-expr"
+        (with-open-file (stream "output/xfloat-math.lisp-expr"
                                 :direction :output :if-exists :supersede)
           (dump-math-memoization-table ht stream)))))
 
