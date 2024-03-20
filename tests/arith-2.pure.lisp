@@ -493,3 +493,12 @@
          (= (/ 5 a) 5))
     ((1) t)
     ((0) (condition 'division-by-zero))))
+
+(with-test (:name :dpb-size-overflow)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((unsigned-byte 8) a))
+      (dpb a (byte 63 8)
+           81))
+   ((90) 23121)))

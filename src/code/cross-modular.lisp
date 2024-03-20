@@ -83,10 +83,10 @@
 
 (defun get-lisp-obj-address (x)
   (etypecase x
-    (character
+    (standard-char
      (dpb (char-code x)
           (byte (- sb-vm:n-word-bits
                    sb-vm:n-widetag-bits) sb-vm:n-widetag-bits)
           sb-vm:character-widetag))
-    (fixnum
+    (sb-xc:fixnum
      (ldb (byte sb-vm:n-word-bits 0) (ash x sb-vm:n-fixnum-tag-bits)))))

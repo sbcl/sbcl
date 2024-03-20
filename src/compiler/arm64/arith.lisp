@@ -933,6 +933,20 @@
            (inst asr res x (1+ posn))
            (inst and res res (ash most-positive-word (- size sb-vm:n-word-bits)))))))
 
+(define-vop (ldb-c)
+  (:translate %ldb)
+  (:args (x :scs (unsigned-reg signed-reg)))
+  (:arg-types (:constant integer) (:constant integer) (:or unsigned-num signed-num))
+  (:info size posn)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (if (and (>= (+ posn size) n-word-bits)
+             (= size 1))
+        (inst lsr res x (1- n-word-bits))
+        (inst ubfm res x posn (+ posn size -1)))))
+
 (deftransform %dpb ((new size posn integer) (:or ((word
                                                    (constant-arg (integer 1 #.(1- n-word-bits)))
                                                    (constant-arg (mod #.n-word-bits))
@@ -948,20 +962,6 @@
               (or (zerop new)
                   (= (logcount new) size))))))
 
-(define-vop (ldb-c)
-  (:translate %ldb)
-  (:args (x :scs (unsigned-reg signed-reg)))
-  (:arg-types (:constant integer) (:constant integer) (:or unsigned-num signed-num))
-  (:info size posn)
-  (:results (res :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 3
-    (if (and (>= (+ posn size) n-word-bits)
-             (= size 1))
-        (inst lsr res x (1- n-word-bits))
-        (inst ubfm res x posn (+ posn size -1)))))
-
 (define-vop (dpb-c/fixnum)
   (:translate %dpb)
   (:args (x :scs (signed-reg) :to :save)
@@ -975,7 +975,10 @@
   (:policy :fast-safe)
   (:generator 2
     (move res y)
-    (inst bfm res x (- (1- n-word-bits) posn) (1- size))))
+    (inst bfm res x (- (1- n-word-bits) posn) (1- (if (> (+ size posn)
+                                                         n-word-bits)
+                                                      (- (1- n-word-bits) posn)
+                                                      size)))))
 
 (define-vop (dpb-c/signed)
   (:translate %dpb)
@@ -992,7 +995,10 @@
     (move res y)
     (inst bfm res x (if (= posn 0)
                         0
-                        (- n-word-bits posn)) (1- size))))
+                        (- n-word-bits posn)) (1- (if (> (+ size posn)
+                                                         n-word-bits)
+                                                      (- n-word-bits posn)
+                                                      size)))))
 
 (define-vop (dpb-c/unsigned)
   (:translate %dpb)
@@ -1009,7 +1015,10 @@
     (move res y)
     (inst bfm res x (if (= posn 0)
                         0
-                        (- n-word-bits posn)) (1- size))))
+                        (- n-word-bits posn)) (1- (if (> (+ size posn)
+                                                         n-word-bits)
+                                                      (- n-word-bits posn)
+                                                      size)))))
 
 ;;; Modular functions
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
