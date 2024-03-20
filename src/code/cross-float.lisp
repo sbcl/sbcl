@@ -548,10 +548,12 @@
      (error "Unexpectedly got host float/complex args")))
 
 (defun rational (x)
-  (if (rationalp x)
-      x
-      (with-memoized-math-op (rational x)
-        (cl:* (flonum-sign x) (flonum-mantissa x) (cl:expt 2 (flonum-exponent x))))))
+  (cond
+    ((rationalp x) x)
+    ((float-infinity-or-nan-p x)
+     (error "Can't convert Inf or NaN to rational."))
+    (t (with-memoized-math-op (rational x)
+         (cl:* (flonum-sign x) (flonum-mantissa x) (cl:expt 2 (flonum-exponent x)))))))
 
 (defun rationalize (x)
   (if (rationalp x)
@@ -1334,7 +1336,7 @@
   (assert (eq (sb-xc:fround (coerce -1/2 format)) (make-flonum :minus-zero format)))
   (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
-           (handler-case (realnumify x)
+           (handler-case (rational x)
              (:no-error (x) (error "Expected an error, got ~S" x))
              (simple-error (x) (declare (ignore x))))))
     (let ((nan (make-single-float #b01111111101000000000000000000000)))
@@ -1343,7 +1345,7 @@
       (assert (float-nan-p nan))
       (assert (float-infinity-or-nan-p nan))
       (assert (not (float-infinity-p nan))))
-    (dolist (symbol '(:+infinity :-infinity :minus-zero))
+    (dolist (symbol '(:+infinity :-infinity))
       (assert-not-number (make-flonum symbol format))))))
 
 #+host-quirks-sbcl ; Cross-check some more things if we can
