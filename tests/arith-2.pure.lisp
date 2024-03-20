@@ -457,7 +457,16 @@
    ((6) nil)
    ((2) nil)
    ((-12) nil)
-   ((-4) nil)))
+   ((-4) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (or (eq x 0)
+          (eq x -4)))
+   ((0) t)
+   ((-4) t)
+   ((4) nil)
+   ((-8) nil)))
 
 (with-test (:name :range<=-same)
   (checked-compile-and-assert

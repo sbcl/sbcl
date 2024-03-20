@@ -7068,32 +7068,33 @@
                               (flush-dest b)
                               (let* ((value (cond (type-check
                                                    ;; Operate on tagged values
-                                                   (setf c1 (get-lisp-obj-address c1-orig)
-                                                         c2 (get-lisp-obj-address c2-orig))
-                                                   '(get-lisp-obj-address a))
+                                                   (cond (characterp
+                                                          (setf c1 (get-lisp-obj-address c1-orig)
+                                                                c2 (get-lisp-obj-address c2-orig))
+                                                          '(get-lisp-obj-address a))
+                                                         (t
+                                                          (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
+                                                                c2 (ash c2 sb-vm:n-fixnum-tag-bits))
+                                                          '(mask-signed-field sb-vm:n-fixnum-bits (get-lisp-obj-address a)))))
                                                   (characterp
                                                    '(char-code a))
                                                   (t
                                                    'a)))
                                      (min (min c1 c2))
                                      (max (max c1 c2)))
-                                (flet ((cut-constant (x)
-                                         (if type-check
-                                             (ldb (byte sb-vm:n-word-bits 0) x)
-                                             x)))
-                                  (transform-call next-node
-                                                  `(lambda (a b)
-                                                     (declare (ignore b))
-                                                     ,(cond ((%one-bit-diff-p c1 c2)
-                                                             (if (zerop min)
-                                                                 `(not (logtest ,value ,(cut-constant (lognot (logxor c1 c2)))))
-                                                                 `(eq (logandc2 ,value
-                                                                                ,(logxor c1 c2))
-                                                                      ,min)))
-                                                            (t
-                                                             `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
-                                                                            ,(cut-constant (lognot (- max min))))))))
-                                                  'or-eq-transform)))))))))))
+                                (transform-call next-node
+                                                `(lambda (a b)
+                                                   (declare (ignore b))
+                                                   ,(cond ((%one-bit-diff-p c1 c2)
+                                                           (if (zerop min)
+                                                               `(not (logtest ,value ,(lognot (logxor c1 c2))))
+                                                               `(eq (logandc2 ,value
+                                                                              ,(logxor c1 c2))
+                                                                    ,min)))
+                                                          (t
+                                                           `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
+                                                                          ,(lognot (- max min)))))))
+                                                'or-eq-transform))))))))))
           (unless (node-prev node)
             ;; Don't proceed optimizing this node
             t))))))
