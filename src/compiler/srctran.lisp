@@ -7029,53 +7029,61 @@
                                (= (logcount (- c2 c1)) 1)))))
                 ;; Comparing integers that differ by only one bit,
                 ;; which is useful for case-insensitive comparison of ASCII characters.
-                (unless type-check
-                  (loop for ((node . if) (next-node . next-if)) = chain
-                        while next-node
-                        do
-                        (pop chain)
-                        (destructuring-bind (a b) (combination-args node)
-                          (destructuring-bind (a2 b2) (combination-args next-node)
-                            (let ((c1 (lvar-value b))
-                                  (c2 (lvar-value b2)))
-                              (when (and (if characterp
-                                             (and (characterp c1)
-                                                  (characterp c2)
-                                                  (setf c1 (char-code c1)
-                                                        c2 (char-code c2)))
-                                             (and (fixnump c1)
-                                                  (fixnump c2)))
-                                         (one-bit-diff-p c1 c2))
-                                (pop chain)
-                                (kill-if-branch-1 if (if-test if)
-                                                  (node-block if)
-                                                  (if-consequent if))
-                                (setf (combination-args node) nil)
-                                (flush-combination node)
-                                (setf (lvar-dest a) next-node)
-                                (setf (combination-args next-node)
-                                      (list a b2))
-                                (flush-dest a2)
-                                (flush-dest b)
-                                (let ((min (min c1 c2))
-                                      (max (max c1 c2))
-                                      (value (if characterp
-                                                 '(char-code a)
-                                                 'a)))
-                                  (transform-call next-node
-                                                  `(lambda (a b)
-                                                     (declare (ignore b))
-                                                     ,(type-check
-                                                       (cond ((%one-bit-diff-p c1 c2)
-                                                              (if (zerop min)
-                                                                  `(not (logtest ,value (lognot ,(logxor c1 c2))))
-                                                                  `(eq (logandc2 ,value
-                                                                                 ,(logxor c1 c2))
-                                                                       ,min)))
-                                                             (t
-                                                              `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
-                                                                             (lognot ,(- max min))))))))
-                                                  'or-eq-transform)))))))))))
+                (loop for ((node . if) (next-node . next-if)) = chain
+                      while next-node
+                      do
+                      (pop chain)
+                      (destructuring-bind (a b) (combination-args node)
+                        (destructuring-bind (a2 b2) (combination-args next-node)
+                          (let ((c1 (lvar-value b))
+                                (c2 (lvar-value b2)))
+                            (when (and (if characterp
+                                           (and (characterp c1)
+                                                (characterp c2)
+                                                (setf c1 (char-code c1)
+                                                      c2 (char-code c2)))
+                                           (and (fixnump c1)
+                                                (fixnump c2)))
+                                       (one-bit-diff-p c1 c2))
+                              (pop chain)
+                              (kill-if-branch-1 if (if-test if)
+                                                (node-block if)
+                                                (if-consequent if))
+                              (setf (combination-args node) nil)
+                              (flush-combination node)
+                              (setf (lvar-dest a) next-node)
+                              (setf (combination-args next-node)
+                                    (list a b2))
+                              (flush-dest a2)
+                              (flush-dest b)
+                              (when type-check
+                                ;; Tag and operate on tagged values returned by get-lisp-obj-address
+                                (if characterp
+                                    (setf c1 (+ (ash c1 sb-vm:n-widetag-bits) sb-vm:character-widetag)
+                                          c2 (+ (ash c2 sb-vm:n-widetag-bits) sb-vm:character-widetag))
+                                    (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
+                                          c2 (ash c2 sb-vm:n-fixnum-tag-bits))))
+                              (let ((min (min c1 c2))
+                                    (max (max c1 c2))
+                                    (value (cond (type-check
+                                                  '(get-lisp-obj-address a))
+                                                 (characterp
+                                                  '(char-code a))
+                                                 (t
+                                                  'a))))
+                                (transform-call next-node
+                                                `(lambda (a b)
+                                                   (declare (ignore b))
+                                                   ,(cond ((%one-bit-diff-p c1 c2)
+                                                           (if (zerop min)
+                                                               `(not (logtest ,value (lognot ,(logxor c1 c2))))
+                                                               `(eq (logandc2 ,value
+                                                                              ,(logxor c1 c2))
+                                                                    ,min)))
+                                                          (t
+                                                           `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
+                                                                          (lognot ,(- max min)))))))
+                                                'or-eq-transform))))))))))
           (unless (node-prev node)
             ;; Don't proceed optimizing this node
             t))))))
