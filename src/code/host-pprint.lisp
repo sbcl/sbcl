@@ -26,7 +26,9 @@
   ;; A hash table mapping things to entries for type specifiers of the
   ;; form (CONS (MEMBER <thing>)). If the type specifier is of this form,
   ;; we put it in this hash table instead of the regular entries table.
-  (cons-entries (make-hash-table :test 'eql) :read-only t)
+  ;; Could also be a function based on perfect hash of the contents,
+  ;; which "downgrades" to a hash-table if set-print-dispatch is called.
+  (cons-entries (make-hash-table :test 'eql) :type (or function hash-table))
   ;; NIL if this this table can't match any numeric type.
   ;; The conservative value is T.
   (number-matchable-p nil)
