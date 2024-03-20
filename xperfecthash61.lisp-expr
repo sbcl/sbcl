@@ -1643,5 +1643,17 @@
 (#(CE71FAA 1430BAFC 25164A63 68D6D579 7E4DD5CC D6E7D73B F5EA1D35)
  "(:NAME :SOURCE :PACKAGE :FUN-MAP :CONTEXTS :MEMO-CELL :ALLOW-OTHER-KEYS)"
  "(  (& (^ (>> val 1) (>> val 23)) 7))")
+(#(74748736 965CD62A 971A1DF1 A0FAB3A5 A2195041)
+ "(REAL FLOAT DOUBLE-FLOAT SINGLE-FLOAT RATIONAL)"
+ "(  (& (^ val (>> val 13)) 7))")
+(#(10ACE44E 74748736 965CD62A 971A1DF1 A0FAB3A5 A2195041)
+ "(REAL FLOAT DOUBLE-FLOAT SINGLE-FLOAT RATIONAL INTEGER)"
+ "(  (& (>> val 2) 7))")
+(#(0 1 2 3 4 5 6 7 8 9 A B C D E F)
+ "(15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 12 0 12 0 12 0 12)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 28) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
