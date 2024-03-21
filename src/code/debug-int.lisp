@@ -2282,7 +2282,8 @@ register."
 (defun debug-var-symbol (debug-var)
   (let ((package (debug-var-package debug-var)))
     (if package
-        (intern (debug-var-name debug-var) package)
+        (without-package-locks
+          (intern (debug-var-name debug-var) package))
         (make-symbol (debug-var-name debug-var)))))
 
 ;;; Return the value stored for DEBUG-VAR in frame, or if the value is
