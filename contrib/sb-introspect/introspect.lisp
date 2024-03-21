@@ -461,8 +461,11 @@ If an unsupported TYPE is requested, the function will return NIL.
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))
      :form-path (if tlf (list tlf))
-     :form-number (sb-di::code-location-form-number
-                   (sb-di::debug-fun-start-location debug-fun))
+     :form-number (handler-case (sb-di::code-location-form-number
+                                 (sb-di::debug-fun-start-location debug-fun))
+                    (sb-di::unknown-code-location (cond)
+                      (declare (ignore cond))
+                      0))
      :file-write-date (debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
 
