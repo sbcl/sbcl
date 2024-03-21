@@ -7044,9 +7044,7 @@
                              ;; then it can be masked off and compared to 0.
                              (let ((c1 (min c1 c2))
                                    (c2 (max c1 c2)))
-                               (and (or characterp
-                                        (not type-check))
-                                (= (logcount (- c2 c1)) 1))))))
+                               (= (logcount (- c2 c1)) 1)))))
                 ;; Comparing integers that differ by only one bit,
                 ;; which is useful for case-insensitive comparison of ASCII characters.
                 (loop for ((node . if) (next-node . next-if)) = chain
@@ -7104,7 +7102,9 @@
                                                                               ,(logxor c1 c2))
                                                                     ,min)))
                                                           (t
-                                                           `(not (logtest (mask-signed-field sb-vm:n-fixnum-bits (- ,value ,min))
+                                                           `(not (logtest (,@(if type-check
+                                                                                 '(logand most-positive-word)
+                                                                                 '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
                                                                           ,(lognot (- max min)))))))
                                                 'or-eq-transform))))))))))
           (unless (node-prev node)
