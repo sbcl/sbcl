@@ -187,7 +187,7 @@
                      (:constant (satisfies ,constant-test)))
        (:generator ,untagged-penalty
          (cond ,@(and negative-op
-                      `(((minusp y)
+                      `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
                          (inst ,negative-op r x (,constant-transform (- y))))))
                (t
                 (inst ,constant-op r x (,constant-transform y))))))
@@ -203,7 +203,7 @@
                    (:constant (satisfies ,constant-test)))
        (:generator ,untagged-penalty
          (cond ,@(and negative-op
-                      `(((minusp y)
+                      `(((minusp (setf y (sb-c::mask-signed-field n-word-bits y)))
                          (inst ,negative-op r x (,constant-transform (- y))))))
                (t
                 (inst ,constant-op r x (,constant-transform y))))))))
@@ -1045,7 +1045,7 @@
   `(define-vop (,name ,prototype)
      (:args (x :scs (unsigned-reg signed-reg)))
      (:info y)
-     (:arg-types untagged-num (:constant (satisfies add-sub-immediate-p)))
+     (:arg-types untagged-num (:constant (satisfies abs-add-sub-immediate-p)))
      (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
      (:result-types unsigned-num)
      (:translate ,function)))
