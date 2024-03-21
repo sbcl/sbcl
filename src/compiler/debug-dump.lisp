@@ -771,6 +771,12 @@
           (setf (compiled-debug-fun-blocks dfun) blocks
                 (compiled-debug-fun-tlf-number dfun) tlf-num))
         (setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
+
+    ;; hack to pack form-number in debug-fun-blocks on debug = 0.
+    (when (< level 1)
+      (setf (compiled-debug-fun-blocks dfun)
+            (source-path-form-number (node-source-path (lambda-bind fun)))))
+
     (if (xep-p fun)
         (setf (compiled-debug-fun-returns dfun) :standard)
         (let ((info (tail-set-info (lambda-tail-set fun))))

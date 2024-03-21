@@ -117,6 +117,9 @@
   ;; function. This slot may be NIL to save space.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*))
                         (simple-array (signed-byte 8) (*))
+                        ;; hack to pack the fun form-number here on
+                        ;; low debug.
+                        integer
                         null))
   ;; If all code locations in this function are in the same top level
   ;; form, then this is the number of that form, otherwise NIL. If
