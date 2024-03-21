@@ -341,6 +341,16 @@
   (declare (type (member add sub) op))
   (multiple-value-setq (x y) (prepare-alu-operands x y vop const-tn-xform (eq op 'add)))
 
+  (when (and (typep y 'unsigned-byte)
+             (logbitp (1- n-word-bits) y))
+    ;; Turn unsigned constants into smaller negative constants
+    (case op
+      (add
+       (setf op 'sub
+             y (- (sb-c::mask-signed-field n-word-bits y))))
+      (sub
+       (setf op 'add
+             y (- (sb-c::mask-signed-field n-word-bits y))))))
   ;; FIXME: What is (ash -1 63) for ? this comment within doesn't match the test.
   (when (and (eq op 'sub) (and (integerp y) (not (eql y (ash -1 63)))))
     ;; If Y is -2147483648 then the negation is not (signed-byte 32).
