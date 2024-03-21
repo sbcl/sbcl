@@ -1107,10 +1107,16 @@ invoked. In that case it will store into PLACE and start over."
                         (when (every (lambda (clause) (constantp `(progn ,@(cdr clause))))
                                      normal-clauses)
                           ;; TODO: use specialized vector if possible
-                          (map 'simple-vector
-                               (lambda (clause)
-                                 `(load-time-value (progn ,@(cdr clause))))
-                               normal-clauses)))
+                          (block nil
+                            (map 'simple-vector
+                                 (lambda (clause)
+                                   (let ((value
+                                           (constant-form-value `(progn ,@(cdr clause)) lexenv)))
+                                     (if (typep value '(or symbol number
+                                                        character))
+                                         value
+                                         (return))))
+                                 normal-clauses))))
                       (seen (alloc-xset))
                       (tested (if default (butlast specified-clauses) specified-clauses))
                       (key-lists

@@ -7195,18 +7195,17 @@
                     (h (,phash-lexpr ,object-hash)))
                ;; EQL reduces to EQ for all object this expanders accepts as keys
                ,(if constants
-                    (let ((load-time-vector `(load-time-value (vector ,@(coerce result-vector 'list)) t)))
-                      (if (eq default :exact)
-                          `(aref ,load-time-vector (truly-the (mod ,(length result-vector)) h))
-                          `(if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
-                               ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'equal))))
-                                  (if all-equal
-                                      (aref result-vector 0)
-                                      `(aref ,load-time-vector h)))
-                               ,(if errorp
-                                    `(ecase-failure #1# ,(coerce errorp 'simple-vector))
-                                    (if default
-                                        `(funcall default))))))
+                    (if (eq default :exact)
+                        `(aref ,result-vector (truly-the (mod ,(length result-vector)) h))
+                        `(if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
+                             ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
+                                (if all-equal
+                                    `',(aref result-vector 0)
+                                    `(aref ,result-vector h)))
+                             ,(if errorp
+                                  `(ecase-failure #1# ,(coerce errorp 'simple-vector))
+                                  (if default
+                                      `(funcall default)))))
                     (let ((otherwise (cdr (assoc 'otherwise targets))))
                       (if otherwise
                           `(if-to-blocks
@@ -7319,10 +7318,10 @@
                                 (let ((key (pop new-key-lists)))
                                   (cond ((and (not rest)
                                               exact)
-                                         constant)
+                                         `',constant)
                                         (constant-p
                                          `(if (memq key ',key)
-                                              ,constant
+                                              ',constant
                                               ,(convert rest)))
                                         (original-keys
                                          `(ecase-failure key ,(coerce original-keys 'simple-vector)))
