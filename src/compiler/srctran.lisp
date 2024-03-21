@@ -7044,7 +7044,9 @@
                              ;; then it can be masked off and compared to 0.
                              (let ((c1 (min c1 c2))
                                    (c2 (max c1 c2)))
-                               (= (logcount (- c2 c1)) 1)))))
+                               (and (or characterp
+                                        (not type-check))
+                                (= (logcount (- c2 c1)) 1))))))
                 ;; Comparing integers that differ by only one bit,
                 ;; which is useful for case-insensitive comparison of ASCII characters.
                 (loop for ((node . if) (next-node . next-if)) = chain
@@ -7085,7 +7087,7 @@
                                                          (t
                                                           (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
                                                                 c2 (ash c2 sb-vm:n-fixnum-tag-bits))
-                                                          '(mask-signed-field sb-vm:n-fixnum-bits (get-lisp-obj-address a)))))
+                                                          '(mask-signed-field sb-vm:n-word-bits (get-lisp-obj-address a)))))
                                                   (characterp
                                                    '(char-code a))
                                                   (t

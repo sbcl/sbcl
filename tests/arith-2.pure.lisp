@@ -466,7 +466,30 @@
    ((0) t)
    ((-4) t)
    ((4) nil)
-   ((-8) nil)))
+   ((-8) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (or (eq x 97)
+          (eq x 65)))
+   ((-4611686018427387807) nil)
+   ((97) t)
+   ((65) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (or (eq x -65)
+          (eq x -97)))
+   ((-97) t)
+   ((-65) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (case x ((-3 -2 17) t)))
+   ((4611686018427387902) nil)
+   ((-3) t)
+   ((-2) t)
+   ((17) t)))
 
 (with-test (:name :range<=-same)
   (checked-compile-and-assert
