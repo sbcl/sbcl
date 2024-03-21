@@ -748,10 +748,14 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
     (briefly-describe-symbol symbol))
   (values))
 
-(defun perfectly-hash-package (designator)
+;;; TODO: I think the original idea was to place all symbols into a single
+;;; vector, with an bit-vector to record internal/external per symbol.
+(defun perfectly-hash-package (package)
   (flet ((rehash (table &aux (cells (symtbl-%cells table)))
            (when (functionp (car cells))
              (return-from rehash)) ; already hashed
+           ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
+           #-darwin-jit (setf (symtbl-modified table) nil)
            (let* ((cells (cdr cells))
                   (hashes (map '(simple-array (unsigned-byte 32) (*))
                                #'symbol-name-hash
@@ -770,9 +774,8 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                      (symtbl-size table) (length hashes)
                      (symtbl-free table) 0
                      (symtbl-deleted table) 0)))))
-    (let ((package (find-package designator)))
-      (rehash (package-internal-symbols package))
-      (rehash (package-external-symbols package)))))
+    (rehash (package-internal-symbols package))
+    (rehash (package-external-symbols package))))
 
 ;;; Reorganize both hashsets of all packages, called by SAVE-LISP-AND-DIE.
 ;;; With a few exceptions, tables are saved at 100% load factor and a perfect hash.
@@ -800,9 +803,13 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            #-darwin-jit (setf (symtbl-modified table) nil)))
     (dolist (package (list-all-packages))
       ;; Choose load factor based on whether INTERN is expected at runtime
+      ;; FIXME: because changing a package from perfectly hashed back to
+      ;; an open-addressing table is not thread-safe, _only_ the CL package can
+      ;; become perfectly hashed.
       (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
                       ((eq (package-id package) +package-id-user+) 8/10)
-                      (t 1))))
+                      ((eq package *cl-package*) 1)
+                      (t 8/10))))
         (cond ((= lf 1)
                (perfectly-hash-package package))
               (t

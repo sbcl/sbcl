@@ -19,8 +19,13 @@
 |#
 
 (with-test (:name :minimal-vs-non-minimal)
-  (let* ((symbols (sb-impl::symtbl-cells (sb-impl::package-internal-symbols
-                                          (find-package "SB-WALKER"))))
+  (let* ((symbols
+          ;; Not sure why INTERN would randomly occur in SB-WALKER but it did,
+          ;; thereby undoing the perfect hash and creating empty cells.
+          ;; It's moot, now that I've temporarily disabled perfect hashing of packages.
+          (remove-if-not #'symbolp
+                         (sb-impl::symtbl-cells (sb-impl::package-internal-symbols
+                                                 (find-package "SB-WALKER")))))
          (hashes (map '(simple-array (unsigned-byte 32) (*))
                       #'sb-kernel::symbol-name-hash
                       symbols))
