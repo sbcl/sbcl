@@ -1104,12 +1104,12 @@ invoked. In that case it will store into PLACE and start over."
         (cond ((and (eq test 'eql)
                     (should-attempt-hash-based-case-dispatch keys))
                (let* ((constants
-                        (when (every (lambda (clause) (constantp `(progn ,@(cdr clause)) lexenv))
+                        (when (every (lambda (clause) (constantp `(progn ,@(cdr clause))))
                                      normal-clauses)
                           ;; TODO: use specialized vector if possible
                           (map 'simple-vector
                                (lambda (clause)
-                                 (constant-form-value `(progn ,@(cdr clause)) lexenv))
+                                 `(load-time-value (progn ,@(cdr clause))))
                                normal-clauses)))
                       (seen (alloc-xset))
                       (tested (if default (butlast specified-clauses) specified-clauses))
