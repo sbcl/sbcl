@@ -6588,7 +6588,8 @@
            (give-up-ir1-transform)))))
 
 (deftransform parse-integer ((string &key (start 0) end radix junk-allowed)
-                             (t &key (:radix (constant-arg (or null (member 10 16)))) &allow-other-keys))
+                             (t &key (:radix (constant-arg (or null (member 10 16))))
+                                (:start t) (:end t) (:junk-allowed t)))
   `(,(if (and radix
               (= (lvar-value radix) 16))
          'sb-impl::parse-integer16
