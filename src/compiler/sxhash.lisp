@@ -249,11 +249,10 @@
       (when (and (not string) (position 0 array))
         (setq string (generate-ph (map '(simple-array (unsigned-byte 32) (*))
                                        (lambda (x) (logxor x #xFFFFFFFF))
-                                       array)))
-        (unless string
-          (return-from make-perfect-hash-lambda (values nil nil)))
-        (when string
-          (setq invert-keys t)))
+                                       array))
+              invert-keys t))
+      (unless string
+        (return-from make-perfect-hash-lambda (values nil nil)))
       ;; string won't account for inverted keys but that's fine
       ;; as the resulting expression will
       (setq expr (with-standard-io-syntax
