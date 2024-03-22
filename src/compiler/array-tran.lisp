@@ -1847,37 +1847,47 @@
   (once-only ((n-array array)
               (n-svalue `(the index ,svalue))
               (n-evalue `(the (or index null) ,evalue)))
-    (let ((check-bounds (policy env (plusp insert-array-bounds-checks))))
-      `(multiple-value-bind (,data-var
-                             ,start-var
-                             ,end-var
-                             ,@ (when offset-var `(,offset-var)))
-           (cond ,@(and (not array-header-p)
-                        `(((not (array-header-p ,n-array))
-                           (let ((,n-array ,n-array))
-                             (declare (type vector ,n-array))
-                             ,(once-only ((n-len `(length ,n-array))
-                                          (n-end `(or ,n-evalue ,n-len)))
-                                (if check-bounds
-                                    `(if (<= 0 ,n-svalue ,n-end ,n-len)
-                                         (values (truly-the simple-array ,n-array)
-                                                 ,n-svalue ,n-end 0)
-                                         ,(if check-fill-pointer
-                                              `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
-                                              `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
-                                    `(values (truly-the simple-array ,n-array)
-                                             ,n-svalue ,n-end 0)))))))
-                 (t
-                  ,(cond (force-inline
-                          `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
-                                                   :check-bounds ,check-bounds
-                                                   :check-fill-pointer ,check-fill-pointer
-                                                   :array-header-p t))
-                         (check-fill-pointer
-                          `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue))
-                         (t
-                          `(%with-array-data ,n-array ,n-svalue ,n-evalue)))))
-         ,@forms))))
+    (multiple-value-bind (forms declarations) (parse-body forms nil)
+      (let ((check-bounds (policy env (plusp insert-array-bounds-checks))))
+        `(multiple-value-bind (,data-var
+                               ,start-var
+                               ,end-var
+                               ,@ (when offset-var `(,offset-var)))
+             (cond ,@(and (not array-header-p)
+                          `(((not (array-header-p ,n-array))
+                             (let ((,n-array ,n-array))
+                               (declare (type vector ,n-array))
+                               ,(once-only ((n-len `(length ,n-array))
+                                            (n-end `(or ,n-evalue ,n-len)))
+                                  (if check-bounds
+                                      `(if (<= 0 ,n-svalue ,n-end ,n-len)
+                                           (values (truly-the simple-array ,n-array)
+                                                   ,n-svalue ,n-end 0)
+                                           ,(if check-fill-pointer
+                                                `(sequence-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)
+                                                `(array-bounding-indices-bad-error ,n-array ,n-svalue ,n-evalue)))
+                                      `(values (truly-the simple-array ,n-array)
+                                               ,n-svalue ,n-end 0)))))))
+                   (t
+                    ,(cond (force-inline
+                            `(%with-array-data-macro ,n-array ,n-svalue ,n-evalue
+                                                     :check-bounds ,check-bounds
+                                                     :check-fill-pointer ,check-fill-pointer
+                                                     :array-header-p t))
+                           (check-fill-pointer
+                            `(%with-array-data/fp ,n-array ,n-svalue ,n-evalue))
+                           (t
+                            `(%with-array-data ,n-array ,n-svalue ,n-evalue)))))
+           ,@declarations
+           ,@(and (and check-bounds
+                       (compiling-p env)
+                       (loop for (nil . declare) in declarations
+                             never (loop for declaration in declare
+                                         thereis
+                                         (and (typep declaration '(cons (eql ignore)))
+                                              (member end-var (cdr declaration))))))
+                  `((%in-bounds-constraint ,data-var ,end-var)))
+           ,@forms)))))
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.

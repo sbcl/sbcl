@@ -1888,7 +1888,7 @@ extended <package-name>::<form-in-package> syntax."
                                   :check-fill-pointer t)
                   (let ((radix ,(or radix 'radix))
                         (index (do ((i start (1+ i)))
-                                   ((= i end)
+                                   ((>= i end)
                                     (if junk-allowed
                                         (return-from ,(symbolicate 'parse-integer
                                                                    (if radix (princ-to-string radix) ""))
@@ -1911,7 +1911,7 @@ extended <package-name>::<form-in-package> syntax."
                                    `(let ((result 0))
                                       (declare (type ,type result))
                                       (loop
-                                       (when (= index end) (return nil))
+                                       (when (>= index end) (return nil))
                                        (let* ((char (char string index))
                                               (weight (digit-char-p char radix)))
                                          (cond (weight
@@ -1923,7 +1923,7 @@ extended <package-name>::<form-in-package> syntax."
                                                ((whitespace[1]p char)
                                                 (loop
                                                  (incf index)
-                                                 (when (= index end) (return))
+                                                 (when (>= index end) (return))
                                                  (unless (whitespace[1]p (char string index))
                                                    (parse-error "junk in string ~S")))
                                                 (return nil))

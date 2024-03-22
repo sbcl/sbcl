@@ -3318,3 +3318,10 @@ is :ANY, the function name is not checked."
                  (node-lexenv (lvar-dest lvar)))
                 *lexenv*)))
     t))
+
+(defun compiling-p (environment)
+  (and (boundp 'sb-c:*compilation*)
+       #+sb-fasteval
+       (not (typep environment 'sb-interpreter:basic-env))
+       #+sb-eval
+       (not (typep environment 'sb-eval::eval-lexenv))))

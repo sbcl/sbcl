@@ -689,6 +689,16 @@
         (derive-node-type node type))))
   :give-up)
 
+(deftransform %in-bounds-constraint ((vector length) * * :node node)
+  (delay-ir1-transform node :ir1-phases)
+  nil)
+
+(defoptimizer (%in-bounds-constraint constraint-propagate) ((vector length) node gen)
+  (let ((var (ok-lvar-lambda-var vector gen)))
+    (when var
+      (add-equality-constraint 'vector-length var length gen gen nil)))
+  nil)
+
 (defun lvar-result-constraints (lvar)
   (let ((uses (lvar-uses lvar)))
     (cond ((combination-p uses)

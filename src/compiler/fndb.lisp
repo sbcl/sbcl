@@ -1938,6 +1938,8 @@
   (movable flushable always-translatable))
 (defknown %type-constraint (t (or type-specifier ctype)) t
     (always-translatable))
+(defknown %in-bounds-constraint (t t) t
+    (always-translatable))
 
 ;;; An identity wrapper to avoid complaints about constant modification
 (defknown ltv-wrapper (t) t
