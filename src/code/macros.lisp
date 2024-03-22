@@ -1113,7 +1113,7 @@ invoked. In that case it will store into PLACE and start over."
                                    (let ((value
                                            (constant-form-value `(progn ,@(cdr clause)) lexenv)))
                                      (if (typep value '(or symbol number
-                                                        character))
+                                                        character (and array (not (array t)))))
                                          value
                                          (return))))
                                  normal-clauses))))
