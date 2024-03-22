@@ -7,6 +7,7 @@ changes relative to sbcl-2.4.2:
   * bug fix: float rounders (FTRUNCATE and related functions) handle minus
     zero more consistently, returning minus zero as the primary value when
     rounding to zero from a negative value.
+  * optimization: faster PARSE-INTEGER :radix 10/16 on word-sized integers.
 
 changes in sbcl-2.4.2 relative to sbcl-2.4.1:
   * bug fix: restore the ability to inherit from both SEQUENCE and
