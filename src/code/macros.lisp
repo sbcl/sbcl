@@ -1136,7 +1136,6 @@ invoked. In that case it will store into PLACE and start over."
                            `(sb-c::%jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
                                                ,@(loop for (nil . form) in tested
                                                        for keys in key-lists
-                                                       for i from 0
                                                        collect `(lambda ()
                                                                   (sb-c::%type-constraint ,keyform-value '(member ,@keys))
                                                                   ,@form))
