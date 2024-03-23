@@ -63,6 +63,16 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                        else-ctran)
                    next result else))))
 
+;;; Hiding jump-table from third party code walkers
+(define-source-transform %jump-table (index &rest targets)
+  `(jump-table ,index
+               ,@(loop for (target . next) on targets
+                       for i from 0
+                       collect `(,(if next
+                                      i
+                                      'otherwise)
+                                 (funcall ,target)))))
+
 (def-ir1-translator jump-table ((index &rest targets) start next result)
   (aver targets)
   (let* ((index-ctran (make-ctran))

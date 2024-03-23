@@ -1131,20 +1131,20 @@ invoked. In that case it will store into PLACE and start over."
                       ,(if constants
                            `(sb-c:case-to-jump-table ,keyform-value ',key-lists ',constants
                                                      ,(if default
-                                                          `(lambda () ,@(cdr default)))
+                                                          `(lambda () (progn ,@(cdr default))))
                                                      ',errorp)
-                           `(sb-c:jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
-                                             ,@(loop for (nil . form) in tested
-                                                     for keys in key-lists
-                                                     for i from 0
-                                                     collect `(,i
-                                                               (sb-c::%type-constraint ,keyform-value '(member ,@keys))
-                                                               ,@form))
-                                             (otherwise
-                                              (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
-                                              ,@(if errorp
-                                                    `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
-                                                    (cdr default)))))))))
+                           `(sb-c::%jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
+                                               ,@(loop for (nil . form) in tested
+                                                       for keys in key-lists
+                                                       for i from 0
+                                                       collect `(lambda ()
+                                                                  (sb-c::%type-constraint ,keyform-value '(member ,@keys))
+                                                                  ,@form))
+                                               (lambda ()
+                                                 (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
+                                                 ,@(if errorp
+                                                       `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
+                                                       (cdr default)))))))))
               ((eq test 'typep)
                (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
                                               default errorp)
