@@ -1090,7 +1090,7 @@ invoked. In that case it will store into PLACE and start over."
 
     ;; Try hash-based dispatch only if expanding for the compiler
     (when (and (neq errorp 'cerror)
-               (boundp 'sb-c::*current-component*)
+               (boundp 'sb-c:*compilation*)
                #+sb-fasteval
                (not (typep lexenv 'sb-interpreter:basic-env))
                #+sb-eval
