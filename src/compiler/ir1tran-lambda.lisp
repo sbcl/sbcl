@@ -1184,10 +1184,12 @@
            (let* ((where-from (leaf-where-from found))
                   (res (make-defined-fun
                         :%source-name name
-                        :where-from (if (eq where-from :declared)
+                        :where-from (if (memq where-from '(:declared :declared-verify))
                                         :declared
                                         :defined-here)
-                        :type (leaf-type found))))
+                        :type (if (eq where-from :declared-verify)
+                                  (leaf-defined-type found)
+                                  (leaf-type found)))))
              (substitute-leaf res found)
              (setf (gethash name free-funs) res)))
           ;; If FREE-FUNS has a previously converted definition
