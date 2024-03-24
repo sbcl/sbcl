@@ -383,7 +383,7 @@ and no value was provided for it." name))))))))))
 ;;; the &REST type.
 (defun definition-type (functional)
   (declare (type functional functional)
-           #-sb-xc-host (values fun-type))
+           #-sb-xc-host (values fun-type &optional))
   (if (lambda-p functional)
       (make-fun-type
        :required (mapcar #'leaf-type (lambda-vars functional))

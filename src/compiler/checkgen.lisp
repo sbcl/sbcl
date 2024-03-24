@@ -162,9 +162,7 @@
                                  (singleton-p (mv-combination-args dest)))
                             (let ((fun-ref (lvar-use (mv-combination-fun dest))))
                               (length (lambda-vars (ref-leaf fun-ref)))))))
-         (n-required (if (eq dtype *wild-type*)
-                         (return-from cast-check-types (values :too-hairy nil))
-                         (length (values-type-required dtype)))))
+         (n-required (length (values-type-required dtype))))
     (aver (not (eq ctype *wild-type*)))
     (cond ((and (null (values-type-optional dtype))
                 (not (values-type-rest dtype)))
@@ -191,7 +189,9 @@
                                                              *universal-type*)
                                                 n-required)))
           (t
-           (values :too-hairy nil)))))
+           (values :hairy (mapcar #'list
+                                  (values-type-types ctype)
+                                  (values-type-types atype)))))))
 
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
@@ -426,6 +426,38 @@
                (make-type-check-form types cast))
   (setf (cast-%type-check cast) nil))
 
+(defun convert-hairy-type-check (cast types)
+  (filter-lvar (cast-value cast)
+               (make-hairy-type-check-form types cast))
+  (setf (cast-%type-check cast) nil))
+
+(defun make-hairy-type-check-form (types cast)
+  (let ((length (length types))
+        (context (cast-context cast)))
+    (lambda (dummy)
+      `(flet ((values-type-check (&rest args)
+                (tagbody
+                   (let ((length (length args)))
+                     (cond
+                       ,@(loop for n downfrom length to 1
+                               collect `((>= length ,n) (go ,n)))
+                       (t (go none))))
+                   ,@(loop for (type-to-check type-to-report) in (reverse types)
+                           for n downfrom length
+                           collect n
+                           collect `(let ((value (fast-&rest-nth ,(1- n) args)))
+                                      (unless (typep value
+                                                     ',(type-specifier type-to-check t))
+                                        ,(internal-type-error-call 'value
+                                                                   (if (fun-designator-type-p type-to-report)
+                                                                       ;; Simplify
+                                                                       (specifier-type 'function-designator)
+                                                                       type-to-report)
+                                                                   context))))
+                 none)
+                (values-list args)))
+         (multiple-value-call #'values-type-check ,dummy)))))
+
 ;;; Check all possible arguments of CAST and emit type warnings for
 ;;; those with type errors. If the value of USE is being used for a
 ;;; variable binding, we figure out which one for source context. If
@@ -522,13 +554,13 @@
               (:simple
                (convert-type-check cast types)
                (setf generated t))
-              (:too-hairy
+              (:hairy
                (when (policy cast (>= safety inhibit-warnings))
                  (let* ((*compiler-error-context* cast)
                         (type (cast-asserted-type cast))
                         (value-type (coerce-to-values type)))
                    (compiler-notify
-                    "Type assertion too complex to check:~@
+                    "Type assertion too complex to check efficiently:~@
                     ~/sb-impl:print-type/.~a"
                     type
                     (cond ((values-type-rest value-type)
@@ -544,8 +576,7 @@
                                    (make-values-type (append (values-type-required value-type)
                                                              (values-type-optional value-type)))))
                           ("")))))
-
-               (setf (cast-type-to-check cast) *wild-type*)
-               (setf (cast-%type-check cast) nil)))))))
+               (convert-hairy-type-check cast types)
+               (setf generated t)))))))
     generated))
 
