@@ -328,27 +328,35 @@
 (defun unset-symbol-progv-optimize (symbol)
   (reset-header-bits symbol sb-vm::+symbol-fast-bindable+))
 
-(defun type-proclamation-mismatch-warn (name old new &optional description)
-  (warn 'type-proclamation-mismatch-warning
-        :name name :old old :new new :description description))
-
 (defun proclaim-type (name type type-specifier where-from)
   (unless (symbolp name)
     (error "Cannot proclaim TYPE of a non-symbol: ~S" name))
 
   (with-single-package-locked-error
       (:symbol name "globally declaring the TYPE of ~A")
-    (when (eq (info :variable :where-from name) :declared)
-      (let ((old-type (info :variable :type name)))
-        (when (type/= type old-type)
-          (type-proclamation-mismatch-warn
-           name (type-specifier old-type) type-specifier))))
+    (let (warned)
+     (when (eq (info :variable :where-from name) :declared)
+       (let ((old-type (info :variable :type name)))
+         (when (type/= type old-type)
+           (setf warned t)
+           (warn 'type-proclamation-mismatch-warning
+                 :name name
+                 :old (type-specifier old-type)
+                 :new type-specifier))))
+      (when (and (not warned)
+                 (boundp name))
+        #-sb-xc-host
+        (let ((value (symbol-value name)))
+          (when (multiple-value-bind (p really) (ctypep value type)
+                  (and really
+                       (not p)))
+            (warn 'type-proclamation-mismatch-warning
+                  :name name
+                  :old (type-of value)
+                  :value value
+                  :new type-specifier)))))
     (setf (info :variable :type name) type
           (info :variable :where-from name) where-from)))
-
-(defun ftype-proclamation-mismatch-warn (name old new &optional description)
-  (warn 'ftype-proclamation-mismatch-warning
-        :name name :old old :new new :description description))
 
 (defun proclaim-ftype (name type-oid type-specifier where-from)
   (declare (type (or ctype defstruct-description) type-oid))
@@ -369,8 +377,10 @@
           (cond
             ((not (type/= type old-type)))    ; not changed
             ((not (info :function :info name)) ; not a known function
-             (ftype-proclamation-mismatch-warn
-              name (type-specifier old-type) type-specifier))
+             (warn 'ftype-proclamation-mismatch-warning
+                   :name name
+                   :old (type-specifier old-type)
+                   :new type-specifier))
             ((csubtypep type old-type)) ; tighten known function type
             (t
              (cerror "Continue"
