@@ -77,11 +77,15 @@
                 (destructuring-bind (name &key codes &allow-other-keys) x
                   (dolist (code codes)
                     (setf (svref table code) name))))
+              ;; widetag-of can return n-widetag-bits-long result for immediates/conses/functions.
               (loop for i from sb-vm:list-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
-                      below 256
+                    below 256
                     do (setf (aref table i) 'cons))
+              (loop for i from sb-vm:fun-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
+                    below 256
+                    do (setf (aref table i) 'function))
               (loop for i from sb-vm:even-fixnum-lowtag by (ash 1 sb-vm:n-fixnum-tag-bits)
-                      below 256
+                    below 256
                     do (setf (aref table i) 'fixnum))
               table)))
 

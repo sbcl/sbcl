@@ -57,6 +57,22 @@
     (inst ldrb result (@ object result))
     done))
 
+;;; Return an index suitable for **PRIMITIVE-OBJECT-LAYOUTS**, with
+;;; instance and funcallable-instance already handled.
+(define-vop (widetag-of-for-layout)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:arg-refs object-ref)
+  (:results (result :scs (unsigned-reg) :from :load))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (inst and result object widetag-mask)
+    (inst and tmp-tn object lowtag-mask)
+    (inst cmp tmp-tn other-pointer-lowtag)
+    (inst b :ne done)
+    (inst ldrb result (@ object (- other-pointer-lowtag)))
+    done))
+
 (define-vop (layout-depthoid)
   (:translate layout-depthoid)
   (:policy :fast-safe)

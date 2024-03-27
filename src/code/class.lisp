@@ -598,10 +598,10 @@ between the ~A definition and the ~A definition"
         ;; the question of when cold-init runs L-T-V forms.
         ((null x) #.(find-layout 'null))
         (t
-         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
-         ;; improved - we've already ruled out some of the lowtags.
          (svref (load-time-value **primitive-object-layouts** t)
-                (widetag-of x))))))
+                #.(sb-c::if-vop-existsp (:named sb-vm::widetag-of-for-layout)
+                                        '(%primitive sb-vm::widetag-of-for-layout x)
+                                        '(widetag-of x)))))))
 
 #-sb-xc-host
 (progn
