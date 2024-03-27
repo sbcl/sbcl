@@ -1655,44 +1655,53 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
           (t
            (values default nil)))))
 
+(defun make-synchronized-table-methods (getter setter remover)
+  (declare (optimize (safety 0)))
+  ;; We might want to think about inlining the guts of
+  ;; CALL-WITH-...LOCK into these methods.
+  (values
+   (lambda (key table default)
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (truly-the
+      (values t t &optional)
+      (let ((table (truly-the hash-table table)))
+        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+          (funcall getter key table default)))))
+   (lambda (key table value)
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (truly-the
+      (values t &optional)
+      (let ((table (truly-the hash-table table)))
+        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+          (funcall setter key table value)))))
+   (lambda (key table)
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
+     (truly-the
+      (values t &optional)
+      (let ((table (truly-the hash-table table)))
+        (sb-thread::with-recursive-system-lock ((hash-table-%lock table))
+          (funcall remover key table)))))))
+
+(defmacro pick-table-methods-1 (synchronized getter setter remover)
+  `(locally (declare (optimize (safety 0)))
+     (if ,synchronized
+         (make-synchronized-table-methods #',getter #',setter #',remover)
+         (values #',getter #',setter #',remover))))
+
 (defun pick-table-methods (synchronized kind)
   (declare ((integer -1 3) kind))
   ;; test is specified as 0..3 for a standard fun or -1 for userfun
-  (macrolet ((gen-cases (wrapping)
-              `(case kind
-                  (-1 (,wrapping gethash/any puthash/any remhash/any))
-                  (0  (,wrapping gethash/eq puthash/eq remhash/eq))
-                  (1  (,wrapping gethash/eql puthash/eql remhash/eql))
-                  (2  (,wrapping gethash/equal puthash/equal remhash/equal))
-                  (3  (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
-             (locked-methods (getter setter remover)
-              ;; We might want to think about inlining the guts of CALL-WITH-...LOCK
-              ;; into these methods
-              ;; Use the private slot accessor, because we know that the mutex
-              ;; has been constructed.
-              `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
-                         (declare (optimize speed (sb-c:verify-arg-count 0)))
-                         (truly-the (values t t &optional)
-                           (sb-thread::with-recursive-system-lock
-                               ((hash-table-%lock (truly-the hash-table table)))
-                             (,getter key table default))))
-                       (named-lambda ,(symbolicate setter "/LOCK") (key table value)
-                         (declare (optimize speed (sb-c:verify-arg-count 0)))
-                         (truly-the (values t &optional)
-                           (sb-thread::with-recursive-system-lock
-                               ((hash-table-%lock (truly-the hash-table table)))
-                             (,setter key table value))))
-                       (named-lambda ,(symbolicate remover "/LOCK") (key table)
-                         (declare (optimize speed (sb-c:verify-arg-count 0)))
-                         (truly-the (values t &optional)
-                           (sb-thread::with-recursive-system-lock
-                               ((hash-table-%lock (truly-the hash-table table)))
-                             (,remover key table))))))
-             (methods (getter setter remover)
-              `(values #',getter #',setter #',remover)))
-    (if synchronized
-        (gen-cases locked-methods)
-        (gen-cases methods))))
+  (case kind
+    (-1 (pick-table-methods-1 synchronized gethash/any puthash/any
+                              remhash/any))
+    (0  (pick-table-methods-1 synchronized gethash/eq puthash/eq
+                              remhash/eq))
+    (1  (pick-table-methods-1 synchronized gethash/eql puthash/eql
+                              remhash/eql))
+    (2  (pick-table-methods-1 synchronized gethash/equal puthash/equal
+                              remhash/equal))
+    (3  (pick-table-methods-1 synchronized gethash/equalp puthash/equalp
+                              remhash/equalp))))
 
 ;;; so people can call #'(SETF GETHASH)
 ;;; FIXME: this function is not mandated. Why do we have it?
