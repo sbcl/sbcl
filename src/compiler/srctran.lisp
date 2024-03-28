@@ -6912,29 +6912,43 @@
       (chain node)
       (values (nreverse chain) characterp))))
 
+(defun contiguous-sequence (sorted-values)
+  (when (loop for i below (1- (length sorted-values))
+              for a = (svref sorted-values i)
+              always (= (1+ a) (svref sorted-values (1+ i))))
+    (values (svref sorted-values 0)
+            (svref sorted-values (1- (length sorted-values))))))
 
-(defun contiguous-sequence (values &optional (key #'identity))
-  (let ((values (sort (copy-list values) #'< :key key)))
-    (when (loop for (a next) on values
-                always (or (not next)
-                           (= (1+ (funcall key a))
-                              (funcall key next))))
-      (values (funcall key (car values))
-              (funcall key (car (last values)))))))
+(defun bit-test-sequence (sorted-values)
+  (let ((min (elt sorted-values 0))
+        (max (elt sorted-values (1- (length sorted-values)))))
+    (and (>= min 0) ;; negative numbers can be handled too
+         (< (- max min) sb-vm:n-word-bits)
+         (values min max))))
 
-(defun bit-test-sequence (values &optional (key #'identity))
-  (let (min max)
-    (when (and (loop for v in values
-                     for c = (funcall key v)
-                     always (>= c 0) ;; negative numbers can be handled too
-                     maximize c into max*
-                     minimize c into min*
-                     finally (setf max max*
-                                   min min*))
-               (< (- max min) sb-vm:n-word-bits)
-               (equal values
-                      (remove-duplicates values)))
-      (values min max))))
+(defun or-eq-transform-p (values)
+  (and (> (length values) 1)
+       (let (fixnump
+             characterp)
+         (map nil (lambda (value)
+                    (unless
+                        (cond (fixnump
+                               (fixnump value))
+                              (characterp
+                               (characterp value))
+                              ((fixnump value)
+                               (setf fixnump t))
+                              ((characterp value)
+                               (setf characterp t)))
+                      (return-from or-eq-transform-p)))
+              values)
+         (let ((values (sort (map 'vector (if characterp
+                                              #'char-code
+                                              #'identity)
+                                  values)
+                             #'<)))
+           (or (contiguous-sequence values)
+               (bit-test-sequence values))))))
 
 ;;; Do something when comparing the same value to multiple things.
 (defun or-eq-transform (op a b node)
@@ -6944,11 +6958,15 @@
                                                                     fixnum)))
       (multiple-value-bind (chain characterp) (find-or-chain node op)
         (when (cdr chain)
-          (let* ((constants (loop for (node) in chain
-                                  for (nil b) = (combination-args node)
-                                  collect (if characterp
-                                              (char-code (lvar-value b))
-                                              (lvar-value b))))
+          (let* ((constants (sort (map 'vector
+                                       (lambda (e)
+                                         (let* ((node (car e))
+                                                (b (second (combination-args node))))
+                                           (if characterp
+                                               (char-code (lvar-value b))
+                                               (lvar-value b))))
+                                       chain)
+                                  #'<))
                  (type-check (if characterp
                                  (not (csubtypep (lvar-type a) (specifier-type 'character)))
                                  (not (csubtypep (lvar-type a) (specifier-type 'fixnum)))))
@@ -7267,27 +7285,9 @@
                                         keys
                                         exact)))))))
 
-(defun values-for-or-eq-transform (key-lists)
+(defun key-lists-for-or-eq-transform-p (key-lists)
   (and (= (length key-lists) 1)
-       (let (fixnump
-             characterp)
-         (loop for value in (first key-lists)
-               unless
-               (cond (fixnump
-                      (fixnump value))
-                     (characterp
-                      (characterp value))
-                     ((fixnump value)
-                      (setf fixnump t))
-                     ((characterp value)
-                      (setf characterp t)))
-               do (return-from values-for-or-eq-transform))
-         (or (contiguous-sequence (first key-lists) (if characterp
-                                                        #'char-code
-                                                        #'identity))
-             (bit-test-sequence (first key-lists) (if characterp
-                                                      #'char-code
-                                                      #'identity))))))
+       (or-eq-transform-p (first key-lists))))
 
 (deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
   (let* ((key-lists (lvar-value key-lists-lvar))
@@ -7307,7 +7307,7 @@
                    (original-keys (and (lvar-value errorp)
                                        original-keys)))
                (or (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
-                        (not (values-for-or-eq-transform new-key-lists))
+                        (not (key-lists-for-or-eq-transform-p new-key-lists))
                         (expand-hash-case-for-jump-table keys new-key-lists nil
                                                          constants (if exact
                                                                        :exact
@@ -7349,7 +7349,7 @@
                             (convert targets)
                             `(if-to-blocks t ,(cdar targets))))))
                (cond ((or (not (sb-impl::should-attempt-hash-based-case-dispatch keys))
-                          (values-for-or-eq-transform key-lists))
+                          (key-lists-for-or-eq-transform-p key-lists))
                       (give-up))
                      ((delay-ir1-transform-p node :constraint)
                       (change-ref-leaf (lvar-uses key-lists-lvar) (find-constant key-lists))

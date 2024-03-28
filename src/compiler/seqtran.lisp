@@ -3061,19 +3061,23 @@
                              (member effective-test '(eql eq char= char-equal))
                              (not start) (not end) (not key)
                              (or (not from-end) (constant-lvar-p from-end)))
-                    (let ((items (coerce const-seq 'simple-vector))
-                          ;; It seems silly to use :from-end and a constant list
-                          ;; in a way where it actually matters (with repeated elements),
-                          ;; but we either have to do it right or not do it.
-                          (reversedp (and from-end (lvar-value from-end))))
+                    (let* ((items (coerce const-seq 'simple-vector))
+                           ;; It seems silly to use :from-end and a constant list
+                           ;; in a way where it actually matters (with repeated elements),
+                           ;; but we either have to do it right or not do it.
+                           (reversedp (and from-end (lvar-value from-end)))
+                           (or-eq-transform-p (and (memq effective-test '(eql eq char=))
+                                                   (or-eq-transform-p items))))
                       (awhen (and (memq effective-test '(eql eq))
+                                  (not or-eq-transform-p)
                                   (try-perfect-find/position-map
                                    ',fun-name nil (lvar-type item) items reversedp nil))
                         (return-from ,fun-name
                           `(lambda (item sequence &rest rest)
                              (declare (ignore sequence rest))
                              ,it)))
-                      (unless (> (length items) 10)
+                      (when (or or-eq-transform-p
+                                (<= (length items) 10))
                         (let ((clauses (loop for x across items for i from 0
                                              ;; Later transforms will change EQL to EQ if appropriate.
                                              collect `((,effective-test item ',x)
