@@ -965,7 +965,7 @@
 (define-vop (dpb-c/fixnum)
   (:translate %dpb)
   (:args (x :scs (signed-reg) :to :save)
-         (y :scs (any-reg)))
+         (y :scs (any-reg) :target res))
   (:arg-types signed-num
               (:constant integer) (:constant integer)
               tagged-num)
@@ -983,7 +983,7 @@
 (define-vop (dpb-c/signed)
   (:translate %dpb)
   (:args (x :scs (signed-reg) :to :save)
-         (y :scs (signed-reg)))
+         (y :scs (signed-reg) :target res))
   (:arg-types signed-num
               (:constant integer) (:constant integer)
               signed-num)
@@ -1003,7 +1003,7 @@
 (define-vop (dpb-c/unsigned)
   (:translate %dpb)
   (:args (x :scs (unsigned-reg) :to :save)
-         (y :scs (unsigned-reg)))
+         (y :scs (unsigned-reg) :target res))
   (:arg-types unsigned-num
               (:constant integer) (:constant integer)
               unsigned-num)
