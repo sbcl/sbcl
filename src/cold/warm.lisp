@@ -25,7 +25,12 @@ sb-kernel::
          (,(find-classoid-cell 'step-condition) . sb-impl::invoke-stepper))))
 ;;;; And now a trick: splice those into the oldest *HANDLER-CLUSTERS*
 ;;;; which had a placeholder NIL reserved for this purpose.
-sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
+(defun splice-handler-clusters ()
+  sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**)))
+
+;;; Don't use the evaluator, it establishes its own dynamic-extent
+;;; bindings for *handler-clusters*
+(splice-handler-clusters)
 
 ;;;; Use the same settings as PROCLAIM-TARGET-OPTIMIZATION
 ;;;; I could not think of a trivial way to ensure that this stays functionally
