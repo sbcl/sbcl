@@ -932,19 +932,23 @@
 
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:arg-refs args)
+  (:arg-refs value-ref)
   (:info not-other-pointer-label null-label zero-extend)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (cond ((other-pointer-tn-ref-p args (not null-label))
+    (when null-label
+      (if (types-equal-or-intersect
+           (type-difference (tn-ref-type value-ref) (specifier-type 'null))
+           (specifier-type 'cons))
+          (inst cmp value nil-value)
+          (inst cmp :byte value (logand nil-value #xff)))
+      (inst jmp :e null-label))
+    (cond ((other-pointer-tn-ref-p value-ref t)
            (if zero-extend
                (inst movzx '(:byte :dword) r (ea (- other-pointer-lowtag) value))
                (inst mov :byte r (ea (- other-pointer-lowtag) value))))
           (t
-           (when null-label
-             (inst cmp value nil-value)
-             (inst jmp :e null-label))
            (%lea-for-lowtag-test r value other-pointer-lowtag :qword)
            (inst test :byte r lowtag-mask)
            (inst jmp :nz not-other-pointer-label)

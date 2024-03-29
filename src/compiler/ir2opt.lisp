@@ -819,9 +819,13 @@
                (chain (vop &optional (collect t))
                  (let ((next (branch-destination vop nil)))
                    (cond ((and next
-                               (or (neq (vop-name vop) 'symbolp)
-                                   (and (not null)
-                                        (setf null (branch-destination vop)))))
+                               (cond ((eq (vop-name vop) 'symbolp)
+                                      (and (not null)
+                                           (setf null (branch-destination vop))))
+                                     ((eq (vop-name vop) 'non-null-symbol-p)
+                                      (and (not null)
+                                           (setf null 'stop)))
+                                     (t t)))
                           (when collect
                             (push vop vops))
                           (cond ((good-vop-p next)
@@ -853,7 +857,9 @@
                                  vop
                                  (list (ir2-block-label stop)
                                        (and null
-                                            (ir2-block-label (vop-block null)))
+                                            (if (eq null 'stop)
+                                                (ir2-block-label stop)
+                                                (ir2-block-label (vop-block null))))
                                        #+x86-64 zero-extend))
             (update-block-succ block
                                (cons stop

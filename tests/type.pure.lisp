@@ -926,3 +926,17 @@
      (declare (integer p))
      (typep p '(vector t 1)))
    null))
+
+(with-test (:name :non-null-symbol-load-widetag)
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+     (declare ((or symbol array) p))
+     (typecase  p
+       ((and symbol (not null)) 1)
+       (simple-array 2)))
+   ((nil) nil)
+   ((t) 1)
+   ((:a) 1)
+   (("") 2)
+   (((make-array 10 :adjustable t)) nil)))
