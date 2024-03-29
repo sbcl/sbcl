@@ -19,14 +19,12 @@ changes relative to sbcl-2.4.2:
   * bug fix: type checks for (VECTOR T) were giving the wrong answer for
     vectors displayed to simple multi-dimensional arrays.  (reported by
     _death)
-  * bug fix: inadvertently reversed optional arguments in compiler transforms.
-    (reported by Bart Botta)
   * bug fix: do not transform away division by BIT when the BIT might still
     include 0.  (lp#2056184, reported by xizang)
   * bug fix: various errors related to imperfections in the perfect hash
     generator.  (lp#2055794, lp#2056341)
-  * bug fix: respect declarations for symbol macros.  (lp#2056514, reported by
-    Jonathan Braud)
+  * bug fix: respect declarations for symbol macros inside defmethod.
+    (lp#2056514, reported by Jonathan Braud)
   * bug fix: failure to set structure slots to floats on Arm64.  (lp#2058148,
     reported by Bibek Panthi)
   * optimization: improvements to the implementation of CASE.
