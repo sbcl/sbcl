@@ -893,7 +893,7 @@
             (inst jmp :ne nope))
           #.(assert (= (integer-length bignum-widetag) 5))
           (inst shr temp 5)
-          (inst cmp :qword (ea (- other-pointer-lowtag) integer temp) 0)
+          (inst cmp :dword (ea (+ (- other-pointer-lowtag) (/ n-word-bytes 2)) integer temp) 0)
           (inst jmp (case comparison
                       ((:l :le) (if not-p :ge :l))
                       (t (if not-p :l :ge)))
