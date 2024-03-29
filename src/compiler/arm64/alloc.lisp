@@ -77,6 +77,16 @@
                             null-tn)
                     ptr cons-cdr-slot list-pointer-lowtag))))
        (move result res)))))
+
+(define-vop ()
+  (:translate unaligned-dx-cons)
+  (:args (car))
+  (:results (result :scs (descriptor-reg)))
+  (:ignore car)
+  (:policy :fast-safe)
+  (:generator 0
+    (inst str null-tn (@ csp-tn n-word-bytes :post-index))
+    (inst add-sub result csp-tn (- list-pointer-lowtag (* cons-size n-word-bytes)))))
 
 ;;;; Special purpose inline allocators.
 

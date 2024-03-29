@@ -229,7 +229,11 @@
       (destructuring-bind (name &optional initial-value (collector nil collectorp)
                                 &aux (n-value (copy-symbol name)))
           spec
-        (push `(,n-value ,(if (or initial-value collectorp) initial-value `(list nil)))
+        (push `(,n-value ,(if (or initial-value collectorp)
+                              initial-value
+                              `(#-sb-xc-host unaligned-dx-cons
+                                #+sb-xc-host list
+                                nil)))
               binds)
         (let ((macro-body
                (cond

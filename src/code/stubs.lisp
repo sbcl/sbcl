@@ -211,3 +211,5 @@
   ;; (OR LIST SYMBOL CLASSOID CLASS), and CLASS isn't known, and you can't
   ;; define it because it's a standard symbol.
   (setq sb-c::*undefined-warnings* nil))
+
+(setf (fdefinition 'unaligned-dx-cons) #'list)

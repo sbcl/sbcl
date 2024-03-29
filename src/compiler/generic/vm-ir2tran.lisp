@@ -400,6 +400,9 @@
 (defoptimizer (%make-complex stack-allocate-result) ((&rest args))
   t)
 
+(defoptimizer (unaligned-dx-cons stack-allocate-result) ((car))
+  t)
+
 ;;; MAKE-LIST optimizations
 #+x86-64
 (progn

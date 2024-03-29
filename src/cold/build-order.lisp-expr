@@ -414,6 +414,8 @@
  ("src/compiler/generic/type-vops")
  ("src/compiler/ir1final")
 
+ ("src/compiler/{arch}/alloc")
+
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
@@ -427,7 +429,6 @@
  ("src/compiler/{arch}/c-call")
  ("src/compiler/{arch}/cell")
  ("src/compiler/{arch}/values")
- ("src/compiler/{arch}/alloc")
  ("src/compiler/{arch}/call")
  ("src/compiler/{arch}/nlx")
  ("src/compiler/generic/late-nlx")

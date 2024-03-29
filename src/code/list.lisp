@@ -395,7 +395,7 @@
 
 (defun append (&rest lists)
   "Construct and return a list by concatenating LISTS."
-  (let* ((result (list nil))
+  (let* ((result (unaligned-dx-cons nil))
          (tail result)
          (index 0)
          (length (length lists))
@@ -1327,6 +1327,7 @@
         (if accumulate
             (cdr ret-list)
             non-acc-result))
+    (declare (dynamic-extent ret-list))
     (do ((l arglists (cdr l))
          (arg args (cdr arg)))
         ((null l))

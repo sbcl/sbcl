@@ -990,6 +990,12 @@
 
 (defknown list (&rest t) list (movable flushable))
 (defknown list* (t &rest t) t (movable flushable))
+
+;;; A stack allocated cons cell used for list accumulation routines.
+;;; The lowtag might be incorrect because it's unaligned.
+;;; Can't pass it to anything, can't take CAR, only CDR is usable.
+(defknown unaligned-dx-cons (t) cons (movable flushable always-translatable))
+
 ;;; The length constraint on MAKE-LIST is such that:
 ;;; - not every byte of addressable memory can be used up.
 ;;; - the number of bytes to allocate should be a fixnum

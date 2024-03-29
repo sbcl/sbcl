@@ -523,6 +523,16 @@
     (aver (null things))
     (move result res)))
 )
+
+(define-vop ()
+  (:translate unaligned-dx-cons)
+  (:args (car))
+  (:results (result :scs (descriptor-reg)))
+  (:ignore car)
+  (:policy :fast-safe)
+  (:generator 0
+    (inst push nil-value)
+    (inst lea result (ea (- list-pointer-lowtag n-word-bytes) rsp-tn))))
 
 ;;;; special-purpose inline allocators
 

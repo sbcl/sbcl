@@ -1893,6 +1893,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MAKE-INSTANCE" "%MAKE-INSTANCE/MIXED"
            "%MAKE-LISP-OBJ"
            "%MAKE-LIST"
+           "UNALIGNED-DX-CONS"
            "%MAKE-RATIO"
            #+sb-simd-pack "%MAKE-SIMD-PACK"
            #+sb-simd-pack-256 "%MAKE-SIMD-PACK-256"

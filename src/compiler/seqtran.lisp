@@ -96,7 +96,7 @@
                         (locally
                             #-sb-xc-host
                             (declare (muffle-conditions compiler-note))
-                          (list nil))))
+                            (unaligned-dx-cons nil))))
                    (declare (dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest

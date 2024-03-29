@@ -91,9 +91,12 @@
 ;;;; list collection macrology
 
 (sb-xc:defmacro with-loop-list-collection-head
-    ((head-var tail-var &optional user-head-var) &body body)
+    ((how head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
-    `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
+    `(let* ((,head-var ,(if (eq how 'list)
+                            `(unaligned-dx-cons nil)
+                            `(list nil)))
+            (,tail-var ,head-var) ,@l)
        (declare (dynamic-extent ,head-var)
                 ,@(and user-head-var `((list ,user-head-var))))
        ,@body)))
@@ -1149,7 +1152,7 @@ code to be loaded.
                                     (gensym "LOOP-LIST-TAIL-")
                                     (and (loop-collector-name lc)
                                          (list (loop-collector-name lc))))))
-        (push `(with-loop-list-collection-head ,tempvars) (wrappers *loop*))
+        (push `(with-loop-list-collection-head (,specifically ,@tempvars)) (wrappers *loop*))
         (unless (loop-collector-name lc)
           (loop-emit-final-value `(loop-collect-answer ,(car tempvars)
                                                        ,@(cddr tempvars)))))

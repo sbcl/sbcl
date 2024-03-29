@@ -135,6 +135,10 @@
       (specifier-type 'cons)
       (lvar-type arg)))
 
+(unless-vop-existsp (:translate unaligned-dx-cons)
+  (define-source-transform unaligned-dx-cons (arg)
+    `(list ,arg)))
+
 (define-source-transform make-list (length &rest rest)
   (if (or (null rest)
           ;; Use of &KEY in source xforms doesn't have all the usual semantics.
