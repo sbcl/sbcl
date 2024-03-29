@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.2:
+changes in sbcl-2.4.3 relative to sbcl-2.4.2:
   * enhancement: when dumping debug information to fasl files, the system
     respects the SOURCE_DATE_EPOCH environment variable (if set) as the latest
     timestamp to be used.
