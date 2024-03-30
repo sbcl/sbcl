@@ -2392,6 +2392,13 @@
   (let* ((seg (dstate-segment dstate))
          (code (seg-code seg)))
     (when code
+      ;; check for exact pointers first
+      (loop for i from sb-vm:code-constants-offset
+            below (code-header-words code)
+            when (eql (get-lisp-obj-address (code-header-ref code i))
+                      value)
+            do (return-from find-code-constant-from-interior-pointer
+                 (code-header-ref code i)))
       (let ((callables (seg-code-callables seg)))
         (when (eq callables :?)
           (setq callables nil)

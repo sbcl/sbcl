@@ -1405,3 +1405,13 @@
                   (declare (optimize (sb-c::verify-arg-count 0)))
                   (if (sb-kernel:non-null-symbol-p x) 'zook (foo)))))
              1)))
+
+(with-test (:name :disassemble-instance-type-test)
+  (let ((lines
+         (disassembly-lines
+          (compile nil '(lambda (m) (the sb-thread:mutex m))))))
+    (assert
+     (loop for line in lines
+           thereis (and (search "CMP DWORD PTR" line)
+                        (search "#<LAYOUT" line)
+                        (search "for SB-THREAD:MUTEX" line))))))
