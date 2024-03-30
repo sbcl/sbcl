@@ -3980,14 +3980,14 @@
 
   (def check-range<= nil nil t))
 
-(deftransform %dpb ((new size posn integer) (:or ((word
-                                                   (constant-arg integer)
+(deftransform %dpb ((new size posn integer) (:or (((constant-arg integer)
                                                    (constant-arg (integer 1 1))
-                                                   word) *)
-                                                 ((signed-word
-                                                   (constant-arg integer)
+                                                   word
+                                                   word) word)
+                                                 (((constant-arg integer)
                                                    (constant-arg (integer 1 1))
-                                                   signed-word) *)) *
+                                                   word
+                                                   signed-word) signed-word)) *
                     :vop t)
   (not (constant-lvar-p posn)))
 
@@ -3996,7 +3996,8 @@
   (:args (posn :scs (unsigned-reg) :target temp)
          (y :scs (any-reg) :target res))
   (:arg-types (:constant integer)
-              (:constant integer) unsigned-num
+              (:constant (integer 1 1))
+              unsigned-num
               tagged-num)
   (:info new size)
   (:ignore size)
@@ -4018,7 +4019,7 @@
   (:args (posn :scs (unsigned-reg))
          (y :scs (unsigned-reg) :target res))
   (:arg-types (:constant integer)
-              (:constant integer) unsigned-num
+              (:constant (integer 1 1)) unsigned-num
               unsigned-num)
   (:info new size)
   (:ignore size)
@@ -4036,7 +4037,8 @@
   (:args (posn :scs (unsigned-reg))
          (y :scs (signed-reg) :target res))
   (:arg-types (:constant integer)
-              (:constant integer) unsigned-num
+              (:constant (integer 1 1))
+              unsigned-num
               signed-num)
   (:info new size)
   (:ignore size)
