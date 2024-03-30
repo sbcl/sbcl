@@ -189,9 +189,7 @@
                                                              *universal-type*)
                                                 n-required)))
           (t
-           (values :hairy (mapcar #'list
-                                  (values-type-types ctype)
-                                  (values-type-types atype)))))))
+           (values :hairy (list ctype atype))))))
 
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
@@ -432,31 +430,42 @@
   (setf (cast-%type-check cast) nil))
 
 (defun make-hairy-type-check-form (types cast)
-  (let ((length (length types))
+  (let ((ctype (first types))
+        (atype (second types))
         (context (cast-context cast)))
-    (lambda (dummy)
-      `(flet ((values-type-check (&rest args)
-                (tagbody
-                   (let ((length (length args)))
-                     (cond
-                       ,@(loop for n downfrom length to 1
-                               collect `((>= length ,n) (go ,n)))
-                       (t (go none))))
-                   ,@(loop for (type-to-check type-to-report) in (reverse types)
-                           for n downfrom length
-                           collect n
-                           collect `(let ((value (fast-&rest-nth ,(1- n) args)))
-                                      (unless (typep value
-                                                     ',(type-specifier type-to-check t))
-                                        ,(internal-type-error-call 'value
-                                                                   (if (fun-designator-type-p type-to-report)
-                                                                       ;; Simplify
-                                                                       (specifier-type 'function-designator)
-                                                                       type-to-report)
-                                                                   context))))
-                 none)
-                (values-list args)))
-         (multiple-value-call #'values-type-check ,dummy)))))
+    (multiple-value-bind (types rest-type) (values-type-types ctype nil)
+      (multiple-value-bind (report-types report-rest-type) (values-type-types atype nil)
+        (let ((length (length types)))
+          (flet ((check (type report-type index)
+                   `(let ((value (fast-&rest-nth ,index args)))
+                      (unless (typep value
+                                     ',(type-specifier type t))
+                        ,(internal-type-error-call 'value
+                                                   (if (fun-designator-type-p report-type)
+                                                       ;; Simplify
+                                                       (specifier-type 'function-designator)
+                                                       report-type)
+                                                   context)))))
+            (lambda (dummy)
+              `(flet ((values-type-check (&rest args)
+                        (prog ((length (length args)))
+                           (cond
+                             ,@(loop for n downfrom length to 1
+                                     collect `((>= length ,n) (go ,n)))
+                             (t
+                              (go none)))
+                           ,@(loop for type-to-check in (reverse types)
+                                   for type-to-report in (reverse report-types)
+                                   for n downfrom length
+                                   collect n
+                                   collect (check type-to-check type-to-report (1- n)))
+                         none
+                           ,@(when rest-type
+                               `((loop for i from ,length below length
+                                       do
+                                       ,(check rest-type report-rest-type 'i)))))
+                        (values-list args)))
+                 (multiple-value-call #'values-type-check ,dummy)))))))))
 
 ;;; Check all possible arguments of CAST and emit type warnings for
 ;;; those with type errors. If the value of USE is being used for a
