@@ -20,7 +20,6 @@
 #include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
-#include "dynbind.h"
 #include "thread.h"
 #include "interr.h"
 #include "genesis/symbol.h"

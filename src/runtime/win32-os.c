@@ -41,7 +41,6 @@
 #include "lispregs.h"
 #include "runtime.h"
 #include "genesis/primitive-objects.h"
-#include "dynbind.h"
 
 #include <sys/types.h>
 #include <sys/time.h>

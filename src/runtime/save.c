@@ -28,7 +28,6 @@
 #include "os.h"
 #include "core.h"
 #include "globals.h"
-#include "dynbind.h"
 #include "lispregs.h"
 #include "validate.h"
 #include "gc.h"

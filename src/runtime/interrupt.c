@@ -66,7 +66,6 @@
 #include "interr.h"
 #include "gc.h"
 #include "genesis/sap.h"
-#include "dynbind.h"
 #include "pseudo-atomic.h"
 #include "genesis/fdefn.h"
 #include "genesis/cons.h"

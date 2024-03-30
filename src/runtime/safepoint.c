@@ -32,7 +32,6 @@
 #include "target-arch-os.h"
 #include "os.h"
 #include "globals.h"
-#include "dynbind.h"
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"
 #include "interr.h"
