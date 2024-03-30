@@ -392,6 +392,14 @@
        (result '() (cons initial-element result)))
       ((<= count 0) result)
     (declare (type index count))))
+
+(defun %sys-make-list (size initial-element)
+  (declare (type index size)
+           (sb-c::tlab :system))
+  (do ((count size (1- count))
+       (result '() (cons initial-element result)))
+      ((<= count 0) result)
+    (declare (type index count))))
 
 (defun append (&rest lists)
   "Construct and return a list by concatenating LISTS."

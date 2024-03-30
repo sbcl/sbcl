@@ -325,3 +325,13 @@
       (loadw next-bits node (+ instance-slots-offset instance-data-start)
              instance-pointer-lowtag)
       (inst orr next-tagged next-bits instance-pointer-lowtag))))
+
+
+(define-vop (switch-to-arena)
+  (:args (x :scs (descriptor-reg immediate)))
+  (:temporary (:sc unsigned-reg :offset nl0-offset :from (:argument 0)) arg0)
+  (:temporary (:sc unsigned-reg :offset nl1-offset) arg1)
+  (:vop-var vop)
+  (:generator 1
+    (inst mov arg0 (if (sc-is x immediate) (tn-value x) x))
+    (invoke-asm-routine 'switch-to-arena arg1)))

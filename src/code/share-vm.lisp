@@ -202,7 +202,7 @@
 
 ;;; Unless using an arena there is really no way to get a number
 ;;; allocated off the heap
-#-x86-64 (defun copy-number-to-heap (n) n)
+#-(or x86-64 system-tlabs) (defun copy-number-to-heap (n) n)
 
 (defun hexdump (thing &optional (count 2 countp)
                             ;; pass NIL explicitly if T crashes on you

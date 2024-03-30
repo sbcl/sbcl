@@ -124,7 +124,12 @@
 ;;; Use LIST* in lieu of CONS so that there are only 2 low-level allocators
 ;;; instead of 3. Strictly speaking, LIST is redundant as well.
 (define-source-transform cons (x y) `(list* ,x ,y))
-
+#+system-tlabs
+(unless-vop-existsp (:translate acons)
+  (define-source-transform acons (key datum alist &environment env)
+    (if (sb-vm::env-system-tlab-p env)
+        `(cons (cons ,key ,datum) ,alist)
+        (values nil t))))
 (defoptimizer (list derive-type) ((&rest args))
   (if args
       (specifier-type 'cons)
@@ -139,12 +144,15 @@
   (define-source-transform unaligned-dx-cons (arg)
     `(list ,arg)))
 
-(define-source-transform make-list (length &rest rest)
+(define-source-transform make-list (length &rest rest &environment env)
   (if (or (null rest)
           ;; Use of &KEY in source xforms doesn't have all the usual semantics.
           ;; It's better to hand-roll it - cf. transforms for WRITE[-TO-STRING].
           (typep rest '(cons (eql :initial-element) (cons t null))))
-      `(%make-list ,length ,(second rest))
+      `(,(if (sb-vm::env-system-tlab-p env)
+             'sb-impl::%sys-make-list
+             '%make-list)
+        ,length ,(second rest))
       (values nil t))) ; give up
 
 (deftransform %make-list ((length item) ((constant-arg (integer 0 2)) t))

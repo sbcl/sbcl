@@ -12,37 +12,40 @@
 
 (in-package "SB-VM")
 
-(define-assembly-routine (allocate-vector-on-heap
-                          (:policy :fast-safe)
-                          (:arg-types positive-fixnum
-                                      positive-fixnum
-                                      positive-fixnum))
-    ((:arg type any-reg r2-offset)
-     (:arg length any-reg r1-offset)
-     (:arg words any-reg r0-offset)
-     (:res result descriptor-reg r0-offset)
+(macrolet ((def (name sys)
+             `(define-assembly-routine (,name
+                                        (:policy :fast-safe)
+                                        (:arg-types positive-fixnum
+                                                    positive-fixnum
+                                                    positive-fixnum))
+                  ((:arg type any-reg r2-offset)
+                   (:arg length any-reg r1-offset)
+                   (:arg words any-reg r0-offset)
+                   (:res result descriptor-reg r0-offset)
 
-     (:temp ndescr non-descriptor-reg nl2-offset)
-     (:temp pa-flag non-descriptor-reg nl3-offset)
-     (:temp lra-save non-descriptor-reg nl5-offset)
-     (:temp lr non-descriptor-reg lr-offset))
-  (pseudo-atomic (pa-flag)
-    (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
-    (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
-    (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
-    (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
-    (allocation nil ndescr other-pointer-lowtag result
-                :flag-tn pa-flag)
+                   (:temp ndescr non-descriptor-reg nl2-offset)
+                   (:temp pa-flag non-descriptor-reg nl3-offset)
+                   (:temp lra-save non-descriptor-reg nl5-offset)
+                   (:temp lr non-descriptor-reg lr-offset))
+                (pseudo-atomic (pa-flag)
+                  (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
+                  (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
+                  (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
+                  (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
+                  (allocation nil ndescr other-pointer-lowtag result
+                              :flag-tn pa-flag :systemp ,sys)
 
-    (move lr lra-save)
-    (inst lsr ndescr type n-fixnum-tag-bits)
-    ;; Touch the last element, to ensure that null-terminated strings
-    ;; passed to C do not cause a WP violation in foreign code.
-    ;; Do that before storing length, since nil-arrays don't have any
-    ;; space, but may have non-zero length.
-    #-generational
-    (storew zr-tn pa-flag -1)
-    (storew-pair ndescr 0 length vector-length-slot tmp-tn)))
+                  (move lr lra-save)
+                  (inst lsr ndescr type n-fixnum-tag-bits)
+                  ;; Touch the last element, to ensure that null-terminated strings
+                  ;; passed to C do not cause a WP violation in foreign code.
+                  ;; Do that before storing length, since nil-arrays don't have any
+                  ;; space, but may have non-zero length.
+                  #-generational
+                  (storew zr-tn pa-flag -1)
+                  (storew-pair ndescr 0 length vector-length-slot tmp-tn)))))
+  (def allocate-vector-on-heap nil)
+  (def sys-allocate-vector-on-heap t))
 
 (define-assembly-routine (allocate-vector-on-stack
                           (:policy :fast-safe)
@@ -59,7 +62,7 @@
   (inst lsl words words (- word-shift n-fixnum-tag-bits))
   (inst add words words (* (1+ vector-data-offset) n-word-bytes))
   (inst and words words (bic-mask lowtag-mask)) ; double-word align
-  (allocation nil words other-pointer-lowtag result :stack-allocate-p t)
+  (allocation nil words other-pointer-lowtag result :stack-allocate-p t :systemp nil)
 
   (inst stp temp length (@ tmp-tn))
   ;; Zero fill

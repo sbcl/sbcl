@@ -358,7 +358,11 @@
                                  (if (sb-c:msan-unpoison sb-c:*compilation*)
                                      'sb-vm::allocate-vector-on-stack+msan-unpoison
                                      'sb-vm::allocate-vector-on-stack)
-                                 'sb-vm::allocate-vector-on-heap))
+                                 (cond #-x86-64
+                                       ((sb-vm::system-tlab-p 0 call)
+                                        'sb-vm::sys-allocate-vector-on-heap)
+                                       (t
+                                        'sb-vm::allocate-vector-on-heap))))
 
 (defun make-vector-check-overflow-p (node)
   (not (or (zerop (policy node safety))

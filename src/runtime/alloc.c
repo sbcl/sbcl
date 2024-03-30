@@ -225,7 +225,7 @@ extern lispobj* lisp_alloc(int, struct alloc_region *, sword_t,
  * size (GC trigger) and to disable the interrupts (interrupts are
  * always disabled during a GC). */
 
-#ifdef LISP_FEATURE_X86_64
+#if defined(LISP_FEATURE_SYSTEM_TLABS) || defined(LISP_FEATURE_X86_64)
 
 // The asm routines have been modified so that alloc() and alloc_list()
 // each receive the size an a single-bit flag affecting locality of the result.
@@ -379,18 +379,20 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
 #else
 /* Let's assume that all the rest of the architectures work similarly.
  * There may be minor variations in how both args get passed */
-NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_bytes) {
+NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_bytes
+#ifdef LISP_FEATURE_SYSTEM_TLABS
+                                            , int sys
+#endif
+    )
+{
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
     sword_t nbytes = context_bytes * CONS_SIZE;
-    struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
-    int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
-    gc_assert(nbytes > (sword_t)partial_request);
-    if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;
+    PREPARE_LIST_ALLOCATION();
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
-        struct cons* c = (void*)lisp_alloc(0, region, partial_request, PAGE_TYPE_CONS, self);
+        struct cons* c = (void*)lisp_alloc(sys, region, partial_request, PAGE_TYPE_CONS, self);
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;

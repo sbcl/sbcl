@@ -228,7 +228,7 @@
  ("src/code/target-c-call"    :not-host)
 
  ("src/code/misc-aliens" :not-host)
- #+x86-64 ("src/code/arena" :not-host)
+ #+(or x86-64 system-tlabs) ("src/code/arena" :not-host)
  ("src/code/weak"             :not-host)
  ("src/code/array"            :not-host)
 

@@ -3090,5 +3090,8 @@
   (let ((b (& (>> val 2) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(CD31CAB 7E4DD5CC 81CDF6F7 8DC2A923 A87D60AD)
+ "(:ALLOW-OTHER-KEYS :SYSTEMP :OVERFLOW :STACK-ALLOCATE-P :FLAG-TN)"
+ "(  (& (+ (>> val 2) (>> val 12)) 7))")
 )
 ;; EOF

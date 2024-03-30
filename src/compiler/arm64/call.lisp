@@ -669,7 +669,7 @@
                       (lambda ()
                         ;; The size will be computed by subtracting from CSP
                         (inst mov tmp-tn context)
-                        (invoke-asm-routine 'listify-&rest lr)
+                        (invoke-asm-routine (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest) lr)
                         (inst mov result tmp-tn)
                         (inst b leave-pa))))
         (move result dst)

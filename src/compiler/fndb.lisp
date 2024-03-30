@@ -1005,7 +1005,7 @@
   (ash most-positive-fixnum (- (+ sb-vm:word-shift 1))))
 (defknown make-list ((integer 0 #.make-list-limit) &key (:initial-element t)) list
   (movable flushable))
-(defknown %make-list ((integer 0 #.make-list-limit) t) list
+(defknown (%make-list sb-impl::%sys-make-list) ((integer 0 #.make-list-limit) t) list
   (movable flushable no-verify-arg-count))
 
 (defknown sb-impl::|List| (&rest t) list (movable flushable))

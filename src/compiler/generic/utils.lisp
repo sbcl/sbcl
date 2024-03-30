@@ -516,6 +516,18 @@
                     smallest-f d n))
            (values (ceiling (expt 2 fraction-bits) d) fraction-bits)))))
 
+(defun env-system-tlab-p (env)
+  #-system-tlabs (declare (ignore env))
+  #+system-tlabs
+  (or sb-c::*force-system-tlab*
+      (and env
+           (dolist (data (sb-c::lexenv-user-data env)
+                         (and (sb-c::lexenv-parent env)
+                              (env-system-tlab-p (sb-c::lexenv-parent env))))
+             (when (and (eq (first data) :declare)
+                        (eq (second data) 'sb-c::tlab))
+               (return (eq (third data) :system)))))))
+
 (defun system-tlab-p (type node)
   #-system-tlabs (declare (ignore type node))
   #+system-tlabs
@@ -528,13 +540,7 @@
           (error "~S instance constructor called in a non-system file"
                  typename)))
       (and node
-           (named-let search-env ((env (sb-c::node-lexenv node)))
-             (dolist (data (sb-c::lexenv-user-data env)
-                           (and (sb-c::lexenv-parent env)
-                                (search-env (sb-c::lexenv-parent env))))
-               (when (and (eq (first data) :declare)
-                          (eq (second data) 'sb-c::tlab))
-                 (return (eq (third data) :system))))))))
+           (env-system-tlab-p (sb-c::node-lexenv node)))))
 
 (defun call-out-pseudo-atomic-p (vop)
   (declare (ignorable vop))

@@ -56,7 +56,7 @@
     (inst jmp :nz have-ymm)
     (do-fprs push :xmm)
     (inst ret)
-    HAVE-YMM
+s    HAVE-YMM
     ;; Although most of the time RDX can be clobbered, some of the time it can't.
     ;; If WITH-REGISTERS-PRESERVED wraps a lisp function to make it appear to preserve
     ;; all registers, we obviously need to return its primary value in RDX.

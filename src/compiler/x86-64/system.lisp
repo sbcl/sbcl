@@ -512,6 +512,22 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     ;; to make an assembly routine that preserves all registers.
     (invoke-asm-routine 'call 'switch-to-arena vop)))
 
+;;; Caution: this vop potentially clobbers all registers, but it doesn't declare them.
+;;; It's safe to use only from DESTROY-ARENA which, being an ordinary full call,
+;;; is presumed not to preserve registers.
+(define-vop (delete-arena)
+  (:args (x :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc unsigned-reg :offset rbx-offset) rsp-save)
+  (:vop-var vop)
+  (:generator 1
+    (move rdi x)
+    (pseudo-atomic ()
+      (inst mov rsp-save rsp-tn)
+      (inst and rsp-tn -16) ; align as required by some ABIs
+      (call-c (ea (make-fixup "sbcl_delete_arena" :foreign 8)) #+win32 rdi)
+      (inst mov rsp-tn rsp-save))))
+
 #+ultrafutex
 (define-vop (quick-try-mutex)
   (:translate quick-try-mutex)
