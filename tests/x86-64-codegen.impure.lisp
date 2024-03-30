@@ -1406,10 +1406,11 @@
                   (if (sb-kernel:non-null-symbol-p x) 'zook (foo)))))
              1)))
 
-(with-test (:name :disassemble-instance-type-test)
+(with-test (:name :disassemble-instance-type-test
+            :skipped-on (not :immobile-space))
   (let ((lines
-         (disassembly-lines
-          (compile nil '(lambda (m) (the sb-thread:mutex m))))))
+          (disassembly-lines
+           (compile nil '(lambda (m) (the sb-thread:mutex m))))))
     (assert
      (loop for line in lines
            thereis (and (search "CMP DWORD PTR" line)
