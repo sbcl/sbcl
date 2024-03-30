@@ -3110,7 +3110,7 @@
            `(logandc2 (ash int (- posn))
                       (ash -1 size))))))
 
-(deftransform %mask-field ((size posn int) (fixnum fixnum integer) word)
+(deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
   `(logand int (ash (ash ,most-positive-word (- size ,sb-vm:n-word-bits)) posn)))
 

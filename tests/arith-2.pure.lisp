@@ -534,3 +534,11 @@
       (dpb a (byte 63 8)
            81))
    ((90) 23121)))
+
+(with-test (:name :mask-field-size-overflow)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (truly-the fixnum
+                 (mask-field (byte 78 0) a)))
+   ((35) 35)))
