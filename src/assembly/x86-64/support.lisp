@@ -83,7 +83,8 @@
   `(progn ,@(mapcar (lambda (stem) `(inst pop ,(symbolicate stem "-TN")))
                     (reverse regs))))
 
-;;; Invoke BODY, saving and restoring all registers except FLAGS and anything in EXCEPT.
+;;; Invoke BODY, saving and restoring all registers other than those mentioned in EXCEPT,
+;;; and not EFLAGS unless specifically requested.
 ;;; If this is utilized at other than an assembly routine entry point, it's best to
 ;;; specify a frame register, because backtracing might become confused otherwise.
 ;;; Consider the case where the stack pointer has already been decremented to make space
@@ -91,15 +92,16 @@
 ;;; After the customary 2-instruction prologue of "PUSH RBP ; MOV RBP,RSP"
 ;;; there is a correct chain of saved RBP values, but 1 word up from the current RBP
 ;;; is probably not a saved program counter, and will look weird to treat it as such.
-(defmacro with-registers-preserved ((convention &key except (frame-reg 'rbp)) &body body)
+(defmacro with-registers-preserved ((convention &key eflags except (frame-reg 'rbp))
+                                    &body body)
   ;: Convention:
   ;;   C    = save GPRs that C call can change
   ;;   Lisp = save GPRs that lisp call can change
   (aver (member convention '(lisp c)))
   (aver (eql card-table-reg 12)) ; change detector
-  (let* ((dont-save-fpr (eq except 'fp))
+  (let* ((save-fpr (neq except 'fp))
          (fpr-align 64)
-         (except (ensure-list except))
+         (except (if (eq except 'fp) nil (ensure-list except)))
          (clobberables
            (remove frame-reg
                    `(rax rbx rcx rdx rsi rdi r8 r9 r10 r11
@@ -107,8 +109,6 @@
                          #+gs-seg r13
                          r14 r15)))
          (frame-tn (when frame-reg (symbolicate frame-reg "-TN"))))
-    (when dont-save-fpr
-      (setf except nil))
     (aver (subsetp except clobberables)) ; Catch spelling mistakes
     ;; Since FPR-SAVE / -RESTORE utilize RAX, returning RAX from an assembly
     ;; routine (by *not* preserving it) will be meaningless.
@@ -131,25 +131,40 @@
            ;; each 8 registers pushed preserves 64-byte alignment
            (alignment-bytes
              (-  (nth-value 1 (ceiling (* n-word-bytes (length gprs)) fpr-align)))))
+      (when eflags (aver frame-reg)) ; don't need to support no-frame-tn,yes-flags
       `(progn
+         ;; Obviously we have to save EFLAGS before messing them up by doing arithmetic.
+         ;; So if requested, save them inside the new frame. It would mess up backtrace
+         ;; to PUSHF before PUSH RBP because then the stack word at 1 slot above RBP
+         ;; would not be the return PC pushed by a preceding CALL. It would similarly be
+         ;; wrong to push flags in between the push of RBP and the MOV.
          ,@(when frame-tn
              `((inst push ,frame-tn)
-               (inst mov ,frame-tn rsp-tn)))
-         ,@(unless dont-save-fpr
+               (inst mov ,frame-tn rsp-tn)
+               ,@(when eflags '((inst pushf)))))
+         ,@(when save-fpr
              `((inst and rsp-tn ,(- fpr-align))))
          (regs-pushlist ,@gprs)
-         ,@(unless dont-save-fpr
+         ,@(when save-fpr
              `((inst sub rsp-tn ,(+ alignment-bytes xsave-area-size))
                (call-fpr-save/restore-routine :save)))
          (assemble () ,@body)
-         ,@(unless dont-save-fpr
+         ,@(when save-fpr
              `((call-fpr-save/restore-routine :restore)
                (inst add rsp-tn ,(+ alignment-bytes xsave-area-size))))
          (regs-poplist ,@gprs)
-         ,@(cond ((eq frame-tn 'rbp)
+         ,@(cond ((and (eq frame-tn 'rbp-tn) (not eflags))
                   '((inst leave)))
+             ;; If EFLAGS got pushed, restoring RBP can't be done with LEAVE,
+             ;; because RSP has to be decremented by 1 word.
+             ;;    return-PC
+             ;;    saved RBP     <-- new RBP points here
+             ;;    saved EFLAGS
                  (frame-tn
-                  `((inst mov rsp-tn ,frame-tn)
+                  `(,@(if eflags
+                          `((inst lea rsp-tn (ea -8 ,frame-tn))
+                            (inst popf))
+                          `((inst mov rsp-tn ,frame-tn)))
                     (inst pop ,frame-tn))))))))
 
 (defmacro call-c (fun &rest args)
