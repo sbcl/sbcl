@@ -27,14 +27,14 @@
 
 (define-xref-test who-calls.4
     (who-calls 'xref/2)
-  (xref/5
-   xref/6
-   xref/8
+  (xref/8
    xref/8
    xref/12
    (sb-pcl::fast-method xref/10 (t t t t t t t t fixnum))
    (sb-pcl::fast-method xref/11 (fixnum))
-   (sb-pcl::fast-method xref/11 ((eql z)))))
+   (sb-pcl::fast-method xref/11 ((eql z)))
+   . #.(list (sb-kernel:%fun-name (sb-kernel:%code-entry-point
+                                   (sb-kernel:fun-code-header #'xref/5) 0)))))
 
 (define-xref-test who-calls.5
     (who-calls 'xref/3)
@@ -73,7 +73,8 @@
 
 (define-xref-test who-calls.14
     (who-calls 'xref/12)
-  (macro/1))
+  #-(and system-tlabs (not mark-region-gc)) (macro/1)
+  #+(and system-tlabs (not mark-region-gc)) ((macro-function macro/1)))
 
 (define-xref-test who-calls.15
     (who-calls 'inline/3)

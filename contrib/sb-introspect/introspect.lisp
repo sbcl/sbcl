@@ -599,6 +599,7 @@ or a method combination name."
 
 ;;; XREF facility
 
+#-(and system-tlabs (not mark-region-gc))
 (defun collect-xref (wanted-kind wanted-name)
   (let ((result '()))
     (sb-c:map-simple-funs
@@ -630,6 +631,53 @@ or a method combination name."
                   (push (cons name source-location) result)))))
           xrefs))))
     result))
+
+;;; Can allocate inside an arena while holding without-gcing in sb-vm:map-code-objects
+#+(and system-tlabs (not mark-region-gc))
+(defun collect-xref (wanted-kind wanted-name)
+  ;; Remove unreachable functions.
+  (sb-ext:gc :full t)
+  (let ((arena (sb-vm:new-arena (* 10 1024 1024))))
+    (unwind-protect
+         (let (funs)
+           (sb-vm:with-arena (arena)
+             (sb-vm:map-code-objects
+              (lambda (code)
+                (dotimes (i (code-n-entries code))
+                  (let ((fun (%code-entry-point code i)))
+                    (binding* ((xrefs (%simple-fun-xrefs fun) :exit-if-null))
+                      (sb-c:map-packed-xref-data
+                       (lambda (xref-kind xref-name xref-form-number)
+                         (when (and (eq xref-kind wanted-kind)
+                                    (equal xref-name wanted-name))
+                           (push (cons fun xref-form-number) funs)))
+                       xrefs)))))))
+           (let (result)
+             (loop for (fun . xref-form-number) in funs
+                   do
+                   (let ((source-location (find-function-definition-source fun)))
+                     ;; Use the more accurate source path from the xref
+                     ;; entry.
+                     (setf (definition-source-form-number source-location) xref-form-number)
+                     (let* ((name (sb-c::%fun-name fun))
+                            (name (cond ((typep name '(cons (eql sb-c:deftransform)))
+                                         (let* ((fun-name (second name))
+                                                (info (sb-int:info :function :info fun-name))
+                                                (transform (and info
+                                                                (find fun (sb-c::fun-info-transforms info)
+                                                                      :key #'sb-c::transform-function))))
+                                           (if transform
+                                               (append name
+                                                       (let* ((type (sb-c::transform-type transform))
+                                                              (type-spec (type-specifier type)))
+                                                         (and (sb-kernel:fun-type-p type)
+                                                              (list (second type-spec)))))
+                                               name)))
+                                        (t
+                                         name))))
+                       (pushnew (cons name source-location) result :test #'equalp))))
+             result))
+      (sb-vm:destroy-arena arena))))
 
 (defun who-calls (function-name)
   "Use the xref facility to search for source locations where the

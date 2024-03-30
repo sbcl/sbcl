@@ -47,6 +47,13 @@
                (and (consp name)
                     (member (car name)
                             '(flet labels lambda))))
+             (handle-refs (functional)
+               ;; Recurse only if we haven't already seen the
+               ;; functional.
+               (unless (memq functional seen)
+                 (push functional seen)
+                 (loop for ref in (functional-refs functional)
+                       thereis (handle-functional (node-home-lambda ref)))))
              (handle-functional (functional)
                ;; If a functional looks like a global function (has a
                ;; XEP, isn't a local function or a lambda) record xref
@@ -56,15 +63,12 @@
                  (let ((entry (functional-entry-fun functional)))
                    (when entry
                      (let ((name (functional-debug-name entry)))
-                       (unless (local-function-name-p name)
-                         (return-from handle-functional
-                           (funcall fun entry)))))))
-               ;; Recurse only if we haven't already seen the
-               ;; functional.
-               (unless (member functional seen)
-                 (push functional seen)
-                 (dolist (ref (functional-refs functional))
-                   (handle-functional (node-home-lambda ref))))))
+                       ;; Is it a lambda inside another function?
+                       (when (or (not (local-function-name-p name))
+                                 (not (handle-refs functional)))
+                         (funcall fun entry)
+                         (return-from handle-functional t))))))
+               (handle-refs functional)))
       (unless (or (functional-kind-eq functional deleted)
                   ;; If the block came from an inlined global
                   ;; function, ignore it.
@@ -238,6 +242,7 @@
              (if (< index common-count)
                  (aref **most-common-xref-names-by-index** index)
                  (aref vector (+ index 1 (- common-count))))))))
+  (declare (inline decode-kind-and-count index-and-number-decoder index->name))
 
   ;;; Pack the xref table that was stored for a functional into a more
   ;;; space-efficient form, and return that packed form.
@@ -304,6 +309,7 @@
   ;;; of the referenced thing and FORM-NUMBER is the number of the
   ;;; form in which the reference occurred.
   (defun map-packed-xref-data (function xref-data)
+    (declare (dynamic-extent function))
     (let* ((function (coerce function 'function))
            (lookup (index->name xref-data))
            (packed (aref xref-data 0))

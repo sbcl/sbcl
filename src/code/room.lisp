@@ -1333,15 +1333,17 @@ We could try a few things to mitigate this:
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
 
 (defun map-code-objects (fun)
+  (declare (dynamic-extent fun))
   (dx-flet ((filter (obj type size)
               (declare (ignore size))
               (when (= type code-header-widetag)
                 (funcall fun obj))))
     (without-gcing
       #+immobile-code
-      (map-objects-in-range #'filter
-                            (ash text-space-start (- n-fixnum-tag-bits))
-                            (%make-lisp-obj (sap-int *text-space-free-pointer*)))
+      (with-system-mutex (*allocator-mutex*)
+        (map-objects-in-range #'filter
+                              (ash text-space-start (- n-fixnum-tag-bits))
+                              (%make-lisp-obj (sap-int *text-space-free-pointer*))))
       (alien-funcall (extern-alien "close_code_region" (function void)))
       (walk-dynamic-space #'filter
                           #b1111111 ; all generations
