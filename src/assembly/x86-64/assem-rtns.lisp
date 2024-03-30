@@ -33,13 +33,11 @@
      (:temp loop-index unsigned-reg r9-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst test rcx rcx)
-  (inst jmp :z ZERO-VALUES)
-  (inst cmp rcx (fixnumize 1))
+  (inst cmp :dword rcx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
-  (inst cmp rcx (fixnumize 2))
-  (inst jmp :e TWO-VALUES)
-  (inst cmp rcx (fixnumize 3))
+  (inst jmp :b ZERO-VALUES)
+  (inst cmp :dword rcx (fixnumize 3))
+  (inst jmp :b TWO-VALUES)
   (inst jmp :e THREE-VALUES)
 
   ;; As per the calling convention RBX is expected to point at the SP
