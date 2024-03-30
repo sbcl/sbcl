@@ -152,16 +152,7 @@
          (dtype (node-derived-type cast))
          (lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar)))
-         (n-consumed (cond ((not lvar)
-                            nil)
-                           ((lvar-single-value-p lvar)
-                            1)
-                           ((and (mv-combination-p dest)
-                                 (eq (mv-combination-kind dest) :local)
-                                 (lvar-uses (mv-combination-fun dest))
-                                 (singleton-p (mv-combination-args dest)))
-                            (let ((fun-ref (lvar-use (mv-combination-fun dest))))
-                              (length (lambda-vars (ref-leaf fun-ref)))))))
+         mv-vars
          (n-required (length (values-type-required dtype))))
     (aver (not (eq ctype *wild-type*)))
     (cond ((and (null (values-type-optional dtype))
@@ -179,15 +170,20 @@
                                                 n-required)))
           ((and (mv-combination-p dest)
                 (eq (mv-combination-kind dest) :local)
-                (singleton-p (mv-combination-args dest)))
+                (lvar-uses (mv-combination-fun dest))
+                (singleton-p (mv-combination-args dest))
+                (let ((fun-ref (lvar-use (mv-combination-fun dest))))
+                  (setf mv-vars (lambda-vars (ref-leaf fun-ref)))))
            ;; we know the number of consumed values
-           (values :simple (lvar-types-to-check (adjust-list (values-type-types ctype)
-                                                             n-consumed
-                                                             *universal-type*)
-                                                (adjust-list (values-type-types atype)
-                                                             n-consumed
-                                                             *universal-type*)
-                                                n-required)))
+           (flet ((filter-unused (types)
+                    (loop for var in mv-vars
+                          for type in types
+                          collect (if (lambda-var-deleted var)
+                                      *universal-type*
+                                      type))))
+             (values :simple (lvar-types-to-check (filter-unused (values-type-out ctype (length mv-vars)))
+                                                  (filter-unused (values-type-out atype (length mv-vars)))
+                                                  n-required))))
           (t
            (values :hairy (list ctype atype))))))
 
