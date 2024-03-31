@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.3:
+  * bug fix: on Arm64, and x86-64 with some non-default build options, integer
+    rounding functions treat minus zero more consistently.
+
 changes in sbcl-2.4.3 relative to sbcl-2.4.2:
   * enhancement: when dumping debug information to fasl files, the system
     respects the SOURCE_DATE_EPOCH environment variable (if set) as the latest

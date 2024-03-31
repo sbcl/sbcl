@@ -1751,10 +1751,13 @@
                                (values res
                                        (- x (* f
                                                #+round-float
-                                               (,',(ecase type
-                                                     (double-float 'round-double)
-                                                     (single-float 'round-single))
-                                                div :truncate)
+                                               (- (,',(ecase type
+                                                        (double-float 'round-double)
+                                                        (single-float 'round-single))
+                                                      div :truncate)
+                                                  ,,(ecase type
+                                                      (double-float $-0.0d0)
+                                                      (single-float $-0.0f0)))
                                                #-round-float
                                                (locally
                                                    (declare (flushable ,',coerce))
@@ -1809,10 +1812,13 @@
                                     (rem (- number (* ,@(unless one-p
                                                           '(f-divisor))
                                                       #+round-float
-                                                      (,',(ecase type
-                                                            (double-float 'round-double)
-                                                            (single-float 'round-single))
-                                                       div :truncate)
+                                                      (- (,',(ecase type
+                                                               (double-float 'round-double)
+                                                               (single-float 'round-single))
+                                                             div :truncate)
+                                                         ,,(ecase type
+                                                             (double-float $-0.0d0)
+                                                             (single-float $-0.0f0)))
                                                       #-round-float
                                                       (locally
                                                           (declare (flushable ,',coerce))

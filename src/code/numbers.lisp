@@ -328,10 +328,13 @@
                              (* #-round-float
                                 (coerce res ',rtype)
                                 #+round-float
-                                (,(ecase rtype
-                                    (double-float 'round-double)
-                                    (single-float 'round-single))
-                                 divided :truncate)
+                                (- (,(ecase rtype
+                                       (double-float 'round-double)
+                                       (single-float 'round-single))
+                                     divided :truncate)
+                                   ,(ecase rtype
+                                      (double-float $-0.0d0)
+                                      (single-float $-0.0f0)))
                                 float-div)))))
              (single-digit-bignum-p (x)
                #+(or x86-64 x86 ppc64)
