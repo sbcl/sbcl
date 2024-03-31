@@ -575,14 +575,22 @@ or a method combination name."
 
 (defun find-function-callees (function)
   "Return functions called by FUNCTION."
-  (declare (simple-fun function))
-  (let ((callees '()))
-    (map-code-constants
-     (fun-code-header function)
-     (lambda (obj)
-       (when (fdefn-p obj)
-         (push (fdefn-fun obj) callees))))
-    callees))
+  (if (typep function 'generic-function)
+      (loop for method in (sb-mop:generic-function-methods function)
+            for method-fun = (sb-mop:method-function method)
+            append (find-function-callees
+                    (if (typep (%fun-name method-fun) '(cons (eql sb-pcl::call)))
+                        (sb-kernel:%closure-index-ref  method-fun 0)
+                        method-fun)))
+      (let ((callees '()))
+        (map-code-constants
+         (fun-code-header (sb-kernel:%fun-fun function))
+         (lambda (obj)
+           (when (fdefn-p obj)
+             (let ((fun (fdefn-fun obj)))
+               (when fun
+                 (push fun callees))))))
+        callees)))
 
 (defun find-function-callers (function &optional (spaces '(:read-only :static
                                                            :dynamic
