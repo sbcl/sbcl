@@ -1935,9 +1935,13 @@ extended <package-name>::<form-in-package> syntax."
                                                 (- result)
                                                 result)))))
                         ,(if radix
-                             `(if (<= (- end index) (floor (log most-positive-word ,radix)))
-                                  (compute word)
-                                  (compute t))
+                             (let ((max-length
+                                    (loop for i from 1
+                                          for mi = (1- radix) then (+ (* mi radix) (1- radix))
+                                          when (> mi most-positive-word) do (return (1- i)))))
+                               `(if (<= (- end index) ,max-length)
+                                    (compute word)
+                                    (compute t)))
                              `(compute t)))
                       (values
                        (if found-digit
