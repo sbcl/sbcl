@@ -1266,9 +1266,8 @@
 (defun print-all-blocks (thing)
   (do-blocks (block (block-component (block-or-lose thing)))
     (handler-case (print-nodes block)
-      ;; (error (condition)
-      ;;   (format t "~&~A...~%" condition))
-      ))
+      (error (condition)
+        (format t "~&~A...~%" condition))))
   (values))
 
 (defvar *list-conflicts-table*)

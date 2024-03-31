@@ -63,16 +63,6 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                        else-ctran)
                    next result else))))
 
-;;; Hiding jump-table from third party code walkers
-(define-source-transform %jump-table (index &rest targets)
-  `(jump-table ,index
-               ,@(loop for (target . next) on targets
-                       for i from 0
-                       collect `(,(if next
-                                      i
-                                      'otherwise)
-                                 (funcall ,target)))))
-
 (def-ir1-translator jump-table ((index &rest targets) start next result)
   (aver targets)
   (let* ((index-ctran (make-ctran))
@@ -87,11 +77,15 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
       (ctran-starts-block next)
       (setf (jump-table-targets node)
             (loop for (index . target) in targets
-                  for ctran = (make-ctran)
-                  for block = (ctran-starts-block ctran)
+                  for block = (if (block-p target)
+                                  target
+                                  (let* ((ctran (make-ctran))
+                                         (block (ctran-starts-block ctran)))
+                                    (ir1-convert-progn-body ctran next result target)
+                                    block))
                   do
-                  (ir1-convert-progn-body ctran next result target)
-                  (link-blocks start-block block)
+                  (unless (memq block (block-succ start-block))
+                    (link-blocks start-block block))
                   collect (cons index block))))))
 
 ;;; then or else can be already converted blocks
@@ -121,6 +115,9 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
             (ir1-convert then-ctran next result then))
           (when else-ctran
             (ir1-convert else-ctran next result else)))))))
+
+(def-ir1-translator to-lvar ((lvar block form) start next result)
+  (ir1-convert start (block-start block) lvar form))
 
 ;;; To get even remotely sensible results for branch coverage
 ;;; tracking, we need good source paths. If the macroexpansions

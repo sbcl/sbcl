@@ -1097,50 +1097,7 @@ invoked. In that case it will store into PLACE and start over."
              (normal-clauses (reverse (if default (cdr clauses) clauses))))
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
         ;; depending on constant-ness of results.
-        (cond ((and (eq test 'eql)
-                    (should-attempt-hash-based-case-dispatch keys))
-               (let* ((constants
-                        (when (every (lambda (clause) (constantp `(progn ,@(cdr clause))))
-                                     normal-clauses)
-                          ;; TODO: use specialized vector if possible
-                          (block nil
-                            (map 'simple-vector
-                                 (lambda (clause)
-                                   (let ((value
-                                           (constant-form-value `(progn ,@(cdr clause)) lexenv)))
-                                     (if (typep value '(or symbol number
-                                                        character (and array (not (array t)))))
-                                         value
-                                         (return))))
-                                 normal-clauses))))
-                      (seen (alloc-xset))
-                      (tested (if default (butlast specified-clauses) specified-clauses))
-                      (key-lists
-                        (loop for clause in tested
-                              collect (mapcan (lambda (key)
-                                                (unless (xset-member-p key seen)
-                                                  (add-to-xset key seen)
-                                                  (list key)))
-                                              (ensure-list (car clause))))))
-                 (return-from case-body
-                   `(let ((,keyform-value ,keyform))
-                      ,(if constants
-                           `(sb-c:case-to-jump-table ,keyform-value ',key-lists ',constants
-                                                     ,(if default
-                                                          `(lambda () (progn ,@(cdr default))))
-                                                     ',errorp)
-                           `(sb-c::%jump-table (sb-c:case-to-jump-table ,keyform-value ',key-lists)
-                                               ,@(loop for (nil . form) in tested
-                                                       for keys in key-lists
-                                                       collect `(lambda ()
-                                                                  (sb-c::%type-constraint ,keyform-value '(member ,@keys))
-                                                                  ,@form))
-                                               (lambda ()
-                                                 (sb-c::%type-constraint ,keyform-value '(not (member ,@keys)))
-                                                 ,@(if errorp
-                                                       `((ecase-failure ,keyform-value ,(coerce keys 'simple-vector)))
-                                                       (cdr default)))))))))
-              ((eq test 'typep)
+        (cond ((eq test 'typep)
                (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
                                               default errorp)
                  (return-from case-body it))))))

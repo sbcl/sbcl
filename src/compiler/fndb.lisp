@@ -2319,7 +2319,3 @@
   (integer t)
   integer
   (movable always-translatable))
-
-(defknown case-to-jump-table (t list &optional sequence t t) * (always-translatable))
-(defknown %jump-table (t &rest t) * (always-translatable))
-

@@ -6671,6 +6671,10 @@
                   (setf ctran start)
                   (go :next-ctran))))))))
 
+(defun next-block (node)
+  (and (not (node-next node))
+       (car (block-succ (node-block node)))))
+
 (defun range-transform (op a b node)
   (unless (delay-ir1-optimizer node :ir1-phases)
     (let ((if (node-dest node)))
@@ -6886,10 +6890,8 @@
     (def range<<= 1 0)
     (def range<=< 0 -1)))
 
-(defun find-or-chain (node op)
-  (let (chain
-        fixnump
-        characterp)
+(defun find-or-chains (node op)
+  (let ((chains (make-array 1 :adjustable t :fill-pointer 1 :initial-element nil)))
     (labels ((chain (node)
                (unless (combination-or-chain-computed node)
                  (let ((if (node-dest node)))
@@ -6898,15 +6900,11 @@
                      (destructuring-bind (a b) (combination-args node)
                        (when (and (constant-lvar-p b)
                                   (let ((value (lvar-value b)))
-                                   (cond (fixnump
-                                          (fixnump value))
-                                         (characterp
-                                          (characterp value))
-                                         ((fixnump value)
-                                          (setf fixnump t))
-                                         ((characterp value)
-                                          (setf characterp t)))))
-                         (push (cons node if) chain)
+                                    (or (fixnump value)
+                                        (symbolp value)
+                                        (characterp value))))
+                         (push (list (lvar-value b) node if)
+                               (aref chains (1- (length chains))))
                          (setf (combination-or-chain-computed node) t)
                          (let ((else (next-node (if-alternative if) :type :non-ref
                                                                     :single-predecessor t)))
@@ -6917,12 +6915,13 @@
                                (when (eq op2 op)
                                  (let ((a2 (car (combination-args else))))
                                    (when (and (same-leaf-ref-p a a2)
-                                              (if-p (setf after-else (next-node else)))
-                                              (eq (if-consequent if)
-                                                  (if-consequent after-else)))
+                                              (if-p (setf after-else (next-node else))))
+                                     (unless (eq (if-consequent if)
+                                                 (if-consequent after-else))
+                                       (vector-push-extend nil chains))
                                      (chain else))))))))))))))
       (chain node)
-      (values (nreverse chain) characterp))))
+      (map-into chains #'nreverse chains))))
 
 (defun contiguous-sequence (sorted-values)
   (when (loop for i below (1- (length sorted-values))
@@ -6962,184 +6961,310 @@
            (or (contiguous-sequence values)
                (bit-test-sequence values))))))
 
+(defun replace-chain (chain form)
+  (let* ((node (second (first chain)))
+         (lvar (first (combination-args node))))
+    (flush-dest (second (combination-args node)))
+    (setf (combination-args node) nil)
+    (loop for ((nil node if) next) on chain
+          for (a2 b2) = (combination-args node)
+          do
+          (cond (next
+                 (kill-if-branch-1 if (if-test if)
+                                   (node-block if)
+                                   (if-consequent if))
+                 (flush-combination node))
+                (t
+                 (setf (lvar-dest lvar) node)
+                 (setf (combination-args node)
+                       (list lvar b2))
+                 (flush-dest a2)
+                 (transform-call node
+                                 form
+                                 'or-eq-transform))))))
+
+(defun single-or-chain (chain)
+  (let* ((node (second (first chain)))
+         (lvar (first (combination-args node)))
+         (characterp)
+         (fixnump)
+         (constants (sort (map 'vector
+                               (lambda (e)
+                                 (let ((value (first e)))
+                                   (or
+                                    (cond (fixnump
+                                           (and (fixnump value)
+                                                value))
+                                          (characterp
+                                           (and (characterp value)
+                                                (char-code value)))
+                                          ((fixnump value)
+                                           (setf fixnump t)
+                                           value)
+                                          ((characterp value)
+                                           (setf characterp t)
+                                           (char-code value)))
+                                    (return-from single-or-chain))))
+                               chain)
+                          #'<))
+         (type-check (if characterp
+                         (not (csubtypep (lvar-type lvar) (specifier-type 'character)))
+                         (not (csubtypep (lvar-type lvar) (specifier-type 'fixnum)))))
+         (range-check (if (and type-check
+                               (not characterp)
+                               (vop-existsp :translate check-range<=))
+                          'check-range<=
+                          '<=)))
+    (flet ((type-check (check-fixnum form)
+             (if (and type-check
+                      (or (not (vop-existsp :translate check-range<=))
+                          characterp
+                          check-fixnum))
+                 `(when (,(if characterp
+                              'characterp
+                              'fixnump)
+                         a)
+                    (let ((a (truly-the ,(if characterp
+                                             'character
+                                             'fixnum)
+                                        a)))
+                      ,form))
+                 form)))
+      ;; Transform contiguous ranges into range<=.
+      (when (or (vop-existsp :translate range<)
+                (> (length constants) 2))
+        (multiple-value-bind (min max)
+            (contiguous-sequence constants)
+          (when min
+            (replace-chain chain
+                           `(lambda (a b)
+                              (declare (ignore b))
+                              ,(type-check nil
+                                           `(,range-check ,min ,(if characterp
+                                                                    '(char-code a)
+                                                                    'a)
+                                                          ,max))))
+            (return-from single-or-chain t))))
+      ;; Turn into a bit mask
+      (multiple-value-bind (min max)
+          (and (> (length constants)
+                  (if type-check
+                      3
+                      2))
+               (bit-test-sequence constants))
+        (when min
+          (replace-chain chain
+                         `(lambda (a b)
+                            (declare (ignore b))
+                            ,(type-check
+                              (>= max sb-vm:n-word-bits)
+                              `(let ((a ,(if characterp
+                                             '(char-code a)
+                                             'a)))
+                                 ,(cond ((< max sb-vm:n-word-bits)
+                                         `(and (,range-check 0 a ,max)
+                                               (logbitp (truly-the (integer 0 ,max) a)
+                                                        ,(reduce (lambda (x y) (logior x (ash 1 y)))
+                                                                 constants :initial-value 0))))
+                                        (t
+                                         (decf max min)
+                                         `(let ((a (- a ,min)))
+                                            (and (<= 0 a ,max)
+                                                 (logbitp (truly-the (integer 0 ,max) a)
+                                                          ,(reduce (lambda (x y) (logior x (ash 1 (- y min))))
+                                                                   constants :initial-value 0))))))))))
+          (return-from single-or-chain t)))
+
+      (labels ((%one-bit-diff-p (c1 c2)
+                 (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
+                         (ash c2 (- sb-vm:n-word-bits)))
+                      (= (logcount (logxor c1 c2)) 1)))
+               (one-bit-diff-p (c1 c2)
+                 (or (%one-bit-diff-p c1 c2)
+                     ;; If the difference is a single bit
+                     ;; then it can be masked off and compared to 0.
+                     (let ((c1 (min c1 c2))
+                           (c2 (max c1 c2)))
+                       (= (logcount (- c2 c1)) 1)))))
+        ;; Comparing integers that differ by only one bit,
+        ;; which is useful for case-insensitive comparison of ASCII characters.
+        (loop for ((c1 node if) (c2 next-node next-if)) = chain
+              while next-node
+              do
+              (pop chain)
+              (destructuring-bind (a b) (combination-args node)
+                (destructuring-bind (a2 b2) (combination-args next-node)
+                  (let* ((c1-orig c1)
+                         (c2-orig c2))
+                    (when (and (if characterp
+                                   (and (characterp c1)
+                                        (characterp c2)
+                                        (setf c1 (char-code c1)
+                                              c2 (char-code c2)))
+                                   (and (fixnump c1)
+                                        (fixnump c2)))
+                               (one-bit-diff-p c1 c2))
+                      (pop chain)
+                      (kill-if-branch-1 if (if-test if)
+                                        (node-block if)
+                                        (if-consequent if))
+                      (setf (combination-args node) nil)
+                      (flush-combination node)
+                      (setf (lvar-dest a) next-node)
+                      (setf (combination-args next-node)
+                            (list a b2))
+                      (flush-dest a2)
+                      (flush-dest b)
+                      (let* ((value (cond (type-check
+                                           ;; Operate on tagged values
+                                           (cond (characterp
+                                                  (setf c1 (get-lisp-obj-address c1-orig)
+                                                        c2 (get-lisp-obj-address c2-orig))
+                                                  '(get-lisp-obj-address a))
+                                                 (t
+                                                  (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
+                                                        c2 (ash c2 sb-vm:n-fixnum-tag-bits))
+                                                  '(mask-signed-field sb-vm:n-word-bits (get-lisp-obj-address a)))))
+                                          (characterp
+                                           '(char-code a))
+                                          (t
+                                           'a)))
+                             (min (min c1 c2))
+                             (max (max c1 c2)))
+                        (transform-call next-node
+                                        `(lambda (a b)
+                                           (declare (ignore b))
+                                           ,(cond ((%one-bit-diff-p c1 c2)
+                                                   (if (zerop min)
+                                                       `(not (logtest ,value ,(lognot (logxor c1 c2))))
+                                                       `(eq (logandc2 ,value
+                                                                      ,(logxor c1 c2))
+                                                            ,min)))
+                                                  (t
+                                                   `(not (logtest (,@(if type-check
+                                                                         '(logand most-positive-word)
+                                                                         '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
+                                                                  ,(lognot (- max min)))))))
+                                        'or-eq-transform)))))))))))
+
+(defun or-eq-to-jump-table (chains node)
+  (let* (keys
+         targets
+         last-if
+         (key-lists
+           (loop for chain across chains
+                 when chain
+                 do
+                 (push (if-consequent (third (first chain))) targets)
+                 and
+                 collect (loop for (key node if) in chain
+                               do (push key keys)
+                                  (setf last-if if)
+                               collect key)))
+         (targets (nreverse targets)))
+    (when (and keys
+               (sb-impl::should-attempt-hash-based-case-dispatch keys)
+               (not (key-lists-for-or-eq-transform-p key-lists)))
+      (let (constant-targets
+            constant-refs
+            constant-target
+            (ref (next-node (if-consequent last-if))))
+        (when (and (ref-p ref)
+                   (constant-p (ref-leaf ref)))
+          (let ((lvar (node-lvar ref)))
+            (setf constant-target (next-block ref))
+            (when lvar
+              (loop with constant
+                    for keys in key-lists
+                    for target in targets
+                    for ref = (next-node target)
+                    do (unless (and (ref-p ref)
+                                    (eq lvar (node-lvar ref))
+                                    (constant-p (setf constant (ref-leaf ref)))
+                                    (eq constant-target
+                                        (next-block ref))
+                                    (typep (constant-value constant)
+                                           '(or symbol number character (and array (not (array t))))))
+                         (setf constant-targets nil)
+                         (return))
+                       (when (and (eq (ctran-kind (node-prev ref)) :block-start)
+                                  (= (length (block-pred (node-block ref)))
+                                     (length keys)))
+                           (push ref constant-refs))
+                       (push (constant-value constant) constant-targets)))))
+        (cond ((or (suitable-jump-table-keys-p keys)
+                   (and (policy node (= jump-table 3))
+                        (or (every #'fixnump keys)
+                            (every #'characterp keys))))
+               (replace-chain (reduce #'append chains)
+                              `(lambda (key b)
+                                 (declare (ignore b))
+                                 (jump-table ,(if (characterp (first keys))
+                                                  `(if-to-blocks (characterp key)
+                                                                 (char-code (truly-the character key))
+                                                                 ,(if-alternative last-if))
+                                                  `(if-to-blocks (fixnump key)
+                                                                 (truly-the fixnum key)
+                                                                 ,(if-alternative last-if)))
+                                             ,@(loop for group in key-lists
+                                                     for target in targets
+                                                     append (loop for key in group
+                                                                  collect (cons (if (characterp key)
+                                                                                    (char-code key)
+                                                                                    key)
+                                                                                target)))
+                                             (otherwise . ,(if-alternative last-if)))))
+               t)
+              (constant-targets
+               (let ((code (expand-hash-case-for-jump-table keys key-lists nil
+                                                            (coerce (nreverse constant-targets) 'vector)
+                                                            (if-alternative last-if))))
+                 (when code
+                   (replace-chain (reduce #'append chains)
+                                  `(lambda (key b)
+                                     (declare (ignore b))
+                                     (to-lvar ,(node-lvar ref)
+                                              ,(or constant-target
+                                                   (node-ends-block ref))
+                                              (the* (,(lvar-type (node-lvar ref)) :truly t)
+                                                    ,code))))
+                   (loop for ref in constant-refs
+                         do
+                         (delete-ref ref)
+                         (unlink-node ref))
+                   t)))
+              (t
+               (multiple-value-bind (code new-targets)
+                   (expand-hash-case-for-jump-table keys key-lists
+                                                    (append targets
+                                                            (list (cons 'otherwise
+                                                                        (if-alternative last-if)))))
+                 (when code
+                   (replace-chain (reduce #'append chains)
+                                  `(lambda (key b)
+                                     (declare (ignore b))
+                                     (jump-table ,code
+                                                 ,@new-targets
+                                                 (otherwise . ,(if-alternative last-if))))))
+                 t)))))))
+
 ;;; Do something when comparing the same value to multiple things.
 (defun or-eq-transform (op a b node)
   (declare (ignorable b))
   (unless (delay-ir1-optimizer node :ir1-phases)
     (when (types-equal-or-intersect (lvar-type a) (specifier-type '(or character
-                                                                    fixnum)))
-      (multiple-value-bind (chain characterp) (find-or-chain node op)
-        (when (cdr chain)
-          (let* ((constants (sort (map 'vector
-                                       (lambda (e)
-                                         (let* ((node (car e))
-                                                (b (second (combination-args node))))
-                                           (if characterp
-                                               (char-code (lvar-value b))
-                                               (lvar-value b))))
-                                       chain)
-                                  #'<))
-                 (type-check (if characterp
-                                 (not (csubtypep (lvar-type a) (specifier-type 'character)))
-                                 (not (csubtypep (lvar-type a) (specifier-type 'fixnum)))))
-                 (range-check (if (and type-check
-                                       (not characterp)
-                                       (vop-existsp :translate check-range<=))
-                                  'check-range<=
-                                  '<=)))
-            (flet ((type-check (check-fixnum form)
-                     (if (and type-check
-                              (or (not (vop-existsp :translate check-range<=))
-                                  characterp
-                                  check-fixnum))
-                         `(when (,(if characterp
-                                      'characterp
-                                      'fixnump)
-                                 a)
-                            (let ((a (truly-the ,(if characterp
-                                                     'character
-                                                     'fixnum)
-                                                a)))
-                              ,form))
-                         form))
-                   (replace-chain (form)
-                     (setf (combination-args node) nil)
-                     (flush-dest b)
-                     (loop for ((node . if) next) on chain
-                           for (a2 b2) = (combination-args node)
-                           do
-                           (cond (next
-                                  (kill-if-branch-1 if (if-test if)
-                                                    (node-block if)
-                                                    (if-consequent if))
-                                  (flush-combination node))
-                                 (t
-                                  (setf (lvar-dest a) node)
-                                  (setf (combination-args node)
-                                        (list a b2))
-                                  (flush-dest a2)
-                                  (transform-call node
-                                                  form
-                                                  'or-eq-transform))))))
-              ;; Transform contiguous ranges into range<=.
-              (when (or (vop-existsp :translate range<)
-                        (> (length constants) 2))
-                (multiple-value-bind (min max)
-                    (contiguous-sequence constants)
-                  (when min
-                    (replace-chain `(lambda (a b)
-                                      (declare (ignore b))
-                                      ,(type-check nil
-                                                   `(,range-check ,min ,(if characterp
-                                                                            '(char-code a)
-                                                                            'a)
-                                                                  ,max))))
-                    (return-from or-eq-transform t))))
-              ;; Turn into a bit mask
-              (multiple-value-bind (min max)
-                  (and (> (length constants)
-                          (if type-check
-                              3
-                              2))
-                       (bit-test-sequence constants))
-                (when min
-                  (replace-chain `(lambda (a b)
-                                    (declare (ignore b))
-                                    ,(type-check
-                                      (>= max sb-vm:n-word-bits)
-                                      `(let ((a ,(if characterp
-                                                     '(char-code a)
-                                                     'a)))
-                                         ,(cond ((< max sb-vm:n-word-bits)
-                                                 `(and (,range-check 0 a ,max)
-                                                       (logbitp (truly-the (integer 0 ,max) a)
-                                                                ,(reduce (lambda (x y) (logior x (ash 1 y)))
-                                                                         constants :initial-value 0))))
-                                                (t
-                                                 (decf max min)
-                                                 `(let ((a (- a ,min)))
-                                                    (and (<= 0 a ,max)
-                                                         (logbitp (truly-the (integer 0 ,max) a)
-                                                                  ,(reduce (lambda (x y) (logior x (ash 1 (- y min))))
-                                                                           constants :initial-value 0))))))))))
-                  (return-from or-eq-transform t)))
-
-              (labels ((%one-bit-diff-p (c1 c2)
-                         (and (= (ash c1 (- sb-vm:n-word-bits)) ;; same sign
-                                 (ash c2 (- sb-vm:n-word-bits)))
-                              (= (logcount (logxor c1 c2)) 1)))
-                       (one-bit-diff-p (c1 c2)
-                         (or (%one-bit-diff-p c1 c2)
-                             ;; If the difference is a single bit
-                             ;; then it can be masked off and compared to 0.
-                             (let ((c1 (min c1 c2))
-                                   (c2 (max c1 c2)))
-                               (= (logcount (- c2 c1)) 1)))))
-                ;; Comparing integers that differ by only one bit,
-                ;; which is useful for case-insensitive comparison of ASCII characters.
-                (loop for ((node . if) (next-node . next-if)) = chain
-                      while next-node
-                      do
-                      (pop chain)
-                      (destructuring-bind (a b) (combination-args node)
-                        (destructuring-bind (a2 b2) (combination-args next-node)
-                          (let* ((c1 (lvar-value b))
-                                (c2 (lvar-value b2))
-                                (c1-orig c1)
-                                (c2-orig c2))
-                            (when (and (if characterp
-                                           (and (characterp c1)
-                                                (characterp c2)
-                                                (setf c1 (char-code c1)
-                                                      c2 (char-code c2)))
-                                           (and (fixnump c1)
-                                                (fixnump c2)))
-                                       (one-bit-diff-p c1 c2))
-                              (pop chain)
-                              (kill-if-branch-1 if (if-test if)
-                                                (node-block if)
-                                                (if-consequent if))
-                              (setf (combination-args node) nil)
-                              (flush-combination node)
-                              (setf (lvar-dest a) next-node)
-                              (setf (combination-args next-node)
-                                    (list a b2))
-                              (flush-dest a2)
-                              (flush-dest b)
-                              (let* ((value (cond (type-check
-                                                   ;; Operate on tagged values
-                                                   (cond (characterp
-                                                          (setf c1 (get-lisp-obj-address c1-orig)
-                                                                c2 (get-lisp-obj-address c2-orig))
-                                                          '(get-lisp-obj-address a))
-                                                         (t
-                                                          (setf c1 (ash c1 sb-vm:n-fixnum-tag-bits)
-                                                                c2 (ash c2 sb-vm:n-fixnum-tag-bits))
-                                                          '(mask-signed-field sb-vm:n-word-bits (get-lisp-obj-address a)))))
-                                                  (characterp
-                                                   '(char-code a))
-                                                  (t
-                                                   'a)))
-                                     (min (min c1 c2))
-                                     (max (max c1 c2)))
-                                (transform-call next-node
-                                                `(lambda (a b)
-                                                   (declare (ignore b))
-                                                   ,(cond ((%one-bit-diff-p c1 c2)
-                                                           (if (zerop min)
-                                                               `(not (logtest ,value ,(lognot (logxor c1 c2))))
-                                                               `(eq (logandc2 ,value
-                                                                              ,(logxor c1 c2))
-                                                                    ,min)))
-                                                          (t
-                                                           `(not (logtest (,@(if type-check
-                                                                                 '(logand most-positive-word)
-                                                                                 '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
-                                                                          ,(lognot (- max min)))))))
-                                                'or-eq-transform))))))))))
-          (unless (node-prev node)
-            ;; Don't proceed optimizing this node
-            t))))))
+                                                                    fixnum
+                                                                    symbol)))
+      (let ((chains (find-or-chains node op)))
+        (or (and (policy node (> jump-table 0))
+                 (vop-existsp :named jump-table)
+                 (or-eq-to-jump-table chains node))
+            (loop for chain across chains
+                  do (when (cdr chain)
+                       (single-or-chain chain))))
+        (unless (node-prev node)
+          ;; Don't proceed optimizing this node
+          t)))))
 
 
 (defoptimizer (eq optimizer) ((a b) node)
@@ -7189,7 +7314,7 @@
       (and (<= table-size size-limit)
            (can-encode min max)))))
 
-(defun expand-hash-case-for-jump-table (keys key-lists targets &optional constants default errorp)
+(defun expand-hash-case-for-jump-table (keys key-lists targets &optional constants default)
   (let* ((phash-lexpr (or (perfectly-hashable keys)
                           (return-from expand-hash-case-for-jump-table (values nil nil))))
          (temp '#1=#:key)               ; GENSYM considered harmful
@@ -7209,7 +7334,7 @@
                                        (t 't))))
          (new-targets))
     (loop for key-list in key-lists
-          for target = (cdr (pop targets))
+          for target = (pop targets)
           for index from 0
           do (dolist (key key-list)
                (let ((phash (funcall hashfn key)))
@@ -7221,181 +7346,32 @@
                         (push phash (aref result-vector index)))))))
     (when (simple-vector-p keys)
       (setq keys (coerce-to-smallest-eltype keys)))
-    (values `(let* ((#1# key)
-                    (h (,phash-lexpr ,object-hash)))
-               ;; EQL reduces to EQ for all object this expanders accepts as keys
-               ,(if constants
-                    (if (eq default :exact)
-                        `(aref ,result-vector (truly-the (mod ,(length result-vector)) h))
-                        `(if (and (< h ,(length key-vector)) (eq (aref ,key-vector h) #1#))
-                             ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
-                                (if all-equal
-                                    `',(aref result-vector 0)
-                                    `(aref ,result-vector h)))
-                             ,(if errorp
-                                  `(ecase-failure #1# ,(coerce errorp 'simple-vector))
-                                  (if default
-                                      `(funcall default)))))
-                    (let ((otherwise (cdr (assoc 'otherwise targets))))
-                      (if otherwise
-                          `(if-to-blocks
-                            (and (< h ,(length key-vector))
-                                 (eq (aref ,key-vector h) #1#))
-                            (truly-the (mod ,(length key-vector)) h)
-                            ,otherwise)
-                          `(truly-the (mod ,(length key-vector)) h)))))
-            new-targets)))
-
-(defun cull-jump-table-targets (key key-lists targets)
-  (let ((type (lvar-type key))
-        (keys))
-    (loop for key-list in key-lists
-          for target in targets
-          for new-list = (loop for key in key-list
-                               when (multiple-value-bind (p really) (ctypep key type)
-                                      (or p
-                                          (not really)))
-                               collect key
-                               and
-                               do (push key keys))
-          when new-list
-          collect new-list into new-lists
-          and
-          collect target into new-targets
-          finally (return (values (if (equal new-lists key-lists)
-                                      key-lists
-                                      new-lists)
-                                  (append new-targets
-                                          (unless (csubtypep type (specifier-type `(member ,@keys)))
-                                            (list (assoc 'otherwise targets))))
-                                  keys)))))
-
-(defun cull-jump-table-constant-targets (key key-lists constants)
-  (let ((type (lvar-type key))
-        (keys))
-    (loop for key-list in key-lists
-          for constant across constants
-          for new-list = (loop for key in key-list
-                               when (multiple-value-bind (p really) (ctypep key type)
-                                      (or p
-                                          (not really)))
-                               collect key
-                               and
-                               do (push key keys))
-          when new-list
-          collect new-list into new-lists
-          and
-          collect constant into new-constants
-          finally (return (let ((exact (csubtypep type (specifier-type `(member ,@keys)))))
-                            (if (equal new-lists key-lists)
-                                (values key-lists
-                                        constants
-                                        keys
-                                        exact)
-                                (values new-lists
-                                        (coerce new-constants 'vector)
-                                        keys
-                                        exact)))))))
+    (let ((typed-h `(truly-the (mod ,(length (if constants
+                                                 result-vector
+                                                 key-vector))) h)))
+      (values `(let* ((#1# key)
+                      (h (,phash-lexpr ,object-hash)))
+                 ;; EQL reduces to EQ for all object this expanders accepts as keys
+                 ,(if constants
+                      (if (eq default :exact)
+                          `(aref ,result-vector (truly-the (mod ,(length result-vector)) h))
+                          `(if-to-blocks (and (< h ,(length key-vector))
+                                              (eq (aref ,key-vector ,typed-h) #1#))
+                                         ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
+                                            (if all-equal
+                                                `',(aref result-vector 0)
+                                                `(aref ,result-vector ,typed-h)))
+                                         ,default))
+                      (let ((otherwise (cdr (assoc 'otherwise targets))))
+                        (if otherwise
+                            `(if-to-blocks
+                              (and (< h ,(length key-vector))
+                                   (eq (aref ,key-vector ,typed-h) #1#))
+                              ,typed-h
+                              ,otherwise)
+                            typed-h))))
+              new-targets))))
 
 (defun key-lists-for-or-eq-transform-p (key-lists)
   (and (= (length key-lists) 1)
        (or-eq-transform-p (first key-lists))))
-
-(deftransform case-to-jump-table ((key key-lists-lvar &optional constants default errorp) * * :node node)
-  (let* ((key-lists (lvar-value key-lists-lvar))
-         (original-keys (reduce #'append key-lists))
-         (jump-table (node-dest node))
-         (jump-table (and (jump-table-p jump-table)
-                          jump-table))
-         (constants (and constants
-                         (lvar-value constants))))
-    (cond (constants
-           (delay-ir1-transform node :constraint)
-           (multiple-value-bind (new-key-lists constants keys exact)
-               (cull-jump-table-constant-targets key key-lists constants)
-             (let ((default (and default
-                                 (not (and (constant-lvar-p default)
-                                           (null (lvar-value default))))))
-                   (original-keys (and (lvar-value errorp)
-                                       original-keys)))
-               (or (and (sb-impl::should-attempt-hash-based-case-dispatch keys)
-                        (not (key-lists-for-or-eq-transform-p new-key-lists))
-                        (expand-hash-case-for-jump-table keys new-key-lists nil
-                                                         constants (if exact
-                                                                       :exact
-                                                                       default)
-                                                         original-keys))
-                   (labels ((convert (constants)
-                              (destructuring-bind (&optional (constant nil constant-p) &rest rest) constants
-                                (let ((key (pop new-key-lists)))
-                                  (cond ((and (not rest)
-                                              exact)
-                                         `',constant)
-                                        (constant-p
-                                         `(if (memq key ',key)
-                                              ',constant
-                                              ,(convert rest)))
-                                        (original-keys
-                                         `(ecase-failure key ,(coerce original-keys 'simple-vector)))
-                                        (default
-                                         `(funcall default)))))))
-                     (convert (coerce constants 'list)))))))
-          ((not jump-table)
-           nil)
-          (t
-           (multiple-value-bind (key-lists targets keys)
-               (cull-jump-table-targets key key-lists (jump-table-targets jump-table))
-             (flet ((give-up ()
-                      (labels ((convert (targets)
-                                 (destructuring-bind ((index . target) (next-index . next-target) &rest rest) targets
-                                   (declare (ignore index next-index))
-                                   (let ((key (pop key-lists)))
-                                     (if rest
-                                         `(if-to-blocks (memq key ',key)
-                                                        ,target
-                                                        ,(convert (cdr targets)))
-                                         `(if-to-blocks (memq key ',key)
-                                                        ,target
-                                                        ,next-target))))))
-                        (if (cdr targets)
-                            (convert targets)
-                            `(if-to-blocks t ,(cdar targets))))))
-               (cond ((or (not (sb-impl::should-attempt-hash-based-case-dispatch keys))
-                          (key-lists-for-or-eq-transform-p key-lists))
-                      (give-up))
-                     ((delay-ir1-transform-p node :constraint)
-                      (change-ref-leaf (lvar-uses key-lists-lvar) (find-constant key-lists))
-                      (setf (node-reoptimize node) nil)
-                      (change-jump-table-targets jump-table targets)
-                      (throw 'give-up-ir1-transform :delayed))
-                     ((or (suitable-jump-table-keys-p original-keys)
-                          (and (policy node (= jump-table 3))
-                               (or (every #'fixnump original-keys)
-                                   (every #'characterp original-keys))))
-                      ;; No hashing required
-                      (let ((otherwise (assoc 'otherwise targets))
-                            new-targets)
-                        (loop for key-list in key-lists
-                              for (nil . target) in targets
-                              for new-list = (loop for key in key-list
-                                                   for value = (if (characterp key)
-                                                                   (char-code key)
-                                                                   key)
-                                                   do (push (cons value target) new-targets)))
-                        (change-jump-table-targets jump-table (nreconc new-targets (and otherwise
-                                                                                        (list otherwise))))
-                        (if (characterp (first original-keys))
-                            `(if-to-blocks (characterp key)
-                                           (char-code key)
-                                           ,(cdr otherwise))
-                            `(if-to-blocks (fixnump key)
-                                           key
-                                           ,(cdr otherwise)))))
-                     (t
-                      (multiple-value-bind (code new-targets)
-                          (expand-hash-case-for-jump-table keys key-lists targets)
-                        (cond (code
-                               (change-jump-table-targets jump-table new-targets)
-                               code)
-                              (t
-                               (give-up))))))))))))

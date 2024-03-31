@@ -7,20 +7,11 @@
   (let ((c (sb-kernel:fun-code-header #'sb-debug::parse-trace-options)))
     (assert (>= (sb-kernel:code-jump-table-words c) 14))))
 
-(with-test (:name :hash-case-compiled-only)
-  (let ((evaluator-expansion
-          (macroexpand-1 '(case x (a 1) (b 2) (c (print'hi)) (d 3))))
-        (compiler-expansion
-          (funcall (compile nil `(lambda ()
-                                   (macrolet ((x (x) `',(macroexpand-1 x)))
-                                     (x (case x (a 1) (b 2) (c (print'hi)) (d 3)))))))))
-    (assert (not (search "JUMP-TABLE" (princ-to-string evaluator-expansion))))
-    (assert (search "JUMP-TABLE" (princ-to-string compiler-expansion)))))
-
 (with-test (:name :type-derivation)
   (assert-type
    (lambda (x)
-     (declare ((member a b c d) x))
+     (declare ((member a b c d) x)
+              (optimize speed))
      (case x
        (a (print 1))
        (b (print 2))
@@ -30,7 +21,8 @@
    (integer 1 4))
   (assert-type
    (lambda (x)
-     (declare ((member a b c d) x))
+     (declare ((member a b c d) x)
+              (optimize speed))
      (case x
        (a 1)
        (b 2)
@@ -103,3 +95,30 @@
               30
               6))))
    (integer 1 6)))
+
+(defstruct a)
+(defstruct (achild (:include a)))
+(defstruct (agrandchild (:include achild)))
+(defstruct (achild2 (:include a)))
+(defstruct b)
+(defstruct c)
+(defstruct d)
+(defstruct e)
+(defstruct (echild (:include e)))
+(defstruct f)
+
+(declaim (freeze-type a b c d e f))
+(defun typecase-jump-table (x)
+  (typecase x
+    (a 'is-a)
+    (b 'is-b)
+    (c 'is-c)
+    ((or d e) 'is-d-or-e)
+    (f 'is-f)))
+(compile 'typecase-jump-table)
+
+(with-test (:name :typecase-jump-table)
+  (assert (eql (sb-kernel:code-jump-table-words
+                (sb-kernel:fun-code-header #'typecase-jump-table))
+               ;; 6 cases including NIL return, plus the size
+               7)))
