@@ -22,7 +22,7 @@
   (addr system-area-pointer)
   (bytes unsigned))
 
-(define-load-time-global *allocator-mutex* (sb-thread:make-mutex :name "Allocator"))
+(define-load-time-global *allocator-mutex* nil)
 
 (defun allocate-static-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
@@ -277,3 +277,16 @@
           (alien-funcall tlsf-unalloc-codeblob tlsf-control addr)
           (setf (car scratchpad) (pop-1)))))
     t))
+
+#+permgen
+(defun sb-kernel::allocate-permgen-layout (nwords)
+  (with-system-mutex (*allocator-mutex* :without-gcing t)
+    (let ((freeptr *permgen-space-free-pointer*))
+      (setf *permgen-space-free-pointer*
+            ;; round-to-odd, add the header word
+            (sap+ freeptr (ash (1+ (logior nwords 1)) word-shift)))
+      (aver (<= (sap-int *permgen-space-free-pointer*)
+                (+ permgen-space-start permgen-space-size)))
+      (setf (sap-ref-word freeptr 0)
+            (logior (ash nwords instance-length-shift) instance-widetag))
+      (%make-lisp-obj (sap-int (sap+ freeptr instance-pointer-lowtag))))))

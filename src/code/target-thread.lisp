@@ -391,6 +391,7 @@ created and old ones may exit at any time."
 (defun init-main-thread ()
   (/show0 "Entering INIT-MAIN-THREAD")
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
+        sb-vm::*allocator-mutex* (make-mutex :name "Allocator")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let* ((name "main thread")
          (thread (%make-thread name nil (make-semaphore :name name))))
