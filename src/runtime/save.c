@@ -181,7 +181,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 {
     size_t words, bytes, data, compressed_flag;
     static char *names[] = {NULL, "dynamic", "static", "read-only",
-                            "fixedobj", "text"};
+      "fixedobj", "text", "permgen"};
 
     compressed_flag
             = ((core_compression_level != COMPRESSION_LEVEL_NONE)
