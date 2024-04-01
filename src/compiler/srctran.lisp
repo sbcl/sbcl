@@ -7243,9 +7243,11 @@
                    (replace-chain (reduce #'append chains)
                                   `(lambda (key b)
                                      (declare (ignore b))
-                                     (jump-table ,code
-                                                 ,@new-targets
-                                                 (otherwise . ,(if-alternative last-if))))))
+                                     ,(if new-targets
+                                          `(jump-table ,code
+                                                       ,@new-targets
+                                                       (otherwise . ,(if-alternative last-if)))
+                                          code))))
                  t)))))))
 
 ;;; Do something when comparing the same value to multiple things.
@@ -7346,9 +7348,14 @@
                         (push phash (aref result-vector index)))))))
     (when (simple-vector-p keys)
       (setq keys (coerce-to-smallest-eltype keys)))
-    (let ((typed-h `(truly-the (mod ,(length (if constants
-                                                 result-vector
-                                                 key-vector))) h)))
+    (let* ((typed-h `(truly-the (mod ,(length (if constants
+                                                  result-vector
+                                                  key-vector))) h))
+           (first-target (and new-targets
+                              (cdar new-targets)))
+           (same-targets (and new-targets
+                              (loop for (nil . block) in (cdr new-targets)
+                                    always (eq block first-target)))))
       (values `(let* ((#1# key)
                       (h (,phash-lexpr ,object-hash)))
                  ;; EQL reduces to EQ for all object this expanders accepts as keys
@@ -7367,10 +7374,13 @@
                             `(if-to-blocks
                               (and (< h ,(length key-vector))
                                    (eq (aref ,key-vector ,typed-h) #1#))
-                              ,typed-h
+                              ,(if same-targets
+                                   first-target
+                                   typed-h)
                               ,otherwise)
                             typed-h))))
-              new-targets))))
+              (unless same-targets
+                new-targets)))))
 
 (defun key-lists-for-or-eq-transform-p (key-lists)
   (and (= (length key-lists) 1)
