@@ -7147,7 +7147,7 @@
                                                                   ,(lognot (- max min)))))))
                                         'or-eq-transform)))))))))))
 
-(defun or-eq-to-aref (keys key-lists targets last-if chains)
+(defun or-eq-to-aref (keys key-lists targets last-if chains otherwise)
   (let (constant-targets
         constant-refs
         constant-target
@@ -7178,7 +7178,7 @@
     (when constant-targets
       (let ((code (expand-hash-case-for-jump-table keys key-lists nil
                                                    (coerce (nreverse constant-targets) 'vector)
-                                                   (if-alternative last-if))))
+                                                   otherwise)))
         (when code
           (replace-chain (reduce #'append chains)
                          `(lambda (key b)
@@ -7208,7 +7208,10 @@
                                do (push key keys)
                                   (setf last-if if)
                                collect key)))
-         (targets (nreverse targets)))
+         (targets (nreverse targets))
+         (lvar (first (combination-args node)))
+         (otherwise (and last-if
+                         (if-alternative last-if))))
     (cond ((not (and keys
                      (sb-impl::should-attempt-hash-based-case-dispatch keys)
                      (not (key-lists-for-or-eq-transform-p key-lists))))
@@ -7231,15 +7234,33 @@
                                                                                 (char-code key)
                                                                                 key)
                                                                             target)))
-                                         (otherwise . ,(if-alternative last-if)))))
+
+                                         (otherwise . ,otherwise))))
            t)
-          ((or-eq-to-aref keys key-lists targets last-if chains))
+          ((let ((diff (type-difference (lvar-type lvar)
+                                        (specifier-type `(member ,@keys)))))
+             ;; If it's an exhaustive case add the missing case back,
+             ;; that way the hash doesn't need to be checked for collisions.
+             (multiple-value-bind (p value) (type-singleton-p diff)
+               (when (and p
+                          (typecase (car keys)
+                            (sb-xc:fixnum (fixnump value))
+                            (symbol (symbolp value))
+                            (character (characterp value))))
+                 (push value keys)
+                 (setf targets (append targets (list otherwise))
+                       key-lists (append key-lists
+                                         (list (list value)))
+                       otherwise nil)))
+             nil))
+          ((or-eq-to-aref keys key-lists targets last-if chains otherwise))
           (t
            (multiple-value-bind (code new-targets)
                (expand-hash-case-for-jump-table keys key-lists
                                                 (append targets
-                                                        (list (cons 'otherwise
-                                                                    (if-alternative last-if)))))
+                                                        (and otherwise
+                                                             (list (cons 'otherwise
+                                                                         otherwise)))))
              (when code
                (replace-chain (reduce #'append chains)
                               `(lambda (key b)
@@ -7247,7 +7268,8 @@
                                  ,(if new-targets
                                       `(jump-table ,code
                                                    ,@new-targets
-                                                   (otherwise . ,(if-alternative last-if)))
+                                                   ,@(and otherwise
+                                                          `((otherwise . ,otherwise))))
                                       code))))
              t)))))
 
@@ -7363,15 +7385,15 @@
                       (h (,phash-lexpr ,object-hash)))
                  ;; EQL reduces to EQ for all object this expanders accepts as keys
                  ,(if constants
-                      (if (eq default :exact)
-                          `(aref ,result-vector (truly-the (mod ,(length result-vector)) h))
+                      (if default
                           `(if-to-blocks (and (< h ,(length key-vector))
                                               (eq (aref ,key-vector ,typed-h) #1#))
                                          ,(let ((all-equal (not (position (aref result-vector 0) result-vector :test-not #'eql))))
                                             (if all-equal
                                                 `',(aref result-vector 0)
                                                 `(aref ,result-vector ,typed-h)))
-                                         ,default))
+                                         ,default)
+                          `(aref ,result-vector (truly-the (mod ,(length result-vector)) h)))
                       (let ((otherwise (cdr (assoc 'otherwise targets))))
                         (if otherwise
                             `(if-to-blocks
