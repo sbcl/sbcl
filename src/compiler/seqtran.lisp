@@ -2856,15 +2856,16 @@
     (collect ((calc))
       (when symbolp
         (if (vop-existsp :translate hash-as-if-symbol-name)
-            (calc '((pointerp item) (hash-as-if-symbol-name item)))
+            (calc '((pointerp item)
+                    (hash-as-if-symbol-name item)))
             ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
             ;; which accepts NIL along with OTHER-POINTER objects.
             (calc `((,(if (member nil keys) 'symbolp 'non-null-symbol-p) item)
-                    (symbol-name-hash item)))))
+                    (symbol-name-hash (truly-the symbol item))))))
       (when fixnump
-        (calc '((fixnump item) (ldb (byte 32 0) item))))
+        (calc '((fixnump item) (ldb (byte 32 0) (truly-the fixnum item)))))
       (when characterp
-        (calc '((characterp item) (char-code item))))
+        (calc '((characterp item) (char-code (truly-the character item)))))
       (let ((calc `(cond ,@(calc) (t 0))))
         (if (eq item 'item) calc (subst item 'item calc))))))
 
