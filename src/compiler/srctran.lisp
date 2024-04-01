@@ -7147,6 +7147,53 @@
                                                                   ,(lognot (- max min)))))))
                                         'or-eq-transform)))))))))))
 
+(defun or-eq-to-aref (keys key-lists targets last-if chains)
+  (let (constant-targets
+        constant-refs
+        constant-target
+        (ref (next-node (if-consequent last-if))))
+    (when (and (ref-p ref)
+               (constant-p (ref-leaf ref)))
+      (let ((lvar (node-lvar ref)))
+        (setf constant-target (next-block ref))
+        (when lvar
+          (loop with constant
+                for keys in key-lists
+                for target in targets
+                for ref = (next-node target)
+                do (unless (and (ref-p ref)
+                                (eq lvar (node-lvar ref))
+                                (constant-p (setf constant (ref-leaf ref)))
+                                (eq constant-target
+                                    (next-block ref))
+                                (typep (constant-value constant)
+                                       '(or symbol number character (and array (not (array t))))))
+                     (setf constant-targets nil)
+                     (return))
+                   (when (and (eq (ctran-kind (node-prev ref)) :block-start)
+                              (= (length (block-pred (node-block ref)))
+                                 (length keys)))
+                     (push ref constant-refs))
+                   (push (constant-value constant) constant-targets)))))
+    (when constant-targets
+      (let ((code (expand-hash-case-for-jump-table keys key-lists nil
+                                                   (coerce (nreverse constant-targets) 'vector)
+                                                   (if-alternative last-if))))
+        (when code
+          (replace-chain (reduce #'append chains)
+                         `(lambda (key b)
+                            (declare (ignore b))
+                            (to-lvar ,(node-lvar ref)
+                                     ,(or constant-target
+                                          (node-ends-block ref))
+                                     (the* (,(lvar-type (node-lvar ref)) :truly t)
+                                           ,code))))
+          (loop for ref in constant-refs
+                do
+                (delete-ref ref)
+                (unlink-node ref))
+          t)))))
+
 (defun or-eq-to-jump-table (chains node)
   (let* (keys
          targets
@@ -7162,93 +7209,47 @@
                                   (setf last-if if)
                                collect key)))
          (targets (nreverse targets)))
-    (when (and keys
-               (sb-impl::should-attempt-hash-based-case-dispatch keys)
-               (not (key-lists-for-or-eq-transform-p key-lists)))
-      (let (constant-targets
-            constant-refs
-            constant-target
-            (ref (next-node (if-consequent last-if))))
-        (when (and (ref-p ref)
-                   (constant-p (ref-leaf ref)))
-          (let ((lvar (node-lvar ref)))
-            (setf constant-target (next-block ref))
-            (when lvar
-              (loop with constant
-                    for keys in key-lists
-                    for target in targets
-                    for ref = (next-node target)
-                    do (unless (and (ref-p ref)
-                                    (eq lvar (node-lvar ref))
-                                    (constant-p (setf constant (ref-leaf ref)))
-                                    (eq constant-target
-                                        (next-block ref))
-                                    (typep (constant-value constant)
-                                           '(or symbol number character (and array (not (array t))))))
-                         (setf constant-targets nil)
-                         (return))
-                       (when (and (eq (ctran-kind (node-prev ref)) :block-start)
-                                  (= (length (block-pred (node-block ref)))
-                                     (length keys)))
-                           (push ref constant-refs))
-                       (push (constant-value constant) constant-targets)))))
-        (cond ((or (suitable-jump-table-keys-p keys)
-                   (and (policy node (= jump-table 3))
-                        (or (every #'fixnump keys)
-                            (every #'characterp keys))))
+    (cond ((not (and keys
+                     (sb-impl::should-attempt-hash-based-case-dispatch keys)
+                     (not (key-lists-for-or-eq-transform-p key-lists))))
+           nil)
+          ((suitable-jump-table-keys-p node keys)
+           (replace-chain (reduce #'append chains)
+                          `(lambda (key b)
+                             (declare (ignore b))
+                             (jump-table ,(if (characterp (first keys))
+                                              `(if-to-blocks (characterp key)
+                                                             (char-code (truly-the character key))
+                                                             ,(if-alternative last-if))
+                                              `(if-to-blocks (fixnump key)
+                                                             (truly-the fixnum key)
+                                                             ,(if-alternative last-if)))
+                                         ,@(loop for group in key-lists
+                                                 for target in targets
+                                                 append (loop for key in group
+                                                              collect (cons (if (characterp key)
+                                                                                (char-code key)
+                                                                                key)
+                                                                            target)))
+                                         (otherwise . ,(if-alternative last-if)))))
+           t)
+          ((or-eq-to-aref keys key-lists targets last-if chains))
+          (t
+           (multiple-value-bind (code new-targets)
+               (expand-hash-case-for-jump-table keys key-lists
+                                                (append targets
+                                                        (list (cons 'otherwise
+                                                                    (if-alternative last-if)))))
+             (when code
                (replace-chain (reduce #'append chains)
                               `(lambda (key b)
                                  (declare (ignore b))
-                                 (jump-table ,(if (characterp (first keys))
-                                                  `(if-to-blocks (characterp key)
-                                                                 (char-code (truly-the character key))
-                                                                 ,(if-alternative last-if))
-                                                  `(if-to-blocks (fixnump key)
-                                                                 (truly-the fixnum key)
-                                                                 ,(if-alternative last-if)))
-                                             ,@(loop for group in key-lists
-                                                     for target in targets
-                                                     append (loop for key in group
-                                                                  collect (cons (if (characterp key)
-                                                                                    (char-code key)
-                                                                                    key)
-                                                                                target)))
-                                             (otherwise . ,(if-alternative last-if)))))
-               t)
-              (constant-targets
-               (let ((code (expand-hash-case-for-jump-table keys key-lists nil
-                                                            (coerce (nreverse constant-targets) 'vector)
-                                                            (if-alternative last-if))))
-                 (when code
-                   (replace-chain (reduce #'append chains)
-                                  `(lambda (key b)
-                                     (declare (ignore b))
-                                     (to-lvar ,(node-lvar ref)
-                                              ,(or constant-target
-                                                   (node-ends-block ref))
-                                              (the* (,(lvar-type (node-lvar ref)) :truly t)
-                                                    ,code))))
-                   (loop for ref in constant-refs
-                         do
-                         (delete-ref ref)
-                         (unlink-node ref))
-                   t)))
-              (t
-               (multiple-value-bind (code new-targets)
-                   (expand-hash-case-for-jump-table keys key-lists
-                                                    (append targets
-                                                            (list (cons 'otherwise
-                                                                        (if-alternative last-if)))))
-                 (when code
-                   (replace-chain (reduce #'append chains)
-                                  `(lambda (key b)
-                                     (declare (ignore b))
-                                     ,(if new-targets
-                                          `(jump-table ,code
-                                                       ,@new-targets
-                                                       (otherwise . ,(if-alternative last-if)))
-                                          code))))
-                 t)))))))
+                                 ,(if new-targets
+                                      `(jump-table ,code
+                                                   ,@new-targets
+                                                   (otherwise . ,(if-alternative last-if)))
+                                      code))))
+             t)))))
 
 ;;; Do something when comparing the same value to multiple things.
 (defun or-eq-transform (op a b node)
@@ -7290,12 +7291,14 @@
 ;;; the branch selector in the jump-table vop, and are within a sufficiently
 ;;; dense range that the resulting table of assembler labels would be reasonably full.
 ;;; Finally, ensure that any operand encoding restrictions would be adhered to.
-(defun suitable-jump-table-keys-p (keys)
+(defun suitable-jump-table-keys-p (node keys)
   (unless keys
     (return-from suitable-jump-table-keys-p nil))
   (cond ((every #'fixnump keys))
         ((every #'characterp keys) (setq keys (mapcar #'char-code keys)))
         (t (return-from suitable-jump-table-keys-p nil)))
+  (when (policy node (= jump-table 3)) ;; trust it
+    (return-from suitable-jump-table-keys-p t))
   ;; There could be a backend-aware aspect to the decision about whether to
   ;; convert to a jump table.
   (flet ((can-encode (min max)
