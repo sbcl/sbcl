@@ -891,6 +891,7 @@
   (def cis (number))
   (def conjugate (number))
   (def cos (number))
+  (def exp (number))
   (def phase (number))
   (def sin (number))
   (def sinh (number))
@@ -913,19 +914,13 @@
       ($0d0 $1d0)
       (t (error "Unimplemented.")))))
 
-(defun exp (x)
-  (validate-args x)
-  (with-memoized-math-op (exp x)
-    (cond ((eql x $1.0f0) $2.7182817)
-          ((eql x $1.0d0) $2.718281828459045d0))))
-
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
   (with-memoized-math-op (log (cons number (if base-p (list base))))
     (let ((format (pick-float-result-format number (if base-p base 0))))
       (if (zerop number)
           (make-flonum :-infinity format)
-          (ecase base
+          (case base
             ((nil)
              (let ((table '((1 . $0f0)
                             (10 . $2.3025851f0)
@@ -951,14 +946,11 @@
                             ($9.223372036854776d18 . $43.66827237527655d0))))
                (or (cdr (assoc number table))
                    (error "missing entry for (LOG ~A)" number))))
-            ((2 $2f0 $2d0)
-             (let ((table '(($2.718281828459045d0 . $1.4426950408889634d0))))
-               (or (cdr (assoc number table))
-                   (error "missing entry for (LOG ~A 2)" number))))
             ((10 $10f0 $10d0)
              (let ((table '(($2d0 . $0.3010299956639812d0))))
                (or (cdr (assoc number table))
-                   (error "missing entry for (LOG ~A 10)" number)))))))))
+                   (error "missing entry for (LOG ~A 10)" number))))
+            (t (error "missing entries for (LOG ~A ~A)" number base)))))))
 
 ;;; The full logic of MAYBE-EXACT-RECIPROCAL is defined in 'float-tran'
 ;;; but we don't want to use that in the cross-compiler (yet, if ever)
