@@ -351,7 +351,8 @@
 ;;;   (define-assembly-routine ... ((:temp ...)) (:let ((c (register-inline-constant ...)))))
 ;;; It just doesn't seem worth the effort to do all that.
 (defparameter eql-dispatch nil)
-(define-assembly-routine (generic-eql (:return-style :none))
+(define-assembly-routine (generic-eql (:return-style :none)
+                                      (:export eql-ratio))
     ((:temp rcx unsigned-reg rcx-offset)  ; callee-saved
      (:temp rax unsigned-reg rax-offset)  ; vop temps
      (:temp rsi unsigned-reg rsi-offset)
