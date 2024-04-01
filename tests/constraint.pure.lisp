@@ -1313,3 +1313,18 @@
            (setq n (dpb p1 (byte p2 35) n))
            n))
     ((1 2 3) 34359738371)))
+
+(with-test (:name :%in-bounds-constraint-not-eq)
+  (checked-compile-and-assert
+      ()
+      `(lambda (sv key n)
+         (declare (fixnum n) (simple-vector sv))
+         (let ((found (find key sv :end n)))
+           (if (< n (length sv))
+               -1
+               found)))
+    ((#(1 2 3) 2 2) -1)
+    ((#(1 2 3) 2 3) 2)
+    ((#(1 2 3) 4 3) nil)))
+
+

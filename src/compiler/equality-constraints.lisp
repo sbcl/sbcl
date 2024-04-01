@@ -696,7 +696,7 @@
 (defoptimizer (%in-bounds-constraint constraint-propagate) ((vector length) node gen)
   (let ((var (ok-lvar-lambda-var vector gen)))
     (when var
-      (add-equality-constraint 'vector-length var length gen gen nil)))
+      (add-equality-constraint '>= (make-vector-length-constraint var) length gen gen nil)))
   nil)
 
 (defun lvar-result-constraints (lvar)
