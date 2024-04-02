@@ -798,6 +798,8 @@ invoked. In that case it will store into PLACE and start over."
 
 (declaim (ftype function sb-pcl::emit-cache-lookup))
 (defun optimize-%typecase-index (layout-lists object sealed)
+  ;; If no new subtypes can be defined, then there is a compiled-time-computable
+  ;; mapping from CLOS-hash to jump table index.
   ;; Try the hash-based expansion if applicable. It's allowed to fail, as it will
   ;; when 32-bit hashes are nonunique.
   (when sealed
@@ -840,7 +842,9 @@ invoked. In that case it will store into PLACE and start over."
   ;; The generated s-expression is too sensitive to the order LOAD-TIME-VALUE fixups are
   ;; patched in by cold-init. You'll have a bad time if CACHE-CELL is an unbound-marker.
   #+sb-xc-host (error "PCL cache won't work for cross-compiled TYPECASE")
-  ;; Use a PCL cache
+  ;; Use a PCL cache when the sealed logic was inapplicable (or failed due to hash collisions).
+  ;; A cache is usually an improvement over sequential tests but it's impossible to know
+  ;; (the first clause could get taken 99% of the time)
   (let ((n (length layout-lists)))
     `(truly-the
       (integer 0 ,n)
@@ -867,6 +871,35 @@ invoked. In that case it will store into PLACE and start over."
            MISS
              (return (sb-pcl::%struct-typecase-miss ,object cache-cell)))))))
 
+;;; Decide whether to bind EXPR to a random gensym or a COPY-SYMBOL, or not at all,
+;;; for purposes of CASE/TYPECASE. Lexical vars don't require rebinding because
+;;; no SET can occur in dispatching to a clause, and multiple refs are devoid
+;;; of side-effects (such as UNBOUND-SYMBOL or undefined-alien trap)
+(defun choose-tempvar (bind expr env)
+  (let ((bind
+         (cond ((or bind (consp expr)) t)
+               ((not (symbolp expr)) nil)
+               (t
+                (let ((found (and (sb-c::lexenv-p env)
+                                  (sb-c:lexenv-find expr vars :lexenv env))))
+                  (cond ((or (sb-c::global-var-p found)
+                             (listp found) ; special, macro, or not found
+                             (eq found :bogus)) ; PCL walker shenanigans
+                         t)
+                        ((sb-c::lambda-var-specvar found)
+                         (bug "can't happen"))
+                        (t
+                         nil)))))))
+    (cond ((not bind) expr)
+          ((and (symbolp expr)
+                ;; Some broken 3rd-party code walker is confused by #:_
+                ;; and this hack of forcing a random gensym seems
+                ;; to partially cure whatever the problem is.
+                (string/= expr "_"))
+           (copy-symbol expr))
+          (t
+           (gensym)))))
+
 ;;; Given an arbitrary TYPECASE, see if it is a discriminator over
 ;;; an assortment of structure-object subtypes. If it is, potentially turn it
 ;;; into a dispatch based on layout-clos-hash.
@@ -883,11 +916,12 @@ invoked. In that case it will store into PLACE and start over."
 ;;; In fact as far as I can tell, redefining a standard class doesn't require a new hash
 ;;; because the obsolete layout always gets clobbered to 0, and cache lookups always check
 ;;; for a match on both the hash and the layout.
-(defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp)
+(defun expand-struct-typecase (keyform normal-clauses type-specs default errorp)
   (let* ((n (length type-specs))
          (n-base-types 0)
          (layout-lists (make-array n))
          (exhaustive-list) ; of classoids
+         (temp (choose-tempvar t keyform nil))
          (all-sealed t))
     (labels
         ((ok-classoid (classoid)
@@ -919,6 +953,8 @@ invoked. In that case it will store into PLACE and start over."
             do (let ((parse (specifier-type spec)))
                  (setf (aref layout-lists i) (or (get-layouts parse)
                                                  (return-from expand-struct-typecase nil)))))
+      ;; The number of base types is an upper bound on the number of different TYPEP
+      ;; executions that could occur.
       ;; Let's say 1 to 4 TYPEP tests isn't to bad. Just do them sequentially.
       ;; But given something like:
       ;; (typecase x
@@ -926,15 +962,11 @@ invoked. In that case it will store into PLACE and start over."
       ;;   ((or parent4 parent5 parent6) ...)
       ;; where eaach parent has dozens of children (directly or indirectly),
       ;; it may be worse to use a hash-based lookup.
-      (when (or (< n-base-types 5)
-                (> (length exhaustive-list) (* 3 n-base-types)))
+      (when (or (< n-base-types 5) ; too few cases
+                (> (length exhaustive-list) (* 3 n-base-types))) ; too much "bloat"
         (return-from expand-struct-typecase))
-      ;; If no new subtypes can be defined, then there is a compiled-time-computable
-      ;; mapping from CLOS-hash to jump table index.
-      ;; The number of base types is an upper bound on the number of different TYPEP
-      ;; executions that could occur. Use a cache if it exceeds 8 but the sealed logic
-      ;; was inapplicable. A cache is usually an improvement over sequential tests
-      ;; but it's impossible to know (the first clause could get taken 99% of the time)
+      ;; I don't know if these criteria are sane: Use hashing only if either all sealed,
+      ;; or very large? Why is this an additional restriction beyond the above heuristics?
       (when (or all-sealed (>= n-base-types 8))
         `(let ((,temp ,keyform))
            (case (sb-kernel::%typecase-index ,layout-lists ,temp ,all-sealed)
@@ -974,8 +1006,8 @@ invoked. In that case it will store into PLACE and start over."
                        (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
                        (keys))
   (destructuring-bind (name keyform &rest specified-clauses
-                       &aux (keyform-value
-                             (if (symbolp keyform) (copy-symbol keyform) (gensym))))
+                       &aux (keyform-value (choose-tempvar (eq errorp 'cerror)
+                                                           keyform lexenv)))
       whole
     (unless (or (cdr whole) (not errorp))
       (warn "no clauses in ~S" name))
@@ -1098,7 +1130,7 @@ invoked. In that case it will store into PLACE and start over."
         ;; Try expanding a using perfect hash and either a jump table or k/v vectors
         ;; depending on constant-ness of results.
         (cond ((eq test 'typep)
-               (awhen (expand-struct-typecase keyform keyform-value normal-clauses keys
+               (awhen (expand-struct-typecase keyform normal-clauses keys
                                               default errorp)
                  (return-from case-body it))))))
 
@@ -1119,16 +1151,21 @@ invoked. In that case it will store into PLACE and start over."
              (cond ,@clauses
                    (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))
 
-    `(let ((,keyform-value ,keyform))
-       (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
-       (cond ,@clauses
-             ,@(when errorp
-                 `((t ,(ecase name
+      (let ((switch
+             `(cond
+                ,@clauses
+                ,@(when errorp
+                    `((t ,(ecase name
                          (etypecase
                           `(etypecase-failure
                             ,keyform-value ,(etypecase-error-spec keys)))
                          (ecase
-                          `(ecase-failure ,keyform-value ',keys))))))))))))
+                             `(ecase-failure ,keyform-value ',keys)))))))))
+        (if (eq keyform-value keyform)
+            switch
+            `(let ((,keyform-value ,keyform))
+               (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
+               ,switch)))))))
 
 ;;; ETYPECASE over clauses that form a "simpler" type specifier should use that,
 ;;; e.g. partitions of INTEGER:

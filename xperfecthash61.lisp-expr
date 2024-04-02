@@ -1704,5 +1704,14 @@
   (let ((b (& val #x3)))
    (let ((a (>> (<< val 25) 30)))
     (^ a (aref tab b))))))")
+(#(3C5A72CA 42CFF1D7 5545367C 9ABE6FD6 A82C3140 AFB09C7B DB03D182 EA7496BF)
+ "(&WHOLE &BODY &ENVIRONMENT &AUX &ALLOW-OTHER-KEYS &KEY &MORE &REST)"
+ "(  (& (- (>> val 2) (>> val 11)) 7))")
+(#(4995E301 58E56AC5 7463EEF9 7B10673A C2E7E4AB)
+ "(:BY :BELOW :ABOVE :DOWNTO :TO)"
+ "(  (& (>> val 24) 7))")
+(#(5C3634FE 919CF251 CBC8EE4C DA0BA737 F9076A5F)
+ "(:INITFORM :INITARG :WRITER :READER :ACCESSOR)"
+ "(  (& (+ (>> val 1) (>> val 7)) 7))")
 )
 ;; EOF
