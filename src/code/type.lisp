@@ -2867,12 +2867,6 @@ expansion happened."
              nil)))))
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
-;;;
-;;; Binding *APPROXIMATE-NUMERIC-UNIONS* to T allows merging non-adjacent
-;;; numeric types, eg (OR (INTEGER 0 12) (INTEGER 20 128)) => (INTEGER 0 128),
-;;; the compiler does this occasionally during type-derivation to avoid
-;;; creating absurdly complex unions of numeric types.
-(defvar *approximate-numeric-unions* nil)
 
 (defun rational-integer-union (rational integer)
   (let ((formatr (numeric-type-format rational))
@@ -2888,8 +2882,7 @@ expansion happened."
         ;; handle the special-case that a single integer expands the
         ;; rational interval.
         ((and (integerp lowi) (integerp highi) (= lowi highi)
-              (or *approximate-numeric-unions*
-                  (numeric-types-adjacent integer rational)
+              (or (numeric-types-adjacent integer rational)
                   (numeric-types-adjacent rational integer)))
          (make-numeric-type
           :class 'rational :format formatr :complexp complexpr
@@ -2912,8 +2905,7 @@ expansion happened."
                   :high (round-numeric-bound highr 'integer formatr nil)))
                 (new-integer
                  (and (numeric-type-p integers-of-rational)
-                      (or *approximate-numeric-unions*
-                          (numeric-types-intersect integers-of-rational integer)
+                      (or (numeric-types-intersect integers-of-rational integer)
                           (numeric-types-adjacent integers-of-rational integer)
                           (numeric-types-adjacent integer integers-of-rational))
                      (let ((new-lowi (numeric-bound-max
@@ -2971,8 +2963,7 @@ expansion happened."
              ((and (eq class1 class2)
                    (eq format1 format2)
                    (eq complexp1 complexp2)
-                   (or *approximate-numeric-unions*
-                       (numeric-types-intersect type1 type2)
+                   (or (numeric-types-intersect type1 type2)
                        (numeric-types-adjacent type1 type2)
                        (numeric-types-adjacent type2 type1)))
               (make-numeric-type
@@ -2992,6 +2983,36 @@ expansion happened."
               (rational-integer-union type2 type1))
              (t nil))))))
 
+;;; If it's longer than N
+(defun weaken-numeric-type-union (n type)
+  (if (and (union-type-p type)
+           (nthcdr n (union-type-types type)))
+      (let ((types (union-type-types type))
+            by-aspect
+            non-numeric
+            new-types)
+        (loop for type in types
+              do (if (numeric-type-p type)
+                     (push type (getf by-aspect (numeric-type-aspects type)))
+                     (push type non-numeric)))
+        (loop for (aspect types) on by-aspect by #'cddr
+              do (loop with min = (numeric-type-low (car types))
+                       with max = (numeric-type-high (car types))
+                       for type in (cdr types)
+                       do
+                       (setf min (numeric-bound-max min
+                                                    (numeric-type-low type)
+                                                    <= < t)
+                             max (numeric-bound-max max
+                                                    (numeric-type-high type)
+                                                    >= > t))
+                       finally
+                       (push (new-ctype numeric-type 0 aspect
+                                        min
+                                        max)
+                             new-types)))
+        (%type-union (append new-types non-numeric)))
+      type))
 
 (!cold-init-forms
   (setf (info :type :kind 'number) :primitive)

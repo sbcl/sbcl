@@ -1463,14 +1463,10 @@
                     (add-to-xset member xset)))
               type))
             ((numeric-type-p type)
-             (let ((*approximate-numeric-unions*
-                    (when (and (union-type-p numeric-type)
-                               (nthcdr *derived-numeric-union-complexity-limit*
-                                       (union-type-types numeric-type)))
-                      t)))
-               (setf numeric-type (type-union type numeric-type))))
+             (setf numeric-type (type-union type numeric-type)))
             (t
              (push type misc-types))))
+    (setf numeric-type (sb-kernel::weaken-numeric-type-union *derived-numeric-union-complexity-limit* numeric-type))
     (if (and (xset-empty-p xset) (not fp-zeroes))
         (apply #'type-union numeric-type misc-types)
         (apply #'type-union (make-member-type xset fp-zeroes)

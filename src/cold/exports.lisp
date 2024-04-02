@@ -1976,7 +1976,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%WITH-ARRAY-DATA"
            "%WITH-ARRAY-DATA/FP"
            "%WITH-ARRAY-DATA-MACRO"
-           "*APPROXIMATE-NUMERIC-UNIONS*"
            "*CURRENT-INTERNAL-ERROR-CONTEXT*"
            "*CURRENT-LEVEL-IN-PRINT*"
            "*EMPTY-TYPE*"
