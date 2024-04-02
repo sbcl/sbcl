@@ -11,6 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(with-test (:name :keyform-always-used)
+  (checked-compile '(lambda (x) (case x (t 'thing)))))
+
 (with-test (:name (case :duplicate-key :compile-time-warning))
  (loop
     for (expected kind . clauses) in

@@ -1137,20 +1137,23 @@ invoked. In that case it will store into PLACE and start over."
     (setq clauses (nreverse clauses))
 
     (let ((expected-type `(,(if (eq test 'eql) 'member 'or) ,@keys)))
-     (if (eq errorp 'cerror) ; CCASE or CTYPECASE
+      (when (eq errorp 'cerror) ; CCASE or CTYPECASE
+        (return-from case-body
       ;; It is not a requirement to evaluate subforms of KEYFORM once only, but it often
       ;; reduces code size to do so, as the update form will take advantage of typechecks
       ;; already performed. (Nor is it _required_ to re-evaluate subforms)
-      (binding* ((switch (make-symbol "SWITCH"))
-                 (retry
-                  ;; TODO: consider using the union type simplifier algorithm here
-                  `(case-body-error ',name ',keyform ,keyform-value ',expected-type ',keys))
-                 ((vars vals stores writer reader) (get-setf-expansion keyform)))
-        `(let* ,(mapcar #'list vars vals)
-           (named-let ,switch ((,keyform-value ,reader))
-             (cond ,@clauses
-                   (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))
+          (binding* ((switch (make-symbol "SWITCH"))
+                     (retry
+                      ;; TODO: consider using the union type simplifier algorithm here
+                      `(case-body-error ',name ',keyform ,keyform-value ',expected-type ',keys))
+                     ((vars vals stores writer reader) (get-setf-expansion keyform)))
+          `(let* ,(mapcar #'list vars vals)
+             (named-let ,switch ((,keyform-value ,reader))
+               (cond ,@clauses
+                     (t (multiple-value-bind ,stores ,retry (,switch ,writer)))))))))
 
+      (when (and (eq keyform-value keyform) (not keys))
+        (setq keyform-value '#:dummy)) ; force a rebinding to "use" the value
       (let ((switch
              `(cond
                 ,@clauses
@@ -1164,8 +1167,11 @@ invoked. In that case it will store into PLACE and start over."
         (if (eq keyform-value keyform)
             switch
             `(let ((,keyform-value ,keyform))
-               (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
-               ,switch)))))))
+               ;; binding must be IGNORABLE in either of these expressions:
+               ;;   (CASE KEY (() 'res))
+               ;;   (CASE KEY (T 'res))
+               (declare (ignorable ,keyform-value))
+               ,switch))))))
 
 ;;; ETYPECASE over clauses that form a "simpler" type specifier should use that,
 ;;; e.g. partitions of INTEGER:
