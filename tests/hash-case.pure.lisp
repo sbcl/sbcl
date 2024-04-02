@@ -122,3 +122,12 @@
                 (sb-kernel:fun-code-header #'typecase-jump-table))
                ;; 6 cases including NIL return, plus the size
                7)))
+
+(with-test (:name :duplicates)
+  (checked-compile-and-assert
+      ()
+      `(lambda (c)
+         (position c "aaaaa"))
+    ((#\a) 0)
+    ((#\b) nil)))
+

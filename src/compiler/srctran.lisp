@@ -7201,8 +7201,11 @@
                  (push (if-consequent (third (first chain))) targets)
                  and
                  collect (loop for (key node if) in chain
-                               do (push key keys)
-                                  (setf last-if if)
+                               do
+                               (when (memq key keys)
+                                 (return-from or-eq-to-jump-table))
+                               (push key keys)
+                               (setf last-if if)
                                collect key)))
          (targets (nreverse targets))
          (lvar (first (combination-args node)))
