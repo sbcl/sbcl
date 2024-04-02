@@ -2322,5 +2322,80 @@
 (#(73FB831 85FCC7A 1025CF34 1A13A884 1CA0C5B8)
  "(REAL FLOAT DOUBLE-FLOAT SINGLE-FLOAT RATIONAL)"
  "(  (& (+ (>> val 18) (>> val 22)) 7))")
+(#(8E 92 96 9E A6 B2 B6 BA C2 D6 DA)
+ "(194 186 182 178 166 158 150 146 218 214 142)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 0 9 11 0 5 6)))
+  (let ((b (& (>> val 2) #x7)))
+   (let ((a (>> (<< val 25) 29)))
+    (^ a (aref tab b))))))")
+(#(73FB831 1025CF34 151C1A4B 1C900CEB 1CB7AFC2)
+ "(SYSTEM-AREA-POINTER DOUBLE-FLOAT SINGLE-FLOAT ENUM SB-ALIEN::RECORD)"
+ "(  (& (>> val 12) 7))")
+(#(8A AA AE B2 BE C2 C6 DA)
+ "(194 190 178 174 170 198 218 138)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 0 7 4)))
+  (+= val #xdb54415e)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 2) #x3)))
+   (let ((a (>> (u32+ val (<< val 27)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 1 2 4 5 6 C 10 14 18 1F)
+ "(1 5 0 2 24 12 6 4 20 16 31)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 8 2 0 0 8 11 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 27) 29)))
+    (^ a (aref tab b))))))")
+(#(3 5 6 7 D)
+ "(7 5 6 3 13)"
+ "((let ((tab #a((4) (unsigned-byte 8) 7 0 0 1)))
+  (let ((b (>> (<< val 28) 30)))
+   (let ((a (& val #x3)))
+    (^ a (aref tab b))))))")
+(#(3298147 DB99C7F DEA8A98 186D9EC7 1BB8AC21)
+ "(:ALLOW-OTHER-KEYS :STRICT :SINGLE-PREDECESSOR :CAST :TYPE)"
+ "(  (& (+ (>> val 3) (>> val 11)) 7))")
+(#(430F94B A12D87E 12F028CD 13B9CD4C 1632420E 1EC131A8)
+ "(NIL :RESULT-TYPES :CONDITIONAL :ARG-TYPES :ARG-CHECK :GUARD)"
+ "(  (& (>> val 15) 7))")
+(#(79D5AF0 E5F6880 11425F95 11D41372 1560B2CB 17505CC4 17BE5DB2 18E6C171 1B4AD01E)
+ "(:NOT :AND :OR :SAME-AS :TEST :NEGATIVE :POSITIVE :CONSTANT T)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 0 13 5 3 4 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 3) 29)))
+    (^ a (aref tab b))))))")
+(#(23 27 2B 2C 2D 3A 40 56 76)
+ "(#\\@ #\\: #\\, #\\' #\\# #\\V #\\v #\\- #\\+)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 2 0 0 4 0 10 0)))
+  (+= val #x1679e37f)
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> (u32+ val (<< val 25)) 29)))
+    (^ a (aref tab b))))))")
+(#(A 3C 3F 5B 7B)
+ "(#\\? #\\{ #\\[ #\\< #\\Newline)"
+ "((let ((tab #a((4) (unsigned-byte 8) 5 0 0 0)))
+  (let ((b (& val #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
+(#(8E 92 96 9E A6 B2 B6 BA C2 D6)
+ "(194 186 182 178 166 158 150 146 214 142)"
+ "((let ((tab #a((8) (unsigned-byte 8) 12 0 0 0 5 0 4 8)))
+  (let ((b (& (>> val 2) #x7)))
+   (let ((a (>> (<< val 25) 29)))
+    (^ a (aref tab b))))))")
+(#(8A AA AE B2 BE C2 C6)
+ "(194 190 178 174 170 198 138)"
+ "((let ((tab #a((4) (unsigned-byte 8) 6 0 0 4)))
+  (+= val #x14650a3e)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 1 2 12 13)
+ "(18 2 19 1 0)"
+ "(  (& (+ val (>> val 4)) 7))")
+(#(0 1 2 11 12 13)
+ "(18 17 2 19 1 0)"
+ "(  (& (+ val (>> val 3)) 7))")
 )
 ;; EOF

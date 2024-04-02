@@ -1655,5 +1655,54 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 28) 29)))
     (^ a (aref tab b))))))")
+(#(8D 91 95 9D A5 AD B9 BD C1 C5 CD E1 E5)
+ "(205 197 193 189 185 173 165 157 149 145 229 225 141)"
+ "((let ((tab #a((8) (unsigned-byte 8) 13 0 0 8 4 1 4 0)))
+  (let ((b (& (>> val 2) #x7)))
+   (let ((a (>> (<< val 25) 29)))
+    (^ a (aref tab b))))))")
+(#(5CDDC111 728F28C5 965CD62A A0FAB3A5 C3127E24)
+ "(SYSTEM-AREA-POINTER DOUBLE-FLOAT SINGLE-FLOAT ENUM SB-ALIEN::RECORD)"
+ "(  (& (^ val (>> val 27)) 7))")
+(#(89 B1 B5 B9 C9 CD D5 D9)
+ "(217 205 201 185 181 177 213 137)"
+ "((let ((tab #a((4) (unsigned-byte 8) 7 0 3 7)))
+  (+= val #x14650a3e)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (u32+ val (<< val 26)) 30)))
+    (^ a (aref tab b))))))")
+(#(0 1 2 4 5 6 C 10 14 18 1F)
+ "(1 5 0 2 24 12 6 4 20 16 31)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 8 2 0 0 8 11 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 27) 29)))
+    (^ a (aref tab b))))))")
+(#(1FBA6881 7E4DD5CC 96F1BB56 C3EABF48 F75C3FD9)
+ "(:ALLOW-OTHER-KEYS :STRICT :SINGLE-PREDECESSOR :CAST :TYPE)"
+ "(  (& (+ (>> val 3) (>> val 31)) 7))")
+(#(0 71A5A23 140C6C3A 7A372C76 89072FE6 C7E7B222)
+ "(NIL :RESULT-TYPES :CONDITIONAL :ARG-TYPES :ARG-CHECK :GUARD)"
+ "(  (& (- val (>> val 2)) 7))")
+(#(3D6EC19 32C229AB 95083148 9F884B31 A17B2D40 B0A49DC5 B34F601E C8A25DB2 FE4CBBB9)
+ "(:NOT :AND :OR :SAME-AS :TEST :NEGATIVE :POSITIVE :CONSTANT T)"
+ "((let ((tab #a((8) (unsigned-byte 8) 7 0 0 0 0 0 13 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(23 27 2B 2C 2D 3A 40 56 76)
+ "(#\\@ #\\: #\\, #\\' #\\# #\\V #\\v #\\- #\\+)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 2 0 0 4 0 10 0)))
+  (+= val #x1679e37f)
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> (u32+ val (<< val 25)) 29)))
+    (^ a (aref tab b))))))")
+(#(A 3C 3F 5B 7B)
+ "(#\\? #\\{ #\\[ #\\< #\\Newline)"
+ "((let ((tab #a((4) (unsigned-byte 8) 5 0 0 0)))
+  (let ((b (& val #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
