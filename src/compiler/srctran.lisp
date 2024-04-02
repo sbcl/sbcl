@@ -6632,7 +6632,8 @@
               node))))
        (go :next))))
 
-(defun next-node (node-or-block &key type (cast t) single-predecessor)
+(defun next-node (node-or-block &key type (cast t) single-predecessor
+                                     strict)
   (let ((node node-or-block)
         ctran)
     (tagbody
@@ -6651,9 +6652,12 @@
                 (ref (unless (eq type :non-ref)
                        (return-from next-node node)))
                 (cast
-                 (unless cast
+                 (when (or strict
+                           (not cast))
                    (return-from next-node node)))
-                (enclose)
+                (enclose
+                 (when strict
+                   (return-from next-node node)))
                 (t (return-from next-node
                      (unless (eq type :ref)
                        node))))
@@ -7147,7 +7151,7 @@
   (let (constant-targets
         constant-refs
         constant-target
-        (ref (next-node (if-consequent last-if))))
+        (ref (next-node (if-consequent last-if) :strict t)))
     (when (and (ref-p ref)
                (constant-p (ref-leaf ref)))
       (let ((lvar (node-lvar ref)))
@@ -7156,7 +7160,7 @@
           (loop with constant
                 for keys in key-lists
                 for target in targets
-                for ref = (next-node target)
+                for ref = (next-node target :strict t)
                 do (unless (and (ref-p ref)
                                 (eq lvar (node-lvar ref))
                                 (constant-p (setf constant (ref-leaf ref)))
