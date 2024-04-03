@@ -176,15 +176,22 @@
               (let ((oldval (cas *dynspace-codeblob-tree* tree newtree)))
                 (if (eq oldval tree) (return) (setq tree oldval))))))))
 
+(defglobal *code-alloc-count* 0) ; frlock: bump once on entry, again on exit
+(declaim (fixnum *code-alloc-count*))
+
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
 ;;; BOXED must be the exact count of boxed words desired. No adjustments
 ;;; are made for alignment considerations or the fixed slots.
+;;; FIXME: it's not necessary that there be two different locks: *allocator-mutex*
+;;; and code_allocator_lock. The Lisp mutex should subsume the C mutex,
+;;; and we should acquire the Lisp one around the entire body of this function.
 (defun allocate-code-object (space boxed unboxed)
   (declare (ignorable space))
   (let* ((total-words
            (the (unsigned-byte 22) ; Enforce limit on total words as well
                 (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2))))
+    (atomic-incf *code-alloc-count*)
     #+immobile-code
     (when (member space '(:immobile :auto))
       (let (addr code holder)
@@ -211,6 +218,7 @@
           (let ((tree *immobile-codeblob-tree*))
             (loop (when (eq tree (setq tree (cas *immobile-codeblob-tree* tree
                                                  (sb-brothertree:insert addr tree))))
+                    (atomic-incf *code-alloc-count*)
                     (return-from allocate-code-object (values code total-words)))))))
       (when (eq space :immobile)
         (error "Immobile code space exhausted")))
@@ -232,6 +240,7 @@
     ;; of the object so that we can find the function table.
     ;; But what about other things that create code objects?
     ;; It could be a subtle source of nondeterministic core images.
+      (atomic-incf *code-alloc-count*)
       (values code total-words))))
 
 ;; The freelist can only be read while holding a mutex because the codeblobs

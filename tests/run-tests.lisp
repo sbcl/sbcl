@@ -239,6 +239,7 @@
       sb-kernel::*type-cache-nonce*
       sb-ext:*gc-run-time*
       sb-ext:*gc-real-time*
+      sb-vm::*code-alloc-count*
       sb-kernel::*gc-epoch*
       sb-int:*n-bytes-freed-or-purified*
       ,(maybe "SB-APROF" "*ALLOCATION-PROFILE-METADATA*")
