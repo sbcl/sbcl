@@ -1143,10 +1143,7 @@
     (move c-arg-1 total-words)
     (move c-arg-2 boxed-words)
     (with-registers-preserved (c :except #-win32 rdi #+win32 rcx :frame-reg r15)
-      (pseudo-atomic ()
-        (call-c
-         #-immobile-code (ea (make-fixup "alloc_code_object" :foreign 8))
-         #+immobile-code (make-fixup "alloc_code_object" :foreign)))
+      (pseudo-atomic () (call-c "alloc_code_object"))
       (move c-arg-1 rax-tn))
     (move res c-arg-1)))
 

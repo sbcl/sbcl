@@ -34,7 +34,6 @@
     (inst and rsp-tn -16) ; align as required for ABI
     (inst push rsp-save) ; push twice to preserve alignment
     (inst push rsp-save)
-    #+immobile-space (inst call (make-fixup "debug_print" :foreign))
-    #-immobile-space (inst call (ea (make-fixup "debug_print" :foreign 8)))
+    (call-c "debug_print")
     (inst pop rsp-tn) ; restore the original RSP
     (move result rax)))
