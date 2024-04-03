@@ -263,8 +263,8 @@
                   (t
                    (return))))
       (when (>= runs-per-test 10)
-	(format t "~&Note: will not keep logs of passing runs~%")
-	(setq *delete-logs* t))
+        (format t "~&Note: will not keep logs of passing runs~%")
+        (setq *delete-logs* t))
       (setq argv
         (mapcar (lambda (file)
                   (probe-file file) ; for effect
