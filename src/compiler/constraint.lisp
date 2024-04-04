@@ -991,27 +991,34 @@
 
 ;;; Compute the tightest type possible for a variable given a set of
 ;;; CONSTRAINTS.
-(defun type-from-constraints (variable constraints initial-type)
-  ;; FIXME: Try to share some of this logic with CONSTRAIN-REF. It was
-  ;; copied out of that.
+(defun type-from-constraints (variable constraints initial-type &optional ref)
+  ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
+  ;; cons up endless union types when propagating large number of EQL
+  ;; constraints -- eg. from large CASE forms -- instead we just
+  ;; directly accumulate one XSET, and a set of fp zeroes, which we at
+  ;; the end turn into a MEMBER-TYPE.
+  ;;
+  ;; Since massive symbol cases are an especially atrocious pattern
+  ;; and the (NOT (MEMBER ...ton of symbols...)) will never turn into
+  ;; a more useful type, don't propagate their negation except for NIL
+  ;; unless SPEED > COMPILATION-SPEED.
   (let ((type        initial-type)
-        ;; FIXME: see the comment in CONSTRAIN-REF-TYPES. This makes
-        ;; LINE-BREAK-ANNOTATE compile a lot slower in self
-        ;; build. Reconsider whether we want this policy dependent and
-        ;; have that function add LINE-BREAK-ANNOTATE once we merge
-        ;; the functions.
-        (constrain-symbols nil)
+        (constrain-symbols
+          (and ref
+               (policy ref (or (> speed compilation-speed)
+                               (> debug 1)))))
         (not-type    *empty-type*)
-        (not-set     nil)
+        (not-xset     nil)
         (not-numeric nil)
-        (not-fpz     '()))
+        (not-fpz     '())
+        set)
     (flet ((note-not (x)
              (if (fp-zero-p x)
                  (push x not-fpz)
                  (when (or constrain-symbols (null x) (not (symbolp x)))
-                   (when (null not-set)
-                     (setf not-set (alloc-xset)))
-                   (add-to-xset x not-set))))
+                   (when (null not-xset)
+                     (setf not-xset (alloc-xset)))
+                   (add-to-xset x not-xset))))
            (intersect-result (other-type)
              (setf type (type-approx-intersection2 type other-type))))
       (declare (inline intersect-result))
@@ -1033,6 +1040,10 @@
              (let ((other-type (leaf-type other)))
                (cond ((not (type-for-constraints-p other-type)))
                      ((not not-p)
+                      (when (and ref
+                                 (constant-p other))
+                        (change-ref-leaf ref other)
+                        (return-from type-from-constraints))
                       (intersect-result other-type))
                      ((constant-p other)
                       (cond ((member-type-p other-type)
@@ -1048,21 +1059,32 @@
             ((< > <= >= =)
              (let ((after (type-after-comparison kind not-p type y)))
                (when after
-                 (setf type after))))))))
-    (let* ((negated not-type)
-           (negated (if (and (null not-set) (null not-fpz))
-                        negated
-                        (let ((excluded (make-member-type
-                                         (or not-set (alloc-xset)) not-fpz)))
-                          (type-union negated excluded))))
-           (numeric (when not-numeric
-                      (contiguous-numeric-set-type not-numeric)))
-           (negated (if numeric
-                        (type-union negated numeric)
-                        negated)))
-      (if (eq negated *empty-type*)
-          type
-          (type-difference type negated)))))
+                 (setf type after))))
+            (set
+             (setf set t))))))
+    (cond ((and ref
+                (and (if-p (node-dest ref))
+                     (or (and not-xset
+                              (xset-member-p nil not-xset))
+                         (csubtypep (specifier-type 'null) not-type))))
+           (setf (node-derived-type ref) *wild-type*)
+           (change-ref-leaf ref (find-constant t)))
+          (t
+           (let* ((negated not-type)
+                  (negated (if (and (null not-xset) (null not-fpz))
+                               negated
+                               (let ((excluded (make-member-type
+                                                (or not-xset (alloc-xset)) not-fpz)))
+                                 (type-union negated excluded))))
+                  (numeric (when not-numeric
+                             (contiguous-numeric-set-type not-numeric)))
+                  (negated (if numeric
+                               (type-union negated numeric)
+                               negated)))
+             (values (if (eq negated *empty-type*)
+                         type
+                         (type-difference type negated))
+                     set))))))
 
 (defun type-after-comparison (operator not-p current-type type)
   (case operator
@@ -1117,126 +1139,52 @@
 ;;; accordingly.
 (defun constrain-ref-type (ref in)
   (declare (type ref ref) (type conset in))
-  ;; KLUDGE: The NOT-SET and NOT-FPZ here are so that we don't need to
-  ;; cons up endless union types when propagating large number of EQL
-  ;; constraints -- eg. from large CASE forms -- instead we just
-  ;; directly accumulate one XSET, and a set of fp zeroes, which we at
-  ;; the end turn into a MEMBER-TYPE.
-  ;;
-  ;; Since massive symbol cases are an especially atrocious pattern
-  ;; and the (NOT (MEMBER ...ton of symbols...)) will never turn into
-  ;; a more useful type, don't propagate their negation except for NIL
-  ;; unless SPEED > COMPILATION-SPEED.
-  (let ((res (single-value-type (node-derived-type ref)))
-        (constrain-symbols (policy ref (or (> speed compilation-speed)
-                                           (> debug 1))))
-        (not-set (alloc-xset))
-        (not-numeric (alloc-xset))
-        (not-fpz nil)
-        (not-res *empty-type*)
-        (leaf (ref-leaf ref))
-        set)
-    (declare (type lambda-var leaf))
-    (flet ((note-not (x)
-             (if (fp-zero-p x)
-                 (push x not-fpz)
-                 (when (or constrain-symbols (null x) (not (symbolp x)))
-                   (add-to-xset x not-set)))))
-      (do-propagatable-constraints (con (in leaf))
-        (let* ((x (constraint-x con))
-               (y (constraint-y con))
-               (not-p (constraint-not-p con))
-               (other (if (eq x leaf) y x))
-               (kind (constraint-kind con)))
-          (case kind
-            (typep
-             (when (type-for-constraints-p other)
-               (if not-p
-                   (if (member-type-p other)
-                       (mapc-member-type-members #'note-not other)
-                       (setq not-res (type-union not-res other)))
-                   (setq res (type-intersection res other)))))
-            (eql
-             (let ((other-type (leaf-type other)))
-               (when (type-for-constraints-p other-type)
-                 (if not-p
-                     (when (constant-p other)
-                       (cond ((member-type-p other-type)
-                              (note-not (constant-value other)))
-                             ;; Numeric types will produce interesting
-                             ;; negations, other than just "not equal"
-                             ;; which can be handled by the equality
-                             ;; constraints.
-                             ((numeric-type-p other-type)
-                              (add-to-xset (constant-value other) not-numeric))))
-                     (cond
-                       ((constant-p other)
-                        (change-ref-leaf ref other)
-                        (return-from constrain-ref-type))
-                       (t
-                        (setq res (type-intersection res other-type))))))))
-            ((< > <= >= =)
-             (let ((type (type-after-comparison kind not-p res y)))
-               (when type
-                 (setf res type))))
-            (set
-             (setf set t))))))
-    (unless set
-      (setf (lambda-var-unused-initial-value leaf) nil))
-    (cond ((and (if-p (node-dest ref))
-                (or (xset-member-p nil not-set)
-                    (csubtypep (specifier-type 'null) not-res)))
-           (setf (node-derived-type ref) *wild-type*)
-           (change-ref-leaf ref (find-constant t)))
-          (t
-           (let* ((union
-                    (type-union not-res
-                                (make-member-type not-set not-fpz)))
-                  (numeric (contiguous-numeric-set-type not-numeric))
-                  (type (type-difference res
-                                         (if numeric
-                                             (type-union union numeric)
-                                             union))))
-             ;; CHANGE-CLASS can change the type, lower down to standard-object,
-             ;; type propagation for classes is not as important anyway.
-             (cond #-sb-xc-host
-                   ((and
-                     (eq sb-pcl::**boot-state** 'sb-pcl::complete)
-                     (block nil
-                       (let ((standard-object (find-classoid 'standard-object)))
-                         (sb-kernel::map-type
-                          (lambda (type)
-                            (when (and (classoid-p type)
-                                       (csubtypep type standard-object))
-                              (return t)))
-                          type)))))
-                   (t
-                    (derive-node-type ref
-                                      (make-single-value-type type))
-                    (when (eq (node-derived-type ref) *empty-type*)
-                      ;; Terminating blocks early may leave loops with
-                      ;; just one entry point, resulting in
-                      ;; monotonically growing variables without a
-                      ;; starting point which will propagate new
-                      ;; constraints for each increment.
-                      (pushnew ref *blocks-to-terminate*)))))))
-    ;; Find unchanged eql refs to a set variable.
-    (when (lambda-var-sets leaf)
-      (let (mark
-            (eq (lambda-var-eq-constraints leaf)))
-        (when eq
-          (loop for other-ref in (leaf-refs leaf)
-                unless (eq other-ref ref)
-                do (let ((constraint (gethash (ref-lvar other-ref) eq)))
-                     (when (and constraint
-                                (conset-member constraint in))
-                       (unless mark
-                         (setf mark (list 0))
-                         (setf (ref-same-refs ref) mark))
-                       (setf (ref-same-refs other-ref) mark)))))
-        (when mark
-          (reoptimize-node ref)))))
-  (values))
+  (let ((leaf (ref-leaf ref)))
+    (multiple-value-bind (type set)
+        (type-from-constraints leaf in (single-value-type (node-derived-type ref))
+                               ref)
+      (when type
+        (unless set
+          (setf (lambda-var-unused-initial-value leaf) nil))
+        ;; CHANGE-CLASS can change the type, lower down to standard-object,
+        ;; type propagation for classes is not as important anyway.
+        (cond #-sb-xc-host
+              ((and
+                (eq sb-pcl::**boot-state** 'sb-pcl::complete)
+                (block nil
+                  (let ((standard-object (find-classoid 'standard-object)))
+                    (sb-kernel::map-type
+                     (lambda (type)
+                       (when (and (classoid-p type)
+                                  (csubtypep type standard-object))
+                         (return t)))
+                     type)))))
+              (t
+               (derive-node-type ref
+                                 (make-single-value-type type))
+               (when (eq (node-derived-type ref) *empty-type*)
+                 ;; Terminating blocks early may leave loops with
+                 ;; just one entry point, resulting in
+                 ;; monotonically growing variables without a
+                 ;; starting point which will propagate new
+                 ;; constraints for each increment.
+                 (pushnew ref *blocks-to-terminate*))))
+        ;; Find unchanged eql refs to a set variable.
+        (when (lambda-var-sets leaf)
+          (let (mark
+                (eq (lambda-var-eq-constraints leaf)))
+            (when eq
+              (loop for other-ref in (leaf-refs leaf)
+                    unless (eq other-ref ref)
+                    do (let ((constraint (gethash (ref-lvar other-ref) eq)))
+                         (when (and constraint
+                                    (conset-member constraint in))
+                           (unless mark
+                             (setf mark (list 0))
+                             (setf (ref-same-refs ref) mark))
+                           (setf (ref-same-refs other-ref) mark)))))
+            (when mark
+              (reoptimize-node ref))))))))
 
 ;;;; Flow analysis
 
