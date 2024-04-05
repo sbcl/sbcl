@@ -3516,6 +3516,14 @@ used for a COMPLEX component.~:@>"
                  (range 0 #.(1- base-char-code-limit)))))))
     (new-ctype character-set-type 0 pairs)))
 
+(defun character-set-type-from-characters (characters)
+  ;; Constructor asserts that pairs are properly sorted
+  (make-character-set-type (mapcar (lambda (x)
+                                     (let ((code (sb-xc:char-code x)))
+                                       (cons code code)))
+                                   (sort (delete-duplicates characters) #'<
+                                         :key #'sb-xc:char-code))))
+
 (declaim (ftype (sfunction (t &key (:complexp t)
                                    (:element-type t)
                                    (:specialized-element-type t))
@@ -4137,7 +4145,7 @@ used for a COMPLEX component.~:@>"
   ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
   ;;  literal symbol *, and does not represent an unspecified value."
   (if members
-      (let ((xset (alloc-xset)) fp-zeros other-reals char-codes)
+      (let ((xset (alloc-xset)) fp-zeros other-reals characters)
         ;; Calling REMOVE-DUPLICATES up front as used to be done is wasteful because the XSET can't
         ;; have dups in it. Elements that don't go in the XSET have to be de-duplicated.
         ;; There are at most 4 fp-zeros, so calling PUSHNEW is fine. For the rest, we can suppose
@@ -4145,14 +4153,12 @@ used for a COMPLEX component.~:@>"
         ;; a cetain length input, but does not)
         (dolist (m members)
           (typecase m
-            (character (push (sb-xc:char-code m) char-codes))
+            (character (push m characters))
             (real (if (fp-zero-p m) (pushnew m fp-zeros) (push m other-reals)))
             (t (add-to-xset m xset))))
         (apply #'type-union
                (make-member-type xset fp-zeros)
-               ;; Constructor asserts that pairs are properly sorted
-               (make-character-set-type (mapcar (lambda (x) (cons x x))
-                                                (sort (delete-duplicates char-codes) #'<)))
+               (character-set-type-from-characters characters)
                (mapcar #'ctype-of-number (delete-duplicates other-reals))))
       *empty-type*))
 (defun make-eql-type (elt)

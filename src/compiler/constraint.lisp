@@ -1010,6 +1010,7 @@
         (not-type    *empty-type*)
         (not-xset     nil)
         (not-numeric nil)
+        not-characters
         (not-fpz     '())
         set)
     (flet ((note-not (x)
@@ -1055,7 +1056,9 @@
                             ((numeric-type-p other-type)
                              (when (null not-numeric)
                                (setf not-numeric (alloc-xset)))
-                             (add-to-xset (constant-value other) not-numeric)))))))
+                             (add-to-xset (constant-value other) not-numeric))
+                            ((typep other-type 'character-set-type)
+                             (push (constant-value other) not-characters)))))))
             ((< > <= >= =)
              (let ((after (type-after-comparison kind not-p type y)))
                (when after
@@ -1070,20 +1073,24 @@
            (setf (node-derived-type ref) *wild-type*)
            (change-ref-leaf ref (find-constant t)))
           (t
-           (let* ((negated not-type)
-                  (negated (if (and (null not-xset) (null not-fpz))
-                               negated
+           (let* ((not-union not-type)
+                  (not-union (if (and (null not-xset) (null not-fpz))
+                               not-union
                                (let ((excluded (make-member-type
                                                 (or not-xset (alloc-xset)) not-fpz)))
-                                 (type-union negated excluded))))
+                                 (type-union not-union excluded))))
                   (numeric (when not-numeric
                              (contiguous-numeric-set-type not-numeric)))
-                  (negated (if numeric
-                               (type-union negated numeric)
-                               negated)))
-             (values (if (eq negated *empty-type*)
+                  (not-union (if numeric
+                               (type-union not-union numeric)
+                               not-union))
+                  (not-union (if not-characters
+                                 (type-union not-union
+                                             (sb-kernel::character-set-type-from-characters not-characters))
+                                 not-union)))
+             (values (if (eq not-union *empty-type*)
                          type
-                         (type-difference type negated))
+                         (type-difference type not-union))
                      set))))))
 
 (defun type-after-comparison (operator not-p current-type type)

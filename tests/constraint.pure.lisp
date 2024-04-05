@@ -1326,3 +1326,18 @@
     ((#(1 2 3) 2 2) -1)
     ((#(1 2 3) 2 3) 2)
     ((#(1 2 3) 4 3) nil)))
+
+(with-test (:name :characters)
+  (assert-type
+   (lambda (c)
+     (cond ((eql c #\a) 1)
+           ((eql c #\a) 2)
+           (t 1)))
+   (eql 1))
+  (assert-type
+   (lambda (c)
+     (cond ((eql c #\a) 1)
+           ((eql c #\b) 1)
+           ((eql c #\a) 2)
+           (t 1)))
+   (eql 1)))
