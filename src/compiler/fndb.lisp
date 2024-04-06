@@ -1999,9 +1999,12 @@
 (defknown %check-bound (array index t) (values)
   (dx-safe))
 (defknown data-vector-ref (simple-array index) t
-  (foldable flushable always-translatable))
+  (foldable flushable always-translatable)
+  ;; check bounds when folding.
+  :folder (lambda (array index) (aref array index)))
 (defknown data-vector-ref-with-offset (simple-array fixnum fixnum) t
-  (foldable flushable always-translatable))
+  (foldable flushable always-translatable)
+  :folder (lambda (array index offset) (aref array (+ index offset))))
 (defknown data-nil-vector-ref (simple-array index) nil
   (always-translatable))
 ;;; The lowest-level vector SET operators should not return a value.
@@ -2009,9 +2012,11 @@
 (defknown data-vector-set (array index t) (values) (dx-safe always-translatable))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
   (dx-safe always-translatable))
-(defknown hairy-data-vector-ref (array index) t (foldable flushable no-verify-arg-count))
+(defknown hairy-data-vector-ref (array index) t (foldable flushable no-verify-arg-count)
+  :folder (lambda (array index) (aref array index)))
 (defknown hairy-data-vector-set (array index t) t (no-verify-arg-count))
-(defknown hairy-data-vector-ref/check-bounds (array index) t (foldable no-verify-arg-count))
+(defknown hairy-data-vector-ref/check-bounds (array index) t (foldable no-verify-arg-count)
+  :folder (lambda (array index) (aref array index)))
 (defknown hairy-data-vector-set/check-bounds (array index t) t (no-verify-arg-count))
 
 (defknown vector-hairy-data-vector-ref (vector index) t (foldable flushable no-verify-arg-count))

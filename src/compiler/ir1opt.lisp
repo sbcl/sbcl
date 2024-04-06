@@ -537,8 +537,8 @@
         (kind (basic-combination-kind node)))
     (case kind
       (:known
-       (cond ((constant-fold-call-p node)
-              (constant-fold-call node))
+       (cond ((and (constant-fold-call-p node)
+                   (constant-fold-call node)))
              ((and (ir1-attributep (fun-info-attributes info) commutative)
                    (= (length args) 2)
                    (constant-lvar-p (first args))
@@ -1189,8 +1189,8 @@
          (process-info)
          (unless (eq (combination-kind node) :error) ;; caused by derive-type
            (let ((attr (fun-info-attributes info)))
-             (when (constant-fold-call-p node)
-               (constant-fold-call node)
+             (when (and (constant-fold-call-p node)
+                        (constant-fold-call node))
                (return-from ir1-optimize-combination))
              (when (fold-call-derived-to-constant node)
                (return-from ir1-optimize-combination))
@@ -1827,39 +1827,44 @@
                      (fdefinition name)
                      (lvar-value lvar)))
                lvar)))
-   (let* ((fun-name (lvar-fun-name (combination-fun call) t))
-          (type (info :function :type fun-name))
-          (lvar-args (let ((args (combination-args call)))
-                       (if (fun-type-p type)
-                           (resolve-key-args args type)
-                           args)))
-          (args (mapcar #'value lvar-args)))
-     (multiple-value-bind (values win) (careful-call (or (and (combination-fun-info call)
-                                                              (fun-info-folder (combination-fun-info call)))
-                                                         fun-name)
-                                                     args)
-       (cond ((not win)
-              (setf (combination-kind call) :error
-                    (combination-info call)
-                    (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values)))
-             ((and (proper-list-of-length-p values 1))
-              (replace-combination-with-constant (first values) call))
-             (t (let ((dummies (make-gensym-list (length args))))
-                  (transform-call
-                   call
-                   `(lambda ,dummies
-                      (declare (ignore ,@dummies))
-                      (values ,@(mapcar (lambda (x)
-                                          (let ((lvar
-                                                  (find x lvar-args :key #'value)))
-                                            ;; Don't lose any annotations
-                                            (if (and lvar
-                                                     (lvar-annotations lvar))
-                                                `(with-annotations ,(lvar-annotations lvar) ',x)
-                                                `',x)))
-                                        values)))
-                   fun-name)))))))
-  (values))
+    (let* ((fun-name (lvar-fun-name (combination-fun call) t))
+           (type (info :function :type fun-name))
+           (lvar-args (let ((args (combination-args call)))
+                        (if (fun-type-p type)
+                            (resolve-key-args args type)
+                            args)))
+           (args (mapcar #'value lvar-args))
+           (folder (fun-info-folder (combination-fun-info call))))
+      (multiple-value-bind (values win) (careful-call (or folder
+                                                          fun-name)
+                                                      args)
+        (cond ((not win)
+               ;; Ignore errors from dedicated folders, in lieu of adding fun-info-fold-p.
+               (unless folder
+                 (setf (combination-kind call) :error
+                       (combination-info call)
+                       (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values))
+                 t))
+              ((and (proper-list-of-length-p values 1))
+               (replace-combination-with-constant (first values) call)
+               t)
+              (t
+               (let ((dummies (make-gensym-list (length args))))
+                 (transform-call
+                  call
+                  `(lambda ,dummies
+                     (declare (ignore ,@dummies))
+                     (values ,@(mapcar (lambda (x)
+                                         (let ((lvar
+                                                 (find x lvar-args :key #'value)))
+                                           ;; Don't lose any annotations
+                                           (if (and lvar
+                                                    (lvar-annotations lvar))
+                                               `(with-annotations ,(lvar-annotations lvar) ',x)
+                                               `',x)))
+                                       values)))
+                  fun-name))
+               t))))))
 
 (defun fold-call-derived-to-constant (call)
   (when (flushable-combination-p call)
