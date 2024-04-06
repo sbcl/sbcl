@@ -13,7 +13,6 @@
 #include "genesis/package.h"
 #include "genesis/vector.h"
 #include "search.h"
-#include "genesis/avlnode.h"
 #include "genesis/sap.h"
 #include "print.h"
 

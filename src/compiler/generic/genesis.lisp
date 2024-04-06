@@ -4373,7 +4373,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (dolist (class '(defstruct-description package
                          ;; FIXME: probably these should be external?
                          sb-lockless::split-ordered-list
-                         sb-vm::arena sb-thread::avlnode
+                         sb-vm::arena
                          sb-c::compiled-debug-info))
           (out-to (string-downcase class)
             ;; parent/child structs like to be output as one header, child first
