@@ -326,6 +326,13 @@
   (deftransform concatenate ((type &rest args))
     (transform 'concatenate args nil 'type)))
 
+(deftransform %concatenate-to-string ((string) ((array character (*))))
+  `(subseq string 0))
+
+#+sb-unicode
+(deftransform %concatenate-to-string ((string) ((array base-char (*))))
+  `(coerce string '(array character (*))))
+
 (defun concatenate-subseq-type (lvar args)
   (flet ((check (arg type)
            (when (eq arg lvar)
