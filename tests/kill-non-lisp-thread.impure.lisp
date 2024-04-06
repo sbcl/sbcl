@@ -13,6 +13,7 @@
 
 #+(or :openbsd :win32 (not :sb-thread)) (invoke-restart 'run-tests::skip-file)
 
+#+sb-thread (sb-impl::finalizer-thread-stop)
 (use-package :sb-alien)
 
 (defun run (program &rest arguments)
