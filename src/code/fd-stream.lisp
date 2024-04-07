@@ -723,6 +723,7 @@
                   (intern (format nil name-fmt (string (car buffering))))))
              (list
                   `(defun ,function (stream |ch|)
+                     (declare (optimize (sb-c:verify-arg-count 0)))
                      (output-wrapper/variable-width (stream ,size ,buffering ,restart)
                        ,@body)
                      ;; return char so WRITE-CHAR can tail-call the stream's output method
@@ -752,6 +753,7 @@
                      (intern (format nil name-fmt (string (car buffering))))))
              (list
                  `(defun ,function (stream byte)
+                    (declare (optimize (sb-c:verify-arg-count 0)))
                      (output-wrapper (stream ,size ,buffering ,restart)
                        ,@body)
                      ;; return byte so WRITE-BYTE can tail-call the stream's output method
@@ -1241,6 +1243,7 @@
                                             &rest body)
   `(progn
      (defun ,name (stream eof-error eof-value)
+       (declare (optimize (sb-c:verify-arg-count 0)))
        (input-wrapper/variable-width (stream ,size eof-error eof-value)
          (let ((,sap (buffer-sap ibuf))
                (,head (buffer-head ibuf)))
@@ -1254,6 +1257,7 @@
                              &rest body)
   `(progn
      (defun ,name (stream eof-error eof-value)
+       (declare (optimize (sb-c:verify-arg-count 0)))
        (input-wrapper (stream ,size eof-error eof-value)
          (let ((,sap (buffer-sap ibuf))
                (,head (buffer-head ibuf)))
@@ -1509,9 +1513,11 @@
          (n-buffer (gensym "BUFFER")))
     `(progn
        (defun ,size-function (|ch|)
-         (declare (ignorable |ch|))
+         (declare (ignorable |ch|)
+                  (optimize (sb-c:verify-arg-count 0)))
          (and ,char-encodable-p ,out-size-expr))
        (defun ,out-function (stream string flush-p start end)
+         (declare (optimize (sb-c:verify-arg-count 0)))
          (let ((start (or start 0))
                (end (or end (length string))))
            (declare (type index start end))
@@ -1574,7 +1580,8 @@
                (declare (type fd-stream stream)
                         (type index start requested total-copied)
                         (type ansi-stream-cin-buffer buffer)
-                        (type ansi-stream-csize-buffer sbuffer))
+                        (type ansi-stream-csize-buffer sbuffer)
+                        (optimize (sb-c:verify-arg-count 0)))
                (when (fd-stream-eof-forced-p stream)
                  (setf (fd-stream-eof-forced-p stream) nil)
                  (return-from ,in-function 0))
@@ -1691,6 +1698,7 @@
                                            (declare (ignorable byte))
                                            ,in-expr))
        (defun ,resync-function (stream)
+         (declare (optimize (sb-c:verify-arg-count 0)))
          (let ((ibuf (fd-stream-ibuf stream))
                size
                (unit ,(if (consp in-size-expr)
@@ -1725,7 +1733,8 @@
                         nil)
                 (return))))))
        (defun ,read-c-string-function (sap element-type)
-         (declare (type system-area-pointer sap))
+         (declare (type system-area-pointer sap)
+                  (optimize (sb-c:verify-arg-count 0)))
          (locally
              (declare (optimize (speed 3) (safety 0)))
            (let* ((stream ,name)

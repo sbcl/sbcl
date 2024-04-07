@@ -709,6 +709,7 @@
 (macrolet
     ((define (name)
        `(defun ,name (string stream start end)
+          (declare (optimize (sb-c:verify-arg-count 0)))
           ;; unclear why the dispatch to simple and gray methods have to receive a simple-string.
           ;; I'm pretty sure the STREAM-foo methods on gray streams are not specified to be
           ;; constrained to receive only simple-string.
@@ -965,7 +966,7 @@
 ;;; function on the synonymed stream.
 (macrolet ((out-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
-                (declare (optimize (safety 1)))
+                (declare (optimize (safety 1) (sb-c:verify-arg-count 0)))
                 (let ((syn (symbol-value (synonym-stream-symbol stream))))
                   (,fun ,(car args) syn ,@(cdr args))))))
   (out-fun synonym-out write-char ch)
@@ -977,7 +978,7 @@
 ;;; the In-Buffer if there is any.
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
-                (declare (optimize (safety 1)))
+                (declare (optimize (safety 1) (sb-c:verify-arg-count 0)))
                 ,@(when (member 'sbuffer args) '((declare (ignore sbuffer))))
                 (,fun (symbol-value (synonym-stream-symbol stream))
                       ,@(remove 'sbuffer args)))))

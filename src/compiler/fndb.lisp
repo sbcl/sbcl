@@ -2252,20 +2252,27 @@
 
 ;;; Avoid a ton of FBOUNDP checks in the string stream constructors etc,
 ;;; by wiring in the needed functions instead of dereferencing their fdefns.
-(defknown (ill-in ill-bin ill-out ill-bout
-           sb-impl::string-in-misc
-           sb-impl::string-sout
-           sb-impl::finite-base-string-ouch sb-impl::finite-base-string-out-misc
-           sb-impl::fill-pointer-ouch sb-impl::fill-pointer-sout
-           sb-impl::fill-pointer-misc
-           sb-impl::case-frob-upcase-out sb-impl::case-frob-upcase-sout
-           sb-impl::case-frob-downcase-out sb-impl::case-frob-downcase-sout
-           sb-impl::case-frob-capitalize-out sb-impl::case-frob-capitalize-sout
-           sb-impl::case-frob-capitalize-first-out sb-impl::case-frob-capitalize-first-sout
-           sb-impl::case-frob-capitalize-aux-out sb-impl::case-frob-capitalize-aux-sout
-           sb-impl::case-frob-misc
-           sb-pretty::pretty-out sb-pretty::pretty-misc) * *)
-(defknown sb-pretty::pretty-sout * * (recursive))
+(defknown (ill-in ill-bin ill-out ill-bout) (t &rest t) nil (no-verify-arg-count))
+(defknown sb-impl::string-in-misc (t t t) * (no-verify-arg-count))
+(defknown sb-impl::string-sout (t t t t) t (no-verify-arg-count))
+(defknown sb-impl::finite-base-string-ouch (t t) t (no-verify-arg-count))
+(defknown sb-impl::finite-base-string-out-misc (t t t) nil (no-verify-arg-count))
+(defknown sb-impl::fill-pointer-ouch (t t) t (no-verify-arg-count))
+(defknown sb-impl::fill-pointer-sout (t t t t) t (no-verify-arg-count))
+(defknown sb-impl::fill-pointer-misc (t t t) t (no-verify-arg-count))
+(defknown sb-impl::case-frob-upcase-out (t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-upcase-sout (t t t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-downcase-out (t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-downcase-sout (t t t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-out (t t) t (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-sout (t t t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-first-out (t t) t (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-first-sout (t t t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-aux-out (t t) t (no-verify-arg-count))
+(defknown sb-impl::case-frob-capitalize-aux-sout (t t t t) * (no-verify-arg-count))
+(defknown sb-impl::case-frob-misc (t t t) * (no-verify-arg-count))
+(defknown sb-pretty::pretty-out (t t) t (no-verify-arg-count))
+(defknown sb-pretty::pretty-misc (t t t) t (no-verify-arg-count))
 
 ;;;; PCL
 
