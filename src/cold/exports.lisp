@@ -2291,7 +2291,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SCHWARTZIAN-STABLE-SORT-LIST" "SCHWARTZIAN-STABLE-SORT-VECTOR"
            "SCRUB-POWER-CACHE"
            "SEQUENCEP" "SEQUENCE-COUNT" "SEQUENCE-END"
-           "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
            "SET-ARRAY-HEADER" "SET-HEADER-DATA"
            "STACK-ALLOCATED-OBJECT-OVERFLOWS-STACK-ERROR"
            "ASSIGN-VECTOR-FLAGS" "LOGIOR-HEADER-BITS" "RESET-HEADER-BITS"
@@ -2405,7 +2404,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "VECTOR-FILL*" "VECTOR-FILL/T"
            "VECTOR-SUBSEQ*"
            "VECTOR-TO-VECTOR*"
-           "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH" "WITH-ARRAY-DATA"
+           "WITH-ARRAY-DATA"
            "WITH-CIRCULARITY-DETECTION"
            "WITH-WORLD-LOCK"
 

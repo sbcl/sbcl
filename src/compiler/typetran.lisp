@@ -1448,7 +1448,7 @@
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
 
-(defun strip-array-dimensions-and-complexity (type)
+(defun strip-array-dimensions-and-complexity (type &optional simple)
   (labels ((process-compound-type (types)
              (let (array-types)
                (dolist (type types)
@@ -1464,7 +1464,9 @@
                            dim
                            (make-list (length dim)
                                       :initial-element '*))
-                       :complexp :maybe
+                       :complexp (if simple
+                                     nil
+                                     :maybe)
                        :element-type (array-type-element-type type)
                        :specialized-element-type (array-type-specialized-element-type type))))
                    ((union-type-p type)

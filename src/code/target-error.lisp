@@ -838,6 +838,8 @@ with that condition (or with no condition) will be returned."
                type)))
     ((eql sb-c::ftype-context)
      "from the function type declaration.")
+    ((member map)
+     (format nil "for the result type of ~a." context))
     ((and symbol
           (not null))
      (format nil "when binding ~s" context))

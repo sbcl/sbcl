@@ -138,49 +138,33 @@
 ;;; the result type matches the actual result. We also wrap it in a
 ;;; TRULY-THE for the most specific type we can determine.
 (deftransform map ((result-type-arg fun seq &rest seqs) * * :node node)
-  (let* ((seq-names (make-gensym-list (1+ (length seqs))))
-         (bare `(%map result-type-arg fun ,@seq-names))
+  (let* ((seq-names (make-gensym-list (length seqs)))
          (constant-result-type-arg-p (constant-lvar-p result-type-arg))
+         (nil-p)
          ;; what we know about the type of the result. (Note that the
          ;; "result type" argument is not necessarily the type of the
          ;; result, since NIL means the result has NULL type.)
-         (result-type (if (not constant-result-type-arg-p)
-                          'consed-sequence
+         (result-type (if constant-result-type-arg-p
                           (let ((result-type-arg-value
-                                 (lvar-value result-type-arg)))
-                            (if (null result-type-arg-value)
-                                'null
-                                result-type-arg-value))))
-         (result-ctype (ir1-transform-specifier-type
-                        result-type)))
-    `(lambda (result-type-arg fun ,@seq-names)
-       (truly-the ,result-type
-         ,(cond ((policy node (< safety 3))
-                 ;; ANSI requires the length-related type check only
-                 ;; when the SAFETY quality is 3... in other cases, we
-                 ;; skip it, because it could be expensive.
-                 bare)
-                ((not constant-result-type-arg-p)
-                 `(sequence-of-checked-length-given-type ,bare
-                                                         result-type-arg))
-                (t
-                 (if (array-type-p result-ctype)
-                     (let ((dims (array-type-dimensions result-ctype)))
-                       (unless (singleton-p dims)
-                         (give-up-ir1-transform "invalid sequence type"))
-                       (let ((dim (first dims)))
-                         (if (eq dim '*)
-                             bare
-                             `(vector-of-checked-length-given-length ,bare
-                                                                     ,dim))))
-                     ;; FIXME: this is wrong, as not all subtypes of
-                     ;; VECTOR are ARRAY-TYPEs [consider, for
-                     ;; example, (OR (VECTOR T 3) (VECTOR T
-                     ;; 4))]. However, it's difficult to see what we
-                     ;; should put here... maybe we should
-                     ;; GIVE-UP-IR1-TRANSFORM if the type is a
-                     ;; subtype of VECTOR but not an ARRAY-TYPE?
-                     bare)))))))
+                                  (lvar-value result-type-arg)))
+                            (cond (result-type-arg-value)
+                                  (t
+                                   (setf nil-p t)
+                                   'null)))
+                          'consed-sequence))
+         (result-ctype (ir1-transform-specifier-type result-type)))
+    `(lambda (result-type-arg fun seq ,@seq-names)
+       (the* (,result-type :context map)
+             (truly-the
+              ,(cond (nil-p
+                      'null)
+                     ((csubtypep result-ctype (specifier-type 'vector))
+                      (strip-array-dimensions-and-complexity result-ctype t))
+                     ((csubtypep result-ctype (specifier-type 'list))
+                      'list)
+                     (t
+                      t))
+              (%map result-type-arg fun seq ,@seq-names))))))
 
 ;;; Return a DO loop, mapping a function FUN to elements of
 ;;; sequences. SEQS is a list of lvars, SEQ-NAMES - list of variables,

@@ -273,32 +273,6 @@
     (or (csubtypep type (specifier-type 'list))
         (csubtypep type (specifier-type 'vector)))))
 
-;;; It's possible with some sequence operations to declare the length
-;;; of a result vector, and to be safe, we really ought to verify that
-;;; the actual result has the declared length.
-(defun vector-of-checked-length-given-length (vector declared-length)
-  (declare (type vector vector))
-  (declare (type index declared-length))
-  (let ((actual-length (length vector)))
-    (unless (= actual-length declared-length)
-      (error 'simple-type-error
-             :datum vector
-             :expected-type `(vector ,declared-length)
-             :format-control
-             "Vector length (~W) doesn't match declared length (~W)."
-             :format-arguments (list actual-length declared-length))))
-  vector)
-
-(defun sequence-of-checked-length-given-type (sequence result-type)
-  (let ((ctype (specifier-type result-type)))
-    (if (not (array-type-p ctype))
-        sequence
-        (let ((declared-length (first (array-type-dimensions ctype))))
-          (if (eq declared-length '*)
-              sequence
-              (vector-of-checked-length-given-length sequence
-                                                     declared-length))))))
-
 (declaim (ftype (function (sequence index) nil) signal-index-too-large-error))
 (define-error-wrapper signal-index-too-large-error (sequence index)
   (let* ((length (length sequence))
@@ -1498,14 +1472,10 @@ many elements are copied."
   (declare (explicit-check))
   (declare (dynamic-extent function))
   (let ((result
-         (apply #'%map result-type function first-sequence more-sequences)))
+          (apply #'%map result-type function first-sequence more-sequences)))
     (if (or (eq result-type 'nil) (typep result result-type))
         result
-        (error 'simple-type-error
-               :format-control "MAP result ~S is not a sequence of type ~S"
-               :datum result
-               :expected-type result-type
-               :format-arguments (list result result-type)))))
+        (sb-c::%type-check-error result result-type 'map))))
 
 (declaim (end-block))
 
