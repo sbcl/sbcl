@@ -644,15 +644,34 @@
                                                         pathname))))
              (change-test-based-on-item 'eql item)))
           (equalp
-           (when (csubtypep item (specifier-type '(not (or number
-                                                        character
-                                                        cons
-                                                        array
-                                                        pathname
-                                                        instance
-                                                        hash-table))))
-             (change-test-based-on-item 'eql item)))))
+           (cond ((csubtypep item (specifier-type '(not (or number
+                                                         character
+                                                         cons
+                                                         array
+                                                         pathname
+                                                         instance
+                                                         hash-table))))
+                  (change-test-based-on-item 'eql item))
+                 ((multiple-value-bind (p value) (type-singleton-p item)
+                    (when (and p
+                               (characterp value)
+                               (not (both-case-p value)))
+                      (change-test-based-on-item 'eq item))))))
+          (char-equal
+           (multiple-value-bind (p value) (type-singleton-p item)
+             (when (and p
+                        (not (both-case-p value)))
+               'char=)))))
    test))
+
+(defun change-test-lvar-based-on-item (test item)
+  (let ((test (if test
+                  (lvar-fun-is test '(eql equal equalp char-equal))
+                  'eql)))
+    (when test
+      (unless (eq (shiftf test (change-test-based-on-item test (lvar-type item)))
+                  test)
+        test))))
 
 (macrolet ((def (name &optional if/if-not)
              (let ((basic (symbolicate "%" name))
@@ -670,7 +689,7 @@
                      `(deftransform ,basic-key ((item list key) (eq-comparable-type t t) * :important nil)
                         `(,',basic-key-eq item list key)))
                   (deftransform ,test ((item list test) (t t t) * :node node)
-                    (let ((test (lvar-fun-is test '(eq eql equal equalp))))
+                    (let ((test (lvar-fun-is test '(eq eql equal equalp char-equal))))
                       (case (change-test-based-on-item test (lvar-type item))
                         (eq
                          `(,',basic-eq item list))
@@ -679,8 +698,9 @@
                         (t
                          (give-up-ir1-transform)))))
                   (deftransform ,key-test ((item list key test) (t t t t) * :important nil)
-                    (let ((test (lvar-fun-is test '(eq eql ,@(unless (eq name 'adjoin)
-                                                               '(equal equalp))))))
+                    (let ((test (lvar-fun-is test '(eq eql
+                                                    ,@(unless (eq name 'adjoin)
+                                                        '(equal equalp char-equal))))))
                       (case ,(if (eq name 'adjoin)
                                  'test
                                  '(change-test-based-on-item test (lvar-type item)))
@@ -2561,7 +2581,7 @@
           type))))
 
 (deftransform %find-position ((item sequence from-end start end key test))
-  (let* ((test (lvar-fun-is test '(eql equal equalp)))
+  (let* ((test (lvar-fun-is test '(eql equal equalp char-equal)))
          (test-origin test))
     (when test
       (setf test (change-test-based-on-item test (lvar-type item)))
@@ -3110,6 +3130,27 @@
                                               ,test-form))))))
   (define-find-position find 0)
   (define-find-position position 1))
+
+;;; Lower :test
+(macrolet ((def (fun-name)
+             `(deftransform ,fun-name ((item sequence &key
+                                             from-end start end
+                                             key test test-not)
+                                       (t  &rest t))
+                (macrolet ((maybe-arg (arg &optional (key (keywordicate arg)))
+                             `(and ,arg `(,,key ,',arg))))
+                  (let ((test (and (not test-not)
+                                   (change-test-lvar-based-on-item test item))))
+                    (if test
+                        `(,',fun-name item sequence :test ',test
+                                      ,@(maybe-arg from-end)
+                                      ,@(maybe-arg start)
+                                      ,@(maybe-arg end)
+                                      ,@(maybe-arg key)
+                                      ,@(maybe-arg test-not))
+                        (give-up-ir1-transform)))))))
+  (def find)
+  (def position))
 
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key
