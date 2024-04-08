@@ -1883,21 +1883,11 @@ function to be removed without further warning."
      (multiple-value-bind (body decls) (parse-body body nil)
        `((declaim (inline ,dispatch-name))
          (defun ,dispatch-name ,params
+           (declare (optimize (sb-c:jump-table 3)))
            ,@decls
            (case (if (%other-pointer-p ,(first params))
                      (ash (%other-pointer-widetag ,(first params)) -2)
                      0)
-             ;; All widetags have to be listed so that the jump table logic doesn't
-             ;; give up due to deciding that it's a waste of space. It could probably
-             ;; be based on the SPACE compilation policy. However, I would imagine that
-             ;; it is almost always a win to use 4x or 5x table words as cases
-             ;; given the amount of code that has to be emitted if not a table.
-             ;; This table has only 2.5x as many words as relevant (non-error) cases.
-             (,(loop for i below 64
-                     unless (find i *specialized-array-element-type-properties*
-                                  :key (lambda (x) (ash (saetp-typecode x) -2)))
-                       collect i)
-              (,error-name ,@params))
              ,@(loop
                  for info across *specialized-array-element-type-properties*
                  for specifier = (saetp-specifier info)
@@ -1907,7 +1897,9 @@ function to be removed without further warning."
                                               ,(first params))))
                              ,@(if (null specifier)
                                    nil-array
-                                   body)))))))))))))
+                                   body))))
+             (t
+              (,error-name ,@params)))))))))))
 
 (defun sb-kernel::check-array-shape (array dimensions)
   (when (let ((dimensions dimensions))

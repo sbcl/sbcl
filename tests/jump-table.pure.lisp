@@ -131,3 +131,7 @@
     ((#\a) 0)
     ((#\b) nil)))
 
+(with-test (:name :array-subtype-dispatch-table)
+  (assert (> (sb-kernel:code-jump-table-words
+              (sb-kernel:fun-code-header #'sb-kernel:vector-subseq*))
+             25)))
