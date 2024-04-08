@@ -254,6 +254,17 @@
 (deftransform sb-impl::append2 ((x y) (null t) * :important nil)
   'y)
 
+(deftransform sb-impl::append2 ((x y) (list t) * :important nil)
+  (let* ((n (splice-fun-args x 'list nil))
+         (args (make-gensym-list (length n))))
+    `(lambda (,@args y) (list* ,@args y))))
+
+(deftransform append ((x &rest args) (list &rest t) * :important nil)
+  (let* ((n (splice-fun-args x 'list nil))
+         (list-args (make-gensym-list (length n)))
+         (append-args (make-gensym-list (length args))))
+    `(lambda (,@list-args ,@append-args) (list* ,@list-args (append ,@append-args)))))
+
 (flet ((remove-nil (fun args)
          (let ((remove
                  (loop for (arg . rest) on args
