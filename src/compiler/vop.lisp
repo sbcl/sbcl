@@ -313,8 +313,7 @@
   ;; constant pool. A non-immediate :CONSTANT TN with offset 0 refers
   ;; to the constant in element 0, etc. Normal constants are
   ;; represented by the placing the CONSTANT leaf in this vector. A
-  ;; load-time constant is distinguished by being a cons
-  ;; (KIND WHAT TN).
+  ;; load-time constant is distinguished by being a cons (KIND WHAT).
   ;; KIND is a keyword indicating how the constant is computed, and
   ;; WHAT is some context.
   ;;
@@ -336,11 +335,16 @@
   ;;    Is replaced with the result of executing the forms
   ;;    to compute <handle>.
   ;;
+  ;; as well as a few other forms of magic - see DUMP-CODE-OBJECT.
+  ;; (:constant )
+  ;; (:coverage-marks )
+  ;; (:tls-index )
+
   ;; A null entry in this vector is a placeholder for implementation
   ;; overhead that is eventually stuffed in somehow.
   ;; Prior to performing SORT-BOXED-CONSTANTS, the index 0 is reserved
   ;; to signify something (other than NIL) if stored as a TN-OFFSET,
-  ;; though nothing makes use of this at present.
+  ;; though nothing makes use of this at present. (Uh, what did I mean by this?)
   (constants (make-array 10 :fill-pointer 1 :adjustable t
                          :initial-element :ignore)
              :type vector :read-only t)

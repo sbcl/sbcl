@@ -295,7 +295,9 @@
          (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants)
           (tn-type res) type)
-    (vector-push-extend (list :load-time-value handle res) constants)
+    ;; The third list element served no purpose as far as I can discern.
+    ;; Perhaps it was for debugging?
+    (vector-push-extend (list :load-time-value handle #|res|#) constants)
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
 
@@ -331,7 +333,9 @@
     (do ((i 1 (1+ i)))
         ((= i (length constants))
          (setf (tn-offset res) i)
-         (vector-push-extend (list kind info res) constants))
+         ;; The third list element served no purpose as far as I can discern.
+         ;; Perhaps it was for debugging?
+         (vector-push-extend (list kind info #|res|#) constants))
       (let ((entry (aref constants i)))
         (when (and (consp entry)
                    (eq (car entry) kind)

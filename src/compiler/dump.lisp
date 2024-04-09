@@ -1157,7 +1157,9 @@
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.
       (loop for i from sb-vm:code-constants-offset below header-length do
-        (let ((entry (aref constants i)))
+        (binding* ((entry (aref constants i))
+                   ((kind payload)
+                    (if (listp entry) (values (car entry) (cadr entry)))))
           (etypecase entry
             (constant
              (cond ((sb-c::leaf-has-source-name-p entry)
@@ -1165,34 +1167,33 @@
                     (dump-fop 'fop-misc-trap fasl-output))
                    (t
                     (dump-object (sb-c::constant-value entry) fasl-output))))
-            (cons
-             (ecase (car entry)
+            (null
+             (dump-fop 'fop-misc-trap fasl-output))
+            (list
+             (ecase kind
                (:constant ; anything that has not been wrapped in a #<CONSTANT>
-                (dump-object (cadr entry) fasl-output))
+                (dump-object payload fasl-output))
                (:entry
-                (let* ((info (sb-c::leaf-info (cadr entry)))
+                (let* ((info (sb-c::leaf-info payload))
                        (handle (gethash info
-                                        (fasl-output-entry-table
-                                         fasl-output))))
+                                        (fasl-output-entry-table fasl-output))))
                   (declare (type sb-c::entry-info info))
-                  (cond
-                   (handle
-                    (dump-push handle fasl-output))
-                   (t
-                    (patches (cons info i))
-                    (dump-fop 'fop-misc-trap fasl-output)))))
+                  (cond (handle (dump-push handle fasl-output))
+                        (t
+                         (patches (cons info i))
+                         (dump-fop 'fop-misc-trap fasl-output)))))
                (:load-time-value
-                (dump-push (cadr entry) fasl-output))
+                (dump-push payload fasl-output))
                (:fdefinition
                 ;; It's possible for other fdefns to be found in the header, but they can't
                 ;; have resulted from IR2 conversion. They would have had to come from
                 ;; something like (load-time-value (find-or-create-fdefn ...))
                 ;; which is fine, but they don't count for this purpose.
                 (incf n-fdefns)
-                (dump-object (cadr entry) fasl-output)
+                (dump-object payload fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
-                (dump-object (cadr entry) fasl-output)
+                (dump-object payload fasl-output)
                 (dump-fop 'fop-known-fun fasl-output))
                (:coverage-marks
                 ;; Avoid the coalescence done by DUMP-VECTOR
@@ -1202,10 +1203,8 @@
                                          fasl-output))
                #+arm64
                (:tls-index
-                (dump-object (cdr entry) fasl-output)
-                (dump-fop 'fop-tls-index fasl-output))))
-            (null
-             (dump-fop 'fop-misc-trap fasl-output)))))
+                (dump-object payload fasl-output)
+                (dump-fop 'fop-tls-index fasl-output)))))))
 
       ;; Dump the debug info.
       (let ((info (sb-c::debug-info-for-component component)))

@@ -411,9 +411,9 @@
     (let ((component (component-info *component-being-compiled*)))
       (ash (or (position-if (lambda (x)
                               (and (typep x '(cons (eql :tls-index)))
-                                   (eq (cdr x) symbol)))
+                                   (eq (cadr x) symbol)))
                             (ir2-component-constants component))
-               (vector-push-extend (cons :tls-index symbol)
+               (vector-push-extend (list :tls-index symbol)
                                    (ir2-component-constants component)))
            word-shift)))
 

@@ -240,20 +240,22 @@
       (do ((index const-patch-start-index (1+ index)))
           ((>= index n-boxed-words))
         (let* ((const (aref constants index))
-               (kind (if (listp const) (car const) const)))
-          (set-boxed-word
-           index
-           (etypecase kind
-             ((eql :entry)
-              (the function (gethash (leaf-info (cadr const))
-                                     (core-object-entry-table object))))
-             ((eql :fdefinition) (cadr const))
-             ((eql :known-fun) (%coerce-name-to-fun (cadr const)))
-             #+arm64
-             ((eql :tls-index)
-              (ash (ensure-symbol-tls-index (cdr const)) (- sb-vm:n-fixnum-tag-bits)))
-             (constant (constant-value const)))
-           (eq kind :fdefinition))))
+               (is-fdefn)
+               (value
+                (if (constant-p const)
+                    (constant-value const)
+                    (destructuring-bind (kind payload) const
+                      (ecase kind
+                        (:entry
+                         (the function (gethash (leaf-info payload)
+                                                (core-object-entry-table object))))
+                        (:fdefinition (setq is-fdefn t) payload)
+                        (:known-fun (%coerce-name-to-fun payload))
+                        #+arm64
+                        (:tls-index
+                         (ash (ensure-symbol-tls-index payload)
+                              (- sb-vm:n-fixnum-tag-bits))))))))
+          (set-boxed-word index value is-fdefn)))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
