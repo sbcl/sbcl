@@ -142,7 +142,15 @@
       (multiple-value-bind (arg-lvars unknown) (resolve-key-args (combination-args combination) type)
         (flet ((call (lvar annotation)
                  (destructuring-bind (args &optional results . options) annotation
-                   (apply function lvar args results
+                   (apply function lvar
+                          (loop for arg in args
+                                if (typep arg '(cons (eql rest-args)))
+                                nconc (loop repeat (- (length (combination-args combination))
+                                                      (fun-type-positional-count type))
+                                            collect arg)
+                                else
+                                collect arg)
+                          results
                           :arg-lvars arg-lvars
                           :unknown-keys unknown
                           options))))
@@ -151,7 +159,7 @@
                 do
                 (let ((arg (nth n arg-lvars)))
                   (when arg
-                   (call arg annotation))))
+                    (call arg annotation))))
           (loop with keys = (nthcdr (fun-type-positional-count type)
                                     arg-lvars)
                 for (key (kind . annotation)) on (fun-type-annotation-key annotation) by #'cddr

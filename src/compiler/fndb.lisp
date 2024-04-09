@@ -650,9 +650,11 @@
                   (intern (concatenate 'string "VECTOR-MAP-INTO/"
                                        (string (sb-vm:saetp-primitive-type-name info)))
                           :sb-impl))
-    (simple-array index index function &rest sequence)
+    (simple-array index index (function ((rest-args :sequence t))
+                                        (nth-arg 0 :sequence t))
+                  &rest sequence)
     index
-    (call no-verify-arg-count))
+  (call no-verify-arg-count))
 
 ;;; returns the result from the predicate...
 (defknown some (function-designator proper-sequence &rest proper-sequence) t
