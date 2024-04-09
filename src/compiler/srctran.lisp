@@ -4644,8 +4644,11 @@
                   (types-equal-or-intersect y ctype)))))
     (not (or (and (let ((int-x (type-intersection x (specifier-type 'number)))
                         (int-y (type-intersection y (specifier-type 'number))))
-                    (not (and (csubtypep int-x (specifier-type 'integer))
-                              (csubtypep int-y (specifier-type 'integer))))))
+                    (and (neq int-x *empty-type*)
+                         (neq int-y *empty-type*)
+                         (not
+                          (and (csubtypep int-x (specifier-type 'integer))
+                               (csubtypep int-y (specifier-type 'integer)))))))
              (both-intersect-p 'array)
              (both-intersect-p 'character)
              (both-intersect-p 'cons)
