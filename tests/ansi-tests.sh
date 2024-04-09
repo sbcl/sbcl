@@ -53,7 +53,7 @@ rm -fr sandbox/scratch
          #-sb-unicode (list "MISC.638")
          (if (member :sb-fasteval sb-impl:+internal-features+)
              (list "INTERSECTION.FOLD.1" "UNION.FOLD.1" "SET-DIFFERENCE.FOLD.1"
-                   "SET-EXCLUSIVE-OR.FOLD.1" "ASH.ERROR.5"
+                   "SET-EXCLUSIVE-OR.FOLD.1"
                    "ALL-STRUCTURE-CLASSES-ARE-SUBTYPES-OF-STRUCTURE-OBJECT.2" "TRACE.8")
              (list "MAP.48" "SYMBOL-FUNCTION.ERROR.5"))
 
