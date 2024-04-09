@@ -644,6 +644,7 @@
           (char-equal
            (multiple-value-bind (p value) (type-singleton-p item)
              (when (and p
+                        (characterp value)
                         (not (both-case-p value)))
                'char=)))))
    test))
