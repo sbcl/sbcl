@@ -542,3 +542,16 @@
       (truly-the fixnum
                  (mask-field (byte 78 0) a)))
    ((35) 35)))
+(with-test (:name :ash-count-integr)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (a b)
+         (ash a b))
+    ((1 -1.0) (condition 'type-error))
+    (((expt 2 74) -1.0) (condition 'type-error))
+    ((0 1.0) (condition 'type-error))
+    (((expt 2 74) 1.0) (condition 'type-error))
+    ((1 1d0) (condition 'type-error))
+    (((expt 2 74) 1d0) (condition 'type-error))
+    ((0 -3d0) (condition 'type-error))
+    (((expt 2 74) -2d0) (condition 'type-error))))

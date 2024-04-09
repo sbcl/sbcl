@@ -1380,25 +1380,25 @@ and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check))
   (etypecase integer
     (fixnum
-     (cond ((zerop integer)
-            0)
-           ((fixnump count)
-            (let ((length (integer-length (truly-the fixnum integer)))
-                  (count (truly-the fixnum count)))
-              (declare (fixnum length count))
-              (cond ((and (plusp count)
-                          (>= (+ length count)
-                              sb-vm:n-word-bits))
-                     (bignum-ashift-left-fixnum integer count))
-                    (t
-                     (truly-the sb-vm:signed-word
-                                (ash (truly-the fixnum integer) count))))))
-           ((minusp count)
+     (cond ((fixnump count)
+            (if (zerop integer)
+                0
+                (let ((length (integer-length (truly-the fixnum integer)))
+                      (count (truly-the fixnum count)))
+                  (declare (fixnum length count))
+                  (cond ((and (plusp count)
+                              (>= (+ length count)
+                                  sb-vm:n-word-bits))
+                         (bignum-ashift-left-fixnum integer count))
+                        (t
+                         (truly-the sb-vm:signed-word
+                                    (ash (truly-the fixnum integer) count)))))))
+           ((minusp (the integer count))
             (if (minusp integer) -1 0))
            (t
             (bignum-ashift-left (make-small-bignum integer) count))))
     (bignum
-     (if (plusp count)
+     (if (plusp (the integer count))
          (bignum-ashift-left integer count)
          (bignum-ashift-right integer (- count))))))
 
