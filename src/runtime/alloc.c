@@ -385,6 +385,9 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
 #endif
     )
 {
+#ifndef LISP_FEATURE_SYSTEM_TLABS
+    int sys = 0;
+#endif
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
     sword_t nbytes = context_bytes * CONS_SIZE;
