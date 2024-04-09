@@ -255,6 +255,7 @@
                         (:tls-index
                          (ash (ensure-symbol-tls-index payload)
                               (- sb-vm:n-fixnum-tag-bits))))))))
+          (declare (ignorable is-fdefn))
           (set-boxed-word index value is-fdefn)))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
