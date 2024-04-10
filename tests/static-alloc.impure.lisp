@@ -1,4 +1,5 @@
 
+#-relocatable-static-space
 (dolist (type '(single-float double-float (unsigned-byte 8)
                 (unsigned-byte 32) (signed-byte 32)
                 base-char character))
@@ -18,6 +19,7 @@
 ;;; Because PRIMITIVE-OBJECT-SIZE always gives you the _CORRECT_ answer
 ;;; for the object, not the amount of space the allocator took,
 ;;; and this test needs to assert correctness of the allocator.
+#-relocatable-static-space
 (dolist (type '(base-char character))
   (loop for i from 1 to 20
      do (let* ((before sb-vm:*static-space-free-pointer*)
