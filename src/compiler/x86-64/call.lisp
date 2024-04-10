@@ -657,18 +657,15 @@
 ;;; have been set up in the current frame.
 (defmacro define-full-call (vop-name named return variable &optional args)
   (aver (not (and variable (eq return :tail))))
-  #+immobile-code (when named (setq named :direct))
   `(define-vop (,vop-name ,@(when (eq return :unknown) '(unknown-values-receiver)))
      (:args    ,@(unless (eq return :tail)
                    '((new-fp :scs (any-reg) :to (:argument 1))))
 
-               ;; If immobile-space is in use, then named call does not require
-               ;; a register unless the caller is NOT in immobile space,
-               ;; in which case the register is needed because there is no
-               ;; absolute addressing mode for jmp/call.
                ,@(unless (eq named :direct)
-                   '((fun :scs (descriptor-reg control-stack)
-                          :target rax :to (:argument 0))))
+                   `((fun ,@(if named
+                                '(:scs (constant))
+                                '(:scs (descriptor-reg control-stack)
+                                  :target rax :to (:argument 0))))))
 
                ,@(when (eq return :tail)
                    '((old-fp)
@@ -708,9 +705,7 @@
                ;; with the real function and invoke the real function
                ;; for closures. Non-closures do not need this value,
                ;; so don't care what shows up in it.
-     ,@(unless (eq named :direct)
-         '((:temporary (:sc descriptor-reg :offset rax-offset
-                        :from (:argument 0) :to :eval) rax)))
+     (:temporary (:sc descriptor-reg :offset rax-offset :from (:argument 0) :to :eval) rax)
 
      ;; We pass the number of arguments in RCX.
      (:temporary
@@ -746,12 +741,14 @@
                      15
                      (if (eq return :unknown) 25 0))
 
+       ,@(when (eq named :direct) '((bug "This vop should never be selected")))
+
        (progn node) ; always "use" it
 
                ;; This has to be done before the frame pointer is
                ;; changed! RAX stores the 'lexical environment' needed
                ;; for closures.
-       ,@(unless (eq named :direct) '((move rax fun)))
+       ,@(unless named '((move rax fun))) ; might not need RAX in named call
 
        ,@(if variable
                      ;; For variable call, compute the number of
@@ -836,25 +833,16 @@
 
                           (move rbp-tn new-fp))))  ; NB - now on new stack frame.
 
-       (when (and step-instrumenting
-                  ,@(and (eq named :direct)
-                         `((not (and #+immobile-code
-                                     ;; handle-single-step-around-trap can't handle it
-                                     (static-fdefn-offset fun))))))
+       (when step-instrumenting
+         #-immobile-code ,@(when named '((move rax fun))) ; RAX was already loaded if un-named call
          (emit-single-step-test)
          (inst jmp :eq DONE)
          (inst break single-step-around-trap))
        DONE
        (note-this-location vop :call-site)
-       ,(cond ((eq named :direct)
-                       #+immobile-code `(emit-direct-call fun ',(if (eq return :tail) 'jmp 'call)
-                                                          node step-instrumenting)
-                       #-immobile-code `(inst ,(if (eq return :tail) 'jmp 'call)
-                                              (ea (+ nil-value (static-fun-offset fun)))))
-              #-immobile-code
-              (named
-               `(inst ,(if (eq return :tail) 'jmp 'call)
-                      (object-slot-ea rax fdefn-raw-addr-slot other-pointer-lowtag)))
+       ,(cond (named
+               `(emit-named-call fun ',(if (eq return :tail) 'jmp 'call)
+                                 node step-instrumenting rax))
               ((eq return :tail)
                `(tail-call-unnamed rax fun-type vop))
               (t
@@ -868,15 +856,12 @@
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
-#-immobile-code
 (define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
-#-immobile-code
 (define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
-#-immobile-code
 (define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
@@ -887,31 +872,51 @@
 (define-full-call unboxed-call-named t :unboxed nil)
 (define-full-call fixed-unboxed-call-named t :unboxed nil :fixed)
 
-;;; Call NAME "directly" meaning in a single JMP or CALL instruction,
+;;; Call FUN "directly" meaning in a single JMP or CALL instruction,
 ;;; if possible (without loading RAX)
-(defun emit-direct-call (name instruction node step-instrumenting)
+(defun emit-named-call (fun instruction node step-instrumenting rax
+                        &aux (name (sb-c::fun-tn-function-name fun))
+                             (static (static-fdefn-offset name)))
+  (declare (ignorable node))
+  #+immobile-code
       ;; a :STATIC-CALL fixup is the address of the entry point of
       ;; the function itself, and a :FDEFN-CALL fixup is the address
       ;; of the JMP instruction embedded in the header for the named FDEFN.
-  (when (static-fdefn-offset name)
-    (let ((fixup (make-fixup name :static-call)))
-      (return-from emit-direct-call
-        (inst* instruction (if (sb-c::code-immobile-p node) fixup (ea fixup))))))
-  (let* ((fixup (make-fixup name :fdefn-call))
-         (target
-              (if (and (sb-c::code-immobile-p node)
-                       (not step-instrumenting))
-                  fixup
-                  (progn
-                    ;; RAX-TN was not declared as a temp var,
-                    ;; however it's sole purpose at this point is
-                    ;; for function call, so even if it was used
-                    ;; to compute a stack argument, it's free now.
-                    ;; If the call hits the undefined fun trap,
-                    ;; RAX will get loaded regardless.
-                    (inst mov rax-tn fixup)
-                    rax-tn))))
-    (inst* instruction target)))
+  (cond ((and static (not step-instrumenting))
+         (sb-c::decrement-load-time-constant-refcount fun)
+         (let ((fixup (make-fixup name :static-call)))
+           (inst* instruction (if (sb-c::code-immobile-p node) fixup (ea fixup)))))
+        (t
+         (let* ((fixup (make-fixup name :fdefn-call))
+                (target (cond ((and (not step-instrumenting)
+                                    (sb-c::code-immobile-p node))
+                               fixup)
+                              (t
+                               (inst mov rax fixup)
+                               rax))))
+           (inst* instruction target))))
+  #-immobile-code
+  ;; Despite strong memory ordering, x86-64 permits "MOV RAX" to appear to execute
+  ;; before "MOV [RSP], RBP" here since the EAs differ:
+  ;;    MOV [RSP], RBP
+  ;;    MOV RBP, RSP
+  ;;    MOV RAX, [RIP-k]
+  ;;    CALL [RAX+9]
+  ;; So it's irrelevant that (MOVE RAX FUN) used to occur sooner, at the top of each named
+  ;; call vop, i.e. before most of its other instructions.
+  (cond ((and static (not step-instrumenting))
+         ;; can't decrement this always when static because the MOV already inserted
+         ;; by the vop generator referenced a boxed constant even though it could
+         ;; have used an immediate operand for the fdefn
+         (sb-c::decrement-load-time-constant-refcount fun)
+         (inst* instruction (ea (+ nil-value (static-fun-offset name)))))
+        (t ; either not static (and possibly stepping), or static and stepping
+         ;; If step-instrumenting, the MOV was already done, as it
+         ;; is critical for the stepper to work properly.
+         (unless step-instrumenting
+           (inst mov rax fun))
+         (inst* instruction (object-slot-ea rax fdefn-raw-addr-slot
+                                            other-pointer-lowtag)))))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)

@@ -232,6 +232,33 @@
       (dovector (constant (sb-vm:sort-inline-constants constants) t)
         (sb-vm:emit-inline-constant section (car constant) (cdr constant))))))
 
+(defun remove-unused-boxed-constants (constant-vector constant-tns)
+  (flet ((remove-p (i)
+           (let ((x (aref constant-vector i)))
+             (and (typep x '(cons (eql :fdefinition)))
+                  (sb-vm::static-fdefn-offset (second x))
+                  (zerop (third x))))))
+    (binding* ((old-n (fill-pointer constant-vector))
+               (remove (loop for i below old-n when (remove-p i) collect i)
+                       :exit-if-null)
+               (new-n (- old-n (length remove)))
+               (new-array (make-array new-n))
+               (mapping (make-array old-n :initial-element nil))
+               (j 0))
+      (dotimes (i old-n)
+        (unless (remove-p i)
+          (setf (aref new-array j) (aref constant-vector i))
+          (setf (aref mapping i) j)
+          (incf j)))
+      (fill constant-vector nil :start old-n)
+      (setf (fill-pointer constant-vector) new-n)
+      (replace constant-vector new-array)
+      ;; Renumber TN-OFFSETs
+      (do ((tn constant-tns (tn-next tn)))
+          ((null tn))
+        (awhen (tn-offset tn)
+          (setf (tn-offset tn) (aref mapping it)))))))
+
 ;; Collect "static" count of number of times each vop is employed.
 ;; (as opposed to "dynamic" - how many times its code is hit at runtime)
 (defglobal *static-vop-usage-counts* nil)
@@ -309,6 +336,12 @@
     (when *do-instcombine-pass*
       #+(or arm64 x86-64)
       (sb-assem::combine-instructions (asmstream-code-section asmstream)))
+
+    ;; The family of function-calling vops can receive load-time-constant TNs
+    ;; for each referenced fdefn whether or not the fdefn has to be present
+    ;; in the code header. Delete any unreferenced ones now.
+    (remove-unused-boxed-constants (ir2-component-constants ir2-component)
+                                   (ir2-component-constant-tns ir2-component))
 
     (emit (asmstream-data-section asmstream)
           (sb-assem::asmstream-data-origin-label asmstream))

@@ -244,7 +244,8 @@
                (value
                 (if (constant-p const)
                     (constant-value const)
-                    (destructuring-bind (kind payload) const
+                    (destructuring-bind (kind payload &optional refcount) const
+                      (declare (ignore refcount))
                       (ecase kind
                         (:entry
                          (the function (gethash (leaf-info payload)
