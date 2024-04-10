@@ -335,9 +335,7 @@
          (setf (tn-offset res) i)
          ;; The third list element served no purpose as far as I can discern.
          ;; Perhaps it was for debugging?
-         (let ((new (list* kind info (if (eq kind :fdefinition)
-                                         (list 1))))) ; refcount
-           (vector-push-extend new constants)))
+         (vector-push-extend (list kind info #|res|#) constants))
       (let ((entry (aref constants i)))
         (when (and (consp entry)
                    (eq (car entry) kind)
@@ -345,26 +343,10 @@
                        (and (consp info)
                             (equal (cadr entry) info))))
           (setf (tn-offset res) i)
-          (when (eq kind :fdefinition) (incf (third entry))) ; +1 refcount
           (return))))
 
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
-
-(defun fun-tn-function-name (fun-tn)
-  (aver (sc-is fun-tn constant))
-  (let* ((component (component-info *component-being-compiled*))
-         (constants (ir2-component-constants component))
-         (constant (aref constants (tn-offset fun-tn))))
-    (aver (typep constant '(cons (eql :fdefinition))))
-    (second constant)))
-
-(defun decrement-load-time-constant-refcount (fun-tn)
-  (let* ((component (component-info *component-being-compiled*))
-         (constants (ir2-component-constants component))
-         (constant (aref constants (tn-offset fun-tn))))
-    (aver (typep constant '(cons (eql :fdefinition))))
-    (decf (third constant))))
 
 ;;;; TN referencing
 
