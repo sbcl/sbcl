@@ -23,7 +23,8 @@
 // Keep in sync with {READ,WRITE}-VAR-INTEGER in
 // src/code/debug-var-io.lisp
 int read_var_integer(unsigned char *source, int *offset) {
-    unsigned char *ptr = source + (offset ? *offset : 0);
+    unsigned char *start = source + (offset ? *offset : 0);
+    unsigned char *ptr = start;
     int result = 0;
     unsigned char octet;
     int k = 0;
@@ -35,7 +36,7 @@ int read_var_integer(unsigned char *source, int *offset) {
         }
     }
     if (offset) {
-        *offset += (ptr - source);
+        *offset += (ptr - start);
     }
     return result;
 }
