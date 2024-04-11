@@ -444,37 +444,20 @@
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
 
-;;; Map a SB-C::COMPILED-DEBUG-FUN to a SB-DI::COMPILED-DEBUG-FUN.
-;;; The mapping is memoized into a slot of %CODE-DEBUG-INFO of COMPONENT
-;;; except on #+cheneygc where that is assumed not to be possible
-;;; (even if it is possible), because usually it's not, because
-;;; code and the debug structures are defined with :PURE T and might reside
-;;; in readonly space, which can only have pointers to static space.
-;;;
-;;; BTW, the nomenclature here is utter and total confusion.
-;;; The type of the object in the argument named COMPILER-DEBUG-FUN
-;;; is SB-C::COMPILED-DEBUG-FUN.
-;;; There is no such type as a "COMPILER-DEBUG-FUN", it's just the name
-;;; of the slot in the SB-DI:: version of the structure.
+;;; This maps SB!C::COMPILED-DEBUG-FUNs to COMPILED-DEBUG-FUNs, so we
+;;; can get at cached stuff and not duplicate COMPILED-DEBUG-FUN
+;;; structures.
+(defvar *compiled-debug-funs* (make-hash-table :test 'eq :weakness :key))
+
+;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN and its
+;;; component. This maps the latter to the former in
+;;; *COMPILED-DEBUG-FUNS*. If there already is a COMPILED-DEBUG-FUN,
+;;; then this returns it from *COMPILED-DEBUG-FUNS*.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
-  (declare (code-component component))
-  (let ((dinfo (%code-debug-info component))
-        (new-df nil))
-    ;; The MEMO-CELL slot holds an alist from compiler -> debugger structure.
-    ;; This list generally contains 5 items or less. At least, in our tests it does
-    ;; which I assume is typical.
-    ;; It would do no good to make this a weak list because most code is
-    ;; pseudo-static and so would always enliven its memo-cell.
-    (named-let retry ((list (sb-c::compiled-debug-info-memo-cell dinfo)))
-      (let ((found (assq compiler-debug-fun list)))
-        (if found
-            (cdr found)
-            (let* ((new (acons compiler-debug-fun
-                               (or new-df (setq new-df (%make-compiled-debug-fun
-                                                        compiler-debug-fun component)))
-                               list))
-                   (old (cas (sb-c::compiled-debug-info-memo-cell dinfo) list new)))
-              (if (eq old list) new-df (retry old))))))))
+  (or (gethash compiler-debug-fun *compiled-debug-funs*)
+      (setf (gethash compiler-debug-fun *compiled-debug-funs*)
+            (%make-compiled-debug-fun compiler-debug-fun component))))
+
 
 ;;;; CODE-LOCATIONs
 

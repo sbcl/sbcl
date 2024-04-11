@@ -364,6 +364,8 @@ sufficiently motivated to do lengthy fixes."
 (defun coalesce-debug-info ()
   ;; Discard the uncompacted fun map cache.
   (clrhash sb-di::*uncompacted-fun-maps*)
+  ;; Discard the debugger's cached mapping of debug functions.
+  (clrhash sb-di::*compiled-debug-funs*)
   (flet ((debug-source= (a b)
            (and (equalp a b)
                 ;; Case sensitive
@@ -396,8 +398,6 @@ sufficiently motivated to do lengthy fixes."
            (#.sb-vm:instance-widetag
             (typecase obj
               (compiled-debug-info
-               ;; Discard memoized debugger's debug info
-               (setf (sb-c::compiled-debug-info-memo-cell obj) nil)
                (let ((source (compiled-debug-info-source obj)))
                  (typecase source
                    (core-debug-source)  ; skip - uh, why?

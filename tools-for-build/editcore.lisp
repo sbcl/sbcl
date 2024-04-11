@@ -1418,9 +1418,7 @@
 ;;; Shared substructure / circularity are OK (I think)
 ;;;
 (defparameter *allowed-instance-types*
-  '(sb-c::compiled-debug-info sb-c::debug-source
-    sb-di::compiled-debug-var sb-di::compiled-debug-block sb-di::compiled-code-location
-    sb-c::compiled-debug-fun))
+  '(sb-c::compiled-debug-info sb-c::debug-source))
 (defparameter *ignored-instance-types*
   '("CORE-DEBUG-SOURCE"))
 
@@ -1481,11 +1479,7 @@
                                    (logior
                                     ;; skip the layout slot if #-compact-instance-header
                                     (if (= sb-vm:instance-data-start 1) 1 0)
-                                    ;; everything else except for compiled-debug-info-memo-cell
-                                    ;; (Why is it ever non-NIL as saved? That's another bug)
-                                    (if (eq allowed 'sb-c::compiled-debug-info)
-                                        (ash 1 (get-dsd-index sb-c::compiled-debug-info sb-c::memo-cell))
-                                        0))))
+                                    0)))
                              (setf (%instance-layout new) (find-layout allowed))
                              (dotimes (i nslots new)
                                (unless (logbitp i exclude-slot-mask)
