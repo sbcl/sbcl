@@ -121,7 +121,10 @@
     ;;; we can stuff it back in because our contrib builder first loads ASDF
     ;;; and then rebinds *FEATURES* with the union of the internal ones.
     (append #+haiku '(:haiku)
-            (remove-if (lambda (x) (member x removable-features)) *features*)))
+            #-sb-devel
+            (remove-if (lambda (x) (member x removable-features)) *features*)
+            #+sb-devel
+            *features*))
   (setq *features* (remove-if-not (lambda (x) (member x public-features))
                                   *features*)))
 
