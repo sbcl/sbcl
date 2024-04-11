@@ -83,11 +83,13 @@
 ;;;
 (defun get-space (id spacemap)
   (find id (cdr spacemap) :key #'space-id))
-(defun compute-nil-object (spacemap)
+(defun compute-nil-addr (spacemap)
   (let ((space (get-space static-core-space-id spacemap)))
     ;; TODO: The core should store its address of NIL in the initial function entry
     ;; so this kludge can be removed.
-    (%make-lisp-obj (logior (space-addr space) #x117)))) ; SUPER KLUDGE
+    (logior (space-addr space) #x117))) ; SUPER KLUDGE
+(defun compute-nil-object (spacemap) ; terrible, don't use!
+  (%make-lisp-obj (compute-nil-addr spacemap)))
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
 ;;; the range at which the core is now mapped during execution of this tool,
@@ -1542,6 +1544,105 @@
     (loop for i from first below last do (scan-slot i))))
 ) ; end MACROLET
 
+;;; Convert the object at SAP (which represents a tagged lispobj)
+;;; into a host proxy for that object, with a few caveats:
+;;; - Structure types *must* match the host's type for the classoid,
+;;;   or bad things happen.
+;;; - Symbols can optionally be returned as instances of CORE-SYM
+;;;
+;;; Structures use the host's LAYOUT instances. The addresses don't
+;;; have to match, but the slots do have to.
+;;;
+;;; Shared substructure / circularity are OK (I think)
+;;;
+(defun extract-object-from-core (core sap &optional proxy-symbols
+                                 &aux (spacemap (core-spacemap core))
+                                      (targ-nil (compute-nil-addr spacemap)))
+  (declare (ignorable proxy-symbols)) ; not done
+  (let ((seen (make-hash-table))) ; address (an integer) -> host object
+    (macrolet ((word (i)
+                 `(sap-ref-word sap (ash ,i sb-vm:word-shift)))
+               (memoize (result)
+                 `(setf (gethash addr seen) ,result)))
+      (labels ((translated-obj (addr)
+                 ;; this not great, but I'm being lazy and it works
+                 (%make-lisp-obj (translate-ptr addr spacemap)))
+               (recurse (addr)
+                 (unless (sb-vm:is-lisp-pointer addr)
+                   (return-from recurse addr))
+                 (awhen (gethash addr seen) ; NIL is not recorded
+                   (return-from recurse it))
+                 (when (eql addr targ-nil)
+                   (return-from recurse nil))
+                 (let ((sap (int-sap (translate-ptr (logandc2 addr sb-vm:lowtag-mask)
+                                                    spacemap))))
+                   (case (logand addr sb-vm:lowtag-mask)
+                     (#.sb-vm:list-pointer-lowtag
+                      (let ((new (memoize (cons 0 0))))
+                        (rplaca new (recurse (word 0)))
+                        (rplacd new (recurse (word 1)))
+                        new))
+                     (#.sb-vm:instance-pointer-lowtag
+                      (let* ((layout
+                              (truly-the layout
+                                (translate (%instance-layout (translated-obj addr))
+                                           spacemap)))
+                             (classoid
+                              (truly-the sb-kernel:classoid
+                                (translate (sb-kernel:layout-classoid layout) spacemap)))
+                             (classoid-name
+                              (truly-the symbol
+                                         (translate (sb-kernel:classoid-name classoid) spacemap)))
+                             (classoid-name-string
+                              (translate (symbol-name classoid-name) spacemap)))
+                        ;; In general, I want to correctly intern the symbol into the host
+                        ;; and then perform FIND-LAYOUT on that symbol.
+                        ;; These few cases are enough to get by.
+                        (cond
+                          ((or (string= classoid-name-string "COMPILED-DEBUG-INFO")
+                               (string= classoid-name-string "DEBUG-SOURCE"))
+                           (let* ((nslots (sb-kernel:%instance-length (translated-obj addr)))
+                                  (new (memoize (sb-kernel:%make-instance nslots))))
+                             (setf (%instance-layout new)
+                                   (sb-kernel:find-layout
+                                    (intern classoid-name-string "SB-C")))
+                             ;; all boxed slots
+                             (dotimes (i nslots new)
+                               (setf (%instance-ref new i)
+                                     (recurse (word (+ sb-vm:instance-slots-offset i)))))))
+                          ((string= classoid-name-string "PACKAGE")
+                           ;; oh dear, this is completely wrong
+                           (let ((package-name
+                                  (translate
+                                   (sb-impl::package-%name
+                                    (truly-the package (translated-obj addr)))
+                                   spacemap)))
+                             (memoize (or (find-package package-name)
+                                          (make-package package-name)))))
+                          (t
+                           (error "Not done: type ~s" classoid-name-string)))))
+                     (#.sb-vm:fun-pointer-lowtag
+                      (error "Sorry no can do"))
+                     (#.sb-vm:other-pointer-lowtag
+                      (let ((widetag (logand (word 0) sb-vm:widetag-mask)))
+                        (cond ((= widetag sb-vm:simple-vector-widetag)
+                               (let* ((len (ash (word 1) (- sb-vm:n-fixnum-tag-bits)))
+                                      (new (memoize (make-array len))))
+                                 (dotimes (i len new)
+                                   (setf (aref new i)
+                                         (recurse (word (+ sb-vm:vector-data-offset i)))))))
+                              ((and (>= widetag #x80)
+                                    (typep (translated-obj addr) 'simple-array))
+                               ;; it could be returned as-is, I suppose?
+                               (memoize (copy-seq (translated-obj addr))))
+                              ((= widetag sb-vm:symbol-widetag)
+                               (let ((name (translate (symbol-name (translated-obj addr)) spacemap)))
+                                 (memoize (intern name "CL-USER")))) ; TEMPORARY HACK
+                              (t
+                               (error "can't translate other fancy stuff yet")))
+                        ))))))
+        (recurse (sap-int sap))))))
+
 (defun compute-nil-symbol-sap (spacemap)
   (let ((space (get-space static-core-space-id spacemap)))
     ;; TODO: The core should store its address of NIL in the initial function entry
@@ -1937,3 +2038,18 @@
                      (cdr spacemap))
              spacemap card-mask-nbits initfun
              core-header core-dir-start output)))))))
+
+(defun test-an-object (input-pathname addr)
+  (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
+    (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
+               (core-offset (read-core-header input core-header t))
+               ((npages space-list card-mask-nbits core-dir-start initfun)
+                (parse-core-header input core-header)))
+      (declare (ignorable card-mask-nbits core-dir-start initfun))
+      (with-mapped-core (sap core-offset npages input)
+        ;; FIXME: WITH-MAPPED-CORE should bind spacemap
+        (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
+               (core (make-core spacemap (make-bounds 0 0) (make-bounds 0 0))))
+          (extract-object-from-core core
+                                    (sb-sys:int-sap addr)
+                                    ))))))
