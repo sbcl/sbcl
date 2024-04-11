@@ -41,6 +41,14 @@ int read_var_integer(unsigned char *source, int *offset) {
     return result;
 }
 
+void skip_var_string(unsigned char* source, int *offset) {
+    int len = read_var_integer(source, offset);
+    int i;
+    for (i = 0; i < len; i++) {
+        read_var_integer(source, offset);
+    }
+}
+
 void varint_unpacker_init(struct varint_unpacker* unpacker, lispobj integer)
 {
   if (fixnump(integer)) {

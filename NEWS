@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.3:
+  * optimization: the amount of space needed for debug-info is about 50% less,
+    leading to a total default image size reduction of more than 10%.
   * bug fix: on Arm64, and x86-64 with some non-default build options, integer
     rounding functions treat minus zero more consistently.
 

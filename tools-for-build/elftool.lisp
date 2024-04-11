@@ -676,16 +676,18 @@
 ;;; not the start of its instructions. Hence we add HEADER-BYTES
 ;;; too all the PC offsets.
 (defun code-symbols (code core)
-  (let ((cdf (extract-fun-map code core))
-        (header-bytes (* (code-header-words code) n-word-bytes))
-        (start-pc 0)
-        (blobs))
+  (let* ((fun-map (extract-fun-map code core))
+         (header-bytes (* (code-header-words code) n-word-bytes))
+         (start-pc 0)
+         (i 1)
+         (len (length fun-map))
+         (blobs))
     (loop
-      (let* ((name (remove-name-junk (sb-c::compiled-debug-fun-name cdf)))
-             (next (sb-c::compiled-debug-fun-next cdf))
-             (end-pc (if next
-                         (+ header-bytes (sb-c::compiled-debug-fun-offset next))
-                         (code-object-size code))))
+      (let* ((name (remove-name-junk
+                    (sb-c::compiled-debug-fun-name (svref fun-map (1- i)))))
+             (end-pc (if (= i len)
+                         (code-object-size code)
+                         (+ header-bytes (svref fun-map i)))))
         (unless (= end-pc start-pc)
           ;; Collapse adjacent address ranges named the same.
           ;; Use EQUALP instead of EQUAL to compare names
@@ -693,9 +695,10 @@
           (if (and blobs (equalp (caar blobs) name))
               (setf (cddr (car blobs)) end-pc)
               (push (list* name start-pc end-pc) blobs)))
-        (if next
-            (setq cdf next start-pc end-pc)
-            (return))))
+        (when (= i len)
+          (return))
+        (setq start-pc end-pc))
+      (incf i 2))
     (nreverse blobs)))
 
 ;;; Convert immobile text space to an assembly file in OUTPUT.

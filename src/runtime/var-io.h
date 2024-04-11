@@ -13,6 +13,7 @@
 #define _VAR_IO_H_
 
 extern int read_var_integer(unsigned char *source, int *offset);
+void skip_var_string(unsigned char* source, int *offset);
 
 // For streaming varints from a specialized data buffer that is first
 // delta-encoded, then varint-encoded.

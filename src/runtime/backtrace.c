@@ -42,16 +42,8 @@
 # include <dlfcn.h>
 #endif
 
-int df_decode_locs(lispobj encoded, int *offset, int *elsewhere)
-{
-    struct varint_unpacker unpacker;
-    lispobj packed_integer = listp(encoded) ? CONS(encoded)->cdr : encoded;
-    varint_unpacker_init(&unpacker, packed_integer);
-    return varint_unpack(&unpacker, offset) && varint_unpack(&unpacker, elsewhere);
-}
-
-struct compiled_debug_fun *
-debug_function_from_pc (struct code* code, void *pc)
+lispobj
+debug_function_name_from_pc (struct code* code, void *pc)
 {
     struct compiled_debug_info *di;
 
@@ -60,35 +52,121 @@ debug_function_from_pc (struct code* code, void *pc)
     else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
         di = (void*)native_pointer(CONS(code->debug_info)->car);
     else
-        return NULL;
+        return (lispobj)NULL;
 
-    if (!instancep(di->fun_map))
-        return NULL;
+    uword_t offset = (char*)pc - code_text_start(code);
 
-    struct compiled_debug_fun *df = (struct compiled_debug_fun*)native_pointer(di->fun_map);
-    int begin, end, elsewhere_begin, elsewhere_end;
-    if (!df_decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
-        return NULL;
-    sword_t offset = (char*)pc - code_text_start(code);
-    while (df) {
-        struct compiled_debug_fun *next;
-        if (df->next != NIL) {
-            next = (struct compiled_debug_fun*) native_pointer(df->next);
-            if (!df_decode_locs(next->encoded_locs, &end, &elsewhere_end))
-                return NULL;
+    struct vector *v;
+    int i, len;
+
+    v = VECTOR(di->fun_map);
+
+    len = vector_len(v);
+
+    unsigned char *map = (unsigned char*)v->data;
+
+    uword_t code_start_pc = 0;
+    __attribute__((unused)) uword_t start_pc = 0;
+    uword_t elsewhere_pc = 0;
+    uword_t first_elsewhere_pc = 0;
+    lispobj last_name;
+    lispobj name;
+
+    i = 0;
+    while (i < len) {
+        unsigned char options = map[i++];
+        unsigned char flags = map[i++];
+        bool vars_p = flags & PACKED_DEBUG_FUN_VARIABLES_BIT;
+        bool blocks_p = flags & PACKED_DEBUG_FUN_BLOCKS_BIT;
+
+        if (is_lisp_pointer(di->contexts) &&
+            widetag_of(native_pointer(di->contexts)) == SIMPLE_VECTOR_WIDETAG) {
+            struct vector *contexts = VECTOR(di->contexts);
+            name = contexts->data[read_var_integer(map, &i)];
         } else {
-            next = 0;
-            end = elsewhere_end = code_text_size(code);
+            read_var_integer(map, &i);
+            name = di->contexts;
         }
-        if ((begin <= offset && offset < end) ||
-            (elsewhere_begin <= offset && offset < elsewhere_end))
-            return df;
-        begin = end;
-        elsewhere_begin = elsewhere_end;
-        df = next;
+
+        if (vars_p) {
+            int len = read_var_integer(map, &i);
+            i += len;
+        }
+
+        if (blocks_p) {
+            int len = read_var_integer(map, &i);
+            i += len;
+        }
+
+        if (flags & PACKED_DEBUG_FUN_TLF_NUMBER_BIT)
+            read_var_integer(map, &i);
+
+        if (vars_p) {
+            if (flags & PACKED_DEBUG_FUN_NON_MINIMAL_ARGUMENTS_BIT) {
+                int len = read_var_integer(map, &i);
+                int idx;
+                for (idx = 0; idx < len; idx++) {
+                    int arg = read_var_integer(map, &i);
+                    switch (arg) {
+                    case PACKED_DEBUG_FUN_KEY_ARG_PACKAGED:
+                        skip_var_string(map, &i);
+                        // fallthrough
+                    case PACKED_DEBUG_FUN_KEY_ARG_KEYWORD:
+                    case PACKED_DEBUG_FUN_KEY_ARG_UNINTERNED:
+                        skip_var_string(map, &i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        switch ((options & PACKED_DEBUG_FUN_RETURNS_BYTE_MASK)
+                >> PACKED_DEBUG_FUN_RETURNS_BYTE_POSITION) {
+        case PACKED_DEBUG_FUN_RETURNS_STANDARD:
+        case PACKED_DEBUG_FUN_RETURNS_FIXED:
+            break;
+        case PACKED_DEBUG_FUN_RETURNS_SPECIFIED: {
+            int len = read_var_integer(map, &i);
+            int idx;
+            for (idx = 0; idx < len; idx++)
+                read_var_integer(map, &i);
+            break;
+        }
+        }
+#ifndef LISP_FEATURE_FP_AND_PC_STANDARD_SAVE
+        int j;
+        for (j = 0; j < 5; j++)
+            // return-pc, return-pc-pass, old-fp, lra-saved-pc,
+            // cfp-saved-pc
+            read_var_integer(map, &i);
+#endif
+        if (flags & PACKED_DEBUG_FUN_CLOSURE_SAVE_LOC_BIT)
+            read_var_integer(map, &i);
+#ifdef LISP_FEATURE_UNWIND_TO_FRAME_AND_CALL_VOP
+        if (flags & PACKED_DEBUG_FUN_BSP_SAVE_LOC_BIT)
+            read_var_integer(map, &i);
+#endif
+        code_start_pc += read_var_integer(map, &i);
+        start_pc = code_start_pc + read_var_integer(map, &i);
+        elsewhere_pc += read_var_integer(map, &i);
+
+        if (first_elsewhere_pc) {
+            if ((offset >= first_elsewhere_pc &&
+                 offset < elsewhere_pc))
+                return last_name;
+        } else
+            first_elsewhere_pc = elsewhere_pc;
+
+        if (offset < code_start_pc)
+            return last_name;
+
+        last_name = name;
     }
 
-    return NULL;
+    if (i == len)
+        return last_name;
+    else
+        lose("failed to parse debug function name");
 }
 
 static void
@@ -408,10 +486,10 @@ lisp_backtrace(int nframes)
         if (!fpvalid) { printf(" BAD FRAME\n"); break; }
 
         if (info.code) {
-            struct compiled_debug_fun *df;
+            lispobj name;
             if (absolute_pc &&
-                (df = debug_function_from_pc((struct code *)info.code, absolute_pc)))
-                print_entry_name(barrier_load(&df->name), stdout);
+                (name = debug_function_name_from_pc((struct code *)info.code, absolute_pc)))
+                print_entry_name(barrier_load(&name), stdout);
             else
                 // I can't imagine a scenario where we have info.code
                 // but do not have an absolute_pc, or debug-fun can't be found.
@@ -557,9 +635,9 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
 #endif
     struct code *code = (void*)component_ptr_from_pc(pc);
     if (code) {
-        struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
-        if (df)
-            print_entry_name(barrier_load(&df->name), f);
+        lispobj name = debug_function_name_from_pc(code, pc);
+        if (name)
+            print_entry_name(barrier_load(&name), f);
         else if (pc >= (char*)asm_routines_start && pc < (char*)asm_routines_end)
             fprintf(f, "%s (asm)", asm_routine_name(pc));
         else
@@ -661,10 +739,10 @@ static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
   struct code* code;
   if (gc_managed_heap_space_p((uword_t)pc) &&
       (code = (void*)component_ptr_from_pc(pc)) != 0) {
-      struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
-      if (df) {
+      lispobj name = debug_function_name_from_pc(code, pc);
+      if (name) {
           fprintf(stderr, " %p [", pc);
-          print_entry_name(barrier_load(&df->name), stderr);
+          print_entry_name(barrier_load(&name), stderr);
           fprintf(stderr, "]\n");
           return 1;
       }

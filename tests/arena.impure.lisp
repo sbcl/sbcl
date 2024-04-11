@@ -168,12 +168,13 @@
   (dolist (code (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
     (let ((info (sb-kernel:%code-debug-info code)))
       (when (typep info 'sb-c::compiled-debug-info)
-        (do ((cdf (sb-c::compiled-debug-info-fun-map info)
-                  (sb-c::compiled-debug-fun-next cdf)))
-            ((null cdf))
-          (test-util:opaque-identity
-           (sb-di::debug-fun-lambda-list
-            (sb-di::make-compiled-debug-fun cdf code))))))))
+        (let ((fun-map (sb-di::get-debug-info-fun-map
+                        (sb-kernel:%code-debug-info code))))
+          (loop for i from 0 below (length fun-map) by 2 do
+            (let ((cdf (aref fun-map i)))
+              (test-util:opaque-identity
+               (sb-di::debug-fun-lambda-list
+                (sb-di::make-compiled-debug-fun cdf code))))))))))
 
 (test-util:with-test (:name :debug-data-force-to-heap)
   (let ((a (sb-vm:new-arena (* 1024 1024 1024))))

@@ -3105,6 +3105,15 @@ Legal values for OFFSET are -4, -8, -12, ..."
                 (maybe-record '("-CORE-SPACE-ID") 9)
                 (maybe-record '("-CORE-SPACE-ID-FLAG") 9)
                 (maybe-record '("-GENERATION+") 10))))))
+      (do-symbols (symbol (find-package "SB-C"))
+        (when (cl:constantp symbol)
+          (let ((name (symbol-name symbol))
+                (prefix "PACKED-DEBUG-FUN-"))
+            (when (> (length name) (length prefix))
+              (when (string= prefix name :end2 (length prefix))
+                (let ((value (symbol-value symbol)))
+                  (when (integerp value)
+                    (record (c-symbol-name symbol) 4/5 symbol ""))))))))
       (dolist (c '(sb-impl::+package-id-none+
                    sb-impl::+package-id-keyword+
                    sb-impl::+package-id-lisp+
@@ -3211,7 +3220,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (dolist (symbol '(sb-vm:float-traps-byte
                     sb-vm::float-exceptions-byte
                     sb-vm:float-sticky-bits
-                    sb-vm::float-rounding-mode))
+                    sb-vm::float-rounding-mode
+                    sb-c::packed-debug-fun-returns-byte))
     (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
             (c-symbol-name symbol)
             (sb-xc:byte-position (symbol-value symbol)))

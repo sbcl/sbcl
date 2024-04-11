@@ -30,7 +30,7 @@ fi
 set -e # exit on error
 
 # Ensure that we're not running a stale shrinkwrap-sbcl
-(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; make shrinkwrap-sbcl)
+(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl* ; make shrinkwrap-sbcl)
 
 # Prevent style-warnings in the editcore script, but don't assume that it
 # can be compiled in the first place unless actually doing the ELFcore tests.

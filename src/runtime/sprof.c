@@ -302,8 +302,8 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
     return len;
 }
 
-extern struct compiled_debug_fun*
-debug_function_from_pc (struct code* code, void *pc);
+extern lispobj
+debug_function_name_from_pc (struct code* code, void *pc);
 
 static int gather_trace_from_frame(struct thread* thread, uword_t* fp,
                                    struct trace* trace, int limit)
@@ -337,10 +337,10 @@ static int gather_trace_from_frame(struct thread* thread, uword_t* fp,
     // into the start of lisp_alloc() and watch that about half the time
     // you get a nice backtrace, and half the time you get a crash.
     if (lisp_frame_previous(thread, &info) && info.code) {
-        struct compiled_debug_fun *df;
-        df = (void*)debug_function_from_pc((struct code *)info.code,
-                                    (void*)((uword_t)info.code + info.pc));
-        if (df) {
+        lispobj name;
+        name = debug_function_name_from_pc((struct code *)info.code,
+                                           (void*)((uword_t)info.code + info.pc));
+        if (name) {
             STORE_PC(*trace, 0, (uword_t)info.code + info.pc);
             ++len;
             if (lisp_frame_previous(thread, &info) && info.code) {

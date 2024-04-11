@@ -24,38 +24,41 @@
   (with-messed-up-foo
       (assert (null (sb-kernel:fun-code-header #'foo)))))
 
-;;; Cross-check the C and lisp implementations of varint decoding
-;;; the compiled debug fun locations.
-(with-test (:name :c-decode-compiled-debug-fun-locs)
-  (let ((ok t))
-    (with-alien ((df-decode-locs (function int unsigned (* int) (* int))
-                                 :extern)
-                 (offset int)
-                 (elsewhere-pc int))
-      (dolist (code (sb-vm::list-allocated-objects
-                     :all :type sb-vm:code-header-widetag))
-        (when (typep (sb-kernel:%code-debug-info code)
-                     'sb-c::compiled-debug-info)
-          (do ((cdf (sb-c::compiled-debug-info-fun-map
-                     (sb-kernel:%code-debug-info code))
-                    (sb-c::compiled-debug-fun-next cdf)))
-              ((null cdf))
-            (let* ((locs (sb-c::compiled-debug-fun-encoded-locs cdf))
-                   (res (sb-sys:with-pinned-objects (locs)
-                          (alien-funcall df-decode-locs (sb-kernel:get-lisp-obj-address locs)
-                                         (addr offset) (addr elsewhere-pc)))))
-              (assert (= res 1))
-              (multiple-value-bind (start-pc expect-elsewhere-pc expect-offset)
-                  (sb-c::cdf-decode-locs cdf)
-                (declare (ignore start-pc))
-                (unless (and (= offset expect-offset)
-                             (= elsewhere-pc expect-elsewhere-pc))
-                  (setq ok nil)
-                  (format t "Fail: ~X ~S ~S ~S ~S~%"
-                          (sb-kernel:get-lisp-obj-address cdf)
-                          offset expect-offset
-                          elsewhere-pc expect-elsewhere-pc))))))))
-    (assert ok)))
+;;; Cross-check the C and lisp implementations of debug fun unpacking.
+(with-test (:name :c-unpack-compiled-debug-info-fun-map)
+  (with-alien ((debug-function-name-from-pc
+                (function (* t) (* t) (* char))
+                :extern)
+               (pc int))
+    (dolist (code (sb-vm::list-allocated-objects
+                   :all :type sb-vm:code-header-widetag))
+      (when (typep (sb-kernel:%code-debug-info code)
+                   'sb-c::compiled-debug-info)
+        (let* ((info (sb-kernel:%code-debug-info code))
+               (parsed (sb-di::get-debug-info-fun-map info)))
+          (sb-int::dovector (thing parsed)
+            (etypecase thing
+              (integer)
+              (sb-c::compiled-debug-fun
+               (let ((start-pc (sb-c::compiled-debug-fun-start-pc thing))
+                     (elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc thing)))
+                 (dolist (pc (list start-pc elsewhere-pc))
+                   (let ((name (sb-c::compiled-debug-fun-name
+                                (sb-di::compiled-debug-fun-compiler-debug-fun
+                                 (sb-di::debug-fun-from-pc code pc)))))
+                     (sb-sys:with-pinned-objects (code)
+                       (assert
+                        (eq name
+                            (sb-kernel::%make-lisp-obj
+                             (sb-sys:sap-int
+                              (sb-alien:alien-sap
+                               (alien-funcall debug-function-name-from-pc
+                                              (sb-sys:int-sap
+                                               (logandc2 (sb-kernel:get-lisp-obj-address code)
+                                                         sb-vm:lowtag-mask))
+                                              (sb-sys:sap+
+                                               (sb-kernel:code-instructions code)
+                                               pc)))))))))))))))))))
 
 ;;; Check that valid_tagged_pointer_p is correct for all pure boxed objects
 ;;; using the super quick check of header validity.

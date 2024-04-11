@@ -1324,14 +1324,7 @@
         (#x6d sb-c::compiled-debug-info)
         (#x6e sb-c::debug-source)
         (#x6f defstruct-description)
-        (#x70 defstruct-slot-description)
-        (#x71 sb-c::debug-fun)
-        (#x72 sb-c::compiled-debug-fun)
-        (#x73 sb-c::compiled-debug-fun-optional)
-        (#x74 sb-c::compiled-debug-fun-more)
-        (#x75 sb-c::compiled-debug-fun-external)
-        (#x76 sb-c::compiled-debug-fun-toplevel)
-        (#x77 sb-c::compiled-debug-fun-cleanup)))
+        (#x70 defstruct-slot-description)))
 
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)

@@ -1228,31 +1228,37 @@ register."
 ;;;; frame utilities
 
 (defun compiled-debug-fun-from-pc (debug-info pc &optional escaped)
-  (let* ((fun-map (sb-c::compiled-debug-info-fun-map debug-info)))
-    (if (sb-c::compiled-debug-fun-next fun-map)
-        (let* ((first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc fun-map))
+  (let* ((fun-map (get-debug-info-fun-map debug-info))
+         (len (length fun-map)))
+    (declare (type simple-vector fun-map))
+    (if (= len 1)
+        (svref fun-map 0)
+        (let* ((i 1)
+               (first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc
+                                    (svref fun-map 0)))
                (elsewhere-p
                  (if escaped ;; See the comment below
                      (>= pc first-elsewhere-pc)
                      (> pc first-elsewhere-pc))))
-          (loop for fun = fun-map then next
-                for next = (sb-c::compiled-debug-fun-next fun)
-                when (or (not next)
-                         (let ((next-pc (if elsewhere-p
-                                            (sb-c::compiled-debug-fun-elsewhere-pc next)
-                                            (sb-c::compiled-debug-fun-offset next))))
-                           (if escaped
-                               (< pc next-pc)
-                               ;; Non-escaped frame means that this frame calls something.
-                               ;; And the PC points to where something should return.
-                               ;; The return adress may be in the next
-                               ;; function, e.g. in local tail calls the
-                               ;; function will be entered just after the
-                               ;; CALL.
-                               ;; See debug.impure.lisp/:local-tail-call for a test-case
-                               (<= pc next-pc))))
-                return fun))
-        fun-map)))
+          (declare (type index i))
+          (loop
+           (when (or (= i len)
+                     (let ((next-pc (if elsewhere-p
+                                        (sb-c::compiled-debug-fun-elsewhere-pc
+                                         (svref fun-map (1+ i)))
+                                        (svref fun-map i))))
+                       (if escaped
+                           (< pc next-pc)
+                           ;; Non-escaped frame means that this frame calls something.
+                           ;; And the PC points to where something should return.
+                           ;; The return adress may be in the next
+                           ;; function, e.g. in local tail calls the
+                           ;; function will be entered just after the
+                           ;; CALL.
+                           ;; See debug.impure.lisp/:local-tail-call for a test-case
+                           (<= pc next-pc))))
+             (return (svref fun-map (1- i))))
+           (incf i 2))))))
 
 ;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB-C::DEBUG-INFO and run down its FUN-MAP to get a
@@ -1394,9 +1400,10 @@ register."
   (let ((vars (gensym))
         (i (gensym)))
     `(let ((,vars (debug-fun-debug-vars ,debug-fun)))
+       (declare (type (or null simple-vector) ,vars))
        (if ,vars
-           (dotimes (,i (compact-vector-length ,vars) ,result)
-             (let ((,var (compact-vector-ref ,vars ,i)))
+           (dotimes (,i (length ,vars) ,result)
+             (let ((,var (aref ,vars ,i)))
                ,@body))
            ,result))))
 
@@ -1497,16 +1504,13 @@ register."
   (let ((simple-fun (%fun-fun fun)))
     (let* ((name (or local-name (%simple-fun-name simple-fun)))
            (component (fun-code-header simple-fun))
-           (res (loop for fmap-entry = (sb-c::compiled-debug-info-fun-map
-                                        (%code-debug-info component))
-                      then next
-                      for next = (sb-c::compiled-debug-fun-next fmap-entry)
-                      ;; Is NAME really the right thing to match on given how bogus
-                      ;; it might be? I would think PC range is better.
-                      when (and (equal (sb-c::compiled-debug-fun-name fmap-entry) name)
-                                (eq (sb-c::compiled-debug-fun-kind fmap-entry) nil))
-                      return fmap-entry
-                      while next)))
+           (res (find-if
+                 (lambda (x)
+                   (and (sb-c::compiled-debug-fun-p x)
+                        (equal (sb-c::compiled-debug-fun-name x) name)
+                        (eq (sb-c::compiled-debug-fun-kind x) nil)))
+                 (get-debug-info-fun-map
+                  (%code-debug-info component)))))
       (cond (res
              (make-compiled-debug-fun res component))
             ((null local-name)
@@ -1563,26 +1567,29 @@ register."
 ;;; about its arguments.
 (defun ambiguous-debug-vars (debug-fun name-prefix-string)
   (declare (simple-string name-prefix-string))
-  (let* ((variables (debug-fun-debug-vars debug-fun))
-         (len (compact-vector-length variables))
-         (prefix-len (length name-prefix-string))
-         (pos (find-var name-prefix-string variables len))
-         (res nil))
-    (when pos
-      ;; Find names from pos to variable's len that contain prefix.
-      (do ((i pos (1+ i)))
-          ((= i len))
-        (let* ((var (compact-vector-ref variables i))
-               (name (debug-var-name var))
-               (name-len (length name)))
-          (declare (simple-string name))
-          (when (/= (or (string/= name-prefix-string name
-                                  :end1 prefix-len :end2 name-len)
-                        prefix-len)
-                    prefix-len)
-            (return))
-          (push var res)))
-      (nreverse res))))
+  (let ((variables (debug-fun-debug-vars debug-fun)))
+    (declare (type (or null simple-vector) variables))
+    (if variables
+        (let* ((len (length variables))
+               (prefix-len (length name-prefix-string))
+               (pos (find-var name-prefix-string variables len))
+               (res nil))
+          (when pos
+            ;; Find names from pos to variable's len that contain prefix.
+            (do ((i pos (1+ i)))
+                ((= i len))
+              (let* ((var (svref variables i))
+                     (name (debug-var-name var))
+                     (name-len (length name)))
+                (declare (simple-string name))
+                (when (/= (or (string/= name-prefix-string name
+                                        :end1 prefix-len :end2 name-len)
+                              prefix-len)
+                          prefix-len)
+                  (return))
+                (push var res)))
+            (setq res (nreverse res)))
+          res))))
 
 ;;; This returns a position in VARIABLES for one containing NAME as an
 ;;; initial substring. END is the length of VARIABLES if supplied.
@@ -1698,8 +1705,9 @@ register."
      1)))
 
 (defun parse-compiled-debug-fun-lambda-list/args-available (vars args)
+  (declare (type (or null simple-vector) vars))
   (let ((i 0)
-        (len (compact-vector-length args))
+        (len (length args))
         (optionalp nil)
         (keyword nil)
         (result '()))
@@ -1712,32 +1720,32 @@ register."
                        tag-and-info)
                    result))
            (var-or-deleted (index-or-deleted)
-             (if (eq index-or-deleted sb-c::debug-info-var-deleted)
+             (if (eq index-or-deleted 'sb-c::deleted)
                  :deleted
-                 (compact-vector-ref vars index-or-deleted))))
+                 (svref vars index-or-deleted))))
       (loop
         while (< i len)
         do
-           (let ((ele (compact-vector-ref args i)))
+           (let ((ele (aref args i)))
              (cond
-               ((eq ele sb-c::debug-info-var-optional)
+               ((eq ele 'sb-c::optional-args)
                 (setf optionalp t))
-               ((eq ele sb-c::debug-info-var-rest)
+               ((eq ele 'sb-c::rest-arg)
                 (push-var '(:rest) 1))
                ;; The next two args are the &MORE arg context and
                ;; count.
-               ((eq ele sb-c::debug-info-var-more)
+               ((eq ele 'sb-c::more-arg)
                 (push-var '(:more) 2))
                ;; SUPPLIED-P var immediately following keyword or
                ;; optional. Stick the extra var in the result element
                ;; representing the keyword or optional, which is the
                ;; previous one.
-               ((eq ele sb-c::debug-info-var-supplied-p)
+               ((eq ele 'sb-c::supplied-p)
                 (push-var (pop result) 1))
                ;; The keyword of a keyword parameter. Store it so the next
                ;; element can be used to form a (:keyword KEYWORD VALUE)
                ;; entry.
-               ((typep ele 'symbol)
+               ((typep ele '(and symbol (not (eql sb-c::deleted))))
                 (setf keyword ele))
                ;; The previous element was the keyword of a keyword
                ;; parameter and is stored in KEYWORD. The current element
@@ -1751,19 +1759,21 @@ register."
                (optionalp
                 (push-var (list :optional (var-or-deleted ele))))
                ;; Deleted required, optional or keyword argument.
-               ((eq ele sb-c::debug-info-var-deleted)
+               ((eq ele 'sb-c::deleted)
                 (push-var :deleted))
                ;; Required arg at beginning of args array.
                (t
-                (push-var (compact-vector-ref vars ele))))
+                (push-var (svref vars ele))))
              (incf i))
         finally (return (nreverse result))))))
 
 ;;; This is used in COMPILED-DEBUG-FUN-LAMBDA-LIST.
 (defun compiled-debug-fun-lambda-list-var (args i vars)
-  (let ((ele (compact-vector-ref args i)))
-    (cond ((typep ele 'index) (compact-vector-ref vars ele))
-          ((eq ele sb-c::debug-info-var-deleted) :deleted)
+  (declare (type (simple-array * (*)) args)
+           (simple-vector vars))
+  (let ((ele (aref args i)))
+    (cond ((typep ele 'index) (svref vars ele))
+          ((eq ele 'sb-c::deleted) :deleted)
           (t (error "malformed arguments description")))))
 
 (defun compiled-debug-fun-debug-info (debug-fun)
@@ -1804,7 +1814,7 @@ register."
                                 debug-fun))
            (blocks
              (let ((blocks (sb-c::compiled-debug-fun-blocks compiler-debug-fun)))
-               (if (typep blocks '(or null integer))
+               (if (null blocks)
                    (return-from parse-compiled-debug-blocks nil)
                    (sb-c::lz-decompress blocks))))
            ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
@@ -1926,13 +1936,13 @@ register."
       (return-from parse-compiled-debug-vars '#()))
     (let ((i 0)
           (id 0)
-          (len (compact-vector-length packed-vars))
+          (len (length packed-vars))
           (buffer (make-array 0 :fill-pointer 0 :adjustable t))
           prev-name)
       (loop
         ;; The routines in the "SB-C" package are macros that advance the
         ;; index.
-        (let* ((flags (prog1 (compact-vector-ref packed-vars i) (incf i)))
+        (let* ((flags (prog1 (aref packed-vars i) (incf i)))
                (minimal (logtest sb-c::compiled-debug-var-minimal-p flags))
                (deleted (logtest sb-c::compiled-debug-var-deleted-p flags))
                (name (cond (minimal "")
@@ -1977,6 +1987,144 @@ register."
         (when args-minimal
           (assign-minimal-var-names result))
         result))))
+
+;;;; unpacking packed debug functions
+
+;;; sleazoid "macro" to keep our indentation sane in UNCOMPACT-FUN-MAP
+(defmacro make-uncompacted-debug-fun ()
+  '(sb-c::make-compiled-debug-fun
+    :name (compact-vector-ref
+           (sb-c::compiled-debug-info-contexts info)
+           (sb-c::read-var-integerf map i))
+    :kind (svref sb-c::packed-debug-fun-kinds
+                 (ldb sb-c::packed-debug-fun-kind-byte options))
+    :vars
+    (when vars-p
+      (let ((len (sb-c::read-var-integerf map i)))
+        (prog1 (subseq map i (+ i len))
+          (incf i len))))
+    :blocks
+    (when blocks-p
+      (let* ((len (sb-c::read-var-integerf map i))
+             (blocks
+               (prog1 (subseq map i (+ i len))
+                 (incf i len))))
+        (if (logtest flags sb-c::packed-debug-fun-blocks-compressed-bit)
+            (map-into (make-array len :element-type '(signed-byte 8))
+                      (lambda (x)
+                        (sb-c::mask-signed-field 8 (the (unsigned-byte 8) x)))
+                      blocks)
+            blocks)))
+    :tlf-number
+    (when (logtest sb-c::packed-debug-fun-tlf-number-bit flags)
+      (sb-c::read-var-integerf map i))
+    :arguments
+    (when vars-p
+      (if (logtest sb-c::packed-debug-fun-non-minimal-arguments-bit flags)
+          (let ((len (sb-c::read-var-integerf map i))
+                (buffer (make-array 0 :fill-pointer 0 :adjustable t)))
+            (dotimes (idx len)
+              (let ((arg (sb-c::read-var-integerf map i)))
+                (case arg
+                  (#.sb-c::packed-debug-fun-arg-deleted
+                   (vector-push-extend 'sb-c::deleted buffer))
+                  (#.sb-c::packed-debug-fun-arg-supplied-p
+                   (vector-push-extend 'sb-c::supplied-p buffer))
+                  (#.sb-c::packed-debug-fun-arg-optional
+                   (vector-push-extend 'sb-c::optional buffer))
+                  (#.sb-c::packed-debug-fun-arg-rest
+                   (vector-push-extend 'sb-c::rest buffer))
+                  (#.sb-c::packed-debug-fun-arg-more
+                   (vector-push-extend 'sb-c::more buffer))
+                  (#.sb-c::packed-debug-fun-key-arg-keyword
+                   (vector-push-extend (intern (sb-c::read-var-string map i)
+                                               *keyword-package*)
+                                       buffer))
+                  (#.sb-c::packed-debug-fun-key-arg-packaged
+                   (without-package-locks
+                     (vector-push-extend (intern (sb-c::read-var-string map i)
+                                                 (sb-c::read-var-string map i))
+                                         buffer)))
+                  (#.sb-c::packed-debug-fun-key-arg-uninterned
+                   (vector-push-extend (make-symbol (sb-c::read-var-string map i))
+                                       buffer))
+                  (otherwise
+                   (vector-push-extend (- arg sb-c::packed-debug-fun-arg-index-offset)
+                                       buffer)))))
+            (coerce buffer 'simple-vector))
+          :minimal))
+    :returns
+    (ecase (ldb sb-c::packed-debug-fun-returns-byte options)
+      (#.sb-c::packed-debug-fun-returns-standard
+       :standard)
+      (#.sb-c::packed-debug-fun-returns-fixed
+       :fixed)
+      (#.sb-c::packed-debug-fun-returns-specified
+       (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
+         (dotimes (idx (sb-c::read-var-integerf map i))
+           (vector-push-extend (sb-c::read-var-integerf map i) buffer))
+         (coerce buffer 'simple-vector))))
+    #-fp-and-pc-standard-save :return-pc
+    #-fp-and-pc-standard-save (sb-c::read-var-integerf map i)
+    #-fp-and-pc-standard-save :return-pc-pass
+    #-fp-and-pc-standard-save (sb-c::read-var-integerf map i)
+    #-fp-and-pc-standard-save :old-fp
+    #-fp-and-pc-standard-save (sb-c::read-var-integerf map i)
+    #-fp-and-pc-standard-save :lra-saved-pc
+    #-fp-and-pc-standard-save (sb-c::read-var-integerf map i)
+    #-fp-and-pc-standard-save :cfp-saved-pc
+    #-fp-and-pc-standard-save (sb-c::read-var-integerf map i)
+    :closure-save
+    (when (logtest flags sb-c::packed-debug-fun-closure-save-loc-bit)
+      (sb-c::read-var-integerf map i))
+    #+unwind-to-frame-and-call-vop :bsp-save
+    #+unwind-to-frame-and-call-vop
+    (when (logtest flags sb-c::packed-debug-fun-bsp-save-loc-bit)
+      (sb-c::read-var-integerf map i))
+    :start-pc
+    (progn
+      (setq code-start-pc (+ code-start-pc (sb-c::read-var-integerf map i)))
+      (+ code-start-pc (sb-c::read-var-integerf map i)))
+    :elsewhere-pc
+    (setq elsewhere-pc (+ elsewhere-pc (sb-c::read-var-integerf map i)))))
+
+;;; Return a normal function map derived from a packed debug info
+;;; function map. This involves looping parsing PACKED-DEBUG-FUNs and
+;;; then building a vector out of them.
+(defun uncompact-fun-map (info)
+  (declare (type sb-c::compiled-debug-info info))
+  (let* ((map (sb-c::compiled-debug-info-fun-map info))
+         (i 0)
+         (len (length map))
+         (code-start-pc 0)
+         (elsewhere-pc 0))
+    (declare (type (simple-array (unsigned-byte 8) (*)) map))
+    (collect ((res))
+      (loop
+        (when (= i len) (return))
+        (let* ((options (prog1 (aref map i) (incf i)))
+               (flags (prog1 (aref map i) (incf i)))
+               (vars-p (logtest flags
+                                sb-c::packed-debug-fun-variables-bit))
+               (blocks-p (logtest flags
+                                  sb-c::packed-debug-fun-blocks-bit))
+               (dfun (make-uncompacted-debug-fun)))
+          (res code-start-pc)
+          (res dfun)))
+
+      (coerce (cdr (res)) 'simple-vector))))
+
+;;; a map from packed DEBUG-INFO function maps to unpacked
+;;; versions thereof
+(defvar *uncompacted-fun-maps* (make-hash-table :test 'eq :weakness :key))
+
+;;; Return a FUN-MAP for a given COMPILED-DEBUG-INFO object. If the
+;;; info is packed, and has not been parsed, then parse it.
+(defun get-debug-info-fun-map (info)
+  (declare (type sb-c::compiled-debug-info info))
+  (or (gethash info *uncompacted-fun-maps*)
+      (setf (gethash info *uncompacted-fun-maps*)
+            (uncompact-fun-map info))))
 
 ;;;; CODE-LOCATIONs
 
