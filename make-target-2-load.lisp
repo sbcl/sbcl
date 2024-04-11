@@ -21,7 +21,8 @@
 
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
-(let* ((non-target-features
+(let* (#-sb-devel
+       (non-target-features
         ;;
         ;; FIXME: I suspect that this list should be changed to its inverse-
         ;; features that _SHOULD_ go into SB-IMPL:+INTERNAL-FEATURES+ and
@@ -94,6 +95,7 @@
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
            :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
+       #-sb-devel
        (removable-features
         (append non-target-features public-features)))
   (defconstant sb-impl:+internal-features+
@@ -121,10 +123,8 @@
     ;;; we can stuff it back in because our contrib builder first loads ASDF
     ;;; and then rebinds *FEATURES* with the union of the internal ones.
     (append #+haiku '(:haiku)
-            #-sb-devel
-            (remove-if (lambda (x) (member x removable-features)) *features*)
-            #+sb-devel
-            *features*))
+            (remove-if (lambda (x) (member x #+sb-devel public-features
+                                             #-sb-devel removable-features)) *features*)))
   (setq *features* (remove-if-not (lambda (x) (member x public-features))
                                   *features*)))
 
