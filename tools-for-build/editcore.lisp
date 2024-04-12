@@ -394,8 +394,9 @@
 ;;; Examine CODE, returning a list of lists describing how to emit
 ;;; the contents into the assembly file.
 ;;;   ({:data | :padding} . N) | (start-pc . end-pc)
-(defun get-text-ranges (code spacemap)
-    (let ((cdf (translate (sb-c::compiled-debug-info-fun-map
+(defun get-text-ranges (code core)
+   (let* ((spacemap (core-spacemap core))
+          (cdf (translate (sb-c::compiled-debug-info-fun-map
                            (truly-the sb-c::compiled-debug-info
                                       (translate (%code-debug-info code) spacemap)))
                           spacemap))
@@ -1177,8 +1178,9 @@
 ;;; Now "step2.core" has a text space, and all lisp-to-lisp calls bypass their FDEFN.
 ;;; At this point split-core on "step2.core" can run in the manner of elfcore.test.sh
 
-(defun get-code-segments (code vaddr spacemap)
+(defun get-code-segments (code vaddr core)
   (let ((di (%code-debug-info code))
+        (spacemap (core-spacemap core))
         (inst-base (+ vaddr (ash (code-header-words code) word-shift)))
         (result))
     (aver (%instancep di))
@@ -1191,7 +1193,7 @@
             (push (make-code-segment code start (- (1+ end) start)
                                      :virtual-location (+ inst-base start))
                   result)))
-        (dolist (range (get-text-ranges code spacemap))
+        (dolist (range (get-text-ranges code core))
           (let ((car (car range)))
             (when (integerp car)
               (push (make-code-segment code car (- (cdr range) car)
@@ -1212,8 +1214,8 @@
           (if (range-labeled self) "L:" "  ")
           (range-vaddr self)
           (range-bytecount self)))
-(defun get-code-instruction-model (code vaddr spacemap)
-  (let* ((segments (get-code-segments code vaddr spacemap))
+(defun get-code-instruction-model (code vaddr core)
+  (let* ((segments (get-code-segments code vaddr core))
          (insts-vaddr (+ vaddr (ash (code-header-words code) word-shift)))
          (dstate (sb-disassem:make-dstate))
          (fun-header-locs

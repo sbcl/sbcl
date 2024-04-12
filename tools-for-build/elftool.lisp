@@ -471,7 +471,7 @@
 
 (defun emit-funs (code vaddr core dumpwords output base-symbol emit-cfi)
   (let* ((spacemap (core-spacemap core))
-         (ranges (get-text-ranges code spacemap))
+         (ranges (get-text-ranges code core))
          (text-sap (code-instructions code))
          (text (sap-int text-sap))
          ;; Like CODE-INSTRUCTIONS, but where the text virtually was
@@ -1598,7 +1598,7 @@
             "allocation_tracker_counted"
             "allocation_tracker_sized")))
 
-(defun patch-assembly-codeblob (spacemap)
+(defun patch-assembly-codeblob (core &aux (spacemap (core-spacemap core)))
   (binding* ((static-space (get-space static-core-space-id spacemap))
              (text-space (get-space immobile-text-core-space-id spacemap))
              ((new-code-vaddr new-code) (get-text-space-asm-code-replica text-space spacemap))
@@ -1634,7 +1634,7 @@
         (setf (aref c-linkage-vector item-index) (%vector-raw-bits inst-buffer 0))))
     ;; Produce a model of the instructions. It doesn't really matter whether we scan
     ;; OLD-CODE or NEW-CODE since we're supplying the proper virtual address either way.
-    (let ((insts (get-code-instruction-model old-code old-code-vaddr spacemap)))
+    (let ((insts (get-code-instruction-model old-code old-code-vaddr core)))
 ;;  (dovector (inst insts) (write inst :base 16 :pretty nil :escape nil) (terpri))
       (dovector (inst insts)
         ;; Look for any call to a linkage table entry.
@@ -1810,8 +1810,9 @@
 ;;; disassembling it at a random physical address is fine.
 #+x86-64
 (defun patch-lisp-codeblob
-    (code vaddr spacemap static-asm-code text-asm-code
-     &aux (insts (get-code-instruction-model code vaddr spacemap))
+    (code vaddr core static-asm-code text-asm-code
+     &aux (insts (get-code-instruction-model code vaddr core))
+            (spacemap (core-spacemap core))
           (fdefns (get-patchable-fdefns code spacemap)))
   (declare (simple-vector insts))
   (do ((i 0 (1+ i)))
@@ -1844,8 +1845,9 @@
                 (parse-core-header stream core-header)))
       (declare (ignore card-mask-nbits core-dir-start initfun))
       (with-mapped-core (sap core-offset npages stream)
-        (let ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr))))
-          (patch-assembly-codeblob spacemap)
+        (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
+               (core (make-core spacemap (make-bounds 0 0) (make-bounds 0 0))))
+          (patch-assembly-codeblob core)
           (let* ((text-space (get-space immobile-text-core-space-id spacemap))
                  (offsets-vector (%make-lisp-obj (logior (sap-int (space-physaddr text-space spacemap))
                                                          lowtag-mask)))
@@ -1870,7 +1872,7 @@
                              (sb-c::unpack-code-fixup-locs fixups)
                            (declare (ignore list1 list3))
                            (aver (null list2))))
-                       (patch-lisp-codeblob physobj vaddr spacemap
+                       (patch-lisp-codeblob physobj vaddr core
                                             static-space-asm-code text-space-asm-code))))
           (persist-to-file spacemap core-offset stream))))))
 
