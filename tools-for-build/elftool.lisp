@@ -412,6 +412,54 @@
 (defun c-symbol-quote (name)
   (concatenate 'string '(#\") name '(#\")))
 
+(defun c-name (lispname core pp-state &optional (prefix ""))
+  (when (typep lispname '(string 0))
+    (setq lispname "anonymous"))
+  ;; Perform backslash escaping on the exploded string
+  ;; Strings were stringified without surrounding quotes,
+  ;; but there might be quotes embedded anywhere, so escape them,
+  ;; and also remove newlines and non-ASCII.
+  (let ((characters
+         (mapcan (lambda (char)
+                   (cond ((not (typep char 'base-char)) (list #\?))
+                         ((member char '(#\\ #\")) (list #\\ char))
+                         ((eql char #\newline) (list #\_))
+                         (t (list char))))
+                 (coerce (cond
+                           #+darwin
+                           ((and (stringp lispname)
+                                 ;; L denotes a symbol which can not be global on macOS.
+                                 (char= (char lispname 0) #\L))
+                            (concatenate 'string "_" lispname))
+                           (t
+                            (write-to-string lispname
+                              ;; Printing is a tad faster without a pretty stream
+                              :pretty (not (typep lispname 'core-sym))
+                              :pprint-dispatch *editcore-ppd*
+                              ;; FIXME: should be :level 1, however see
+                              ;; https://bugs.launchpad.net/sbcl/+bug/1733222
+                              :escape nil :level 2 :length 5
+                              :case :downcase :gensym nil
+                              :right-margin 10000)))
+                         'list))))
+    (let ((string (concatenate 'string prefix characters)))
+      ;; If the string appears in the linker symbols, then string-upcase it
+      ;; so that it looks like a conventional Lisp symbol.
+      (cond ((find-if (lambda (x) (string= string (if (consp x) (car x) x)))
+                      (core-linkage-symbols core))
+             (setq string (string-upcase string)))
+            ((string= string ".") ; can't use the program counter symbol either
+             (setq string "|.|")))
+      ;; If the symbol is still nonunique, add a random suffix.
+      ;; The secondary value is whether the symbol should be a linker global.
+      ;; For now, make nothing global, thereby avoiding potential conflicts.
+      (let ((occurs (incf (gethash string (car pp-state) 0))))
+        (if (> occurs 1)
+            (values (concatenate 'string  string "_" (write-to-string occurs))
+                    nil)
+            (values string
+                    nil))))))
+
 (defun emit-symbols (blobs core pp-state output &aux base-symbol)
   (dolist (blob blobs base-symbol)
     (destructuring-bind (name start . end) blob
@@ -621,6 +669,42 @@
           (when (endp list) (return)))
         (format output "~%# end of lisp asm routines~2%")
         (+ skip obj-size)))))
+
+;;; Return a list of ((NAME START . END) ...)
+;;; for each C symbol that should be emitted for this code object.
+;;; Start and and are relative to the object's base address,
+;;; not the start of its instructions. Hence we add HEADER-BYTES
+;;; too all the PC offsets.
+(defun code-symbols (code core &aux (spacemap (core-spacemap core)))
+  (let ((cdf (translate
+                  (sb-c::compiled-debug-info-fun-map
+                   (truly-the sb-c::compiled-debug-info
+                              (translate (%code-debug-info code) spacemap)))
+                  spacemap))
+        (header-bytes (* (code-header-words code) n-word-bytes))
+        (start-pc 0)
+        (blobs))
+    (loop
+      (let* ((name (fun-name-from-core
+                    (sb-c::compiled-debug-fun-name
+                     (truly-the sb-c::compiled-debug-fun cdf))
+                    core))
+             (next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
+                     (translate (sb-c::compiled-debug-fun-next cdf) spacemap)))
+             (end-pc (if next
+                         (+ header-bytes (cdf-offset next spacemap))
+                         (code-object-size code))))
+        (unless (= end-pc start-pc)
+          ;; Collapse adjacent address ranges named the same.
+          ;; Use EQUALP instead of EQUAL to compare names
+          ;; because instances of CORE-SYMBOL are not interned objects.
+          (if (and blobs (equalp (caar blobs) name))
+              (setf (cddr (car blobs)) end-pc)
+              (push (list* name start-pc end-pc) blobs)))
+        (if next
+            (setq cdf next start-pc end-pc)
+            (return))))
+    (nreverse blobs)))
 
 ;;; Convert immobile text space to an assembly file in OUTPUT.
 (defun write-assembler-text

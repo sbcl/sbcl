@@ -151,54 +151,6 @@
                          ppd)
     ppd))
 
-(defun c-name (lispname core pp-state &optional (prefix ""))
-  (when (typep lispname '(string 0))
-    (setq lispname "anonymous"))
-  ;; Perform backslash escaping on the exploded string
-  ;; Strings were stringified without surrounding quotes,
-  ;; but there might be quotes embedded anywhere, so escape them,
-  ;; and also remove newlines and non-ASCII.
-  (let ((characters
-         (mapcan (lambda (char)
-                   (cond ((not (typep char 'base-char)) (list #\?))
-                         ((member char '(#\\ #\")) (list #\\ char))
-                         ((eql char #\newline) (list #\_))
-                         (t (list char))))
-                 (coerce (cond
-                           #+darwin
-                           ((and (stringp lispname)
-                                 ;; L denotes a symbol which can not be global on macOS.
-                                 (char= (char lispname 0) #\L))
-                            (concatenate 'string "_" lispname))
-                           (t
-                            (write-to-string lispname
-                              ;; Printing is a tad faster without a pretty stream
-                              :pretty (not (typep lispname 'core-sym))
-                              :pprint-dispatch *editcore-ppd*
-                              ;; FIXME: should be :level 1, however see
-                              ;; https://bugs.launchpad.net/sbcl/+bug/1733222
-                              :escape t :level 2 :length 5
-                              :case :downcase :gensym nil
-                              :right-margin 10000)))
-                         'list))))
-    (let ((string (concatenate 'string prefix characters)))
-      ;; If the string appears in the linker symbols, then string-upcase it
-      ;; so that it looks like a conventional Lisp symbol.
-      (cond ((find-if (lambda (x) (string= string (if (consp x) (car x) x)))
-                      (core-linkage-symbols core))
-             (setq string (string-upcase string)))
-            ((string= string ".") ; can't use the program counter symbol either
-             (setq string "|.|")))
-      ;; If the symbol is still nonunique, add a random suffix.
-      ;; The secondary value is whether the symbol should be a linker global.
-      ;; For now, make nothing global, thereby avoiding potential conflicts.
-      (let ((occurs (incf (gethash string (car pp-state) 0))))
-        (if (> occurs 1)
-            (values (concatenate 'string  string "_" (write-to-string occurs))
-                    nil)
-            (values string
-                    nil))))))
-
 (defmethod print-object ((sym core-sym) stream)
   (format stream "~(~:[~*~;~:*~A~:[:~;~]:~]~A~)"
           (core-sym-package sym)
@@ -238,65 +190,6 @@
         (translate (package-%name (truly-the package package))
                    (core-spacemap core)))))
 
-(defun %fun-name-from-core (name core &aux (spacemap (core-spacemap core))
-                                           (packages (core-packages core))
-                                           (core-nil (core-nil-object core)))
-  (named-let recurse ((depth 0) (x name))
-    (unless (is-lisp-pointer (get-lisp-obj-address x))
-      (return-from recurse x)) ; immediate object
-    (when (eq x core-nil)
-      (return-from recurse nil))
-    (setq x (translate x spacemap))
-    (ecase (lowtag-of x)
-      (#.list-pointer-lowtag
-       (cons (recurse (1+ depth) (car x))
-             (recurse (1+ depth) (cdr x))))
-      ((#.instance-pointer-lowtag #.fun-pointer-lowtag) "?")
-      (#.other-pointer-lowtag
-       (cond
-        ((stringp x)
-         (let ((p (position #\/ x :from-end t)))
-           (if p (subseq x (1+ p)) x)))
-        ((symbolp x)
-         (let ((package-id (symbol-package-id x))
-               (name (translate (symbol-name x) spacemap)))
-           (when (eq package-id 0) ; uninterned
-             (return-from recurse (string-downcase name)))
-           (let* ((package (truly-the package
-                                      (aref (core-pkg-id->package core) package-id)))
-                  (package-name (translate (package-%name package) spacemap)))
-             ;; The name-cleaning code wants to compare against symbols
-             ;; in CL, PCL, and KEYWORD, so use real symbols for those.
-             ;; Other than that, we avoid finding host symbols
-             ;; because the externalness could be wrong and misleading.
-             ;; It's a very subtle point, but best to get it right.
-             (when (member package-name '("COMMON-LISP" "KEYWORD" "SB-PCL")
-                           :test #'string=)
-               ;; NIL can't occur. It was picked off above.
-               (awhen (find-symbol name package-name) ; if existing symbol, use it
-                 (return-from recurse it)))
-             (unless (gethash name (core-nonunique-symbol-names core))
-               ;; Don't care about package
-               (return-from recurse (make-core-sym nil name nil)))
-             (when (string= package-name "KEYWORD") ; make an external core-symbol
-               (return-from recurse (make-core-sym nil name t)))
-             (let ((externals (gethash package-name packages))
-                   (n 0))
-               (unless externals
-                 (scan-symbol-table
-                  (lambda (string symbol)
-                    (declare (ignore symbol))
-                    (incf n)
-                    (push string externals))
-                  (package-external-symbols package)
-                  core)
-                 (setf externals (make-string-hashset externals n)
-                       (gethash package-name packages) externals))
-               (make-core-sym package-name
-                              name
-                              (sb-int:hashset-find externals name))))))
-        (t "?"))))))
-
 (defun remove-name-junk (name)
   (setq name
         (named-let recurse ((x name))
@@ -309,6 +202,11 @@
                       (let ((mismatch (mismatch (string x) "CLEANUP-FUN-")))
                         (or (eql mismatch nil) (= mismatch (length "CLEANUP-FUN-")))))
                  '#:cleanup-fun)
+                ;; Try to chop off all the directory names in strings resembling
+                ;; (lambda () in "/some/very/long/pathname/to/a/thing.lisp")
+                ((stringp x)
+                 (let ((p (position #\/ x :from-end t)))
+                   (if p (subseq x (1+ p)) x)))
                 ((consp x) (recons x (recurse (car x)) (recurse (cdr x))))
                 (t x))))
   ;; Shorten obnoxiously long printed representations of methods.
@@ -330,9 +228,6 @@
             (unpackageize qual))))))
   name)
 
-(defun fun-name-from-core (name core)
-  (remove-name-junk (%fun-name-from-core name core)))
-
 ;;; A problem: COMPILED-DEBUG-FUN-ENCODED-LOCS (a packed integer) might be a
 ;;; bignum - in fact probably is. If so, it points into the target core.
 ;;; So we have to produce a new instance with an ENCODED-LOCS that
@@ -351,42 +246,6 @@
      (sb-c::make-compiled-debug-fun
       :name nil
       :encoded-locs (if (fixnump locs) locs (translate locs spacemap))))))
-
-;;; Return a list of ((NAME START . END) ...)
-;;; for each C symbol that should be emitted for this code object.
-;;; Start and and are relative to the object's base address,
-;;; not the start of its instructions. Hence we add HEADER-BYTES
-;;; too all the PC offsets.
-(defun code-symbols (code core &aux (spacemap (core-spacemap core)))
-  (let ((cdf (translate
-                  (sb-c::compiled-debug-info-fun-map
-                   (truly-the sb-c::compiled-debug-info
-                              (translate (%code-debug-info code) spacemap)))
-                  spacemap))
-        (header-bytes (* (code-header-words code) n-word-bytes))
-        (start-pc 0)
-        (blobs))
-    (loop
-      (let* ((name (fun-name-from-core
-                    (sb-c::compiled-debug-fun-name
-                     (truly-the sb-c::compiled-debug-fun cdf))
-                    core))
-             (next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
-                     (translate (sb-c::compiled-debug-fun-next cdf) spacemap)))
-             (end-pc (if next
-                         (+ header-bytes (cdf-offset next spacemap))
-                         (code-object-size code))))
-        (unless (= end-pc start-pc)
-          ;; Collapse adjacent address ranges named the same.
-          ;; Use EQUALP instead of EQUAL to compare names
-          ;; because instances of CORE-SYMBOL are not interned objects.
-          (if (and blobs (equalp (caar blobs) name))
-              (setf (cddr (car blobs)) end-pc)
-              (push (list* name start-pc end-pc) blobs)))
-        (if next
-            (setq cdf next start-pc end-pc)
-            (return))))
-    (nreverse blobs)))
 
 (defstruct (descriptor (:constructor make-descriptor (bits)))
   (bits 0 :type word))
@@ -1561,7 +1420,7 @@
 ;;;
 ;;; Shared substructure / circularity are OK (I think)
 ;;;
-(defun extract-object-from-core (core sap &optional proxy-symbols
+(defun extract-object-from-core (sap core &optional proxy-symbols
                                  &aux (spacemap (core-spacemap core))
                                       (targ-nil (compute-nil-addr spacemap))
                                       ;; address (an integer) -> host object
@@ -1656,6 +1515,10 @@
                               (t
                                (error "can't translate other fancy stuff yet"))))))))))
       (recurse (sap-int sap)))))
+
+(defun fun-name-from-core (name core)
+  (remove-name-junk (extract-object-from-core (int-sap (get-lisp-obj-address name))
+                                              core)))
 
 (defun compute-nil-symbol-sap (spacemap)
   (let ((space (get-space static-core-space-id spacemap)))
@@ -2073,5 +1936,5 @@
                           (truly-the code-component
                                      (%make-lisp-obj code-physaddr)))))))
               (when (= (logand (sb-sys:sap-int di) lowtag-mask) instance-pointer-lowtag)
-                (let ((copy (extract-object-from-core core di)))
+                (let ((copy (extract-object-from-core di core)))
                   (print copy))))))))))
