@@ -396,48 +396,48 @@
 ;;; CODE is supplied as a _physical_ object, i.e. whever it is currently
 ;;; mapped into memory which on AMD64 Linux is typically around #x7F.........F
 (defun get-text-ranges (code core)
-   (let* ((cdf (extract-fun-map code core))
-          (next-simple-fun-pc-offs (%code-fun-offset code 0))
-          (start-pc (code-n-unboxed-data-bytes code))
-          (simple-fun-index -1)
-          (simple-fun)
-          (blobs))
-      (when (plusp start-pc)
-        (aver (zerop (rem start-pc n-word-bytes)))
-        (push `(:data . ,(ash start-pc (- word-shift))) blobs))
-      (loop
-        (let* ((next (sb-c::compiled-debug-fun-next cdf))
-               (end-pc (if next
-                           (sb-c::compiled-debug-fun-offset next)
-                           (%code-text-size code))))
-          (cond
-            ((= start-pc end-pc)) ; crazy shiat. do not add to blobs
-            ((<= start-pc next-simple-fun-pc-offs (1- end-pc))
-             (incf simple-fun-index)
-             (setq simple-fun (%code-entry-point code simple-fun-index))
-             (let ((padding (- next-simple-fun-pc-offs start-pc)))
-               (when (plusp padding)
-                 ;; Assert that SIMPLE-FUN always begins at an entry
-                 ;; in the fun-map, and not somewhere in the middle:
-                 ;;   |<--  fun  -->|<--  fun  -->|
-                 ;;   ^- start (GOOD)      ^- alleged start (BAD)
-                 (cond ((eq simple-fun (%code-entry-point code 0))
-                        (bug "Misaligned fun start"))
-                       (t ; sanity-check the length of the filler
-                        (aver (< padding (* 2 n-word-bytes)))))
-                 (push `(:pad . ,padding) blobs)
-                 (incf start-pc padding)))
-             (push `(,start-pc . ,end-pc) blobs)
-             (setq next-simple-fun-pc-offs
-                   (if (< (1+ simple-fun-index ) (code-n-entries code))
-                       (%code-fun-offset code (1+ simple-fun-index))
-                       -1)))
-            (t
-             (let ((current-blob (car blobs)))
-               (setf (cdr current-blob) end-pc)))) ; extend this blob
-          (unless next
-            (return (nreverse blobs)))
-          (setq cdf next start-pc end-pc)))))
+  (let* ((fun-map (extract-fun-map code core))
+         (next-simple-fun-pc-offs (%code-fun-offset code 0))
+         (start-pc (code-n-unboxed-data-bytes code))
+         (simple-fun-index -1)
+         (simple-fun)
+         (blobs))
+    (when (plusp start-pc)
+      (aver (zerop (rem start-pc n-word-bytes)))
+      (push `(:data . ,(ash start-pc (- word-shift))) blobs))
+    (loop
+      (let* ((next (sb-c::compiled-debug-fun-next fun-map))
+             (end-pc (if next
+                         (sb-c::compiled-debug-fun-offset next)
+                         (%code-text-size code))))
+        (cond
+          ((= start-pc end-pc)) ; crazy shiat. do not add to blobs
+          ((<= start-pc next-simple-fun-pc-offs (1- end-pc))
+           (incf simple-fun-index)
+           (setq simple-fun (%code-entry-point code simple-fun-index))
+           (let ((padding (- next-simple-fun-pc-offs start-pc)))
+             (when (plusp padding)
+               ;; Assert that SIMPLE-FUN always begins at an entry
+               ;; in the fun-map, and not somewhere in the middle:
+               ;;   |<--  fun  -->|<--  fun  -->|
+               ;;   ^- start (GOOD)      ^- alleged start (BAD)
+               (cond ((eq simple-fun (%code-entry-point code 0))
+                      (bug "Misaligned fun start"))
+                     (t   ; sanity-check the length of the filler
+                      (aver (< padding (* 2 n-word-bytes)))))
+               (push `(:pad . ,padding) blobs)
+               (incf start-pc padding)))
+           (push `(,start-pc . ,end-pc) blobs)
+           (setq next-simple-fun-pc-offs
+                 (if (< (1+ simple-fun-index) (code-n-entries code))
+                     (%code-fun-offset code (1+ simple-fun-index))
+                     -1)))
+          (t
+           (let ((current-blob (car blobs)))
+             (setf (cdr current-blob) end-pc)))) ; extend this blob
+        (unless next
+          (return (nreverse blobs)))
+        (setq fun-map next start-pc end-pc)))))
 
 (defun %widetag-of (word) (logand word widetag-mask))
 
@@ -1479,11 +1479,13 @@
                            (let* ((nslots (%instance-length (translated-obj)))
                                   (new (memoize (%make-instance nslots)))
                                   (exclude-slot-mask
-                                   (if (eq allowed 'sb-c::compiled-debug-info)
-                                       (ash 1 (get-dsd-index sb-c::compiled-debug-info sb-c::memo-cell))
-                                       0)))
+                                   (logior
+                                    ;; all boxed slots, but skip the layout if #-compact-instance-header
+                                    #-compact-instance-header 1
+                                    (if (eq allowed 'sb-c::compiled-debug-info)
+                                        (ash 1 (get-dsd-index sb-c::compiled-debug-info sb-c::memo-cell))
+                                        0))))
                              (setf (%instance-layout new) (find-layout allowed))
-                             ;; all boxed slots
                              (dotimes (i nslots new)
                                (unless (logbitp i exclude-slot-mask)
                                  (setf (%instance-ref new i)
