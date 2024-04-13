@@ -675,24 +675,16 @@
 ;;; Start and and are relative to the object's base address,
 ;;; not the start of its instructions. Hence we add HEADER-BYTES
 ;;; too all the PC offsets.
-(defun code-symbols (code core &aux (spacemap (core-spacemap core)))
-  (let ((cdf (translate
-                  (sb-c::compiled-debug-info-fun-map
-                   (truly-the sb-c::compiled-debug-info
-                              (translate (%code-debug-info code) spacemap)))
-                  spacemap))
+(defun code-symbols (code core)
+  (let ((cdf (extract-fun-map code core))
         (header-bytes (* (code-header-words code) n-word-bytes))
         (start-pc 0)
         (blobs))
     (loop
-      (let* ((name (fun-name-from-core
-                    (sb-c::compiled-debug-fun-name
-                     (truly-the sb-c::compiled-debug-fun cdf))
-                    core))
-             (next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
-                     (translate (sb-c::compiled-debug-fun-next cdf) spacemap)))
+      (let* ((name (remove-name-junk (sb-c::compiled-debug-fun-name cdf)))
+             (next (sb-c::compiled-debug-fun-next cdf))
              (end-pc (if next
-                         (+ header-bytes (cdf-offset next spacemap))
+                         (+ header-bytes (sb-c::compiled-debug-fun-offset next))
                          (code-object-size code))))
         (unless (= end-pc start-pc)
           ;; Collapse adjacent address ranges named the same.
