@@ -6625,6 +6625,9 @@
          'sb-impl::parse-integer10)
     string start end junk-allowed))
 
+(deftransform %coerce-to-policy ((thing) (policy))
+  'thing)
+
 
 (defun prev-node (node &key type (cast t))
   (let (ctran)

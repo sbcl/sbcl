@@ -2333,3 +2333,5 @@
   (integer t)
   integer
   (movable always-translatable))
+
+(defknown %coerce-to-policy (t) policy (flushable))
