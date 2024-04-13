@@ -54,7 +54,7 @@ int set_noecho(int fd)
     if (tcgetattr(fd, &stermios) < 0) return 0;
 
     stermios.c_lflag &= ~(  ECHO | /* ECHOE |  ECHOK | */  ECHONL);
-    stermios.c_oflag &= ~(ONLCR);
+    stermios.c_oflag |= (ONLCR);
     stermios.c_iflag &= ~(BRKINT);
     stermios.c_iflag |= (ICANON|ICRNL);
 
