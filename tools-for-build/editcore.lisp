@@ -1480,8 +1480,10 @@
                                   (new (memoize (%make-instance nslots)))
                                   (exclude-slot-mask
                                    (logior
-                                    ;; all boxed slots, but skip the layout if #-compact-instance-header
-                                    #-compact-instance-header 1
+                                    ;; skip the layout slot if #-compact-instance-header
+                                    (if (= sb-vm:instance-data-start 1) 1 0)
+                                    ;; everything else except for compiled-debug-info-memo-cell
+                                    ;; (Why is it ever non-NIL as saved? That's another bug)
                                     (if (eq allowed 'sb-c::compiled-debug-info)
                                         (ash 1 (get-dsd-index sb-c::compiled-debug-info sb-c::memo-cell))
                                         0))))
@@ -1514,8 +1516,7 @@
                                    (setf (aref new i)
                                          (recurse (word (+ vector-data-offset i)))))))
                               ((and (>= widetag #x80) (typep (translated-obj) 'simple-array))
-                               ;; it could be returned as-is, I suppose?
-                               (memoize (copy-seq (translated-obj))))
+                               (memoize (translated-obj))) ; unboxed array is OK in place
                               ((= widetag symbol-widetag)
                                (let* ((sym (translated-obj))
                                       (name (translate (symbol-name sym) spacemap))
