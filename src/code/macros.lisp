@@ -991,6 +991,11 @@ invoked. In that case it will store into PLACE and start over."
       (incf minimum 2))
     (>= (length keys) minimum)))
 
+(defun wrap-if (condition with form)
+  (if condition
+      (append with (list form))
+      form))
+
 ;;; CASE-BODY returns code for all the standard "case" macros. NAME is
 ;;; the macro name, and KEYFORM is the thing to case on.
 ;;; When ERRORP, no OTHERWISE-CLAUSEs are recognized,
@@ -1158,12 +1163,16 @@ invoked. In that case it will store into PLACE and start over."
              `(cond
                 ,@clauses
                 ,@(when errorp
-                    `((t ,(ecase name
-                         (etypecase
-                          `(etypecase-failure
-                            ,keyform-value ,(etypecase-error-spec keys)))
-                         (ecase
-                             `(ecase-failure ,keyform-value ',keys)))))))))
+                    `((t
+                       ,(wrap-if
+                         (sb-c::compiling-p lexenv)
+                         '(locally (declare (muffle-conditions code-deletion-note)))
+                         (ecase name
+                           (etypecase
+                             `(etypecase-failure
+                                 ,keyform-value ,(etypecase-error-spec keys)))
+                           (ecase
+                             `(ecase-failure ,keyform-value ',keys))))))))))
         (if (eq keyform-value keyform)
             switch
             `(let ((,keyform-value ,keyform))

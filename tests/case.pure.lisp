@@ -57,3 +57,17 @@
 
 (with-test (:name :duplicate-cases-load)
   (assert (load "case-test.lisp")))
+
+(with-test (:name :no-notes-e-failure)
+  (checked-compile '(lambda (x)
+                     (when (typep x 'sequence)
+                       (etypecase x
+                         (list 1)
+                         (sequence 10))))
+                   :allow-notes nil)
+  (checked-compile '(lambda (x)
+                     (when (typep x 'symbol)
+                       (ecase x
+                         (a 1)
+                         (2 10))))
+                   :allow-notes nil))
