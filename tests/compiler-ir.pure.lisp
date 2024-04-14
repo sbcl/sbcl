@@ -437,3 +437,11 @@
                                     l))))
                       :key (lambda (x) (combination-fun-source-name x nil)))
                1)))
+
+(with-test (:name :pop-special-once)
+  (assert
+   (= (count 'symbol-value
+             (ir2-vops '(lambda (s)
+                         (declare (special s))
+                         (pop s))))
+      1)))
