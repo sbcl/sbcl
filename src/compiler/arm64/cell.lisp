@@ -81,9 +81,10 @@
   (define-vop (set)
     (:args (object :scs (descriptor-reg)
                    :load-if (not (and (sc-is object constant)
-                                      (symbol-always-has-tls-value-p (tn-value object)))))
+                                      (symbol-always-has-tls-value-p (tn-value object) node))))
            (value :scs (descriptor-reg any-reg zero)))
     (:temporary (:sc any-reg) tls-index)
+    (:node-var node)
     (:vop-var vop)
     (:generator 4
       (sc-case object
@@ -113,13 +114,14 @@
     (:temporary (:sc any-reg) tls-index)
     (:variant-vars check-boundp)
     (:variant t)
+    (:node-var node)
     (:generator 9
       (let* ((known-symbol-p (sc-is symbol constant))
              (known-symbol (and known-symbol-p (tn-value symbol)))
              (fixup (and known-symbol
                          (make-fixup known-symbol :symbol-tls-index))))
         (cond
-          ((symbol-always-has-tls-value-p known-symbol)
+          ((symbol-always-has-tls-value-p known-symbol node)
            (inst ldr value (@ thread-tn fixup)))
           (t
            (cond

@@ -292,7 +292,7 @@
              (known-symbol (and known-symbol-p (tn-value symbol))))
         ;; In order from best to worst.
         (cond
-          ((symbol-always-has-tls-value-p known-symbol)
+          ((symbol-always-has-tls-value-p known-symbol (sb-c::vop-node vop))
            (setq symbol-reg nil)
            (inst mov value (access-wired-tls-val known-symbol)))
           (t

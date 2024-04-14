@@ -33,9 +33,11 @@
     (let ((cup (lexenv-cleanup lexenv)))
       (when cup (return cup)))))
 
-(defun map-nested-cleanups (function block &optional return-value)
-  (declare (type cblock block))
-  (do ((cleanup (block-end-cleanup block)
+(defun map-nested-cleanups (function block-or-node &optional return-value)
+  (declare (type (or node cblock) block-or-node))
+  (do ((cleanup (if (node-p block-or-node)
+                    (node-enclosing-cleanup block-or-node)
+                    (block-end-cleanup block-or-node))
                 (node-enclosing-cleanup (cleanup-mess-up cleanup))))
       ((not cleanup) return-value)
     (funcall function cleanup)))
@@ -3327,3 +3329,23 @@ is :ANY, the function name is not checked."
        (not (typep environment 'sb-interpreter:basic-env))
        #+sb-eval
        (not (typep environment 'sb-eval::eval-lexenv))))
+
+;;; Return T if SYMBOL will always have a value in its TLS cell that is
+;;; not EQ to NO-TLS-VALUE-MARKER-WIDETAG. As an optimization, set and ref
+;;; are permitted (but not required) to avoid checking for it.
+;;; This will be true of all C interface symbols, 'struct thread' slots,
+;;; and any variable defined by DEFINE-THREAD-LOCAL.
+;;;
+;;; Or if there's a binding around NODE.
+(defun sb-vm::symbol-always-has-tls-value-p (symbol node)
+  (or (typep (info :variable :wired-tls symbol)
+             '(or (eql :always-thread-local) fixnum))
+      (when node
+        (do-nested-cleanups (cleanup node)
+          (when (eq (cleanup-kind cleanup) :special-bind)
+            (let* ((node (cleanup-mess-up cleanup))
+                   (args (when (basic-combination-p node)
+                           (basic-combination-args node))))
+              (when (and args
+                         (eq (leaf-source-name (lvar-value (car args))) symbol))
+                (return t))))))))
