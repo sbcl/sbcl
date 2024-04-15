@@ -754,7 +754,8 @@
                (setf (svref vector index)
                      (acons name
                             (cons (when (or bootstrap
-                                            (and (standard-class-p class)
+                                            (and (or (standard-class-p class)
+                                                     (funcallable-standard-class-p class))
                                                  (slot-accessor-std-p slot 'all)))
                                     (if bootstrap
                                         (early-slot-definition-location slot)

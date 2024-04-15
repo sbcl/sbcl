@@ -539,6 +539,27 @@
                      (atomic-pop (symbol-value 'x))))))
       1)))
 
+(defclass cas-fsc (generic-function) 
+  ((a :initform 2))
+  (:metaclass sb-mop:funcallable-standard-class))
+
+(with-test (:name :cas-funcallable-instance)
+  (let ((x (make-instance 'cas-fsc)))
+    (assert
+     (= (funcall (compile nil
+                          `(lambda (x)
+                             (cas (slot-value x 'a) 0 1)))
+                 x)
+        2))
+    (assert (eql (slot-value x 'a) 2))
+    (assert
+     (= (funcall (compile nil
+                          `(lambda (x)
+                             (cas (slot-value x 'a) 2 3)))
+                 x)
+        2))
+    (assert (eql (slot-value x 'a) 3))))
+
 (in-package "SB-VM")
 
 ;;; This file defines a structure, so is an 'impure' test

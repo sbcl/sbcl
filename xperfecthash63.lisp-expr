@@ -3356,5 +3356,17 @@
 (#(CE71FAA 25164A63 68D6D579 7E4DD5CC D6E7D73B F5EA1D35)
  "(:ALLOW-OTHER-KEYS :CONTEXTS :FUN-MAP :PACKAGE :SOURCE :NAME)"
  "(  (& (^ (>> val 1) (>> val 23)) 7))")
+(#(D807 DA10 DA20 DA21 DCE8 DE82 DE83)
+ "(55303 56963 56962 56552 55841 55840 55824)"
+ "((let ((tab #a((4) (unsigned-byte 8) 6 0 2 7)))
+  (+= val #xcf72a6f6)
+  (+= val (<< val 8))
+  (^= val (>> val 4))
+  (let ((b (& (>> val 8) #x3)))
+   (let ((a (>> (u32+ val (<< val 13)) 30)))
+    (^ a (aref tab b))))))")
+(#(432D590 E0106E3 1DA93F40 582CD525 702216F9 88B200C9 DEBFB91F)
+ "(:DCZID_EL0 :TPIDRRO_EL0 :TPIDR_EL0 :CCNT :FPSR :FPCR :NZCV)"
+ "(  (& (+ val (>> val 18)) 7))")
 )
 ;; EOF
