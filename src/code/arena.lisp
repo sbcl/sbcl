@@ -68,6 +68,7 @@
 ;;; There are one or more large blocks of memory associated with
 ;;; an arena, obtained via malloc(). Allocations within a block are
 ;;; contiguous but the blocks can be discontiguous.
+#+system-tlabs
 (declaim (ftype (sfunction (fixnum &optional fixnum fixnum) arena) new-arena))
 (defun new-arena (size &optional (growth-amount size) (max-extensions 7))
   (declare (ignorable growth-amount max-extensions))
