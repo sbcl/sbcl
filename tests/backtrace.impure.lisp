@@ -550,7 +550,7 @@
   (gf-dispatch-test/gf 1 1)
   ;; Wrong argument count
   (assert-backtrace (lambda () (gf-dispatch-test/f 42))
-                    '(((sb-pcl::gf-dispatch gf-dispatch-test/gf) 42))))
+                    '((gf-dispatch-test/gf 42))))
 
 (defgeneric gf-default-only-test/gf (x y)
   (:method (x y) (+ x y)))
