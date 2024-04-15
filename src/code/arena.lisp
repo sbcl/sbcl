@@ -68,9 +68,9 @@
 ;;; There are one or more large blocks of memory associated with
 ;;; an arena, obtained via malloc(). Allocations within a block are
 ;;; contiguous but the blocks can be discontiguous.
+(declaim (ftype (sfunction (fixnum &optional fixnum fixnum) arena) new-arena))
 (defun new-arena (size &optional (growth-amount size) (max-extensions 7))
-  (declare (ignorable growth-amount max-extensions)
-           (fixnum size growth-amount max-extensions))
+  (declare (ignorable growth-amount max-extensions))
   (assert (>= size 65536))
   "Create a new arena of SIZE bytes which can be grown additively by GROWTH-AMOUNT
 one or more times, not to exceed MAX-EXTENSIONS times"
@@ -116,7 +116,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
   #-system-tlabs `(progn ,@body)
   #+system-tlabs
   `(let ((a ,arena))
-     (assert (typep a 'arena))
+     (declare (arena a))
      ;; maybe allow switching from one arena to another?
      (switch-to-arena a)
      (unwind-protect (progn ,@body) (switch-to-arena 0))))
