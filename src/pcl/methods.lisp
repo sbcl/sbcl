@@ -1282,11 +1282,6 @@
                                            (do-if t) (do-if nil))))))))))
       (do-column precedence methods ()))))
 
-(defun compute-secondary-dispatch-function (generic-function net &optional
-                                            method-alist wrappers)
-  (funcall (the function (compute-secondary-dispatch-function1 generic-function net))
-           method-alist wrappers))
-
 (defvar *eq-case-table-limit* 15)
 (defvar *case-table-limit* 10)
 
