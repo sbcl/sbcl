@@ -2856,7 +2856,13 @@ void free_large_object(lispobj* where, lispobj* end)
         gc_assert(page_single_obj_p(page)); // redundant for the first page
         gc_assert(page_table[page].gen == g); // also redundant
         gc_assert(page_scan_start(page) == where);
-        gc_dcheck(page_cards_all_marked_nonsticky(page)); // is this right?
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        gc_dcheck(page_cards_all_marked_nonsticky(page));
+#else
+        /* Force page to be writable. As much as memory faults should not occur
+         * during GC, they are allowed, and this step will ensure writability. */
+        *page_address(page) = 0;
+#endif
     }
     // Copied from free_oldspace
     for (page = first ; page <= last ; ++page) {
