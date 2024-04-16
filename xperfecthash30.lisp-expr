@@ -2406,5 +2406,41 @@
 (#(B8918A5 1243EBEC 13796C56 137D56C3 176D31BE)
  "(:INITFORM :INITARG :WRITER :READER :ACCESSOR)"
  "(  (& (+ (>> val 7) (>> val 24)) 7))")
+(#(61DD4A0 13738951 183580D4 18CCEF23 1B7EAF35 1BAF8BF6 1BB8AC21 1BDB6B4B 1BFD9CCB 1DD2FDC1 1F7D7711 1FBDF73E)
+ "(:ALLOW-OTHER-KEYS :ELSEWHERE-PC :START-PC :BSP-SAVE :CLOSURE-SAVE :RETURNS :ARGUMENTS :TLF-NUMBER :BLOCKS :VARS :KIND :NAME)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 5 0 0 0 3 13 12)))
+  (+= val #xc4da5ddf)
+  (^= val (>> val 16))
+  (+= val (<< val 8))
+  (^= val (>> val 4))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
+(#(154E417 61DD4A0 152F696B 15EC7A14 1BB8AC21 1DBE97B4)
+ "(:ALLOW-OTHER-KEYS :CONTEXTS :FUN-MAP :PACKAGE :SOURCE :NAME)"
+ "(  (& (^ val (>> val 16)) 7))")
+(#(43EB9AD 500B4FB 5EC8D52 9AFEF84 D79819C 175E257B 17BE5DB2 1A084EFF 1C3E4F58)
+ "(DEFSTRUCT-SLOT-DESCRIPTION DEFSTRUCT-DESCRIPTION SB-C::DEBUG-SOURCE SB-C::COMPILED-DEBUG-INFO SB-C::DEBUG-INFO SB-C:DEFINITION-SOURCE-LOCATION CONDITION STRUCTURE-OBJECT T)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 0 5 0 9 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 3) 29)))
+    (^ a (aref tab b))))))")
+(#(1 2 8 10 40)
+ "(64 16 8 2 1)"
+ "(  (& (+ (>> val 0) (>> val 1) (>> val 5)) 7))")
+(#(27F36EA B2215A5 C730CB9 DFC6AC7 121266F1)
+ "(SB-C::MORE REST SB-C::OPTIONAL SB-C::SUPPLIED-P SB-C::DELETED)"
+ "(  (& (- val (>> val 5)) 7))")
+(#(345E94A 3B704AF 61DD4A0 ECA6FCF 13738951 162A8BBD 183580D4 18FCBC48 1B7EAF35 1BAF8BF6 1BB8AC21 1BDB6B4B 1BFD9CCB 1DD2FDC1
+   1F7D7711 1FBDF73E)
+ "(:ALLOW-OTHER-KEYS :ELSEWHERE-PC :START-PC :CLOSURE-SAVE :CFP-SAVED-PC :LRA-SAVED-PC :OLD-FP :RETURN-PC-PASS :RETURN-PC :RETURNS :ARGUMENTS :TLF-NUMBER :BLOCKS :VARS :KIND :NAME)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 7 13 0 12 3 9 9)))
+  (+= val #x5d9ed3c5)
+  (^= val (>> val 16))
+  (+= val (<< val 8))
+  (^= val (>> val 4))
+  (let ((b (& (>> val 22) #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
