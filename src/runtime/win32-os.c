@@ -1078,7 +1078,9 @@ signal_internal_error_or_lose(os_context_t *ctx,
      */
 
     if (internal_errors_enabled) {
-
+        /* The exception system doesn't automatically clear pending
+         * exceptions, so we lose as soon as we execute any FP
+         * instruction unless we do this first. */
         asm("fnclex");
         /* We're making the somewhat arbitrary decision that having
          * internal errors enabled means that lisp has sufficient
@@ -1094,9 +1096,10 @@ signal_internal_error_or_lose(os_context_t *ctx,
             DX_ALLOC_SAP(exception_record_sap, exception_record);
             thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
 
-            /* The exception system doesn't automatically clear pending
-             * exceptions, so we lose as soon as we execute any FP
-             * instruction unless we do this first. */
+#ifdef LISP_FEATURE_X86_64
+            asm("fninit");
+#endif
+            
             /* Call into lisp to handle things. */
             funcall2(StaticSymbolFunction(HANDLE_WIN32_EXCEPTION),
                      context_sap,
