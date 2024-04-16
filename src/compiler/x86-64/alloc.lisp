@@ -764,8 +764,7 @@
                                                'stack-allocated-object-overflows-stack-error
                                                (if (tn-p size)
                                                    size
-                                                   (make-constant-tn
-                                                    (sb-c::find-constant size))))))
+                                                   (make-sc+offset immediate-sc-number size)))))
             (inst sub rsp-tn size)
             (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
             ;; avoid clearing condition codes
