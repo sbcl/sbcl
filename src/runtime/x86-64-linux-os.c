@@ -152,7 +152,7 @@ void sb_dump_mcontext(char *reason, ucontext_t* context)
     }
     sigset_tostring(&context->uc_sigmask, smallbuf, sizeof smallbuf);
     ptr += snprintf(obuf+ptr, REMAINING, "sigmask=%s\n", smallbuf);
-    write(2, obuf, ptr);
+    ignore_value(write(2, obuf, ptr));
 }
 
 os_context_register_t *

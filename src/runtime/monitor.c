@@ -235,7 +235,7 @@ void save_gc_crashdump(char *pathname,
               int n = snprintf(msg, sizeof msg,
                                "thread %p state %d - No stackptr for crash dump\n",
                                th, th->state_word.state);
-              write(2, msg, n);
+              ignore_value(write(2, msg, n));
               _exit(1);
             }
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
