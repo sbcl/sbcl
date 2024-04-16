@@ -608,30 +608,18 @@
 ;;; open. IF X is NIL, the result is NIL.
 (defun bound-func (f x strict)
   (declare (type function f))
-  (and x
-       (handler-case
-         (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
-           ;; With these traps masked, we might get things like infinity
-           ;; or negative infinity returned. Check for this and return
-           ;; NIL to indicate unbounded.
-           #+sb-xc-host
-           (when (and (eql f #'log)
-                      (zerop x))
-             (return-from bound-func))
-           (let ((y (funcall f (type-bound-number x))))
-             (if (or (and (floatp y)
-                          (float-infinity-p y))
-                     (and (typep y 'complex)
-                          (or (and (floatp (imagpart y))
-                                   (float-infinity-p (imagpart y)))
-                              (and (floatp (realpart y))
-                                   (float-infinity-p (realpart y))))))
-                 nil
-                 (set-bound y (and strict (consp x))))))
-         ;; Some numerical operations will signal an ERROR, e.g. in
-         ;; the course of converting a bignum to a float. Default to
-         ;; NIL in that case.
-         (arithmetic-error ()))))
+  (when x
+    #+sb-xc-host
+    (when (and (eql f #'log)
+               (zerop x))
+      (return-from bound-func))
+    (handler-case
+        (set-bound (funcall f (type-bound-number x))
+                   (and strict (consp x)))
+      ;; Some numerical operations will signal an ERROR, e.g. in
+      ;; the course of converting a bignum to a float. Default to
+      ;; NIL in that case.
+      (arithmetic-error ()))))
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)
@@ -703,36 +691,37 @@
 (defmacro bound-binop (op x y)
   (with-unique-names (xb yb res)
     `(and ,x ,y
-          (with-float-traps-masked (:underflow :overflow :inexact :divide-by-zero)
-            (let* ((,xb (type-bound-number ,x))
-                   (,yb (type-bound-number ,y))
-                   (,res (safely-binop ,op ,xb ,yb)))
-              (set-bound ,res
-                         (and (or (consp ,x) (consp ,y))
-                              ;; Open bounds can very easily be messed up
-                              ;; by FP rounding, so take care here.
-                              ,(ecase op
-                                 (sb-xc:*
-                                  ;; Multiplying a greater-than-zero with
-                                  ;; less than one can round to zero.
-                                  `(or (not (fp-zero-p ,res))
-                                       (cond ((and (consp ,x) (fp-zero-p ,xb))
-                                              (>= (abs ,yb) 1))
-                                             ((and (consp ,y) (fp-zero-p ,yb))
-                                              (>= (abs ,xb) 1)))))
-                                 (sb-xc:/
-                                  ;; Dividing a greater-than-zero with
-                                  ;; greater than one can round to zero.
-                                  `(or (not (fp-zero-p ,res))
-                                       (cond ((and (consp ,x) (fp-zero-p ,xb))
-                                              (<= (abs ,yb) 1))
-                                             ((and (consp ,y) (fp-zero-p ,yb))
-                                              (<= (abs ,xb) 1)))))
-                                 ((sb-xc:+ sb-xc:-)
-                                  ;; Adding or subtracting greater-than-zero
-                                  ;; can end up with identity.
-                                  `(and (not (fp-zero-p ,xb))
-                                        (not (fp-zero-p ,yb))))))))))))
+          (handler-case
+              (let* ((,xb (type-bound-number ,x))
+                     (,yb (type-bound-number ,y))
+                     (,res (safely-binop ,op ,xb ,yb)))
+                (set-bound ,res
+                           (and (or (consp ,x) (consp ,y))
+                                ;; Open bounds can very easily be messed up
+                                ;; by FP rounding, so take care here.
+                                ,(ecase op
+                                   (sb-xc:*
+                                    ;; Multiplying a greater-than-zero with
+                                    ;; less than one can round to zero.
+                                    `(or (not (fp-zero-p ,res))
+                                         (cond ((and (consp ,x) (fp-zero-p ,xb))
+                                                (>= (abs ,yb) 1))
+                                               ((and (consp ,y) (fp-zero-p ,yb))
+                                                (>= (abs ,xb) 1)))))
+                                   (sb-xc:/
+                                    ;; Dividing a greater-than-zero with
+                                    ;; greater than one can round to zero.
+                                    `(or (not (fp-zero-p ,res))
+                                         (cond ((and (consp ,x) (fp-zero-p ,xb))
+                                                (<= (abs ,yb) 1))
+                                               ((and (consp ,y) (fp-zero-p ,yb))
+                                                (<= (abs ,xb) 1)))))
+                                   ((sb-xc:+ sb-xc:-)
+                                    ;; Adding or subtracting greater-than-zero
+                                    ;; can end up with identity.
+                                    `(and (not (fp-zero-p ,xb))
+                                          (not (fp-zero-p ,yb))))))))
+            (arithmetic-error ())))))
 
 (defun coercion-loses-precision-p (val type)
   (typecase val
@@ -1525,11 +1514,11 @@
                  (cond
                    ((member-type-p x)
                     (if member-fun
-                        (with-float-traps-masked
-                            (:underflow :overflow :divide-by-zero)
-                          (specifier-type
-                           `(eql ,(funcall member-fun
-                                           (first (member-type-members x))))))
+                        (handler-case
+                            (specifier-type
+                             `(eql ,(funcall member-fun
+                                             (first (member-type-members x)))))
+                          (arithmetic-error () nil))
                         ;; Otherwise convert to a numeric type.
                         (funcall derive-fun (convert-member-type x))))
                    ((or (numeric-type-p x)
@@ -1580,10 +1569,7 @@
                     (let* ((x (first (member-type-members x)))
                            (y (first (member-type-members y)))
                            (result (ignore-errors
-                                    (with-float-traps-masked
-                                        (:underflow :overflow :divide-by-zero
-                                                    :invalid)
-                                      (funcall member-fun x y)))))
+                                    (funcall member-fun x y))))
                       (cond ((null result) *empty-type*)
                             ((and (floatp result) (float-nan-p result))
                              (make-numeric-type :class 'float
