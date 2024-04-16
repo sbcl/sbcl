@@ -539,7 +539,7 @@
                      (atomic-pop (symbol-value 'x))))))
       1)))
 
-(defclass cas-fsc (generic-function) 
+(defclass cas-fsc (generic-function)
   ((a :initform 2))
   (:metaclass sb-mop:funcallable-standard-class))
 

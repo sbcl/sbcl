@@ -142,8 +142,13 @@
                      (subtypep condition-name 'arithmetic-error))
                 (multiple-value-bind (op operands)
                     (sb-di::decode-arithmetic-error-operands context-sap)
-                  ;; Reset the accumulated exceptions
-                  (setf (ldb sb-vm:float-sticky-bits (sb-vm:floating-point-modes)) 0)
+                  ;; KLUDGE: FP errors from library functions reset
+                  ;; the FPU control bits.
+                  ;; This might enable some disabled exceptions, but
+                  ;; since at least one exception is not disabled it's
+                  ;; unlikely that disabling other exceptions is
+                  ;; important.
+                  (sb-vm::float-cold-init-or-reinit)
                   (error condition-name :operation op
                                         :operands operands)))
                ((eq condition-name 'memory-fault-error)
