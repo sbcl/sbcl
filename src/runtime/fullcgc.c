@@ -442,6 +442,7 @@ static uword_t sweep(lispobj* where, lispobj* end,
     return 0;
 }
 
+#ifndef LISP_FEATURE_MARK_REGION_GC
 static uword_t sweep_possibly_large(lispobj* where, lispobj* end,
                                     __attribute__((unused)) uword_t arg)
 {
@@ -452,6 +453,7 @@ static uword_t sweep_possibly_large(lispobj* where, lispobj* end,
         sweep(where, end, arg);
     return 0;
 }
+#endif
 
 void dispose_markbits() {
     os_deallocate((void*)fullcgcmarks, markbits_size);
@@ -468,6 +470,9 @@ void dispose_markbits() {
 
 void execute_full_sweep_phase()
 {
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    lose("Can't do sweep");
+#else
     long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
 
     local_smash_weak_pointers();
@@ -499,4 +504,5 @@ void execute_full_sweep_phase()
         fprintf(stderr, " words zeroed]\n");
     }
     dispose_markbits();
+#endif
 }

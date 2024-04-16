@@ -1099,7 +1099,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
 #ifdef LISP_FEATURE_X86_64
             asm("fninit");
 #endif
-            
+
             /* Call into lisp to handle things. */
             funcall2(StaticSymbolFunction(HANDLE_WIN32_EXCEPTION),
                      context_sap,
