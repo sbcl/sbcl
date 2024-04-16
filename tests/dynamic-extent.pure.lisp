@@ -2197,3 +2197,10 @@
            (print-nothing (car another)))
          (car digits)))
      (() 0))))
+
+(with-test (:name :encode-error-break-large-immediate)
+  (disassemble '(lambda ()
+                 (sb-int:dx-let ((v (make-array 65536
+                                                :element-type '(unsigned-byte 8))))
+                  (opaque-identity v)))
+               :stream (make-broadcast-stream)))
