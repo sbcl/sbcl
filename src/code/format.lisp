@@ -329,8 +329,9 @@
 (defun %formatter (control-string &optional (arg-count 0) (need-retval t)
                    &aux (lambda-name
                          (logically-readonlyize
-                          (possibly-base-stringize
-                           (concatenate 'string "fmt$" control-string)))))
+                          (format nil "fmt$~36R"
+                                  (#+sb-xc-host %sxhash-simple-string
+                                   #-sb-xc-host sxhash control-string)))))
   ;; ARG-COUNT is supplied only when the use of this formatter is in a literal
   ;; call to FORMAT, in which case we can possibly elide &optional parsing.
   ;; But we can't in general, because FORMATTER may be called by users
