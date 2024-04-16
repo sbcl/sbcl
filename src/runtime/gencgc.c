@@ -2843,6 +2843,32 @@ static void free_oldspace(void)
     generations[from_space].bytes_allocated -= bytes_freed;
     bytes_allocated -= bytes_freed;
 }
+void free_large_object(lispobj* where, lispobj* end)
+{
+    page_index_t first = find_page_index(where);
+    page_index_t last = find_page_index((char*)end - 1);
+    generation_index_t g = page_table[first].gen;
+    gc_assert(page_ends_contiguous_block_p(last, g));
+    uword_t bytes_freed = 0;
+    page_index_t page;
+    // Perform all assertions before clobbering anything
+    for (page = first ; page <= last ; ++page) {
+        gc_assert(page_single_obj_p(page)); // redundant for the first page
+        gc_assert(page_table[page].gen == g); // also redundant
+        gc_assert(page_scan_start(page) == where);
+        gc_dcheck(page_cards_all_marked_nonsticky(page)); // is this right?
+    }
+    // Copied from free_oldspace
+    for (page = first ; page <= last ; ++page) {
+        int used = page_words_used(page);
+        if (used) set_page_need_to_zero(page, 1);
+        set_page_bytes_used(page, 0);
+        reset_page_flags(page);
+        bytes_freed += used << WORD_SHIFT;
+    }
+    generations[g].bytes_allocated -= bytes_freed;
+    bytes_allocated -= bytes_freed;
+}
 
 /* Call 'proc' with pairs of addresses demarcating ranges in the
  * specified generation.

@@ -385,7 +385,6 @@ static void sweep_fixedobj_pages()
  * unlike deposit_filler() which tries to be efficient */
 static void clobber_headered_object(lispobj* addr, sword_t nwords)
 {
-    // FIXME: clobbering an object on single-object pages should free entire pages
     page_index_t page = find_page_index(addr);
     if (page < 0) { // code space
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -403,7 +402,7 @@ static void clobber_headered_object(lispobj* addr, sword_t nwords)
             }
         }
 #endif
-    } else if ((SINGLE_OBJECT_FLAG|page_table[page].type) == (SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE)) {
+    } else if (is_code(page_table[page].type)) {
         // Code pages don't want (0 . 0) fillers, otherwise heap checking
         // gets an error: "object @ 0x..... is non-code on code page"
         addr[0] = make_filler_header(nwords);
@@ -440,6 +439,17 @@ static uword_t sweep(lispobj* where, lispobj* end,
             if (!livep) where[0] = where[1] = (uword_t)-1;
         }
     }
+    return 0;
+}
+
+static uword_t sweep_possibly_large(lispobj* where, lispobj* end,
+                                    __attribute__((unused)) uword_t arg)
+{
+    extern void free_large_object(lispobj*, lispobj*);
+    if (page_single_obj_p(find_page_index(where))) {
+        if (!pointer_survived_gc_yet((lispobj)where)) free_large_object(where, end);
+    } else
+        sweep(where, end, arg);
     return 0;
 }
 
@@ -480,7 +490,7 @@ void execute_full_sweep_phase()
             text_page_genmask[find_text_page_index(where)]
                 |= (1 << immobile_obj_gen_bits(where));
 #endif
-    walk_generation(sweep, -1, (uword_t)words_zeroed);
+    walk_generation(sweep_possibly_large, -1, (uword_t)words_zeroed);
     if (gencgc_verbose) {
         fprintf(stderr, "[Sweep phase: ");
         int i;
