@@ -728,10 +728,12 @@
   (define-vop (allocate-vector-on-stack)
     #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
-           (length :scs (any-reg immediate))
+           (length :scs (any-reg (immediate
+                                  (typep (fixnumize (tn-value tn))
+                                         '(signed-byte 32)))))
            (words :scs (any-reg (immediate
                                  (typep (pad-data-block (+ (tn-value tn) vector-data-offset))
-                                        '(signed-byte 32))))))
+                                        'sc-offset)))))
     (:results (result :scs (descriptor-reg) :from :load))
     (:node-var node)
     (:vop-var vop)

@@ -779,6 +779,11 @@
    `(lambda (fn)
       (let ((s (make-string 536870910)))
         (declare (dynamic-extent s))
+        (funcall fn s))))
+  (checked-compile
+   `(lambda (fn)
+      (let ((s (make-string 536870910 :element-type 'base-char)))
+        (declare (dynamic-extent s))
         (funcall fn s)))))
 
 (with-test (:name :hairy-aref-check-bounds)
