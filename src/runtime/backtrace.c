@@ -69,7 +69,7 @@ debug_function_name_from_pc (struct code* code, void *pc)
     __attribute__((unused)) uword_t start_pc = 0;
     uword_t elsewhere_pc = 0;
     uword_t first_elsewhere_pc = 0;
-    lispobj last_name;
+    lispobj last_name = 0;
     lispobj name;
 
     i = 0;
