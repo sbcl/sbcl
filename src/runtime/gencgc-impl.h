@@ -607,7 +607,7 @@ set_page_scan_start_offset(page_index_t index, os_vm_size_t offset)
 {
     // If the offset is nonzero and page-aligned
     unsigned int lsb = offset !=0 && IS_ALIGNED(offset, GENCGC_PAGE_BYTES);
-    os_vm_size_t scaled = (offset >> (lsb ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb;
+    os_vm_size_t scaled = (offset >> (lsb ? GENCGC_PAGE_SHIFT-1 : WORD_SHIFT)) | lsb;
     if (scaled > SCAN_START_OFS_MAX) {
         // Assert that if offset exceed the max representable value,
         // then it is a page-aligned offset, not a cons-aligned offset.
@@ -630,7 +630,7 @@ static os_vm_size_t scan_start_offset_iterated(page_index_t index)
         offset = page_table[lookback_page].scan_start_offset_;
         tot_offset_in_pages += offset >> 1;
     } while (offset == SCAN_START_OFS_MAX);
-    return (os_vm_size_t)tot_offset_in_pages << GENCGC_CARD_SHIFT;
+    return (os_vm_size_t)tot_offset_in_pages << GENCGC_PAGE_SHIFT;
 }
 
 static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t index)
@@ -638,7 +638,7 @@ static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t
     return page_table[index].scan_start_offset_ != SCAN_START_OFS_MAX
         ? (os_vm_size_t)(page_table[index].scan_start_offset_ & ~1)
           << ((page_table[index].scan_start_offset_ & 1) ?
-              (GENCGC_CARD_SHIFT-1) : WORD_SHIFT)
+              (GENCGC_PAGE_SHIFT-1) : WORD_SHIFT)
         : scan_start_offset_iterated(index);
 }
 

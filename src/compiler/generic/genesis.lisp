@@ -3172,11 +3172,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
   ;; It's the granularity at which we can map the core file pages.
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
   ;; values never needed in Lisp, so therefore not a defconstant
-  (progn
-  (format t "#define MAX_CONSES_PER_PAGE ~D~%" sb-vm::max-conses-per-page)
-  (format t "#define CARDS_PER_PAGE ~D~%#define GENCGC_CARD_SHIFT ~D~%"
-          sb-vm::cards-per-page ; this is the "GC" page, not "backend" page
-          sb-vm::gencgc-card-shift))
+  (format t "~:{#define ~A ~D~%~}"
+          `(("MAX_CONSES_PER_PAGE" ,sb-vm::max-conses-per-page)
+            ("GENCGC_PAGE_SHIFT" ,(1- (integer-length sb-vm:gencgc-page-bytes)))
+            ("GENCGC_CARD_SHIFT" ,sb-vm::gencgc-card-shift)
+            ("CARDS_PER_PAGE" ,sb-vm::cards-per-page)))
 
   (let ((size sb-vm::default-dynamic-space-size))
   ;; "-DDEFAULT_DYNAMIC_SPACE_SIZE=n" in CFLAGS will override this.
