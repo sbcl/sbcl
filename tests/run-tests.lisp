@@ -223,6 +223,7 @@
       sb-c::*compile-elapsed-time*
       sb-c::*compile-file-elapsed-time*
       sb-c::*phash-lambda-cache*
+      ,(maybe "SB-IMPL" "*RUN-GC-HOOKS*")
       sb-impl::**finalizer-store**
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*

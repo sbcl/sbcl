@@ -483,12 +483,17 @@
   (with-arena (*arena*) (gc))
   (assert (heap-allocated-p sb-kernel::*gc-epoch*)))
 
+(defvar *sem* (sb-thread:make-semaphore))
 (defvar *thing-created-by-hook* nil)
-(push (lambda () (push (cons 1 2) *thing-created-by-hook*))
+(push (lambda ()
+        (push (cons 1 2) *thing-created-by-hook*)
+        (sb-thread:signal-semaphore *sem*))
       *after-gc-hooks*)
 (test-util:with-test (:name :post-gc-hooks-unuse-arena)
   (with-arena (*arena*) (gc))
+  (sb-thread:wait-on-semaphore *sem*)
   (setq *after-gc-hooks* nil)
+  (assert *thing-created-by-hook*)
   (assert (heap-allocated-p *thing-created-by-hook*))
   (assert (heap-allocated-p (car *thing-created-by-hook*))))
 

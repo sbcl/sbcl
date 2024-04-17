@@ -414,7 +414,14 @@ Examples:
         (handler-case (let ((*in-a-finalizer* t)) (funcall fun))
           (error (c) (warn "Error calling finalizer ~S:~%  ~A" fun c)))))))
 
-#+sb-thread (define-alien-variable finalizer-thread-runflag int)
+#+sb-thread
+(progn
+(define-alien-variable finalizer-thread-runflag int)
+;; post-GC hooks are synchronously invoked after GC if #-sb-thread
+(define-load-time-global *after-gc-hooks* nil)
+(define-load-time-global *run-gc-hooks* 0)
+(declaim (fixnum *run-gc-hooks*)))
+
 ;;; Drain the queue of finalizers and return when empty.
 ;;; Concurrent invocations of this function in different threads are ok.
 ;;; Nested invocations (from a GC forced by a finalizer) are not ok.
@@ -424,8 +431,15 @@ Examples:
   (declare (dynamic-extent system-finalizer-scratchpad))
   (finalizers-rehash)
   (loop
-   ;; Perform no further work if trying to stop the thread, even if there is work.
-   #+sb-thread (when (zerop finalizer-thread-runflag) (return))
+   #+sb-thread
+   (progn
+     ;; Perform no further work if trying to stop the thread, even if there is work.
+     (when (zerop finalizer-thread-runflag) (return))
+     ;; If this thread is very slow to notice *RUN-GC-HOOKS* due to a slow finalizer,
+     ;; requests to run can stack up. A request will not be lost but may be delayed
+     (when (plusp *run-gc-hooks*)
+       (sb-vm:without-arena (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))
+       (atomic-decf *run-gc-hooks*)))
    (let ((ran-bg-compile ; Try to run a background compilation task
           (when *bg-compiler-function* (funcall *bg-compiler-function*)))
          (ran-a-system-finalizer ; Try to run 1 system finalizer

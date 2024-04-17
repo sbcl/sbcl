@@ -222,14 +222,12 @@ run in any thread.")
 
 #+sb-thread
 (defun post-gc ()
+  ;; The finalizer thread will continually check whether it should run post-GC hooks.
+  ;; Hooks need to be sufficiently uncomplicated as to be harmless,
+  ;; and should not expect any particular thread context.
+  (atomic-incf sb-impl::*run-gc-hooks*)
   (sb-impl::finalizer-thread-notify)
-  (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
-  ;; Post-GC actions are invoked synchronously by the GCing thread,
-  ;; which is an arbitrary one. If those actions aquire any locks, or are sensitive
-  ;; to the state of *ALLOW-WITH-INTERRUPTS*, any deadlocks of what-have-you
-  ;; are user error. Hooks need to be sufficiently uncomplicated as to be harmless.
-  (sb-vm:without-arena "post-gc"
-    (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))
+  (alien-funcall (extern-alien "empty_thread_recyclebin" (function void))))
 
 #-sb-thread
 (defun post-gc ()
