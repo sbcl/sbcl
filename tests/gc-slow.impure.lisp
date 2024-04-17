@@ -8,30 +8,29 @@
 (with-test (:name :cons-madly-without-interrupts)
   (sb-sys:without-interrupts (cons-madly)))
 
+(define-alien-variable n-lisp-gcs int)
 (with-test (:name :without-gcing)
-  (let ((gc-happend nil))
-    (push (lambda () (setq gc-happend t)) sb-ext:*after-gc-hooks*)
+  (let ((initial-gc-count n-lisp-gcs))
 
     ;; check that WITHOUT-GCING defers explicit gc
     (sb-sys:without-gcing
       (gc)
-      (assert (not gc-happend)))
-    (assert gc-happend)
+      (assert (= n-lisp-gcs initial-gc-count)))
+    (assert (> n-lisp-gcs initial-gc-count))
 
     ;; check that WITHOUT-GCING defers SIG_STOP_FOR_GC
     #+sb-thread
     (let ((in-without-gcing nil))
-      (setq gc-happend nil)
+      (setq initial-gc-count n-lisp-gcs)
       (sb-thread:make-thread (lambda ()
                                (loop while (not in-without-gcing))
                                (sb-ext:gc)))
       (sb-sys:without-gcing
         (setq in-without-gcing t)
         (sleep 3)
-        (assert (not gc-happend)))
-      ;; give the hook time to run
+        (assert (= n-lisp-gcs initial-gc-count)))
       (sleep 1)
-      (assert gc-happend))))
+      (assert (> n-lisp-gcs initial-gc-count)))))
 
 ;;; After each iteration of FOO there are a few pinned conses.
 ;;; On alternate GC cycles, those get promoted to generation 1.

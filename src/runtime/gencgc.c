@@ -57,7 +57,7 @@ extern FILE *gc_activitylog();
 
 /* Largest allocation seen since last GC. */
 os_vm_size_t large_allocation = 0;
-int n_gcs;
+int n_lisp_gcs;
 
 
 /*
@@ -3766,7 +3766,7 @@ long tot_gc_nsec;
 void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
-    ++n_gcs;
+    ++n_lisp_gcs;
     THREAD_JIT_WP(0);
     generation_index_t gen = 0, i;
     bool gc_mark_only = 0;
@@ -3809,7 +3809,7 @@ collect_garbage(generation_index_t last_gen)
     struct thread *th;
     for_each_thread(th) gc_close_thread_regions(th, 0);
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
-    if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_gcs, last_gen);
+    if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_lisp_gcs, last_gen);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
   if (ENABLE_PAGE_PROTECTION) {
