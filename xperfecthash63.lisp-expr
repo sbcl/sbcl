@@ -3389,5 +3389,11 @@
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
+(#(164892EC 16A3242C 1C8FB561 4A02C7DB 4C1DC72C A98151CA CBFDE8B6 E87FFC20 E99AC2D9 EE8ACE5F)
+ "(SB-C:MULTIPLE-CALL SB-C:MULTIPLE-CALL-LOCAL SB-C:MULTIPLE-CALL-NAMED SB-C:STATIC-MULTIPLE-CALL-NAMED SB-C:MULTIPLE-CALL-VARIABLE SB-C:PUSH-VALUES VALUES-LIST SB-C::REVERSE-VALUES-LIST SB-C:%MORE-ARG-VALUES UNALIGNED-DX-CONS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 0 5 2 9 0 3 3)))
+  (let ((b (& (>> val 9) #x7)))
+   (let ((a (>> (<< val 31) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

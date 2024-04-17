@@ -1303,13 +1303,16 @@
             (setq vop (vop-next vop)))))))
 
 ;;; If a constant is already loaded into a register use that register.
+;;; Also track stack alignment by consecutive stack-allocating VOPs.
 (defun optimize-constant-loads (component)
   (let* ((register-sb (sb-or-lose 'sb-vm::registers))
          (loaded-constants
            (make-array (sb-size register-sb)
-                       :initial-element nil)))
+                       :initial-element nil))
+         (aligned-stack))
     (do-ir2-blocks (block component)
       (fill loaded-constants nil)
+      (setf aligned-stack nil)
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (labels ((register-p (tn)
@@ -1385,6 +1388,39 @@
                      (t
                       (remove-written-tns)))))
             (t
+             ;; Stack allocation alignes the stack and leaves it aligned,
+             ;; adjacent stack allocation doesn't need to realign it.
+             (let ((node (vop-node vop)))
+               (flet ((vop-dx-info ()
+                        (case (vop-name vop)
+                          (make-closure
+                           (nthcdr 2 (vop-codegen-info vop))))))
+                 (cond ((memq (vop-name vop)
+                              '(multiple-call multiple-call-local
+                                multiple-call-named
+                                static-multiple-call-named
+                                multiple-call-variable
+                                push-values values-list
+                                reverse-values-list %more-arg-values
+                                unaligned-dx-cons))
+                        (setf aligned-stack nil))
+                       ((memq (vop-name vop) '(move-operand))) ;; shares vop-node
+                       ((and aligned-stack
+                             (neq aligned-stack node))
+                        (let ((info (vop-dx-info)))
+                          (if info
+                              (when (car info)
+                                (setf (car info) :aligned-stack))
+                              (when (and (combination-p node)
+                                         (node-stack-allocate-p node))
+                                (setf (combination-info node) :aligned-stack)))))
+                       (t
+                        (let ((info (vop-dx-info)))
+                          (when (if info
+                                    (car info)
+                                    (and (valued-node-p node)
+                                         (node-stack-allocate-p node)))
+                            (setf aligned-stack node)))))))
              (remove-written-tns))))))))
 
 (defun ir2-optimize (component &optional stage)

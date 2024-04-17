@@ -169,6 +169,13 @@
     (invoke-asm-routine asm-routine alloc-tn))
   (inst b back-label))
 
+(defun aligned-stack-p (dx)
+  (or (eq dx :aligned-stack)
+      (and sb-assem::*current-vop*
+           (let ((node (sb-c::vop-node sb-assem::*current-vop*)))
+             (and (sb-c::combination-p node)
+                  (eq (sb-c::combination-info node) :aligned-stack))))))
+
 ;;; Leaves the untagged pointer in TMP-TN,
 ;;; Allowing it to be used with STP later.
 (defun allocation (type size lowtag result-tn
@@ -180,10 +187,21 @@
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
-        (inst add tmp-tn csp-tn lowtag-mask)
-        (inst and tmp-tn tmp-tn (lognot lowtag-mask))
-        (inst add csp-tn tmp-tn (add-sub-immediate size result-tn))
-        (inst add result-tn tmp-tn lowtag))
+        (cond ((aligned-stack-p stack-allocate-p)
+               (assemble ()
+                 (inst tst csp-tn lowtag-mask)
+                 (inst b :eq skip)
+                 (inst add csp-tn csp-tn 8)
+                 (error-call nil 'sb-kernel::unreachable-error)
+                 skip)
+               (move tmp-tn csp-tn)
+               (inst add csp-tn csp-tn (add-sub-immediate size result-tn))
+               (inst add result-tn tmp-tn lowtag))
+              (t
+               (inst add tmp-tn csp-tn lowtag-mask)
+               (inst and tmp-tn tmp-tn (lognot lowtag-mask))
+               (inst add csp-tn tmp-tn (add-sub-immediate size result-tn))
+               (inst add result-tn tmp-tn lowtag))))
       (let ((alloc (gen-label))
             #+sb-thread (tlab (if systemp
                                   (if (eq type 'list) thread-sys-cons-tlab-slot thread-sys-mixed-tlab-slot)
