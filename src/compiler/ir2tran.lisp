@@ -152,17 +152,26 @@
        ;; might try to redefine it and get the old definition. And
        ;; they shouldn't be expected to understand the failure mode
        ;; and the remedy.
-       (cond ((and (labels ((internal-name-p (what)
-                              (typecase what
-                                (list
-                                 (every #'internal-name-p what))
-                                (symbol
-                                 (let ((pkg (sb-xc:symbol-package what)))
-                                   (or (and pkg (system-package-p pkg))
-                                       (eq pkg *cl-package*))))
-                                (t t))))
-                     (internal-name-p name))
-                   (info :function :info name)
+       (let ((internal
+              (named-let internal-p ((what name))
+                (typecase what
+                  (list (every #'internal-p what))
+                  (symbol
+                   (let ((pkg (sb-xc:symbol-package what)))
+                     (or (and pkg (system-package-p pkg))
+                         (eq pkg *cl-package*))))
+                  (t t))))
+             (could-early-bind
+              ;: Existence of globaldb info is a certificate that the function definition
+              ;; will not change. Though functions named (CAS CAR) and (SETF SVREF) lack
+              ;; globaldb info they won't be undefined, nor are they redefinable.
+              ;; And note that this is "could" and not "should", since we're also
+              ;; going to check for NOTINLINE.
+              (or (info :function :info name)
+                  (and (typep name '(cons (member setf cas) (cons symbol null)))
+                       (eq (sb-xc:symbol-package (cadr name)) *cl-package*)))))
+         (if (and internal
+                  could-early-bind
                    ;; Known functions can be dumped without going through fdefns.
                    ;; But if NOTINLINEd, don't early-bind to the functional value
                    ;; because that disallows redefinition, including but not limited
@@ -174,16 +183,18 @@
                    ;; If to a file, then it better exist at some point, but its existence
                    ;; in the compilation lisp doesn't really imply that it will.
                    #-sb-xc-host (if (producing-fasl-file) t (fboundp name)))
-              (emit-move node block (make-load-time-constant-tn :known-fun name)
-                         res))
-             (t
-              (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
+             (emit-move node block (make-load-time-constant-tn :known-fun name) res)
+             (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
+               ;; There is no case in which an internal function will lack a definition
+               ;; when referenced as #' - if it lacked such then you'd likely have just
+               ;; as bad a time with or without safety. One way or another you're landing
+               ;; in the ldb monitor if it occurs during cold-init.
                 #+untagged-fdefns
-                (if unsafe
+                (if (or unsafe internal)
                     (vop sb-vm::untagged-fdefn-fun node block fdefn-tn res)
                     (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res))
                 #-untagged-fdefns
-                (if unsafe
+                (if (or unsafe internal)
                     (vop slot node block fdefn-tn 'fdefn-fun sb-vm:fdefn-fun-slot
                          sb-vm:other-pointer-lowtag res)
                     (vop safe-fdefn-fun node block fdefn-tn res)))))))))
