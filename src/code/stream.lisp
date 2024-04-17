@@ -1112,19 +1112,20 @@
                       (bin #'concatenated-bin)
                       (n-bin #'concatenated-n-bin)
                       (misc #'concatenated-misc))
-            (:constructor %make-concatenated-stream (streams))
+            (:constructor %make-concatenated-stream (list))
             (:copier nil)
             (:predicate nil))
   ;; The car of this is the substream we are reading from now.
-  (streams nil :type list))
-
+  ;; This is not named CONCATENATED-STREAM-STREAMS because user modification
+  ;; via (SETF CONCATENATED-STREAM-STREAMS) is not conforming.
+  (list nil :type list))
 (declaim (freeze-type concatenated-stream))
+(defun concatenated-stream-streams (stream) ; standard function
+  (concatenated-stream-list stream))
 
 (defmethod print-object ((x concatenated-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (format stream
-            ":STREAMS ~S"
-            (concatenated-stream-streams x))))
+    (format stream ":STREAMS ~S" (concatenated-stream-list x))))
 
 (defun make-concatenated-stream (&rest streams)
   "Return a stream which takes its input from each of the streams in turn,
@@ -1138,20 +1139,20 @@
 
 (macrolet ((in-fun (name fun)
              `(defun ,name (stream eof-error-p eof-value)
-                (do ((streams (concatenated-stream-streams stream)
+                (do ((streams (concatenated-stream-list stream)
                               (cdr streams)))
                     ((null streams)
                      (eof-or-lose stream eof-error-p eof-value))
                   (let* ((stream (car streams))
                          (result (,fun stream nil nil)))
                     (when result (return result)))
-                  (pop (concatenated-stream-streams stream))))))
+                  (pop (concatenated-stream-list stream))))))
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 
 (defun concatenated-n-bin (stream buffer sbuffer start numbytes eof-errorp)
   (declare (ignore sbuffer))
-  (do ((streams (concatenated-stream-streams stream) (cdr streams))
+  (do ((streams (concatenated-stream-list stream) (cdr streams))
        (current-start start)
        (remaining-bytes numbytes))
       ((null streams)
@@ -1164,10 +1165,10 @@
       (incf current-start bytes-read)
       (decf remaining-bytes bytes-read)
       (when (zerop remaining-bytes) (return numbytes)))
-    (setf (concatenated-stream-streams stream) (cdr streams))))
+    (setf (concatenated-stream-list stream) (cdr streams))))
 
 (defun concatenated-misc (stream operation arg1)
-  (let* ((left (concatenated-stream-streams stream))
+  (let* ((left (concatenated-stream-list stream))
          (current (car left)))
     (stream-misc-case (operation)
       (:listen
@@ -1179,9 +1180,8 @@
                          (stream-misc-dispatch current operation arg1))))
           (cond ((eq stuff :eof)
                  ;; Advance STREAMS, and try again.
-                 (pop (concatenated-stream-streams stream))
-                 (setf current
-                       (car (concatenated-stream-streams stream)))
+                 (pop (concatenated-stream-list stream))
+                 (setf current (car (concatenated-stream-list stream)))
                  (unless current
                    ;; No further streams. EOF.
                    (return :eof)))
