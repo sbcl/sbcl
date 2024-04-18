@@ -3365,10 +3365,10 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
                (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h))))))))
 
 (defun write-genesis-thread-h-requisites ()
-  (write-structure-object (layout-info (find-layout 'sb-thread::thread))
-                          *standard-output* "thread_instance" nil)
-  (write-structure-object (layout-info (find-layout 'sb-thread::mutex))
-                          *standard-output* "lispmutex" nil)
+  (write-structure-type (layout-info (find-layout 'sb-thread::thread))
+                        *standard-output* "thread_instance")
+  (write-structure-type (layout-info (find-layout 'sb-thread::mutex))
+                        *standard-output* "lispmutex")
   ;; The os_thread field is either pthread_t or lispobj.
   ;; If no threads, then it's lispobj. #+win32 uses lispobj too
   ;; but it gets cast to HANDLE upon use.
@@ -3438,6 +3438,10 @@ do {                                                                \\
 } while (0)~%"
             sap-align)))
 
+(defun get-primitive-obj (x)
+  (find x sb-vm:*primitive-objects* :key #'sb-vm:primitive-object-name
+        :test #'string=))
+
 (defun output-c-primitive-obj (obj &aux (name (sb-vm:primitive-object-name obj))
                                         (slots (sb-vm:primitive-object-slots obj))
                                         (rest-slot
@@ -3460,13 +3464,13 @@ do {                                                                \\
               (eq slot rest-slot))))
   (format t "};~%"))
 
-(defun write-primitive-object (obj *standard-output*)
+(defun sub-write-primitive-object (obj lang)
   (let* ((name (sb-vm:primitive-object-name obj))
          (c-name (c-name (string-downcase name)))
          (slots (sb-vm:primitive-object-slots obj))
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
-  ;; writing primitive object layouts
-    (flet ((output-c ()
+    (ecase lang
+      (:c
              (when (eq name 'sb-vm::thread)
                (write-genesis-thread-h-requisites)
                (format t "#define INIT_THREAD_REGIONS(x) \\~%")
@@ -3481,7 +3485,9 @@ do {                                                                \\
                  #+(or sparc ppc ppc64) (format t "typedef char pa_bits_t[~d];~2%" sb-vm:n-word-bytes)
                  #-(or sparc ppc ppc64) (format t "typedef lispobj pa_bits_t;~2%"))
                (format t "extern struct thread *all_threads;~%"))
+
              (output-c-primitive-obj obj)
+
              (when (eq name 'sb-vm::code)
                (format t "#define CODE_SLOTS_PER_SIMPLE_FUN ~d
 static inline struct code* fun_code_header(struct simple_fun* fun) {
@@ -3489,6 +3495,7 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
 }~%" sb-vm:code-slots-per-simple-fun)
                (write-cast-operator 'function "simple_fun" sb-vm:fun-pointer-lowtag
                                     *standard-output*))
+
              (when (eq name 'vector)
                (output-c-primitive-obj (get-primitive-obj 'array))
                ;; This is 'sword_t' because we formerly would call fixnum_value() which
@@ -3507,28 +3514,52 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
                (write-cast-operator name c-name lowtag *standard-output*))
              (when (eq name 'vector)
                (write-vector-sap-helpers)))
-           (output-asm ()
-             (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
-             (format t " * so they work directly on tagged addresses. */~2%")
+
+      (:asm
              (dovector (slot slots)
                (format t "#define ~A_~A_OFFSET ~D~%"
                        (c-symbol-name name)
                        (c-symbol-name (sb-vm:slot-name slot))
                        (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag)))
              (format t "#define ~A_SIZE ~d~%"
-                     (string-upcase c-name) (sb-vm:primitive-object-length obj))))
-      (when (eq name 'sb-vm::thread)
-        (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
-        (dovector (x sb-vm::+thread-header-slot-names+)
-          (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
-            (format t "#define ~a ~d~%" (c-name (string s)) (symbol-value s))))
-        (terpri))
-      (format t "#ifdef __ASSEMBLER__~2%")
-      (output-asm)
-      (format t "~%#else /* __ASSEMBLER__ */~2%")
-      (format t "#include ~S~%" (lispobj-dot-h))
-      (output-c)
-      (format t "~%#endif /* __ASSEMBLER__ */~%"))))
+                     (string-upcase c-name) (sb-vm:primitive-object-length obj)))
+
+      (:language-agnostic
+       (when (eq name 'sb-vm::thread)
+         (format t "~%#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
+         (dovector (x sb-vm::+thread-header-slot-names+)
+           (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
+             (format t "#define ~a ~d~%" (c-name (string s)) (symbol-value s))))
+         (terpri))))
+    (case name
+      (sb-vm::unwind-block
+       (sub-write-primitive-object (get-primitive-obj 'catch-block) lang))
+      (sb-kernel:closure
+       (sub-write-primitive-object (get-primitive-obj 'simple-fun) lang)
+       (sub-write-primitive-object (get-primitive-obj 'code) lang))
+      (instance
+       (sub-write-primitive-object (get-primitive-obj 'funcallable-instance) lang)
+       (when (eq lang :c)
+         (write-wired-layout-ids *standard-output*)
+         (write-structure-type (layout-info (find-layout 'layout)) *standard-output*
+                               "layout")
+         (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag
+                              *standard-output*)
+         (format t "#include ~S~%"
+                 (namestring (merge-pathnames "instance.inc" (lispobj-dot-h)))))))))
+
+(defvar included-lispobj-h)
+(defun write-primitive-object (obj *standard-output*)
+  (sub-write-primitive-object obj :language-agnostic)
+  (format t "#ifdef __ASSEMBLER__~2%")
+  (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
+  (format t " * so they work directly on tagged addresses. */~2%")
+  (sub-write-primitive-object obj :asm)
+  (format t "~%#else /* __ASSEMBLER__ */~2%")
+  (format t "#include ~S~%" (lispobj-dot-h))
+  (setq included-lispobj-h t)
+  (sub-write-primitive-object obj :c)
+  (format t "~%#endif /* __ASSEMBLER__ */~%"))
 
 (defun write-hash-table-flag-extractors ()
   ;; 'flags' is a packed integer.
@@ -3539,8 +3570,7 @@ static inline int hashtable_weakp(struct hash_table* ht) { return ht->uw_flags &
 static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flags >> 6; }
 #define HASHTABLE_KIND_EQL 1~%"))
 
-(defun write-structure-object (dd *standard-output* &optional structure-tag
-                                                      (assembler-guard t))
+(defun write-structure-type (dd *standard-output* &optional structure-tag)
   (labels
       ((cstring (designator) (c-name (string-downcase designator)))
        (output (dd structure-tag)
@@ -3578,8 +3608,8 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
                          (if (string= (car slot) "default") "_default" (car slot))
                          (cdr slot))))
          (format t "};~%")))
-    (when assembler-guard
-      (format t "#ifndef __ASSEMBLER__~2%")
+    (unless included-lispobj-h ; looks better without redundant inclusions
+      (setq included-lispobj-h t)
       (format t "#include ~S~%" (lispobj-dot-h)))
     (output dd (or structure-tag (cstring (dd-name dd))))
     (when (eq (dd-name dd) 'sb-impl::general-hash-table)
@@ -3590,9 +3620,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
       (terpri)
       (output (layout-info (find-layout 'sb-lockless::so-data-node)) "solist_node")
       (format t "static inline int so_dummy_node_p(struct solist_node* n) {
-    return !(n->node_hash & ~D);~%}~%" (sb-vm:fixnumize 1)))
-    (when assembler-guard
-      (format t "~%#endif /* __ASSEMBLER__ */~2%"))))
+    return !(n->node_hash & ~D);~%}~%" (sb-vm:fixnumize 1)))))
 
 (defun write-thread-init (stream)
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
@@ -4281,9 +4309,6 @@ static inline uword_t word_has_stickymark(uword_t word) {
                 c-const (sb-kernel::choose-layout-id type nil))))
   (terpri stream))
 
-(defun get-primitive-obj (x)
-  (find x sb-vm:*primitive-objects* :key #'sb-vm:primitive-object-name))
-
 (defparameter numeric-primitive-objects
   (remove nil ; SINGLE-FLOAT and/or the SIMD-PACKs might not exist
           (mapcar #'get-primitive-obj
@@ -4310,6 +4335,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
                  (let* ((extension
                          (cond ((and (stringp name) (position #\. name)) nil)
                                (t ".h")))
+                        (included-lispobj-h nil)
                         (inclusion-guardp
                          (string= extension ".h")))
                   (with-open-file (stream (format nil "~A/~A~@[~A~]"
@@ -4330,12 +4356,11 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (out-to "cardmarks" (write-mark-array-operators stream))
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
-        (let* ((funinstance (get-primitive-obj 'funcallable-instance))
-               (catch-block (get-primitive-obj 'sb-vm::catch-block))
-               (code (get-primitive-obj 'sb-vm::code))
-               (simple-fun (get-primitive-obj 'sb-kernel:simple-fun))
-               (array (get-primitive-obj 'array))
-               (skip `(,funinstance ,catch-block ,code ,simple-fun ,array
+        (let* ((skip `(,(get-primitive-obj 'funcallable-instance)
+                       ,(get-primitive-obj 'catch-block)
+                       ,(get-primitive-obj 'code)
+                       ,(get-primitive-obj 'simple-fun)
+                       ,(get-primitive-obj 'array)
                        ,@numeric-primitive-objects))
                (structs (sort (set-difference sb-vm:*primitive-objects* skip) #'string<
                               :key #'sb-vm:primitive-object-name)))
@@ -4345,22 +4370,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
               (mapc 'output-c-primitive-obj numeric-primitive-objects)))
           (dolist (obj structs)
             (out-to (string-downcase (sb-vm:primitive-object-name obj))
-                (write-primitive-object obj stream)
-                (case (sb-vm:primitive-object-name obj)
-                  (instance
-                   (write-primitive-object funinstance stream)
-                   (write-wired-layout-ids stream)
-                   (write-structure-object (layout-info (find-layout 'layout)) stream
-                                  "layout")
-                   (write-cast-operator 'layout "layout"
-                                        sb-vm:instance-pointer-lowtag stream)
-                   (format stream "#include ~S~%"
-                           (namestring (merge-pathnames "instance.inc" (lispobj-dot-h)))))
-                  (sb-vm::unwind-block
-                   (write-primitive-object catch-block stream))
-                  (sb-kernel:closure
-                   (write-primitive-object simple-fun stream)
-                   (write-primitive-object code stream)))))
+              (write-primitive-object obj stream)))
           (out-to "primitive-objects"
             (format stream "~&#include \"number-types.h\"~%")
             (dolist (obj structs)
@@ -4372,13 +4382,13 @@ static inline uword_t word_has_stickymark(uword_t word) {
         ;; For purposes of the C code, cast all hash tables as general_hash_table
         ;; even if they lack the slots for weak tables.
         (out-to "hash-table"
-          (write-structure-object (layout-info (find-layout 'sb-impl::general-hash-table))
-                                  stream "hash_table"))
+          (write-structure-type (layout-info (find-layout 'sb-impl::general-hash-table))
+                                stream "hash_table"))
         (out-to "brothertree"
-          (write-structure-object (layout-info (find-layout 'sb-brothertree::unary-node))
-                                  stream "unary_node")
-          (write-structure-object (layout-info (find-layout 'sb-brothertree::binary-node))
-                                  stream "binary_node")
+          (write-structure-type (layout-info (find-layout 'sb-brothertree::unary-node))
+                                stream "unary_node")
+          (write-structure-type (layout-info (find-layout 'sb-brothertree::binary-node))
+                                stream "binary_node")
           (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
         (dolist (class '(defstruct-description package
                          ;; FIXME: probably these should be external?
@@ -4392,9 +4402,8 @@ static inline uword_t word_has_stickymark(uword_t word) {
                            (defstruct-description 'defstruct-slot-description)
                            (package 'sb-impl::symbol-table))))
               (when child
-                (write-structure-object (layout-info (find-layout child)) stream)))
-            (write-structure-object (layout-info (find-layout class))
-                                    stream)))
+                (write-structure-type (layout-info (find-layout child)) stream)))
+            (write-structure-type (layout-info (find-layout class)) stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
