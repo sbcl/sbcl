@@ -185,8 +185,7 @@
 
 (defmacro def-complex-format-interpreter (char lambda-list &body body)
   (aver (not (lower-case-p char)))
-  (let ((defun-name
-            (intern (format nil "~:C-INTERPRETER" char)))
+  (let ((defun-name (directive-handler-name char "-INTERPRETER"))
         (directive '.directive) ; expose this var to the lambda. it's easiest
         (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
     `(progn

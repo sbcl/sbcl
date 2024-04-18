@@ -496,12 +496,18 @@
 
 ;;;; format directive machinery
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun directive-handler-name (char suffix)
+    (package-symbolicate "SB-FORMAT"
+                         (if (char= char #\Newline) "NL" (string char))
+                         suffix)))
+
 (defmacro def-complex-format-directive (char lambda-list &body body)
   ;; Assert that it isn't lowercase
   (let ((code (sb-xc:char-code char)))
     (when (<= (sb-xc:char-code #\a) code (sb-xc:char-code #\z))
       (error "Come on, use uppercase why don't you?")))
-  (let ((defun-name (symbolicate char "-FORMAT-DIRECTIVE-EXPANDER"))
+  (let ((defun-name (directive-handler-name char "-COMPILER"))
         (directive (gensym "DIRECTIVE"))
         (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
     `(progn
