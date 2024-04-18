@@ -32,7 +32,7 @@
 #include "lispregs.h"
 #include "runtime.h"
 #include "genesis/static-symbols.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 
 #include <errno.h>
 

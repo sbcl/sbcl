@@ -42,7 +42,7 @@
 #include "code.h"
 #include "graphvisit.h"
 #include "genesis/instance.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 
 #include <errno.h>
 

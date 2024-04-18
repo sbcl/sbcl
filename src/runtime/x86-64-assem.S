@@ -21,7 +21,7 @@
 #include "genesis/sbcl.h"
 #include "validate.h"
 #include "genesis/closure.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 

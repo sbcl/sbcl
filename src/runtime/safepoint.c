@@ -33,7 +33,7 @@
 #include "os.h"
 #include "globals.h"
 #include "genesis/cons.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "interr.h"
 #include "genesis/sap.h"
 #include "gc.h"

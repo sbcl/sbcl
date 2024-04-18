@@ -67,7 +67,7 @@
 #include "gc.h"
 #include "genesis/sap.h"
 #include "pseudo-atomic.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "genesis/cons.h"
 #include "genesis/vector.h"
 #include "genesis/thread.h"

@@ -20,7 +20,7 @@
 #include "lispregs.h"
 #include "gc.h"
 #include "code.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "incremental-compact.h"
 #include "pseudo-atomic.h"
 #include "genesis/instance.h"

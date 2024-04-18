@@ -30,7 +30,6 @@
 #include "search.h"
 #include "var-io.h"
 
-#include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "core.h"

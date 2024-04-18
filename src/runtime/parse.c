@@ -35,7 +35,6 @@
 #include "thread.h"
 
 #include "genesis/closure.h"
-#include "genesis/fdefn.h"
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 

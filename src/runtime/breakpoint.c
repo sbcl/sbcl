@@ -24,7 +24,7 @@
 #include "breakpoint.h"
 #include "thread.h"
 #include "code.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 
 #define REAL_LRA_SLOT 0
 

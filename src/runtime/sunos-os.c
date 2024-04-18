@@ -19,7 +19,7 @@
 
 #ifdef LISP_FEATURE_X86
 #include "genesis/static-symbols.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #endif
 
 #include "gc.h"

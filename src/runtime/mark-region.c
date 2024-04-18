@@ -12,7 +12,7 @@
 #include "os.h"
 #include "gc.h"
 #include "code.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "runtime.h"
 #include "validate.h"
 #include "gc-assert.h"

@@ -6,7 +6,7 @@
 #include "code.h"
 #include "genesis/closure.h"
 #include "genesis/cons.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"
 #include "genesis/instance.h"

@@ -9,7 +9,7 @@
 #include "runtime.h"
 #include "interrupt.h"
 #include "x86-darwin-os.h"
-#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
 #include "gc.h" // for gencgc_handle_wp_violation
 
 #include <mach/mach.h>

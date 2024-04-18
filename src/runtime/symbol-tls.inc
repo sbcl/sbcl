@@ -63,3 +63,14 @@ extern void bind_variable(lispobj symbol, lispobj value,void *thread);
 
 extern void unbind(void *thread);
 extern void unbind_to_here(lispobj *bsp,void *thread);
+
+#include "genesis/static-symbols.h"
+static lispobj __attribute__((unused)) symbol_function(struct symbol* symbol)
+{
+    if (symbol->fdefn && symbol->fdefn != NIL) return FDEFN(symbol->fdefn)->fun;
+    return NIL;
+}
+#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
+/* Return 'fun' given a tagged pointer to an fdefn. */
+static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }
+extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);

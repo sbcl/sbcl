@@ -20,7 +20,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "arch.h" // why is this where funcall2 is declared???
-#include "genesis/fdefn.h" // for StaticSymbolFunction
+#include "genesis/symbol.h"
 #include "code.h"
 
 lispobj* atomic_bump_static_space_free_ptr(int nbytes)

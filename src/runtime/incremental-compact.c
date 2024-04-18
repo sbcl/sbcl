@@ -12,7 +12,6 @@
 #include "queue-suballocator.h"
 #include "incremental-compact.h"
 #include "genesis/static-symbols.h"
-#include "genesis/fdefn.h"
 #include "mark-region.h"
 
 #include "genesis/closure.h"

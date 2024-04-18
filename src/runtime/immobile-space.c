@@ -50,7 +50,6 @@
 #include "gc.h"
 #include "genesis/brothertree.h"
 #include "genesis/cons.h"
-#include "genesis/fdefn.h"
 #include "genesis/gc-tables.h"
 #include "genesis/hash-table.h"
 #include "genesis/instance.h"

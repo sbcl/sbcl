@@ -3333,14 +3333,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format stream "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-type-name operator-name c-type-name lowtag)
   (case operator-name
-    (fdefn
-     (format stream "#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
-/* Return 'fun' given a tagged pointer to an fdefn. */
-static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }
-extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);~%"))
-    (symbol
+    (symbol ; FIXME: this is not a great place to inject all these extra accessors
      (format stream "
-lispobj symbol_function(struct symbol* symbol);
 #include \"~A/vector.h\"
 struct vector *symbol_name(struct symbol*);~%
 lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
@@ -3469,6 +3463,8 @@ do {                                                                \\
          (c-name (c-name (string-downcase name)))
          (slots (sb-vm:primitive-object-slots obj))
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
+    (when (eq name 'symbol)
+      (sub-write-primitive-object (get-primitive-obj 'fdefn) lang))
     (ecase lang
       (:c
              (when (eq name 'sb-vm::thread)
@@ -4360,6 +4356,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
                        ,(get-primitive-obj 'catch-block)
                        ,(get-primitive-obj 'code)
                        ,(get-primitive-obj 'simple-fun)
+                       ,(get-primitive-obj 'fdefn)
                        ,(get-primitive-obj 'array)
                        ,@numeric-primitive-objects))
                (structs (sort (set-difference sb-vm:*primitive-objects* skip) #'string<
