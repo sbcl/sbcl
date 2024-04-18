@@ -32,7 +32,7 @@
   ;; - It's not the job of FIXED-ALLOC to realign anything.
   ;; - The real issue is that it's not obvious that the stack is
   ;;   16-byte-aligned at *all* times. Maybe it is, maybe it isn't.
-  (unless known-alignedp ; can skip this AND if we're all good
+  (unless (aligned-stack-p known-alignedp) ; can skip this AND if we're all good
     (inst and rsp-tn #.(lognot lowtag-mask)))
   (tagify alloc-tn rsp-tn lowtag)
   (values))
@@ -391,7 +391,8 @@
   (:generator 10
     (cond
       ((node-stack-allocate-p node)
-       (inst and rsp-tn (lognot lowtag-mask))
+       (unless (aligned-stack-p)
+         (inst and rsp-tn (lognot lowtag-mask)))
        (cond ((and (sc-is car immediate) (sc-is cdr immediate)
                    (typep (encode-value-if-immediate car) '(signed-byte 8))
                    (typep (encode-value-if-immediate cdr) '(signed-byte 8)))
@@ -468,7 +469,8 @@
   (:generator 10
     (cond
       ((node-stack-allocate-p node)
-       (inst and rsp-tn (lognot lowtag-mask))
+       (unless (aligned-stack-p)
+         (inst and rsp-tn (lognot lowtag-mask)))
        (list-ctor-push-elt cddr alloc)
        (list-ctor-push-elt cadr alloc)
        (inst lea alloc (ea list-pointer-lowtag rsp-tn))
@@ -521,8 +523,7 @@
             (store-slot (pop-arg things) ptr cons-cdr-slot list-pointer-lowtag)
             (storew* nil-value ptr cons-cdr-slot list-pointer-lowtag zeroed))))
     (aver (null things))
-    (move result res)))
-)
+    (move result res))))
 
 (define-vop ()
   (:translate unaligned-dx-cons)
@@ -778,7 +779,7 @@
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation size other-pointer-lowtag result
                           ;; If already aligned RSP, don't need to do it again.
-                          #+ubsan (want-shadow-bits))
+                          #+ubsan (and (want-shadow-bits) :aligned-stack))
         ;; NB: store the trailing null BEFORE storing the header,
         ;; in case the length in words is 0, which stores into the LENGTH slot
         ;; as if it were element -1 of data (which probably can't happen).
@@ -961,7 +962,7 @@
       (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
                       :elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
-            (stack-allocation bytes fun-pointer-lowtag result)
+            (stack-allocation bytes fun-pointer-lowtag result stack-allocate-p)
             (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
         (storew* #-compact-instance-header header ; write the widetag and size
                  #+compact-instance-header        ; ... plus the layout pointer

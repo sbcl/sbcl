@@ -569,3 +569,10 @@
            (when (and (member-type-p type)
                       (= (member-type-size type) 1))
              (the symbol (first (member-type-members type))))))))
+
+(defun aligned-stack-p (&optional dx)
+  (or (eq dx :aligned-stack)
+      (and sb-assem::*current-vop*
+           (let ((node (sb-c::vop-node sb-assem::*current-vop*)))
+             (and (sb-c::combination-p node)
+                  (eq (sb-c::combination-info node) :aligned-stack))))))
