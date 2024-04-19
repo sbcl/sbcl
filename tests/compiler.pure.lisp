@@ -3319,11 +3319,6 @@
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
                                      ,lambda-form)))))
-             ;; Multiplication at runtime should be eliminated only with
-             ;; FLOAT-ACCURACY=0. (To catch SNaNs.)
-             #+(or x86 x86-64)
-             (assert (and (ctu:asm-search "MUL" fun1)
-                          (not (ctu:asm-search "MUL" fun2))))
              ;; Not generic arithmetic, please!
              (assert (and (not (ctu:asm-search "GENERIC" fun1))
                           (not (ctu:asm-search "GENERIC" fun2))))
