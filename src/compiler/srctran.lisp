@@ -4235,17 +4235,17 @@
   'x)
 
 ;;; Fold (OP x +/-1)
-;;;
-;;; %NEGATE might not always signal correctly.
+;;; If a signaling nan somehow got here without signaling anything then
+;;; why signal now.
 (macrolet
-    ((def (name result minus-result)
+    ((def (name result minus-result type)
          `(deftransform ,name ((x y)
-                               (exact-number (constant-arg (member 1 -1))))
+                               (,type (constant-arg (member 1 -1))))
             "fold identity operations"
             (if (minusp (lvar-value y)) ',minus-result ',result))))
-  (def * x (%negate x))
-  (def / x (%negate x))
-  (def expt x (/ 1 x)))
+  (def * x (%negate x) number)
+  (def / x (%negate x) number)
+  (def expt x (/ 1 x) (or exact-number real))) ;; (expt #c(2d0 2d0) 1) doesn't return #c(2d0 2d0)
 
 (deftransform + ((x y) (number number))
   (cond ((splice-fun-args y '%negate 1 nil)

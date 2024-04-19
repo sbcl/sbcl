@@ -1341,3 +1341,10 @@
            ((eql c #\a) 2)
            (t 1)))
    (eql 1)))
+
+(with-test (:name :multiply-by-one)
+  (assert-type
+   (lambda (x)
+     (the (unsigned-byte 8) (* x 1))
+     x)
+   (unsigned-byte 8)))
