@@ -343,22 +343,19 @@
 
 ;;; Return a form that tests the variable N-OBJECT for being in the
 ;;; binds specified by TYPE. BASE is the name of the base type, for
-;;; declaration. We make SAFETY locally 0 to inhibit any checking of
-;;; this assertion.
+;;; declaration.
 (defun transform-numeric-bound-test (n-object type base)
   (declare (type numeric-type type))
   (let ((low (numeric-type-low type))
         (high (numeric-type-high type)))
-    `(locally
-       (declare (optimize (safety 0)))
-       (and ,@(when low
-                (if (consp low)
-                    `((> (truly-the ,base ,n-object) ,(car low)))
-                    `((>= (truly-the ,base ,n-object) ,low))))
-            ,@(when high
-                (if (consp high)
-                    `((< (truly-the ,base ,n-object) ,(car high)))
-                    `((<= (truly-the ,base ,n-object) ,high))))))))
+    `(and ,@(when low
+              (if (consp low)
+                  `((> (truly-the ,base ,n-object) ,(car low)))
+                  `((>= (truly-the ,base ,n-object) ,low))))
+          ,@(when high
+              (if (consp high)
+                  `((< (truly-the ,base ,n-object) ,(car high)))
+                  `((<= (truly-the ,base ,n-object) ,high)))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
