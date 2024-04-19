@@ -136,3 +136,10 @@
 
 (with-test (:name (sb-ext:search-roots :ignore-immediate))
   (sb-ext:search-roots (make-weak-pointer 48) :print nil))
+
+(defvar *stringweakptr* (make-weak-pointer (symbol-name (intern "FOOLZ"))))
+(with-test (:name :search-for-symbol-name)
+  (let ((path
+         (with-output-to-string (*standard-output*) (search-roots *stringweakptr*))))
+    ;; firstly it just shouldn't crash, secondly we should find an answer
+    (assert (search "SB-IMPL::SYMBOL-TABLE" path))))

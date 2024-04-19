@@ -140,6 +140,8 @@ static inline lispobj canonical_obj(lispobj obj)
     return obj;
 }
 
+#define slot_index_of(tag_,slot_) offsetof(struct tag_,slot_)/N_WORD_BYTES
+
 /* Return the word index of the pointer in 'source' which references 'target'.
  * Return -1 on failure. (This is an error if it happens)
  */
@@ -179,6 +181,14 @@ static int find_ref(lispobj* source, lispobj target)
     case CODE_HEADER_WIDETAG:
         scan_limit = code_header_words((struct code*)source);
         break;
+    case SYMBOL_WIDETAG: {
+        struct symbol* sym = (void*)source;
+        check_ptr(slot_index_of(symbol,value), sym->value);
+        check_ptr(slot_index_of(symbol,info), sym->info);
+        check_ptr(slot_index_of(symbol,fdefn), sym->fdefn);
+        check_ptr(slot_index_of(symbol,name), decode_symbol_name(sym->name));
+        return -1;
+    }
     case FDEFN_WIDETAG:
         check_ptr(3, decode_fdefn_rawfun((struct fdefn*)source));
         scan_limit = 3;
@@ -656,23 +666,29 @@ static lispobj trace1(lispobj object,
         lispobj ptr = next.object;
         path = mkcons(mkcons(ptr, make_fixnum(next.wordindex)), path);
         target = native_pointer(ptr)[next.wordindex];
-        // Special-case a few combinations of <type,wordindex>
-        switch (next.wordindex) {
-        case 0:
-            if (instancep(ptr) || functionp(ptr))
-                target = instance_layout(native_pointer(ptr));
-            break;
-#if FUN_SELF_FIXNUM_TAGGED
-        case 1:
-            if (functionp(ptr) && widetag_of(native_pointer(ptr)) == CLOSURE_WIDETAG)
-                target = fun_taggedptr_from_self(target);
-            break;
+        /* Special-case a few combinations of <type,wordindex>.
+         * And don't assume that each special case is uniquely identified
+         * by a wordindex. Coincidentally they are, but it would be incredibly
+         * unmaintainable to assume that */
+        if (next.wordindex == 0 && (instancep(ptr) || functionp(ptr))) {
+            target = instance_layout(native_pointer(ptr));
+        }
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+        else if (next.wordindex == slot_index_of(symbol,name) &&
+                 lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+                 widetag_of(&SYMBOL(ptr)->header) == SYMBOL_WIDETAG) {
+            target = decode_symbol_name(target);
+        }
 #endif
-        case 3:
-            if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
-                widetag_of(&FDEFN(ptr)->header) == FDEFN_WIDETAG)
-                target = decode_fdefn_rawfun((struct fdefn*)native_pointer(ptr));
-            break;
+#if FUN_SELF_FIXNUM_TAGGED
+        else if (next.wordindex == 1 && functionp(ptr)
+                 && widetag_of(native_pointer(ptr)) == CLOSURE_WIDETAG) {
+            target = fun_taggedptr_from_self(target);
+        }
+#endif
+        else if (next.wordindex == 3 && lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+                 widetag_of(&FDEFN(ptr)->header) == FDEFN_WIDETAG) {
+            target = decode_fdefn_rawfun((struct fdefn*)native_pointer(ptr));
         }
         target = canonical_obj(target);
         struct layer* next_layer = top_layer->next;
@@ -780,6 +796,14 @@ static uword_t build_refs(lispobj* where, lispobj* end,
         case CODE_HEADER_WIDETAG:
             scan_limit = code_header_words((struct code*)where);
             break;
+        case SYMBOL_WIDETAG: {
+            // I think it's OK to omit 'package'. It's seldom interesting
+            // to discover a path involving a symbol back to its package.
+            struct symbol* s = (void*)where;
+            check_ptr(s->value); check_ptr(s->info); check_ptr(s->fdefn);
+            check_ptr(decode_symbol_name(s->name));
+            continue;
+            }
         case FDEFN_WIDETAG:
             check_ptr(decode_fdefn_rawfun((struct fdefn*)where));
             scan_limit = 3;
