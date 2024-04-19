@@ -7072,6 +7072,11 @@
                                              '(char-code a)
                                              'a)))
                                  ,(cond ((< max sb-vm:n-word-bits)
+                                         (let ((interval (type-approximate-interval (lvar-type lvar))))
+                                           (when (and interval
+                                                      (interval-high interval)
+                                                      (< (interval-high interval) sb-vm:n-word-bits))
+                                             (setf max (interval-high interval))))
                                          `(and (,range-check 0 a ,max)
                                                (logbitp (truly-the (integer 0 ,max) a)
                                                         ,(reduce (lambda (x y) (logior x (ash 1 y)))
