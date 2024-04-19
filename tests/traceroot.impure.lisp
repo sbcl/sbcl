@@ -137,9 +137,23 @@
 (with-test (:name (sb-ext:search-roots :ignore-immediate))
   (sb-ext:search-roots (make-weak-pointer 48) :print nil))
 
-(defvar *stringweakptr* (make-weak-pointer (symbol-name (intern "FOOLZ"))))
+;;; Try very hard to make a string reachable only through the name of a symbol.
+;;; To achieve that, the symbol has to be in a different package from *PACKAGE*.
+;;; And it has to be interned because if it isn't, then its package ID bits are 0
+;;; so it doesn't constitute a good test of decoding the name field.
+(defvar *stringweakptr*
+  #+sb-thread
+  (sb-thread:join-thread
+   (sb-thread:make-thread
+    (lambda ()
+      (let* ((p (make-package "DERP"))
+             (*package* p))
+        (make-weak-pointer (symbol-name (read-from-string "FOOLZ"))))))))
+
 (with-test (:name :search-for-symbol-name)
-  (let ((path
-         (with-output-to-string (*standard-output*) (search-roots *stringweakptr*))))
-    ;; firstly it just shouldn't crash, secondly we should find an answer
-    (assert (search "SB-IMPL::SYMBOL-TABLE" path))))
+  (when (boundp '*stringweakptr*)
+    (let ((path
+           (with-output-to-string (*standard-output*)
+             (search-roots *stringweakptr*))))
+      ;; firstly it just shouldn't crash, secondly we should find an answer
+      (assert (search "SB-IMPL::SYMBOL-TABLE" path)))))
