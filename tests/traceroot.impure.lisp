@@ -150,7 +150,8 @@
              (*package* p))
         (make-weak-pointer (symbol-name (read-from-string "FOOLZ"))))))))
 
-(with-test (:name :search-for-symbol-name)
+(with-test (:name :search-for-symbol-name
+                  :fails-on :mark-region-gc)
   (when (boundp '*stringweakptr*)
     (let ((path
            (with-output-to-string (*standard-output*)
