@@ -1869,9 +1869,6 @@
                (ir2-convert-full-call node block))))))
 
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
-  ;; Slime is still using that argument
-  (aver (and (constant-lvar-p start)
-             (eql (lvar-value start) 0)))
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
@@ -1886,11 +1883,21 @@
                      loc)))
       (:unknown
        (let ((locs (ir2-lvar-locs 2lvar)))
-         (vop* %more-arg-values node block
-               ((lvar-tn node block context)
-                (lvar-tn node block count)
-                nil)
-               ((reference-tn-list locs t))))))))
+         (if (and (constant-lvar-p start)
+                  (eql (lvar-value start) 0))
+             (vop* %more-arg-values node block
+                   ((lvar-tn node block context)
+                    (lvar-tn node block count)
+                    nil)
+                   ((reference-tn-list locs t)))
+             (if-vop-existsp (:named sb-vm::%more-arg-values-skip)
+               (vop* sb-vm::%more-arg-values-skip node block
+                     ((lvar-tn node block context)
+                      (lvar-tn node block start)
+                      (lvar-tn node block count)
+                      nil)
+                     ((reference-tn-list locs t)))
+               (bug "Implement"))))))))
 
 #+call-symbol
 (defoptimizer (%coerce-callable-for-call ir2-convert) ((fun) node block)

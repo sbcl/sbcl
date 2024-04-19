@@ -1924,7 +1924,7 @@
 
 ;;;; magical compiler frobs
 
-(defknown %rest-values (t t t) * (always-translatable))
+(defknown %rest-values (t t t t) * (always-translatable))
 (defknown %rest-ref (t t t t &optional boolean) * (always-translatable))
 (defknown %rest-length (t t t) * (always-translatable))
 (defknown %rest-null (t t t t) * (always-translatable))

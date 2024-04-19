@@ -159,3 +159,44 @@
     (inst jmp :nz LOOP)
 
     DONE))
+
+(define-vop (%more-arg-values-skip)
+  (:args (context :scs (descriptor-reg any-reg) :target src)
+         (skip :scs (any-reg immediate))
+         (num :scs (any-reg)))
+  (:arg-types * positive-fixnum positive-fixnum)
+  (:temporary (:sc any-reg :from (:argument 0)) src)
+  (:temporary (:sc unsigned-reg) loop-index)
+  (:temporary (:sc descriptor-reg) temp)
+  (:results (start :scs (any-reg) :from :eval)
+            (count :scs (any-reg) :from :eval))
+  (:generator 20
+    (move loop-index num)
+    (unless (eq (tn-kind count) :unused)
+      (zeroize count))
+    (sc-case skip
+      (immediate
+       (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))
+       (inst sub loop-index (fixnumize (tn-value skip))))
+      (any-reg
+       (inst neg skip)
+       (inst lea src (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
+       (inst neg skip)
+       (inst sub loop-index skip)))
+    (unless (eq (tn-kind start) :unused)
+      (inst mov start rsp-tn))
+    (unless (eq (tn-kind count) :unused)
+      (inst cmov :g count loop-index))
+    (inst jmp :le DONE)
+    (inst shl loop-index (- word-shift n-fixnum-tag-bits))
+
+    (inst sub rsp-tn loop-index)
+    (inst sub src loop-index)
+
+    LOOP
+    (inst mov temp (ea src loop-index))
+    (inst sub loop-index n-word-bytes)
+    (inst mov (ea rsp-tn loop-index) temp)
+    (inst jmp :nz LOOP)
+
+    DONE))

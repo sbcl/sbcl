@@ -5685,10 +5685,16 @@
 
 ;;; VALUES-LIST -> %REST-VALUES
 (define-source-transform values-list (list)
-  (multiple-value-bind (context count) (possible-rest-arg-context list)
-    (if context
-        `(%rest-values ,list ,context ,count)
-        (values nil t))))
+  (let ((skip 0))
+    (when-vop-existsp (:named sb-vm::%more-arg-values-skip)
+      (when (typep list '(cons (member cdr rest) (cons t null)))
+        (setf skip 1)
+        (setf list (second list))))
+    (multiple-value-bind (context count )
+        (possible-rest-arg-context list)
+      (if context
+          `(%rest-values ,list ,context ,skip ,count)
+          (values nil t)))))
 
 ;;; NTH -> %REST-REF
 (define-source-transform nth (n list)
@@ -5762,10 +5768,10 @@
 (define-source-transform null (x) (source-transform-null x 'null))
 (define-source-transform endp (x) (source-transform-null x 'endp))
 
-(deftransform %rest-values ((list context count))
+(deftransform %rest-values ((list context skip count))
   (if (rest-var-more-context-ok list)
-      `(%more-arg-values context 0 count)
-      `(values-list list)))
+      `(%more-arg-values context skip count)
+      `(values-list (nthcdr skip list))))
 
 (deftransform %rest-ref ((n list context count &optional length-checked-p))
   (cond ((not (rest-var-more-context-ok list))
