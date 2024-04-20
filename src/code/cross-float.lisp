@@ -57,17 +57,6 @@
     (output-part (complexnum-imag self) stream)
     (write-char #\) stream)))
 
-#+host-quirks-sbcl
-(defun get-float-bits (x)
-  (etypecase x
-    (cl:double-float
-     ;; DOUBLE-FLOAT-BITS didn't exist as a thing until recently,
-     ;; and even then it only exists if the host is 64-bit.
-     (logior (ash (host-sb-kernel:double-float-high-bits x) 32)
-             (host-sb-kernel:double-float-low-bits x)))
-    (cl:single-float
-     (host-sb-kernel:single-float-bits x))))
-
 ;;; Convert flonum exceptional symbols to target representation.
 ;;; TOTAL-BITS is the size in bits.
 ;;; PRECISION includes the hidden bit.
@@ -130,50 +119,10 @@
    (double-float 64)))
 
 (defun float-ops-cache-insert (table key values)
-  ;; Verify results (when possible) prior to inserting into the hash-table.
-  ;; If we were to support different floating-point formats across the various
-  ;; backends, this check should confined to the scenarios where the host's
-  ;; precision is at least as much as the target's precision.
-  #+host-quirks-sbcl
-  (let* ((fun (car key))
-         (args (cdr key))
-         (host-fun (intern (string fun) "CL")))
-    (flet ((native-flonum-value (x &aux (bits (flonum-%bits x)))
-             (ecase (flonum-format x)
-               (single-float (host-sb-kernel:make-single-float bits))
-               (double-float (host-sb-kernel:make-double-float
-                              (ash bits -32) (ldb (byte 32 0) bits))))))
-      (multiple-value-bind (sb-cold::*choke-on-host-irrationals* cl:*read-default-float-format*)
-          (if (eql host-fun 'cl:read-from-string)
-              (values nil (car args))
-              (values sb-cold::*choke-on-host-irrationals* cl:*read-default-float-format*))
-        (when (eql host-fun 'cl:read-from-string)
-          (setf args (cdr args)))
-        (let* ((authoritative-answer
-                 (multiple-value-list
-                  (host-sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
-                    (apply host-fun
-                           (mapcar (lambda (x)
-                                     (etypecase x
-                                       (float (native-flonum-value x))
-                                       (rational x)
-                                       (string x)
-                                       (symbol (intern (string x) "CL"))))
-                                   (ensure-list args)))))))
-          (unless (equal authoritative-answer
-                         (mapcar (lambda (value)
-                                   (if (floatp value)
-                                       (native-flonum-value value)
-                                       value))
-                                 values))
-            (format t
-             "~&//CROSS-FLOAT DISCREPANCY!
-// CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
-             key values
-             (when (cl:floatp authoritative-answer)
-               (get-float-bits authoritative-answer))
-             authoritative-answer))))))
-  (setf (gethash key table) (if (singleton-p values) (car values) (cons '&values values))))
+  (setf (gethash key table)
+        (if (singleton-p values)
+            (car values)
+            (cons '&values values))))
 
 (defun parse-xfloat-math-file (stream table)
   ;; Ensure that we're reading the correct variant of the file
@@ -1062,16 +1011,3 @@
       (assert (not (float-infinity-p nan))))
     (dolist (symbol '(:+infinity :-infinity))
       (assert-not-number (make-flonum symbol format))))))
-
-#+host-quirks-sbcl ; Cross-check some more things if we can
-(loop for (our-symbol host-single host-double)
-      in '((:+infinity host-sb-ext:single-float-positive-infinity
-                       host-sb-ext:double-float-positive-infinity)
-           (:-infinity host-sb-ext:single-float-negative-infinity
-                       host-sb-ext:double-float-negative-infinity))
-      do (assert (= (flonum-%bits (make-flonum our-symbol 'single-float))
-                    (host-sb-kernel:single-float-bits (symbol-value host-single))))
-         (assert (= (double-float-high-bits (make-flonum our-symbol 'double-float))
-                    (host-sb-kernel:double-float-high-bits (symbol-value host-double))))
-         (assert (= (double-float-low-bits (make-flonum our-symbol 'double-float))
-                    (host-sb-kernel:double-float-low-bits (symbol-value host-double)))))
