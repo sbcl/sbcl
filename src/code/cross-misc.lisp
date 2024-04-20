@@ -24,6 +24,11 @@
         (remf args :hash-function)))
     (apply 'make-hash-table args)))
 
+(defun %hash-table-alist (hash-table &aux result)
+  (maphash (lambda (key value) (push (cons key value) result))
+           hash-table)
+  result)
+
 ;;; In correct code, TRULY-THE has only a performance impact and can
 ;;; be safely degraded to ordinary THE.
 (defmacro truly-the (type expr)

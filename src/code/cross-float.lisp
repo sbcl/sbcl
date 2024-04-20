@@ -936,85 +936,43 @@
          nil)
         (t (error "MAYBE-EXACT-RECIPROCAL: didn't expect ~S" x))))
 
-;;; This is a convenient utility to have - we use it within this file and
-;;; genesis quite a bit. The target definition resides in target-hash-table.
-(defun %hash-table-alist (hash-table &aux result)
-  (maphash (lambda (key value) (push (cons key value) result))
-           hash-table)
-  result)
-
 ;;; Canonicalize and write out the memoization table. Order it by function,
 ;;; then number of arguments, then each argument's value. Rational precedes
 ;;; single-float which precedes double-float, then order by bits.
 (defun dump-math-memoization-table (table stream)
   (format stream ";;; This file is machine-generated. DO NOT EDIT~2%")
   (format stream ":DEFAULT~%(~%")
-  (labels ((classify (x)
-             (cond ((symbolp x) 0)
-                   ((stringp x) 1)
-                   ((rationalp x) 2)
-                   ((single-float-p x) 3)
-                   ((double-float-p x) 4)
-                   (t (error "Unclassifiable arg ~S" x))))
-           (spelling-of (expr)
-             (when (stringp expr)
-               (return-from spelling-of (write-to-string expr :pretty nil :escape t)))
+  (labels ((spelling-of (expr)
              ;; MUST not write package prefixes !
              ;; e.g. avoid writing a line like (COERCE (-33619991 SB-XC:DOUBLE-FLOAT) ...)
-             (let ((hex (write-to-string expr :pretty nil :base 16 :radix t :escape nil))
-                   (dec (write-to-string expr :pretty nil :base 10 :escape nil)))
-               (if (<= (length hex) (length dec)) hex dec)))
-           (lessp (expr-a expr-b)
-             (let ((f (string (car expr-a)))
-                   (g (string (car expr-b))))
-               (when (string< f g) (return-from lessp t))
-               (when (string> f g) (return-from lessp nil)))
-             (let ((args-a (ensure-list (cdr expr-a)))
-                   (args-b (ensure-list (cdr expr-b))))
-               (let ((m (length args-a))
-                     (n (length args-b)))
-                 (when (< m n) (return-from lessp t))
-                 (when (> m n) (return-from lessp nil)))
-               (loop for a in args-a
-                     for b in args-b
-                     do (let ((a-class (classify a))
-                              (b-class (classify b)))
-                          (when (< a-class b-class) (return-from lessp t))
-                          (when (> a-class b-class) (return-from lessp nil)))
-                        (typecase a
-                          ;; this case is for the 2nd arg of COERCE
-                          ;; and the 1st (pseudo-)arg of
-                          ;; READ-FROM-STRING
-                          (symbol (unless (string= a b)
-                                    (return-from lessp (string< a b))))
-                          ;; this case is for the 2nd arg of
-                          ;; READ-FROM-STRING
-                          (string (unless (string= a b)
-                                    (return-from lessp (string< a b))))
-                          (t
-                           ;; This might have to be enhanced to compare complex
-                           ;; numbers by their realpart and imagpart eventually.
-                           (let ((a-val (if (floatp a) (flonum-%bits a) a))
-                                 (b-val (if (floatp b) (flonum-%bits b) b)))
-                             (when (< a-val b-val) (return-from lessp t))
-                             (when (> a-val b-val) (return-from lessp nil))))))
-               (bug "Unreachable"))))
+             (if (stringp expr)
+                 (write-to-string expr :pretty nil :escape t)
+                 (let ((hex (write-to-string expr :pretty nil :base 16 :radix t :escape nil))
+                       (dec (write-to-string expr :pretty nil :base 10 :escape nil)))
+                   (if (<= (length hex) (length dec))
+                       hex
+                       dec)))))
     ;; Record each <fun,args> combination to STREAM
     ;; Though all symbols we print, such as SINGLE-FLOAT, are accessible
     ;; in any of the SB- packages, ABCL would buggily output package prefixes
     ;; if ~S is used here. The intent is to use only SBCL as host to compute
     ;; the table, since we assume that everybody's math routines suck.
     ;; But anyway, this does seem to work in most other lisps.
-    (let ((*print-pretty* nil) (*proxy-sfloat-ctor* "S")  (*proxy-dfloat-ctor* "D"))
-      (dolist (pair (sort (%hash-table-alist table) #'lessp :key #'car))
-        (destructuring-bind ((fun . args) . result) pair
-          (format stream "(~A ~A~{ ~A~})~%"
-                  fun
-                  ;; Why do ABS and RATIONAL write the unary arg as an atom
-                  ;; but SQRT writes it as a singleton list?
-                  (if (listp args) (mapcar #'spelling-of args) (spelling-of args))
-                  ;; Can't use ENSURE-LIST. We need NIL -> (NIL)
-                  (if (consp result) result (list result)))))))
+    (let ((*print-pretty* nil) (*proxy-sfloat-ctor* "S") (*proxy-dfloat-ctor* "D"))
+      (maphash (lambda (key result)
+                 (destructuring-bind (fun . args) key
+                   (format stream "(~A ~A~{ ~A~})~%"
+                           fun
+                           ;; Why do ABS and RATIONAL write the unary arg as an atom
+                           ;; but SQRT writes it as a singleton list?
+                           (if (listp args)
+                               (mapcar #'spelling-of args)
+                               (spelling-of args))
+                           ;; Can't use ENSURE-LIST. We need NIL -> (NIL)
+                           (if (consp result)
+                               result
+                               (list result)))))
+               table)))
   (format stream ")~%"))
 
 (defun show-interned-numbers (stream)
