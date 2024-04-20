@@ -7078,7 +7078,7 @@
                                              '(char-code a)
                                              'a)))
                                  ,(cond ((< max sb-vm:n-word-bits)
-                                         (let ((interval (type-approximate-interval (lvar-type lvar))))
+                                         (let ((interval (type-approximate-interval (lvar-type lvar) t)))
                                            (when (and interval
                                                       (interval-high interval)
                                                       (< (interval-high interval) sb-vm:n-word-bits))
