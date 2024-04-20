@@ -129,14 +129,6 @@
    (single-float 32)
    (double-float 64)))
 
-;;; Preload the interned flonum table
-(dolist (format '(single-float double-float))
-  (make-flonum 0 format)
-  (let ((sign (ash -1 (1- (float-format-bits format)))))
-    (make-flonum sign format))
-  (make-flonum :+infinity format)
-  (make-flonum :-infinity format))
-
 (defun float-ops-cache-insert (table key values)
   ;; Verify results (when possible) prior to inserting into the hash-table.
   ;; If we were to support different floating-point formats across the various
