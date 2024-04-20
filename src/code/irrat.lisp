@@ -14,6 +14,8 @@
 
 ;;;; miscellaneous constants, utility functions, and macros
 
+(defconstant pi #.pi)
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun handle-reals (function var)
     `((((foreach fixnum single-float bignum ratio))

@@ -59,11 +59,6 @@
 (declaim (notinline single-from-bits double-from-bits))
 
 ;;;; float parameters
-(defconstant most-positive-single-float #.most-positive-single-float)
-(defconstant most-negative-single-float #.most-negative-single-float)
-(defconstant most-positive-double-float #.most-positive-double-float)
-(defconstant most-negative-double-float #.most-negative-double-float)
-(defconstant pi #.pi)
 
 (defconstant least-positive-single-float (single-from-bits 0 0 1))
 (defconstant least-positive-short-float (single-from-bits 0 0 1))
@@ -107,18 +102,23 @@
   (long-from-bits 1 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
 
+(defconstant most-positive-single-float #.most-positive-single-float)
 (defconstant most-positive-short-float most-positive-single-float)
+(defconstant most-negative-single-float #.most-negative-single-float)
 (defconstant most-negative-short-float most-negative-single-float)
+(defconstant most-positive-double-float #.most-positive-double-float)
 (defconstant most-positive-long-float  most-positive-double-float)
+(defconstant most-negative-double-float #.most-negative-double-float)
 (defconstant most-negative-long-float  most-negative-double-float)
 
-(defconstant single-float-positive-infinity #.(sb-impl::make-flonum :+infinity 'single-float))
-(defconstant single-float-negative-infinity #.(sb-impl::make-flonum :-infinity 'single-float))
-(defconstant double-float-positive-infinity #.(sb-impl::make-flonum :+infinity 'double-float))
-(defconstant double-float-negative-infinity #.(sb-impl::make-flonum :-infinity 'double-float))
-
+(defconstant single-float-positive-infinity
+  (single-from-bits 0 (1+ sb-vm:single-float-normal-exponent-max) 0))
 (defconstant short-float-positive-infinity single-float-positive-infinity)
+(defconstant single-float-negative-infinity
+  (single-from-bits 1 (1+ sb-vm:single-float-normal-exponent-max) 0))
 (defconstant short-float-negative-infinity single-float-negative-infinity)
+(defconstant double-float-positive-infinity
+  (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0))
 #+(not long-float)
 (defconstant long-float-positive-infinity double-float-positive-infinity)
 #+(and long-float x86)
