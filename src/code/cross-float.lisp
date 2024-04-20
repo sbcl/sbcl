@@ -865,19 +865,9 @@
   (declare (type (signed-byte 64) bits))
   (make-flonum bits 'double-float))
 
-(defconstant most-positive-single-float $+3.40282347F38)
-(defconstant most-negative-single-float $-3.40282347F38)
-
-(defconstant most-positive-double-float $+1.7976931348623157D308)
-(defconstant most-negative-double-float $-1.7976931348623157D308)
-
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
 (defconstant pi $3.14159265358979323846264338327950288419716939937511L0)
-
-;;; These two constants are used in 'type'
-(defconstant most-positive-long-float most-positive-double-float)
-(defconstant most-negative-long-float most-negative-double-float)
 
 (macrolet ((def (name lambda-list)
              `(defun ,(intern (string name) "SB-XC") ,lambda-list

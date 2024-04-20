@@ -55,8 +55,6 @@
 
 ) ; EVAL-WHEN
 
-;;; cross-float doesn't like constructig floats at compile-time
-(declaim (notinline single-from-bits double-from-bits))
 
 ;;;; float parameters
 
@@ -102,14 +100,32 @@
   (long-from-bits 1 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
 
-(defconstant most-positive-single-float #.most-positive-single-float)
+(defconstant most-positive-single-float
+  (single-from-bits 0 sb-vm:single-float-normal-exponent-max
+                    (ldb sb-vm:single-float-significand-byte -1)))
 (defconstant most-positive-short-float most-positive-single-float)
-(defconstant most-negative-single-float #.most-negative-single-float)
+(defconstant most-negative-single-float
+  (single-from-bits 1 sb-vm:single-float-normal-exponent-max
+                    (ldb sb-vm:single-float-significand-byte -1)))
 (defconstant most-negative-short-float most-negative-single-float)
-(defconstant most-positive-double-float #.most-positive-double-float)
-(defconstant most-positive-long-float  most-positive-double-float)
-(defconstant most-negative-double-float #.most-negative-double-float)
-(defconstant most-negative-long-float  most-negative-double-float)
+(defconstant most-positive-double-float
+  (double-from-bits 0 sb-vm:double-float-normal-exponent-max
+                    (ldb (byte sb-vm:double-float-digits 0) -1)))
+#-long-float
+(defconstant most-positive-long-float most-positive-double-float)
+#+(and long-float x86)
+(defconstant most-positive-long-float
+  (long-from-bits 0 sb-vm:long-float-normal-exponent-max
+                  (ldb (byte sb-vm:long-float-digits 0) -1)))
+(defconstant most-negative-double-float
+  (double-from-bits 1 sb-vm:double-float-normal-exponent-max
+                    (ldb (byte sb-vm:double-float-digits 0) -1)))
+#-long-float
+(defconstant most-negative-long-float most-negative-double-float)
+#+(and long-float x86)
+(defconstant most-negative-long-float
+  (long-from-bits 1 sb-vm:long-float-normal-exponent-max
+                  (ldb (byte sb-vm:long-float-digits 0) -1)))
 
 (defconstant single-float-positive-infinity
   (single-from-bits 0 (1+ sb-vm:single-float-normal-exponent-max) 0))
@@ -175,5 +191,3 @@
 
 (defconstant most-negative-fixnum-double-float
   (double-from-bits 1 (+ sb-vm:n-fixnum-bits sb-vm:double-float-bias) 0))
-
-(declaim (inline single-from-bits double-from-bits))

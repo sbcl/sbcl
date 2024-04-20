@@ -163,7 +163,7 @@
 
  ("src/code/debug-var-io")
 
- ("src/code/early-float")
+ ("src/code/early-float" :c-headers)
 
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
  ("src/code/early-time" :c-headers)
