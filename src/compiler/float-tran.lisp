@@ -1673,6 +1673,61 @@
       (union-type (mapc #'numeric (union-type-types type))))
     (error "Couldn't come up with a value for ~s" type)))
 
+#-(or sb-xc-host 64-bit)
+(progn
+  (declaim (inline %make-double-float))
+  (defun %make-double-float (bits)
+    (make-double-float (ash bits -32) (ldb (byte 32 0) bits))))
+
+;;; Transform inclusive integer bounds so that they work on floats
+;;; before truncating to zero.
+(macrolet
+    ((def (type)
+       `(defun ,(symbolicate type '-integer-bounds) (low high)
+          (macrolet ((const (name)
+                       (package-symbolicate :sb-vm ',type '- name)))
+            (labels ((fractions-p (number)
+                       (< (integer-length (abs number))
+                          (const digits)))
+                     (c (number round)
+                       (if (zerop number)
+                           (sb-kernel:make-single-float 0)
+                           (let* ((negative (minusp number))
+                                  (number (abs number))
+                                  (length (integer-length number))
+                                  (shift (- length (const digits)))
+                                  (shifted (truly-the fixnum
+                                                      (ash number
+                                                           (- shift))))
+                                  ;; Cut off the hidden bit
+                                  (signif (ldb (const significand-byte) shifted))
+                                  (exp (+ (const bias) length))
+                                  (bits (ash exp
+                                             (byte-position (const exponent-byte)))))
+                             (incf signif round)
+                             ;; If rounding up overflows this will increase the exponent too
+                             (let ((bits (+ bits signif)))
+                               (when negative
+                                 (setf bits (logior (ash -1 ,(case type
+                                                               (double-float 63)
+                                                               (single-float 31)))
+                                                    bits)))
+                               (,(case type
+                                   (single-float 'make-single-float)
+                                   (double-float '%make-double-float)) bits))))))
+              (values (if (<= low 0)
+                          (if (fractions-p low)
+                              (c (1- low) -1)
+                              (c low 0))
+                          (c low 0))
+                      (if (< high 0)
+                          (c high 0)
+                          (if (fractions-p high)
+                              (c (1+ high) -1)
+                              (c high 0)))))))))
+  (def single-float)
+  (def double-float))
+
 (deftransform unary-truncate ((x) * * :result result :node node)
   (unless (lvar-single-value-p result)
     (give-up-ir1-transform))
@@ -1687,7 +1742,7 @@
                            (csubtypep cast (specifier-type 'sb-vm:signed-word)))
                       (let ((int (type-approximate-interval cast)))
                         (when int
-                          (multiple-value-bind (low high) (,(package-symbolicate :sb-kernel type '-integer-bounds)
+                          (multiple-value-bind (low high) (,(symbolicate type '-integer-bounds)
                                                            (interval-low int)
                                                            (interval-high int))
                             `(if (typep number
