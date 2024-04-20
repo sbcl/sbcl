@@ -74,7 +74,9 @@ echo //doing warm init - load and dump phase
 EOF
 
 ./src/runtime/sbcl --noinform --core output/sbcl.core \
-  --no-sysinit --no-userinit --noprint <<EOF
+                   --no-sysinit --no-userinit --noprint <<EOF
+  (load "validate-float.lisp")
+  (check-float-file "output/xfloat-math.lisp-expr")
   (ignore-errors (delete-file "output/reorg.core"))
   ;; * Lisp won't read compressed cores, and crashes on arm64
   #+(and mark-region-gc x86-64 (not sb-core-compression))

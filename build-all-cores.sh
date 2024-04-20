@@ -132,7 +132,9 @@ obj/xbuild/{cfg}.core: obj/xbuild/{cfg}/xc.core
                :search t))
 (when (= (process-exit-code *process*) 0)
   (load "src/cold/shared" :verbose t)
-  ;; TODO: merge the xfloat-math files, unless we decide to get rid of them
+  (load "validate-float.lisp")
+  (dolist (pathname (directory "obj/xbuild/**/xfloat-math.lisp-expr"))
+    (check-float-file pathname))
   (dolist (nbits '(30 61 63))
     (let* ((filename (format nil "xperfecthash~D.lisp-expr" nbits))
            (sources (directory (format nil "obj/xbuild/*/from-xc/~A" filename))))

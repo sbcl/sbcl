@@ -175,8 +175,7 @@
              authoritative-answer))))))
   (setf (gethash key table) (if (singleton-p values) (car values) (cons '&values values))))
 
-(defun parse-xfloat-math-file (stream table mode)
-  (declare (type (member :all :merge) mode))
+(defun parse-xfloat-math-file (stream table)
   ;; Ensure that we're reading the correct variant of the file
   ;; in case there is more than one set of floating-point formats.
   (assert (eq (read stream) :default))
@@ -201,18 +200,7 @@
                                 (rest values)
                                 values)))
                (when existsp
-                 (case mode
-                   (:merge
-                    (when (and existsp
-                               (not (equal
-                                     (if (and (listp existsp) (eq (car existsp) '&values))
-                                         (cdr existsp)
-                                         existsp)
-                                     (if (singleton-p values) (car values) values))))
-                      (error "Got different answers for ~S: ~S and ~S"
-                             key existsp values)))
-                   (:all ; should not happen
-                    (error "Line ~D of float cache: ~S is repeated" line key))))
+                 (error "Line ~D of float cache: ~S is repeated" line key))
                (float-ops-cache-insert table key values))))
       (delete-package pkg))))
 
@@ -225,7 +213,7 @@
       (with-open-file (stream (setq pathname (sb-cold::math-journal-pathname :input))
                               :if-does-not-exist nil)
         (when stream
-          (parse-xfloat-math-file stream table :all)
+          (parse-xfloat-math-file stream table)
           (setf (cdr cache) (hash-table-count table))
           (when cl:*compile-verbose*
             (format t "~&; Math journal: prefilled ~D entries from ~S~%"
@@ -1028,31 +1016,6 @@
                   ;; Can't use ENSURE-LIST. We need NIL -> (NIL)
                   (if (consp result) result (list result)))))))
   (format stream ")~%"))
-
-;;; Recipe:
-;;; $ ./build-all-cores.sh
-;;; $ /path/to/host/sbcl
-;;; * (load "load-xc")
-;;; * (sb-impl:merge-all-xfloat-files)
-;;; Check:
-;;; $ ./make-target-2.sh
-(export 'merge-all-xfloat-files)
-(defun merge-all-xfloat-files ()
-  (let ((ht sb-cold::*math-ops-memoization*)
-        (total-delta 0))
-    (dolist (pathname (directory "obj/xbuild/**/xfloat-math.lisp-expr"))
-      (let ((old-count (hash-table-count ht)))
-        (with-open-file (stream pathname)
-          (parse-xfloat-math-file stream ht :merge)
-          (let ((delta (- (hash-table-count ht) old-count)))
-            (incf total-delta delta)
-            (when (plusp delta)
-              (format t "~D new entr~@:P from ~S~%" delta pathname))))))
-    (if (zerop total-delta)
-        (format t "~&Nothing new~%")
-        (with-open-file (stream "output/xfloat-math.lisp-expr"
-                                :direction :output :if-exists :supersede)
-          (dump-math-memoization-table ht stream)))))
 
 (defun show-interned-numbers (stream)
   (flet ((to-native (x)

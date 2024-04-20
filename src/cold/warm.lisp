@@ -85,49 +85,6 @@ sb-kernel::
 
 ;;; Verify that compile-time floating-point math matches load-time.
 (defvar *compile-files-p*)
-(when (or (not (boundp '*compile-files-p*)) *compile-files-p*)
-  (with-open-file (stream "output/xfloat-math.lisp-expr" :if-does-not-exist nil)
-    (when stream
-      (format t "; Checking ~S~%" (pathname stream))
-      ;; Ensure that we're reading the correct variant of the file
-      ;; in case there is more than one set of floating-point formats.
-      (assert (eq (read stream) :default))
-      (sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
-        (let ((*readtable* (copy-readtable))
-              (*package* (find-package "SB-KERNEL")))
-          ;; The reasoning behind this limited-use variant of read-time-eval is that
-          ;; since it is too early to actually use EVAL in the interpreted fashion,
-          ;; EVAL would call COMPILE which is just ridiculous because it would mean
-          ;; compiling however many #. expression there are in this file
-          (set-dispatch-macro-character
-           #\# #\. (lambda (stream subchar arg)
-                     (declare (ignore subchar arg))
-                     (let ((expr (read stream t nil t)))
-                       (ecase (car expr)
-                         (sb-kernel::s (sb-kernel:make-single-float (second expr)))
-                         (sb-kernel::d
-                          (sb-kernel:make-double-float (second expr) (third expr)))))))
-          (dolist (expr (read stream))
-            (destructuring-bind (fun args . result) expr
-              (let ((result (if (eq (first result) 'sb-kernel::&values)
-                                (rest result)
-                                result))
-                    (actual (if (eql fun 'read-from-string)
-                                (let ((*read-default-float-format* (car args)))
-                                  (multiple-value-list (apply fun (sb-int:ensure-list (cdr args)))))
-                                (multiple-value-list (apply fun (sb-int:ensure-list args))))))
-                (labels ((eqal (x y) ; non-ideal name, but other names are also non-ideal
-                           (etypecase x
-                             (cons (and (consp y) (eqal (car x) (car y)) (eqal (cdr x) (cdr y))))
-                             (symbol (eql x y))
-                             (rational (eql x y))
-                             (float (eql x y))
-                             (string (string= x y)))))
-                  (unless (eqal actual result)
-                    (cerror "Continue"
-                     "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
-                     expr actual)))))))))))
-
 (when (if (boundp '*compile-files-p*) *compile-files-p* t)
   (with-open-file (output "output/cold-vop-usage.txt" :if-does-not-exist nil)
     (when output
