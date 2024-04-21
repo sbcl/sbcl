@@ -154,18 +154,11 @@
                     (cdr cache) pathname)))))
     table))
 
-(defun record-math-op (key &rest values)
+(defun record-math-op (fun args &rest values)
   (let* ((cache sb-cold::*math-ops-memoization*)
-         (table (if (atom cache) cache (car cache)))
-         (fun (car key))
-         (args (cdr key))
-         ;; args list is potentially on stack, so copy it
-         (key (cons fun (if (listp args) (copy-list args) args)))
-         (old-count (hash-table-count table)))
-    (setf (gethash key table) values)
-    (unless (= (hash-table-count table) (1+ old-count))
-      (bug "Non-canonical math journal entry ~S" key)))
-  (apply #'values values))
+         (table (if (atom cache) cache (car cache))))
+    (setf (gethash (cons fun args) table) values))
+  (values-list values))
 
 ;;; Disallow non-canonical symbols in the float math cache,
 ;;; or it gets very confusing as to whether the cache is dirty.
@@ -188,15 +181,16 @@
   ;; the expression to determine whether was is canonical. But since only COERCE can have
   ;; a problem of non-canononical symbols, it's easiest to just always canonicalize
   ;; for COERCE, and nothing else.
-  `(dx-let ((cache-key
-             ,(if (string= name 'coerce)
-                  `(cons ',(intern (string name) "CL") (canonical-math-op-args ,key-expr))
-                  `(cons ',(intern (string name) "CL") ,key-expr))))
+  `(let ((fun ',(intern (string name) "CL"))
+         (args ,(if (string= name 'coerce)
+                    `(canonical-math-op-args ,key-expr)
+                    key-expr)))
      (multiple-value-bind (answer foundp)
-         (gethash cache-key (get-float-ops-cache))
+         (dx-let ((cache-key (cons fun args)))
+           (gethash cache-key (get-float-ops-cache)))
        (if foundp
            (values-list answer)
-           (multiple-value-call #'record-math-op cache-key (progn ,@calculation))))))
+           (multiple-value-call #'record-math-op fun args (progn ,@calculation))))))
 
 (defun sb-cold::read-target-float (stream char)
   (let ((buffer *floating-point-number-buffer*)
