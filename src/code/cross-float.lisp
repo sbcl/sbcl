@@ -57,25 +57,6 @@
     (output-part (complexnum-imag self) stream)
     (write-char #\) stream)))
 
-;;; Convert flonum exceptional symbols to target representation.
-;;; TOTAL-BITS is the size in bits.
-;;; PRECISION includes the hidden bit.
-(defun float-to-bits (x total-bits precision)
-  (flet ((set-sign (sign unsigned-result) ; SIGN is -1 or 0
-           (logior (ash sign (1- total-bits)) unsigned-result)))
-    ;; The sign consumes 1 bit, but the significand has 1 hidden bit,
-    ;; so it nets out the same in terms of how many remain for the exponent.
-    (let* ((exponent-bits (- total-bits precision)))
-      (ecase x
-        ((:-infinity :+infinity)
-         (set-sign (if (eq x :-infinity) -1 0)
-                   (ash (1- (ash 1 exponent-bits)) ; all 1s
-                        ;; shift left by the number of represented
-                        ;; significand bits. i.e. exclude the hidden bit.
-                        (1- precision))))
-        (:minus-zero
-         (set-sign -1 0))))))
-
 ;;; To ensure that target numbers compare by EQL correctly under the host's
 ;;; definition of EQL (so that we don't have to intercept it and all else
 ;;; that uses EQL such as EQUAL, EQUALP and sequence traversers etc),
@@ -83,19 +64,31 @@
 (defvar *interned-numbers* (make-hash-table :test 'equal))
 
 (defun make-flonum (value format)
-  (let* ((bits (etypecase value
-                 (integer
-                  (ecase format
-                    (single-float (assert (typep value '(signed-byte 32))))
-                    (double-float (assert (typep value '(signed-byte 64)))))
-                  value)
-                 (keyword
-                  (ecase format
-                    (single-float (float-to-bits value 32 24))
-                    (double-float (float-to-bits value 64 53))))))
-         (flonum (ensure-gethash (cons bits format) *interned-numbers*
-                                 (%make-flonum bits format))))
-    flonum))
+  (let ((bits (etypecase value
+                (integer
+                 (ecase format
+                   (single-float (assert (typep value '(signed-byte 32))))
+                   (double-float (assert (typep value '(signed-byte 64)))))
+                 value)
+                (keyword
+                 ;; TOTAL-BITS is the size in bits. PRECISION
+                 ;; includes the hidden bit.
+                 (multiple-value-bind (total-bits precision)
+                     (ecase format
+                       (single-float (values 32 24))
+                       (double-float (values 64 53)))
+                   ;; The sign consumes 1 bit, but the significand
+                   ;; has 1 hidden bit, so it nets out the same in
+                   ;; terms of how many remain for the exponent.
+                   (let ((exponent-bits (- total-bits precision)))
+                     (logior (ash (ecase value (:+infinity 0) (:-infinity -1))
+                                  (1- total-bits))
+                             (ash (1- (ash 1 exponent-bits)) ; all 1s
+                                  ;; shift left by the number of represented
+                                  ;; significand bits. i.e. exclude the hidden bit.
+                                  (1- precision)))))))))
+    (values (ensure-gethash (cons bits format) *interned-numbers*
+                            (%make-flonum bits format)))))
 
 (defun flonum-from-rational (rational format)
   (ecase format
@@ -143,7 +136,7 @@
     (return-from get-float-ops-cache cache))
   (let ((table (car cache))
         (pathname))
-    (when (zerop (hash-table-count table))
+    (when (= (hash-table-count table) 0)
       (with-open-file (stream (setq pathname (sb-cold::math-journal-pathname :input))
                               :if-does-not-exist nil)
         (when stream
@@ -191,7 +184,9 @@
        (if foundp
            (values-list answer)
            (multiple-value-call #'record-math-op fun args (progn ,@calculation))))))
+) ; EVAL-WHEN
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun sb-cold::read-target-float (stream char)
   (let ((buffer *floating-point-number-buffer*)
         (index -1)
@@ -243,8 +238,8 @@
                     (and (or (string= significand "-0") (string= significand "-0."))
                          (or marker-pos (error "~S has integer syntax" string))))
                 (ecase format
-                  (single-float (values (make-flonum :minus-zero 'single-float) (length string)))
-                  (double-float (values (make-flonum :minus-zero 'double-float) (length string))))
+                  (single-float (values #.(make-flonum (ash -1 31) 'single-float) (length string)))
+                  (double-float (values #.(make-flonum (ash -1 63) 'double-float) (length string))))
                 (let ((result (flonum-from-rational rational format)))
                   (values result (length string))))))
       (declare (ignore nchars))
@@ -272,6 +267,9 @@
 (defun float-sign-bit-set-p (float)
   (declare (type float float))
   (= (float-sign-bit float) 1))
+(declaim (inline flonum-minus-zero-p))
+(defun flonum-minus-zero-p (flonum)
+  (or (eq flonum $-0.0f0) (eq flonum $-0.0d0)))
 
 (defun pick-result-format (&rest args)
   (flet ((target-num-fmt (num)
@@ -285,8 +283,8 @@
                ;; This is inadequate for complex numbers,
                ;; but we don't need them.
                (arg-contagion
-                (position arg-fmt
-                          '(rational short-float single-float double-float long-float))))
+                 (position arg-fmt
+                           '(rational short-float single-float double-float long-float))))
           (when (cl:> arg-contagion result-contagion)
             (setq result-fmt arg-fmt result-contagion arg-contagion)))))))
 
@@ -360,10 +358,9 @@
     (return-from coerce object))
   (with-memoized-math-op (coerce (list object type))
     (if (realp object)
-        (if (and (floatp object)
-                 (flonum-minus-zero-p object)
+        (if (and (flonum-minus-zero-p object)
                  (member type '(double-float single-float)))
-            (make-flonum :minus-zero type)
+            (ecase type (single-float $-0.0f0) (double-float $-0.0d0))
             (let ((actual-type (if (member type '(double-float long-float))
                                    'double-float
                                    'single-float))
@@ -396,12 +393,6 @@
                   -1
                   1)
               (flonum-format x))))
-
-;;; This is simple enough that it's not necessary to memoize all calls.
-(defun xfloat-zerop (x)
-  (if (floatp x)
-      (or (eql (flonum-%bits x) 0) (flonum-minus-zero-p x))
-      (error "non-number?"))) ; or complex (not handled)
 
 (macrolet ((define (name float-fun)
              `(progn
@@ -457,13 +448,9 @@
                                     'double-float
                                     'single-float)))
                       (with-memoized-math-op (,name (list number divisor))
-                        (if (and (floatp number)
-                                 (flonum-minus-zero-p number))
+                        (if (flonum-minus-zero-p number)
                             (values 0
-                                    (make-flonum (if (< divisor 0)
-                                                     0
-                                                     :minus-zero)
-                                                 type))
+                                    (coerce (if (< divisor 0) 0 $-0.0) type))
                             (multiple-value-bind (q r)
                                 (,clname (rational number) (rational divisor))
                               (values q (flonum-from-rational r type)))))))))))
@@ -495,9 +482,9 @@
                           (,clname (rational number) (rational divisor))
                         (let ((remainder (if (eql format 'rational) r (flonum-from-rational r format))))
                           (if (cl:= q 0)
-                              (if (cl:/= (sgn number) (sgn divisor))
-                                  (values (make-flonum :minus-zero type) remainder)
-                                  (values (coerce 0 type) remainder))
+                              (values (coerce (if (cl:= (sgn number) (sgn divisor)) 0 $-0.0)
+                                              type)
+                                      remainder)
                               (values (flonum-from-rational q type) remainder))))))))))
   (define fceiling cl:ceiling)
   (define ffloor cl:floor)
@@ -656,9 +643,9 @@
            (let ((format (pick-result-format x y)))
              (cond
                ((eql format 'rational) (cl:+ x y))
-               ((and (and (floatp x) (flonum-minus-zero-p x))
-                     (and (floatp y) (flonum-minus-zero-p y)))
-                (make-flonum :minus-zero format))
+               ((and (flonum-minus-zero-p x)
+                     (flonum-minus-zero-p y))
+                (coerce $-0.0 format))
                (t (flonum-from-rational (cl:+ (rational x) (rational y)) format))))))
     (if (every #'rationalp args)
         (apply #'cl:+ args)
@@ -675,9 +662,9 @@
            (let ((format (pick-result-format x y)))
              (cond
                ((eql format 'rational) (cl:- x y))
-               ((and (and (floatp x) (flonum-minus-zero-p x))
-                     (and (zerop y) (or (not (floatp y)) (not (flonum-minus-zero-p y)))))
-                (make-flonum :minus-zero format))
+               ((and (flonum-minus-zero-p x)
+                     (and (zerop y) (not (flonum-minus-zero-p y))))
+                (coerce $-0.0 format))
                (t (flonum-from-rational (cl:- (rational x) (rational y)) format))))))
     (if (every #'rationalp args)
         (apply #'cl:- args)
@@ -691,11 +678,9 @@
            (let ((format (pick-result-format x y)))
              (cond
                ((eql format 'rational) (cl:* x y))
-               ((or (and (floatp x) (flonum-minus-zero-p x))
-                    (and (floatp y) (flonum-minus-zero-p y)))
-                (if (cl:= (sgn x) (sgn y))
-                    (coerce 0 format)
-                    (make-flonum :minus-zero format)))
+               ((or (flonum-minus-zero-p x)
+                    (flonum-minus-zero-p y))
+                (coerce (if (cl:= (sgn x) (sgn y)) 0 $-0.0) format))
                (t (flonum-from-rational (cl:* (rational x) (rational y)) format))))))
     (if (every #'rationalp args)
         (apply #'cl:* args)
@@ -720,9 +705,7 @@
                ((zerop y)
                 (error "can't represent Inf for (/ x 0)"))
                ((zerop x)
-                (if (cl:= (sgn x) (sgn y))
-                    (coerce 0 format)
-                    (make-flonum :minus-zero format)))
+                (coerce (if (cl:= (sgn x) (sgn y)) 0 $-0.0) format))
                (t (flonum-from-rational (cl:/ (rational x) (rational y)) format))))))
     (if (every #'rationalp args)
         (apply #'cl:/ args)
@@ -933,48 +916,47 @@
                *interned-numbers*))))
 
 ;;; Perform some simple checks
-(assert (not (eq (make-flonum :minus-zero 'single-float)
-                 (make-flonum :minus-zero 'double-float))))
-(assert (not (eq (make-flonum :+infinity 'single-float) $0s0)))
+(assert (not (eq $-0.0f0 $-0.0d0)))
+(assert (not (eq (make-flonum :+infinity 'single-float) $0f0)))
 (dolist (format '(single-float double-float))
   (assert (zerop (coerce 0 format)))
-  (assert (zerop (make-flonum :minus-zero format)))
+  (assert (zerop (coerce $-0.0 format)))
   (assert (float-infinity-p (make-flonum :+infinity format)))
   (assert (float-infinity-or-nan-p (make-flonum :+infinity format)))
   (assert (not (float-nan-p (make-flonum :+infinity format))))
   (assert (float-infinity-p (make-flonum :-infinity format)))
   (assert (float-infinity-or-nan-p (make-flonum :-infinity format)))
   (assert (not (float-nan-p (make-flonum :-infinity format))))
-  (assert (eq (make-flonum :minus-zero format) (make-flonum :minus-zero format)))
+  (assert (eq (coerce $-0.0 format) (coerce $-0.0 format)))
   (assert (eq (make-flonum :+infinity format) (make-flonum :+infinity format)))
   (assert (eq (make-flonum :-infinity format) (make-flonum :-infinity format)))
-  (assert (eq (sb-xc:+ (make-flonum :minus-zero format) (coerce 0 format)) (coerce 0 format)))
-  (assert (eq (sb-xc:+ (coerce 0 format) (make-flonum :minus-zero format)) (coerce 0 format)))
-  (assert (eq (sb-xc:+ (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:- (coerce 0 format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:- (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:+ (coerce $-0.0 format) (coerce 0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:+ (coerce 0 format) (coerce $-0.0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:+ (coerce $-0.0 format) (coerce $-0.0 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:- (coerce 0 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:- (coerce $-0.0 format)) (coerce 0 format)))
   (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
   (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
   (assert (eq (sb-xc:- (coerce 0 format) (coerce 0 format)) (coerce 0 format)))
-  (assert (eq (sb-xc:- (coerce 0 format) (make-flonum :minus-zero format)) (coerce 0 format)))
-  (assert (eq (sb-xc:- (make-flonum :minus-zero format) (coerce 0 format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:- (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (coerce 0 format)))
+  (assert (eq (sb-xc:- (coerce 0 format) (coerce $-0.0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:- (coerce $-0.0 format) (coerce 0 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:- (coerce $-0.0 format) (coerce $-0.0 format)) (coerce 0 format)))
   (assert (eq (sb-xc:* (coerce 0 format) (coerce 0 format)) (coerce 0 format)))
-  (assert (eq (sb-xc:* (make-flonum :minus-zero format) (coerce 0 format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:* (coerce 0 format) (make-flonum :minus-zero format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:* (make-flonum :minus-zero format) (make-flonum :minus-zero format)) (coerce 0 format)))
-  (assert (eq (sb-xc:/ (make-flonum :minus-zero format) (coerce -1 format)) (coerce 0 format)))
-  (assert (eq (sb-xc:/ (make-flonum :minus-zero format) (coerce 1 format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:/ (coerce 0 format) (coerce -1 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:* (coerce $-0.0 format) (coerce 0 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:* (coerce 0 format) (coerce $-0.0 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:* (coerce $-0.0 format) (coerce $-0.0 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:/ (coerce $-0.0 format) (coerce -1 format)) (coerce 0 format)))
+  (assert (eq (sb-xc:/ (coerce $-0.0 format) (coerce 1 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:/ (coerce 0 format) (coerce -1 format)) (coerce $-0.0 format)))
   (assert (eq (sb-xc:/ (coerce 0 format) (coerce 1 format)) (coerce 0 format)))
-  (assert (eq (sb-xc:fceiling -1/2) (make-flonum :minus-zero 'single-float)))
-  (assert (eq (sb-xc:fceiling (coerce -1/2 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:fceiling -1/2) $-0.0f0))
+  (assert (eq (sb-xc:fceiling (coerce -1/2 format)) (coerce $-0.0 format)))
   (assert (eq (sb-xc:ffloor -1/2) (coerce -1 'single-float)))
   (assert (eq (sb-xc:ffloor (coerce -1/2 format)) (coerce -1 format)))
-  (assert (eq (sb-xc:ftruncate -1/2) (make-flonum :minus-zero 'single-float)))
-  (assert (eq (sb-xc:ftruncate (coerce -1/2 format)) (make-flonum :minus-zero format)))
-  (assert (eq (sb-xc:fround -1/2) (make-flonum :minus-zero 'single-float)))
-  (assert (eq (sb-xc:fround (coerce -1/2 format)) (make-flonum :minus-zero format)))
+  (assert (eq (sb-xc:ftruncate -1/2) $-0.0f0))
+  (assert (eq (sb-xc:ftruncate (coerce -1/2 format)) (coerce $-0.0 format)))
+  (assert (eq (sb-xc:fround -1/2) $-0.0f0))
+  (assert (eq (sb-xc:fround (coerce -1/2 format)) (coerce $-0.0 format)))
   (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (rational x)
