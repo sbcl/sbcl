@@ -17,10 +17,7 @@
                             (d (sb-kernel:make-double-float (second expr) (third expr)))))))
           (dolist (expr (read stream))
             (destructuring-bind (fun args . result) expr
-              (let ((result (if (eq (first result) 'sb-kernel::&values)
-                                (rest result)
-                                result))
-                    (actual (if (eql fun 'read-from-string)
+              (let ((actual (if (eql fun 'read-from-string)
                                 (let ((*read-default-float-format* (car args)))
                                   (multiple-value-list (apply fun (sb-int:ensure-list (cdr args)))))
                                 (multiple-value-list (apply fun (sb-int:ensure-list args))))))

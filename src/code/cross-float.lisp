@@ -118,12 +118,6 @@
    (single-float 32)
    (double-float 64)))
 
-(defun float-ops-cache-insert (table key values)
-  (setf (gethash key table)
-        (if (singleton-p values)
-            (car values)
-            (cons '&values values))))
-
 (defun parse-xfloat-math-file (stream table)
   ;; Ensure that we're reading the correct variant of the file
   ;; in case there is more than one set of floating-point formats.
@@ -137,20 +131,11 @@
          (dolist (expr (let ((*package* pkg)) (read stream)))
            (incf line)
            (destructuring-bind (fun args . values) expr
-             ;; It seem so unnecessarily convoluted to remove &VALUES and re-insert
-             ;; in the table and remove for comparison below.
-             ;; Why not just NOT do any of that? After all, a list is a perfectly
-             ;; good representation of one or more values.
              (let* ((key (cons fun args))
-                    (existsp (gethash key table))
-                    (values (if (and (symbolp (first values))
-                                     (string= (symbol-name (first values))
-                                              "&VALUES"))
-                                (rest values)
-                                values)))
+                    (existsp (gethash key table)))
                (when existsp
                  (error "Line ~D of float cache: ~S is repeated" line key))
-               (float-ops-cache-insert table key values))))
+               (setf (gethash key table) values))))
       (delete-package pkg))))
 
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
@@ -177,7 +162,7 @@
          ;; args list is potentially on stack, so copy it
          (key (cons fun (if (listp args) (copy-list args) args)))
          (old-count (hash-table-count table)))
-    (float-ops-cache-insert table key values)
+    (setf (gethash key table) values)
     (unless (= (hash-table-count table) (1+ old-count))
       (bug "Non-canonical math journal entry ~S" key)))
   (apply #'values values))
@@ -207,12 +192,10 @@
              ,(if (string= name 'coerce)
                   `(cons ',(intern (string name) "CL") (canonical-math-op-args ,key-expr))
                   `(cons ',(intern (string name) "CL") ,key-expr))))
-     (multiple-value-bind (answer foundp) (gethash cache-key (get-float-ops-cache))
+     (multiple-value-bind (answer foundp)
+         (gethash cache-key (get-float-ops-cache))
        (if foundp
-           (if (and (listp answer)
-                    (eq (first answer) '&values))
-               (values-list (rest answer))
-               answer)
+           (values-list answer)
            (multiple-value-call #'record-math-op cache-key (progn ,@calculation))))))
 
 (defun sb-cold::read-target-float (stream char)
