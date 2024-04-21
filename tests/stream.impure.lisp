@@ -700,7 +700,8 @@
 #-win32
 (with-test (:name :overeager-character-buffering :skipped-on :win32)
   (let ((use-threads #+sb-thread t)
-        (proc nil))
+        (proc nil)
+        (sem (sb-thread:make-semaphore)))
     (sb-int:dovector (entry sb-impl::*external-formats*)
       (unless entry (return))
       (with-scratch-file (fifo)
@@ -721,6 +722,7 @@
                               (with-open-file (f fifo :direction :output
                                                       :if-exists :overwrite
                                                       :external-format format)
+                                (sb-thread:wait-on-semaphore sem)
                                 (write-line "foobar" f)
                                 (finish-output f)
                                 (sleep most-positive-fixnum))))))
@@ -737,6 +739,8 @@
               ;; Whether we're using threads or processes, the writer isn't
               ;; injecting any more input, but isn't indicating EOF either.
               (with-open-file (f fifo :direction :input :external-format format)
+                #+sb-thread
+                (sb-thread:signal-semaphore sem)
                 (assert (equal "foobar" (read-line f)))))
           (when proc
             (cond (use-threads (sb-thread:terminate-thread proc))
