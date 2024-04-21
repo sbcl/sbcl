@@ -555,3 +555,15 @@
     (((expt 2 74) 1d0) (condition 'type-error))
     ((0 -3d0) (condition 'type-error))
     (((expt 2 74) -2d0) (condition 'type-error))))
+
+(with-test (:name :log-integer-derive-type)
+  (assert-type
+   (lambda (x)
+     (declare ((integer 0) x))
+     (log x))
+   (single-float 0.0))
+  (assert-type
+   (lambda (x)
+     (declare (integer x))
+     (log x))
+   (or (complex single-float) (single-float 0.0))))

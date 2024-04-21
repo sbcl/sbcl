@@ -1050,7 +1050,12 @@
 ;;; Note we must assume that a type including 0.0 may also include
 ;;; -0.0 and thus the result may be complex -infinity + i*pi.
 (defun log-derive-type-aux-1 (x)
-  (elfun-derive-type-simple x #'log $0d0 nil nil nil))
+  (elfun-derive-type-simple x #'log $0d0 nil
+                            ;; (log 0) is an error
+                            ;; and there's nothing between 0 and 1 for integers.
+                            (and (integer-type-p x)
+                                 $0f0)
+                            nil))
 
 (defun log-derive-type-aux-2 (x y same-arg)
   (let ((log-x (log-derive-type-aux-1 x))

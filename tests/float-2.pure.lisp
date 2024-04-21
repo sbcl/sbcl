@@ -448,7 +448,7 @@ fractional bits."
   (assert-type (lambda (y)
                  (declare (integer y))
                  (log y 2.0d0))
-               (or double-float (complex double-float)))
+               (or (double-float 0d0) (complex double-float)))
   (assert-type (lambda (y)
                  (declare (double-float y))
                  (log y 2.0d0))
