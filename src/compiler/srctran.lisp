@@ -603,6 +603,18 @@
     (%make-interval (normalize-bound low)
                     (normalize-bound high))))
 
+;; Some backends have no float traps
+(declaim (inline bad-float-p))
+(defun bad-float-p (value)
+  (declare (ignorable value))
+  #+(and (or arm (and arm64 (not darwin)) riscv)
+         (not sb-xc-host))
+  (or (and (floatp value)
+           (float-infinity-or-nan-p value))
+      (and (complex-float-p value)
+           (or (float-infinity-or-nan-p (imagpart value))
+               (float-infinity-or-nan-p (realpart value))))))
+
 ;;; Apply the function F to a bound X. If X is an open bound and the
 ;;; function is declared strictly monotonic, then the result will be
 ;;; open. IF X is NIL, the result is NIL.
@@ -614,8 +626,9 @@
                (zerop x))
       (return-from bound-func))
     (handler-case
-        (set-bound (funcall f (type-bound-number x))
-                   (and strict (consp x)))
+        (let ((bound (funcall f (type-bound-number x))))
+          (unless (bad-float-p bound)
+            (set-bound bound (and strict (consp x)))))
       ;; Some numerical operations will signal an ERROR, e.g. in
       ;; the course of converting a bignum to a float. Default to
       ;; NIL in that case.
@@ -5325,14 +5338,7 @@
                     (arithmetic-error ()
                       (not-constants arg))
                     (:no-error (value)
-                      ;; Some backends have no float traps
-                      (cond #+(and (or arm arm64 riscv)
-                                   (not sb-xc-host))
-                            ((or (and (floatp value)
-                                      (float-infinity-or-nan-p value))
-                                 (and (complex-float-p value)
-                                      (or (float-infinity-or-nan-p (imagpart value))
-                                          (float-infinity-or-nan-p (realpart value)))))
+                      (cond ((bad-float-p value)
                              (not-constants arg))
                             (t
                              (setf reduced-value value
