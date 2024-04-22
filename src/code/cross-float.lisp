@@ -14,19 +14,6 @@
 (in-package "SB-IMPL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defun single-float-bits (target-flonum)
-  (flonum-%bits (the single-float target-flonum)))
-
-(defun double-float-bits (target-flonum)
-  (flonum-%bits (the double-float target-flonum)))
-
-(defun double-float-low-bits (x)
-  (logand (double-float-bits x) #xffffffff))
-
-(defun double-float-high-bits (x)
-  (ash (double-float-bits x) -32))
-
 ;;; This choice exists because cold-init reads from "output/sxhash-calls.lisp-expr"
 ;;; using the ordinary definition of "#." which has to call the function at the car
 ;;; of a list; but warm.lisp uses a purpose-made #. reader that handles only 2
@@ -39,7 +26,7 @@
        (output-part (x stream)
          (typecase x
            (single-float
-            (format stream "(~A ~A)" *proxy-sfloat-ctor* (stringify (flonum-%bits x))))
+            (format stream "(~A ~A)" *proxy-sfloat-ctor* (stringify (single-float-bits x))))
            (double-float
             (format stream "(~A ~A ~A)" *proxy-dfloat-ctor*
                     (stringify (double-float-high-bits x))
@@ -264,7 +251,7 @@
 
 (defun float-sign-bit (float)
   (declare (type float float))
-  (logand (ash (flonum-%bits float)
+  (logand (ash (flonum-bits float)
                (- (1- (float-format-bits (flonum-format float)))))
           1))
 (defun float-sign-bit-set-p (float)
@@ -670,8 +657,8 @@
   (flet ((one-arg-- (x)
            (etypecase x
              (rational (cl:- x))
-             (single-float (make-flonum (logxor (ash -1 31) (flonum-%bits x)) 'single-float))
-             (double-float (make-flonum (logxor (ash -1 63) (flonum-%bits x)) 'double-float))))
+             (single-float (make-flonum (logxor (ash -1 31) (single-float-bits x)) 'single-float))
+             (double-float (make-flonum (logxor (ash -1 63) (double-float-bits x)) 'double-float))))
          (two-arg-- (x y)
            (let ((format (pick-result-format x y)))
              (cond
@@ -907,7 +894,7 @@
                          r
                          (case (flonum-format r)
                           (single-float
-                           (host-sb-kernel:make-single-float (flonum-%bits r)))
+                           (host-sb-kernel:make-single-float (flonum-bits r)))
                           (double-float
                            (host-sb-kernel:make-double-float
                             (double-float-high-bits r)
