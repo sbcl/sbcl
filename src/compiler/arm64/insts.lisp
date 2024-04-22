@@ -995,7 +995,7 @@
   (:printer move-wide ((op #b00)))
   (:emitter
    (aver (not (ldb-test (byte 4 0) shift)))
-   (emit-move-wide segment +64-bit-size+ #b00 (/ shift 16) imm (gpr-offset rd))))
+   (emit-move-wide segment (reg-size rd) #b00 (/ shift 16) imm (gpr-offset rd))))
 
 (define-instruction movz (segment rd imm &optional (shift 0))
   (:printer move-wide ((op #b10)))

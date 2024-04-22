@@ -38,8 +38,16 @@
              (inst orr y zr-tn val)
              y)
             ((and (typep val '(unsigned-byte 32))
-                  (encode-logical-immediate val 32))
-             (inst orr (32-bit-reg y) zr-tn val)
+                  (cond ((encode-logical-immediate val 32)
+                         (inst orr (32-bit-reg y) zr-tn val)
+                         t)
+                        ((zerop (ldb (byte 16 0) (lognot val)))
+                         (inst movn (32-bit-reg y) (ldb (byte 16 16) (lognot val)) 16)
+                         t)
+                        ((zerop (ldb (byte 16 16) (lognot val)))
+                         (inst movn (32-bit-reg y) (ldb (byte 16 0) (lognot val)))
+                         t)))
+
              y)
             ((and ignore-tag
                   (not (logtest fixnum-tag-mask val))
