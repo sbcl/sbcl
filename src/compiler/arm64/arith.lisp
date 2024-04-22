@@ -175,9 +175,11 @@
        (:generator 1
          (cond ,@(and negative-op
                       `(((minusp y)
-                         (inst ,negative-op r x (,constant-fixnum-transform (fixnumize (- y)))))))
+                         (let ((imm (,constant-fixnum-transform (fixnumize (- y)))))
+                          (inst ,negative-op r x imm)))))
                (t
-                (inst ,constant-op r x (,constant-fixnum-transform (fixnumize y)))))))
+                (let ((imm (,constant-fixnum-transform (fixnumize y))))
+                  (inst ,constant-op r x imm))))))
      (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
                   fast-signed-binop)
        (:translate ,translate)
@@ -223,6 +225,15 @@
                                      ((let ((tagged (logior x fixnum-tag-mask)))
                                         (and (encode-logical-immediate tagged)
                                              tagged)))
+                                     ((and (typep x '(unsigned-byte 32))
+                                           (encode-logical-immediate x 32))
+                                      (setf r (32-bit-reg r))
+                                      x)
+                                     ((and (typep x '(unsigned-byte 32))
+                                           (let ((tagged (logior x fixnum-tag-mask)))
+                                             (when (encode-logical-immediate tagged 32)
+                                               (setf r (32-bit-reg r))
+                                               tagged))))
                                      (t
                                       (load-immediate-word tmp-tn x nil t)))))
 (define-binop logior 2 orr)
