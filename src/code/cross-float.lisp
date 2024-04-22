@@ -62,11 +62,6 @@
 
 (defvar *floating-point-number-buffer* (make-array 100 :element-type 'character))
 
-(defun float-format-bits (format)
-  (ecase format
-   (single-float 32)
-   (double-float 64)))
-
 (defun parse-xfloat-math-file (stream table)
   ;; Ensure that we're reading the correct variant of the file
   ;; in case there is more than one set of floating-point formats.
@@ -209,7 +204,7 @@
 ;;; REAL and IMAG are either host integers (therefore EQL-comparable)
 ;;; or if not, have already been made EQ-comparable by hashing.
 (defun complex (re im)
-  (if (or (and (floatp re) (floatp im) (eq (flonum-format re) (flonum-format im)))
+  (if (or (and (floatp re) (floatp im) (eq (type-of re) (type-of im)))
           ;; Complex rationals can't have 0 imaginary part.
           ;; It ought to have been canonicalized to a purely real rational.
           ;; This is not done here, though maybe it should be,
@@ -222,7 +217,9 @@
 (defun float-sign-bit (float)
   (declare (type float float))
   (logand (ash (flonum-bits float)
-               (- (1- (float-format-bits (flonum-format float)))))
+               (- (1- (etypecase float
+                        (single-float 32)
+                        (double-float 64)))))
           1))
 (defun float-sign-bit-set-p (float)
   (declare (type float float))
@@ -234,7 +231,7 @@
 (defun pick-result-format (&rest args)
   (flet ((target-num-fmt (num)
            (cond ((rationalp num) 'rational)
-                 ((floatp num) (flonum-format num))
+                 ((floatp num) (type-of num))
                  (t (error "What? ~S" num)))))
     (let* ((result-fmt 'rational)
            (result-contagion 0))
@@ -251,7 +248,7 @@
 (defun pick-float-result-format (&rest args)
   (flet ((target-num-fmt (num)
            (cond ((rationalp num) 'single-float)
-                 ((floatp num) (flonum-format num))
+                 ((floatp num) (type-of num))
                  (t (error "What? ~S" num)))))
     (let* ((result-fmt 'single-float)
            (result-contagion 0))
@@ -314,7 +311,7 @@
   (unless (member type '(float short-float single-float double-float long-float))
     (error "Can't COERCE ~S ~S" object type))
   (when (and (floatp object)
-             (or (eq type 'float) (eq (flonum-format object) type)))
+             (or (eq type 'float) (eq (type-of object) type)))
     (return-from coerce object))
   (with-memoized-math-op (coerce (list object type))
     (if (realp object)
@@ -363,7 +360,7 @@
       (coerce (if (float-sign-bit-set-p x)
                   -1
                   1)
-              (flonum-format x))))
+              (type-of x))))
 
 (macrolet ((define (name float-fun)
              `(progn
@@ -382,7 +379,7 @@
   (validate-args number prototype)
   (with-memoized-math-op (float (cons number (if prototypep (list prototype))))
     (let* ((format
-             (if (not prototypep) 'single-float (flonum-format prototype))))
+             (if (not prototypep) 'single-float (type-of prototype))))
       (flonum-from-rational (rational number) format))))
 
 ;;; Produce a float with the magnitude of FLOAT2 and sign of FLOAT1.
@@ -395,7 +392,7 @@
               (exponent (%single-exponent-bits float2))
               (mantissa (%single-mantissa-bits float2))
               (bits (%single-bits-from sign exponent mantissa)))
-         (coerce (make-flonum bits 'single-float) (flonum-format float1))))
+         (coerce (make-single-float bits) (type-of float1))))
       (double-float
        (let* ((sign (float-sign-bit float1))
               (exponent (%double-exponent-bits float2))
@@ -412,10 +409,8 @@
                         (,clname number divisor)
                         (,float-fun number divisor)))
                   (defun ,float-fun (number divisor)
-                    (let ((type (if (or (and (floatp number)
-                                             (eq (flonum-format number) 'double-float))
-                                        (and (floatp divisor)
-                                             (eq (flonum-format divisor) 'double-float)))
+                    (let ((type (if (or (typep number 'double-float)
+                                        (typep divisor 'double-float))
                                     'double-float
                                     'single-float)))
                       (with-memoized-math-op (,name (list number divisor))
@@ -441,10 +436,8 @@
 (macrolet ((define (name clname)
              `(progn
                 (defun ,name (number &optional (divisor 1 divisorp))
-                  (let ((type (if (or (and (floatp number)
-                                           (eq (flonum-format number) 'double-float))
-                                      (and (floatp divisor)
-                                           (eq (flonum-format divisor) 'double-float)))
+                  (let ((type (if (or (typep number 'double-float)
+                                      (typep divisor 'double-float))
                                   'double-float
                                   'single-float))
                         (format (pick-result-format number divisor)))
@@ -470,7 +463,7 @@
     (t
      (with-memoized-math-op (expt (list base power))
        (if (zerop power)
-           (coerce 1 (flonum-format base))
+           (coerce 1 (type-of base))
            (flonum-from-rational
             (cl:expt (rational base) power)
             (pick-result-format base power)))))))
@@ -506,7 +499,7 @@
 (defun scale-float (f ex)
   (validate-args f)
   (with-memoized-math-op (scale-float (list f ex))
-    (flonum-from-rational (cl:* (rational f) (expt 2 ex)) (flonum-format f))))
+    (flonum-from-rational (cl:* (rational f) (expt 2 ex)) (type-of f))))
 
 (defun scale-single-float (f ex)
   (validate-args f)
@@ -627,8 +620,8 @@
   (flet ((one-arg-- (x)
            (etypecase x
              (rational (cl:- x))
-             (single-float (make-flonum (logxor (ash -1 31) (single-float-bits x)) 'single-float))
-             (double-float (make-flonum (logxor (ash -1 63) (double-float-bits x)) 'double-float))))
+             (single-float (make-single-float (logxor (ash -1 31) (single-float-bits x))))
+             (double-float (%make-double-float (logxor (ash -1 63) (double-float-bits x))))))
          (two-arg-- (x y)
            (let ((format (pick-result-format x y)))
              (cond
@@ -664,9 +657,9 @@
              ((rationalp x) (cl:/ x))
              ((zerop x)
               (if (cl:= (float-sign-bit x) 1)
-                  (coerce single-float-negative-infinity (flonum-format x))
-                  (coerce single-float-positive-infinity (flonum-format x))))
-             (t (flonum-from-rational (cl:/ (rational x)) (flonum-format x)))))
+                  (coerce single-float-negative-infinity (type-of x))
+                  (coerce single-float-positive-infinity (type-of x))))
+             (t (flonum-from-rational (cl:/ (rational x)) (type-of x)))))
          (two-arg-/ (x y)
            (let ((format (pick-result-format x y)))
              (cond
@@ -697,7 +690,7 @@
     (%%sqrt rational (cl:/ (isqrt (numerator rational)) (isqrt (denominator rational))))))
 
 (defun sb-xc:sqrt (arg)
-  (let ((format (if (rationalp arg) 'single-float (flonum-format arg))))
+  (let ((format (if (rationalp arg) 'single-float (type-of arg))))
     (with-memoized-math-op (sqrt (list arg))
       (flonum-from-rational (%sqrt (rational arg)) format))))
 
@@ -860,7 +853,7 @@
             (flet ((realize (r)
                      (if (rationalp r)
                          r
-                         (case (flonum-format r)
+                         (etypecase r
                           (single-float
                            (host-sb-kernel:make-single-float (flonum-bits r)))
                           (double-float

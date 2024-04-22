@@ -979,7 +979,7 @@ core and return a descriptor to it."
   address)
 
 (defun float-to-core (x)
-  (ecase (sb-impl::flonum-format x)
+  (etypecase x
     (single-float
      (let ((bits (single-float-bits x)))
        #+64-bit ; 64-bit platforms have immediate single-floats
@@ -1007,26 +1007,27 @@ core and return a descriptor to it."
                     #+big-endian    (logior (ash word0 32) word1))))
     (sb-impl::make-flonum (sb-vm::sign-extend bits 64) 'double-float)))
 
-(defun complexnum-to-core (num &aux (r (realpart num)) (i (imagpart num)))
-  (if (rationalp r)
-      (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-rational-widetag)
-      (ecase (sb-impl::flonum-format r)
-       (single-float
-        (let* ((des (allocate-otherptr *dynamic* sb-vm:complex-single-float-size
-                                       sb-vm:complex-single-float-widetag))
-               (where (+ (descriptor-byte-offset des)
-                         (ash #+64-bit sb-vm:complex-single-float-data-slot
-                              #-64-bit sb-vm:complex-single-float-real-slot
-                              sb-vm:word-shift))))
-          (setf (bvref-s32 (descriptor-mem des) where) (single-float-bits r)
-                (bvref-s32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
-          des))
-       (double-float
-        (let ((des (allocate-otherptr *dynamic* sb-vm:complex-double-float-size
-                                      sb-vm:complex-double-float-widetag)))
-          (write-double-float-bits des sb-vm:complex-double-float-real-slot r)
-          (write-double-float-bits des sb-vm:complex-double-float-imag-slot i)
-          des)))))
+(defun complex-single-float-to-core (num)
+  (declare (type (complex single-float) num))
+  (let* ((des (allocate-otherptr *dynamic* sb-vm:complex-single-float-size
+                                 sb-vm:complex-single-float-widetag))
+         (where (+ (descriptor-byte-offset des)
+                   (ash #+64-bit sb-vm:complex-single-float-data-slot
+                        #-64-bit sb-vm:complex-single-float-real-slot
+                        sb-vm:word-shift))))
+    (setf (bvref-s32 (descriptor-mem des) where) (single-float-bits (realpart num))
+          (bvref-s32 (descriptor-mem des) (+ where 4)) (single-float-bits (imagpart num)))
+    des))
+
+(defun complex-double-float-to-core (num)
+  (declare (type (complex double-float) num))
+  (let ((des (allocate-otherptr *dynamic* sb-vm:complex-double-float-size
+                                sb-vm:complex-double-float-widetag)))
+    (write-double-float-bits des sb-vm:complex-double-float-real-slot
+                             (realpart num))
+    (write-double-float-bits des sb-vm:complex-double-float-imag-slot
+                             (imagpart num))
+    des))
 
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
@@ -1036,8 +1037,15 @@ core and return a descriptor to it."
     (ratio (number-pair-to-core (number-to-core (numerator number))
                                 (number-to-core (denominator number))
                                 sb-vm:ratio-widetag))
+    ((complex single-float) (complex-single-float-to-core number))
+    ((complex double-float) (complex-double-float-to-core number))
+    #+long-float
+    ((complex long-float)
+     (error "~S isn't a cold-loadable number at all!" number))
+    (complex (number-pair-to-core (number-to-core (realpart number))
+                                  (number-to-core (imagpart number))
+                                  sb-vm:complex-rational-widetag))
     (float (float-to-core number))
-    (complex (complexnum-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.

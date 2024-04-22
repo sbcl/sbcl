@@ -45,7 +45,7 @@
                     ;; then return the symbol as found via XC-STRICT-CL.
                     ;; This ensures that symbols that are used for their identity and
                     ;; not function compare as EQ after uncrossing, which they would not
-                    ;; if for example, we altered (EQ (FLONUM-FORMAT x) 'SHORT-FLOAT)
+                    ;; if for example, we altered (EQ (TYPE-OF x) 'SHORT-FLOAT)
                     ;; to compare against CL:SHORT-FLOAT.
                     (if (eq (sb-xc:symbol-package form) *cl-package*)
                         (find-symbol (symbol-name form) #.(find-package "XC-STRICT-CL"))

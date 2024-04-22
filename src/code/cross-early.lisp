@@ -35,12 +35,8 @@
                   (:constructor nil)
                   (:predicate floatp))
   ;; the bits are canonical as regards hash-consing
-  (bits (error "unspecified BITS") :type integer :read-only t)
-  ;; SHORT-FLOAT and LONG-FLOAT are not choices here,
-  ;; since we're trying to exactly model the supported target float formats.
-  (format nil :type (member single-float double-float) :read-only t))
+  (bits (error "unspecified BITS") :type integer :read-only t))
 (defstruct (single-float (:include float
-                          (format 'single-float)
                           (bits (error "unspecified %BITS") :type (signed-byte 32)))
                          (:constructor %make-single-flonum (bits))))
 
@@ -60,7 +56,6 @@
   (cl:ldb (cl:byte 23 0) (single-float-bits single)))
 
 (defstruct (double-float (:include float
-                          (format 'double-float)
                           (bits (error "unspecifier %BITS") :type (signed-byte 64)))
                          (:constructor %make-double-flonum (bits))))
 
@@ -182,6 +177,8 @@
   (cond ((member spec '(* real)) 'complexnum)
         ((eq spec 'single-float) '(satisfies complex-single-float-p))
         ((eq spec 'double-float) '(satisfies complex-double-float-p))
+        #+long-float
+        ((eq spec 'long-float) '(satisfies complex-long-float-p))
         (t (error "complex type specifier too complicated: ~s" spec))))
 
 (deftype number () '(or real complex))
@@ -202,7 +199,7 @@
   (declare (ignore env))
   (if (complexp self)
       `(complex ,(complexnum-real self) ,(complexnum-imag self))
-      `(make-flonum ,(flonum-bits self) ',(flonum-format self))))
+      `(make-flonum ,(flonum-bits self) ',(type-of self))))
 
 #+weak-vector-readbarrier
 (progn (deftype weak-vector () nil) ; nothing is a weak-vector
