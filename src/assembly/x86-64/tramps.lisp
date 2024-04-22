@@ -144,13 +144,6 @@
     (pseudo-atomic ()
       (call-c "allocation_tracker_sized" (* (ea 8 rbp-tn))))))
 
-(define-assembly-routine (undefined-tramp (:return-style :none))
-    ((:temp rax descriptor-reg rax-offset))
-  (inst pop (ea n-word-bytes rbp-tn))
-  (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
-  (inst push (ea n-word-bytes rbp-tn))
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
-
 #+win32
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
