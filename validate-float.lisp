@@ -13,8 +13,10 @@
                         (declare (ignore subchar arg))
                         (let ((expr (read stream t nil t)))
                           (ecase (car expr)
-                            (s (sb-kernel:make-single-float (second expr)))
-                            (d (sb-kernel:make-double-float (second expr) (third expr)))))))
+                            (make-single-float
+                             (sb-kernel:make-single-float (second expr)))
+                            (make-double-float
+                             (sb-kernel:make-double-float (second expr) (third expr)))))))
           (dolist (expr (read stream))
             (destructuring-bind (fun args . result) expr
               (let ((actual (if (eql fun 'read-from-string)

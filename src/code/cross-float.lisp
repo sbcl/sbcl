@@ -14,35 +14,6 @@
 (in-package "SB-IMPL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-;;; This choice exists because cold-init reads from "output/sxhash-calls.lisp-expr"
-;;; using the ordinary definition of "#." which has to call the function at the car
-;;; of a list; but warm.lisp uses a purpose-made #. reader that handles only 2
-;;; symbols, reducing the size of xfloat-math.lisp-expr by abbreviating the float
-;;; constructors to single-character symbols.
-(defvar *proxy-sfloat-ctor* "MAKE-SINGLE-FLOAT")
-(defvar *proxy-dfloat-ctor* "MAKE-DOUBLE-FLOAT")
-(labels
-      ((stringify (bits) (if (= bits 0) 0 (format nil "#x~x" bits)))
-       (output-part (x stream)
-         (typecase x
-           (single-float
-            (format stream "(~A ~A)" *proxy-sfloat-ctor* (stringify (single-float-bits x))))
-           (double-float
-            (format stream "(~A ~A ~A)" *proxy-dfloat-ctor*
-                    (stringify (double-float-high-bits x))
-                    (stringify (double-float-low-bits x))))
-           (rational
-            (prin1 x stream)))))
-  (defmethod print-object ((self float) stream)
-    (write-string "#." stream)
-    (output-part self stream))
-
-  (defmethod print-object ((self complexnum) stream)
-    (write-string "#.(COMPLEX " stream)
-    (output-part (complexnum-real self) stream)
-    (write-char #\Space stream)
-    (output-part (complexnum-imag self) stream)
-    (write-char #\) stream)))
 
 ;;; To ensure that target numbers compare by EQL correctly under the host's
 ;;; definition of EQL (so that we don't have to intercept it and all else
@@ -100,11 +71,10 @@
   ;; Ensure that we're reading the correct variant of the file
   ;; in case there is more than one set of floating-point formats.
   (assert (eq (read stream) :default))
-  (let ((pkg (make-package "SB-FLOAT-MATH-GENIE" :use '("CL")))
+  (let ((pkg (make-package "SB-FLOAT-GENIE" :use '("CL")))
         (line 0))
-    (loop for (alias . actual) in '(("S" . sb-kernel:make-single-float)
-                                    ("D" . sb-kernel:make-double-float))
-          do (setf (fdefinition (intern alias pkg)) (fdefinition actual)))
+    (import 'make-single-float pkg)
+    (import 'make-double-float pkg)
     (unwind-protect
          (dolist (expr (let ((*package* pkg)) (read stream)))
            (incf line)
@@ -865,10 +835,8 @@
     ;; Record each <fun,args> combination to STREAM
     ;; Though all symbols we print, such as SINGLE-FLOAT, are accessible
     ;; in any of the SB- packages, ABCL would buggily output package prefixes
-    ;; if ~S is used here. The intent is to use only SBCL as host to compute
-    ;; the table, since we assume that everybody's math routines suck.
-    ;; But anyway, this does seem to work in most other lisps.
-    (let ((*print-pretty* nil) (*proxy-sfloat-ctor* "S") (*proxy-dfloat-ctor* "D"))
+    ;; if ~S is used here.
+    (let ((*print-pretty* nil))
       (maphash (lambda (key result)
                  (destructuring-bind (fun . args) key
                    (format stream "(~A ~A~{ ~A~})~%"

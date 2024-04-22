@@ -43,6 +43,10 @@
                           (format 'single-float)
                           (bits (error "unspecified %BITS") :type (signed-byte 32)))
                          (:constructor %make-single-flonum (bits))))
+
+(defmethod print-object ((obj single-float) stream)
+  (format stream "#.(MAKE-SINGLE-FLOAT #x~x)" (single-float-bits obj)))
+
 (defun %single-bits-from (sign exponent mantissa)
   (declare (type bit sign)
            (type (unsigned-byte 8) exponent)
@@ -59,6 +63,12 @@
                           (format 'double-float)
                           (bits (error "unspecifier %BITS") :type (signed-byte 64)))
                          (:constructor %make-double-flonum (bits))))
+
+(defmethod print-object ((obj double-float) stream)
+  (format stream "#.(MAKE-DOUBLE-FLOAT #x~x #x~x)"
+          (double-float-high-bits obj)
+          (double-float-low-bits obj)))
+
 (defun %double-bits-from (sign exponent mantissa)
   (declare (type bit sign)
            (type (unsigned-byte 11) exponent)
@@ -151,6 +161,13 @@
                        (:constructor %make-complexnum (real imag)))
   (real nil :type real :read-only t)
   (imag nil :type real :read-only t))
+
+(defmethod print-object ((obj complexnum) stream)
+  (write-string "#.(COMPLEX " stream)
+  (prin1 (complexnum-real obj) stream)
+  (write-char #\Space stream)
+  (prin1 (complexnum-imag obj) stream)
+  (write-char #\) stream))
 
 (defun complex-single-float-p (x)
   (and (complexp x) (single-float-p (complexnum-real x))))
