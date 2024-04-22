@@ -63,32 +63,30 @@
 ;;; we enforce that EQL numbers are in fact EQ.
 (defvar *interned-numbers* (make-hash-table :test 'equal))
 
-(defun make-flonum (value format)
-  (let ((bits (etypecase value
-                (integer
-                 (ecase format
-                   (single-float (assert (typep value '(signed-byte 32))))
-                   (double-float (assert (typep value '(signed-byte 64)))))
-                 value)
-                (keyword
-                 ;; TOTAL-BITS is the size in bits. PRECISION
-                 ;; includes the hidden bit.
-                 (multiple-value-bind (total-bits precision)
-                     (ecase format
-                       (single-float (values 32 24))
-                       (double-float (values 64 53)))
-                   ;; The sign consumes 1 bit, but the significand
-                   ;; has 1 hidden bit, so it nets out the same in
-                   ;; terms of how many remain for the exponent.
-                   (let ((exponent-bits (- total-bits precision)))
-                     (logior (ash (ecase value (:+infinity 0) (:-infinity -1))
-                                  (1- total-bits))
-                             (ash (1- (ash 1 exponent-bits)) ; all 1s
-                                  ;; shift left by the number of represented
-                                  ;; significand bits. i.e. exclude the hidden bit.
-                                  (1- precision)))))))))
-    (values (ensure-gethash (cons bits format) *interned-numbers*
-                            (%make-flonum bits format)))))
+(defun make-flonum (bits format)
+  (values (ensure-gethash (cons bits format) *interned-numbers*
+                          (ecase format
+                            ((single-float) (%make-single-flonum bits))
+                            ((double-float) (%make-double-flonum bits))))))
+
+(defun make-float-infinity (sign format)
+  ;; TOTAL-BITS is the size in bits. PRECISION includes the hidden
+  ;; bit.
+  (multiple-value-bind (total-bits precision)
+      (ecase format
+        (single-float (values 32 24))
+        (double-float (values 64 53)))
+    ;; The sign consumes 1 bit, but the significand has 1 hidden bit,
+    ;; so it nets out the same in terms of how many remain for the
+    ;; exponent.
+    (let ((exponent-bits (- total-bits precision)))
+      (make-flonum
+       (logior (ash sign (1- total-bits))
+               (ash (1- (ash 1 exponent-bits)) ; all 1s
+                    ;; shift left by the number of represented
+                    ;; significand bits. i.e. exclude the hidden bit.
+                    (1- precision)))
+       format))))
 
 (defun flonum-from-rational (rational format)
   (ecase format
@@ -246,6 +244,11 @@
       flonum)))
 ) ; EVAL-WHEN
 
+(defconstant single-float-negative-infinity (make-float-infinity -1 'single-float))
+(defconstant single-float-positive-infinity (make-float-infinity 0 'single-float))
+(defconstant double-float-negative-infinity (make-float-infinity -1 'double-float))
+(defconstant double-float-positive-infinity (make-float-infinity 0 'double-float))
+
 ;;; REAL and IMAG are either host integers (therefore EQL-comparable)
 ;;; or if not, have already been made EQ-comparable by hashing.
 (defun complex (re im)
@@ -358,14 +361,25 @@
     (return-from coerce object))
   (with-memoized-math-op (coerce (list object type))
     (if (realp object)
-        (if (and (flonum-minus-zero-p object)
-                 (member type '(double-float single-float)))
-            (ecase type (single-float $-0.0f0) (double-float $-0.0d0))
-            (let ((actual-type (if (member type '(double-float long-float))
-                                   'double-float
-                                   'single-float))
-                  (source-value (rational object)))
-              (flonum-from-rational source-value actual-type)))
+        (cond ((and (flonum-minus-zero-p object)
+                    (member type '(double-float single-float)))
+               (ecase type (single-float $-0.0f0) (double-float $-0.0d0)))
+              ((float-infinity-p object)
+               (ecase type
+                 (single-float
+                  (if (float-sign-bit-set-p object)
+                      single-float-negative-infinity
+                      single-float-positive-infinity))
+                 (double-float
+                  (if (float-sign-bit-set-p object)
+                      double-float-negative-infinity
+                      double-float-positive-infinity))))
+              (t
+               (let ((actual-type (if (member type '(double-float long-float))
+                                      'double-float
+                                      'single-float))
+                     (source-value (rational object)))
+                 (flonum-from-rational source-value actual-type))))
         (error "Can't COERCE ~S ~S" object type))))
 
 (macrolet ((define (name)
@@ -693,8 +707,8 @@
              ((rationalp x) (cl:/ x))
              ((zerop x)
               (if (cl:= (float-sign-bit x) 1)
-                  (make-flonum :-infinity (flonum-format x))
-                  (make-flonum :+infinity (flonum-format x))))
+                  (coerce single-float-negative-infinity (flonum-format x))
+                  (coerce single-float-positive-infinity (flonum-format x))))
              (t (flonum-from-rational (cl:/ (rational x)) (flonum-format x)))))
          (two-arg-/ (x y)
            (let ((format (pick-result-format x y)))
@@ -798,7 +812,7 @@
   (with-memoized-math-op (log (cons number (if base-p (list base))))
     (let ((format (pick-float-result-format number (if base-p base 0))))
       (if (zerop number)
-          (make-flonum :-infinity format)
+          (coerce single-float-negative-infinity format)
           (case base
             ((nil)
              (let ((table '((1 . $0f0)
@@ -917,26 +931,30 @@
 
 ;;; Perform some simple checks
 (assert (not (eq $-0.0f0 $-0.0d0)))
-(assert (not (eq (make-flonum :+infinity 'single-float) $0f0)))
+(assert (not (eq single-float-negative-infinity $0f0)))
 (dolist (format '(single-float double-float))
   (assert (zerop (coerce 0 format)))
   (assert (zerop (coerce $-0.0 format)))
-  (assert (float-infinity-p (make-flonum :+infinity format)))
-  (assert (float-infinity-or-nan-p (make-flonum :+infinity format)))
-  (assert (not (float-nan-p (make-flonum :+infinity format))))
-  (assert (float-infinity-p (make-flonum :-infinity format)))
-  (assert (float-infinity-or-nan-p (make-flonum :-infinity format)))
-  (assert (not (float-nan-p (make-flonum :-infinity format))))
+  (assert (float-infinity-p (coerce single-float-positive-infinity format)))
+  (assert (float-infinity-or-nan-p (coerce single-float-positive-infinity format)))
+  (assert (not (float-nan-p (coerce single-float-positive-infinity format))))
+  (assert (float-infinity-p (coerce single-float-negative-infinity format)))
+  (assert (float-infinity-or-nan-p (coerce single-float-negative-infinity format)))
+  (assert (not (float-nan-p (coerce single-float-negative-infinity format))))
   (assert (eq (coerce $-0.0 format) (coerce $-0.0 format)))
-  (assert (eq (make-flonum :+infinity format) (make-flonum :+infinity format)))
-  (assert (eq (make-flonum :-infinity format) (make-flonum :-infinity format)))
+  (assert (eq (coerce single-float-positive-infinity format)
+              (coerce single-float-positive-infinity format)))
+  (assert (eq (coerce single-float-negative-infinity format)
+              (coerce single-float-negative-infinity format)))
   (assert (eq (sb-xc:+ (coerce $-0.0 format) (coerce 0 format)) (coerce 0 format)))
   (assert (eq (sb-xc:+ (coerce 0 format) (coerce $-0.0 format)) (coerce 0 format)))
   (assert (eq (sb-xc:+ (coerce $-0.0 format) (coerce $-0.0 format)) (coerce $-0.0 format)))
   (assert (eq (sb-xc:- (coerce 0 format)) (coerce $-0.0 format)))
   (assert (eq (sb-xc:- (coerce $-0.0 format)) (coerce 0 format)))
-  (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
-  (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
+  (assert (eq (coerce single-float-positive-infinity format)
+              (sb-xc:- (coerce single-float-negative-infinity format))))
+  (assert (eq (coerce single-float-negative-infinity format)
+              (sb-xc:- (coerce single-float-positive-infinity format))))
   (assert (eq (sb-xc:- (coerce 0 format) (coerce 0 format)) (coerce 0 format)))
   (assert (eq (sb-xc:- (coerce 0 format) (coerce $-0.0 format)) (coerce 0 format)))
   (assert (eq (sb-xc:- (coerce $-0.0 format) (coerce 0 format)) (coerce $-0.0 format)))
@@ -968,5 +986,7 @@
       (assert (float-nan-p nan))
       (assert (float-infinity-or-nan-p nan))
       (assert (not (float-infinity-p nan))))
-    (dolist (symbol '(:+infinity :-infinity))
-      (assert-not-number (make-flonum symbol format))))))
+    (assert-not-number single-float-negative-infinity)
+    (assert-not-number single-float-positive-infinity)
+    (assert-not-number double-float-negative-infinity)
+    (assert-not-number double-float-positive-infinity))))

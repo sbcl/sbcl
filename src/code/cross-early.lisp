@@ -40,8 +40,8 @@
   ;; since we're trying to exactly model the supported target float formats.
   (format nil :type (member single-float double-float) :read-only t))
 (defstruct (single-float (:include float
-                                   (format 'single-float)
-                                   (%bits (error "unspecified %BITS") :type (signed-byte 32)))
+                          (format 'single-float)
+                          (%bits (error "unspecified %BITS") :type (signed-byte 32)))
                          (:conc-name "%SINGLE-FLONUM-")
                          (:constructor %make-single-flonum (%bits))
                          (:predicate single-float-p)))
@@ -74,11 +74,6 @@
   (cl:ldb (cl:byte 11 52) (%double-flonum-%bits double)))
 (defun %double-mantissa-bits (double)
   (cl:ldb (cl:byte 52 0) (%double-flonum-%bits double)))
-
-(defun %make-flonum (bits format)
-  (ecase format
-    ((single-float) (%make-single-flonum bits))
-    ((double-float) (%make-double-flonum bits))))
 
 (macrolet ((def (name bits-fun n-exponent-bits n-mantissa-bits)
              (let ((initial-exponent (1- (ash 1 (1- n-exponent-bits))))
