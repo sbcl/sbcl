@@ -1921,8 +1921,6 @@ variable: an unreadable object representing the error is printed instead.")
     (let (dinfo)
       (cond ((eq (setq dinfo (%code-debug-info component)) :bpt-lra)
              (write-string "bpt-trap-return" stream))
-            ((functionp dinfo)
-             (format stream "trampoline ~S" dinfo))
             (t
              (format stream "code~@[ id=~x~] [~D]"
                      (%code-serialno component)
