@@ -15,17 +15,10 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-;;; To ensure that target numbers compare by EQL correctly under the host's
-;;; definition of EQL (so that we don't have to intercept it and all else
-;;; that uses EQL such as EQUAL, EQUALP and sequence traversers etc),
-;;; we enforce that EQL numbers are in fact EQ.
-(defvar *interned-numbers* (make-hash-table :test 'equal))
-
-(defun make-flonum (bits format)
-  (values (ensure-gethash (cons bits format) *interned-numbers*
-                          (ecase format
-                            ((single-float) (%make-single-flonum bits))
-                            ((double-float) (%make-double-flonum bits))))))
+(defun flonum-from-rational (rational format)
+  (ecase format
+    (single-float (make-single-float (%single-bits-from-rational rational)))
+    (double-float (%make-double-float (%double-bits-from-rational rational)))))
 
 (defun make-float-infinity (sign format)
   ;; TOTAL-BITS is the size in bits. PRECISION includes the hidden
@@ -37,28 +30,16 @@
     ;; The sign consumes 1 bit, but the significand has 1 hidden bit,
     ;; so it nets out the same in terms of how many remain for the
     ;; exponent.
-    (let ((exponent-bits (- total-bits precision)))
-      (make-flonum
-       (logior (ash sign (1- total-bits))
-               (ash (1- (ash 1 exponent-bits)) ; all 1s
-                    ;; shift left by the number of represented
-                    ;; significand bits. i.e. exclude the hidden bit.
-                    (1- precision)))
-       format))))
-
-(defun flonum-from-rational (rational format)
-  (ecase format
-    (single-float (make-flonum (%single-bits-from-rational rational) format))
-    (double-float (make-flonum (%double-bits-from-rational rational) format))))
-
-(defun make-single-float (bits)
-  (declare (type (signed-byte 32) bits))
-  (make-flonum bits 'single-float))
-
-(defun make-double-float (hi lo)
-  (declare (type (signed-byte 32) hi)
-           (type (unsigned-byte 32) lo))
-  (make-flonum (logior (ash hi 32) lo) 'double-float))
+    (let* ((exponent-bits (- total-bits precision))
+           (bits
+             (logior (ash sign (1- total-bits))
+                     (ash (1- (ash 1 exponent-bits)) ; all 1s
+                          ;; shift left by the number of represented
+                          ;; significand bits. i.e. exclude the hidden bit.
+                          (1- precision)))))
+      (ecase format
+        (single-float (make-single-float bits))
+        (double-float (%make-double-float bits))))))
 
 (defvar *floating-point-number-buffer* (make-array 100 :element-type 'character))
 
@@ -134,9 +115,7 @@
        (if foundp
            (values-list answer)
            (multiple-value-call #'record-math-op fun args (progn ,@calculation))))))
-) ; EVAL-WHEN
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun sb-cold::read-target-float (stream char)
   (let ((buffer *floating-point-number-buffer*)
         (index -1)
@@ -188,8 +167,8 @@
                     (and (or (string= significand "-0") (string= significand "-0."))
                          (or marker-pos (error "~S has integer syntax" string))))
                 (ecase format
-                  (single-float (values #.(make-flonum (ash -1 31) 'single-float) (length string)))
-                  (double-float (values #.(make-flonum (ash -1 63) 'double-float) (length string))))
+                  (single-float (values #.(make-single-float (ash -1 31)) (length string)))
+                  (double-float (values #.(%make-double-float (ash -1 63)) (length string))))
                 (let ((result (flonum-from-rational rational format)))
                   (values result (length string))))))
       (declare (ignore nchars))
@@ -200,19 +179,6 @@
 (defconstant single-float-positive-infinity (make-float-infinity 0 'single-float))
 (defconstant double-float-negative-infinity (make-float-infinity -1 'double-float))
 (defconstant double-float-positive-infinity (make-float-infinity 0 'double-float))
-
-;;; REAL and IMAG are either host integers (therefore EQL-comparable)
-;;; or if not, have already been made EQ-comparable by hashing.
-(defun complex (re im)
-  (if (or (and (floatp re) (floatp im) (eq (type-of re) (type-of im)))
-          ;; Complex rationals can't have 0 imaginary part.
-          ;; It ought to have been canonicalized to a purely real rational.
-          ;; This is not done here, though maybe it should be,
-          ;; because (cl:complex 1 0) = 1.
-          (and (rationalp re) (rationalp im) (/= im 0)))
-      (values (ensure-gethash (list re im) *interned-numbers*
-                              (%make-complexnum re im)))
-      (error "Won't make complex number from ~s ~s" re im)))
 
 (defun float-sign-bit (float)
   (declare (type float float))
@@ -398,7 +364,7 @@
               (exponent (%double-exponent-bits float2))
               (mantissa (%double-mantissa-bits float2))
               (bits (%double-bits-from sign exponent mantissa)))
-         (make-flonum bits 'double-float))))))
+         (%make-double-float bits))))))
 
 (macrolet ((define (name float-fun)
              (let ((clname (intern (string name) "CL")))
@@ -713,11 +679,6 @@
 (defun sb-vm::sign-extend (x size)
   (if (logbitp (1- size) x) (cl:dpb x (cl:byte size 0) -1) x))
 
-;;; This is the preferred constructor for 64-bit machines
-(defun %make-double-float (bits)
-  (declare (type (signed-byte 64) bits))
-  (make-flonum bits 'double-float))
-
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
 (defconstant pi $3.14159265358979323846264338327950288419716939937511L0)
@@ -866,16 +827,19 @@
                   (realize x)))))
     (let (values)
       (format stream "~2&; Interned flonums:~%")
-      (maphash (lambda (k v)
-                 (let ((actual (to-native v)))
-                   (format stream "; ~S -> ~S~@[ = ~D~]~%" k v actual)
-                   (when actual
-                     (when (member actual values)
-                       ;; Duplicates means that the host's EQL
-                       ;; would not answer correctly for certain inputs.
-                       (error "Duplicate float in interned flonum table"))
-                     (push actual values))))
-               *interned-numbers*))))
+      (dolist (table (list *interned-single-floats*
+                           *interned-double-floats*
+                           *interned-complex-numbers*))
+        (maphash (lambda (k v)
+                   (let ((actual (to-native v)))
+                     (format stream "; ~S -> ~S~@[ = ~D~]~%" k v actual)
+                     (when actual
+                       (when (member actual values)
+                         ;; Duplicates means that the host's EQL
+                         ;; would not answer correctly for certain inputs.
+                         (error "Duplicate float in interned flonum table"))
+                       (push actual values))))
+                 table)))))
 
 ;;; Perform some simple checks
 (assert (not (eq $-0.0f0 $-0.0d0)))

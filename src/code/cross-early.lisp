@@ -27,8 +27,12 @@
 (deftype mod (n) `(integer 0 ,(1- n)))
 (deftype rational (&optional low high) `(cl:rational ,low ,high))
 
-;;; Target floating-point and COMPLEX number representation
-;;; is defined sufficiently early to avoid "undefined type" warnings.
+;;; To ensure that target numbers compare by EQL correctly under the
+;;; host's definition of EQL (so that we don't have to intercept it
+;;; and all else that uses EQL such as EQUAL, EQUALP and sequence
+;;; traversers etc), we enforce that EQL numbers are in fact EQ by
+;;; hash consing either on the bits for floats or on the real and
+;;; imaginary parts for complex numbers.
 (defstruct (target-num (:constructor nil)))
 (defstruct (float (:include target-num)
                   (:conc-name "FLONUM-")
@@ -38,10 +42,22 @@
   (bits (error "unspecified BITS") :type integer :read-only t))
 (defstruct (single-float (:include float
                           (bits (error "unspecified %BITS") :type (signed-byte 32)))
-                         (:constructor %make-single-flonum (bits))))
+                         (:constructor %%make-single-float (bits))))
 
 (defmethod print-object ((obj single-float) stream)
   (format stream "#.(MAKE-SINGLE-FLOAT #x~x)" (single-float-bits obj)))
+
+(defmethod cl:make-load-form ((obj single-float) &optional env)
+  (declare (ignore env))
+  `(make-single-float ,(single-float-bits obj)))
+
+(defvar *interned-single-floats* (make-hash-table))
+
+(defun make-single-float (bits)
+  (declare (type (signed-byte 32) bits))
+  (let ((table *interned-single-floats*))
+    (or (gethash bits table)
+        (setf (gethash bits table) (%%make-single-float bits)))))
 
 (defun %single-bits-from (sign exponent mantissa)
   (declare (type bit sign)
@@ -57,12 +73,30 @@
 
 (defstruct (double-float (:include float
                           (bits (error "unspecifier %BITS") :type (signed-byte 64)))
-                         (:constructor %make-double-flonum (bits))))
+                         (:constructor %%make-double-float (bits))))
 
 (defmethod print-object ((obj double-float) stream)
   (format stream "#.(MAKE-DOUBLE-FLOAT #x~x #x~x)"
           (double-float-high-bits obj)
           (double-float-low-bits obj)))
+
+(defmethod cl:make-load-form ((obj double-float) &optional env)
+  (declare (ignore env))
+  `(%make-double-float ,(double-float-bits obj)))
+
+(defvar *interned-double-floats* (make-hash-table))
+
+;;; This is the preferred constructor for 64-bit machines
+(defun %make-double-float (bits)
+  (declare (type (signed-byte 64) bits))
+  (let ((table *interned-double-floats*))
+    (or (gethash bits table)
+        (setf (gethash bits table) (%%make-double-float bits)))))
+
+(defun make-double-float (hi lo)
+  (declare (type (signed-byte 32) hi)
+           (type (unsigned-byte 32) lo))
+  (%make-double-float (logior (ash hi 32) lo)))
 
 (defun %double-bits-from (sign exponent mantissa)
   (declare (type bit sign)
@@ -164,6 +198,26 @@
   (prin1 (complexnum-imag obj) stream)
   (write-char #\) stream))
 
+(defmethod cl:make-load-form ((obj complexnum) &optional env)
+  (declare (ignore env))
+  `(complex ,(complexnum-real obj) ,(complexnum-imag obj)))
+
+(defvar *interned-complex-numbers* (make-hash-table :test #'equal))
+
+;;; REAL and IMAG are either host integers (therefore EQL-comparable)
+;;; or if not, have already been made EQ-comparable by hashing.
+(defun complex (re im)
+  (if (or (and (floatp re) (eq (type-of re) (type-of im)))
+          (and (rationalp re) (rationalp im)))
+      (if (eql im 0)
+          re
+          (let ((table *interned-complex-numbers*)
+                (key (cons re im)))
+            (or (gethash key table)
+                (setf (gethash key table)
+                      (%make-complexnum re im)))))
+      (error "Won't make complex number from ~s ~s" re im)))
+
 (defun complex-single-float-p (x)
   (and (complexp x) (single-float-p (complexnum-real x))))
 (defun complex-double-float-p (x)
@@ -194,12 +248,6 @@
 ;;; ZEROP is needed sooner than the rest of the cross-float. (Not sure why exactly)
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (sb-xc:= x 0)))
-
-(defmethod cl:make-load-form ((self target-num) &optional env)
-  (declare (ignore env))
-  (if (complexp self)
-      `(complex ,(complexnum-real self) ,(complexnum-imag self))
-      `(make-flonum ,(flonum-bits self) ',(type-of self))))
 
 #+weak-vector-readbarrier
 (progn (deftype weak-vector () nil) ; nothing is a weak-vector

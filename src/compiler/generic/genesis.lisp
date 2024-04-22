@@ -995,7 +995,7 @@ core and return a descriptor to it."
        (write-double-float-bits des sb-vm:double-float-value-slot x)))))
 
 (defun unsigned-bits-to-single-float (bits)
-  (sb-impl::make-flonum (sb-vm::sign-extend bits 32) 'single-float))
+  (make-single-float (sb-vm::sign-extend bits 32)))
 (defun double-float-from-core (des)
   (let ((bits
          #+64-bit (read-bits-wordindexed des 1)
@@ -1005,7 +1005,7 @@ core and return a descriptor to it."
                                  des (1+ sb-vm:double-float-value-slot))))
                     #+little-endian (logior (ash word1 32) word0)
                     #+big-endian    (logior (ash word0 32) word1))))
-    (sb-impl::make-flonum (sb-vm::sign-extend bits 64) 'double-float)))
+    (sb-impl::%make-double-float (sb-vm::sign-extend bits 64))))
 
 (defun complex-single-float-to-core (num)
   (declare (type (complex single-float) num))
