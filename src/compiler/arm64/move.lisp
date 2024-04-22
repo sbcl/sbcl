@@ -11,7 +11,8 @@
 
 (in-package "SB-VM")
 
-(defun load-immediate-word (y val &optional single-instruction)
+(defun load-immediate-word (y val &optional single-instruction
+                                            ignore-tag)
   (let (single-mov
         ffff-count
         zero-count
@@ -36,6 +37,12 @@
             ((encode-logical-immediate val)
              (inst orr y zr-tn val)
              y)
+            ((and ignore-tag
+                  (not (logtest fixnum-tag-mask val))
+                  ;; Contiguous bits are more likely to be better
+                  (logbitp n-fixnum-tag-bits val))
+             (load-immediate-word y (logior val fixnum-tag-mask)
+                                  single-instruction))
             ((and
               (not (single-mov))
               (not single-instruction)

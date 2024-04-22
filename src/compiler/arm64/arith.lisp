@@ -157,6 +157,7 @@
                           (constant-fixnum-test 'fixnum-encode-logical-immediate)
                           (constant-op op)
                           (constant-transform 'identity)
+                          (constant-fixnum-transform constant-transform)
                           negative-op)
   `(progn
      (define-vop (,(symbolicate 'fast- translate '/fixnum=>fixnum)
@@ -167,14 +168,16 @@
      (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
                   fast-fixnum-binop-c)
        (:arg-types tagged-num
-                   (:constant (satisfies ,constant-fixnum-test)))
+                   (:constant ,(if (eq constant-fixnum-test 'fixnum)
+                                  'fixnum
+                                  `(satisfies ,constant-fixnum-test))))
        (:translate ,translate)
        (:generator 1
          (cond ,@(and negative-op
                       `(((minusp y)
-                         (inst ,negative-op r x (,constant-transform (fixnumize (- y)))))))
+                         (inst ,negative-op r x (,constant-fixnum-transform (fixnumize (- y)))))))
                (t
-                (inst ,constant-op r x (,constant-transform (fixnumize y)))))))
+                (inst ,constant-op r x (,constant-fixnum-transform (fixnumize y)))))))
      (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
                   fast-signed-binop)
        (:translate ,translate)
@@ -213,11 +216,15 @@
 (define-binop - 4 sub :constant-test abs-add-sub-immediate-p :constant-fixnum-test fixnum-abs-add-sub-immediate-p
   :negative-op add)
 (define-binop logand 2 and
-  :constant-fixnum-test fixnum-encode-logical-immediate-ignore-tag
-  :constant-transform (lambda (x)
-                        (if (encode-logical-immediate x)
-                            x
-                            (logior x fixnum-tag-mask))))
+  :constant-fixnum-test fixnum
+  :constant-fixnum-transform (lambda (x)
+                               (cond ((encode-logical-immediate x)
+                                      x)
+                                     ((let ((tagged (logior x fixnum-tag-mask)))
+                                        (and (encode-logical-immediate tagged)
+                                             tagged)))
+                                     (t
+                                      (load-immediate-word tmp-tn x nil t)))))
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
