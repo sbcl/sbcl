@@ -392,7 +392,6 @@
   (def double-float $1.0d0 $-1.0d0))
 
 ;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
-#-sb-xc-host
 (defun maybe-exact-reciprocal (x)
   (unless (zerop x)
     (handler-case
@@ -1013,11 +1012,9 @@
 
 (defun integer-float-p (float)
   (and (floatp float)
-       (or
-        #-sb-xc-host
-        (multiple-value-bind (significand exponent) (integer-decode-float float)
-          (or (plusp exponent)
-              (<= (- exponent) (sb-kernel::first-bit-set significand)))))))
+       (multiple-value-bind (significand exponent) (integer-decode-float float)
+         (or (plusp exponent)
+             (<= (- exponent) (sb-kernel::first-bit-set significand))))))
 
 (defun expt-derive-type-aux (x y same-arg)
   (declare (ignore same-arg))
@@ -1615,13 +1612,11 @@
   (labels ((try (x)
              (when (ctypep x type)
                (return-from value-within-numeric-type x)))
-           #-sb-xc-host
            (next-float (float)
              (multiple-value-bind (frac exp sign)
                  (integer-decode-float float)
                (* (scale-float (float (1+ frac) float) exp)
                   sign)))
-           #-sb-xc-host
            (prev-float (float)
              (multiple-value-bind (frac exp sign)
                  (integer-decode-float float)
@@ -1631,7 +1626,6 @@
              (typecase x
                (integer
                 (1+ x))
-               #-sb-xc-host
                (float
                 (next-float x))
                (t
@@ -1640,7 +1634,6 @@
              (typecase x
                (integer
                 (1- x))
-               #-sb-xc-host
                (float
                 (prev-float x))
                (t

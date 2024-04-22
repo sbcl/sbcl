@@ -87,7 +87,7 @@
  ("src/code/cross-byte"  :c-headers :not-target)
  ("src/code/cross-misc"  :c-headers :not-target)
  ("src/code/cross-char"  :c-headers :not-target)
- ("src/code/cross-float" :c-headers :not-target)
+ ("src/code/cross-float-reader" :c-headers :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-condition" :not-target)
 
@@ -163,7 +163,9 @@
 
  ("src/code/debug-var-io")
 
+ ("src/code/number-dispatch" :c-headers)
  ("src/code/early-float" :c-headers)
+ ("src/code/cross-float" :c-headers :not-target)
 
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
  ("src/code/early-time" :c-headers)
@@ -250,8 +252,6 @@
  ;; around the compilation of "code/class". Why?
  ("src/code/class" :c-headers)
  ("src/pcl/pre-warm")
- ("src/code/number-dispatch" :not-host)
- ("src/code/float-inf-nan"   :not-host)
  ("src/code/pathname" :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 

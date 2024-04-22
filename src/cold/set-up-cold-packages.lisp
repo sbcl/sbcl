@@ -178,8 +178,12 @@
     ;; RATIONALP isn't here because its behavior is unchanged.
     "FLOATP" "REALP" "COMPLEXP" "NUMBERP"
     "COERCE" "EXP" "EXPT" "LOG" "SIGNUM" "IMAGPART" "REALPART"
-    "ZEROP" "ABS" "SIGNUM" "FLOAT-SIGN"
+    "ZEROP" "ABS" "SIGNUM"
     "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
+    ;; Float decoding:
+    "DECODE-FLOAT" "INTEGER-DECODE-FLOAT" "FLOAT-SIGN"
+    "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"
+    "SCALE-FLOAT"
     ;; We always want irrational functions to use target floats.
     "ACOS" "ACOSH" "ASIN" "ASINH" "ATAN" "ATANH"  "CIS" "CONJUGATE"
     "COS" "COSH"  "FCEILING" "FFLOOR" "FROUND" "FTRUNCATE"
@@ -321,11 +325,7 @@
 ;;; see by default, so that using them by accident fails.
 (defparameter *undefineds*
   '("SYMBOL-PACKAGE"
-    "PACKAGE-NAME"
-    ;; Float decoding: don't want to see these used either.
-    "DECODE-FLOAT" "INTEGER-DECODE-FLOAT"
-    "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"
-    "SCALE-FLOAT"))
+    "PACKAGE-NAME"))
 
 ;; The running-in-the-host-Lisp Python cross-compiler defines its
 ;; own versions of a number of functions which should not overwrite
