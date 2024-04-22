@@ -687,11 +687,12 @@
         do (setf integer (ash integer -1))
         finally (return i)))
 
-(defun find-pattern (integer)
+(defun find-pattern (integer &optional (width 64))
   (declare (type (unsigned-byte 64) integer)
+           (type (member 32 64) width)
            (optimize speed))
   (loop with pattern = integer
-        for size of-type (integer 0 32) = 32 then (truncate size 2)
+        for size of-type (integer 0 32) = (truncate width 2) then (truncate size 2)
         for try-pattern of-type (unsigned-byte 32) = (ldb (byte size 0) integer)
         while (and (= try-pattern
                       (the (unsigned-byte 32) (ldb (byte size size) integer)))
@@ -703,13 +704,13 @@
   (and (fixnump integer)
        (encode-logical-immediate (fixnumize integer))))
 
-(defun encode-logical-immediate (integer)
+(defun encode-logical-immediate (integer &optional (width 64))
   (let ((integer (ldb (byte 64 0) integer)))
     (cond ((or (zerop integer)
                (= integer (ldb (byte 64 0) -1)))
            nil)
           (t
-           (multiple-value-bind (size pattern) (find-pattern integer)
+           (multiple-value-bind (size pattern) (find-pattern integer width)
              (values (ldb (byte 1 6) size) ;; 64-bit patterns need to set the N bit to 1
                      (cond ((sequence-of-ones-p pattern)
                             ;; Simple case of consecutive ones, just needs shifting right
@@ -781,11 +782,14 @@
       (if (or (register-p rm)
               (shifter-operand-p rm))
           (emit-logical-reg-inst segment ,opc 0 rd rn rm)
-          (multiple-value-bind (n immr imms)
-              (encode-logical-immediate rm)
-            (unless n
-              (error 'cannot-encode-immediate-operand :value rm))
-            (emit-logical-imm segment +64-bit-size+ ,opc n immr imms (gpr-offset rn) (gpr-offset rd)))))))
+          (let ((size (reg-size rd)))
+           (multiple-value-bind (n immr imms)
+               (encode-logical-immediate rm (if (= size 1)
+                                                64
+                                                32))
+             (unless n
+               (error 'cannot-encode-immediate-operand :value rm))
+             (emit-logical-imm segment size ,opc n immr imms (gpr-offset rn) (gpr-offset rd))))))))
 
 (def-logical-imm-and-reg and #b00
   (:printer logical-imm ((op #b00) (n 0)))

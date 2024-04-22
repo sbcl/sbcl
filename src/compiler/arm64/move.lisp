@@ -37,6 +37,10 @@
             ((encode-logical-immediate val)
              (inst orr y zr-tn val)
              y)
+            ((and (typep val '(unsigned-byte 32))
+                  (encode-logical-immediate val 32))
+             (inst orr (32-bit-reg y) zr-tn val)
+             y)
             ((and ignore-tag
                   (not (logtest fixnum-tag-mask val))
                   ;; Contiguous bits are more likely to be better
