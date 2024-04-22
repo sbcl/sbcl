@@ -1912,29 +1912,27 @@
   (label :field (byte 19 5) :type 'label)
   (rt :field (byte 5 0) :type 'reg))
 
-(define-instruction cbz (segment rt label)
-  (:printer compare-branch-imm ((op 0)))
-  (:emitter
-   (aver (label-p label))
-   (emit-back-patch segment 4
-                    (lambda (segment posn)
-                      (emit-compare-branch-imm segment
-                                               +64-bit-size+
-                                               0
-                                               (ash (- (label-position label) posn) -2)
-                                               (gpr-offset rt))))))
-
-(define-instruction cbnz (segment rt label)
-  (:printer compare-branch-imm ((op 1)))
-  (:emitter
-   (aver (label-p label))
-   (emit-back-patch segment 4
-                    (lambda (segment posn)
-                      (emit-compare-branch-imm segment
-                                               (reg-size rt)
-                                               1
-                                               (ash (- (label-position label) posn) -2)
-                                               (gpr-offset rt))))))
+(macrolet ((def (name op)
+             `(define-instruction ,name (segment rt label)
+                (:printer compare-branch-imm ((op ,op)))
+                (:emitter
+                 (cond ((fixup-p label)
+                        (note-fixup segment :cond-branch label)
+                        (emit-compare-branch-imm segment
+                                                 +64-bit-size+
+                                                 ,op
+                                                 0
+                                                 (gpr-offset rt)))
+                       (t
+                        (emit-back-patch segment 4
+                                         (lambda (segment posn)
+                                           (emit-compare-branch-imm segment
+                                                                    +64-bit-size+
+                                                                    ,op
+                                                                    (ash (- (label-position label) posn) -2)
+                                                                    (gpr-offset rt))))))))))
+  (def cbz 0)
+  (def cbnz 1))
 
 (def-emitter test-branch-imm
   (b5 1 31)
