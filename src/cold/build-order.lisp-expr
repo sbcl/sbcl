@@ -384,6 +384,7 @@
  ("src/compiler/life")
 
  ("src/compiler/debug-dump")
+ ("src/compiler/generic/static-syms" :c-headers)
  ("src/compiler/generic/utils" :c-headers)
 
  ("src/assembly/assemfile" :not-target)
@@ -616,6 +617,9 @@
   ;; Delay (re)defining WARN until after undo-static-linkage works.
   ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
+  ;; Redefine some functions that contributed to far too numerous
+  ;; xperfecthash entries due to variation by build configuration.
+  "src/compiler/generic/static-syms"
   "src/code/icf"
   "src/code/defpackage")
 
