@@ -678,8 +678,7 @@
                    `((args :more t ,@(unless (eq args :fixed)
                                        '(:scs (descriptor-reg control-stack)))))))
 
-               ,@(when (memq return '(:fixed :unboxed))
-                   '((:results (values :more t))))
+     ,@(when (memq return '(:fixed :unboxed)) '((:results (values :more t))))
 
      (:save-p ,(if (eq return :tail) :compute-only t))
 
@@ -772,7 +771,7 @@
                      (t
                       (inst mov rcx (fixnumize nargs))))))
        ,@(cond ((eq return :tail)
-                        '(;; Python has figured out what frame we should
+                '(        ;; Python has figured out what frame we should
                           ;; return to so might as well use that clue.
                           ;; This seems really important to the
                           ;; implementation of things like
@@ -785,35 +784,29 @@
                           ;; wired to the stack in standard locations
                           ;; then these moves will be un-necessary;
                           ;; this is probably best for the x86.
-                          (sc-case old-fp
-                                   ((control-stack)
-                                    (unless (= ocfp-save-offset
-                                               (tn-offset old-fp))
+                  (sc-case old-fp
+                   ((control-stack)
+                    (unless (= ocfp-save-offset (tn-offset old-fp))
                                       ;; FIXME: FORMAT T for stale
                                       ;; diagnostic output (several of
                                       ;; them around here), ick
-                                      (error "** tail-call old-fp not S0~%")
-                                      (move old-fp-tmp old-fp)
-                                      (storew old-fp-tmp
-                                              rbp-tn
-                                              (frame-word-offset ocfp-save-offset))))
-                                   ((any-reg descriptor-reg)
-                                    (error "** tail-call old-fp in reg not S0~%")
-                                    (storew old-fp
-                                            rbp-tn
-                                            (frame-word-offset ocfp-save-offset))))
+                      (error "** tail-call old-fp not S0~%")
+                      (move old-fp-tmp old-fp)
+                      (storew old-fp-tmp rbp-tn (frame-word-offset ocfp-save-offset))))
+                   ((any-reg descriptor-reg)
+                    (error "** tail-call old-fp in reg not S0~%")
+                    (storew old-fp rbp-tn (frame-word-offset ocfp-save-offset))))
 
                           ;; For tail call, we have to push the
                           ;; return-pc so that it looks like we CALLed
                           ;; despite the fact that we are going to JMP.
-                          (inst push return-pc)
-                          ))
+                  (inst push return-pc)))
                (t
                         ;; For non-tail call, we have to save our
                         ;; frame pointer and install the new frame
                         ;; pointer. We can't load stack tns after this
                         ;; point.
-                        `(;; Python doesn't seem to allocate a frame
+                `(        ;; Python doesn't seem to allocate a frame
                           ;; here which doesn't leave room for the
                           ;; ofp/ret stuff.
 
@@ -823,18 +816,16 @@
                           ;; allocate on the call. So need to ensure
                           ;; there are at least 3 slots. This hack
                           ;; just adds 3 more.
-                          ,(if variable
-                               '(inst sub rsp-tn (* 3 n-word-bytes)))
+                  ,(if variable
+                       '(inst sub rsp-tn (* 3 n-word-bytes)))
 
                           ;; Bias the new-fp for use as an fp
-                          ,(if variable
-                               '(inst sub new-fp (* sp->fp-offset n-word-bytes)))
+                   ,(if variable
+                        '(inst sub new-fp (* sp->fp-offset n-word-bytes)))
 
                           ;; Save the fp
-                          (storew rbp-tn new-fp
-                                  (frame-word-offset ocfp-save-offset))
-
-                          (move rbp-tn new-fp))))  ; NB - now on new stack frame.
+                   (storew rbp-tn new-fp (frame-word-offset ocfp-save-offset))
+                   (move rbp-tn new-fp))))  ; NB - now on new stack frame.
 
        (when (and step-instrumenting
                   ,@(and (eq named :direct)

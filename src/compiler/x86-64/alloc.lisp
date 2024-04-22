@@ -986,8 +986,7 @@
   (:results (result :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 1
-    (inst lea (pc-size vop)
-      result (rip-relative-ea label fun-pointer-lowtag))))
+    (inst lea (pc-size vop) result (rip-relative-ea label fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
