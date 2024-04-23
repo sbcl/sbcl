@@ -4552,6 +4552,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
     // if (strict_containment && !gc_managed_heap_space_p(thing)) GC_WARN("non-Lisp memory");
     page_index_t source_page_index = find_page_index(where);
     page_index_t target_page_index = find_page_index((void*)thing);
+    int source_is_generational = source_page_index >= 0 || immobile_space_p((lispobj)where);
     if (!(target_page_index >= 0 || immobile_space_p(thing))) return 0; // can't do much with it
     if ((state->flags & VERIFY_TAGS) && target_page_index >= 0) {
         if (listp(thing)) {
@@ -4597,7 +4598,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
             lose("code @ %p (g%d). word @ %p -> %"OBJ_FMTX" (g%d)",
                  state->object_addr, state->object_gen, where, thing, to_gen);
     } else if ((state->flags & VERIFYING_GENERATIONAL) && to_gen < state->object_gen
-               && source_page_index >= 0) {
+               && source_is_generational) {
         /* The WP criteria are:
          *  - CONS marks the exact card since it can't span cards
          *  - SIMPLE-VECTOR marks the card containing the cell with the old->young pointer.

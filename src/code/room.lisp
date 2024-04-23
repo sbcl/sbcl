@@ -247,19 +247,6 @@
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
-#+immobile-space
-(progn
-    (define-alien-type nil
-        ;; ... and yet another place for Lisp to become out-of-sync with C.
-        (struct immobile-page
-                (flags (unsigned 8))
-                (obj-spacing (unsigned 8))
-                (obj-size (unsigned 8))
-                (generations (unsigned 8))
-                (free-index (unsigned 32))
-                (page-link (unsigned 16))
-                (prior-free-index (unsigned 16))))
-    (define-alien-variable "fixedobj_pages" (* (struct immobile-page))))
 (define-alien-variable "next_free_page" sb-kernel::page-index-t)
 
 #+immobile-space
