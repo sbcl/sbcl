@@ -330,7 +330,7 @@
                 (do ((count index (1- count))
                      (list sequence (cdr list)))
                     ((= count 0)
-                     (if (endp list)
+                     (if (atom list)
                          (signal-index-too-large-error sequence index)
                          (car list)))
                   (declare (type index count)))
