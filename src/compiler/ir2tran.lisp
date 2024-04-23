@@ -2410,7 +2410,8 @@
                              (name (and (ref-p use)
                                         (leaf-has-source-name-p (ref-leaf use))
                                         (leaf-source-name (ref-leaf use))))
-                             (ftype (and (info :function :info name) ; only use the ftype if
+                             (ftype (and #-sb-xc-host
+                                         (info :function :info name) ; only use the ftype if
                                          (global-ftype name)))) ; name was defknown
                         (unless (or (node-tail-p last)
                                     (policy last (zerop safety))

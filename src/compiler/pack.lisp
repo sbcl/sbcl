@@ -615,6 +615,7 @@
                    (let ((type (sb-c::lvar-fun-type (sb-c::combination-fun node))))
                      (and (fun-type-p type)
                           (eq (sb-kernel:fun-type-returns type) *empty-type*)))
+                   #-sb-xc-host
                    (or
                     (sb-c::combination-fun-info node)
                     (policy node (zerop safety)))))))
