@@ -135,3 +135,22 @@
   (assert (> (sb-kernel:code-jump-table-words
               (sb-kernel:fun-code-header #'sb-kernel:vector-subseq*))
              20)))
+
+(with-test (:name :cleanups)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c &optional f)
+      (block b
+        (case
+            (let ((* b))
+              (if (eql c 0)
+                  (return-from b (funcall f 11))
+                  b))
+          (t (case c
+               ((197 97 399) b)
+               (t 0))))))
+   ((33 0 (lambda (x) (+ x *))) 44)
+   ((1 1) 0)
+   ((2 197) 2)
+   ((3 97) 3)
+   ((4 399) 4)))

@@ -6945,6 +6945,8 @@
                          (let ((else (next-node (if-alternative if) :type :non-ref
                                                                     :single-predecessor t)))
                            (when (and (combination-p else)
+                                      (only-harmless-cleanups (node-block if)
+                                                              (if-alternative if))
                                       (eq (combination-kind else) :known)) ;; no notinline
                              (let ((op2 (combination-fun-debug-name else))
                                    after-else)
