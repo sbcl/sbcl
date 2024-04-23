@@ -1590,6 +1590,7 @@
            (unsafely-flushable)))
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (unsafely-flushable))
+(defknown sb-format::princ-multiple-to-string (&rest t) simple-string (unsafely-flushable))
 (defknown sb-impl::stringify-object (t) simple-string (no-verify-arg-count))
 
 (defknown write-char (character &optional stream-designator) character ()

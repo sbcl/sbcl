@@ -1228,6 +1228,19 @@
                                         (if atsignp orig-args arg)
                                         arg))))))
   (if atsignp nil args))
+
+(defun princ-multiple-to-string (&rest args)
+  (%with-output-to-string (str)
+    (let ((*print-escape* nil)
+          (*print-readably* nil))
+      (do-rest-arg ((arg) args)
+        (typecase arg
+          (string
+           (write-string arg str))
+          (character
+           (write-char arg str))
+          (t
+           (output-object arg str)))))))
 
 ;;;; format interpreter and support functions for user-defined method
 

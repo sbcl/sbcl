@@ -5995,14 +5995,12 @@
          always
          (or (stringp directive)
              (and (sb-format::format-directive-p directive)
-                  (let ((char (sb-format::directive-character directive))
-                        (params (sb-format::directive-params directive)))
-                     (and (char= char #\A)
-                          (null params)
-                          (pop args))))))
+                  (and (eql (sb-format::directive-bits directive) (char-code #\A))
+                       (null (sb-format::directive-params directive))
+                       (pop args)))))
    (null args)))
 
-(deftransform format ((stream control &rest args) (null (constant-arg string) &rest string))
+(deftransform format ((stream control &rest args) (null (constant-arg string) &rest t))
   (let ((tokenized
           (handler-case
               (sb-format::tokenize-control-string (coerce (lvar-value control) 'simple-string))
@@ -6010,21 +6008,37 @@
               (give-up-ir1-transform)))))
     (unless (concatenate-format-p tokenized args)
       (give-up-ir1-transform))
-    (let ((arg-names (make-gensym-list (length args))))
-      `(lambda (stream control ,@arg-names)
-         (declare (ignore stream control)
-                  (ignorable ,@arg-names))
-         (concatenate
-          'string
-          ,@(mapcar (lambda (directive)
-                      (if (stringp directive)
-                          directive
-                          (let ((arg (pop args))
-                                (arg-name (pop arg-names)))
-                            (if (constant-lvar-p arg)
-                                (lvar-value arg)
-                                arg-name))))
-                    tokenized))))))
+    (let* ((arg-names (make-gensym-list (length args)))
+           (stringsp t)
+           (args (let ((arg-names arg-names))
+                   (mapcar (lambda (directive)
+                             (if (stringp directive)
+                                 directive
+                                 (let ((arg (pop args))
+                                       (arg-name (pop arg-names)))
+                                   (unless (csubtypep (lvar-type arg) (specifier-type 'string))
+                                     (setf stringsp nil))
+                                   (if (constant-lvar-p arg)
+                                       `',(lvar-value arg)
+                                       arg-name))))
+                           tokenized))))
+      (if (= (length args) 1)
+          `(lambda (stream control ,@arg-names)
+             (declare (ignore stream control)
+                      (ignorable ,@arg-names))
+             (princ-to-string ,@args))
+          `(lambda (stream control ,@arg-names)
+             (declare (ignore stream control)
+                      (ignorable ,@arg-names))
+             (,@(if stringsp
+                    `(concatenate 'string)
+                    `(sb-format::princ-multiple-to-string))
+              ,@args))))))
+
+(deftransform sb-format::princ-multiple-to-string ((&rest args) (&rest string) * :important nil)
+  (let ((arg-names (make-gensym-list (length args))))
+    `(lambda ,arg-names
+       (concatenate 'string ,@arg-names))))
 
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)
