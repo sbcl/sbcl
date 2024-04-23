@@ -257,7 +257,7 @@
 
  ("src/code/debug-info" :c-headers)
 
- ("src/code/source-location")
+ ("src/code/source-location" :c-headers)
 
  ("src/compiler/proclaim" :c-headers)
 
