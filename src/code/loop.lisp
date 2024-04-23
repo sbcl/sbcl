@@ -195,9 +195,8 @@ constructed.
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
-      :temp-variable (gensym "LOOP-MAXMIN-TEMP-")
-      :flag-variable (and (not infinity-data)
-                          (gensym "LOOP-MAXMIN-FLAG-"))
+      :temp-variable (gensym "MINMAXTMP")
+      :flag-variable (and (not infinity-data) (gensym "MINMAXFLAG"))
       :operations nil
       :infinity-data infinity-data)))
 
@@ -205,8 +204,7 @@ constructed.
   (pushnew (the symbol operation) (loop-minimax-operations minimax))
   (when (and (cdr (loop-minimax-operations minimax))
              (not (loop-minimax-flag-variable minimax)))
-    (setf (loop-minimax-flag-variable minimax)
-          (gensym "LOOP-MAXMIN-FLAG-")))
+    (setf (loop-minimax-flag-variable minimax) (gensym "MINMAXFLAG")))
   operation)
 
 (sb-xc:defmacro with-minimax-value (lm &body body)
@@ -600,15 +598,13 @@ code to be loaded.
                    (())
                  (cond ((null cdr)
                         (return (nreconc result
-                                         (car (push (gensym "LOOP-IGNORED-")
-                                                    ignores)))))
+                                         (car (push (gensym "_") ignores)))))
                        ((atom cdr)
                         (return (nreconc result cdr)))
                        ((consp (car cdr))
                         (push (list (transform (car cdr))) result))
                        ((null (car cdr))
-                        (push (car (push (gensym "LOOP-IGNORED-")
-                                         ignores))
+                        (push (car (push (gensym "_") ignores))
                               result))
                        (t
                         (push (car cdr) result))))))
@@ -904,7 +900,7 @@ code to be loaded.
 (defun loop-make-var (name initialization dtype &optional step-var-p
                                                 &aux (loop *loop*))
   (cond ((null name)
-         (setq name (gensym "LOOP-IGNORE-"))
+         (setq name (gensym "_"))
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))
                (vars loop))
          (push `(ignore ,name) (declarations loop))
@@ -925,7 +921,7 @@ code to be loaded.
                (vars loop)))
         (initialization
          (check-var-name name)
-         (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
+         (let ((newvar (gensym "DS")))
            (loop-declare-var name dtype :desetq t)
            (push (list newvar initialization) (vars loop))
            ;; (DESETQ *LOOP*) gathered in reverse order.
@@ -994,10 +990,6 @@ code to be loaded.
                                     :desetq desetq))))
         (t (error "invalid LOOP variable passed in: ~S" name))))
 
-(defun loop-maybe-bind-form (form data-type)
-  (if (constantp form)
-      form
-      (loop-make-var (gensym "LOOP-BIND-") form data-type)))
 
 (defun loop-do-if (for negatep &aux (loop *loop*) (universe (universe loop)))
   (let ((form (loop-get-form))
@@ -1148,8 +1140,8 @@ code to be loaded.
     (let ((tempvars (loop-collector-tempvars lc)))
       (unless tempvars
         (setf (loop-collector-tempvars lc)
-              (setq tempvars (list* (gensym "LOOP-LIST-HEAD-")
-                                    (gensym "LOOP-LIST-TAIL-")
+              (setq tempvars (list* (gensym "HEAD")
+                                    (gensym "TAIL")
                                     (and (loop-collector-name lc)
                                          (list (loop-collector-name lc))))))
         (push `(with-loop-list-collection-head (,specifically ,@tempvars)) (wrappers *loop*))
@@ -1173,7 +1165,7 @@ code to be loaded.
       (unless tempvars
         (setf (loop-collector-tempvars lc)
               (setq tempvars (list (or (loop-collector-name lc)
-                                  (gensym "LOOP-SUM-")))))
+                                       (gensym "SUM")))))
         (unless (loop-collector-name lc)
           (loop-emit-final-value (car (loop-collector-tempvars lc))))
         (push `(with-sum-count ,lc) (wrappers *loop*)))
@@ -1195,7 +1187,7 @@ code to be loaded.
         (setf (loop-collector-data lc)
               (setq data (make-loop-minimax
                           (or (loop-collector-name lc)
-                              (gensym "LOOP-MAXMIN-"))
+                              (gensym "MINMAX"))
                           (loop-collector-dtype lc))))
         (unless (loop-collector-name lc)
           (loop-emit-final-value (loop-minimax-answer-variable data)))
@@ -1243,7 +1235,7 @@ code to be loaded.
                       `(mod ,(1+ (ceiling count))))
                      (t
                       `(integer ,(ceiling count))))))
-    (let ((var (loop-make-var (gensym "LOOP-REPEAT-") `(ceiling ,form) type)))
+    (let ((var (loop-make-var (gensym "REP") `(ceiling ,form) type)))
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) (before-loop loop))
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) (after-body loop))
       ;; FIXME: What should
@@ -1351,7 +1343,7 @@ code to be loaded.
 (defun loop-when-it-var (&aux (loop *loop*))
   (or (when-it-var loop)
       (setf (when-it-var loop)
-            (loop-make-var (gensym "LOOP-IT-") nil nil))))
+            (loop-make-var (gensym "IT") nil nil))))
 
 ;;;; various FOR/AS subdispatches
 
@@ -1372,8 +1364,8 @@ code to be loaded.
 
 (defun loop-for-across (var val data-type)
   (loop-make-var var nil data-type)
-  (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
-        (index-var (gensym "LOOP-ACROSS-INDEX-")))
+  (let ((vector-var (gensym "V"))
+        (index-var (gensym "I")))
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
       (loop-make-var
@@ -1384,8 +1376,8 @@ code to be loaded.
       (loop-make-var index-var 0 'fixnum)
       (let* ((length-form (if constantp
                               (length vector-value)
-                              (let ((v (gensym "LOOP-ACROSS-LIMIT-")))
-                                   (push `(let ((,v (length ,vector-var))))
+                              (let ((v (gensym "LIM")))
+                                (push `(let ((,v (length ,vector-var))))
                                          (wrappers *loop*))
                                    v)))
              (test `(>= ,index-var ,length-form))
@@ -1405,7 +1397,7 @@ code to be loaded.
           ((and (consp stepper) (eq (car stepper) 'function))
            (list (cadr stepper) listvar))
           (t
-           `(funcall ,(loop-make-var (gensym "LOOP-FN-") stepper 'function)
+           `(funcall ,(loop-make-var (gensym "F") stepper 'function)
                      ,listvar)))))
 
 (defun loop-for-on (var val data-type)
@@ -1446,7 +1438,7 @@ code to be loaded.
       (loop-for-across var `(list-reverse-into-vector ,(second val)) data-type)
       (multiple-value-bind (list constantp list-value)
           (loop-constant-fold-if-possible val)
-        (let ((listvar (gensym "LOOP-LIST-")))
+        (let ((listvar (gensym "L")))
           (loop-make-var var nil data-type)
           (loop-make-var listvar
                          ;; Don't want to assert the type, as ENDP will do that
@@ -1658,14 +1650,14 @@ code to be loaded.
             (setq endform (if limit-constantp
                               `',limit-value
                               (loop-make-var
-                                 (gensym "LOOP-LIMIT-") form
+                                 (gensym "LIM") form
                                  `(and ,indexv-type real)))))
            (:by
             (multiple-value-setq (form stepby-constantp stepby)
               (loop-constant-fold-if-possible form
                                               `(and ,indexv-type (real (0)))))
             (unless stepby-constantp
-              (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+              (loop-make-var (setq stepby (gensym "STEP"))
                  form
                  `(and ,indexv-type (real (0)))
                  t)))
@@ -1710,7 +1702,7 @@ code to be loaded.
        (cond ((member dir '(nil :up))
               (when (or limit-given default-top)
                 (unless limit-given
-                  (loop-make-var (setq endform (gensym "LOOP-SEQ-LIMIT-"))
+                  (loop-make-var (setq endform (gensym "LIM"))
                      nil
                      indexv-type)
                   (push `(setq ,endform ,default-top) (prologue loop)))
@@ -1791,8 +1783,8 @@ code to be loaded.
          (loop-error "Too many prepositions!"))
         ((null prep-phrases)
          (loop-error "missing OF or IN in ~S iteration path")))
-  (let ((ht-var (gensym "LOOP-HASHTAB-"))
-        (next-fn (gensym "LOOP-HASHTAB-NEXT-"))
+  (let ((ht-var (gensym "HT")) ; the table
+        (next-fn (gensym "NEXT")) ; WITH-HASH-TABLE-ITERATOR name
         (dummy-predicate-var nil)
         (post-steps nil))
     (multiple-value-bind (other-var other-p)
@@ -1808,7 +1800,7 @@ code to be loaded.
             dummy-predicate-var (loop-when-it-var))
       (let* ((key-var nil)
              (val-var nil)
-             (variable (or variable (gensym "LOOP-HASH-VAR-TEMP-")))
+             (variable (or variable (gensym "VAR")))
              (bindings `((,variable nil ,data-type)
                          (,ht-var ,(cadar prep-phrases))
                          ,@(and other-p other-var `((,other-var nil))))))
@@ -1820,12 +1812,12 @@ code to be loaded.
         (push `(with-hash-table-iterator (,next-fn ,ht-var)) (wrappers *loop*))
         (when (or (consp key-var) data-type)
           (setq post-steps
-                `(,key-var ,(setq key-var (gensym "LOOP-HASH-KEY-TEMP-"))
+                `(,key-var ,(setq key-var (gensym "KTMP"))
                            ,@post-steps))
           (push `(,key-var nil) bindings))
         (when (or (consp val-var) data-type)
           (setq post-steps
-                `(,val-var ,(setq val-var (gensym "LOOP-HASH-VAL-TEMP-"))
+                `(,val-var ,(setq val-var (gensym "VTMP"))
                            ,@post-steps))
           (push `(,val-var nil) bindings))
         `(,bindings                     ;bindings
@@ -1844,9 +1836,9 @@ code to be loaded.
          (bug "Unknown preposition ~S." (caar prep-phrases))))
   (unless (symbolp variable)
     (loop-error "Destructuring is not valid for package symbol iteration."))
-  (let ((pkg-var (gensym "LOOP-PKGSYM-"))
-        (next-fn (gensym "LOOP-PKGSYM-NEXT-"))
-        (variable (or variable (gensym "LOOP-PKGSYM-VAR-")))
+  (let ((pkg-var (gensym "SYM"))
+        (next-fn (gensym "NEXT")) ; WITH-PACKAGE-ITERATOR name
+        (variable (or variable (gensym "VAR")))
         (package (or (cadar prep-phrases) '*package*)))
     (push `(with-package-iterator (,next-fn ,pkg-var ,@symbol-types))
           (wrappers *loop*))
