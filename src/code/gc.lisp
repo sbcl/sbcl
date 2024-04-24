@@ -293,7 +293,8 @@ is true, all generations are collected. If GEN is provided, it can be
 used to specify the oldest generation guaranteed to be collected."
   (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
     (when (eq t (sub-gc gen))
-      (post-gc))))
+      (post-gc)))
+  nil)
 
 (define-alien-routine scrub-control-stack void)
 
