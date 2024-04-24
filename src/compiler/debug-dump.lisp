@@ -800,8 +800,11 @@
 ;;; PREV-ELSEWHERE is the previous function's elsewhere PC.
 (defun dump-1-packed-dfun (dfun prev-start start prev-elsewhere)
   (declare (type compiled-debug-fun dfun)
-           (type index prev-start start prev-elsewhere))
-  (let ((name (compiled-debug-fun-name dfun)))
+           (type index prev-start start prev-elsewhere)
+           (special *debug-component-name*))
+  (let* ((name (compiled-debug-fun-name dfun))
+         (same-name-p (eq name
+                          *debug-component-name*)))
     (let ((options 0))
       (setf (ldb packed-debug-fun-kind-byte options)
             (position-or-lose (compiled-debug-fun-kind dfun)
@@ -829,11 +832,14 @@
       #+unwind-to-frame-and-call-vop
       (when (compiled-debug-fun-bsp-save dfun)
         (setq flags (logior flags packed-debug-fun-bsp-save-loc-bit)))
+      (when same-name-p
+        (setq flags (logior flags packed-debug-fun-previous-name)))
       (vector-push-extend flags *byte-buffer*))
-
-    (write-var-integer (or (position name *contexts* :test #'equal)
-                           (vector-push-extend name *contexts*))
-                       *byte-buffer*)
+    (unless same-name-p
+      (setf *debug-component-name* name)
+      (write-var-integer (or (position name *contexts* :test #'equal)
+                             (vector-push-extend name *contexts*))
+                         *byte-buffer*))
 
     (let ((vars (compiled-debug-fun-vars dfun)))
       (when vars
@@ -966,15 +972,26 @@
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)
   (declare (type component component))
-  (let ((dfuns nil)
-        (var-locs (make-hash-table :test 'eq))
-        (*byte-buffer* (make-array 10
-                                   :element-type '(unsigned-byte 8)
-                                   :fill-pointer 0
-                                   :adjustable t))
-        (*contexts* (make-array 10
-                                :fill-pointer 0
-                                :adjustable t)))
+  (let* ((dfuns nil)
+         (var-locs (make-hash-table :test 'eq))
+         (*byte-buffer* (make-array 10
+                                    :element-type '(unsigned-byte 8)
+                                    :fill-pointer 0
+                                    :adjustable t))
+         (*contexts* (make-array 10
+                                 :fill-pointer 0
+                                 :adjustable t))
+         (name (let* ((2comp (component-info component))
+                      (entries (ir2-component-entries 2comp)))
+                 ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.
+                 ;; Function names, on the other hand, are seldom unhelpful,
+                 ;; so if there's only one function, pick that as the component name.
+                 ;; Otherwise preserve whatever crummy name was already assigned.
+                 (or (and (not (cdr entries))
+                          (entry-info-name (car entries)))
+                     (component-name component))))
+         (*debug-component-name* name))
+    (declare (special *debug-component-name*))
     (dolist (lambda (component-lambdas component))
       (unless (empty-fun-p lambda)
         (clrhash var-locs)
@@ -983,15 +1000,7 @@
               dfuns)))
     (let ((sorted (sort dfuns #'< :key #'car)))
       (make-compiled-debug-info
-       ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.
-       ;; Function names, on the other hand, are seldom unhelpful,
-       ;; so if there's only one function, pick that as the component name.
-       ;; Otherwise preserve whatever crummy name was already assigned.
-       :name (let* ((2comp (component-info component))
-                    (entries (sb-c::ir2-component-entries 2comp)))
-               (or (and (not (cdr entries))
-                        (sb-c::entry-info-name (car entries)))
-                   (component-name component)))
+       :name name
        :package *package*
        :fun-map (compute-packed-debug-funs sorted)
        :contexts (compact-vector *contexts*)))))

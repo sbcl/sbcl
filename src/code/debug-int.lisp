@@ -1976,9 +1976,12 @@ register."
 ;;; sleazoid "macro" to keep our indentation sane in UNCOMPACT-FUN-MAP
 (defmacro make-uncompacted-debug-fun ()
   '(sb-c::make-compiled-debug-fun
-    :name (compact-vector-ref
-           (sb-c::compiled-debug-info-contexts info)
-           (sb-c::read-var-integerf map i))
+    :name (if (logtest flags sb-c::packed-debug-fun-previous-name)
+              name
+              (setf name
+                    (compact-vector-ref
+                     (sb-c::compiled-debug-info-contexts info)
+                     (sb-c::read-var-integerf map i))))
     :kind (svref sb-c::packed-debug-fun-kinds
                  (ldb sb-c::packed-debug-fun-kind-byte options))
     :vars
@@ -2080,7 +2083,8 @@ register."
          (i 0)
          (len (length map))
          (code-start-pc 0)
-         (elsewhere-pc 0))
+         (elsewhere-pc 0)
+         (name (sb-c::compiled-debug-info-name info)))
     (declare (type (simple-array (unsigned-byte 8) (*)) map))
     (collect ((res))
       (loop

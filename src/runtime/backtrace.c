@@ -70,7 +70,7 @@ debug_function_name_from_pc (struct code* code, void *pc)
     uword_t elsewhere_pc = 0;
     uword_t first_elsewhere_pc = 0;
     lispobj last_name = 0;
-    lispobj name;
+    lispobj name = di->name;
 
     i = 0;
     while (i < len) {
@@ -79,13 +79,15 @@ debug_function_name_from_pc (struct code* code, void *pc)
         bool vars_p = flags & PACKED_DEBUG_FUN_VARIABLES_BIT;
         bool blocks_p = flags & PACKED_DEBUG_FUN_BLOCKS_BIT;
 
-        if (is_lisp_pointer(di->contexts) &&
-            widetag_of(native_pointer(di->contexts)) == SIMPLE_VECTOR_WIDETAG) {
-            struct vector *contexts = VECTOR(di->contexts);
-            name = contexts->data[read_var_integer(map, &i)];
-        } else {
-            read_var_integer(map, &i);
-            name = di->contexts;
+        if (!(flags & PACKED_DEBUG_FUN_PREVIOUS_NAME)) {
+            if (is_lisp_pointer(di->contexts) &&
+                widetag_of(native_pointer(di->contexts)) == SIMPLE_VECTOR_WIDETAG) {
+                struct vector *contexts = VECTOR(di->contexts);
+                name = contexts->data[read_var_integer(map, &i)];
+            } else {
+                read_var_integer(map, &i);
+                name = di->contexts;
+            }
         }
 
         if (vars_p) {

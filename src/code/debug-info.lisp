@@ -269,6 +269,9 @@
 #+unwind-to-frame-and-call-vop
 (defconstant packed-debug-fun-bsp-save-loc-bit (ash 1 5))
 
+
+(defconstant packed-debug-fun-previous-name (ash 1 6))
+
 ;;; The following are codes for the marker symbols used to indicate
 ;;; call syntax.
 (defconstant packed-debug-fun-arg-deleted 0)
