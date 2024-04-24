@@ -227,7 +227,8 @@ run in any thread.")
   ;; and should not expect any particular thread context.
   (atomic-incf sb-impl::*run-gc-hooks*)
   (sb-impl::finalizer-thread-notify)
-  (alien-funcall (extern-alien "empty_thread_recyclebin" (function void))))
+  (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
+  nil)
 
 #-sb-thread
 (defun post-gc ()
@@ -281,7 +282,8 @@ run in any thread.")
       (sb-thread::without-thread-waiting-for ()
         (with-interrupts
           (run-pending-finalizers)
-          (call-hooks "after-GC" *after-gc-hooks* :on-error :warn)))))
+          (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))
+  nil)
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)
@@ -293,8 +295,7 @@ is true, all generations are collected. If GEN is provided, it can be
 used to specify the oldest generation guaranteed to be collected."
   (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
     (when (eq t (sub-gc gen))
-      (post-gc)))
-  nil)
+      (post-gc))))
 
 (define-alien-routine scrub-control-stack void)
 
