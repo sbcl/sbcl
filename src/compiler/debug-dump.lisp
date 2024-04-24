@@ -981,29 +981,28 @@
          (*contexts* (make-array 10
                                  :fill-pointer 0
                                  :adjustable t))
-         (name (let* ((2comp (component-info component))
-                      (entries (ir2-component-entries 2comp)))
-                 ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.
-                 ;; Function names, on the other hand, are seldom unhelpful,
-                 ;; so if there's only one function, pick that as the component name.
-                 ;; Otherwise preserve whatever crummy name was already assigned.
-                 (or (and (not (cdr entries))
-                          (entry-info-name (car entries)))
-                     (component-name component))))
+         (lambdas (sort (copy-list (component-lambdas component))
+                        #'<
+                        :key (lambda (lambda)
+                               (label-position (block-label (lambda-block lambda))))))
+         (name (loop for lambda in lambdas
+                     for entry = (leaf-info lambda)
+                     when entry
+                     return
+                     (entry-info-name entry)))
          (*debug-component-name* name))
     (declare (special *debug-component-name*))
-    (dolist (lambda (component-lambdas component))
+    (dolist (lambda lambdas)
       (unless (empty-fun-p lambda)
         (clrhash var-locs)
         (push (cons (label-position (block-label (lambda-block lambda)))
                     (compute-1-debug-fun lambda var-locs))
               dfuns)))
-    (let ((sorted (sort dfuns #'< :key #'car)))
-      (make-compiled-debug-info
-       :name name
-       :package *package*
-       :fun-map (compute-packed-debug-funs sorted)
-       :contexts (compact-vector *contexts*)))))
+    (make-compiled-debug-info
+     :name name
+     :package *package*
+     :fun-map (compute-packed-debug-funs (nreverse dfuns))
+     :contexts (compact-vector *contexts*))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.

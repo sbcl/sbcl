@@ -377,9 +377,7 @@
                  (non-top component))
                 ((or (some #'has-xep-or-nlx funs)
                      (and has-top (rest funs)))
-                 (setf (component-name component)
-                       (possibly-base-stringize
-                        (find-component-name component)))
+                 (setf (component-name component) (find-component-name component))
                  (non-top component)
                  (when has-top
                    (setf (component-kind component) :complex-toplevel)))
