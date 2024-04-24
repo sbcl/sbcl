@@ -9,8 +9,9 @@ EOF
 status=$?
 if [ $status -eq 0 ]
 then
-  stdout=$TEST_FILESTEM.out
-  stderr=$TEST_FILESTEM.err
+  use_test_subdirectory
+  stdout=$TEST_DIRECTORY/$TEST_FILESTEM.out
+  stderr=$TEST_DIRECTORY/$TEST_FILESTEM.err
   run_sbcl >$stdout 2>$stderr <<EOF
 ;; Immobile pages have physical protection, so it's unlikely that it would be wrong.
 ;; However, the verifier was never actually checking.
