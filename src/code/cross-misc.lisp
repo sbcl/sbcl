@@ -177,12 +177,6 @@
 (defun %negate (number)
   (sb-xc:- number))
 
-(defun %single-float (number)
-  (coerce number 'single-float))
-
-(defun %double-float (number)
-  (coerce number 'double-float))
-
 (defun %ldb (size posn integer)
   (ldb (byte size posn) integer))
 

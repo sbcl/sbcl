@@ -11,6 +11,40 @@
 
 (in-package "SB-IMPL")
 
+(macrolet ((def (name bits-fun n-exponent-bits n-mantissa-bits)
+             (let ((initial-exponent (1- (ash 1 (1- n-exponent-bits))))
+                   (max-exponent (1- (ash 1 n-exponent-bits))))
+             `(defun ,name (rational)
+                (declare (type cl:rational rational))
+                (let ((sign (if (cl:= (cl:signum rational) -1) 1 0))
+                      (magnitude (cl:abs rational)))
+                  (when (cl:= magnitude 0)
+                    (return-from ,name (,bits-fun 0 0 0)))
+                  (loop with dir = (if (cl:> magnitude 1) -1 1)
+                        for exponent = ,initial-exponent then (cl:- exponent dir)
+                        for mantissa = magnitude then (cl:* mantissa (cl:expt 2 dir))
+                        until (and (cl:<= 1 mantissa) (cl:< mantissa 2))
+                        ;; the calls to CL:ROUND in this FINALLY
+                        ;; clause are the representation of the FPU
+                        ;; rounding mode.
+                        finally (let ((%mantissa (cl:round (cl:* (cl:1- mantissa) (cl:expt 2 ,n-mantissa-bits)))))
+                                  (when (cl:= %mantissa (cl:expt 2 ,n-mantissa-bits))
+                                    (incf exponent)
+                                    (setf %mantissa 0))
+                                  (when (cl:>= exponent ,max-exponent)
+                                    (setf exponent ,max-exponent %mantissa 0))
+                                  (when (cl:<= exponent 0)
+                                    (setf %mantissa (cl:round (cl:* mantissa (cl:expt 2 (cl:+ -1 ,n-mantissa-bits exponent))))
+                                          exponent 0))
+                                  (return (,bits-fun sign exponent %mantissa)))))))))
+  (def %single-float-rational sb-kernel::single-from-bits 8 23)
+  (def %double-float-rational sb-kernel::double-from-bits 11 52))
+
+(defun flonum-from-rational (rational format)
+  (ecase format
+    (single-float (%single-float-rational rational))
+    (double-float (%double-float-rational rational))))
+
 (defvar *floating-point-number-buffer* (make-array 100 :element-type 'character))
 
 (defun parse-xfloat-math-file (stream table)

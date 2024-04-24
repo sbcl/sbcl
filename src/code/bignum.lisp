@@ -2167,8 +2167,97 @@
                          (t (- r)))))
           (values (%normalize-bignum quotient (%bignum-length quotient))
                   rem))))))
+
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
+                  (declare (inline ,decode))
+                  (multiple-value-bind (bits exp sign) (,decode number)
+                    (let ((truncated ,(case type
+                                        #-64-bit
+                                        (double-float
+                                         ;; Shifting negatives right is different
+                                         `(let ((truncated (ash bits exp)))
+                                            (if (minusp sign)
+                                                (- truncated)
+                                                truncated)))
+                                        (t
+                                         `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                                         (- bits)
+                                                                         bits)
+                                                                     exp)))))
+                      (values
+                       truncated
+                       ,(case type
+                          ((single-float #+64-bit double-float)
+                           `(coerce 0 ',type))
+                          (t
+                           `(- number (coerce truncated ',type)))))))))))
+  (def double-float)
+  (def single-float))
+
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
+                  (declare (inline ,decode))
+                  (multiple-value-bind (bits exp sign) (,decode number)
+                    ,(case type
+                       #-64-bit
+                       (double-float
+                        ;; Shifting negatives right is different
+                        `(let ((truncated (ash bits exp)))
+                           (if (minusp sign)
+                               (- truncated)
+                               truncated)))
+                       (t
+                        `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                        (- bits)
+                                                        bits)
+                                                    exp))))))))
+  (def double-float)
+  (def single-float))
+
 
 ;;;; hashing
+
+;;; Needs to be synchronized with sxhash-bignum
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate 'sxhash-bignum- type) (number)
+                  #-sb-xc-host
+                  (declare (inline ,decode))
+                  (let ((result 316495330))
+                    (declare (type fixnum result))
+                    (multiple-value-bind (bits exp sign) (,decode number)
+                      (let ((bits (if (minusp sign)
+                                      (- bits)
+                                      bits)))
+                        (multiple-value-bind (digits remaining) (truncate exp digit-size)
+                          (dotimes (i digits)
+                            do (mixf result 0))
+                          ;; Taken from bignum-ashift-left-fixnum.
+                          (let* ((right-half (ldb (byte digit-size 0)
+                                                  (ash bits remaining)))
+                                 (sign-bit-p
+                                   (logbitp (1- digit-size) right-half))
+                                 (left-half (ash bits
+                                                 (- remaining digit-size)))
+                                 (left-half-p (if sign-bit-p
+                                                  (/= left-half -1)
+                                                  (/= left-half 0))))
+                            (mixf result
+                                  (logand most-positive-fixnum
+                                          (logxor right-half
+                                                  (ash right-half -7))))
+                            (when left-half-p
+                              (let ((left-half (ldb (byte digit-size 0) left-half)))
+                                (mixf result
+                                      (logand most-positive-fixnum
+                                              (logxor left-half
+                                                      (ash left-half -7))))))))))
+                    result)))))
+  (def double-float)
+  (def single-float))
 
 ;;; the bignum case of the SXHASH function
 ;;; Needs to be synchronized with sxhash-bignum-double-float

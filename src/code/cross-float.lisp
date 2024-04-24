@@ -45,40 +45,18 @@
             (setq result-fmt arg-fmt result-contagion arg-contagion)))))))
 
 (defun pick-float-result-format (&rest args)
-  (flet ((target-num-fmt (num)
-           (cond ((rationalp num) 'single-float)
-                 ((floatp num) (type-of num))
-                 (t (error "What? ~S" num)))))
-    (let* ((result-fmt 'single-float)
-           (result-contagion 0))
-      (dolist (arg args result-fmt)
-        (let* ((arg-fmt (target-num-fmt arg))
-               ;; This is inadequate for complex numbers,
-               ;; but we don't need them.
-               (arg-contagion
-                (position arg-fmt
-                          '(short-float single-float double-float long-float))))
-          (when (cl:> arg-contagion result-contagion)
-            (setq result-fmt arg-fmt result-contagion arg-contagion)))))))
-
-(defun rational (x)
-  (cond
-    ((rationalp x) x)
-    ((float-infinity-or-nan-p x)
-     (error "Can't convert Inf or NaN to rational."))
-    (t (with-memoized-math-op (rational x)
-         (multiple-value-bind (significand exponent sign)
-             (integer-decode-float x)
-           (cl:* sign significand (cl:expt 2 exponent)))))))
+  (let ((format (apply #'pick-result-format args)))
+    (if (eq format 'rational)
+        'single-float
+        format)))
 
 (defun rationalize (x)
   (if (rationalp x)
       x
-      (with-memoized-math-op (rationalize x)
-        (let ((rational (rational x)))
-          (if (integerp rational)
-              rational
-              (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x))))))
+      (let ((rational (rational x)))
+        (if (integerp rational)
+            rational
+            (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x)))))
 
 (defun xfloat-coerce (object type)
   (declare (number object))
@@ -117,20 +95,16 @@
              (flonum-from-rational source-value actual-type))))))
 
 (defun xfloat-abs (x)
-  (with-memoized-math-op (abs x)
-    (if (float-sign-bit-set-p x)
-        (sb-xc:- x)
-        x)))
+  (if (float-sign-bit-set-p x)
+      (sb-xc:- x)
+      x))
 
 ;;; Signum should return -0 of the correct type for -0 input.
 ;;; We don't need it currently.
 (defun xfloat-signum (x)
   (if (zerop x)
       x
-      (coerce (if (float-sign-bit-set-p x)
-                  -1
-                  1)
-              (type-of x))))
+      (float-sign x)))
 
 (macrolet ((define (name float-fun)
              (declare (ignore name))
@@ -140,20 +114,10 @@
   (define mod xfloat-mod)
   (define rem xfloat-rem))
 
-(defun float (number &optional (prototype nil prototypep))
-  (validate-args number prototype)
-  (with-memoized-math-op (float (cons number (if prototypep (list prototype))))
-    (let* ((format
-             (if (not prototypep) 'single-float (type-of prototype))))
-      (flonum-from-rational (rational number) format))))
-
 (macrolet ((define (name float-fun)
              (let ((clname (intern (string name) "CL")))
                `(defun ,float-fun (number divisor)
-                  (let ((type (if (or (typep number 'double-float)
-                                      (typep divisor 'double-float))
-                                  'double-float
-                                  'single-float)))
+                  (let ((type (pick-float-result-format number divisor)))
                     (with-memoized-math-op (,name (list number divisor))
                       (if (flonum-minus-zero-p number)
                           (values 0
@@ -175,22 +139,20 @@
     (float (if (float-sign-bit-set-p thing) -1 1))))
 
 (macrolet ((define (name clname)
-             `(progn
-                (defun ,name (number &optional (divisor 1 divisorp))
-                  (let ((type (if (or (typep number 'double-float)
-                                      (typep divisor 'double-float))
-                                  'double-float
-                                  'single-float))
-                        (format (pick-result-format number divisor)))
-                    (with-memoized-math-op (,name (list* number (and divisorp (list divisor))))
-                      (multiple-value-bind (q r)
-                          (,clname (rational number) (rational divisor))
-                        (let ((remainder (if (eql format 'rational) r (flonum-from-rational r format))))
-                          (if (cl:= q 0)
-                              (values (coerce (if (cl:= (sgn number) (sgn divisor)) 0 $-0.0)
-                                              type)
-                                      remainder)
-                              (values (flonum-from-rational q type) remainder))))))))))
+             `(defun ,name (number &optional (divisor 1 divisorp))
+                (with-memoized-math-op (,name (if divisorp (list number divisor) number))
+                  (multiple-value-bind (q r)
+                      (,clname (rational number) (rational divisor))
+                    (let* ((type (pick-float-result-format number divisor))
+                           (format (pick-result-format number divisor))
+                           (remainder (if (eql format 'rational)
+                                          r
+                                          (flonum-from-rational r format))))
+                      (if (cl:= q 0)
+                          (values (coerce (if (cl:= (sgn number) (sgn divisor)) 0 $-0.0)
+                                          type)
+                                  remainder)
+                          (values (flonum-from-rational q type) remainder))))))))
   (define fceiling cl:ceiling)
   (define ffloor cl:floor)
   (define fround cl:round)
@@ -205,47 +167,6 @@
             (flonum-from-rational
              (cl:expt (rational base) power)
              (pick-result-format base power))))))
-
-(defun %unary-truncate (number)
-  (typecase number
-    (integer number)
-    (ratio (values (truncate (numerator number) (denominator number))))
-    ((or single-float double-float #+long-float long-float)
-     (error "Unimplemented."))))
-
-(defun %unary-ftruncate (number)
-  (typecase number
-    (integer number)
-    (ratio (values (ftruncate (numerator number) (denominator number))))
-    ((or single-float double-float #+long-float long-float)
-     (error "Unimplemented."))))
-
-(defun %unary-round (number)
-  (typecase number
-    (integer number)
-    (ratio (values (round (numerator number) (denominator number))))
-    ((or single-float double-float #+long-float long-float)
-     (error "Unimplemented."))))
-
-(defun %unary-fround (number)
-  (typecase number
-    (integer number)
-    (ratio (values (fround (numerator number) (denominator number))))
-    ((or single-float double-float #+long-float long-float)
-     (error "Unimplemented."))))
-
-(defun scale-float (f ex)
-  (validate-args f)
-  (with-memoized-math-op (scale-float (list f ex))
-    (flonum-from-rational (cl:* (rational f) (expt 2 ex)) (type-of f))))
-
-(defun scale-single-float (f ex)
-  (validate-args f)
-  (scale-float f ex))
-
-(defun scale-double-float (f ex)
-  (validate-args f)
-  (scale-float f ex))
 
 ;;; Four possible return values.  NIL if the numbers (rationals or
 ;;; flonums) are incomparable (either is a NaN).  Otherwise: -1, 0, 1
@@ -361,6 +282,14 @@
            (let ((format (pick-result-format x y)))
              (cond
                ((eql format 'rational) (cl:* x y))
+               ((or (and (floatp x) (float-infinity-p x))
+                    (and (floatp y) (float-infinity-p y)))
+                (when (or (zerop x) (zerop y))
+                  (error "Can't multiply infinity with 0."))
+                (coerce (if (cl:= (sgn x) (sgn y))
+                            single-float-positive-infinity
+                            single-float-negative-infinity)
+                        format))
                ((or (flonum-minus-zero-p x)
                     (flonum-minus-zero-p y))
                 (coerce (if (cl:= (sgn x) (sgn y)) 0 $-0.0) format))
@@ -375,9 +304,7 @@
            (cond
              ((rationalp x) (cl:/ x))
              ((zerop x)
-              (if (cl:= (float-sign-bit x) 1)
-                  (coerce single-float-negative-infinity (type-of x))
-                  (coerce single-float-positive-infinity (type-of x))))
+              (float-sign x single-float-positive-infinity))
              (t (flonum-from-rational (cl:/ (rational x)) (type-of x)))))
          (two-arg-/ (x y)
            (let ((format (pick-result-format x y)))
@@ -410,7 +337,7 @@
 
 (defun sb-xc:sqrt (arg)
   (let ((format (if (rationalp arg) 'single-float (type-of arg))))
-    (with-memoized-math-op (sqrt (list arg))
+    (with-memoized-math-op (sqrt arg)
       (flonum-from-rational (%sqrt (rational arg)) format))))
 
 ;;; There seems to be no portable way to mask float traps, so right
@@ -459,13 +386,13 @@
   (if number2p
       (with-memoized-math-op (atan (list number1 number2))
         (error "Unimplemented."))
-      (with-memoized-math-op (atan (list number1))
+      (with-memoized-math-op (atan number1)
         (if (eql number1 $1.4916681462400417d-154)
             number1
             (error "Unimplemented.")))))
 
 (defun cosh (number)
-  (with-memoized-math-op (cosh (list number))
+  (with-memoized-math-op (cosh number)
     (case number
       ((0 $0f0) $1f0)
       ($0d0 $1d0)
@@ -473,7 +400,7 @@
 
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
-  (with-memoized-math-op (log (cons number (if base-p (list base))))
+  (with-memoized-math-op (log (if base-p (list number base) number))
     (let ((format (pick-float-result-format number (if base-p base 0))))
       (if (zerop number)
           (coerce single-float-negative-infinity format)

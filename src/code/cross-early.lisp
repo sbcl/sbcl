@@ -63,12 +63,6 @@
     (or (gethash bits table)
         (setf (gethash bits table) (%%make-single-float bits)))))
 
-(defun %single-bits-from (sign exponent mantissa)
-  (declare (type bit sign)
-           (type (unsigned-byte 8) exponent)
-           (type (unsigned-byte 23) mantissa))
-  (logior (ash (cl:- sign) 31) (ash exponent 23) mantissa))
-
 (defstruct (double-float (:include float
                           (bits (error "unspecifier %BITS") :type (signed-byte 64)))
                          (:constructor %%make-double-float (bits))))
@@ -96,49 +90,10 @@
            (type (unsigned-byte 32) lo))
   (%make-double-float (logior (ash hi 32) lo)))
 
-(defun %double-bits-from (sign exponent mantissa)
-  (declare (type bit sign)
-           (type (unsigned-byte 11) exponent)
-           (type (unsigned-byte 52) mantissa))
-  (logior (ash (cl:- sign) 63) (ash exponent 52) mantissa))
 (defun double-float-low-bits (x)
   (logand (double-float-bits x) #xffffffff))
 (defun double-float-high-bits (x)
   (ash (double-float-bits x) -32))
-
-(macrolet ((def (name bits-fun n-exponent-bits n-mantissa-bits)
-             (let ((initial-exponent (1- (ash 1 (1- n-exponent-bits))))
-                   (max-exponent (1- (ash 1 n-exponent-bits))))
-             `(defun ,name (rational)
-                (declare (type cl:rational rational))
-                (let ((sign (if (cl:= (cl:signum rational) -1) 1 0))
-                      (magnitude (cl:abs rational)))
-                  (when (cl:= magnitude 0)
-                    (return-from ,name (,bits-fun 0 0 0)))
-                  (loop with dir = (if (cl:> magnitude 1) -1 1)
-                        for exponent = ,initial-exponent then (cl:- exponent dir)
-                        for mantissa = magnitude then (cl:* mantissa (cl:expt 2 dir))
-                        until (and (cl:<= 1 mantissa) (cl:< mantissa 2))
-                        ;; the calls to CL:ROUND in this FINALLY
-                        ;; clause are the representation of the FPU
-                        ;; rounding mode.
-                        finally (let ((%mantissa (cl:round (cl:* (cl:1- mantissa) (cl:expt 2 ,n-mantissa-bits)))))
-                                  (when (cl:= %mantissa (cl:expt 2 ,n-mantissa-bits))
-                                    (incf exponent)
-                                    (setf %mantissa 0))
-                                  (when (cl:>= exponent ,max-exponent)
-                                    (setf exponent ,max-exponent %mantissa 0))
-                                  (when (cl:<= exponent 0)
-                                    (setf %mantissa (cl:round (cl:* mantissa (cl:expt 2 (cl:+ -1 ,n-mantissa-bits exponent))))
-                                          exponent 0))
-                                  (return (,bits-fun sign exponent %mantissa)))))))))
-  (def %single-bits-from-rational %single-bits-from 8 23)
-  (def %double-bits-from-rational %double-bits-from 11 52))
-
-(defun flonum-from-rational (rational format)
-  (ecase format
-    (single-float (make-single-float (%single-bits-from-rational rational)))
-    (double-float (%make-double-float (%double-bits-from-rational rational)))))
 
 (deftype real () '(or cl:rational float))
 (declaim (inline realp))
@@ -218,6 +173,33 @@
   (if (and (rationalp base) (integerp power))
       (cl:expt base power)
       (xfloat-expt base power)))
+
+(macrolet ((define (name)
+             `(defun ,name (numerator denominator)
+                (declare (integer numerator denominator))
+                (cl:/ numerator denominator))))
+  (define %make-ratio))
+
+(declaim (inline bignum-ashift-left-fixnum))
+(defun bignum-ashift-left-fixnum (fixnum count)
+  (ash fixnum count))
+
+(macrolet ((define (name type)
+             `(progn
+                (declaim (inline ,name))
+                (defun ,name (bignum)
+                  (coerce bignum ',type)))))
+  (define bignum-to-single-float single-float)
+  (define bignum-to-double-float double-float))
+
+(macrolet ((define (name)
+             `(defun ,name (x exp)
+                (declare (ignore x exp))
+                (error "Unimplemented."))))
+  (define sb-kernel::scale-single-float-maybe-underflow)
+  (define sb-kernel::scale-single-float-maybe-overflow)
+  (define sb-kernel::scale-double-float-maybe-underflow)
+  (define sb-kernel::scale-double-float-maybe-overflow))
 
 (macrolet ((define (name float-fun)
              `(progn

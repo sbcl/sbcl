@@ -87,7 +87,6 @@
  ("src/code/cross-byte"  :c-headers :not-target)
  ("src/code/cross-misc"  :c-headers :not-target)
  ("src/code/cross-char"  :c-headers :not-target)
- ("src/code/cross-float-reader" :c-headers :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-condition" :not-target)
 
@@ -164,7 +163,8 @@
  ("src/code/debug-var-io")
 
  ("src/code/number-dispatch" :c-headers)
- ("src/code/early-float" :c-headers)
+ ("src/code/float" :c-headers)
+ ("src/code/cross-float-reader" :c-headers :not-target)
  ("src/code/cross-float" :c-headers :not-target)
 
  ;; 32-bit implementation of GET-INTERNAL-REAL-TIME needs some thread slots
@@ -324,7 +324,7 @@
  ("src/code/bignum"          :not-host #-(or bignum-assertions sb-devel) :block-compile)
  ("src/code/numbers"         :not-host)
  ("src/code/float-trap"      :not-host)
- ("src/code/float"           :not-host)
+ ("src/code/target-float"    :not-host)
  ("src/code/irrat"           :not-host)
 
  ("src/code/alloc"           :not-host) ; for ALLOCATE-SYSTEM-MEMORY in make-buffer
