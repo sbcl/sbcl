@@ -2781,6 +2781,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "JOIN-THREAD"
            "JOIN-THREAD-ERROR"
            "JOIN-THREAD-ERROR-THREAD"
+           "JOIN-THREAD-PROBLEM"
            "LIST-ALL-THREADS"
            "MAKE-THREAD"
            "SYMBOL-VALUE-IN-THREAD"

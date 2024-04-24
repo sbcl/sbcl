@@ -188,6 +188,10 @@ offending thread using THREAD-ERROR-THREAD."))
 to be joined. The offending thread can be accessed using
 THREAD-ERROR-THREAD."))
 
+(setf (documentation 'join-thread-problem 'function)
+  "Return the reason that a JOIN-THREAD-ERROR was signaled. Possible values are
+:TIMEOUT, :ABORT, :FOREIGN, and :SELF-JOIN.")
+
 (define-deprecated-function :late "1.0.29.17" join-thread-error-thread thread-error-thread
     (condition)
   (thread-error-thread condition))
