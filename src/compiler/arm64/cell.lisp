@@ -77,7 +77,25 @@
   (eval-when (:compile-toplevel)
     ;; Assert that "CMN reg, 1" is the same as "CMP reg, NO-TLS-VALUE-MARKER"
     (aver (= (ldb (byte 64 0) -1) no-tls-value-marker)))
-  (defmacro compare-to-no-tls-value-marker (x) `(inst cmn ,x 1))
+  (defun no-tls-marker (x symbol set target)
+    ;; Pointers wouldn't have the sign bit set (unless they are
+    ;; tagged, which they shouldn't be)
+    (let* ((symbol (cond ((symbolp symbol)
+                          symbol)
+                         ((sc-is symbol constant)
+                          (tn-value symbol))
+                         ))
+           (pointer (and symbol
+                         (not (types-equal-or-intersect
+                               (info :variable :type symbol)
+                               (specifier-type '(or integer single-float)))))))
+      (cond (pointer
+             (if set
+                 (inst tbnz* x 63 target)
+                 (inst tbz* x 63 target)))
+            (t
+             (inst cmn x 1)
+             (inst b (if set :eq :ne) target)))))
   (define-vop (set)
     (:args (object :scs (descriptor-reg)
                    :load-if (not (and (sc-is object constant)
@@ -94,8 +112,7 @@
          (assemble ()
            (inst ldr (32-bit-reg tls-index) (tls-index-of object))
            (inst ldr tmp-tn (@ thread-tn tls-index))
-           (compare-to-no-tls-value-marker tmp-tn)
-           (inst b :ne LOCAL)
+           (no-tls-marker tmp-tn object nil LOCAL)
            (emit-gengc-barrier object nil tls-index (vop-nth-arg 1 vop) value)
            (storew value object symbol-value-slot other-pointer-lowtag)
            (inst b DONE)
@@ -134,8 +151,7 @@
               (inst ldr value (@ thread-tn tls-index))))
 
            (assemble ()
-             (compare-to-no-tls-value-marker value)
-             (inst b :ne LOCAL)
+             (no-tls-marker value symbol nil LOCAL)
              (when known-symbol
                (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
              (loadw value symbol symbol-value-slot other-pointer-lowtag)
@@ -179,14 +195,13 @@
   (:translate boundp)
   #+sb-thread
   (:generator 9
-      (inst ldr (32-bit-reg value) (tls-index-of object))
-      (inst ldr value (@ thread-tn value))
-      (compare-to-no-tls-value-marker value)
-      (inst b :ne LOCAL)
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      LOCAL
-      (inst cmp value unbound-marker-widetag)
-      (inst b (if not-p :eq :ne) target))
+    (inst ldr (32-bit-reg value) (tls-index-of object))
+    (inst ldr value (@ thread-tn value))
+    (no-tls-marker value object nil LOCAL)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    LOCAL
+    (inst cmp value unbound-marker-widetag)
+    (inst b (if not-p :eq :ne) target))
   #-sb-thread
   (:generator 9
       (loadw value object symbol-value-slot other-pointer-lowtag)
@@ -277,8 +292,7 @@
       (inst str new (@ thread-tn tls-index))
       DONT-STORE-TLS
 
-      (compare-to-no-tls-value-marker result)
-      (inst b :ne CHECK-UNBOUND))
+      (no-tls-marker result symbol nil CHECK-UNBOUND))
     (inst add-sub lip symbol (- (* symbol-value-slot n-word-bytes)
                                 other-pointer-lowtag))
     LOOP
@@ -320,8 +334,7 @@
       (inst str new (@ thread-tn tls-index))
       DONT-STORE-TLS
 
-      (compare-to-no-tls-value-marker result)
-      (inst b :ne CHECK-UNBOUND))
+      (no-tls-marker result symbol nil CHECK-UNBOUND))
     (inst add-sub lip symbol (- (* symbol-value-slot n-word-bytes)
                                 other-pointer-lowtag))
     (move result old)
