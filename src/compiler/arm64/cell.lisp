@@ -432,36 +432,55 @@
                                    (ir2-component-constants component)))
            word-shift)))
 
+  (defun bind (bsp symbol tls-index tls-value)
+    (load-binding-stack-pointer bsp)
+    (inst add bsp bsp (* binding-size n-word-bytes))
+    (store-binding-stack-pointer bsp)
+    (let* ((pkg (sb-xc:symbol-package symbol))
+           ;; These symbols should have a small enough index to be
+           ;; immediately encoded.
+           (known-symbol-p (or (and pkg (system-package-p pkg))
+                               (eq pkg *cl-package*)))
+           (tls-index-reg tls-index)
+           (tls-index (if known-symbol-p
+                          (make-fixup symbol :symbol-tls-index)
+                          tls-index)))
+      (cond (known-symbol-p
+             (inst movz tls-index-reg tls-index))
+            (t
+             ;; TODO: a fixup could replace this with an immediate
+             (inst load-constant tls-index (load-time-tls-index symbol))))
+      (inst ldr tls-value (@ thread-tn tls-index))
+      (inst stp tls-value tls-index-reg
+            (@ bsp (* (- binding-value-slot binding-size)
+                      n-word-bytes)))
+      tls-index-reg))
+
   (define-vop (bind)
     (:args (value :scs (any-reg descriptor-reg zero) :to :save))
     (:temporary (:sc non-descriptor-reg) tls-index)
-    (:temporary (:sc descriptor-reg) temp)
+    (:temporary (:sc descriptor-reg) tls-value)
     (:info symbol)
     (:temporary (:scs (any-reg)) bsp)
     (:generator 5
-      (load-binding-stack-pointer bsp)
-      (inst add bsp bsp (* binding-size n-word-bytes))
-      (store-binding-stack-pointer bsp)
-      (let* ((pkg (sb-xc:symbol-package symbol))
-             ;; These symbols should have a small enough index to be
-             ;; immediately encoded.
-             (known-symbol-p (or (and pkg (system-package-p pkg))
-                                 (eq pkg *cl-package*)))
-             (tls-index-reg tls-index)
-             (tls-index (if known-symbol-p
-                            (make-fixup symbol :symbol-tls-index)
-                            tls-index)))
-        (assemble ()
-          (cond (known-symbol-p
-                 (inst movz tls-index-reg tls-index))
-                (t
-                 ;; TODO: a fixup could replace this with an immediate
-                 (inst load-constant tls-index (load-time-tls-index symbol))))
-          (inst ldr temp (@ thread-tn tls-index))
-          (inst stp temp tls-index-reg
-                (@ bsp (* (- binding-value-slot binding-size)
-                          n-word-bytes)))
-          (inst str value (@ thread-tn tls-index))))))
+      (inst str value (@ thread-tn (bind bsp symbol tls-index tls-value)))))
+
+  (define-vop (rebind)
+    (:temporary (:sc non-descriptor-reg) tls-index)
+    (:temporary (:sc descriptor-reg) value tls-value)
+    (:info symbol)
+    (:vop-var vop)
+    (:node-var node)
+    (:temporary (:scs (any-reg)) bsp)
+    (:generator 5
+      (let ((tls-index (bind bsp symbol tls-index tls-value)))
+        (unless (symbol-always-has-tls-value-p symbol node)
+          (assemble ()
+            (no-tls-marker tls-value symbol nil DONE)
+            (load-constant vop (emit-constant symbol) value)
+            (loadw value value symbol-value-slot other-pointer-lowtag)
+            (inst str value (@ thread-tn tls-index))
+            DONE)))))
 
   (define-vop (unbind-n)
     (:info symbols)

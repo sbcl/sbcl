@@ -1123,6 +1123,28 @@
     (defoptimizer (vop-optimize unsigned-byte-64-p select-representations) (vop)
       (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))))
 
+(when-vop-existsp (:named sb-vm::rebind)
+  (defoptimizer (vop-optimize fast-symbol-value)
+      (vop)
+    (let ((bind (next-vop-is vop '(bind))))
+      (when bind
+        (vop-bind (symbol) (symbol-value) vop
+          (vop-bind (bind-value) () bind
+            (let ((bind-symbol (car (vop-codegen-info bind))))
+              (when (and (eq symbol-value bind-value)
+                         (constant-tn-p symbol)
+                         (eq bind-symbol (tn-value symbol)))
+                (emit-and-insert-vop (vop-node bind)
+                                     (vop-block bind)
+                                     (template-or-lose 'sb-vm::rebind)
+                                     nil
+                                     nil
+                                     bind
+                                     (list bind-symbol))
+                (delete-vop vop)
+                (delete-vop bind)))))
+        nil))))
+
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))
         (reads (tn-reads tn)))
