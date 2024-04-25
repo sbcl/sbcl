@@ -373,9 +373,7 @@
     (when elsewhere-locations
       (dolist (loc (nreverse elsewhere-locations))
         (dump-location-from-info loc tlf-num var-locs)))
-    ;; lz-compress accept any array of octets and returns a simple-array
-    (values (logically-readonlyize (lz-compress byte-buffer))
-            tlf-num)))
+    (values (coerce byte-buffer '(simple-array (unsigned-byte 8) (*))) tlf-num)))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -820,8 +818,6 @@
       (when (compiled-debug-fun-vars dfun)
         (setq flags (logior flags packed-debug-fun-variables-bit)))
       (when (compiled-debug-fun-blocks dfun)
-        (when (typep (compiled-debug-fun-blocks dfun) '(simple-array (signed-byte 8) (*)))
-          (setq flags (logior flags packed-debug-fun-blocks-compressed-bit)))
         (setq flags (logior flags packed-debug-fun-blocks-bit)))
       (when (compiled-debug-fun-tlf-number dfun)
         (setq flags (logior flags packed-debug-fun-tlf-number-bit)))
@@ -951,7 +947,7 @@
             (elsewhere (compiled-debug-fun-elsewhere-pc (cdr dfun))))
         (dump-1-packed-dfun (cdr dfun) prev-start start prev-elsewhere)
         (setq prev-start start prev-elsewhere elsewhere))))
-  (coerce-to-smallest-eltype *byte-buffer*))
+  (logically-readonlyize (compress *byte-buffer*)))
 
 
 ;;;; full component dumping
@@ -1029,3 +1025,56 @@
       (unless (= shift initial)
         (vector-push-extend byte byte-buffer))))
   (values))
+
+(declaim (ftype (sfunction ((and byte-buffer (not simple-array)))
+                           (or (simple-array (unsigned-byte 8) 1)
+                               (simple-array (signed-byte 8) 1)))
+                compress)
+         (ftype (sfunction ((or (simple-array (unsigned-byte 8) 1)
+                                (simple-array (signed-byte 8) 1)))
+                           (simple-array (unsigned-byte 8) 1))
+                decompress))
+
+#-(and sb-core-compression (not sb-xc-host))
+(progn
+  (defun compress (vector)
+    #-sb-xc-host (%shrink-vector (%array-data vector) (length vector))
+    #+sb-xc-host (coerce vector '(simple-array (unsigned-byte 8) 1)))
+
+  (defun decompress (vector)
+    vector))
+
+#+(and sb-core-compression (not sb-xc-host))
+(progn
+  (defun compress (vector)
+    (with-alien ((compress-vector (function (* char) (* char) (* size-t)) :extern "compress_vector")
+                 (size size-t))
+      (let* ((data (truly-the (simple-array * (*)) (%array-data vector)))
+             (pointer
+               (with-pinned-objects (data)
+                 (%shrink-vector data (length vector))
+                 (alien-funcall compress-vector (int-sap (get-lisp-obj-address data)) (addr size))))
+             (length size))
+        (if (and (plusp length)
+                 (< length (length data)))
+            (let ((new (make-array length :element-type '(signed-byte 8))))
+              (loop for i below length
+                    do (setf (aref new i) (deref pointer i)))
+              (free-alien pointer)
+              new)
+            data))))
+
+  (defun decompress (vector)
+    (if (typep vector '(simple-array (signed-byte 8) (*)))
+        (with-alien ((decompress-vector (function (* unsigned-char) (* char) (* size-t)) :extern "decompress_vector")
+                     (size size-t))
+          (let* ((pointer
+                   (with-pinned-objects (vector)
+                     (alien-funcall decompress-vector (int-sap (get-lisp-obj-address vector)) (addr size))))
+                 (length size)
+                 (new (make-array length :element-type '(unsigned-byte 8))))
+            (loop for i below length
+                  do (setf (aref new i) (deref pointer i)))
+            (free-alien pointer)
+            new))
+        vector)))

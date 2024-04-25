@@ -392,7 +392,7 @@ void *successful_malloc(size_t size)
 {
     void* result = malloc(size);
     if (0 == result) {
-        lose("malloc failure");
+        lose("malloc(%zu) failure", size);
     } else {
         return result;
     }

@@ -62,8 +62,12 @@ debug_function_name_from_pc (struct code* code, void *pc)
     v = VECTOR(di->fun_map);
 
     len = vector_len(v);
-
     unsigned char *map = (unsigned char*)v->data;
+#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+    int compressed = widetag_of(&v->header) == SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG;
+    if (compressed)
+        map = decompress_vector(di->fun_map, (size_t*)&len);
+#endif
 
     uword_t code_start_pc = 0;
     __attribute__((unused)) uword_t start_pc = 0;
@@ -155,20 +159,26 @@ debug_function_name_from_pc (struct code* code, void *pc)
         if (first_elsewhere_pc) {
             if ((offset >= first_elsewhere_pc &&
                  offset < elsewhere_pc))
-                return last_name;
+                goto done;
         } else
             first_elsewhere_pc = elsewhere_pc;
 
         if (offset < code_start_pc)
-            return last_name;
+            goto done;
 
         last_name = name;
     }
 
     if (i == len)
-        return last_name;
+        goto done;
     else
         lose("failed to parse debug function name");
+  done:
+    return last_name;
+#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+    if (compressed)
+        free(map);
+#endif
 }
 
 static void

@@ -1799,7 +1799,7 @@ register."
              (let ((blocks (sb-c::compiled-debug-fun-blocks compiler-debug-fun)))
                (if (null blocks)
                    (return-from parse-compiled-debug-blocks nil)
-                   (sb-c::lz-decompress blocks))))
+                   blocks)))
            ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
            ;; element size of the packed binary representation of the
            ;; blocks data.
@@ -1995,12 +1995,7 @@ register."
              (blocks
                (prog1 (subseq map i (+ i len))
                  (incf i len))))
-        (if (logtest flags sb-c::packed-debug-fun-blocks-compressed-bit)
-            (map-into (make-array len :element-type '(signed-byte 8))
-                      (lambda (x)
-                        (sb-c::mask-signed-field 8 (the (unsigned-byte 8) x)))
-                      blocks)
-            blocks)))
+        blocks))
     :tlf-number
     (when (logtest sb-c::packed-debug-fun-tlf-number-bit flags)
       (sb-c::read-var-integerf map i))
@@ -2079,13 +2074,12 @@ register."
 ;;; then building a vector out of them.
 (defun uncompact-fun-map (info)
   (declare (type sb-c::compiled-debug-info info))
-  (let* ((map (sb-c::compiled-debug-info-fun-map info))
+  (let* ((map (sb-c::decompress (sb-c::compiled-debug-info-fun-map info)))
          (i 0)
          (len (length map))
          (code-start-pc 0)
          (elsewhere-pc 0)
          (name (sb-c::compiled-debug-info-name info)))
-    (declare (type (simple-array (unsigned-byte 8) (*)) map))
     (collect ((res))
       (loop
         (when (= i len) (return))
