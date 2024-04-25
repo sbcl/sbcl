@@ -285,12 +285,12 @@
         ;; so explicitly return the NEW-VALUE
         `(typecase string
            ((simple-array character (*))
-            (let ((c (the* (character :context 'aref-context) new-value)))
+            (let ((c (the* (character :context aref-context) new-value)))
               (data-vector-set string index c)
               c))
            #+sb-unicode
            ((simple-array base-char (*))
-            (let ((c (the* (base-char :context 'aref-context :silent-conflict t) new-value)))
+            (let ((c (the* (base-char :context aref-context :silent-conflict t) new-value)))
               (data-vector-set string index c)
               c))))))
 
