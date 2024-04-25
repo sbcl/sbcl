@@ -16,7 +16,6 @@
   allocate-instance
   compute-applicable-methods
   slot-makunbound
-  make-load-form-saving-slots
   sb-vm:symbol-from-tls-index
   sb-ext:primitive-object-size)
  ;; CLOS implementation
@@ -184,8 +183,6 @@
   sb-impl::user-homedir-namestring
   sb-lockless:make-so-map/addr
   sb-c::apply-core-fixups
-  sb-c::compiled-debug-info-char-offset
-  sb-c::compiled-debug-info-tlf-number
   sb-c::pack-xref-data
   sb-c::prepare-for-compile
   sb-sys:reinit-internal-real-time))
