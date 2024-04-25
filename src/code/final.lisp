@@ -454,8 +454,10 @@ Examples:
 (declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
 #+sb-thread
 (progn
-(defun finalizer-thread-notify ()
-  (alien-funcall (extern-alien "finalizer_thread_wake" (function void)))
+(defun finalizer-thread-notify (run-hooks)
+  (declare (bit run-hooks))
+  (alien-funcall (extern-alien "finalizer_thread_wake" (function void int))
+                 run-hooks)
   nil)
 
 ;;; The following operations are synchronized by *MAKE-THREAD-LOCK* -

@@ -231,6 +231,7 @@
     sb-impl::**finalizer-store**
     sb-impl::*finalizer-rehashlist*
     sb-impl::*finalizers-triggered*
+    sb-impl::*run-gc-hooks*
 
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread

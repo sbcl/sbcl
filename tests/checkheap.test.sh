@@ -30,7 +30,7 @@ then
 (let ((i (floor (- (sb-kernel:get-lisp-obj-address '*posix-argv*)
                    sb-vm:fixedobj-space-start)
                 4096)))
-  ;; Mark it as-is write-protected (though without using mprotect)
+  ;; Mark it as-if write-protected (though without using mprotect)
   ;; This constant is defined in immobile-space.c: #define WRITE_PROTECT 0x80
   (setf (slot (deref fixedobj-pages i) 'flags) 128)
   (gc)) ; should fail pre-GC assertions

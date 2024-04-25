@@ -78,6 +78,8 @@ and submit it as a patch."
 
 ;;;; GC hooks
 
+;;; N.B.: hooks need to be sufficiently uncomplicated as to be harmless,
+;;; and should not expect any particular thread context.
 (define-load-time-global *after-gc-hooks* nil
   "Called after each garbage collection, except for garbage collections
 triggered during thread exits. In a multithreaded environment these hooks may
@@ -222,11 +224,7 @@ run in any thread.")
 
 #+sb-thread
 (defun post-gc ()
-  ;; The finalizer thread will continually check whether it should run post-GC hooks.
-  ;; Hooks need to be sufficiently uncomplicated as to be harmless,
-  ;; and should not expect any particular thread context.
-  (atomic-incf sb-impl::*run-gc-hooks*)
-  (sb-impl::finalizer-thread-notify)
+  (sb-impl::finalizer-thread-notify 1) ; Tell it to perform post-GC hooks
   (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
   nil)
 

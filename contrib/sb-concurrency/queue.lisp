@@ -198,5 +198,5 @@ must walk the entire queue."
               (wait-on-gate gate)
               (apply fin args)))
       (enqueue (vector fin lexpr gate) *compilation-queue*)
-      (sb-impl::finalizer-thread-notify)
+      (sb-impl::finalizer-thread-notify 0)
       fin)))

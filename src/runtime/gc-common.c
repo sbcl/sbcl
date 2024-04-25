@@ -1426,12 +1426,26 @@ pthread_cond_t finalizer_condvar = PTHREAD_COND_INITIALIZER;
 #endif
 void finalizer_thread_wait () {
     ignore_value(mutex_acquire(&finalizer_mutex));
-    if (finalizer_thread_runflag)
+    /* Sleep only if we should be running but there is no post-GC hook to run.
+     * Finalizers per se do not have an assurance of quick execution. Namely,
+     * there is a race between deciding to wait and testing whether a finalizer
+     * should run. That's OK, though in fact it would be fairly simple to
+     * examine FINALIZERS_TRIGGERED as part of the condition here */
+    if (finalizer_thread_runflag && SYMBOL(RUN_GC_HOOKS)->value == 0)
         CONDITION_VAR_WAIT(&finalizer_condvar, &finalizer_mutex);
     ignore_value(mutex_release(&finalizer_mutex));
 }
-void finalizer_thread_wake () {
-    CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
+void finalizer_thread_wake (int run_hooks) {
+    if (run_hooks) {
+        ignore_value(mutex_acquire(&finalizer_mutex));
+        // This has to be atomic because the finalizer thread doesn't acquire
+        // the mutex when decrementing
+        __sync_add_and_fetch(&SYMBOL(RUN_GC_HOOKS)->value, make_fixnum(1));
+        CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
+        ignore_value(mutex_release(&finalizer_mutex));
+    } else { // just poke the finalizer thread and hope it runs something
+        CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
+    }
 }
 void finalizer_thread_stop () {
     ignore_value(mutex_acquire(&finalizer_mutex));
@@ -2121,6 +2135,11 @@ static bool can_invoke_post_gc(__attribute__((unused)) struct thread* th,
                                   sigset_t *context_sigmask)
 {
 #ifdef LISP_FEATURE_SB_THREAD
+    /* TODO: with #+sb-thread, running post-GC actions is as simple as bumping the
+     * value in the static symbol *RUN-GC-HOOKS* and waking the finalizer thread,
+     * which is done in a C function. Therefore all this complicated logic around whether
+     * Lisp can/should execute user code is for nothing- the finalizer is always alive,
+     * and either executing a thunk of user code, or idle */
     lispobj obj = th->lisp_thread;
     /* Ok, I seriously doubt that this can happen now. Don't we create
      * the 'struct thread' with a pointer to its SB-THREAD:THREAD right away?
