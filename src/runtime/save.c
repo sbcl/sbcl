@@ -138,6 +138,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
                bytes, total_written, compression);
 
         ZSTD_freeCStream(stream);
+        free(buf);
 #endif
     } else {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
