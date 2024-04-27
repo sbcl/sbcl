@@ -195,14 +195,64 @@
 (defmacro %clear-pseudo-atomic ()
   '(inst mov :qword (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
 
-#+sb-safepoint
+;;; This is sort of a macro instruction but also not. Macro instructions
+;;; don't know the instruction that was emitted by the vop because expansion
+;;; occurs early. But we need to test for yieldpoint instructions
+;;; in a post-processing step.
+;;; I can't remember why it's not in "insts"
+(sb-assem:define-instruction yieldpoint (segment kind)
+  (:emitter
+   (assemble (segment)
+    (let ((ea (thread-slot-ea thread-saved-csp-offset)))
+      (ecase kind
+        (:lisp
+         (inst vmovntdqa float15-tn ea)
+         ;(inst prefetch :nta ea)
+;         (inst pushf)
+;         (inst inc :dword (thread-slot-ea thread-lisp-yps-executed-slot))
+;         (inst popf)
+;         (inst test :byte ea thread-tn)
+         ;(inst test :dword (ea (+ (ash thread-stepping-slot word-shift) 4) thread-tn) thread-tn)
+         ;(inst byte #x74) (inst byte 1)
+         ;(inst icebp)
+         )
+        (:call-out
+         ;(inst inc :qword (thread-slot-ea thread-c-yps-executed-slot))
+         (inst mov ea rsp-tn))
+        (:call-out-done
+         (inst xor ea rsp-tn)))))))
+
+(defun note-yieldpoint (stmt) (setf (stmt-plist stmt) :yieldpoint))
+
+#+nil
+(defun sb-c::emit-patchable-yieldpoint-nop (name) ; 4-byte NOP
+  (cond ((eql (string/= "TWO-WORD-BIGNUM" name) 15)
+         ;; these routines need the carry flag so we don't want
+         ;; to mess it up by doing a TEST instruction.
+         ;; I guess we could emit the 6-byte MOV yieldpoint.
+         ;; For the time being, I'm doing the yieldpoint at the end,
+         ;; inside the routine, and not overwriting with a NOP.
+         )
+        ((member name '(sb-vm::enable-alloc-counter ; not sure about this or the next
+                        sb-vm::enable-sized-alloc-counter
+                        sb-vm::undefined-tramp ; don't need one here
+                        sb-vm::undefined-alien-tramp ; or here
+                        sb-vm::handle-deferred-signal ; don't want
+                        sb-vm::tail-call-variable ; don't need - calls a function
+                        sb-vm::tail-call-callable-variable ; "
+                        sb-vm::call-symbol ; "
+                        sb-kernel:update-object-layout ; "
+                        sb-impl::install-hash-table-lock ; "
+                        sb-vm::fpr-save ; internal use only for other ASM routines
+                        sb-vm::fpr-restore)) ; "
+         nil)
+        (t ; otherwise emit a 4-byte NOP
+         (dolist (b '(#x0f #x1f #x40 #x00))
+           (inst byte b)))))
+
 (defun emit-safepoint ()
-  ;; FIXME: need to get the node and policy to decide not to emit this safepoint.
-  ;; Also, it would be good to emit only the last of consecutive safepoints in
-  ;; straight-line code, e.g. (LIST (LIST X Y) (LIST Z W)) should emit 1 safepoint
-  ;; not 3, even if we consider it 3 separate pointer bumps.
-  ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
-  (inst test :byte rax-tn (ea -8 gc-card-table-reg-tn)))
+  #+yieldpoints (inst yieldpoint :lisp)
+  #+sb-safepoint (inst test :byte rax-tn (ea -8 gc-card-table-reg-tn)))
 
 (macrolet ((pa-bits-ea ()
              #+sb-thread `(thread-slot-ea
@@ -216,10 +266,10 @@
              #+(and sb-thread (not gs-seg)) 'thread-tn
              #-(and sb-thread (not gs-seg)) 'rbp-tn))
   (defun emit-begin-pseudo-atomic ()
-    #-sb-safepoint (inst mov (pa-bits-ea) (nonzero-bits)))
+    #-(or sb-safepoint yieldpoints) (inst mov (pa-bits-ea) (nonzero-bits)))
   (defun emit-end-pseudo-atomic ()
     #+sb-safepoint (emit-safepoint)
-    #-sb-safepoint
+    #-(or sb-safepoint yieldpoints)
     (assemble ()
       (inst xor (pa-bits-ea) (nonzero-bits))
       (inst jmp :z OUT)
@@ -232,6 +282,11 @@
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
+(defmacro with-allocator (options &body body)
+  (declare (ignorable options))
+  #+(or sb-safepoint yieldpoints) `(assemble () ,@body)
+  #-(or sb-safepoint yieldpoints) `(pseudo-atomic ,options ,@body))
+
 (defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
                          &body forms)
   (declare (ignorable thread))

@@ -1635,7 +1635,7 @@
     (let ((lab (gen-label)))
       (setf (ir2-environment-environment-start env) lab)
       (vop note-environment-start node block lab)
-      #+sb-safepoint
+      #+(or sb-safepoint yieldpoints)
       (when (policy fun (/= insert-safepoints 0))
         (vop sb-vm::insert-safepoint node block))))
 
@@ -2362,7 +2362,7 @@
                        2block
                        *dynamic-counts-tn*
                        num))))
-              #+sb-safepoint
+              #+(or sb-safepoint yieldpoints)
               (let ((first-node (block-start-node block)))
                 (unless (or (and (bind-p first-node)
                                  ;; Bind-nodes already have safepoints

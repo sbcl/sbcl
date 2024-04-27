@@ -17,7 +17,7 @@ static void release_lock(lock_t *l) { gc_assert(!pthread_mutex_unlock(l)); }
 struct lock { _Atomic(int) grabbed; };
 typedef struct lock lock_t;
 
-static void acquire_lock(lock_t *l) {
+static void __attribute__((unused)) acquire_lock(lock_t *l) {
   int expected = 0, cycles = 0;
   /* atomic_compare_exchange_strong kindly clobbers expected for us,
    * when CAS fails. */
@@ -26,7 +26,11 @@ static void acquire_lock(lock_t *l) {
     if (cycles++ > 1000) sched_yield();
   }
 }
-static void release_lock(lock_t *l) {
+static int __attribute__((unused)) try_acquire_lock(lock_t *l) {
+  int expected = 0;
+  return atomic_compare_exchange_strong(&l->grabbed, &expected, 1);
+}
+static void __attribute__((unused)) release_lock(lock_t *l) {
   atomic_store(&l->grabbed, 0);
 }
 #define LOCK_INITIALIZER { 0 }

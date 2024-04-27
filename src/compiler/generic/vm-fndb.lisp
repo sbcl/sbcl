@@ -241,6 +241,7 @@
 #+(or arm64 riscv x86 x86-64)
 (defknown %raw-instance-cas/signed-word (instance index sb-vm:signed-word sb-vm:signed-word)
   sb-vm:signed-word ())
+(defknown %raw-instance-xchg/byte (instance index (unsigned-byte 8)) (unsigned-byte 8) ())
 (defknown %raw-instance-xchg/word (instance index sb-vm:word) sb-vm:word ())
 
 (macrolet ((define-raw-slot-defknowns ()

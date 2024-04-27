@@ -436,6 +436,11 @@
     ;; Always try to add an end-of-line comment about the EA.
     ;; Assembler routines were already handled above (not really sure why)
     ;; so now we have to figure out everything else.
+    #+yieldpoints
+    (when (and (eql (machine-ea-base value) sb-vm::thread-reg)
+               (eql (machine-ea-disp value) (ash sb-vm::thread-saved-csp-offset sb-vm:word-shift)))
+      (return-from print-mem-ref (note "yieldpoint" dstate)))
+
     #+sb-safepoint
     (when (and (eql (machine-ea-base value) sb-vm::card-table-reg)
                (eql (machine-ea-disp value) -8))

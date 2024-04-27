@@ -23,7 +23,7 @@
   #+sb-simd-pack-256
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
-            sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
+            sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn sb-vm::rsp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
             sb-vm::ymm-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
@@ -1200,7 +1200,7 @@
          (let ((ss (1- (integer-length scale)))
                (index (if (null index)
                           #b100
-                          (if (location= index sb-vm::rsp-tn)
+                          (if (location= index rsp-tn)
                               (error "can't index off of RSP")
                               (reg-encoding (if xmm-index
                                                 (get-fpr :xmm (tn-offset index))
@@ -2355,6 +2355,32 @@
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
+
+#+nil
+(defun sb-c::emit-patchable-yieldpoint-nop (name) ; 4-byte NOP
+  (cond ((eql (string/= "TWO-WORD-BIGNUM" name) 15)
+         ;; these routines need the carry flag so we don't want
+         ;; to mess it up by doing a TEST instruction.
+         ;; I guess we could emit the 6-byte MOV yieldpoint.
+         ;; For the time being, I'm doing the yieldpoint at the end,
+         ;; inside the routine, and not overwriting with a NOP.
+         )
+        ((member name '(sb-vm::enable-alloc-counter ; not sure about this or the next
+                        sb-vm::enable-sized-alloc-counter
+                        sb-vm::undefined-tramp ; don't need one here
+                        sb-vm::undefined-alien-tramp ; or here
+                        sb-vm::handle-deferred-signal ; don't want
+                        sb-vm::tail-call-variable ; don't need - calls a function
+                        sb-vm::tail-call-callable-variable ; "
+                        sb-vm::call-symbol ; "
+                        sb-kernel:update-object-layout ; "
+                        sb-impl::install-hash-table-lock ; "
+                        sb-vm::fpr-save ; internal use only for other ASM routines
+                        sb-vm::fpr-restore)) ; "
+         nil)
+        (t ; otherwise emit a 4-byte NOP
+         (dolist (b '(#x0f #x1f #x40 #x00))
+           (inst byte b)))))
 
 ;;; Compute the distance backward to the base address of the code component
 ;;; containing this simple-fun header, measured in words.
@@ -3587,6 +3613,138 @@
       (delete-stmt next)
       stmt)))
 
+(defconstant-eqx yieldpoint-asm-routines
+    '(sb-c:return-multiple
+      sb-c:tail-call-variable
+      sb-vm::tail-call-callable-variable
+      sb-vm::call-symbol
+      throw sb-c:unwind
+      sb-kernel:update-object-layout
+      sb-vm::return-values-list)
+  #'equal)
+
+#+nil
+(defun copy-asm-statements (start)
+  (let* ((new-head (copy-structure start))
+         (new-prev new-head)
+         (stmt start))
+    (loop
+      (let ((next (stmt-next stmt)))
+        (when (null next) (return new-head))
+        (let ((copy-of-next (copy-structure next)))
+          (setf (stmt-next new-prev) copy-of-next
+                (stmt-prev copy-of-next) new-prev)
+          (setq new-prev copy-of-next
+                stmt next))))))
+
+(defvar *original-total-n-yieldpoints* 0)
+(defvar *total-n-yieldpoints-deleted* 0)
+(defun delete-redundant-yieldpoints (start label->stmt-map elsewhere-labels &aux (n-deleted 0) original)
+  (declare (ignorable original))
+  #+nil (setq original (copy-asm-statements start))
+  ;; Given straight-line code: POINT1 .. anything .. POINT2
+  ;; then POINT1 is redundant because POINT2 is eventually hit.
+  (labels ((yieldpoint-inst-p (x) (eq (stmt-mnemonic x) 'yieldpoint))
+           (straight-line-to-yieldpoint-p (from follow-branches)
+             ;; Return true if there is no control flow to the next yieldpoint starting at FROM,
+             ;; i.e. if it is certain that a yieldpoint is hit; NIL otherwise.
+             (do ((s from (stmt-next s)))
+                 ((null s) nil)
+               ;;(format t "~&Consider s-l-to-yp ~s ~S~%" s)
+               (when (or (yieldpoint-inst-p s)
+                         ;; CALL and unconditional JMP can be annotated as yieldpoints
+                         ;; and this shortcut is easier than deducing based on the operands
+                         (eq (stmt-plist s) :yieldpoint)
+                           ;; BREAK invokes a signal handler, and signal handlers yield
+                         (eq (stmt-mnemonic s) 'break))
+                 (return t))
+               (when (eq (stmt-mnemonic s) 'ret)
+                 (return nil))
+               (when (member (stmt-mnemonic s) '(jmp call))
+                 (case (categorize-branch (car (last (stmt-operands s)))
+                                          (keywordp (car (stmt-operands s))) ; conditional
+                                          s
+                                          follow-branches)
+                   (:yieldpoint (return t)) ; consider the jmp/call a yieldpoint
+                   (:ignore ; just continue looking for a yieldpoint
+                    ;(format t "~A ~S = :IGNORE~%" (stmt-mnemonic s) (stmt-operands s))
+                    )
+                   (t
+                    ;(format t "~A ~S can't ignore~%" (stmt-mnemonic s) (stmt-operands s))
+                    (return nil)))))) ; no good
+           (categorize-branch (target conditional stmt follow-branches)
+             ;; JMP and CALL are tricky:
+             ;; - CALL to any Lisp function is a yieldpoint per se, as every
+             ;;   function can be assumed to yield in its prologue.
+             ;; - foreign call is preceded by a yieldpoint.
+             ;; JMP depends on a few things:
+             ;; - JMP to a lisp function is a tail-call. The called function will
+             ;;   commence with a yieldpoint. This goes for named or un-named call.
+             ;; - JMP to a BREAK is not a yieldpoint per se, unless it's unconditional.
+             ;    If conditional it does not disrupt straight-line code.
+             ;; CALL to assembly routine is generally considered straight-line code
+             ;; though a few routines can be treated as yieldpoints.
+             (when (label-p target)
+               (when (and conditional (xset-member-p target elsewhere-labels))
+                 ;; Branching to the elsewhere segment is like straight-line code
+                 ;; because the exceptional path contains a yieldpoint.
+                 (return-from categorize-branch :ignore))
+               (return-from categorize-branch
+                 (let ((target (gethash target label->stmt-map)))
+                   (cond ((and follow-branches conditional
+                               ;; If, no matter which way you branch, it is straight-line to a yieldpoint,
+                               ;; then this branch is as good as a yieldpoint.
+                               (straight-line-to-yieldpoint-p (stmt-next stmt) nil)
+                               (straight-line-to-yieldpoint-p target nil))
+                          :yieldpoint)
+                         ((and follow-branches (not conditional)) ; maybe this does nothing now?
+                          (straight-line-to-yieldpoint-p target nil))
+                         (t ; also this, is it helpful? Branching to ELSEWHERE was already handled,
+                          ;; but sometimes we have error breaks in non-elsewhere
+                          (do ((stmt target (stmt-next stmt))) ; quick check
+                              (nil)
+                            (aver stmt)
+                            (when (eq (stmt-mnemonic stmt) 'break)
+                              (return (if conditional :ignore :yieldpoint)))
+                            (unless (eq (stmt-mnemonic stmt) 'mov)
+                              (return nil))))))))
+             (let ((fixup (cond ((and (fixup-p target)
+                                      (eq (fixup-flavor target) :assembly-routine))
+                                 target)
+                                ((and (ea-p target)
+                                      (fixup-p (ea-disp target))
+                                      (eq (fixup-flavor (ea-disp target)) :assembly-routine*))
+                                 (ea-disp target)))))
+               (when fixup
+                 (return-from categorize-branch
+                   (if (member (fixup-name fixup) yieldpoint-asm-routines) :yieldpoint :ignore))))
+             (when (and (ea-p target)
+                        (ea-base target)
+                        (eql (ea-disp target) (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                        (location= (ea-base target) sb-vm::rax-tn))
+               (return-from categorize-branch :yieldpoint))))
+    (let ((stmt start))
+      (loop
+        (when (null stmt) (return))
+        (let ((next (stmt-next stmt)))
+          ;; A call-out yieldpoint can't be deleted, but a call-out can count as
+          ;; the subsequent yieldpoint for a preceding Lisp yieldpoint.
+          (when (and (yieldpoint-inst-p stmt) (eq (car (stmt-operands stmt)) :lisp))
+            (incf *original-total-n-yieldpoints*)
+            (when (straight-line-to-yieldpoint-p next t)
+              (incf n-deleted)
+              (awhen (stmt-labels stmt) (add-stmt-labels next it))
+              (delete-stmt stmt)))
+          (setq stmt next)))))
+  #+nil
+  (when (plusp n-deleted)
+    (with-open-file (f "/tmp/asmdump.txt" :direction :output :if-exists :append :if-does-not-exist :create)
+      (format f "~&Deleted ~D yieldpoints. Original code:~%" n-deleted)
+      (sb-assem::dump-symbolic-asm original f)
+      (terpri f)
+      (sb-assem::dump-symbolic-asm start f)))
+  (incf *total-n-yieldpoints-deleted* n-deleted))
+
 ;;; Return :TAKEN if taking the conditional branch COND1 implies that COND2's
 ;;; branch will be taken, or :NOT-TAKEN if COND2 will fallthrough,
 ;;; or NIL it can't be determined.
@@ -3609,10 +3767,7 @@
           ((conditions :a :ne) :taken) ; above to not-equal
           (t nil))))
 
-;;; Possible enhancement: it should be possible to eliminate more jumps-to-jumps
-;;; by knowing something about implication of one condition upon another, e.g.
-;;; either JC or JZ jumping to JBE would take the second jump, since JBE is (CF=1 or ZF=1).
-(defun sb-assem::perform-jump-to-jump-elimination (starting-stmt label->stmt-map)
+(defun sb-assem::perform-jump-to-jump-elimination (starting-stmt label->stmt-map elsewhere-labels)
   (flet ((jmp-cond (stmt)
            (if (cdr (stmt-operands stmt))
                (encoded-condition (car (stmt-operands stmt)))
@@ -3639,4 +3794,5 @@
                          (let ((label (gen-label))) ; maake a new label
                            (setf (gethash label label->stmt-map) fallthrough)
                            (add-stmt-labels fallthrough label)))))
-               (setf (car (last (stmt-operands stmt))) label)))))))))
+               (setf (car (last (stmt-operands stmt))) label))))))))
+  (delete-redundant-yieldpoints starting-stmt label->stmt-map elsewhere-labels))

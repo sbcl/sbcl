@@ -123,7 +123,6 @@ int internal_errors_enabled = 0; // read in cold-init
 // SIGRTMAX is not usable in an array size declaration because it might be
 // a variable expression, so use NSIG which is at least as large as SIGRTMAX.
 #ifndef LISP_FEATURE_WIN32
-static
 void (*interrupt_low_level_handlers[NSIG]) (int, siginfo_t*, os_context_t*);
 struct sigaction old_ll_sigactions[NSIG];
 #endif
@@ -420,7 +419,11 @@ sigaddset_blockable(sigset_t *sigset)
 {
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     sigaddset_async(sigset);
-#else
+#endif
+#ifdef LISP_FEATURE_YIELDPOINTS
+    sigaddset_deferrable(sigset);
+#endif
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     sigaddset_deferrable(sigset);
     sigaddset_gc(sigset);
 #endif
@@ -578,7 +581,7 @@ static void assert_blockables_blocked()
 #endif
 }
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
 void
 check_gc_signals_unblocked_or_lose(sigset_t *sigset)
 {
@@ -614,7 +617,7 @@ unblock_deferrable_signals(sigset_t *where)
 {
     if (interrupt_handler_pending_p())
         lose("unblock_deferrable_signals: losing proposition");
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     // If 'where' is null, check_gc_signals_unblocked_or_lose() will
     // fetch the current signal mask (from the OS) and check that.
     check_gc_signals_unblocked_or_lose(where);
@@ -636,7 +639,7 @@ unblock_deferrable_signals(sigset_t *where)
         thread_sigmask(SIG_UNBLOCK, sigset, 0);
 }
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
 // This function previously had an #ifdef guard precluding doing anything for
 // win32, which was redundant because SB_SAFEPOINT is always defined for win32.
 void unblock_gc_stop_signal(void) {
@@ -648,7 +651,7 @@ void
 unblock_signals_in_context_and_maybe_warn(os_context_t *context)
 {
     sigset_t *sigset = os_context_sigmask_addr(context);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     if (sigismember(sigset, SIG_STOP_FOR_GC)) {
         corruption_warning_and_maybe_lose(
 "Enabling blocked gc signals to allow returning to Lisp without risking\n\
@@ -672,7 +675,7 @@ they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
  * The purpose is to avoid losing the pending gc signal if a
  * deferrable interrupt async unwinds between clearing the pseudo
  * atomic and trapping to GC.*/
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
 void maybe_save_gc_mask_and_block_deferrables(os_context_t *context)
 {
     struct thread *thread = get_sb_vm_thread();
@@ -718,6 +721,7 @@ void maybe_save_gc_mask_and_block_deferrables(os_context_t *context)
 /* Are we leaving WITH-GCING and already running with interrupts
  * enabled, without the protection of *GC-INHIBIT* T and there is gc
  * (or stop for gc) pending, but we haven't trapped yet? */
+#ifndef LISP_FEATURE_YIELDPOINTS
 int
 in_leaving_without_gcing_race_p(struct thread __attribute__((unused)) *thread)
 {
@@ -749,7 +753,7 @@ check_interrupt_context_or_lose(os_context_t *context)
     int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
     int in_race_p = in_leaving_without_gcing_race_p(thread);
     int safepoint_active = 0;
-#if defined(LISP_FEATURE_SB_SAFEPOINT)
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     /* Don't try to take the gc state lock if there's a chance that
      * we're already holding it (thread_register_gc_trigger() is
      * called from PA, gc_stop_the_world() and gc_start_the_world()
@@ -800,13 +804,14 @@ check_interrupt_context_or_lose(os_context_t *context)
         check_deferrables_blocked_or_lose(sigset);
     else {
         check_deferrables_unblocked_or_lose(sigset);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
         /* If deferrables are unblocked then we are open to signals
          * that run lisp code. */
         check_gc_signals_unblocked_or_lose(sigset);
 #endif
     }
 }
+#endif
 
 /*
  * utility routines used by various signal handlers
@@ -1056,7 +1061,7 @@ interrupt_handle_pending(os_context_t *context)
     }
 
     assert_blockables_blocked();
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     /*
      * (On safepoint builds, there is no gc_blocked_deferrables nor
      * SIG_STOP_FOR_GC.)
@@ -1097,7 +1102,7 @@ interrupt_handle_pending(os_context_t *context)
             thread_in_lisp_raised(context);
             undo_fake_foreign_function_call(context);
         }
-#elif defined(LISP_FEATURE_SB_THREAD)
+#elif defined THREADS_USING_GCSIGNAL
         if (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
              * the signal handler if it actually stops us. */
@@ -1234,7 +1239,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * be available; should we copy it or was nobody using it anyway?)
          * then we should convert this to return-elsewhere */
 
-#if !defined(LISP_FEATURE_SB_SAFEPOINT) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+#if defined LISP_FEATURE_GC_STW_SIGNAL && defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* Leave deferrable signals blocked, the handler itself will
          * allow signals again when it sees fit. */
         /* handler.lisp will hide from the GC, will be enabled in the handler itself.
@@ -1278,8 +1283,8 @@ run_deferred_handler(struct interrupt_data *data, os_context_t *context)
     (*pending_handler)(data->pending_signal,&(data->pending_info), context);
 }
 
-#ifndef LISP_FEATURE_WIN32
-static void
+#ifdef LISP_FEATURE_UNIX
+void
 store_signal_data_for_later (struct interrupt_data *data, void *handler,
                              int signal,
                              siginfo_t *info, os_context_t *context)
@@ -1301,6 +1306,9 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     sigcopyset(&data->pending_mask, os_context_sigmask_addr(context));
     sigaddset_deferrable(os_context_sigmask_addr(context));
 }
+#endif
+
+#if !defined LISP_FEATURE_WIN32 && !defined LISP_FEATURE_YIELDPOINTS
 
 /* What's going on ?
  *
@@ -1528,7 +1536,7 @@ arrange_return_to_c_function(os_context_t *context,
                              call_into_lisp_lookalike funptr,
                              lispobj function)
 {
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STOP_SIGNAL
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
 #endif
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
@@ -1968,6 +1976,7 @@ ll_install_handler (int signal, interrupt_handler_t handler)
 }
 #endif
 
+#ifndef LISP_FEATURE_YIELDPOINTS
 extern void sigprof_handler(int, siginfo_t*, void*);
 
 /* This is called from Lisp. */
@@ -2018,6 +2027,7 @@ void install_handler(int signal, lispobj handler)
     }
 #endif
 }
+#endif
 
 /* This must not go through lisp as it's allowed anytime, even when on
  * the altstack. */

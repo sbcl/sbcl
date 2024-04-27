@@ -113,7 +113,7 @@ void handle_breakpoint(os_context_t *context)
 
     fake_foreign_function_call(context);
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef USE_GC_STOP_SIGNAL
     unblock_gc_stop_signal();
 #endif
     code = find_code(context);
@@ -140,7 +140,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
 
     fake_foreign_function_call(context);
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef USE_GC_STOP_SIGNAL
     unblock_gc_stop_signal();
 #endif
 

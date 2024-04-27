@@ -292,10 +292,10 @@
 (declaim (freeze-type stmt))
 (defmethod print-object ((stmt stmt) stream)
   (print-unreadable-object (stmt stream :type t :identity t)
-    (awhen (stmt-labels stmt)
-      (princ it stream)
-      (write-char #\space stream))
-    (princ (stmt-mnemonic stmt) stream)))
+    (format t stream "~@[~A ~]~A ~:S"
+            (stmt-labels stmt)
+            (stmt-mnemonic stmt)
+            (stmt-operands stmt))))
 
 ;;; A section is just a doubly-linked list of statements with a head and
 ;;; tail pointer to allow insertion anywhere,
@@ -1394,9 +1394,9 @@
   (defun extract-prefix-keywords (x) x)
   (defun decode-prefix (args) args))
 
-(defun dump-symbolic-asm (section stream &aux last-vop all-labels (n 0))
+(defun dump-symbolic-asm (start stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
-  (do ((statement (stmt-next (section-start section)) (stmt-next statement))
+  (do ((statement start (stmt-next statement))
        (*print-pretty* nil))
       ((null statement))
     (incf n)
@@ -2002,7 +2002,8 @@
                (entry (list opcodes1 opcodes2  applicator index name)))
           (push entry *asm-pattern-matchers*)))))
 
-(defun combine-instructions (section)
+(defun combine-instructions (code-section elsewhere-section)
+  (declare (ignorable elsewhere-section))
   ;; Triply nested loop:
   ;;   - repeatedly scan until no further changes
   ;;   -   looking for a pattern that starts at each instruction
@@ -2013,7 +2014,7 @@
   (loop
     (let* ((any-changes)
            (stmt nil)
-           (next (section-start section)))
+           (next (section-start code-section)))
       (loop
         (setq stmt next next (stmt-next stmt))
         (unless next (return))
@@ -2046,13 +2047,19 @@
       (unless any-changes (return))))
   #+x86-64
   ;; Build the label -> stmt map
-  (let ((label->stmt (make-hash-table)))
-    (do ((stmt (section-start section) (stmt-next stmt)))
-        ((null stmt))
-      (dolist (label (ensure-list (stmt-labels stmt)))
-        (aver (not (gethash label label->stmt)))
-        (setf (gethash label label->stmt) stmt)))
-    (perform-jump-to-jump-elimination (section-start section) label->stmt)))
+  (let ((label->stmt (make-hash-table))
+        (elsewhere-labels (alloc-xset)))
+    (dolist (section `((nil . ,code-section)
+                       (t   . ,elsewhere-section)))
+      (do ((stmt (section-start (cdr section)) (stmt-next stmt)))
+          ((null stmt))
+        (dolist (label (ensure-list (stmt-labels stmt)))
+          (aver (not (gethash label label->stmt)))
+          (when (car section) ; is "elsewhere"
+            (add-to-xset label elsewhere-labels))
+          (setf (gethash label label->stmt) stmt))))
+    (perform-jump-to-jump-elimination (section-start code-section)
+                                      label->stmt elsewhere-labels)))
 
 ;; Remove macros that users should not invoke
 (push '("SB-ASSEM" define-instruction define-instruction-macro)

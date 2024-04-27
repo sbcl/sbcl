@@ -53,7 +53,7 @@
   (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag))
         (nbytes #+bignum-assertions 32 #-bignum-assertions 16))
     (instrument-alloc bignum-widetag nbytes nil alloc-tn)
-    (pseudo-atomic ()
+    (with-allocator ()
       (allocation bignum-widetag nbytes 0 alloc-tn nil nil nil)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)

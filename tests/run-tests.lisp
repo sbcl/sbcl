@@ -224,6 +224,9 @@
       sb-c::*compile-file-elapsed-time*
       sb-c::*phash-lambda-cache*
       ,(maybe "SB-IMPL" "*RUN-GC-HOOKS*")
+      sb-x86-64-asm::*total-n-yieldpoints-deleted*
+      sb-x86-64-asm::*original-total-n-yieldpoints*
+      sb-thread::*anon-thread-name-generator*
       sb-impl::**finalizer-store**
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*

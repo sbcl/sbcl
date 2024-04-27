@@ -86,7 +86,7 @@
 (define-assembly-routine (switch-to-arena (:return-style :raw)) ()
   ;; RSI and RDI are vop temps, so don't bother preserving them
   (with-registers-preserved (c :except (rsi rdi))
-    (pseudo-atomic ()
+    (pseudo-atomic () ; arena switcher
       #-system-tlabs (inst break halt-trap)
       #+system-tlabs (call-c "switch_to_arena" #+win32 rdi-tn #+win32 rsi-tn))))
 
@@ -103,30 +103,35 @@
                     ,vars ,@code)))))
 
 (def-routine-pair (alloc-tramp) ()
-  (with-registers-preserved (c)
+  ;(emit-safepoint)
+  (with-registers-preserved (#+yieldpoints lisp)
     (call-c "alloc" (ea 16 rbp-tn) system-tlab-p)
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
-  (with-registers-preserved (c)
+  ;(emit-safepoint)
+  (with-registers-preserved (#+yieldpoints lisp)
     (call-c "alloc_list" (ea 16 rbp-tn) system-tlab-p)
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (listify-&rest (:return-style :none)) ()
-  (with-registers-preserved (c)
+  ;(emit-safepoint)
+  (with-registers-preserved (#+yieldpoints lisp)
     (call-c "listify_rest_arg" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
     (inst mov (ea 24 rbp-tn) rax-tn))   ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
 (def-routine-pair (make-list (:return-style :none)) ()
-  (with-registers-preserved (c)
+  ;(emit-safepoint)
+  (with-registers-preserved (#+yieldpoints lisp)
     (call-c "make_list" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
     (inst mov (ea 24 rbp-tn) rax-tn)) ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 )
 
 (define-assembly-routine (alloc-funinstance) ()
-  (with-registers-preserved (c)
+  ;(emit-safepoint)
+  (with-registers-preserved (#+yieldpoints lisp)
     (call-c "alloc_funinstance" (ea 16 rbp-tn))
     (inst mov (ea 16 rbp-tn) rax-tn)))
 
@@ -135,13 +140,13 @@
 (define-assembly-routine (enable-alloc-counter) ()
   (with-registers-preserved (c)
     #+sb-thread
-    (pseudo-atomic ()
+    (pseudo-atomic () ; (not sure why this is pseudo-atomic)
       (call-c "allocation_tracker_counted" (* (ea 8 rbp-tn))))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
   (with-registers-preserved (c)
     #+sb-thread
-    (pseudo-atomic ()
+    (pseudo-atomic () ; (not sure why this is pseudo-atomic)
       (call-c "allocation_tracker_sized" (* (ea 8 rbp-tn))))))
 
 #+win32
@@ -243,7 +248,7 @@
                     (rax rax-tn)
                     (rdx rdx-tn)
                     (rdi rdi-tn))
-    (pseudo-atomic ()
+    (pseudo-atomic () ; setting a code header slot
       #+immobile-space
       (progn
         #-sb-thread
@@ -291,4 +296,24 @@
   (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
   uncontested
   (inst pop rax-tn))
+
+(define-assembly-routine (mutex-unlock-if-held (:return-style :raw)) ()
+  ;; There are no registers reserved for this asm routine
+  (inst push rax-tn)
+  (inst mov rax-tn (thread-tls-ea (load-time-tls-offset '*current-mutex*)))
+  (inst cmp (mutex-slot rax-tn %owner) thread-tn)
+  (inst jmp :ne uncontested) ; "not mine"
+  (inst mov :qword (mutex-slot rax-tn %owner) 0)
+  (inst dec :lock :byte (mutex-slot rax-tn state))
+  (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
+  (inst call (make-fixup 'mutex-wake-waiter :assembly-routine))
+  uncontested
+  (inst pop rax-tn))
 ) ; end PROGN
+
+#+yieldpoints
+(define-assembly-routine (handle-deferred-signal) ()
+  (inst pushf)
+  (with-registers-preserved (lisp)
+    (call-static-fun 'sb-unix::handle-deferred-signal 0))
+  (inst popf))

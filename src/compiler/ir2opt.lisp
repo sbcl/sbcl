@@ -1230,7 +1230,7 @@
          ;; but the slot setters don't all have to be updated to understand how to
          ;; terminate the pseudo-atomic sequence. It's a separate vop to do that.
          (emit-and-insert-vop (vop-node last) (vop-block last)
-                              (template-or-lose 'end-pseudo-atomic)
+                              (template-or-lose 'end-allocation)
                               nil nil (vop-next last)))
        (process-closure-inits (vop)
          (let* ((result-ref (vop-results vop))

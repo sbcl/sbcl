@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #include "genesis/sbcl.h"
+#include "genesis/hash-table.h"
 #include "runtime.h"
 #include "globals.h"
 #include "validate.h"
@@ -364,7 +365,7 @@ restore_breakpoint_from_single_step(os_context_t * context)
     return;
 }
 
-void
+static void
 sigtrap_handler(int __attribute__((unused)) signal,
                 siginfo_t __attribute__((unused)) *info,
                 os_context_t *context)
@@ -501,6 +502,7 @@ arch_install_interrupt_handlers()
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
 #ifndef LISP_FEATURE_WIN32
+    extern void sigtrap_handler();
     ll_install_handler(SIGILL , sigill_handler);
     ll_install_handler(SIGTRAP, sigtrap_handler);
 #endif
@@ -787,3 +789,36 @@ lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs) {
 }
 
 #include "x86-arch-shared.inc"
+
+void yieldpoint_patch_asm_routines(int flag)
+{
+    struct code* code = (struct code*)asm_routines_start;
+#ifdef LISP_FEATURE_DARWIN_JIT
+    lispobj ht = CONS(code->debug_info)->car;
+#else
+    lispobj ht = code->debug_info;
+#endif
+    struct vector* table =
+        VECTOR(((struct hash_table*)native_pointer(ht))->pairs);
+    int i;
+    uint32_t nop = 0x00401F0F; // really [0F 1F 40 00]
+    uint32_t yp  = 0x806D8545; // really [45 85 6D 80]
+    uint32_t old = nop;
+    uint32_t new = yp;
+    if (!flag) { // deinstall them
+      old = yp;
+      new = nop;
+    }
+    for (i=2 ; i < vector_len(table) ; i += 2) {
+        lispobj value = table->data[i+1];
+        if (listp(value)) {
+            // value = (start-address . (end-address . index))
+            char* entrypoint
+                = code_text_start(code) + fixnum_value(CONS(value)->car);
+            uint32_t* pdword = (uint32_t*)entrypoint;
+            if (*pdword == old)
+                __sync_bool_compare_and_swap(pdword, old, new);
+        }
+    }
+}
+

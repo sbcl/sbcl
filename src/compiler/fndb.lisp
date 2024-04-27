@@ -2226,7 +2226,7 @@
 (defknown sb-vm:%write-barrier () (values) ())
 (defknown sb-vm:%data-dependency-barrier () (values) ())
 
-#+sb-safepoint
+#+(or sb-safepoint yieldpoints)
 ;;; Note: This known function does not have an out-of-line definition;
 ;;; and if such a definition were needed, it would not need to "call"
 ;;; itself inline, but could be a no-op, because the compiler inserts a

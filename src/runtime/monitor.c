@@ -1081,6 +1081,25 @@ ldb_monitor(void)
 #ifdef STANDALONE_LDB
 void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing
+void defer_until_yieldpoint() { }
+void sigtrap_handler() { }
+void set_gc_pending() { }
+void safepoint_init() { }
+void request_garbage_collection(int) { }
+void cooperate_with_gc(struct thread* th) { lose("cooperate_with_gc %p ?", th); }
+int handle_safepoint_violation(__attribute__((unused)) os_context_t *context,
+                               __attribute__((unused)) os_vm_address_t addr) { return 0; }
+struct alloc_region alloc_cooperate_before(__attribute__((unused)) struct alloc_region*,
+                                           __attribute__((unused)) struct thread*) {
+  struct alloc_region r;
+  memset(&r, 0, sizeof r);
+  return r;
+}
+void alloc_cooperate_after(__attribute__((unused)) struct alloc_region*dst,
+                           __attribute__((unused)) struct alloc_region*src,
+                           __attribute__((unused)) struct thread* th) { }
+void maybe_suspend_for_gc(__attribute__((unused)) struct thread* th) { }
+
 #include <errno.h>
 #include <setjmp.h>
 #include "core.h"

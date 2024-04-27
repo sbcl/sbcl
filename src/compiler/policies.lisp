@@ -142,7 +142,6 @@ debugger.")
     1
   ("no" "no" "yes" "yes"))
 
-#+sb-safepoint
 (define-optimization-quality insert-safepoints
     1
   ("no" "yes" "yes" "yes")

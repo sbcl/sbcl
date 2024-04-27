@@ -24,12 +24,14 @@ void set_thread_state(struct thread *thread, char state, bool);
 int thread_wait_until_not(int state, struct thread *thread);
 #endif
 
+#if defined LISP_FEATURE_YIELDPOINTS || defined LISP_FEATURE_SB_SAFEPOINT
+int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
+#endif
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
 struct gcing_safety {
     lispobj csp_around_foreign_call;
 };
 
-int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
 void* os_get_csp(struct thread* th);
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
@@ -154,10 +156,10 @@ extern pthread_key_t current_thread;
 #endif
 #endif
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-# define THREAD_CSP_PAGE_SIZE 0
+#if defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_YIELDPOINTS
+# define THREAD_YIELDPOINT_PAGE_SIZE os_reported_page_size
 #else
-# define THREAD_CSP_PAGE_SIZE os_reported_page_size
+# define THREAD_YIELDPOINT_PAGE_SIZE 0
 #endif
 
 #ifdef LISP_FEATURE_WIN32
@@ -171,7 +173,7 @@ extern pthread_key_t current_thread;
 #define THREAD_STRUCT_SIZE \
   (THREAD_ALIGNMENT_BYTES + \
    thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
-   THREAD_CSP_PAGE_SIZE + \
+   THREAD_YIELDPOINT_PAGE_SIZE + \
    (THREAD_HEADER_SLOTS*N_WORD_BYTES) + dynamic_values_bytes + \
    sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
 
@@ -330,7 +332,11 @@ extern void create_main_lisp_thread(lispobj);
 #ifdef LISP_FEATURE_WIN32
 extern CRITICAL_SECTION all_threads_lock;
 #elif defined LISP_FEATURE_SB_THREAD
+# ifdef LISP_FEATURE_YIELDPOINTS
+extern pthread_rwlock_t all_threads_lock;
+# else
 extern pthread_mutex_t all_threads_lock;
+# endif
 #endif
 
 #ifndef LISP_FEATURE_SB_THREAD

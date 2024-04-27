@@ -460,3 +460,12 @@ ascs_check_loop:
 ascs_finished:
 	ret
 	SIZE(GNAME(arch_scrub_control_stack))
+
+        .global GNAME(foo)
+GNAME(foo):    .byte 0x66, 0x45, 0x0f, 0x38, 0x2a, 0x7d, 0x80
+        .byte 0x45, 0x0f, 0x38, 0x2a, 0x7d, 0x80
+
+        .globl GNAME(bar)
+GNAME(bar):
+        vmovntdqa -128(%r13), %xmm15
+        vmovntdqa -128(%r13), %ymm15

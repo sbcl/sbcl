@@ -76,11 +76,13 @@ struct interrupt_data {
     int pending_signal;
     siginfo_t pending_info;
     sigset_t pending_mask;
+#ifndef LISP_FEATURE_YIELDPOINTS
     /* Was pending mask saved for gc request? True if GC_PENDING or
      * SIG_STOP_FOR_GC happened in a pseudo atomic with GC_INHIBIT NIL
      * and with no pending handler. Both deferrable interrupt handlers
      * and gc are careful not to clobber each other's pending_mask. */
     bool gc_blocked_deferrables;
+#endif
 #if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC \
   || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_SPARC
 #define HAVE_ALLOCATION_TRAP_CONTEXT 1

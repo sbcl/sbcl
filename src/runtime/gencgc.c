@@ -324,22 +324,24 @@ static page_index_t
 get_alloc_start_page(unsigned int page_type)
 {
     if (page_type > 7) lose("bad page_type: %d", page_type);
-    struct thread* th = get_sb_vm_thread();
     page_index_t global_start = alloc_start_pages[page_type];
-    page_index_t hint;
-    switch (page_type) {
-    case PAGE_TYPE_MIXED:
-        if ((hint = thread_extra_data(th)->mixed_page_hint) > 0 && hint <= global_start) {
-            thread_extra_data(th)->mixed_page_hint = - 1;
-            return hint;
+    struct thread* th = get_sb_vm_thread();
+    if (th) {
+        page_index_t hint;
+        switch (page_type) {
+        case PAGE_TYPE_MIXED:
+            if ((hint = thread_extra_data(th)->mixed_page_hint) > 0 && hint <= global_start) {
+                thread_extra_data(th)->mixed_page_hint = - 1;
+                return hint;
+            }
+            break;
+        case PAGE_TYPE_CONS:
+            if ((hint = thread_extra_data(th)->cons_page_hint) > 0 && hint <= global_start) {
+                thread_extra_data(th)->cons_page_hint = - 1;
+                return hint;
+            }
+            break;
         }
-        break;
-    case PAGE_TYPE_CONS:
-        if ((hint = thread_extra_data(th)->cons_page_hint) > 0 && hint <= global_start) {
-            thread_extra_data(th)->cons_page_hint = - 1;
-            return hint;
-        }
-        break;
     }
     return global_start;
 }
@@ -3175,6 +3177,7 @@ conservative_stack_scan(struct thread* th,
 #  ifndef LISP_FEATURE_WIN32
     if (th != get_sb_vm_thread()) {
         int k = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        //fprintf(stderr, "scanning context, thread %p index %d\n", th, k);
         while (k > 0) {
             os_context_t* context = nth_interrupt_context(--k, th);
             if (context)
@@ -3184,10 +3187,11 @@ conservative_stack_scan(struct thread* th,
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
     int i;
-    /* fprintf(stderr, "Thread %p, ici=%d stack[%p:%p] (%dw)",
-            th, fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th)),
+    if (th->control_stack_pointer != 0) esp = th->control_stack_pointer;
+    /* fprintf(stderr, "Thread %p, ici=%d stack[%p:%p] (%dw)\n",
+            th, (int)fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th)),
             th->control_stack_start, th->control_stack_end,
-            th->control_stack_end - th->control_stack_start); */
+            (int)(th->control_stack_end - th->control_stack_start)); */
     for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
         os_context_t *c = nth_interrupt_context(i, th);
         visit_context_registers(context_method, c, (void*)1);
@@ -3981,6 +3985,13 @@ collect_garbage(generation_index_t last_gen)
 
     large_allocation = 0;
  finish:
+    {
+    struct cons* cons = gc_general_alloc(cons_region, 2*N_WORD_BYTES, PAGE_TYPE_CONS);
+    cons->car = cons->cdr = 0;
+    SYMBOL(GC_EPOCH)->value = make_lispobj(cons, LIST_POINTER_LOWTAG);
+    ensure_region_closed(cons_region, PAGE_TYPE_CONS);
+    }
+
     write_protect_immobile_space();
     gc_active_p = 0;
 
@@ -4020,6 +4031,10 @@ gc_init(void)
                      32 /* logical bin count */, 0 /* default range */);
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&free_pages_lock);
+#endif
+    extern void safepoint_init(void);
+#if defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_YIELDPOINTS
+    safepoint_init();
 #endif
 }
 
@@ -4104,6 +4119,10 @@ lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
      * should GC in the near future
      */
     if (auto_gc_trigger && (bytes_allocated+trigger_bytes > auto_gc_trigger)) {
+#ifdef LISP_FEATURE_YIELDPOINTS
+        extern void request_garbage_collection(int);
+        request_garbage_collection(-1);
+#else
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */
@@ -4125,6 +4144,7 @@ lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
 #endif
             }
         }
+#endif
     }
 
     /* For the architectures which do NOT use a trap instruction for allocation,
@@ -4792,8 +4812,10 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
 #endif
             if (widetag != FILLER_WIDETAG && pg >= 0) {
                     // Assert proper page type
-                    if (state->object_header) // is not a cons
-                        gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
+                    if (state->object_header) { // is not a cons
+                        if (page_table[pg].type == PAGE_TYPE_CONS)
+                            lose("headered object @ %p on cons page", state->object_addr);
+                    }
 #ifdef LISP_FEATURE_USE_CONS_REGION
                     else if (page_table[pg].type != PAGE_TYPE_CONS) {
                       if (is_cons_half(where[0]))

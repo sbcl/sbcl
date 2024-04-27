@@ -160,7 +160,9 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-    `#(sb-impl::install-hash-table-lock update-object-layout
+    `#(sb-impl::install-hash-table-lock
+       update-object-layout
+       #+yieldpoints sb-unix::handle-deferred-signal
        ,@common-static-fdefns)
   #'equalp)
 
@@ -197,3 +199,6 @@
   ;; The 'disp' field will aready be correct.
   (logior (ash undefined-function-trap 8)
           (+ #x100000 (or #+int4-breakpoints #xCE #xCC))))
+
+#+yieldpoints
+(defconstant sb-vm::thread-saved-csp-offset (- (+ 2 sb-vm::thread-header-slots)))

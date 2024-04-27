@@ -154,7 +154,7 @@
   (defreg float14 14 :float)
   (defreg float15 15 :float)
   (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
-             float8 float9 float10 float11 float12 float13 float14 float15)
+             float8 float9 float10 float11 float12 float13 float14 #|float15|#)
 
   ;; registers used to pass arguments
   ;;

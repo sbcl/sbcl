@@ -510,11 +510,11 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
     (define-alien-routine "futex_wake" int (word-addr unsigned) (n unsigned-long))
 
-    (defun futex-wait (word-addr oldval to-sec to-usec)
-      (with-alien ((%wait (function int unsigned
-                                    (unsigned 32)
-                                    long unsigned-long)
-                          :extern "futex_wait"))
+    (with-alien ((%wait (function int unsigned (unsigned 32) long unsigned-long)
+                        :extern "futex_wait"))
+      (defun fast-futex-wait (word-addr oldval to-sec to-usec)
+        (alien-funcall %wait word-addr oldval to-sec to-usec))
+      (defun futex-wait (word-addr oldval to-sec to-usec)
         (with-interrupts
           (alien-funcall %wait word-addr oldval to-sec to-usec))))))
 
@@ -820,13 +820,6 @@ returns NIL each time."
 
 #+ultrafutex
 (progn
-(declaim (inline fast-futex-wait))
-(defun fast-futex-wait (word-addr oldval to-sec to-usec)
-  (with-alien ((%wait (function int unsigned
-                                #+freebsd unsigned #-freebsd (unsigned 32)
-                                long unsigned-long)
-                      :extern "futex_wait"))
-    (alien-funcall %wait word-addr oldval to-sec to-usec)))
 (declaim (sb-ext:maybe-inline %wait-for-mutex-algorithm-3))
 (defun %wait-for-mutex-algorithm-3 (mutex)
   #+nil ; in case I want to count calls to this function
@@ -845,7 +838,12 @@ returns NIL each time."
         (loop while (/= c 0)
               do (with-pinned-objects (mutex)
                    (fast-futex-wait (mutex-state-address mutex) 2 -1 0))
-                 (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2))))))))
+                 (setq c (%raw-instance-xchg/word mutex (get-dsd-index mutex state) 2)))))))
+(defun wait-for-mutex-algorithm-3 (mutex)
+    ;(declare (inline %wait-for-mutex-algorithm-3))
+    (let ((mutex (sb-ext:truly-the mutex mutex)))
+      (%wait-for-mutex-algorithm-3 mutex)
+      (setf (mutex-%owner mutex) (current-vmthread-id)))))
 
 #+mutex-benchmarks
 (symbol-macrolet ((val (mutex-state mutex)))
@@ -879,7 +877,7 @@ returns NIL each time."
   ;; Code size is a little less. More improvement comes from doing the
   ;; partial-inline algorithms which perform one CAS without a function call.
   (defun wait-for-mutex-algorithm-3 (mutex)
-    (declare (inline %wait-for-mutex-algorithm-3))
+    ;(declare (inline %wait-for-mutex-algorithm-3))
     (let ((mutex (sb-ext:truly-the mutex mutex)))
       (%wait-for-mutex-algorithm-3 mutex)
       (setf (mutex-%owner mutex) (current-vmthread-id))))
@@ -1268,14 +1266,10 @@ associated data:
 
 IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
 must be held by this thread during this call."
-  #-sb-thread
-  (declare (ignore queue n))
-  #-sb-thread
-  (error "Not supported in unithread builds.")
-  #+sb-thread
-  (cond
-   #+sb-futex
-   (t
+  (declare (ignorable queue n))
+  #-sb-thread (error "Not supported in unithread builds.")
+  #+sb-futex ; implies sb-thread per feature-compatibility-tests
+  (progn
       ;; No problem if >1 thread notifies during the comment in condition-wait:
       ;; as long as the value in queue-data isn't the waiting thread's id, it
       ;; matters not what it is. We rely on kernel thread ID being nonzero.
@@ -1288,10 +1282,9 @@ must be held by this thread during this call."
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n))
       nil)
-   #-sb-futex
-   (t
-    (with-cas-lock ((waitqueue-%owner queue))
-      (%waitqueue-wakeup queue n)))))
+  #+(and sb-thread (not sb-futex))
+  (with-cas-lock ((waitqueue-%owner queue))
+      (%waitqueue-wakeup queue n)))
 
 
 (declaim (ftype (sfunction (waitqueue) null) condition-broadcast))
@@ -1885,6 +1878,10 @@ session."
           (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
+(sb-ext:defglobal *lisp-yps-executed* 0)
+(sb-ext:defglobal *c-yps-executed* 0)
+(declaim (fixnum *lisp-yps-executed* *c-yps-executed*))
+
 ;;; Remove thread from its session, if it has one, and from *all-threads*.
 ;;; Also clobber the pointer to the primitive thread
 ;;; which makes THREAD-ALIVE-P return false hereafter.
@@ -1925,7 +1922,9 @@ session."
         (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
                          (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
               0)
-        ;; Take ownership of our statistical profiling data and transfer the results to
+        (sb-ext:atomic-incf *lisp-yps-executed* (sb-sys:sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-lisp-yps-executed-slot)))
+        (sb-ext:atomic-incf *c-yps-executed* (sb-sys:sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-c-yps-executed-slot)))
+        ;; take ownership of our statistical profiling data and transfer the results to
         ;; the global pool. This doesn't need to synchronize with the signal handler,
         ;; which is effectively disabled now, but does synchronize via the interruptions
         ;; mutex with any other thread trying to read this thread's data.
@@ -2062,6 +2061,7 @@ session."
   0)
 ) ; end PROGN for #+sb-thread
 
+(sb-ext:defglobal *anon-thread-name-generator* 0)
 (defun make-thread (function &key name arguments)
   "Create a new thread of NAME that runs FUNCTION with the argument
 list designator provided (defaults to no argument). Thread exits when
@@ -2075,7 +2075,10 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   #-sb-thread (declare (ignore function name arguments))
   #-sb-thread (error "Not supported in unithread builds.")
   #+sb-thread
-  (let ((name (when name (possibly-base-stringize name))))
+  (let ((name (if name
+                  (possibly-base-stringize name)
+                  (with-system-mutex (*make-thread-lock*)
+                    (format nil "Thr~D" (incf *anon-thread-name-generator*))))))
     (assert (or (atom arguments) (null (cdr (last arguments))))
             (arguments)
             "Argument passed to ~S, ~S, is an improper list."
@@ -2399,6 +2402,11 @@ Short version: be careful out there."
   ;;  the behavior is undefined."
   ;; so we use the death lock to keep the thread alive, unless it already isn't.
   ;;
+  (let ((str (let ((*print-pretty* nil))
+               (format nil "~s interrupts ~S with ~s~%"
+                       (thread-name *current-thread*) (thread-name thread) function))))
+    (with-pinned-objects (str)
+      (sb-unix:unix-write 2 str 0 (length str))))
   (when (with-deathlok (thread c-thread)
           ;; Return T if couldn't interrupt.
           (cond ((eql c-thread 0) t)
@@ -2647,14 +2655,12 @@ mechanism for inter-thread communication."
 
 ;;;; Stepping
 
-(defun thread-stepping ()
-  (sap-ref-lispobj (current-thread-sap)
-                   (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes)))
-
-(defun (setf thread-stepping) (value)
-  (setf (sap-ref-lispobj (current-thread-sap)
-                         (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))
-        value))
+#+sb-thread
+(macrolet ((access-it ()
+             `(sap-ref-8 (current-thread-sap)
+                         (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))))
+  (defun thread-stepping () (access-it))
+  (defun (setf thread-stepping) (value) (setf (access-it) value)))
 
 ;;;; Diagnostic tool
 

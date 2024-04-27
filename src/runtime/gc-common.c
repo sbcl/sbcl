@@ -1415,7 +1415,7 @@ bool test_weak_triggers(bool (*predicate)(lispobj), void (*mark)(lispobj))
 }
 
 int finalizer_thread_runflag = 1;
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_YIELDPOINTS
 
 #ifdef LISP_FEATURE_WIN32
 CRITICAL_SECTION finalizer_mutex;
@@ -2195,7 +2195,7 @@ bool maybe_gc(os_context_t *context)
      * A kludgy alternative is to propagate the sigmask change to the
      * outer context.
      */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef USE_GC_STOP_SIGNAL
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
     unblock_gc_stop_signal();
 #endif
@@ -2233,7 +2233,7 @@ bool maybe_gc(os_context_t *context)
              * post-GC code. Except that we do it while the interrupt context
              * is still on the stack */
             thread_sigmask(SIG_SETMASK, context_sigmask, 0);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef USE_GC_STOP_SIGNAL
             check_gc_signals_unblocked_or_lose(0);
 #endif
 #endif

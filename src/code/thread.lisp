@@ -174,7 +174,7 @@ HOLDING-MUTEX-P."
      ;; Well if either HOLDING-MUTEX-P *or* if the OWNER is 0, there's no chance that
      ;; a different thread owns it.
      (unless (sb-vm::quick-try-mutex m)
-       (%wait-for-mutex-algorithm-3 m))
+       (wait-for-mutex-algorithm-3 m))
      ;; unbinding the special = releasing the mutex
      (let ((sb-vm::*current-mutex* m))
        (setf (mutex-%owner m) (current-vmthread-id))
@@ -268,11 +268,11 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
             (t
              `(fast-call-with-recursive-lock #'with-recursive-lock-thunk ,mutex)))))
 
+;#-ultrafutex
 (macrolet ((def (name &optional variant)
              `(defun ,(if variant (symbolicate name "/" variant) name)
                   (function mutex)
-                (declare (function function))
-                (declare (dynamic-extent function))
+                (declare (function function) (dynamic-extent function))
                 (flet ((%call-with-system-mutex ()
                          (let (got-it)
                            (unwind-protect
@@ -363,16 +363,16 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
           (funcall function)
           (with-ultrafutex (mutex) (funcall function)))))
 
-  (defun call-with-recursive-system-lock (function lock)
+  (defun call-with-recursive-system-lock (function mutex)
     (declare (function function))
     (declare (dynamic-extent function))
     (without-interrupts
-      (let ((had-it (holding-mutex-p lock))
+      (let ((had-it (holding-mutex-p mutex))
             (got-it nil))
         (unwind-protect
-             (when (or had-it (setf got-it (grab-mutex lock)))
+             (when (or had-it (setf got-it (grab-mutex mutex)))
                (funcall function))
           (when got-it
-            (release-mutex lock)))))))
+            (release-mutex mutex)))))))
 
 (sb-ext:define-load-time-global *make-thread-lock* nil)

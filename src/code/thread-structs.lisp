@@ -62,7 +62,7 @@
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
-  (%count    0 :type (integer 0))
+  (%count    0 :type (and (integer 0) fixnum))
   (waitcount 0 :type sb-vm:word)
   (mutex nil :read-only t :type mutex)
   (queue nil :read-only t :type waitqueue))

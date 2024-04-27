@@ -380,7 +380,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+#if defined LISP_FEATURE_YIELDPOINTS || LISP_FEATURE_SB_SAFEPOINT
     if (handle_safepoint_violation(context, addr)) return;
 #endif
 
@@ -398,7 +398,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 os_install_interrupt_handlers(void)
 {
-    if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
+  if (1) { // INSTALL_SIG_MEMORY_FAULT_HANDLER) {
     ll_install_handler(SIG_MEMORY_FAULT, sigsegv_handler);
     }
 }

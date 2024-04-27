@@ -85,7 +85,7 @@
     (inst or  :dword header type)
     (inst shr :dword header n-fixnum-tag-bits)
     (instrument-alloc nil bytes node temp thread-tn)
-    (pseudo-atomic (:thread-tn thread-tn)
+    (with-allocator (:thread-tn thread-tn)
      (allocation type bytes 0 result node temp thread-tn)
      (storew header result 0 0)
      (inst or :byte result other-pointer-lowtag))))

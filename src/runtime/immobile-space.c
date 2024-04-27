@@ -1096,6 +1096,7 @@ sweep_text_pages(int raise)
     if (freelist_tail) {
         freelist_tail[1] = codeblob_freelist;
         codeblob_freelist = (lispobj)freelist;
+        // fprintf(stderr, "New items in codeblob freelist\n");
     }
 }
 

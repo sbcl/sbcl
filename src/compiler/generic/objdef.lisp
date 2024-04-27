@@ -553,7 +553,7 @@ during backtrace.
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
 
-  (stepping)
+  (stepping :c-type "struct {int step; int suspend;}")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
@@ -616,6 +616,9 @@ during backtrace.
   ;; a struct containing {starting, running, suspended, dead}
   ;; and some other state fields.
   (state-word :c-type "struct thread_state_word")
+  (yieldpoint-spinlock :c-type "lock_t")
+  (yieldpoint-page-access)
+  (interrupt-reason)
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
   ;;
@@ -647,6 +650,13 @@ during backtrace.
   (symbol-tlab :c-type "struct alloc_region" :length 3)
   (sys-mixed-tlab :c-type "struct alloc_region" :length 3)
   (sys-cons-tlab :c-type "struct alloc_region" :length 3)
+  (spill-cons-tlab-end)
+  (spill-mixed-tlab-end)
+  (spill-sys-cons-tlab-end)
+  (spill-sys-mixed-tlab-end)
+  (lisp-yps-executed)
+  (c-yps-executed)
+  ;;(spill-boxed-tlab-end)
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)
   (tot-bytes-alloc-unboxed)

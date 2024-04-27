@@ -15,12 +15,13 @@ struct alloc_region {
     void  *start_addr;
 };
 
+#define REGION_END_EMPTY_VALUE (void*)0x1000
 static inline void gc_set_region_empty(struct alloc_region *region)
 {
     /* Free-pointer has to be not equal to 0 because it's undefined behavior
      * to add any value whatsoever to the null pointer.
      * Annoying, isn't it.  http://c-faq.com/null/machexamp.html */
-    region->free_pointer = region->end_addr = (void*)0x1000;
+    region->free_pointer = region->end_addr = REGION_END_EMPTY_VALUE;
     /* Start 0 is the indicator of closed-ness. */
     region->start_addr = 0;
 }

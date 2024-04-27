@@ -283,6 +283,9 @@ run in any thread.")
           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))
   nil)
 
+(with-alien ((request-garbage-collection (function void int) :extern)
+             (gc-inhibitor-control (function void int) :extern))
+
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (full nil) (gen 0) &allow-other-keys)
   "Initiate a garbage collection.
@@ -292,8 +295,34 @@ trigger a collection of one or more older generations as well. If FULL
 is true, all generations are collected. If GEN is provided, it can be
 used to specify the oldest generation guaranteed to be collected."
   (let ((gen (if full sb-vm:+pseudo-static-generation+ gen)))
+    #+yieldpoints
+    (let ((inhibit *gc-inhibit*))
+      (if inhibit
+          (setq *gc-inhibit* (max inhibit gen))
+          (alien-funcall request-garbage-collection gen)))
+    #-yieldpoints
     (when (eq t (sub-gc gen))
       (post-gc))))
+
+(defun call-with-gc-disabled (thunk)
+  (if *gc-inhibit*
+      (funcall thunk)
+      ;; If GC was was deferred, NLX through this will NOT gc but normal exit will.
+      ;; (And if NLX, what the f*** are you doing anyway? Inhibiting GC is for
+      ;; small code fragments, not massive swaths of application logic)
+      (let (gen)
+        (multiple-value-prog1
+            (let ((*gc-inhibit* -1))
+              (unwind-protect
+                   (multiple-value-prog1
+                       (progn (alien-funcall gc-inhibitor-control 1)
+                              ;(format t "~&doing a without-gcing thunk~%")
+                              (funcall thunk))
+                     (setq gen *gc-inhibit*))
+                  (alien-funcall gc-inhibitor-control 0)))
+          (when (>= gen 0)
+            (alien-funcall request-garbage-collection gen))))))
+) ; end WITH-ALIEN
 
 (define-alien-routine scrub-control-stack void)
 

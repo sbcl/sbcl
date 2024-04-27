@@ -75,7 +75,17 @@ CRITICAL_SECTION all_threads_lock;
 static CRITICAL_SECTION recyclebin_lock;
 static CRITICAL_SECTION in_gc_lock;
 #else
+#ifdef LISP_FEATURE_YIELDPOINTS
+pthread_rwlock_t all_threads_lock = PTHREAD_RWLOCK_INITIALIZER;
+// the functions return 0 on success, but we want boolean true
+#define GRAB_ALL_THREADS_LOCK() !pthread_rwlock_wrlock(&all_threads_lock)
+#define RELEASE_ALL_THREADS_LOCK() !pthread_rwlock_unlock(&all_threads_lock)
+
+#else
 pthread_mutex_t all_threads_lock = PTHREAD_MUTEX_INITIALIZER;
+#define GRAB_ALL_THREADS_LOCK() mutex_acquire(&all_threads_lock)
+#define RELEASE_ALL_THREADS_LOCK() mutex_release(&all_threads_lock)
+#endif
 static pthread_mutex_t recyclebin_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t in_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -121,7 +131,7 @@ char* vm_thread_name(struct thread* th)
 #define get_thread_state(thread) \
  (int)__sync_val_compare_and_swap(&thread->state_word.state, -1, -1)
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
 
 void
 set_thread_state(struct thread *thread,
@@ -445,10 +455,10 @@ init_new_thread(struct thread *th,
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     csp_around_foreign_call(th) = (lispobj)scribble;
 #endif
-    __attribute__((unused)) int lock_ret = mutex_acquire(&all_threads_lock);
+    __attribute__((unused)) int lock_ret = GRAB_ALL_THREADS_LOCK();
     gc_assert(lock_ret);
     link_thread(th);
-    ignore_value(mutex_release(&all_threads_lock));
+    ignore_value(RELEASE_ALL_THREADS_LOCK());
 
     /* Kludge: Changed the order of some steps between the safepoint/
      * non-safepoint versions of this code.  Can we unify this more?
@@ -469,7 +479,8 @@ unregister_thread(struct thread *th,
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
-#else
+#endif
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     /* This state change serves to "acknowledge" any stop-the-world
      * signal received while the STOP_FOR_GC signal is blocked */
     set_thread_state(th, STATE_DEAD, 1);
@@ -478,10 +489,10 @@ unregister_thread(struct thread *th,
      * thread, but since we are either exiting lisp code as a lisp
      * thread that is dying, or exiting lisp code to return to
      * former status as a C thread, it won't wait long. */
-    __attribute__((unused)) int lock_ret = mutex_acquire(&all_threads_lock);
+    __attribute__((unused)) int lock_ret = GRAB_ALL_THREADS_LOCK();
     gc_assert(lock_ret);
     unlink_thread(th);
-    lock_ret = mutex_release(&all_threads_lock);
+    lock_ret = RELEASE_ALL_THREADS_LOCK();
     gc_assert(lock_ret);
 
     arch_os_thread_cleanup(th);
@@ -490,7 +501,7 @@ unregister_thread(struct thread *th,
 #ifdef LISP_FEATURE_UNIX
     os_sem_destroy(&semaphores->sprof_sem);
 #endif
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
@@ -577,7 +588,7 @@ void* new_thread_trampoline(void* arg)
     // strictly below the computed th->control_stack_end. So make sure the value we pick
     // is strictly above any value of SP that the interrupt context could have.
 #if defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK && !defined ADDRESS_SANITIZER \
-    && !defined LISP_FEATURE_SB_SAFEPOINT
+    && defined LISP_FEATURE_UNIX
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
     th->os_kernel_tid = get_nonzero_tid();
@@ -681,7 +692,7 @@ static void attach_os_thread(init_thread_data *scribble)
     void* recycled_memory = get_recyclebin_item();
     struct thread *th = alloc_thread_struct(recycled_memory);
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
     /* FIXME: could be done using a single call to pthread_sigmask
        together with blocking the deferrable signals above. */
@@ -764,7 +775,7 @@ static void detach_os_thread(init_thread_data *scribble)
      *  - but STOP_FOR_GC is pending because it was in the blocked set.
      * Bad things happen unless we clear the pending GC signal.
      */
-#if !defined LISP_FEATURE_SB_SAFEPOINT
+#ifdef LISP_FEATURE_GC_STW_SIGNAL
     sigset_t pending;
     sigpending(&pending);
     if (sigismember(&pending, SIG_STOP_FOR_GC)) {
@@ -863,8 +874,8 @@ callback_wrapper_trampoline(
  *     /   ___ aligned_spaces
  *    /   /
  *  (0) (1)       (2)       (3)       (4)    (5)          (6)
- *   |   | CONTROL | BINDING |  ALIEN  |  CSP | thread     |          |
- *   |   |  STACK  |  STACK  |  STACK  | PAGE | structure  | altstack |
+ *   |   | CONTROL | BINDING |  ALIEN  | Trap | thread     |          |
+ *   |   |  STACK  |  STACK  |  STACK  | page | structure  | altstack |
  *   |...|------------------------------------------------------------|
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
@@ -917,17 +928,17 @@ alloc_thread_struct(void* spaces) {
     /* Aligning up is safe as THREAD_STRUCT_SIZE has
      * THREAD_ALIGNMENT_BYTES padding. */
     char *aligned_spaces = PTR_ALIGN_UP(spaces, THREAD_ALIGNMENT_BYTES);
-    char* csp_page = aligned_spaces + thread_control_stack_size +
-                     BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
+    char* yieldpoint_page = aligned_spaces + thread_control_stack_size +
+                            BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
-    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE
+    struct thread *th = (void*)(yieldpoint_page + THREAD_YIELDPOINT_PAGE_SIZE
                                 + THREAD_HEADER_SLOTS*N_WORD_BYTES);
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+#if defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_YIELDPOINTS
     // Out of caution I'm supposing that the last thread to use this memory
     // might have left this page as read-only. Could it? I have no idea.
-    os_protect(csp_page, THREAD_CSP_PAGE_SIZE, OS_VM_PROT_READ|OS_VM_PROT_WRITE);
+    os_protect(yieldpoint_page, THREAD_YIELDPOINT_PAGE_SIZE, OS_VM_PROT_READ|OS_VM_PROT_WRITE);
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -1071,11 +1082,7 @@ alloc_thread_struct(void* spaces) {
     access_control_frame_pointer(th)=0;
 #endif
 
-    thread_interrupt_data(th).pending_handler = 0;
-    thread_interrupt_data(th).gc_blocked_deferrables = 0;
-#if HAVE_ALLOCATION_TRAP_CONTEXT
-    thread_interrupt_data(th).allocation_trap_context = 0;
-#endif
+    memset(&thread_interrupt_data(th), 0, sizeof (struct interrupt_data));
 #if defined LISP_FEATURE_PPC64
     /* Storing a 0 into code coverage mark bytes or GC card mark bytes
      * can be done from the low byte of the thread base register.
@@ -1103,7 +1110,7 @@ alloc_thread_struct(void* spaces) {
         thread_private_events(th,i) = CreateEvent(NULL,FALSE,FALSE,NULL);
     thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
 #endif
-    th->stepping = 0;
+    memset(&th->stepping, 0, N_WORD_BYTES);
     th->card_table = (lispobj)gc_card_mark;
     return th;
 }
@@ -1161,7 +1168,7 @@ void thread_accrue_stw_time(struct thread* th, struct timespec* begin)
 /*
  * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
  */
-#if !defined LISP_FEATURE_SB_SAFEPOINT && !defined STANDALONE_LDB
+#if defined LISP_FEATURE_GC_STW_SIGNAL && !defined STANDALONE_LDB
 
 /* To avoid deadlocks when gc stops the world all clients of each
  * mutex must enable or disable SIG_STOP_FOR_GC for the duration of

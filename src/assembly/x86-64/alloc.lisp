@@ -146,7 +146,7 @@
     ;; to receive an interrupt causing it to do a slow operation between
     ;; acquisition and release of the spinlock. Preventing GC is irrelevant,
     ;; but would not be if we recycled tls indices of garbage symbols.
-    (pseudo-atomic ()
+    (pseudo-atomic () ; allocating a TLS index
      RETRY
        (inst bts :qword :lock free-tls-index-ea lock-bit)
        (inst jmp :nc got-tls-index-lock)

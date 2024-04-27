@@ -251,13 +251,14 @@
     ;; the C function is in a dynamic shared object or not)
     +required-foreign-symbols+
 
+     ;; arbitrary object that changes after each GC
+     sb-kernel::*gc-epoch*
+
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.
     ;;; However there is no efficiency gain if we have #+immobile-space.
     #-immobile-space ,@'(
-     ;; arbitrary object that changes after each GC
-     sb-kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
      %%data-vector-reffers%%
      %%data-vector-reffers/check-bounds%%
@@ -366,10 +367,10 @@
 (defconstant thread-header-slots
   ;; This seems to need to be an even number.
   ;; I'm not sure what the constraint on that stems from.
-  #+(and x86-64 sb-safepoint) 14 ; the safepoint trap page is at word index -15
-  #+(and x86-64 (not sb-safepoint)) 16
-  #+(and (not x86-64) immobile-space) 14 ; the safepoint trap page is at word index -15
-  #+(and (not x86-64) (not immobile-space)) 0)
+  #+x86-64 (or #+(or sb-safepoint yieldpoints) 14 ; the safepoint trap page is at word index -15
+                                               16)
+  #-x86-64 (or #+immobile-space 14 ; the safepoint trap page is at word index -15
+                                0))
 
 (progn
   (defconstant +highest-normal-generation+ 5)

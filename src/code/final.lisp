@@ -427,7 +427,8 @@ Examples:
 ;;; Nested invocations (from a GC forced by a finalizer) are not ok.
 ;;; See the trace at the bottom of this file.
 (define-load-time-global *bg-compiler-function* nil)
-(defun run-pending-finalizers (&aux (system-finalizer-scratchpad (list 0)))
+(defun run-pending-finalizers (&aux (system-finalizer-scratchpad (list 0))
+                                    (n-ran 0))
   (declare (dynamic-extent system-finalizer-scratchpad))
   (finalizers-rehash)
   (loop
@@ -446,9 +447,16 @@ Examples:
           (sb-vm::immobile-code-dealloc-1 system-finalizer-scratchpad))
          (ran-a-user-finalizer ; Try to run 1 user finalizer
           (run-user-finalizer)))
+     (incf n-ran (+ (if ran-a-system-finalizer 1 0)
+                    (if ran-a-user-finalizer 1 0)))
      ;; Did this iteration do anything at all?
      (unless (or ran-bg-compile ran-a-system-finalizer ran-a-user-finalizer)
-       (return)))))
+       (return))))
+  #+nil
+  (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned))
+                 (vector-sap #.(format nil "Finalizer ran %d things~%"))
+                 n-ran)
+  )
 
 (define-load-time-global *finalizer-thread* nil)
 (declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
@@ -475,6 +483,9 @@ Examples:
            (sb-thread::make-system-thread
             "finalizer"
             (lambda ()
+              ;; This lambda is in the lexical scope of (INSERT-SAFEPOINT 0) due to
+              ;; the system mutex. But the finalizer-thread-wait must have a yieldpoint.
+              #+yieldpoints (declare (optimize (sb-c::insert-safepoints 1)))
               (setf *finalizer-thread* sb-thread:*current-thread*)
               (loop (run-pending-finalizers)
                     (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))

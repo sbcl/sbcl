@@ -185,8 +185,9 @@
 ;;; the allocator to use cons_tlab.
 (defconstant +cons-primtype+ list-pointer-lowtag)
 
-(define-vop (sb-c::end-pseudo-atomic)
-  (:generator 1 (emit-end-pseudo-atomic)))
+(define-vop (sb-c::end-allocation)
+  (:generator 1
+    #-sb-safepoint (emit-end-pseudo-atomic)))
 
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
@@ -249,7 +250,7 @@
              ;; alloc-tn <- old free ptr and temp <- new free ptr
              (inst xadd temp alloc-tn)
              (inst cmp temp end-addr)
-             (inst jmp :a NOT-INLINE)
+             (note-yieldpoint (inst jmp :a NOT-INLINE))
              (inst mov free-pointer temp)
              (emit-label DONE)
              (when (/= lowtag 0) (inst or :byte alloc-tn lowtag))
@@ -268,14 +269,14 @@
                     (when (tn-p size) (aver (not (location= size temp))))
                     (inst lea temp (ea size alloc-tn))
                     (inst cmp temp end-addr)
-                    (inst jmp :a NOT-INLINE)
+                    (note-yieldpoint (inst jmp :a NOT-INLINE))
                     (inst mov free-pointer temp)
                     (emit-label DONE)
                     (when (/= lowtag 0) (inst or :byte alloc-tn lowtag)))
                    (t
                     (inst add alloc-tn size)
                     (inst cmp alloc-tn end-addr)
-                    (inst jmp :a NOT-INLINE)
+                    (note-yieldpoint (inst jmp :a NOT-INLINE))
                     (inst mov free-pointer alloc-tn)
                     (cond ((tn-p size)
                            (inst sub alloc-tn size)
@@ -310,7 +311,7 @@
   (instrument-alloc widetag bytes node (cons result-tn (ensure-list alloc-temps)) thread-temp)
   (let ((header (compute-object-header nwords widetag))
         (alloc-temp (if (listp alloc-temps) (car alloc-temps) alloc-temps)))
-    (pseudo-atomic ()
+    (with-allocator ()
       (cond (alloc-temp
              (allocation widetag bytes 0 result-tn node alloc-temp thread-temp)
              (storew* header result-tn 0 0 t)
@@ -413,7 +414,7 @@
              (zeroed #+mark-region-gc t)
              (prev-constant temp)) ;; a non-eq initial value
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
-         (pseudo-atomic (:thread-tn thread-tn)
+         (with-allocator (:thread-tn thread-tn)
            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
            (store-slot car alloc cons-car-slot 0)
            (store-slot cdr alloc cons-cdr-slot 0)
@@ -437,7 +438,7 @@
           (zeroed #+mark-region-gc t)
           (prev-constant temp))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
-      (pseudo-atomic (:thread-tn thread-tn)
+      (with-allocator (:thread-tn thread-tn)
         (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
         (store-slot tail alloc cons-cdr-slot 0)
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
@@ -482,7 +483,7 @@
              (zeroed #+mark-region-gc t)
              (prev-constant temp))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
-         (pseudo-atomic (:thread-tn thread-tn)
+         (with-allocator (:thread-tn thread-tn)
            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
            (store-slot car alloc cons-car-slot 0)
            (store-slot cadr alloc (+ 2 cons-car-slot) 0)
@@ -509,7 +510,7 @@
            (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+      (with-allocator (:elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation size list-pointer-lowtag res)
             (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
@@ -676,7 +677,7 @@
         ;; It would be possible to do this and the array proper
         ;; in a single pseudo-atomic section, but I don't care to do that.
         (let ((nbytes (calc-shadow-bits-size result)))
-          (pseudo-atomic ()
+          (with-allocator ()
             ;; Allocate the bits into RESULT
             (allocation simple-bit-vector-widetag nbytes 0 result node temp nil)
             (inst mov :byte (ea result) simple-bit-vector-widetag)
@@ -715,7 +716,7 @@
                                 (t 'unboxed-array))
                               type)
                           size-tn node instrumentation-temp thread-tn)
-        (pseudo-atomic (:thread-tn thread-tn)
+        (with-allocator (:thread-tn thread-tn)
          (allocation type size-tn 0 result node alloc-temp thread-tn)
          (put-header result 0 type length t alloc-temp)
          (inst or :byte result other-pointer-lowtag)))
@@ -901,7 +902,7 @@
             (loop (gen-label))
             (leave-pa (gen-label)))
         (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
-        (pseudo-atomic (:thread-tn thread-tn)
+        (with-allocator (:thread-tn thread-tn)
          (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
                      :overflow
                      (lambda ()
@@ -957,10 +958,11 @@
            (header (logior (ash (1- words) n-widetag-bits) closure-widetag))
            (remain-pseudo-atomic
             (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
+      (declare (ignorable remain-pseudo-atomic))
       (unless stack-allocate-p
         (instrument-alloc closure-widetag bytes node (list result temp) thread-tn))
-      (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
-                      :elide-if stack-allocate-p :thread-tn thread-tn)
+      (with-allocator (:default-exit (not remain-pseudo-atomic)
+                       :elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation bytes fun-pointer-lowtag result stack-allocate-p)
             (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
@@ -1030,13 +1032,14 @@
                     &aux (bytes (pad-data-block words))
                          (remain-pseudo-atomic
                           (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
+    (declare (ignorable remain-pseudo-atomic))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
     (unless stack-allocate-p
       (instrument-alloc type bytes node (list result alloc-temp) thread-tn))
-    (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
-                    :elide-if stack-allocate-p :thread-tn thread-tn)
+    (with-allocator (:default-exit (not remain-pseudo-atomic)
+                     :elide-if stack-allocate-p :thread-tn thread-tn)
       ;; If storing a header word, defer ORing in the lowtag until after
       ;; the header is written so that displacement can be 0.
       (cond (stack-allocate-p
@@ -1106,6 +1109,7 @@
      ;; But it seems we never need this! (so is it FIXME or isn't it?)
      (error "can't %MAKE-FUNCALLABLE-INSTANCE of unknown length"))
    (let ((remain-pseudo-atomic (eq (car (last (vop-codegen-info vop))) :pseudo-atomic)))
+     (declare (ignorable remain-pseudo-atomic))
    ;; With the exception of bignums, these objects have effectively
    ;; 32-bit headers because the high 4 byes contain a layout pointer.
      (let ((operand-size (if (= type bignum-widetag) :qword :dword)))
@@ -1127,8 +1131,8 @@
              ;; because it might be in the same physical reg as BYTES.
              ;; Yup, the lifetime specs in this vop are pretty confusing.
              (instrument-alloc type bytes node alloc-temp thread-tn)
-             (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
-                             :thread-tn thread-tn)
+             (with-allocator (:default-exit (not remain-pseudo-atomic)
+                              :thread-tn thread-tn)
               (allocation type bytes lowtag result node alloc-temp thread-tn)
               (storew header result 0 lowtag)))))))
 
@@ -1149,7 +1153,7 @@
     (move c-arg-1 total-words)
     (move c-arg-2 boxed-words)
     (with-registers-preserved (c :except #-win32 rdi #+win32 rcx :frame-reg r15)
-      (pseudo-atomic () (call-c "alloc_code_object"))
+      (with-allocator () (call-c "alloc_code_object"))
       (move c-arg-1 rax-tn))
     (move res c-arg-1)))
 
@@ -1178,7 +1182,7 @@
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
-   (pseudo-atomic ()
+   (with-allocator ()
      (call-c (c-fun "alloc_immobile_fixedobj"))
      (move result rax))))
 
@@ -1215,7 +1219,7 @@
     ;; because it is no longer a page of symbols but rather a free page.
     ;; There is no way to inform GC that we are currently looking at a page
     ;; in anticipation of allocating to it.
-    (pseudo-atomic ()
+    (with-allocator ()
        (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
        (inst test :dword rax rax)
        (inst jmp :z FAIL) ; fail if hint page is 0

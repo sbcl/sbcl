@@ -233,6 +233,9 @@
                                     internal-time-units-per-second)))
                     (format t " (~5,3f sec)~%" elapsed)
                     (incf total-time elapsed)))
+                (format t "~&Total yieldpoints: ~D, deleted: ~D ~%"
+                        sb-x86-64-asm::*original-total-n-yieldpoints*
+                        sb-x86-64-asm::*total-n-yieldpoints-deleted*)
                 ;(sb-kernel::show-ctype-ctor-cache-metrics)
                 (when sb-impl::*profile-hash-cache*
                   ;;  avoid "make-host-2 stopped due to unexpected STYLE-WARNING raised from the host."

@@ -56,7 +56,7 @@
 ;;; doing things the SBCL way and moving this kind of C-level work
 ;;; down to C wrapper functions.)
 
-#-sb-safepoint
+#-(or sb-safepoint yieldpoints)
 (defun unblock-stop-for-gc-signal ()
   (with-alien ((%unblock (function void) :extern "unblock_gc_stop_signal"))
     (alien-funcall %unblock)
@@ -81,13 +81,13 @@
   ;; are opaque. We use our own explicit translation of 0 and 1 to them
   ;; in the C install_handler() argument passing convention.
   (with-alien ((%sigaction (function void int unsigned) :extern "install_handler"))
-    #+sb-safepoint
+    #+(or sb-safepoint yieldpoints)
     (alien-funcall %sigaction signal
                    (case handler
                      (:default 0)
                      (:ignore 1)
                      (t (sb-kernel:get-lisp-obj-address handler))))
-    #-sb-safepoint
+    #-(or sb-safepoint yieldpoints)
     (flet ((run-handler (signo info-sap context-sap)
              #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
              (unblock-stop-for-gc-signal)
@@ -146,7 +146,9 @@
                  (signal int)
                  ;; Then enter the debugger like BREAK.
                  (%break 'sigint int))))))
-    #+sb-safepoint
+    ;; The comment below is confusing AF but the behavior of the
+    ;; #+sb-safepoint code is correct for #+yieldpoints as well.
+    #+(or sb-safepoint yieldpoints)
     (let ((target (sb-thread::foreground-thread)))
       ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
       ;; interrupt right away, because deferrables are blocked.  Rather,
@@ -161,7 +163,7 @@
       (if (eq target sb-thread:*current-thread*)
           (interrupt-it)
           (sb-thread:interrupt-thread target #'interrupt-it)))
-    #-sb-safepoint
+    #-(or sb-safepoint yieldpoints)
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
@@ -250,3 +252,24 @@
                                           (ash num sb-vm:word-shift))))
                 (when (functionp fun)
                   (funcall fun num nil nil)))))))))
+
+#+yieldpoints
+(with-alien ((show-interrupt-data (function void) :extern)
+             (getcontext (function int system-area-pointer) :extern)
+             (get-pending-signal-number (function int) :extern)
+             (lisp-sig-handlers (array unsigned 32) :extern)
+             (flush-pending-signal-and-restore (function void) :extern))
+  (export 'showint)
+  (defun showint ()
+    (alien-funcall show-interrupt-data))
+  (defun handle-deferred-signal ()
+    (alien-funcall show-interrupt-data)
+    (let* ((c-context (make-array sb-unix::sizeof-ucontext_t :element-type '(unsigned-byte 8)))
+           (sig (alien-funcall get-pending-signal-number))
+           (fun (sb-kernel:%make-lisp-obj (deref lisp-sig-handlers sig))))
+      (aver (functionp fun))
+      (with-pinned-objects (c-context)
+        (let ((context-sap (vector-sap c-context)))
+          (alien-funcall getcontext context-sap)
+          (funcall fun sig (sb-sys:int-sap 0) context-sap)
+          (alien-funcall flush-pending-signal-and-restore))))))

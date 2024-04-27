@@ -52,6 +52,8 @@ maintained."
   (with-unique-names (without-gcing-body)
     `(dx-flet ((,without-gcing-body ()
               ,@body))
+       #+yieldpoints (sb-kernel::call-with-gc-disabled #',without-gcing-body)
+       #-yieldpoints
        (if *gc-inhibit*
            (,without-gcing-body)
            ;; We need to disable interrupts before disabling GC, so
@@ -258,7 +260,9 @@ maintained."
 ;;; System mutexes will always be our own mutex-based-on-futex (if available).
 (defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
                                     &body body)
-  `(dx-flet ((with-system-mutex-thunk () ,@body))
+  `(dx-flet ((with-system-mutex-thunk ()
+               #+yieldpoints (declare (optimize (sb-c::insert-safepoints 0)))
+               ,@body))
      (,(cond (without-gcing
                'call-with-system-mutex/without-gcing)
              (allow-with-interrupts
@@ -269,5 +273,7 @@ maintained."
        ,mutex)))
 
 (defmacro with-recursive-system-lock ((lock) &body body)
-  `(dx-flet ((recursive-system-lock-thunk () ,@body))
+  `(dx-flet ((recursive-system-lock-thunk ()
+               #+yieldpoints (declare (optimize (sb-c::insert-safepoints 0)))
+               ,@body))
      (call-with-recursive-system-lock #'recursive-system-lock-thunk ,lock)))

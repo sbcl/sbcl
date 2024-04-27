@@ -529,7 +529,7 @@
   ;; occurs at the end. In that case, we can not prevent stop-for-GC
   ;; from occurring in the C code, because foreign code is allowed
   ;; to run during GC; it just can't go back into Lisp until GC is over.
-  #-sb-safepoint
+  #-(or sb-safepoint yieldpoints)
   (loop for e = (sb-c::node-lexenv (sb-c::vop-node vop))
         then (sb-c::lexenv-parent e)
         while e

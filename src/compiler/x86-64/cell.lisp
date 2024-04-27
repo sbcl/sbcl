@@ -54,7 +54,7 @@
            ;; But funcallable-instances are on PAGE_TYPE_CODE, and code pages do not use
            ;; MMU-based protection regardless of this feature.
            ;; So we have to alter the card mark differently.
-           (pseudo-atomic ()
+           (pseudo-atomic () ; setting funinstance-fun
              (emit-code-page-gengc-barrier object val-temp)
              (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
@@ -507,7 +507,7 @@
     ;;      refer to doc/internals-notes/fdefn-gc-safety
     ;; No barrier here, because fdefns in immobile space rely on the SIGSEGV signal
     ;; to manage the card marks.
-    (pseudo-atomic ()
+    (pseudo-atomic () ; setting fdefn-fun
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (storew raw-word fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       ;; Ensure that the header contains a JMP instruction, not INT3.
@@ -627,13 +627,7 @@
           do
           #+ultrafutex
           (when (eq symbol '*current-mutex*)
-            (let ((uncontested (gen-label)))
-              (inst mov temp tls-cell) ; load the current value
-              (inst mov :qword (mutex-slot temp %owner) 0)
-              (inst dec :lock :byte (mutex-slot temp state))
-              (inst jmp :z uncontested) ; if ZF then previous value was 1, no waiters
-              (invoke-asm-routine 'call 'mutex-wake-waiter vop)
-              (emit-label uncontested)))
+            (invoke-asm-routine 'call 'mutex-unlock-if-held vop))
 
           (inst sub bsp (* binding-size n-word-bytes))
 
@@ -680,7 +674,7 @@
       (let ((notmutex (gen-label)))
         (inst cmp :dword symbol (make-fixup '*current-mutex* :symbol-tls-index))
         (inst jmp :ne notmutex)
-        (inst call (ea (make-fixup 'mutex-unlock :assembly-routine*)))
+        (inst call (ea (make-fixup 'mutex-unlock-if-held :assembly-routine*)))
         (emit-label notmutex))
       (inst test :dword symbol symbol))
     #-sb-thread
@@ -744,7 +738,7 @@
   (:generator 4
    (let ((ea (ea (- (* funcallable-instance-info-offset n-word-bytes) fun-pointer-lowtag)
                  object index (index-scale n-word-bytes index))))
-     (pseudo-atomic ()
+     (pseudo-atomic () ; setting funinstance-info
        (emit-code-page-gengc-barrier object val-temp)
        (emit-store ea value val-temp))))))
 
@@ -895,9 +889,11 @@
   instance-slots-offset instance-pointer-lowtag
   (signed-reg) signed-num %raw-instance-cas/signed-word)
 
-(define-vop ()
+(define-vop (%raw-instance-xchg/word)
   (:translate %raw-instance-xchg/word)
   (:policy :fast-safe)
+  (:variant-vars operand-size)
+  (:variant :qword)
   (:args (instance :scs (descriptor-reg))
          (newval :scs (unsigned-reg immediate constant) :target result))
   (:info index)
@@ -905,6 +901,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
   (:generator 3
     ;; Use RESULT as the source of the exchange, unless doing so
     ;; would clobber NEWVAL
@@ -912,11 +909,15 @@
       (if (sc-is newval immediate)
           (inst mov source (constantize (tn-value newval)))
           (move source newval))
-      (inst xchg (ea (- (ash (+ instance-slots-offset index) word-shift)
-                        instance-pointer-lowtag) instance)
+      (inst xchg operand-size
+            (ea (- (ash (+ instance-slots-offset index) word-shift) instance-pointer-lowtag)
+                instance)
             source)
       (unless (eq source result)
         (move result temp)))))
+(define-vop (%raw-instance-xchg/byte %raw-instance-xchg/word)
+  (:translate %raw-instance-xchg/byte)
+  (:variant :byte))
 
 ;;;; code object frobbing
 

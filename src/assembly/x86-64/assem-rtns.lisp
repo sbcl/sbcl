@@ -32,6 +32,7 @@
      (:temp temp unsigned-reg r8-offset)
      (:temp loop-index unsigned-reg r9-offset))
 
+  (emit-safepoint)
   ;; Pick off the cases where everything fits in register args.
   (inst cmp :dword rcx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
@@ -313,6 +314,7 @@
                           (:temp value unsigned-reg r10-offset)
                           (:temp bsp-temp unsigned-reg r11-offset)
                           (:temp zero complex-double-reg float0-offset))
+  (emit-safepoint)
   AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst test block block)             ; check for NULL pointer
@@ -404,6 +406,7 @@
      (:temp null unsigned-reg r8-offset)
      (:temp temp unsigned-reg r9-offset)
      (:temp return unsigned-reg r10-offset))
+  (emit-safepoint)
   (flet ((check (label)
            (assemble ()
              (%test-lowtag list temp skip nil list-pointer-lowtag)

@@ -795,7 +795,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     os_install_interrupt_handlers();
 # ifdef LISP_FEATURE_SB_SAFEPOINT
     ll_install_handler(SIGURG, thruption_handler);
-# elif defined LISP_FEATURE_SB_THREAD
+# elif defined THREADS_USING_GCSIGNAL
     ll_install_handler(SIG_STOP_FOR_GC, sig_stop_for_gc_handler);
 # endif
 #else

@@ -327,6 +327,9 @@
           (push :salted-symbol-hash sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or (:and :darwin (:not (:or :ppc :x86))) :openbsd)))
           (push :os-thread-stack sb-xc:*features*))
+        (when (target-featurep '(:and (:not :sb-safepoint) (:not :yieldpoints)))
+          ;; signal-based stop-the-world (_other_ than memory-fault on a trap page)
+          (push :gc-stw-signal sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
           ;; 0xCE is a perfectly good 32-bit instruction,
           ;; unlike on x86-64 where it is illegal. It's therefore

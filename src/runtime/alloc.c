@@ -213,11 +213,25 @@ void gc_close_thread_regions(__attribute__((unused)) struct thread* th,
       { main_thread_cons_region, PAGE_TYPE_CONS },
 #endif
     };
+#if 0
+    fprintf(stderr, "about to close region for %ps:\n", th);
+    int i;
+    for (i=0;i<4;++i) {
+      struct alloc_region* r = argv[i].r;
+      fprintf(stderr, " %p:%p (free=%p)\n", r->start_addr, r->end_addr, r->free_pointer);
+    }
+#endif
     sync_close_regions(0, locking, argv, N_THREAD_TLABS(argv));
+
 }
 
 extern lispobj* lisp_alloc(int, struct alloc_region *, sword_t,
                            int, struct thread *);
+extern void maybe_suspend_for_gc(struct thread*);
+extern struct alloc_region alloc_cooperate_before(struct alloc_region*, struct thread*);
+// argument order is like memcpy() - to, from
+extern void alloc_cooperate_after(struct alloc_region*, struct alloc_region*,
+                                  struct thread*);
 
 /* alloc() and alloc_list() are external interfaces for memory allocation.
  * They allocate to generation 0 and are not called from within the garbage
@@ -227,14 +241,21 @@ extern lispobj* lisp_alloc(int, struct alloc_region *, sword_t,
 
 #if defined(LISP_FEATURE_SYSTEM_TLABS) || defined(LISP_FEATURE_X86_64)
 
-// The asm routines have been modified so that alloc() and alloc_list()
-// each receive the size an a single-bit flag affecting locality of the result.
+/* The asm routines have been modified so that alloc() and alloc_list()
+ * each receive the size an a single-bit flag affecting locality of the result.
+ * Note that we make a copy by value of the TLAB which avoids having GC steal
+ * it while in lisp_alloc. cooperate_with_gc contains the logic to synchronize
+ * with GC. */
 #define DEFINE_LISP_ENTRYPOINT(name, largep, TLAB, page_type) \
 NO_SANITIZE_MEMORY lispobj *name(sword_t nbytes, int sys) { \
     struct thread *self = get_sb_vm_thread(); \
-    return lisp_alloc(largep | sys, \
-                      sys ? &self->sys_##TLAB##_tlab : THREAD_ALLOC_REGION(self,TLAB), \
-                      nbytes, page_type, self); }
+    struct alloc_region* tlab \
+        = sys ? &self->sys_##TLAB##_tlab : THREAD_ALLOC_REGION(self,TLAB); \
+    struct alloc_region region = alloc_cooperate_before(tlab, self);   \
+    lispobj* res = lisp_alloc(largep | sys, &region, nbytes, page_type, self); \
+    alloc_cooperate_after(tlab, &region, self); \
+    return res; \
+}
 
 DEFINE_LISP_ENTRYPOINT(alloc, (nbytes >= LARGE_OBJECT_SIZE), mixed, PAGE_TYPE_MIXED)
 DEFINE_LISP_ENTRYPOINT(alloc_list, 0, cons, PAGE_TYPE_CONS)
@@ -262,6 +283,7 @@ DEFINE_LISP_ENTRYPOINT(alloc_list, 0, mixed, PAGE_TYPE_MIXED)
 lispobj alloc_code_object(unsigned total_words, unsigned boxed)
 {
     struct thread *th = get_sb_vm_thread();
+    maybe_suspend_for_gc(th);
     // x86-64 uses pseudo-atomic. Others should too, but instead use WITHOUT-GCING
 #ifndef LISP_FEATURE_X86_64
     if (read_TLS(GC_INHIBIT, th) == NIL)
@@ -297,9 +319,10 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
 
 #ifdef LISP_FEATURE_SYSTEM_TLABS
 #define PREPARE_LIST_ALLOCATION() \
-    struct alloc_region *region = sys ? &self->sys_cons_tlab : &self->cons_tlab; \
+    struct alloc_region* tlab = sys ? &self->sys_cons_tlab : &self->cons_tlab; \
+    struct alloc_region region = alloc_cooperate_before(tlab, self); \
     int partial_request = (self->arena && !sys) ? \
-                          nbytes : (char*)region->end_addr - (char*)region->free_pointer; \
+                          nbytes : (char*)region.end_addr - (char*)region.free_pointer; \
     gc_assert(nbytes >= (sword_t)partial_request); \
     if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES
 #else /* no system tlabs */
@@ -314,6 +337,7 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
 NO_SANITIZE_MEMORY lispobj alloc_funinstance(sword_t nbytes)
 {
     struct thread *th = get_sb_vm_thread();
+    maybe_suspend_for_gc(th);
     __attribute__((unused)) int result = mutex_acquire(&code_allocator_lock);
     gc_assert(result);
     void* mem = lisp_alloc(0, code_region, nbytes, PAGE_TYPE_CODE, th);
@@ -334,7 +358,7 @@ make_list(lispobj element, sword_t nbytes, int sys) {
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
-        struct cons* c = (void*)lisp_alloc(sys, region, partial_request, PAGE_TYPE_CONS, self);
+        struct cons* c = (void*)lisp_alloc(sys, &region, partial_request, PAGE_TYPE_CONS, self);
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;
@@ -347,6 +371,7 @@ make_list(lispobj element, sword_t nbytes, int sys) {
         partial_request = CONS_PAGE_USABLE_BYTES;
     } while (nbytes);
     *tail = NIL;
+    alloc_cooperate_after(tlab, &region, self);
     return result;
 }
 #endif
@@ -361,7 +386,7 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
-        struct cons* c = (void*)lisp_alloc(sys, region, partial_request, PAGE_TYPE_CONS, self);
+        struct cons* c = (void*)lisp_alloc(sys, &region, partial_request, PAGE_TYPE_CONS, self);
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;
@@ -374,6 +399,7 @@ listify_rest_arg(lispobj* context, sword_t nbytes, int sys) {
         partial_request = CONS_PAGE_USABLE_BYTES;
     } while (nbytes);
     *tail = NIL;
+    alloc_cooperate_after(tlab, &region, self);
     return result;
 }
 #else

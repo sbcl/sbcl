@@ -39,7 +39,7 @@
   (:generator 0
      (emit-label the-label)))
 
-#+sb-safepoint
+#+(or sb-safepoint yieldpoints)
 (define-vop (sb-vm::insert-safepoint)
   (:policy :fast-safe)
   (:translate sb-kernel::gc-safepoint)

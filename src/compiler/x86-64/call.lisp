@@ -887,7 +887,8 @@
   (when (static-fdefn-offset name)
     (let ((fixup (make-fixup name :static-call)))
       (return-from emit-direct-call
-        (inst* instruction (if (sb-c::code-immobile-p node) fixup (ea fixup))))))
+        (note-yieldpoint (inst* instruction
+                                (if (sb-c::code-immobile-p node) fixup (ea fixup)))))))
   (let* ((fixup (make-fixup name :fdefn-call))
          (target
               (if (and (sb-c::code-immobile-p node)
@@ -902,7 +903,7 @@
                     ;; RAX will get loaded regardless.
                     (inst mov rax-tn fixup)
                     rax-tn))))
-    (inst* instruction target)))
+    (note-yieldpoint (inst* instruction target))))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)
@@ -1341,7 +1342,7 @@
            (inst jmp :z done)))
     (unless (node-stack-allocate-p node)
       (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
-    (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
+    (with-allocator (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
        (if (node-stack-allocate-p node)
            (stack-allocation rcx 0 dst)

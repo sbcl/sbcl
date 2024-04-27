@@ -55,6 +55,9 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#ifdef LISP_FEATURE_YIELDPOINTS
+#include <ucontext.h> // probably already included via signal.h
+#endif
 
 #ifdef LISP_FEATURE_BSD
   #include <sys/param.h>
@@ -280,6 +283,9 @@ main(int argc, char __attribute__((unused)) *argv[])
 
     printf(";;; signals\n");
     defconstant("sizeof-sigset_t", sizeof (sigset_t));
+#ifdef LISP_FEATURE_YIELDPOINTS
+    defconstant("sizeof-ucontext_t", sizeof (ucontext_t));
+#endif
     defconstant("sig_block", SIG_BLOCK);
     defconstant("sig_unblock", SIG_UNBLOCK);
     defconstant("sig_setmask", SIG_SETMASK);

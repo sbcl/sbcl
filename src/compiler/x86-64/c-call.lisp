@@ -264,17 +264,14 @@
            (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
            (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) res))))))
 
-#+sb-safepoint
-(defconstant thread-saved-csp-offset (- (1+ sb-vm::thread-header-slots)))
-
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun destroyed-c-registers ()
     ;; Safepoints do not save interrupt contexts to be scanned during
     ;; GCing, it only looks at the stack, so if a register isn't
     ;; spilled it won't be visible to the GC.
-    #+sb-safepoint
+    #+(or sb-safepoint yieldpoints)
     '((:save-p t))
-    #-sb-safepoint
+    #-(or sb-safepoint yieldpoints)
     (let ((gprs (list '#:rcx '#:rdx #-win32 '#:rsi #-win32 '#:rdi
                       '#:r8 '#:r9 '#:r10 '#:r11))
           (vars))
@@ -389,8 +386,8 @@
   ;; the UNDEFINED-ALIEN-TRAMP lisp asm routine to recognize the various shapes
   ;; this instruction sequence can take.
   #-win32
-  (pseudo-atomic (:elide-if (not (call-out-pseudo-atomic-p vop)))
-    (inst call (if (tn-p fun)
+  (let ((operand
+         (if (tn-p fun)
                  fun
                  #-immobile-space (ea (make-fixup fun :foreign 8))
                  #+immobile-space
@@ -401,6 +398,24 @@
                         ;; spilled by Lisp because a C function has to save it if used)
                         (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
                         (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn))))))
+    (cond ((or (call-out-pseudo-atomic-p vop)
+               (policy (sb-c::vop-node vop) (= sb-c:insert-safepoints 0)))
+           #+yieldpoints (inst call operand)
+           #-yieldpoints (pseudo-atomic () (inst call operand)))
+          #+yieldpoints
+          (t
+           ;; GC can run without pausing this thread so long as the thread indicates that
+           ;; it is in foreign code by the saved-csp being nonzero. The PC of the call site
+           ;; can be read from the word below the stack pointer that is saved here,
+           ;; which is important if that PC needs to pin a Lisp function.
+           ;; Possibly TODO: the pre/post-call instructions could be incorporated into the
+           ;; linkage table entry.
+           (inst yieldpoint :call-out)
+           (inst call operand)
+           (inst yieldpoint :call-out-done))
+          #-yieldpoints
+          (t
+           (inst call operand))))
 
   ;; On win64, we don't support immobile space (yet) and calls go through one of
   ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is

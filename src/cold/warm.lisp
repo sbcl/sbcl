@@ -173,6 +173,7 @@ sb-kernel::
                                     (sb-c:insert-step-conditions 0)
                                     (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)))
                         (compile-file (concatenate 'string *sbclroot* stem)
+                                      ;:trace-file t :print t
                                       :output-file output)))
                      ((nil) output))
                   (cond ((not output-truename)
