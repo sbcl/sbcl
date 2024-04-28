@@ -4396,20 +4396,19 @@ static inline uword_t word_has_stickymark(uword_t word) {
           (write-structure-type (layout-info (find-layout 'sb-brothertree::binary-node))
                                 stream "binary_node")
           (format stream "extern uword_t brothertree_find_lesseql(uword_t key, lispobj tree);~%"))
-        (dolist (class '(defstruct-description package
-                         ;; FIXME: probably these should be external?
-                         sb-lockless::split-ordered-list
-                         sb-vm::arena
-                         sb-c::compiled-debug-info))
-          (out-to (string-downcase class)
-            ;; parent/child structs like to be output as one header, child first
-            (let ((child (case class
-                           (sb-c::compiled-debug-info 'sb-c::compiled-debug-fun)
-                           (defstruct-description 'defstruct-slot-description)
-                           (package 'sb-impl::symbol-table))))
-              (when child
-                (write-structure-type (layout-info (find-layout child)) stream)))
-            (write-structure-type (layout-info (find-layout class)) stream)))
+      (dolist (class '(defstruct-description package
+                       ;; FIXME: probably these should be external?
+                       sb-lockless::split-ordered-list
+                       sb-vm::arena
+                       sb-c::compiled-debug-info))
+        (out-to (string-downcase class)
+                ;; parent/child structs like to be output as one header, child first
+                (let ((child (case class
+                               (defstruct-description 'defstruct-slot-description)
+                               (package 'sb-impl::symbol-table))))
+                  (when child
+                    (write-structure-type (layout-info (find-layout child)) stream)))
+                (write-structure-type (layout-info (find-layout class)) stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
                                 :direction :output :if-exists :supersede)
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
