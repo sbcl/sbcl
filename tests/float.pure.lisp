@@ -820,3 +820,12 @@
 (with-test (:name :rational-not-bignum)
   (assert (equal (type-of (eval '(rational -4.3973217e12)))
                  (type-of -4397321682944))))
+
+(with-test (:name :single-to-double-comparsion)
+  (assert (= (count 'sb-kernel:%double-float
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (single-float x))
+                        (= x 1d0))
+                     nil))
+             0)))

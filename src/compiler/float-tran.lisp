@@ -1428,6 +1428,31 @@
       (give-up-ir1-transform)
       `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y)))
 
+(deftransform double-float-real-contagion-cmp ((x y) * * :node node :defun-only t)
+  (cond ((csubtypep (lvar-type y) (specifier-type 'double-float))
+         (give-up-ir1-transform))
+        ;; Turn (= single-float 1d0) into (= single-float 1f0)
+        ((and (constant-lvar-p x)
+              (csubtypep (lvar-type y) (specifier-type 'single-float))
+              (let ((x (lvar-value x)))
+                (when (and (safe-single-coercion-p x)
+                           (= x (coerce x 'single-float)))
+                  `(,(lvar-fun-name (basic-combination-fun node)) ,(coerce x 'single-float) y)))))
+        (t
+         `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y)))))
+
+(deftransform real-double-float-contagion-cmp ((x y) * * :node node :defun-only t)
+  (cond ((csubtypep (lvar-type x) (specifier-type 'double-float))
+         (give-up-ir1-transform))
+        ((and (constant-lvar-p y)
+              (csubtypep (lvar-type x) (specifier-type 'single-float))
+              (let ((y (lvar-value y)))
+                (when (and (safe-single-coercion-p y)
+                           (= y (coerce y 'single-float)))
+                  `(,(lvar-fun-name (basic-combination-fun node)) x ,(coerce y 'single-float))))))
+        (t
+         `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y))))
+
 (flet ((def (op)
          (%deftransform op nil '(function (single-float real) single-float)
                         #'single-float-real-contagion nil)
@@ -1462,12 +1487,12 @@
                                            (or single-float
                                                (integer ,most-negative-exactly-double-float-integer
                                                         ,most-positive-exactly-double-float-integer))))
-                        #'double-float-real-contagion nil)
+                        #'double-float-real-contagion-cmp nil)
          (%deftransform op nil `(function ((or single-float
                                                (integer ,most-negative-exactly-double-float-integer
                                                         ,most-positive-exactly-double-float-integer))
                                            double-float))
-                        #'real-double-float-contagion nil)))
+                        #'real-double-float-contagion-cmp nil)))
   (dolist (op '(= < > <= >=))
     (def op)))
 
