@@ -56,8 +56,19 @@
 (define-load-time-global sb-fasl::*asm-routine-index-to-name* #())
 (declaim (simple-vector sb-fasl::*asm-routine-index-to-name*))
 
-(flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p
-               real-code-obj)
+;;; Fasl files encode <flavor,kind> in a packed integer. Dispatching on the integer
+;;; is simple, but the case keys still want to be symbols.
+(defmacro fixup-flavor-case (flavor-id &rest clauses)
+  (declare (notinline position))
+  `(ecase ,flavor-id
+     ,@(mapcar (lambda (clause)
+                 (cons (mapcar (lambda (kwd) (sb-fasl::encoded-fixup-flavor kwd))
+                               (ensure-list (car clause)))
+                       (cdr clause)))
+               clauses)))
+
+(flet ((fixup (code-obj offset name kind flavor-id preserved-lists statically-link-p
+               real-code-obj &aux (flavor (aref sb-fasl::+fixup-flavors+ flavor-id)))
          (declare (ignorable statically-link-p preserved-lists))
          ;; NAME depends on the kind and flavor of fixup.
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
@@ -67,7 +78,7 @@
          ;; and the other is LOAD-CODE, both of which pin the code.
          (sb-vm:fixup-code-object
                  code-obj offset
-                 (ecase flavor
+                 (fixup-flavor-case flavor-id
                    ((:assembly-routine :assembly-routine*)
                     (or (get-asm-routine name (eq flavor :assembly-routine*))
                         (error "undefined assembler routine: ~S" name)))
@@ -126,15 +137,16 @@
         (setf (gethash code-obj *allocation-patch-points*) it))
       (loop
         (when (>= index end) (return))
-        (binding* (((offset kind flavor data)
+        (binding* (((offset kind flavor-id data)
                     (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
+                   (flavor (aref sb-fasl::+fixup-flavors+ flavor-id))
                    (name
                     (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
                           ((and (plusp data)
                                 (member flavor '(:assembly-routine :assembly-routine*)))
                            (aref sb-fasl::*asm-routine-index-to-name* data))
                           (t (svref fixups (incf index))))))
-          (fixup code-obj offset name kind flavor preserved nil real-code-obj)))
+          (fixup code-obj offset name kind flavor-id preserved nil real-code-obj)))
       (finish-fixups code-obj preserved)))
 
   (defun apply-core-fixups (code-obj fixup-notes retained-fixups real-code-obj)
@@ -148,7 +160,7 @@
           (fixup code-obj offset
                  (fixup-name fixup)
                  (fixup-note-kind note)
-                 (fixup-flavor fixup)
+                 (sb-fasl::encoded-fixup-flavor (fixup-flavor fixup))
                  preserved t
                  real-code-obj)))
       (finish-fixups code-obj preserved))))

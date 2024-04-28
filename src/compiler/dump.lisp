@@ -1049,6 +1049,10 @@
     :layout-id)
   #'equalp)
 
+(defun encoded-fixup-flavor (flavor)
+  (or (position flavor +fixup-flavors+)
+      (error "Bad fixup flavor ~s" flavor)))
+
 ;;; Pack the aspects of a fixup into an integer.
 ;;; DATA is for asm routine fixups. The routine can be represented in 8 bits,
 ;;; so the fixup can be reduced to one word instead of an integer and a symbol.
@@ -1058,9 +1062,7 @@
           (the (mod 16) (or (position kind +fixup-kinds+)
                            (error "Bad fixup kind ~s" kind)))
           ;; 4 bits
-          (ash (the (mod 16) (or (position flavor +fixup-flavors+)
-                                 (error "Bad fixup flavor ~s" flavor)))
-               4)
+          (ash (the (mod 16) (encoded-fixup-flavor flavor)) 4)
           ;; 8 bits
           (ash (the (mod 256) data) 8)
           ;; whatever it needs
@@ -1068,10 +1070,10 @@
 
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
 (declaim (inline !unpack-fixup-info))
-(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor data)
+(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor-id data)
   (values (ash packed-info -16)
           (aref +fixup-kinds+ (ldb (byte 4 0) packed-info))
-          (aref +fixup-flavors+ (ldb (byte 4 4) packed-info))
+          (ldb (byte 4 4) packed-info)
           (ldb (byte 8 8) packed-info)))
 
 #-(or x86 x86-64) ; these two architectures provide an overriding definition

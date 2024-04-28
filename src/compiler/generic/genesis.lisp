@@ -2931,8 +2931,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                          (cold-symbol-value 'sb-c::*!cold-allocation-patch-point*))))
   (loop
     (when (>= index end) (return))
-    (binding* (((offset kind flavor)
+    (binding* (((offset kind flavor-id)
                 (!unpack-fixup-info (descriptor-integer (svref fixups (incf index)))))
+               (flavor (aref +fixup-flavors+ flavor-id))
                (name (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
                            (t (svref fixups (incf index)))))
                (string
