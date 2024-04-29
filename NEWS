@@ -1,10 +1,46 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.3:
+  * minor incompatible change: after-GC hooks are now called in the finalizer
+    thread on threaded builds.
+  * platform support:
+    ** on win32 on 64-bit systems, clear x87 state as well as SSE state after
+       an exception.  (lp#2000435, reported by David Scherfgen)
+  * enhancement: type assertions resulting from declarations involving variable
+    numbers of multiple values are now checked.
+  * enhancement: support for memory allocation arenas is now available on the
+    arm64 platform.
+  * enhancement: the cross-referencing facility is now able to handle
+    anonymous functions.
+  * enhacnement: the SB-INTROSPECT contrib finds callees in methods of generic
+    functions.
+  * bug fix: inconsistency in VOP definitions implementing DPB.  (lp#2059842)
+  * bug fix: MASK-FIELD miscompilation.  (lp#2059849)
+  * bug fix: caching a state-dependent type function leads to wrong type
+    inference further down the line.  (lp#2059888)
+  * bug fix: internal consistency violation after failing to apply a
+    MAKE-ARRAY transform.  (lp#2060083)
+  * bug fix: check the array index before constant-folding an array reference.
+    (lp#2060347)
+  * bug fix: don't try to apply type constraints from SATISFIES
+    types.  (lp#2060756)
+  * bug fix: the JOIN-THREAD-PROBLEM function is now exported from the
+    SB-THREAD package.  (lp#2063385, thanks to Benjamin Lee)
+  * bug fix: compare-and-swap works as expected on SLOT-VALUE of
+    FUNCALLABLE-STANDARD-OBJECT instances.  (reported by qhong)
+  * bug fix: on arm64, and x86-64 with some non-default build options, integer
+    rounding functions treat minus zero more consistently.
+  * bug fix: disassembly of stack allocation of vectors caused a crash.
+    (reported by bohonghuang)
+  * bug fix: don't leak memory when decompressing a compressed core.
   * optimization: the amount of space needed for debug-info is about 50% less,
     leading to a total default image size reduction of more than 10%.
-  * bug fix: on Arm64, and x86-64 with some non-default build options, integer
-    rounding functions treat minus zero more consistently.
+  * optimization: on arm64 and x86-64, encoding constants in machine code is
+    sometimes smaller.
+  * optimization: on arm64 and x86-64, list accumulation is done with less
+    space overhead.
+  * optimization: APPLY can apply a function to the REST of a &REST list
+    without additional consing.
 
 changes in sbcl-2.4.3 relative to sbcl-2.4.2:
   * enhancement: when dumping debug information to fasl files, the system
