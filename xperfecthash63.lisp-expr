@@ -1990,12 +1990,5 @@
   (let ((b (& (>> val 5) #xf)))
    (let ((a (>> (<< val 31) 28)))
     (^ a (aref tab b))))))")
-(#(19A804F1 3D6712AB 42354AFF 511F123D 52F791B3 8AFF6C0B B6C53C5B C4F3111F CB28EF79 CB2A2A51 E7BDDEAC EED915AA F1366560
-   FB4D653B)
- "(:STATIC-CALL :FDEFN-CALL :SYMBOL-VALUE :IMMOBILE-SYMBOL :CARD-TABLE-INDEX-MASK :LAYOUT-ID :LAYOUT :CODE-OBJECT :FOREIGN-DATAREF :FOREIGN :ALIEN-DATA-LINKAGE-INDEX :ALIEN-CODE-LINKAGE-INDEX :ASSEMBLY-ROUTINE* :ASSEMBLY-ROUTINE)"
- "((let ((tab #a((8) (unsigned-byte 8) 14 0 0 0 0 14 1 8)))
-  (let ((b (& (>> val 4) #x7)))
-   (let ((a (>> (<< val 5) 29)))
-    (^ a (aref tab b))))))")
 )
 ;; EOF
