@@ -829,3 +829,30 @@
                         (= x 1d0))
                      nil))
              0)))
+
+(with-test (:name :float-to-known-comparison)
+  (assert (= (count 'sb-int:single-float-p
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (float x)
+                                 (optimize speed))
+                        (= x 1d0))
+                     nil))
+             1))
+  (assert (= (count 'sb-int:single-float-p
+                    (ctu:ir1-named-calls
+                     `(lambda (x y)
+                        (declare (float x)
+                                 ((signed-byte 8) y)
+                                 (optimize speed))
+                        (= x y))
+                     nil))
+             1))
+  (assert (= (count 'sb-int:single-float-p
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (float x)
+                                 (optimize (speed 1)))
+                        (= x 1d0))
+                     nil))
+             0)))
