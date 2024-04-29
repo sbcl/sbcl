@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.3:
+changes in sbcl-2.4.4 relative to sbcl-2.4.3:
   * minor incompatible change: after-GC hooks are now called in the finalizer
     thread on threaded builds.
   * platform support:
