@@ -628,8 +628,18 @@
     (if (simple-vector-p vector)
         (locally
             (declare (optimize (speed 3) (safety 0))) ; transform will kick in
-          (fill (truly-the simple-vector vector) item
-                :start start :end end))
+          (cond #+soft-card-marks
+                ((sb-c::unless-vop-existsp (:named sb-kernel:vector-fill/t)
+                   (typep item '(or fixnum boolean)))
+                 ;; No gc-card mark for these types
+                 ;; Omit character and single-float for better
+                 ;; type-checking, they are likely to go a
+                 ;; specialized array.
+                 (fill (truly-the simple-vector vector) item
+                       :start start :end end))
+                (t
+                 (fill (truly-the simple-vector vector) item
+                       :start start :end end))))
         (let* ((widetag (%other-pointer-widetag vector))
                (bashers (svref %%fill-bashers%% widetag)))
           (macrolet ((fill-float (type)
