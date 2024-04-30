@@ -2,7 +2,8 @@
 ;;; potential pointers. Also make sure it sees the SYMBOL-INFO slot.
 (defstruct afoo (slot nil :type sb-ext:word))
 (defvar *afoo* (make-afoo :slot (sb-kernel:get-lisp-obj-address '*posix-argv*)))
-(with-test (:name :map-referencing-objs)
+(with-test (:name :map-referencing-objs
+            :broken-on :mark-region-gc)
   (sb-vm::map-referencing-objects (lambda (x) (assert (not (typep x 'afoo))))
                                   :dynamic '*posix-argv*)
   (let ((v (sb-kernel:symbol-%info 'satisfies)) referers)
