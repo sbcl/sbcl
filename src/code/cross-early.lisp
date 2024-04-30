@@ -168,6 +168,9 @@
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (sb-xc:= x 0)))
 
+(declaim (inline minusp))
+(defun minusp (x) (if (rationalp x) (< x 0) (sb-xc:< x 0)))
+
 (declaim (inline expt))
 (defun expt (base power)
   (if (and (rationalp base) (integerp power))

@@ -178,7 +178,7 @@
     ;; RATIONALP isn't here because its behavior is unchanged.
     "FLOATP" "REALP" "COMPLEXP" "NUMBERP"
     "COERCE" "EXP" "EXPT" "LOG" "SIGNUM" "IMAGPART" "REALPART"
-    "ZEROP" "ABS" "SIGNUM"
+    "ZEROP" "MINUSP" "ABS" "SIGNUM"
     "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
     ;; Float decoding:
     "DECODE-FLOAT" "INTEGER-DECODE-FLOAT" "FLOAT-SIGN"
