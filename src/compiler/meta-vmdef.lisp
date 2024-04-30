@@ -2010,12 +2010,18 @@
     (let ((n-head nil)
           (n-prev nil))
       (dolist (op fixed)
-        (let ((n-ref (gensym)))
-          (binds `(,n-ref (reference-tn ,op ,write-p)))
-          (if n-prev
-              (forms `(setf (tn-ref-across ,n-prev) ,n-ref))
-              (setq n-head n-ref))
-          (setq n-prev n-ref)))
+        (multiple-value-bind (op lvar)
+            (if (typep op '(cons (eql :lvar)))
+                (values (third op) (second op))
+                op)
+          (let ((n-ref (gensym)))
+            (binds `(,n-ref (reference-tn ,op ,write-p)))
+            (when lvar
+              (forms `(setf (tn-ref-type ,n-ref) (lvar-type ,lvar))))
+            (if n-prev
+                (forms `(setf (tn-ref-across ,n-prev) ,n-ref))
+                (setq n-head n-ref))
+            (setq n-prev n-ref))))
 
       (when more
         (let ((n-more (gensym)))

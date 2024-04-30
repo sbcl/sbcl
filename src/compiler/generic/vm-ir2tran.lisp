@@ -47,7 +47,7 @@
 
 (defoptimizer ir2-convert-setter ((object value) node block name offset lowtag)
   (let ((value-tn (lvar-tn node block value)))
-    (vop set-slot node block (lvar-tn node block object) value-tn
+    (vop set-slot node block (lvar-tn node block object) (:lvar value value-tn)
          name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
@@ -67,8 +67,8 @@
          (res (first locs)))
     (vop compare-and-swap-slot node block
          (lvar-tn node block object)
-         (lvar-tn node block old)
-         (lvar-tn node block new)
+         (:lvar old (lvar-tn node block old))
+         (:lvar new (lvar-tn node block new))
          name offset lowtag
          res)
     (move-lvar-result node block locs lvar)))
