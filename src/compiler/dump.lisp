@@ -236,16 +236,14 @@
 
 ;; Dump a word-sized integer.
 (defun dump-word (num fasl-output)
-  (declare (type sb-vm:word num))
-  (declare (type fasl-output fasl-output))
+  (declare (type sb-vm:word num) (type fasl-output fasl-output))
   (let ((stream (fasl-output-stream fasl-output)))
     (dotimes (i sb-vm:n-word-bytes)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
 
 ;; Dump a 32-bit integer.
 (defun dump-unsigned-byte-32 (num fasl-output)
-  (declare (type sb-vm:word num))
-  (declare (type fasl-output fasl-output))
+  (declare (type (unsigned-byte 32) num) (type fasl-output fasl-output))
   (let ((stream (fasl-output-stream fasl-output)))
     (dotimes (i 4)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
