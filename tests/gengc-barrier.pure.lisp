@@ -20,7 +20,7 @@
     (assert (= actual (- sb-vm::*store-barriers-emitted* old-actual)))))
 
 (with-test (:name :rplaca-union-types)
-  (assert-barriers 1 0 
+  (assert-barriers 1 0
                    `(lambda (x y)
                       (when (typep y '(or fixnum null))
                         (rplaca x y)))))

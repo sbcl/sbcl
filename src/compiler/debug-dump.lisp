@@ -1047,22 +1047,11 @@
 #+(and sb-core-compression (not sb-xc-host))
 (progn
   (defun compress (vector)
-    (with-alien ((compress-vector (function (* char) (* char) (* size-t)) :extern "compress_vector")
-                 (size size-t))
-      (let* ((data (truly-the (simple-array * (*)) (%array-data vector)))
-             (pointer
-               (with-pinned-objects (data)
-                 (%shrink-vector data (length vector))
-                 (alien-funcall compress-vector (int-sap (get-lisp-obj-address data)) (addr size))))
-             (length size))
-        (if (and (plusp length)
-                 (< length (length data)))
-            (let ((new (make-array length :element-type '(signed-byte 8))))
-              (loop for i below length
-                    do (setf (aref new i) (deref pointer i)))
-              (free-alien pointer)
-              new)
-            data))))
+    (with-alien ((compress-vector (function int (* char) size-t) :extern "compress_vector"))
+      (let* ((data (truly-the (simple-array * (*)) (%array-data vector))))
+        (with-pinned-objects (data)
+          (alien-funcall compress-vector (int-sap (get-lisp-obj-address data)) (length vector)))
+        data)))
 
   (defun decompress (vector)
     (if (typep vector '(simple-array (signed-byte 8) (*)))

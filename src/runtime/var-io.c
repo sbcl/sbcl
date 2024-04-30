@@ -111,23 +111,32 @@ void skip_data_stream(struct varint_unpacker* unpacker)
     int val;
     while (varint_unpack(unpacker, &val) && val != 0) { }
 }
-
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-char* compress_vector(lispobj vector, size_t *result_size) {
+int compress_vector(lispobj vector, lispobj end) {
     struct vector *v = VECTOR(vector);
-    size_t bytes = vector_len(v);
+    size_t current_length = (size_t) vector_len(v);
 
-
-    size_t buf_size = ZSTD_compressBound(bytes);
+    size_t buf_size = ZSTD_compressBound(end);
     char* buf = successful_malloc(buf_size);
-    size_t ret = ZSTD_compress(buf, buf_size, v->data, bytes, 22);
-    if (ZSTD_isError(ret)) {
-        *result_size = 0;
+    size_t new_length = ZSTD_compress(buf, buf_size, v->data, end, 22);
+    if (ZSTD_isError(new_length)) {
         free(buf);
-        return NULL;
+        return 0;
     }
-    *result_size = ret;
-    return buf;
+
+    if (new_length < current_length) {
+        assign_widetag(&v->header, SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG);
+        memcpy(&v->data, buf, new_length);
+        memset(((char*)&v->data)+new_length, 0, current_length-new_length);
+        v->length_ = make_fixnum(new_length);
+        free(buf);
+        return 1;
+    }
+    /* Shrink the data vector from an adjustable vector. */
+    memset(((char*)&v->data)+end, 0, current_length-end);
+    v->length_ = make_fixnum(end);
+    free(buf);
+    return 0;
 }
 
 unsigned char* decompress_vector(lispobj vector, size_t *result_size) {
@@ -142,7 +151,7 @@ unsigned char* decompress_vector(lispobj vector, size_t *result_size) {
     size_t out_increment = ZSTD_CStreamOutSize();
     size_t buf_size = 0;
 
-    char* buf = NULL;
+    unsigned char* buf = NULL;
     size_t ret;
 
     ZSTD_DStream *stream = ZSTD_createDStream();
@@ -181,20 +190,11 @@ void compress_debug_info(lispobj * code_ptr) {
         di = (void*)native_pointer(CONS(code->debug_info)->car);
     else
         return;
-
     struct vector *v = VECTOR(di->fun_map);
     if (widetag_of(&v->header) != SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG)
         return;
-    size_t length;
-    char* compressed = compress_vector(di->fun_map, &length);
-    size_t current_length = (size_t) vector_len(v);
-    if (length > 0 && length < current_length) {
-        assign_widetag(&v->header, SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG);
-        v->length_ = make_fixnum(length);
-        memcpy(&v->data, compressed, length);
-        memset(((char*)&v->data)+length, 0, current_length-length);
-        free(compressed);
-    }
+
+    compress_vector(di->fun_map, vector_len(v));
 
 }
 #endif
