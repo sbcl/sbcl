@@ -924,15 +924,6 @@
             (t
              (sub-dump-object obj file))))))
 
-(macrolet (#+sb-xc-host
-           (%other-pointer-widetag (x)
-             `(if (bit-vector-p ,x)
-                  sb-vm:simple-bit-vector-widetag
-                  (sb-vm:saetp-typecode
-                   (find (sb-xc:array-element-type ,x)
-                         sb-vm:*specialized-array-element-type-properties*
-                         :key #'sb-vm:saetp-specifier :test #'equal)))))
-
 (defun dump-specialized-vector (vector file &key data-only)
   ;; The DATA-ONLY option was for the now-obsolete trace-table,
   ;; but it seems like a good option to keep around.
@@ -959,7 +950,7 @@
                             vector
                             0
                             (ceiling (* length bits-per-elt) sb-vm:n-byte-bits)
-                            #+sb-xc-host bits-per-elt))))
+                            #+sb-xc-host bits-per-elt)))
 
 ;;; Dump string-ish things.
 

@@ -97,6 +97,14 @@
 (deftype sb-xc:simple-vector ()
   '(and cl:simple-vector (not (satisfies target-specialized-array-p))))
 
+(defun %other-pointer-widetag (x)
+  (if (bit-vector-p x)
+      sb-vm:simple-bit-vector-widetag
+      (sb-vm:saetp-typecode
+       (find (sb-xc:array-element-type x)
+             sb-vm:*specialized-array-element-type-properties*
+             :key #'sb-vm:saetp-specifier :test #'equal))))
+
 (defun sb-cold::clear-specialized-array-registry ()
   (let ((registry *array-to-specialization*))
     (maphash (lambda (key value)
