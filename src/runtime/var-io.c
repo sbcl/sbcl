@@ -178,23 +178,4 @@ unsigned char* decompress_vector(lispobj vector, size_t *result_size) {
     *result_size = buf_size;
     return buf;
 }
-
-void compress_debug_info(lispobj * code_ptr) {
-    struct code* code = (struct code*)code_ptr;
-
-    struct compiled_debug_info *di;
-
-    if (instancep(code->debug_info))
-        di = (void*)native_pointer(code->debug_info);
-    else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
-        di = (void*)native_pointer(CONS(code->debug_info)->car);
-    else
-        return;
-    struct vector *v = VECTOR(di->fun_map);
-    if (widetag_of(&v->header) != SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG)
-        return;
-
-    compress_vector(di->fun_map, vector_len(v));
-
-}
 #endif

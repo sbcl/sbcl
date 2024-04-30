@@ -287,6 +287,17 @@ Please check that all strings which were not recognizable to the compiler
       (format t "~&Removed ~D doc string~:P" count)))
 )
 
+#+sb-core-compression
+(defun compress-debug-info (code)
+  (let ((info (sb-c::%code-debug-info code)))
+    (when (typep info 'sb-c::compiled-debug-info)
+      (let ((map (sb-c::compiled-debug-info-fun-map info)))
+        (when (typep map '(simple-array (unsigned-byte 8) (*)))
+          (sb-alien:with-alien ((compress-vector (function int (* char) size-t) :extern "compress_vector"))
+            (sb-sys:with-pinned-objects (map)
+              (sb-alien:alien-funcall compress-vector
+                                      (sb-sys:int-sap (sb-kernel:get-lisp-obj-address map))
+                                      (length map)))))))))
 (progn
   ;; Remove source forms of compiled-to-memory lambda expressions.
   ;; The disassembler is the major culprit for retention of these,
@@ -302,6 +313,8 @@ Please check that all strings which were not recognizable to the compiler
        (when (typep obj 'sb-c::core-debug-source)
          (setf (sb-c::core-debug-source-form obj) nil)))
       (#.sb-vm:code-header-widetag
+       #+sb-core-compression
+       (compress-debug-info obj)
        (dotimes (i (sb-kernel:code-n-entries obj))
          (let ((fun (sb-kernel:%code-entry-point obj i)))
            (when (sb-kernel:%simple-fun-lexpr fun)

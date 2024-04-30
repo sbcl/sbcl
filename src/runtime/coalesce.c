@@ -187,9 +187,6 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                 continue;
             }
             case CODE_HEADER_WIDETAG:
-#ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-                compress_debug_info(where);
-#endif
                 coalesce_nwords = code_header_words((struct code*)where);
                 break;
             }
