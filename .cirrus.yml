@@ -11,7 +11,7 @@ freebsd_build_task:
 
   build_script:
     - echo '"1.9.99.999"' > version.lisp-expr
-    - ./make.sh
+    - ./make.sh --with-sb-core-compression
 
   test_script:
     - cd tests; ./run-tests.sh
