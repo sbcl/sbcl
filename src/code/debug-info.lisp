@@ -80,6 +80,7 @@
 
 (defstruct (compiled-debug-fun (:include debug-fun)
                                (:copier nil)
+                               #-sb-xc-host
                                (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
