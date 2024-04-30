@@ -13,6 +13,7 @@
 #include "var-io.h"
 #include "genesis/number-types.h"
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+# include <stdlib.h>
 # include <zstd.h>
 # include "genesis/vector.h"
 # include "genesis/cons.h"
