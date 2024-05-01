@@ -360,31 +360,36 @@
                             (truncate object))
                            (t
                             object)))
-             (condition
-               (make-condition (if (and (%instancep object)
-                                        (layout-invalid (%instance-layout object)))
-                                   ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
-                                   ;; more information in that it says that the object may have at some point
-                                   ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
-                                   'layout-invalid
-                                   'type-error)
-                               :datum object
-                               :expected-type (typecase type
-                                                (classoid-cell
-                                                 (classoid-cell-name type))
-                                                (layout
-                                                 (layout-proper-name type))
-                                                (t
-                                                 type))
-                               :context (and (not (integerp context))
-                                             (not (eq context 'cerror))
-                                             context))))
-        (cond ((integerp context)
-               (restart-type-error type condition context))
-              ((eq context 'cerror)
-               (restart-type-error type condition))
-              (t
-               (error condition))))))
+             (expected-type (typecase type
+                              (classoid-cell
+                               (classoid-cell-name type))
+                              (layout
+                               (layout-proper-name type))
+                              (t
+                               type))))
+        (if (typep context '(cons (eql format)))
+            (sb-format::format-error-at (second context) (third context)
+                                        (format nil "~~S is not of type ~S" type)
+                                        object)
+            (let ((condition
+                    (make-condition (if (and (%instancep object)
+                                             (layout-invalid (%instance-layout object)))
+                                        ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
+                                        ;; more information in that it says that the object may have at some point
+                                        ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
+                                        'layout-invalid
+                                        'type-error)
+                                    :datum object
+                                    :expected-type expected-type
+                                    :context (and (not (integerp context))
+                                                  (not (eq context 'cerror))
+                                                  context))))
+              (cond ((integerp context)
+                     (restart-type-error type condition context))
+                    ((eq context 'cerror)
+                     (restart-type-error type condition))
+                    (t
+                     (error condition))))))))
 
 (macrolet ((def (errname fun-name)
              `(setf (svref **internal-error-handlers**

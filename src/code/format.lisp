@@ -594,10 +594,7 @@
 (def-format-directive #\C (colonp atsignp params string end)
   (expand-bind-defaults () params
     (let ((n-arg (gensym "ARG")))
-      `(let ((,n-arg ,(expand-next-arg)))
-         (unless (typep ,n-arg 'character)
-           (format-error-at ,string ,(1- end)
-                            "~S is not of type CHARACTER." ,n-arg))
+      `(let ((,n-arg (the* (character :context (format ,string ,(1- end))) ,(expand-next-arg))))
          ,(cond (colonp
                  `(format-print-named-character ,n-arg stream))
                 (atsignp

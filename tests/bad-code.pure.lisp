@@ -772,3 +772,10 @@
                      (checked-compile
                       `(lambda () (declare (sb-ext:muffle-conditions foo)) nil)
                       :allow-style-warnings t))))
+
+(with-test (:name :format-char)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (format t "~c" 1))
+                      :allow-warnings t))))

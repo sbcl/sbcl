@@ -1166,7 +1166,7 @@ care."
                         (values-specifier-type value-type)))
         (*current-path* (if source-form
                             (ensure-source-path source-form)
-                            *current-path*))
+                            (ensure-source-path form)))
         (context (cond (restart
                         ;; For now, these share the same place in the debug info
                         (aver (not context))
