@@ -78,7 +78,14 @@
                (and info (ir1-attributep (fun-info-attributes info)
                                          foldable)))
              (and (every (lambda (arg)
-                           (%constantp arg environment envp))
+                           ;; filter-lvar inserts dummy constants,
+                           ;; while the forms are clearly not
+                           ;; constant. Most functions fail on them.
+                           ;; But there's a problem with error
+                           ;; signaling during cold init.
+                           ;; And some functions might not signal errors at all.
+                           (unless (constant-p arg)
+                             (%constantp arg environment envp)))
                          (cdr form))))
         ;; Even though the function may be marked as foldable
         ;; the call may still signal an error -- eg: (CAR 1).
