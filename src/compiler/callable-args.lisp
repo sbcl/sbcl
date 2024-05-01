@@ -254,7 +254,7 @@
                       lvar-type)
                      ((symbolp fun-name)
                       (if (or (fun-lexically-notinline-p fun-name
-                                                         (node-lexenv (node-dest node)))
+                                                         (node-lexenv (lvar-dest (node-lvar node))))
                               (and (or asserted-type
                                        defined-here)
                                    (neq (info :function :where-from fun-name) :declared)))
