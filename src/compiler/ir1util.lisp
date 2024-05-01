@@ -133,7 +133,7 @@
          (lambda-var-p (ref-leaf ref))
          (ref-leaf ref))))
 
-;;; Look through casts and variables
+;;; Look through casts and variables, m-v-bind+values
 (defun map-all-uses (function lvar)
   (declare (dynamic-extent function))
   (labels ((recurse-lvar (lvar)
@@ -142,9 +142,31 @@
            (recurse (use)
              (cond ((ref-p use)
                     (let ((lvar (lambda-var-ref-lvar use)))
-                      (if lvar
-                          (recurse-lvar lvar)
-                          (funcall function use))))
+                      (cond (lvar
+                             (recurse-lvar lvar))
+                            ((let ((var (ref-leaf use)))
+                               (when (and (lambda-var-p var)
+                                          (not (lambda-var-sets var)))
+                                 (let ((fun (lambda-var-home var)))
+                                   (when (functional-kind-eq fun mv-let)
+                                     (let* ((fun (lambda-var-home var))
+                                            (n-value (position-or-lose var (lambda-vars fun)))
+                                            (args (basic-combination-args (let-combination fun))))
+                                       (when (singleton-p args)
+                                         (let ((all-processed t))
+                                           (do-uses (use (car args))
+                                             (unless (when (and (combination-p use)
+                                                                (eq (lvar-fun-name (combination-fun use))
+                                                                    'values))
+                                                       (let ((lvar (nth n-value (combination-args use))))
+                                                         (when lvar
+                                                           (recurse-lvar lvar)
+                                                           t)))
+                                               (setf all-processed nil)))
+                                           all-processed))))))))
+                            (t
+                             (funcall function use)))))
+
                    ((cast-p use)
                     (recurse-lvar (cast-value use)))
                    (t

@@ -796,3 +796,14 @@
                                    (lambda (x)
                                      (< x 0)))))
                       :allow-style-warnings t))))
+
+(with-test (:name :see-through-mv-let+values)
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda (x f)
+                         (multiple-value-bind (f key)
+                             (if f
+                                 (values f #'car)
+                                 (values #'1+ #'cdr))
+                           (sort x f :key key)))
+                      :allow-style-warnings t))))

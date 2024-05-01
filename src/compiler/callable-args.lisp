@@ -537,12 +537,12 @@
                          (eq (basic-combination-fun dest) lvar)))
             (multiple-value-bind (args results)
                 (function-designator-lvar-types annotation)
-              (let* ((condition (if (consp (lvar-uses lvar))
-                                    'simple-style-warning
+              (let* ((condition (if (eq node (principal-lvar-use lvar))
                                     (callable-argument-lossage-kind name
                                                                     leaf
                                                                     'simple-style-warning
-                                                                    'simple-warning)))
+                                                                    'simple-warning)
+                                    'simple-style-warning))
                      (type-condition (case condition
                                        (simple-style-warning
                                         'type-style-warning)
