@@ -205,9 +205,9 @@
                (filter-lvar lvar
                             (if signedp
                                 (lambda (dummy)
-                                  `(mask-signed-field ,width ,dummy))
+                                  `(truly-the (signed-byte ,width) (mask-signed-field ,width ,dummy)))
                                 (lambda (dummy)
-                                  `(logand ,dummy ,(ldb (byte width 0) -1)))))
+                                  `(truly-the (unsigned-byte ,width) (logand ,dummy ,(ldb (byte width 0) -1))))))
                (do-uses (node lvar)
                  (setf (block-reoptimize (node-block node)) t)
                  (reoptimize-component (node-component node) :maybe))
