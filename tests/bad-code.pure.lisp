@@ -779,3 +779,10 @@
                       `(lambda ()
                          (format t "~c" 1))
                       :allow-warnings t))))
+
+(with-test (:name :format-r)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (format t "~r" t))
+                      :allow-warnings t))))

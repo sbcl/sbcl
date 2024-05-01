@@ -727,7 +727,6 @@
 
 (with-test (:name (format :type-check))
   (assert (equal "1/10" (format nil "~2r" 1/2)))
-  (assert-error (format nil "~r" 1.32) sb-format:format-error)
   (assert (equal "1/10" (eval '(format nil "~2r" 1/2))))
   (assert-error (eval '(format nil "~r" 1.32)) sb-format:format-error)
   (assert-error (eval '(format nil "~c" 1.32)) sb-format:format-error))

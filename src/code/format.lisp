@@ -644,11 +644,16 @@
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
-    (let ((n-arg (gensym "ARG")))
-      `(let ((,n-arg ,(expand-next-arg)))
-         (unless (or ,base
-                     (integerp ,n-arg))
-           (format-error-at ,string ,(1- end) "~S is not of type INTEGER." ,n-arg))
+
+    (let ((n-arg (gensym "ARG"))
+          (expanded-arg (expand-next-arg)))
+      `(let ((,n-arg ,(if (car params)
+                          expanded-arg
+                          `(the* (integer :context (format ,string ,(1- end))) ,expanded-arg))))
+         ,@(if (car params)
+               `((unless (or ,base
+                             (integerp ,n-arg))
+                   (format-error-at ,string ,(1- end) "~S is not of type INTEGER." ,n-arg))))
          (if ,base
              (format-print-integer stream ,n-arg ,colonp ,atsignp
                                    ,base ,mincol
