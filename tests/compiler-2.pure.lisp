@@ -4404,3 +4404,14 @@
       (declare ((function (fixnum &rest t)) j))
       (apply j l r))
    ((#'+ 1 '(2)) 3)))
+
+(with-test (:name :disabling-arg-count-checking)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (x d)
+         (let ((f (lambda (x y)
+                    (< x y))))
+           (funcall d f)
+           (sort x f)))
+    ((nil #'funcall) (condition 'program-error))
+    ((nil #'list) nil)))

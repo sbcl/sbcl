@@ -498,6 +498,13 @@
 
 (defun disable-arg-count-checking (leaf type arg-count)
   (when (lambda-p leaf)
+    (let ((once nil))
+      ;; TODO: what if all destinations can disable arg count checking.
+      (map-leaf-refs (lambda (dest)
+                       (declare (ignore dest))
+                       (when (shiftf once t)
+                         (return-from disable-arg-count-checking)))
+                     leaf))
     (multiple-value-bind (min max) (fun-type-arg-limits type)
       (when (and min
                  (if max

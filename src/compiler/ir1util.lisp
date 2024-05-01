@@ -3055,6 +3055,28 @@ is :ANY, the function name is not checked."
                   when (eq v lambda-var)
                   do (funcall function combination arg))))))))
 
+(defun map-leaf-refs (function leaf)
+  (let* ((seen-calls))
+    (labels ((recur (leaf)
+               (dolist (ref (leaf-refs leaf))
+                 (let* ((lvar (node-lvar ref))
+                        (dest (and lvar
+                                   (lvar-dest lvar))))
+                   (if (and (combination-p dest)
+                            (eq (combination-kind dest) :local))
+                       (let ((lambda (combination-lambda dest)))
+                         (when (cond ((functional-kind-eq lambda let))
+                                     ((memq dest seen-calls)
+                                      nil)
+                                     (t
+                                      (push dest seen-calls)))
+                           (loop for v in (lambda-vars lambda)
+                                 for arg in (combination-args dest)
+                                 when (eq arg lvar)
+                                 do (recur v))))
+                       (funcall function dest))))))
+      (recur leaf))))
+
 (defun propagate-lvar-annotations-to-refs (lvar var)
   (when (lvar-annotations lvar)
     (dolist (ref (leaf-refs var))
