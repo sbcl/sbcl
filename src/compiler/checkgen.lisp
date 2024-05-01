@@ -193,7 +193,12 @@
   (declare (type cast cast))
   (let ((lvar (node-lvar cast)))
     (multiple-value-bind (dest lvar) (and lvar (immediately-used-let-dest lvar cast))
-      (cond ((and (basic-combination-p dest)
+      (cond ((and (cast-context cast)
+                  (policy cast (or (> debug 1)
+                                   (and (> debug 0)
+                                        (>= debug speed)))))
+             nil)
+            ((and (basic-combination-p dest)
                   (or (not (basic-combination-fun-info dest))
                       ;; fixed-args functions do not check their arguments.
                       (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))
