@@ -174,11 +174,11 @@ debug_function_name_from_pc (struct code* code, void *pc)
     else
         lose("failed to parse debug function name");
   done:
-    return last_name;
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
     if (compressed)
         free(map);
 #endif
+    return last_name;
 }
 
 static void
