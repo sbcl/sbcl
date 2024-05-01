@@ -786,3 +786,13 @@
                       `(lambda ()
                          (format t "~r" t))
                       :allow-warnings t))))
+
+(with-test (:name :multiple-uses-funargs)
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda (x f)
+                         (sort x
+                               (or f
+                                   (lambda (x)
+                                     (< x 0)))))
+                      :allow-style-warnings t))))

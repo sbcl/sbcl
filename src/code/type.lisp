@@ -471,6 +471,7 @@
                         (make-fun-type :required (fun-type-required ftype)
                                        :optional (fun-type-optional ftype)
                                        :keyp (fun-type-keyp ftype)
+                                       :rest (fun-type-rest ftype)
                                        :keywords (fun-type-keywords ftype)
                                        :allowp (fun-type-allowp ftype)
                                        :returns rtype
