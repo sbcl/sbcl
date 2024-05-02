@@ -42,11 +42,11 @@
              (safely-print (message)
                (handler-case
                    (progn
-                     (princ "Help! ERROR-ERROR is " *terminal-io*)
-                     (princ *error-error-depth* *terminal-io*)
-                     (princ " levels deep. " *terminal-io*)
-                     (princ message *terminal-io*)
-                     (terpri *terminal-io*))
+                     (princ "Help! ERROR-ERROR is " *tty*)
+                     (princ *error-error-depth* *tty*)
+                     (princ " levels deep. " *tty*)
+                     (princ message *tty*)
+                     (terpri *tty*))
                  (t ()))))
           (declare (inline safely-print))
           (case *error-error-depth*
