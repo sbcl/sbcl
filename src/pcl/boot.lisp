@@ -2812,8 +2812,9 @@ bootstrapping.
                                   (apply #'real-make-a-method args)))
                               (early-gf-methods gf))))
         (setf (generic-function-method-class gf) *the-class-standard-method*)
-        (setf (generic-function-method-combination gf)
-              *standard-method-combination*)
+        (let ((mc *standard-method-combination*))
+          (setf (generic-function-method-combination gf) mc)
+          (add-to-weak-hashset gf (method-combination-%generic-functions mc)))
         (set-methods gf methods)))
 
     (dolist (fn *!early-functions*)
@@ -2852,12 +2853,12 @@ bootstrapping.
                           'standard-method
                           qualifiers lambda-list specializers initargs nil
                           'source (translate-source-location fun))))))
-            (setf (generic-function-method-class gf)
-                  *the-class-standard-method*
-                  (generic-function-method-combination gf)
-                  (ecase method-combination
-                    (standard *standard-method-combination*)
-                    (or *or-method-combination*)))
+            (let ((mc (ecase method-combination
+                        (standard *standard-method-combination*)
+                        (or *or-method-combination*))))
+              (setf (generic-function-method-class gf) *the-class-standard-method*
+                    (generic-function-method-combination gf) mc)
+              (add-to-weak-hashset gf (method-combination-%generic-functions mc)))
             (set-methods gf (mapcar #'make-method methods)))))
 
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
