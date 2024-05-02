@@ -1374,7 +1374,7 @@
   (:method-combination progn))
 (defmethod gf-with-keys-and-invalid-qualifier progn ((x integer) &key b)
   (declare (ignore b))
-  (print (1+ x)))
+  (print (1+ x) (make-broadcast-stream))) ; don't show noise
 ;; I'm guessing this is PROGN but spelled wrong purposely, right?
 (defmethod gf-with-keys-and-invalid-qualifier prong ((x fixnum) &key c) (print c))
 
