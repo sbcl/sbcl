@@ -1,5 +1,5 @@
 (with-test (:name :bug-981106
-            :broken :freebsd)
+            :broken-on :freebsd)
   (gc :full t)
   (assert (eq :ok
                (handler-case
