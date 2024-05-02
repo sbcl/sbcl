@@ -6301,6 +6301,20 @@
                               (%coerce-callable-to-fun predicate)
                               (if key (%coerce-callable-to-fun key) #'identity)))
 
+(deftransform sort ((vector predicate &key key)
+                      (vector t &rest t) *
+                      :policy (= space 0))
+  (when (eq (array-type-upgraded-element-type (lvar-type vector)) *wild-type*)
+    (give-up-ir1-transform))
+  `(with-array-data ((vector vector)
+                     (start)
+                     (end)
+                     :check-fill-pointer t)
+     (sb-impl::sort-vector vector
+                           start end
+                           (%coerce-callable-to-fun predicate)
+                           (if key (%coerce-callable-to-fun key) #'identity))))
+
 (deftransform stable-sort ((sequence predicate &key key)
                            ((or vector list) t))
   (let ((sequence-type (lvar-type sequence)))

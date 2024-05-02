@@ -800,8 +800,8 @@
 
 (with-test (:name :find-compile-time-mismatch)
   (assert
-   (nth-value 2 (checked-compile `  (lambda (c) (find c #*10 :test #'char-equal))
-                                    :allow-warnings t))))
+   (nth-value 2 (checked-compile `(lambda (c) (find c #*10 :test #'char-equal))
+                                 :allow-warnings t))))
 
 (with-test (:name :subseq-nil-array)
   (checked-compile-and-assert
@@ -817,3 +817,8 @@
                                           (declare (optimize speed))
                                           (find 1 (the simple-bit-vector x))))
                   '(SB-KERNEL:%BIT-POS-FWD/1))))
+
+(with-test (:name :sort-inlining-warnings)
+  (checked-compile `(lambda (x)
+                      (declare (optimize (debug 2) (space 0)))
+                      (sort x #'< :key #'car))))

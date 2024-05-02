@@ -19,7 +19,9 @@
 ;;; application where sorting is a major bottleneck, and inlining it
 ;;; allows the compiler to make enough optimizations that it might be
 ;;; worth the (large) cost in space.
-(declaim (maybe-inline sort stable-sort))
+(declaim (maybe-inline stable-sort))
+
+;;; SORT is inlined from a transform for known sequence types.
 (defun sort (sequence predicate &rest args &key key)
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
