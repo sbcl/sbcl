@@ -7203,6 +7203,11 @@
                                                                   ,(lognot (- max min)))))))
                                         'or-eq-transform)))))))))))
 
+;;; Prevent slow perfect hash finder from hogging time if time spent compiling
+;;; is strictly more important than execution speed
+(defun slow-findhash-allowed (node)
+  (policy node (>= speed compilation-speed)))
+
 (defun or-eq-to-aref (keys key-lists targets last-if chains otherwise)
   (let (constant-targets
         constant-refs
@@ -7232,9 +7237,10 @@
                      (push ref constant-refs))
                    (push (constant-value constant) constant-targets)))))
     (when constant-targets
-      (let ((code (expand-hash-case-for-jump-table keys key-lists nil
+      (let ((code (and (slow-findhash-allowed last-if)
+                       (expand-hash-case-for-jump-table keys key-lists nil
                                                    (coerce (nreverse constant-targets) 'vector)
-                                                   otherwise)))
+                                                   otherwise))))
         (when code
           (replace-chain (reduce #'append chains)
                          `(lambda (key b)
@@ -7315,11 +7321,12 @@
           ((or-eq-to-aref keys key-lists targets last-if chains otherwise))
           (t
            (multiple-value-bind (code new-targets)
-               (expand-hash-case-for-jump-table keys key-lists
+               (and (slow-findhash-allowed node)
+                    (expand-hash-case-for-jump-table keys key-lists
                                                 (append targets
                                                         (and otherwise
                                                              (list (cons 'otherwise
-                                                                         otherwise)))))
+                                                                         otherwise))))))
              (when code
                (replace-chain (reduce #'append chains)
                               `(lambda (key b)

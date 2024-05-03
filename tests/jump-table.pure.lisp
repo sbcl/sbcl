@@ -108,20 +108,26 @@
 (defstruct f)
 
 (declaim (freeze-type a b c d e f))
-(defun typecase-jump-table (x)
-  (typecase x
+(macrolet ((guts ()
+ `(typecase x
     (a 'is-a)
     (b 'is-b)
     (c 'is-c)
     ((or d e) 'is-d-or-e)
-    (f 'is-f)))
-(compile 'typecase-jump-table)
+    (f 'is-f))))
+  (defun typecase-jump-table (x) (guts))
+  (defun typecase-no-jump-table (x)
+    (declare (optimize compilation-speed))
+    (guts)))
 
 (with-test (:name :typecase-jump-table)
-  (assert (eql (sb-kernel:code-jump-table-words
-                (sb-kernel:fun-code-header #'typecase-jump-table))
-               ;; 6 cases including NIL return, plus the size
-               7)))
+  (flet ((check (name n)
+           (compile name)
+           (let ((code (sb-kernel:fun-code-header (symbol-function name))))
+             (assert (eql (sb-kernel:code-jump-table-words code) n)))))
+    ;; 6 cases including NIL return, plus the size
+    (check 'typecase-jump-table 7)
+    (check 'typecase-no-jump-table 1)))
 
 (with-test (:name :duplicates)
   (checked-compile-and-assert
