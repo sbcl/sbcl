@@ -447,7 +447,8 @@
 ;;; This maps SB!C::COMPILED-DEBUG-FUNs to COMPILED-DEBUG-FUNs, so we
 ;;; can get at cached stuff and not duplicate COMPILED-DEBUG-FUN
 ;;; structures.
-(defglobal *compiled-debug-funs* (make-hash-table :test 'eq :weakness :key :synchronized t))
+(define-load-time-global *compiled-debug-funs*
+    (make-hash-table :test 'eq :weakness :key :synchronized t))
 
 ;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN and its
 ;;; component. This maps the latter to the former in
@@ -2097,7 +2098,8 @@ register."
 
 ;;; a map from packed DEBUG-INFO function maps to unpacked
 ;;; versions thereof
-(defglobal *uncompacted-fun-maps* (make-hash-table :test 'eq :weakness :key :synchronized t))
+(define-load-time-global *uncompacted-fun-maps*
+    (make-hash-table :test 'eq :weakness :key :synchronized t))
 
 ;;; Return a FUN-MAP for a given COMPILED-DEBUG-INFO object. If the
 ;;; info is packed, and has not been parsed, then parse it.
