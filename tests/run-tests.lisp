@@ -258,6 +258,8 @@
       ,(maybe "SB-SYS" "*THRUPTION-PENDING*")
       ,(maybe "SB-THREAD" "*ALLOCATOR-METRICS*")
       sb-pcl::*dfun-constructors*
+      sb-di::*uncompacted-fun-maps*
+      sb-di::*compiled-debug-funs*
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*
       sb-unicode::*name->char-buffers*)))

@@ -363,9 +363,9 @@ sufficiently motivated to do lengthy fixes."
 
 (defun coalesce-debug-info ()
   ;; Discard the uncompacted fun map cache.
-  (clrhash sb-di::*uncompacted-fun-maps*)
+  (setq sb-di::*uncompacted-fun-maps* nil)
   ;; Discard the debugger's cached mapping of debug functions.
-  (clrhash sb-di::*compiled-debug-funs*)
+  (setq sb-di::*compiled-debug-funs* nil)
   (flet ((debug-source= (a b)
            (and (equalp a b)
                 ;; Case sensitive

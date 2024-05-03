@@ -430,6 +430,21 @@
                 (code-location nil)
                 (debug-fun (breakpoint-kind obj)))))))
 
+(defmacro with-weak-cache ((temp global) &body body)
+  `(let ((,temp (or ,global
+                    (let ((new
+                           (sb-vm:without-arena
+                               (make-hash-table :test 'eq
+                                                :weakness :key
+                                                :synchronized t))))
+                      ;; double-checked idiom has to ensure that no other CPU
+                      ;; can see a just-made hash-table until all the slots of
+                      ;; the instance are definitely published before the
+                      ;; global var points to it.
+                      (sb-thread:barrier (:write))
+                      (or (cas ,global nil new) new)))))
+     ,@body))
+
 (defstruct (compiled-debug-fun
             (:include debug-fun)
             (:constructor %make-compiled-debug-fun
@@ -444,20 +459,20 @@
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
 
-;;; This maps SB!C::COMPILED-DEBUG-FUNs to COMPILED-DEBUG-FUNs, so we
+;;; This maps SB-C::COMPILED-DEBUG-FUNs to SB-DI::COMPILED-DEBUG-FUNs, so we
 ;;; can get at cached stuff and not duplicate COMPILED-DEBUG-FUN
 ;;; structures.
-(define-load-time-global *compiled-debug-funs*
-    (make-hash-table :test 'eq :weakness :key :synchronized t))
+(define-load-time-global *compiled-debug-funs* nil)
 
-;;; Make a COMPILED-DEBUG-FUN for a SB!C::COMPILER-DEBUG-FUN and its
+;;; Make a SB-DI::COMPILED-DEBUG-FUN for a SB-C::COMPILED-DEBUG-FUN and its
 ;;; component. This maps the latter to the former in
 ;;; *COMPILED-DEBUG-FUNS*. If there already is a COMPILED-DEBUG-FUN,
 ;;; then this returns it from *COMPILED-DEBUG-FUNS*.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
-  (or (gethash compiler-debug-fun *compiled-debug-funs*)
-      (setf (gethash compiler-debug-fun *compiled-debug-funs*)
-            (%make-compiled-debug-fun compiler-debug-fun component))))
+  (with-weak-cache (ht *compiled-debug-funs*)
+    (or (gethash compiler-debug-fun ht)
+        (setf (gethash compiler-debug-fun ht)
+              (%make-compiled-debug-fun compiler-debug-fun component)))))
 
 
 ;;;; CODE-LOCATIONs
@@ -2101,16 +2116,15 @@ register."
 
 ;;; a map from packed DEBUG-INFO function maps to unpacked
 ;;; versions thereof
-(define-load-time-global *uncompacted-fun-maps*
-    (make-hash-table :test 'eq :weakness :key :synchronized t))
+(define-load-time-global *uncompacted-fun-maps* nil)
 
 ;;; Return a FUN-MAP for a given COMPILED-DEBUG-INFO object. If the
 ;;; info is packed, and has not been parsed, then parse it.
 (defun get-debug-info-fun-map (info)
   (declare (type sb-c::compiled-debug-info info))
-  (or (gethash info *uncompacted-fun-maps*)
-      (setf (gethash info *uncompacted-fun-maps*)
-            (uncompact-fun-map info))))
+  (with-weak-cache (ht *uncompacted-fun-maps*)
+    (or (gethash info ht)
+        (setf (gethash info ht) (uncompact-fun-map info)))))
 
 ;;;; CODE-LOCATIONs
 
