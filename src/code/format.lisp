@@ -623,9 +623,7 @@
         `(format-print-integer stream ,(expand-next-arg) ,colonp ,atsignp
                                ,base ,mincol ,padchar ,commachar
                                ,commainterval))
-      `(let ((*print-base* ,base)
-             (*print-radix* nil))
-         (princ ,(expand-next-arg) stream))))
+      `(format-integer ,(expand-next-arg) ,base stream)))
 
 (def-format-directive #\D (colonp atsignp params)
   (expand-format-integer 10 colonp atsignp params))

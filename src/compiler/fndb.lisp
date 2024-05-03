@@ -1592,6 +1592,7 @@
 (defknown (prin1-to-string princ-to-string) (t) simple-string (unsafely-flushable))
 (defknown sb-format::princ-multiple-to-string (&rest t) simple-string (unsafely-flushable))
 (defknown sb-impl::stringify-object (t) simple-string (no-verify-arg-count))
+(defknown sb-format::format-integer (t t t) t (always-translatable))
 
 (defknown write-char (character &optional stream-designator) character ()
   :derive-type #'result-type-first-arg)

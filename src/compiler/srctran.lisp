@@ -6039,6 +6039,15 @@
     `(lambda ,arg-names
        (concatenate 'string ,@arg-names))))
 
+(deftransform sb-format::format-integer ((object base stream) * * :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(let ((*print-base* base)
+         (*print-radix* nil))
+     (princ object stream)))
+
+(deftransform sb-format::format-integer ((object base stream) (integer t t))
+  `(sb-impl::%output-integer-in-base object base stream))
+
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)
 
