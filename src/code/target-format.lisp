@@ -344,6 +344,12 @@
           (format-write-field stream signed mincol 1 0 padchar t))
         (princ number stream))))
 
+;;; Interpreter stub
+(defun format-integer (object base stream)
+  (let ((*print-base* base)
+        (*print-radix* nil))
+    (princ object stream)))
+
 (defun format-add-commas (string commachar commainterval)
   (let ((length (length string)))
     (multiple-value-bind (commas extra) (truncate (1- length) commainterval)
