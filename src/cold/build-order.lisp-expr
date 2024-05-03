@@ -551,13 +551,14 @@
 
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
- ("src/code/gc"                :not-host)
  ("src/code/avltree"           :c-headers)
  ("src/code/target-thread"     :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
+ ("src/code/gc"                :not-host)
+
  ("src/code/interr" :not-host)
 
  ("src/code/target-load" :not-host) ; for *assembler-routines*, needed by target-disassem

@@ -317,6 +317,13 @@ used to specify the oldest generation guaranteed to be collected."
         ((eql 1 gen)
          (sb-format::tokenize-control-string-cache-clear))
         (t
+         (sb-thread:with-recursive-lock ((hash-table-lock sb-di::*uncompacted-fun-maps*)
+                                         :wait-p nil)
+           (clrhash sb-di::*uncompacted-fun-maps*))
+         (sb-thread:with-recursive-lock ((hash-table-lock sb-di::*compiled-debug-funs*)
+                                         :wait-p nil)
+           (clrhash sb-di::*compiled-debug-funs*))
+
          (drop-all-hash-caches))))
 
 ;;;; auxiliary functions
