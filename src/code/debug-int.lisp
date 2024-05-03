@@ -1651,6 +1651,21 @@ register."
 ;;; (VALUES NIL T) means there were no arguments, but (VALUES NIL NIL)
 ;;; means there was no argument information.
 (defun parse-compiled-debug-fun-lambda-list (debug-fun)
+  ;; This file could not be slammed if COERCE is inlined because it thinks :UNPARSED
+  ;; (i.e. not a sequence) can be returned as the DEBUG-VARS. But it can't, and a running
+  ;; image was able to recompile the function with no decl and no warning. What's up with that?
+  (declare (notinline coerce)) ; FIXME
+; in: DEFUN PARSE-COMPILED-DEBUG-FUN-LAMBDA-LIST
+;     (SB-XC:COERCE (SB-DI::DEBUG-FUN-DEBUG-VARS SB-DI:DEBUG-FUN) 'LIST)
+;
+; caught WARNING:
+;   Derived type of SB-IMPL::OBJECT is
+;     (VALUES (MEMBER :UNPARSED) &OPTIONAL),
+;   conflicting with its asserted type
+;     SEQUENCE.
+;
+; compilation unit finished
+;   caught 1 WARNING condition
   (let ((args (sb-c::compiled-debug-fun-arguments
                (compiled-debug-fun-compiler-debug-fun debug-fun))))
     (cond
