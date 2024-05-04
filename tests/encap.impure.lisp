@@ -25,3 +25,37 @@
           (constantly 'gazonk)))
   (assert (sb-kernel:closurep (symbol-function 'fleem)))
   (tryit 'fleem))
+
+(with-test (:name :encapsulation-type-is-symbol)
+  (assert-error (sb-int:encapsulate 'e "foo" #'cons)))
+
+(defun install-testfun ()
+  (fmakunbound 'thing)
+  (defun thing (x) (list :hi x))
+  (dolist (suffix '(d c b a)) ; install so that the list comes out A B C D
+    (let ((kwd (sb-int:keywordicate suffix)))
+      (sb-int:encapsulate 'thing (sb-int:symbolicate "ENCAP." suffix)
+       (lambda (realfun arg) (cons kwd (funcall realfun arg)))))))
+
+(install-testfun)
+
+(with-test (:name :delete-encap)
+  (let ((expect '(:a :b :c :d :hi :x)))
+    (assert (equal (thing :x) expect))
+    (dolist (sym '(:a :b :c :d))
+      (sb-int:unencapsulate 'thing (sb-int:symbolicate "ENCAP." sym))
+      (assert (equal (thing :x) (remove sym expect)))
+      (install-testfun)))) ; restore it
+
+(with-test (:name :change-encap)
+  (let ((expect '(:a :b :c :d :hi :x)))
+    (dolist (sym '(:a :b :c :d))
+      (install-testfun)
+      ;; alter it
+      (sb-int:encapsulate 'thing (sb-int:symbolicate "ENCAP." sym)
+       (lambda (realfun arg) (cons (string sym) (funcall realfun arg))))
+      (assert (equal (thing :x) (subst (string sym) sym expect)))))
+  ;; keeping the replaced fourth encapsulation, also replace the first
+  (sb-int:encapsulate 'thing 'encap.a
+   (lambda (realfun arg) (cons :new-a (funcall realfun arg))))
+  (assert (equal (thing :x) '(:new-a :b :c "D" :hi :x))))

@@ -218,13 +218,8 @@
 (defstruct (encapsulation-info (:constructor make-encapsulation-info
                                              (type definition))
                                (:copier nil))
-  ;; This is definition's encapsulation type. The encapsulated
-  ;; definition is in the previous ENCAPSULATION-INFO element or
-  ;; installed as the global definition of some function name.
-  type
-  ;; the previous, encapsulated definition. This used to be installed
-  ;; as a global definition for some function name, but it was
-  ;; replaced by an encapsulation of type TYPE.
+  (type nil :type symbol)
+  ;; the underlying definition prior to getting wrapped in a closure
   (definition nil :type function))
 (declaim (freeze-type encapsulation-info))
 
@@ -238,86 +233,64 @@
          (typecase name
            (symbol (%symbol-function name))
            (t (binding* ((fdefn (find-fdefn name) :exit-if-null))
-                (fdefn-fun fdefn))))))
+                (fdefn-fun fdefn)))))
+       (has-encap (fun type &aux predecessor)
+         (do ((info (encapsulation-info fun)
+                    (encapsulation-info (encapsulation-info-definition info))))
+             ((null info) (values nil nil))
+           (if (eq (encapsulation-info-type info) type)
+               (return (values info predecessor))
+               (setq predecessor info)))))
 
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
+  (declare (symbol type))
   (let ((fun (name->fun name)))
-    (when (typep fun 'generic-function)
-      (return-from encapsulated-p (encapsulated-generic-function-p fun type)))
-    (do ((encap-info (encapsulation-info fun)
-                     (encapsulation-info
-                      (encapsulation-info-definition encap-info))))
-        ((null encap-info) nil)
-      (declare (type (or encapsulation-info null) encap-info))
-      (when (eq (encapsulation-info-type encap-info) type)
-        (return t)))))
+    (if (typep fun 'generic-function)
+        (encapsulated-generic-function-p fun type)
+        (values (has-encap fun type)))))
 
 ;;; Replace the definition of NAME with a function that calls FUNCTION
 ;;; with the original function and its arguments.
 ;;; TYPE is whatever you would like to associate with this
 ;;; encapsulation for identification in case you need multiple
-;;; encapsulations of the same name.
+;;; encapsulations of the same function name.
+;;; For non-generic functions only: if encapsulation TYPE already exists,
+;;; it will be replaced by a new encapsulation in an order-preserving manner,
+;;; otherwise the new encapsulation goes to the front of the chain.
 (defun encapsulate (name type function)
   (let ((underlying-fun (name->fun name)))
     (when (macro/special-guard-fun-p underlying-fun)
       (error "~S can not be encapsulated" name))
-    (if (typep underlying-fun 'generic-function)
-        (encapsulate-generic-function underlying-fun type function)
-    ;; We must bind and close over INFO. Consider the case where we
-    ;; encapsulate (the second) an encapsulated (the first)
-    ;; definition, and later someone unencapsulates the encapsulated
-    ;; (first) definition. We don't want our encapsulation (second) to
-    ;; bind basic-definition to the encapsulated (first) definition
-    ;; when it no longer exists. When unencapsulating, we make sure to
-    ;; clobber the appropriate INFO structure to allow
-    ;; basic-definition to be bound to the next definition instead of
-    ;; an encapsulation that no longer exists.
-        (let ((info (make-encapsulation-info type underlying-fun)))
-          (setf (fdefn-fun (find-fdefn name))
-            (named-lambda encapsulation (&rest args)
-              (apply function (encapsulation-info-definition info)
-                     args)))))))
+    (when (typep underlying-fun 'generic-function)
+      (return-from encapsulate
+        (encapsulate-generic-function underlying-fun type function)))
+    (multiple-value-bind (existing predecessor) (has-encap underlying-fun type)
+      ;; If TYPE existed, the new DEFINITION comes from the existing
+      (when existing
+        (setf underlying-fun (encapsulation-info-definition existing)))
+      (let* ((info (make-encapsulation-info type underlying-fun))
+             (closure (named-lambda encapsulation (&rest args)
+                        (apply function (encapsulation-info-definition info)
+                               args))))
+        (if predecessor
+            ;; Become the successor of the existing predecessor
+            (setf (encapsulation-info-definition predecessor) closure)
+            ;; Was first in chain or didn't exist
+            (setf (fdefn-fun (find-fdefn name)) closure))))))
 
-;;; When removing an encapsulation, we must remember that
-;;; encapsulating definitions close over a reference to the
-;;; ENCAPSULATION-INFO that describes the encapsulating definition.
-;;; When you find an info with the target type, the previous info in
-;;; the chain has the ensulating definition of that type. We take the
-;;; encapsulated definition from the info with the target type, and we
-;;; store it in the previous info structure whose encapsulating
-;;; definition it describes looks to this previous info structure for
-;;; a definition to bind (see ENCAPSULATE). When removing the first
-;;; info structure, we do something conceptually equal, but
-;;; mechanically it is different.
 (defun unencapsulate (name type)
-  "Removes NAME's outermost encapsulation of the specified TYPE."
-  (let* ((fun (name->fun name))
-         (encap-info (encapsulation-info fun)))
-    (cond ((typep fun 'generic-function)
-           (unencapsulate-generic-function fun type))
-          ((not encap-info)
-           ;; It disappeared on us, so don't worry about it.
-           )
-          ((eq (encapsulation-info-type encap-info) type)
-           ;; It's the first one, so change the fdefn object.
-           (setf (fdefn-fun (find-fdefn name))
-                 (encapsulation-info-definition encap-info)))
-          (t
-           ;; It must be an interior one, so find it.
-           (loop
-             (let ((next-info (encapsulation-info
-                               (encapsulation-info-definition encap-info))))
-               (unless next-info
-                 ;; Not there, so don't worry about it.
-                 (return))
-               (when (eq (encapsulation-info-type next-info) type)
-                 ;; This is it, so unlink us.
-                 (setf (encapsulation-info-definition encap-info)
-                       (encapsulation-info-definition next-info))
-                 (return))
-               (setf encap-info next-info))))))
-  t))
+  "Removes NAME's encapsulation of the specified TYPE if such exists."
+  (let ((fun (name->fun name)))
+    (if (typep fun 'generic-function)
+        (unencapsulate-generic-function fun type)
+        (multiple-value-bind (existing predecessor) (has-encap fun type)
+          (when existing
+            (let ((next (encapsulation-info-definition existing)))
+              (if predecessor
+                  (setf (encapsulation-info-definition predecessor) next)
+                  ;; It's the first one, so change the fdefn object.
+                  (setf (fdefn-fun (find-fdefn name)) next)))))))))
 
 
 ;;;; FDEFINITION
