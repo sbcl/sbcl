@@ -813,3 +813,34 @@
       `(lambda (a)
          (typep a '(vector t 2)))
     (((make-array 2 :displaced-to (make-array '(2 1)))) t)))
+
+(defun aindex (i array) (aref array i))
+(defun 2d-aindex (i array) (aref array i i))
+(defun seqindex (i seq) (elt seq i))
+
+(with-test (:name :array-index-error-wording)
+  ;; message contains a "should be ... below"
+  (macrolet ((try (form)
+               `(handler-case ,form
+                  (:no-error (x) (error "Got ~S instead an error" x))
+                  (condition (c)
+                    (let ((str (princ-to-string c)))
+                      (assert (search "Invalid index" str))
+                      (assert (search "should be" str)))))))
+    (try (aindex 5 #(1)))
+    (try (2d-aindex 5 (make-array '(10 1))))
+    (try (seqindex 5 #(1)))
+    (try (seqindex 5 (make-array 9 :fill-pointer 1))))
+  ;; message does not contains a "should be"
+  (macrolet ((try (form)
+               `(handler-case ,form
+                  (:no-error (x) (error "Got ~S instead of an error" x))
+                  (condition (c)
+                    (let ((str (princ-to-string c)))
+                      (assert (search "Invalid index" str))
+                      (assert (not (search "should be" str)))
+                      (assert (not (search "below 0" str))))))))
+    (try (aindex 5 #()))
+    (try (2d-aindex 5 (make-array '(10 0))))
+    (try (seqindex 5 #()))
+    (try (seqindex 5 (make-array 9 :fill-pointer 0)))))

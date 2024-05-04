@@ -1389,14 +1389,15 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (let ((array (invalid-array-index-error-array condition))
            (index (type-error-datum condition)))
        (if (integerp index)
-           (format stream "Invalid index ~S for ~@[axis ~W of ~]~S, ~
-                           should be a non-negative integer below ~W."
+           (format stream "Invalid index ~D for ~@[axis ~D of ~]~
+~S~@[, ~:@_should be a non-negative integer below ~D~]."
                    (type-error-datum condition)
                    (when (> (array-rank array) 1)
                      (invalid-array-index-error-axis condition))
                    (type-of array)
                    ;; Extract the bound from (INTEGER 0 (BOUND))
-                   (caaddr (type-error-expected-type condition)))
+                   (let ((max (caaddr (type-error-expected-type condition))))
+                     (if (> max 0) max)))
            (format stream "~s is not of type INTEGER." index))))))
 
 (define-condition invalid-array-error (reference-condition type-error) ()
@@ -1449,15 +1450,15 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (let ((sequence (slot-value condition 'sequence))
            (index (type-error-datum condition)))
        (if (vectorp sequence)
-           (format stream "Invalid index ~W for ~S ~@[with fill-pointer ~a~], ~
-                           should be a non-negative integer below ~W."
+           (format stream "Invalid index ~D for ~S~@[ with fill-pointer ~D~]~
+~@[, ~:@_should be a non-negative integer below ~D~]."
                    index
                    (type-of sequence)
                    (and (array-has-fill-pointer-p sequence)
                         (fill-pointer sequence))
-                   (length sequence))
+                   (let ((l (length sequence))) (if (> l 0) l)))
            (format stream
-                   "The index ~S is too large for a ~a of length ~s."
+                   "The index ~D is too large for a ~a of length ~D."
                    index
                    (if (listp sequence)
                        "list"
