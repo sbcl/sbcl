@@ -42,7 +42,7 @@
     ("riscv"  ("riscv" :64-bit :little-endian :sb-thread))
     ("sparc"  ("sparc" :big-endian)
               ("sparc-sunos" :big-endian :unix :sunos :elf))
-    ("x86"    ("x86" :little-endian :largefile)
+    ("x86"    ("x86" :little-endian :largefile (not :sb-eval) :sb-fasteval)
               ("x86-ascii" :little-endian :largefile (not :sb-unicode))
               ("x86-thread" :little-endian :largefile :sb-thread)
               ("x86-linux" :little-endian :largefile :sb-thread :linux :unix :elf :sb-thread))

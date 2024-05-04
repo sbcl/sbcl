@@ -60,7 +60,7 @@ obj/xbuild/sparc-sunos.core: obj/xbuild/sparc-sunos/xc.core
 	$(SBCL) $(ARGS) sparc-sunos < $(SCRIPT2)
 
 obj/xbuild/x86/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86 x86 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :LARGEFILE)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86 x86 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :LARGEFILE (NOT :SB-EVAL) :SB-FASTEVAL)" < $(SCRIPT1)
 obj/xbuild/x86.core: obj/xbuild/x86/xc.core
 	$(SBCL) $(ARGS) x86 < $(SCRIPT2)
 
