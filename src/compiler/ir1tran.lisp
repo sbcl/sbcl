@@ -967,7 +967,7 @@
            #-sb-xc-host (values combination))
   (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
-    (ir1-convert start ctran fun-lvar `(the (or function symbol) ,fun))
+    (reference-leaf start ctran fun-lvar fun)
     (let ((combination
            (ir1-convert-combination-args fun-lvar ctran next result
                                          (cdr (proper-list form)))))
