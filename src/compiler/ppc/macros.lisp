@@ -21,11 +21,9 @@
        (inst mr ,n-dst ,n-src))))
 
 (defmacro load-asm-rtn-addr (reg name)
-  ;; Gencgc has asm code in static space and we can reference it relative to NIL.
-  #+gencgc `(inst addi ,reg null-tn (make-fixup ,name :assembly-routine*))
-  ;; Cheneygc has asm code in read-only space which is not within
-  ;; a sufficiently small displacement.
-  #+cheneygc `(inst lr ,reg (make-fixup ,name :assembly-routine)))
+  ;; asm code resides in static space and we can reference it relative to NIL.
+  ;; The :L fixup subtracts the address of NIL for you.
+  `(inst addi ,reg null-tn (make-fixup ,name :assembly-routine)))
 
 (macrolet
     ((def (op inst shift)

@@ -17,7 +17,7 @@
     ((:raw :none)
      (let ((jump (make-symbol "JUMP")))
        (values
-        `((inst addi ,jump null-tn (make-fixup ',name :assembly-routine*))
+        `((inst addi ,jump null-tn (make-fixup ',name :assembly-routine))
           (inst mtlr ,jump)
           (inst blrl))
         `((:temporary (:sc any-reg) ,jump)))))
@@ -33,7 +33,7 @@
               (store-stack-tn ,nfp-save cur-nfp))
             (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
-            (inst addi ,jump null-tn (make-fixup ',name :assembly-routine*))
+            (inst addi ,jump null-tn (make-fixup ',name :assembly-routine))
             (inst mtlr ,jump)
             (inst blr)
             (emit-return-pc lra-label)

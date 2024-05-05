@@ -372,7 +372,7 @@
     (inst addi lip function
           (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
     (inst beq SIMPLE)
-    (inst addi lip null-tn (make-fixup 'closure-tramp :assembly-routine*))
+    (inst addi lip null-tn (make-fixup 'closure-tramp :assembly-routine))
     SIMPLE
     (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
@@ -384,7 +384,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst addi temp null-tn (make-fixup 'undefined-tramp :assembly-routine*))
+    (inst addi temp null-tn (make-fixup 'undefined-tramp :assembly-routine))
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; Binding and Unbinding.

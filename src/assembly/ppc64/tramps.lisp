@@ -129,7 +129,7 @@
     ;; We're back.
     (inst mtctr r3) ; stash the result in a reg that won't be clobbered
     ;; Reload a pointer to this asm routine
-    (inst addi lip null-tn (make-fixup 'alloc-tramp :assembly-routine*))
+    (inst addi lip null-tn (make-fixup 'alloc-tramp :assembly-routine))
     ;; Restore the return address from the caller's frame.
     ;; 'sp' hasn't been restored yet, so add our frame size.
     (inst ld r0 machine-sp (+ 32 16))

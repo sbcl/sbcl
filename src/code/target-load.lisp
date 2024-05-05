@@ -375,9 +375,9 @@
              (addr (sap-int (sap+ insts start))))
         (unless indirect
           (return-from get-asm-routine addr))
-        #-(or ppc ppc64 x86 x86-64) (bug "Indirect asm-routine lookup")
-        #+(or ppc ppc64) (- addr sb-vm:nil-value)
-        #+(or x86 x86-64) ; return the address of a word containing 'addr'
+        ;; FIXME: bury this logic inside SB-VM::FIXUP-CODE-OBJECT, don't do it here
+        #-x86-64 (bug "Indirect asm-routine lookup")
+        #+x86-64 ; return the address of a word containing 'addr'
         (let ((offset (ash index sb-vm:word-shift)))
           ;; the address is in the "external" static-space jump table
           #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
