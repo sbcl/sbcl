@@ -1348,3 +1348,14 @@
      (the (unsigned-byte 8) (* x 1))
      x)
    (unsigned-byte 8)))
+
+(with-test (:name :multiply-by-zero)
+  (assert-type
+   (lambda (b c)
+     (declare ((integer 0 2) b)
+              ((integer 1 10) c))
+     (if (typep (* b c) '(integer * 0))
+         (values b c)
+         (values nil nil)))
+   (values (or null (integer 0 0))
+           (or null (integer 1 10)) &optional)))

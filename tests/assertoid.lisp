@@ -83,7 +83,9 @@
       (sb-kernel:%simple-fun-type
        (test-util:checked-compile
         ',lambda)))
-     '(values ,type &optional))))
+     ',(if (typep type '(cons (eql values)))
+           type
+           `(values ,type &optional)))))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of

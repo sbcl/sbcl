@@ -130,8 +130,16 @@
                                                         'rational))))))
                     (cond ((or y-rationalp x-rationalp)
                            (let ((interval (type-approximate-interval constraint t)))
-                             (int interval y x)
-                             (int interval x y)))
+                             (cond ((not interval))
+                                   ((eql (interval-high interval) 0)
+                                    ;; If one is not zero the other must include a zero
+                                    (cond ((not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0))))
+                                           (int interval y x))
+                                          ((not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0))))
+                                           (int interval x y))))
+                                   (t
+                                    (int interval y x)
+                                    (int interval x y)))))
                           ((or (csubtypep (lvar-type x) real-type)
                                (csubtypep (lvar-type y) real-type))
                            (add x (specifier-type 'rational))
