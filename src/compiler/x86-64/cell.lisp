@@ -541,8 +541,10 @@
     ;; and resume at undefined-tramp. However, CALL-SYMBOL jumps via raw-addr if
     ;; its callable object was not a function. In that case RAX holds a symbol,
     ;; so we're OK because we can identify the undefined function.
-    ;; Technically this could be computed using "LEA temp, [RIP-disp]"
-    (inst mov temp (ea (make-fixup 'undefined-tramp :assembly-routine*)))
+    (let ((fixup (make-fixup 'undefined-tramp :assembly-routine)))
+      (if (sb-c::code-immobile-p vop)
+          (inst lea temp (rip-relative-ea fixup)) ; avoid a preserved fixup
+          (inst mov temp (ea fixup))))
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; binding and unbinding
@@ -680,7 +682,7 @@
       (let ((notmutex (gen-label)))
         (inst cmp :dword symbol (make-fixup '*current-mutex* :symbol-tls-index))
         (inst jmp :ne notmutex)
-        (inst call (ea (make-fixup 'mutex-unlock :assembly-routine*)))
+        (inst call (ea (make-fixup 'mutex-unlock :assembly-routine)))
         (emit-label notmutex))
       (inst test :dword symbol symbol))
     #-sb-thread

@@ -365,41 +365,36 @@
 ;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)
 
-(defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
-  ;; Each architecture can define an "indirect" value in its own peculiar way.
-  ;; Only some of our architectures use that option.
+(defun get-asm-routine (name &aux (code *assembler-routines*))
   (awhen (the list (gethash (the symbol name) (%asm-routine-table code)))
-    (destructuring-bind (start end . index) it
-      (declare (ignore end) (ignorable index))
-      (let* ((insts (code-instructions code))
-             (addr (sap-int (sap+ insts start))))
-        (unless indirect
-          (return-from get-asm-routine addr))
-        ;; FIXME: bury this logic inside SB-VM::FIXUP-CODE-OBJECT, don't do it here
-        #-x86-64 (bug "Indirect asm-routine lookup")
-        #+x86-64 ; return the address of a word containing 'addr'
-        (let ((offset (ash index sb-vm:word-shift)))
-          ;; the address is in the "external" static-space jump table
-          #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
-                              (ash sb-vm:vector-data-offset sb-vm:word-shift)
-                          ;; offset is biased by 1 word, accounting for the jump-table-count
-                          ;; at the first word in code-instructions. So unbias it.
-                              (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
-          #-immobile-space ; the address is in the "internal" jump table
-          (sap-int (sap+ insts offset)))))))
+    (sap-int (sap+ (code-instructions code) (car it)))))
+
+(defun asm-routine-index-from-addr (addr)
+  (let* ((code *assembler-routines*)
+         (max (hash-table-count (%asm-routine-table code)))
+         (min 1)
+         (table (code-instructions code)))
+    (loop
+     (let* ((guess-index (floor (+ min max) 2))
+            (guess-val (sap-ref-word table (ash guess-index sb-vm:word-shift))))
+       (cond ((= guess-val addr) (return guess-index))
+             ((< guess-val addr) (setq min (1+ guess-index))) ; guess too small
+             (t (setq max (1- guess-index)))) ; guess too large
+       (if (< max min) (return nil))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
          (size (%code-text-size code))
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
+         (offsets (make-array (1+ count) :element-type '(unsigned-byte 16)))
          (ht (make-hash-table))) ; keys are symbols
     (#+darwin-jit rplaca #-darwin-jit setf (%code-debug-info code) ht)
-    (setf *asm-routine-index-to-name* (make-array (1+ (length vector))))
+    (setf sb-c::*asm-routine-offsets* offsets)
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
-          (setf (aref *asm-routine-index-to-name* (1+ i)) name)
+          (setf (aref offsets (1+ i)) offset)
           ;; Must be in ascending order, but one address can have more than one name.
           (aver (>= next-offset offset))
           ;; store inclusive bounds on PC offset range and the function index

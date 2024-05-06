@@ -1211,9 +1211,13 @@
        (cond ((= mod #b01)
               (emit-byte segment disp))
              ((or (= mod #b10) (null base))
-              (if (fixup-p disp)
-                  (emit-absolute-fixup segment disp)
-                  (emit-signed-dword segment disp))))))))
+              (cond ((not (fixup-p disp))
+                     (emit-signed-dword segment disp))
+                    ((eq (fixup-flavor disp) :assembly-routine)
+                     (note-fixup segment :*abs32 disp)
+                     (emit-signed-dword segment 0))
+                    (t
+                     (emit-absolute-fixup segment disp)))))))))
 
 ;;;; utilities
 
@@ -2269,7 +2273,7 @@
   (:printer byte-imm ((op #xCE)) :default :print-name 'into :control #'break-control)
   (:emitter
    #+sw-int-avoidance ; emit CALL [EA] to skip over the trap instruction
-   (let ((where (ea (make-fixup 'sb-vm::synchronous-trap :assembly-routine*))))
+   (let ((where (ea (make-fixup 'sb-vm::synchronous-trap :assembly-routine))))
      (emit-prefixes segment where nil :do-not-set)
      (emit-byte segment #xFF)
      (emit-ea segment where #b010))
@@ -3343,12 +3347,30 @@
                                 collect (prog1 (ldb (byte 8 0) val)
                                           (setf val (ash val -8))))))))))
 
+;;; Return an address which when _dereferenced_ will return ADDR
+(defun asm-routine-indirect-address (addr)
+  (let ((i (sb-fasl::asm-routine-index-from-addr addr)))
+    (declare (ignorable i))
+    #-immobile-space (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*)
+                                    (ash i word-shift)))
+    ;; When asm routines are in relocatable text space, the vector of indirections
+    ;; is stored externally in static space. It's unfortunately overly complicated
+    ;; to get the address of that vector in genesis. But it doesn't matter.
+    #+immobile-space
+    (or
+     ;; Accounting for the jump-table-count as the first unboxed word in
+     ;; code-instructions, subtract 1 from I to get the correct vector element.
+     #-sb-xc-host (sap-int (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
+                                 (ash (1- i) word-shift)))
+     (error "unreachable"))))
+
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;; Return KIND if the fixup needs to be recorded in %CODE-FIXUPS.
 ;;; The code object we're fixing up is pinned whenever this is called.
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
+  (when (and (eq flavor :assembly-routine) (eq kind :*abs32))
+    (setq value (asm-routine-indirect-address value)))
   (let ((sap (code-instructions code)))
     (case flavor
       (:card-table-index-mask ; the VALUE is nbits, so convert it to an AND mask
@@ -3368,7 +3390,7 @@
                        (signed-sap-ref-64 sap offset)
                        (signed-sap-ref-32 sap offset)))
        (ecase kind
-         (:abs32 ; 32 unsigned bits
+         ((:abs32 :*abs32) ; 32 unsigned bits
           (setf (sap-ref-32 sap offset) value))
          (:rel32
           ;; Replace word with the difference between VALUE and current pc.

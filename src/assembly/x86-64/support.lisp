@@ -19,7 +19,7 @@
       (let ((label (gen-label)))
         (assemble (:elsewhere)
           (emit-label label)
-          (inst jmp (ea (make-fixup name :assembly-routine*))))
+          (inst jmp (ea (make-fixup name :assembly-routine))))
         (push (cons name label) (sb-assem::asmstream-indirection-table asmstream))
         label)))
 
@@ -27,7 +27,7 @@
   (inst* (the (member jmp call) inst)
          (if (or (null vop) (sb-c::code-immobile-p vop))
              (make-fixup routine :assembly-routine)
-             (ea (make-fixup routine :assembly-routine*)))))
+             (ea (make-fixup routine :assembly-routine)))))
 
 (defmacro call-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
   `(invoke-asm-routine
@@ -75,7 +75,7 @@
         ;; direct call from asm routine or immobile code
         (inst call (make-fixup routine :assembly-routine))
         ;; indirect call from dynamic space
-        (inst call (ea (make-fixup routine :assembly-routine*))))))
+        (inst call (ea (make-fixup routine :assembly-routine))))))
 
 (defmacro regs-pushlist (&rest regs)
   `(progn ,@(mapcar (lambda (stem) `(inst push ,(symbolicate stem "-TN"))) regs)))

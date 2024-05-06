@@ -53,20 +53,6 @@
            #-(or x86 x86-64 arm64) fun))
      (setf (sb-vm::%simple-fun-self fun) self)))
 
-(define-load-time-global sb-fasl::*asm-routine-index-to-name* #())
-(declaim (simple-vector sb-fasl::*asm-routine-index-to-name*))
-
-;;; Fasl files encode <flavor,kind> in a packed integer. Dispatching on the integer
-;;; is simple, but the case keys still want to be symbols.
-(defmacro fixup-flavor-case (flavor-id &rest clauses)
-  (declare (notinline position))
-  `(ecase ,flavor-id
-     ,@(mapcar (lambda (clause)
-                 (cons (mapcar (lambda (kwd) (sb-fasl::encoded-fixup-flavor kwd))
-                               (ensure-list (car clause)))
-                       (cdr clause)))
-               clauses)))
-
 (flet ((fixup (code-obj offset name kind flavor-id preserved-lists statically-link-p
                real-code-obj &aux (flavor (aref sb-fasl::+fixup-flavors+ flavor-id)))
          (declare (ignorable statically-link-p preserved-lists))
@@ -78,10 +64,15 @@
          ;; and the other is LOAD-CODE, both of which pin the code.
          (sb-vm:fixup-code-object
                  code-obj offset
-                 (fixup-flavor-case flavor-id
-                   ((:assembly-routine :assembly-routine*)
-                    (or (get-asm-routine name (eq flavor :assembly-routine*))
-                        (error "undefined assembler routine: ~S" name)))
+                 (sb-fasl::fixup-flavor-case flavor-id
+                   (:assembly-routine
+                    (let* ((asm-code *assembler-routines*)
+                           (index (if (fixnump name)
+                                      name
+                                      (or (cddr (gethash name (sb-fasl::%asm-routine-table asm-code)))
+                                          (error "Unknown asm routine ~S" name)))))
+                      (sap-int (sap+ (code-instructions asm-code)
+                                     (aref *asm-routine-offsets* index)))))
                    (:alien-code-linkage-index (sb-impl::ensure-alien-linkage-index name nil))
                    (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
                    (:foreign (foreign-symbol-address name))
@@ -139,13 +130,7 @@
         (when (>= index end) (return))
         (binding* (((offset kind flavor-id data)
                     (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
-                   (flavor (aref sb-fasl::+fixup-flavors+ flavor-id))
-                   (name
-                    (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
-                          ((and (plusp data)
-                                (member flavor '(:assembly-routine :assembly-routine*)))
-                           (aref sb-fasl::*asm-routine-index-to-name* data))
-                          (t (svref fixups (incf index))))))
+                   (name (if (eql 0 data) (svref fixups (incf index)) data)))
           (fixup code-obj offset name kind flavor-id preserved nil real-code-obj)))
       (finish-fixups code-obj preserved)))
 

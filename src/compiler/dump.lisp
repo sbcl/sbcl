@@ -1028,7 +1028,7 @@
   (assert (<= (length +fixup-kinds+) 16))) ; fixup-kind fits in 4 bits
 
 (defconstant-eqx +fixup-flavors+
-  #(:assembly-routine :assembly-routine*
+  #(:assembly-routine
     :card-table-index-mask :symbol-tls-index
     :alien-code-linkage-index :alien-data-linkage-index
     :foreign :foreign-dataref
@@ -1038,9 +1038,10 @@
     :layout-id)
   #'equalp)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun encoded-fixup-flavor (flavor)
   (or (position flavor +fixup-flavors+)
-      (error "Bad fixup flavor ~s" flavor)))
+      (error "Bad fixup flavor ~s" flavor))))
 
 ;;; Pack the aspects of a fixup into an integer.
 ;;; DATA is for asm routine fixups. The routine can be represented in 8 bits,
@@ -1049,7 +1050,7 @@
 (defun !pack-fixup-info (offset kind flavor data)
   (logior ;; 4 bits
           (the (mod 16) (or (position kind +fixup-kinds+)
-                           (error "Bad fixup kind ~s" kind)))
+                            (error "Bad fixup kind ~s" kind)))
           ;; 4 bits
           (ash (the (mod 16) (encoded-fixup-flavor flavor)) 4)
           ;; 8 bits
@@ -1073,10 +1074,21 @@
         (when (eq (fixup-flavor fixup) :card-table-index-mask)
           (push (fixup-note-position note) result))))))
 
-;;; Dump all the fixups.
-;;;  - foreign (C) symbols: named by a string
-;;;  - code object references: don't need a name.
-;;;  - everything else: a symbol for the name.
+;;; Fasl files encode <flavor,kind> in a packed integer. Dispatching on the integer
+;;; is simple, but the case keys still want to be symbols.
+(defmacro fixup-flavor-case (flavor-id &rest clauses)
+  (declare (notinline position))
+  `(case ,flavor-id
+     ,@(mapcar (lambda (clause)
+                 (if (eq (car clause) t)
+                     clause
+                     (cons (mapcar (lambda (kwd) (encoded-fixup-flavor kwd))
+                                   (ensure-list (car clause)))
+                           (cdr clause))))
+               clauses)))
+
+;;; Dump all the fixups. The two CASE statements below check that each
+;;; fixnum has a NAME of the type appropriate to the flavor.
 (defun dump-fixups (fixup-notes alloc-points fasl-output &aux (nelements 2))
   (declare (type list fixup-notes) (type fasl-output fasl-output))
   ;; "retained" fixups are those whose offset in the code needs to be
@@ -1088,40 +1100,43 @@
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
-           (named (not (member flavor '(:code-object :card-table-index-mask))))
-           (data
-            (or #-sb-xc-host ; ASM routine indices aren't known to the cross-compiler
-                (when (member flavor '(:assembly-routine :assembly-routine*))
-                  (setq named nil)
-                  (the (integer 1 *) ; data can't be 0
-                       (cddr (gethash name (%asm-routine-table *assembler-routines*)))))
-                0))
+           (flavor-id (encoded-fixup-flavor flavor))
+           (numeric-operand
+            (fixup-flavor-case flavor-id
+              ((:code-object :card-table-index-mask)
+               (the null name)
+               1) ; avoid dumping a general operand
+              #-sb-xc-host ; ASM routine indices aren't known to the cross-compiler
+              (:assembly-routine
+               (the (integer 1 *) ; must not be nonzero. 0 decodes as no numeric operand
+                    (cddr (gethash name (%asm-routine-table *assembler-routines*)))))))
            (info
             (!pack-fixup-info (fixup-note-position note) (fixup-note-kind note)
-                              flavor data))
-           (operand
-            (ecase flavor
-              ((:code-object :card-table-index-mask) (the null name))
-              (:layout
-               (if (symbolp name)
-                   name
-                   (layout-classoid-name name)))
-              (:layout-id (the layout name))
-              ((:assembly-routine :assembly-routine*
-               :symbol-tls-index
-               ;; Only #+immobile-space can use the following two flavors.
-               ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
-               ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
-               ;; In the latter case, the symbol's address doesn't matter,
-               ;; but its global value must be an immobile object.
-               :immobile-symbol :symbol-value)
-               (the symbol name))
-              ((:alien-code-linkage-index :alien-data-linkage-index
-                :foreign :foreign-dataref) (the string name))
-              ((:fdefn-call :static-call) name))))
+                              flavor (or numeric-operand 0))))
       (dump-object info fasl-output)
-      (incf nelements (cond (named (dump-object operand fasl-output) 2)
-                            (t 1))))))
+      (if numeric-operand
+          (incf nelements) ; used 1 element of the fasl stack
+          (let ((operand
+                 (fixup-flavor-case flavor-id
+                   ((:alien-code-linkage-index :alien-data-linkage-index
+                     :foreign :foreign-dataref) (the string name))
+                   (:layout
+                    (if (symbolp name)
+                        name
+                        (layout-classoid-name name)))
+                   (:layout-id (the layout name))
+                   ((:assembly-routine
+                     :symbol-tls-index
+                     ;; Only #+immobile-space can use the following two flavors.
+                     ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
+                     ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
+                     ;; In the latter case, the symbol's address doesn't matter,
+                     ;; but its global value must be an immobile object.
+                     :immobile-symbol :symbol-value)
+                    (the symbol name))
+                   (t name)))) ; function name
+            (dump-object operand fasl-output)
+            (incf nelements 2))))))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.

@@ -322,3 +322,7 @@
                            (logand status #b11))  ; new flag bits
                         (logand existing -4)      ; old count
                         (logand status -4))))))   ; new count
+
+(declaim (type (simple-array (unsigned-byte 16) 1) *asm-routine-offsets*))
+(define-load-time-global *asm-routine-offsets*
+  (make-array 0 :element-type '(unsigned-byte 16)))

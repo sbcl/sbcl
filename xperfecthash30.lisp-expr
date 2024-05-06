@@ -1651,5 +1651,11 @@
   (let ((b (& val #xf)))
    (let ((a (>> (<< val 3) 28)))
     (^ a (aref tab b))))))")
+(#(FDC1A4 2A52D0C 4B25CD9 8854C0F ACA92C6 DC571BB 10294987 1209C54D 13965BF7 14348698 157A6A3D 1C2E380B 1DEAED54 1F859AC5)
+ "#(:ASSEMBLY-ROUTINE :CARD-TABLE-INDEX-MASK :SYMBOL-TLS-INDEX :ALIEN-CODE-LINKAGE-INDEX :ALIEN-DATA-LINKAGE-INDEX :FOREIGN :FOREIGN-DATAREF :CODE-OBJECT :LAYOUT :IMMOBILE-SYMBOL :FDEFN-CALL :STATIC-CALL :SYMBOL-VALUE :LAYOUT-ID)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 4 0 3 13 14 8)))
+  (let ((b (& (>> val 5) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
