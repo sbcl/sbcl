@@ -76,6 +76,8 @@ missing MAKE-LOAD-FORM methods?")
                       (and (policy bind (> store-source-form 0))
                            inline-expansion)))
            (doc (functional-documentation internal-fun)))
+      (when doc
+        (setf doc (possibly-base-stringize doc)))
       (setf (entry-info-form/doc info)
             (if (and form doc) (cons form doc) (or form doc))))
     (when (policy bind (>= debug 1))

@@ -619,7 +619,7 @@
     vector
   (flushable no-verify-arg-count))
 
-(defknown (possibly-base-stringize possibly-base-stringize-to-heap) (string) simple-string
+(defknown (possibly-base-stringize possibly-base-stringize-to-heap) ((or null string)) (or null simple-string)
   (flushable no-verify-arg-count))
 
 (defknown map (type-specifier (function-designator ((nth-arg 2 :sequence t)

@@ -106,7 +106,8 @@
   (cdr (assoc type (info :random-documentation :stuff name))))
 
 (defun (setf random-documentation) (new-value name type)
-  (let ((pair (assoc type (info :random-documentation :stuff name))))
+  (let ((pair (assoc type (info :random-documentation :stuff name)))
+        (new-value (possibly-base-stringize new-value)))
     (if pair
         (setf (cdr pair) new-value)
         (push (cons type new-value)

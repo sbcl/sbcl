@@ -25,25 +25,26 @@
 
 (defun (setf fun-doc) (new-value function)
   (declare (type (or null string) new-value))
-  (typecase function
-    (interpreted-function
-     #+sb-fasteval
-     (setf (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function))
-           new-value)
-     #+sb-eval
-     (setf (sb-eval:interpreted-function-documentation function) new-value))
-    (generic-function
-     (setf (slot-value function '%documentation) new-value))
-    (closure
-     (set-closure-extra-values
-      function nil
-      (pack-closure-extra-values
-       (nth-value +closure-name-index+ (closure-extra-values function))
-       new-value)))
-    (simple-fun
-     ;; Don't allow PCL CTORs and other random functions through
-     ;; because we don't want to affect builtin docstrings.
-     (setf (%simple-fun-doc function) new-value)))
+  (let ((new-value (possibly-base-stringize new-value)))
+    (typecase function
+      (interpreted-function
+       #+sb-fasteval
+       (setf (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function))
+             new-value)
+       #+sb-eval
+       (setf (sb-eval:interpreted-function-documentation function) new-value))
+      (generic-function
+       (setf (slot-value function '%documentation) new-value))
+      (closure
+       (set-closure-extra-values
+        function nil
+        (pack-closure-extra-values
+         (nth-value +closure-name-index+ (closure-extra-values function))
+         new-value)))
+      (simple-fun
+       ;; Don't allow PCL CTORs and other random functions through
+       ;; because we don't want to affect builtin docstrings.
+       (setf (%simple-fun-doc function) new-value))))
   new-value)
 
 (defun real-function-name (name)
@@ -94,17 +95,18 @@
 ;;; It, and the corresponding reader, are not for use outside this file.
 (defun (setf %doc-info) (string name doc-type)
   (declare (type (or null string) string))
-  (let ((info-number
-         (macrolet ((info-number (class type)
-                      (meta-info-number (meta-info class type))))
-           (case doc-type
-             (variable (info-number :variable :documentation))
-             (structure
-              (cond ((eq (info :type :kind name) :instance)
-                     (info-number :type :documentation))
-                    ((info :typed-structure :info name)
-                     (info-number :typed-structure :documentation))))
-             (type (info-number :type :documentation))))))
+  (let ((string (possibly-base-stringize string))
+        (info-number
+          (macrolet ((info-number (class type)
+                       (meta-info-number (meta-info class type))))
+            (case doc-type
+              (variable (info-number :variable :documentation))
+              (structure
+               (cond ((eq (info :type :kind name) :instance)
+                      (info-number :type :documentation))
+                     ((info :typed-structure :info name)
+                      (info-number :typed-structure :documentation))))
+              (type (info-number :type :documentation))))))
     (cond (info-number
            (if string
                (set-info-value name info-number string)
@@ -131,7 +133,8 @@
                  (t
                   (setf (fun-doc (fdefinition name)) string))))
           ((typep name '(or symbol cons))
-           (setf (random-documentation name doc-type) string)))))
+           (setf (random-documentation name doc-type) string))))
+  string)
 
 (defun set-function-name-documentation (name documentation)
   (aver name)
@@ -256,14 +259,16 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (set-function-name-documentation x new-value))
+  (set-function-name-documentation x (possibly-base-stringize new-value))
+  new-value)
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
     (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
-  (set-function-name-documentation x new-value))
+  (set-function-name-documentation x (possibly-base-stringize new-value))
+  new-value)
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
@@ -272,11 +277,13 @@
 ;;; SETF documentation is attached to the function that performs expansion,
 ;;; except for short form DEFSETF which is in the globaldb value directly.
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (let ((expander (info :setf :expander x)))
+  (let ((expander (info :setf :expander x))
+        (new-value (possibly-base-stringize new-value)))
     (typecase expander
       ((cons symbol) (setf (second expander) new-value))
       (cons (setf (documentation (cdr expander) 'function) new-value))
-      (function (setf (documentation expander 'function) new-value)))))
+      (function (setf (documentation expander 'function) new-value))))
+  new-value)
 
 (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
   (let ((expander (info :setf :expander x)))
@@ -298,11 +305,13 @@
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) new-value))
+  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  new-value)
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 'method-combination)))
-  (setf (slot-value x '%documentation) new-value))
+  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  new-value)
 
 (defmethod (setf documentation)
     (new-value (x symbol) (doc-type (eql 'method-combination)))
@@ -314,7 +323,8 @@
 
 (defmethod (setf documentation)
     (new-value (x standard-method) (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) new-value))
+  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  new-value)
 
 ;;; types, classes, and structure names
 
@@ -348,11 +358,13 @@
           (defmethod (setf documentation) (new-value
                                            (x symbol)
                                            (doc-type (eql ',doc-type)))
-            (acond
-             ((find-class x nil)
-              (setf (documentation it t) new-value))
-             (t
-              (setf (%doc-info x ',doc-type) new-value)))))))
+            (let ((new-value (possibly-base-stringize new-value)))
+             (acond
+               ((find-class x nil)
+                (setf (documentation it t) new-value))
+               (t
+                (setf (%doc-info x ',doc-type) new-value))))
+            new-value))))
 
   (define-type-documentation-methods structure-class
       (%doc-info (class-name x) 'type)
@@ -360,7 +372,7 @@
 
   (define-type-documentation-methods class
       (slot-value x '%documentation)
-      (setf (slot-value x '%documentation) new-value))
+      (setf (slot-value x '%documentation) (possibly-base-stringize new-value)))
 
   ;; although the CLHS doesn't mention this, it is reasonable to
   ;; assume that parallel treatment of condition-class was intended
@@ -390,8 +402,7 @@
 
 (defmethod (setf documentation)
     (new-value (slotd standard-slot-definition) (doc-type (eql 't)))
-  (declare (ignore doc-type))
-  (setf (slot-value slotd '%documentation) new-value))
+  (setf (slot-value slotd '%documentation) (possibly-base-stringize new-value)))
 
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.
