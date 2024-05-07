@@ -90,10 +90,23 @@
 
 ;;;; list collection macrology
 
+(defstruct (loop-collector
+            (:copier nil)
+            (:predicate nil))
+  (name nil :read-only t)
+  (class nil :read-only t)
+  (history nil)
+  (tempvars nil)
+  (specified-type nil :read-only t)
+  dtype
+  (data nil)) ;collector-specific data
+(declaim (sb-ext:freeze-type loop-collector))
+
 (sb-xc:defmacro with-loop-list-collection-head
-    ((how head-var tail-var &optional user-head-var) &body body)
+    ((collector head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
-    `(let* ((,head-var ,(if (eq how 'list)
+    `(let* ((,head-var ,(if (loop for how in (loop-collector-history collector)
+                                  always (eq how 'list))
                             `(unaligned-dx-cons nil)
                             `(list nil)))
             (,tail-var ,head-var) ,@l)
@@ -1064,20 +1077,6 @@ code to be loaded.
 (defun loop-do-return ()
   (loop-emit-body (loop-construct-return (loop-get-form))))
 
-;;;; value accumulation: LIST
-
-(defstruct (loop-collector
-            (:copier nil)
-            (:predicate nil))
-  (name nil :read-only t)
-  (class nil :read-only t)
-  (history nil)
-  (tempvars nil)
-  (specified-type nil :read-only t)
-  dtype
-  (data nil)) ;collector-specific data
-(declaim (sb-ext:freeze-type loop-collector))
-
 (sb-xc:defmacro with-sum-count (lc &body body)
   (let* ((type (loop-collector-dtype lc))
          (temp-var (car (loop-collector-tempvars lc))))
@@ -1144,7 +1143,7 @@ code to be loaded.
                                     (gensym "TAIL")
                                     (and (loop-collector-name lc)
                                          (list (loop-collector-name lc))))))
-        (push `(with-loop-list-collection-head (,specifically ,@tempvars)) (wrappers *loop*))
+        (push `(with-loop-list-collection-head (,lc ,@tempvars)) (wrappers *loop*))
         (unless (loop-collector-name lc)
           (loop-emit-final-value `(loop-collect-answer ,(car tempvars)
                                                        ,@(cddr tempvars)))))
