@@ -2784,7 +2784,7 @@
                (values nil nil))))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
-                              (character string t t t function function)
+                              (t string t t t function function)
                               *
                               :policy (> speed space))
   (if (eq '* (upgraded-element-type-specifier sequence))
