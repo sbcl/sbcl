@@ -470,8 +470,9 @@
                        (if simple
                            cdims
                            (length cdims))))
-                    ((csubtypep (lvar-type dims)
-                                (specifier-type 'integer))
+                    ((or (csubtypep (lvar-type dims)
+                                    (specifier-type 'integer))
+                         (supplied-and-true fill-pointer))
                      '(*))
                     (t
                      '*)))))
