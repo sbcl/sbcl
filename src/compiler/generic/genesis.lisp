@@ -2052,6 +2052,11 @@ core and return a descriptor to it."
   ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler elides.
   (cold-set '*package* (cdr (cold-find-package-info "COMMON-LISP-USER")))
 
+  (loop with ud-tramp = (lookup-assembler-reference 'sb-vm::undefined-tramp)
+        for fdefn being each hash-value of *cold-fdefn-objects*
+        when (cold-null (cold-fdefn-fun fdefn))
+        do (write-wordindexed/raw fdefn sb-vm:fdefn-raw-addr-slot ud-tramp))
+
   (dump-symbol-infos
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
@@ -2130,14 +2135,6 @@ core and return a descriptor to it."
     result))
 
 (defvar *assembler-routines*) ; descriptor
-;;; Writing the address of the undefined trampoline into static fdefns
-;;; has to occur after the asm routines are loaded, which occurs after
-;;; the static fdefns are initialized.
-(defvar *deferred-undefined-tramp-refs*)
-(defun fdefn-makunbound (fdefn)
-  (write-wordindexed fdefn sb-vm:fdefn-fun-slot *nil-descriptor*)
-  (write-wordindexed/raw fdefn sb-vm:fdefn-raw-addr-slot
-                         (lookup-assembler-reference 'sb-vm::undefined-tramp)))
 (defun ensure-cold-fdefn (cold-name &optional
                                           (gspace #+immobile-space *immobile-fixedobj*
                                                   #-immobile-space *dynamic*))
@@ -2146,22 +2143,15 @@ core and return a descriptor to it."
     (or (gethash warm-name *cold-fdefn-objects*)
         (let ((fdefn (allocate-otherptr gspace sb-vm:fdefn-size sb-vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
-          #+x86-64
-          (write-wordindexed/raw ; write an INT instruction into the header
-           fdefn 0 (logior (ash sb-vm::undefined-fdefn-header 16)
-                           (read-bits-wordindexed fdefn 0)))
-          (write-wordindexed fdefn sb-vm:fdefn-name-slot cold-name)
           (when core-file-name
+            (write-wordindexed fdefn sb-vm:fdefn-name-slot cold-name)
+            (write-wordindexed fdefn sb-vm:fdefn-fun-slot *nil-descriptor*)
+            #+x86-64
+            (write-wordindexed/raw ; write an INT instruction into the header
+             fdefn 0 (logior (ash sb-vm::undefined-fdefn-header 16)
+                             (read-bits-wordindexed fdefn 0)))
             (when (typep warm-name '(and symbol (not null)))
-              (write-wordindexed (cold-intern warm-name) sb-vm:symbol-fdefn-slot fdefn))
-            (if *assembler-routines*
-                (fdefn-makunbound fdefn)
-                (push (lambda ()
-                        (when (zerop (read-bits-wordindexed fdefn sb-vm:fdefn-fun-slot))
-                          ;; This is probably irrelevant - it only occurs for static fdefns,
-                          ;; but every static fdefn will eventually get a definition.
-                          (fdefn-makunbound fdefn)))
-                      *deferred-undefined-tramp-refs*)))
+              (write-wordindexed (cold-intern warm-name) sb-vm:symbol-fdefn-slot fdefn)))
           fdefn))))
 
 (defun cold-fun-entry-addr (fun)
@@ -4125,7 +4115,6 @@ III. initially undefined function references (alphabetically):
            *cold-static-call-fixups*
            *cold-assembler-routines*
            *assembler-routines*
-           *deferred-undefined-tramp-refs*
            (*deferred-known-fun-refs* nil))
 
       (make-nil-descriptor)
@@ -4150,8 +4139,6 @@ III. initially undefined function references (alphabetically):
             (aver (singleton-p files))
             (cold-load (car files) verbose nil)))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
-      (mapc 'funcall *deferred-undefined-tramp-refs*)
-      (makunbound '*deferred-undefined-tramp-refs*)
 
       (when *assembler-routines*
         ;; code-debug-info stores the name->addr hashtable.
