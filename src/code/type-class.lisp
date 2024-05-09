@@ -1157,7 +1157,7 @@
     ;; Don't need the answer to be positive for key-info-set-hashset,
     ;; but do need it to be positive when hashing ARGS-TYPE which uses MIX.
     (dolist (elt set (logand h sb-xc:most-positive-fixnum))
-      (setf h (plus-mod-fixnum (truly-the fixnum (key-info-hash elt)) h)))))
+      (setf h (plus-mod-fixnum (truly-the sb-xc:fixnum (key-info-hash elt)) h)))))
 
 (defun key-info-list-flags (list)
   (let ((bits 0))
