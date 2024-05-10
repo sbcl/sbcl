@@ -577,6 +577,21 @@
     (storew tls-index bsp (- binding-symbol-slot binding-size))
     (inst mov (thread-tls-ea tls-index) val)))
 
+(defun bind (bsp symbol tmp)
+  (inst mov bsp (* binding-size n-word-bytes))
+  (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
+  (let* ((tls-index (load-time-tls-offset symbol))
+         (tls-cell (thread-tls-ea tls-index)))
+    ;; Too bad we can't use "XCHG [thread + disp], val" to write new value
+    ;; and read the old value in one step. It will violate the constraints
+    ;; prescribed in the internal documentation on special binding.
+    (inst mov tmp tls-cell)
+    (storew tmp bsp binding-value-slot)
+    ;; Indices are small enough to be written as :DWORDs which avoids
+    ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
+    (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) tls-index)
+    (values tls-cell tmp)))
+
 (define-vop (bind) ; bind a known symbol
   (:args (val :scs (any-reg descriptor-reg)
               :load-if (not (let ((imm (encode-value-if-immediate val)))
@@ -585,19 +600,18 @@
   (:temporary (:sc unsigned-reg) bsp tmp)
   (:info symbol)
   (:generator 10
-    (inst mov bsp (* binding-size n-word-bytes))
-    (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
-    (let* ((tls-index (load-time-tls-offset symbol))
-           (tls-cell (thread-tls-ea tls-index)))
-      ;; Too bad we can't use "XCHG [thread + disp], val" to write new value
-      ;; and read the old value in one step. It will violate the constraints
-      ;; prescribed in the internal documentation on special binding.
-      (inst mov tmp tls-cell)
-      (storew tmp bsp binding-value-slot)
-      ;; Indices are small enough to be written as :DWORDs which avoids
-      ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
-      (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) tls-index)
-      (inst mov :qword tls-cell (encode-value-if-immediate val))))))
+    (inst mov :qword (bind bsp symbol tmp) (encode-value-if-immediate val))))
+
+(define-vop (rebind)
+  (:temporary (:sc unsigned-reg) bsp tls-value)
+  (:info symbol)
+  (:node-var node)
+  (:generator 10
+    (multiple-value-bind (tls-cell tls-value) (bind bsp symbol tls-value)
+      (unless (symbol-always-has-tls-value-p symbol node)
+        (inst cmp tls-value no-tls-value-marker)
+        (inst cmov :e tls-value (symbol-slot-ea symbol symbol-value-slot))
+        (inst mov tls-cell tls-value))))))
 
 #-sb-thread
 (define-vop (dynbind)
