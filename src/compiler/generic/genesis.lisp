@@ -2266,7 +2266,7 @@ core and return a descriptor to it."
 (defvar *cold-foreign-symbol-table*)
 (declaim (type hash-table *cold-foreign-symbol-table*))
 
-(defvar *cold-assembler-routines*)
+(defvar *asm-routine-alist*)
 (defvar *cold-static-call-fixups*)
 
 ;;: See picture in 'objdef'
@@ -2319,13 +2319,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
        (code-header-bytes code-component))))
 
 (defun lookup-assembler-reference (symbol)
-  (let ((cell (or (assq symbol *cold-assembler-routines*)
+  (let ((cell (or (assq symbol *asm-routine-alist*)
                   (error "Unknown asm routine ~S" symbol))))
     (+ (assembler-code-insts-start) (cdr cell)))) ; compute the starting address
 
 (defun asm-routine-index-from-addr (address)
   (let ((relative-start (- address (assembler-code-insts-start))))
-    (1+ (position relative-start *cold-assembler-routines* :key #'cdr))))
+    (1+ (position relative-start *asm-routine-alist* :key #'cdr))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2367,7 +2367,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (if (listp key) (cold-list sym) sym))
              'sb-vm::+required-foreign-symbols+)
     (cold-set (cold-intern '*assembler-routines*) *assembler-routines*)
-    (to-core *cold-assembler-routines*
+    (to-core *asm-routine-alist*
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
              '*!initial-assembler-routines*)))
@@ -2874,13 +2874,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
       ;; Now that we combine all assembler routines into a single code object
       ;; at assembly time, they can all be sorted at this point.
       ;; We used to combine them with some magic in genesis.
-      (setq *cold-assembler-routines* (sort table #'< :key #'cdr)))
+      (setq *asm-routine-alist* (sort table #'< :key #'cdr)))
     (let ((stack (%fasl-input-stack (fasl-input))))
       (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts) n-fixup-elts))
     #+(or x86 x86-64) ; fill in the indirect call table
     (let ((base (code-header-words asm-code))
           (index 0))
-      (dolist (item *cold-assembler-routines*)
+      (dolist (item *asm-routine-alist*)
         ;; Word 0 of code-instructions is the jump table count (the asm routine entrypoints
         ;; look to GC exactly like a jump table in any other codeblob)
         (let ((entrypoint (lookup-assembler-reference (car item))))
@@ -3738,7 +3738,7 @@ as is fairly common for structure accessors.)")
 
   (format t "I. assembler routines defined in core image: (base=~x)~2%"
           (descriptor-bits *assembler-routines*))
-  (dolist (routine *cold-assembler-routines*)
+  (dolist (routine *asm-routine-alist*)
     (let ((name (car routine)))
       (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
 
@@ -4113,7 +4113,7 @@ III. initially undefined function references (alphabetically):
            (*cold-methods* nil)
            (*!cold-toplevels* nil)
            *cold-static-call-fixups*
-           *cold-assembler-routines*
+           *asm-routine-alist*
            *assembler-routines*
            (*deferred-known-fun-refs* nil))
 
