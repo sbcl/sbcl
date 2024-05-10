@@ -211,11 +211,12 @@
       `(%cas-symbol-global-value symbol old new)
       (sb-c::give-up-ir1-transform)))
 
+(defmacro symbol-value-slot-ea (sym)    ; SYM is a TN
+  `(ea (- (* symbol-value-slot n-word-bytes) other-pointer-lowtag)
+       ,sym))
+
 (macrolet ((access-wired-tls-val (sym) ; SYM is a symbol
              `(thread-tls-ea (load-time-tls-offset ,sym)))
-           (symbol-value-slot-ea (sym) ; SYM is a TN
-             `(ea (- (* symbol-value-slot n-word-bytes) other-pointer-lowtag)
-                  ,sym))
            (load-oldval ()
              `(if (sc-is old immediate)
                   (inst mov rax (encode-value-if-immediate old))
@@ -604,13 +605,22 @@
 
 (define-vop (rebind)
   (:temporary (:sc unsigned-reg) bsp tls-value)
+  (:temporary (:sc descriptor-reg
+               :unused-if (eq (immediate-constant-sc symbol) immediate-sc-number))
+              symbol-reg)
   (:info symbol)
   (:node-var node)
+  (:vop-var vop)
   (:generator 10
     (multiple-value-bind (tls-cell tls-value) (bind bsp symbol tls-value)
       (unless (symbol-always-has-tls-value-p symbol node)
+        (unless (eq (tn-kind symbol-reg) :unused)
+          (load-constant vop (emit-constant symbol) symbol-reg))
         (inst cmp tls-value no-tls-value-marker)
-        (inst cmov :e tls-value (symbol-slot-ea symbol symbol-value-slot))
+        (inst cmov :e tls-value
+              (if (eq (tn-kind symbol-reg) :unused)
+                  (symbol-slot-ea symbol symbol-value-slot)
+                  (symbol-value-slot-ea symbol-reg)))
         (inst mov tls-cell tls-value))))))
 
 #-sb-thread
