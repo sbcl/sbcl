@@ -79,8 +79,8 @@
           #+sb-unicode
           (character ,(cl:code-char 0) 32 simple-character-string
                      :complex-typecode #.complex-character-string-widetag)
-          (single-float $0.0f0 32 simple-array-single-float)
-          (double-float $0.0d0 64 simple-array-double-float)
+          (single-float 0.0f0 32 simple-array-single-float)
+          (double-float 0.0d0 64 simple-array-double-float)
           (bit 0 1 simple-bit-vector
                :complex-typecode #.complex-bit-vector-widetag)
           ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
@@ -125,12 +125,12 @@
           (fixnum 0 64 simple-array-fixnum :fixnum-p t)
           #+64-bit
           ((signed-byte 64) 0 64 simple-array-signed-byte-64)
-          ((complex single-float) ,(complex $0f0 $0f0) 64
+          ((complex single-float) #C(0f0 0f0) 64
            simple-array-complex-single-float)
-          ((complex double-float) ,(complex $0d0 $0d0) 128
+          ((complex double-float) #C(0d0 0d0) 128
            simple-array-complex-double-float)
           #+long-float
-          ((complex long-float) ,(complex $0L0 $0L0) #+x86 192 #+sparc 256
+          ((complex long-float) #C(0L0 0L0) #+x86 192 #+sparc 256
            simple-array-complex-long-float)
           (t 0 #.n-word-bits simple-vector)))))
 

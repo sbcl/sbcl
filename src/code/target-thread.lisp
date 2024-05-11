@@ -720,7 +720,7 @@ returns NIL each time."
                   (let ((,time-left (- ,deadline (get-internal-real-time))))
                     (if (plusp ,time-left)
                         (* (coerce ,time-left 'single-float)
-                           (sb-xc:/ $1.0f0 internal-time-units-per-second))
+                           (sb-xc:/ 1.0f0 internal-time-units-per-second))
                         0)))))
          ,@body))))
 

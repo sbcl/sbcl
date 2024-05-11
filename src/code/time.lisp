@@ -288,7 +288,7 @@ doing so may interfere with results reported by eg. TIME.")
             ;; Round up so we don't mislead by saying 0.0 seconds of non-GC time...
             (- (ceiling total-run-time-us 1000) gc-run-time-ms)
             (if (zerop real-time-ms)
-                $100.0
+                100.0
                 (float (* 100 (/ (round total-run-time-us 1000) real-time-ms))))
             eval-calls
             lambdas-converted

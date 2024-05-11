@@ -116,9 +116,6 @@
                       *compile-file-pathname*
                       *load-truename*
                       *load-pathname*
-                      ;; READ might get altered
-                      read
-                      read-preserving-whitespace
                       ;; These change because CMU CL uses them as internal
                       ;; variables:
                       ,@'

@@ -112,7 +112,7 @@
   (imag nil :type real :read-only t))
 
 (defmethod print-object ((obj complexnum) stream)
-  (write-string "#.(COMPLEX " stream)
+  (write-string "#C( " stream)
   (prin1 (complexnum-real obj) stream)
   (write-char #\Space stream)
   (prin1 (complexnum-imag obj) stream)
@@ -121,6 +121,15 @@
 (defmethod cl:make-load-form ((obj complexnum) &optional env)
   (declare (ignore env))
   `(complex ,(complexnum-real obj) ,(complexnum-imag obj)))
+
+;;; KLUDGE: this is more-or-less copied from sharpm,
+(defun sb-cold::read-target-complex (stream sub-char numarg)
+  (declare (ignore sub-char numarg))
+  (let ((cnum (read stream t nil t)))
+    (when *read-suppress* (return-from sb-cold::read-target-complex nil))
+    (if (and (listp cnum) (= (length cnum) 2))
+        (complex (car cnum) (cadr cnum))
+        (error "illegal complex number format: #C~S" cnum))))
 
 (defvar *interned-complex-numbers* (make-hash-table :test #'equal))
 

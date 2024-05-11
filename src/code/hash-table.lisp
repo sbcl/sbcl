@@ -140,7 +140,7 @@
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
-  (rehash-size nil :type (or index (single-float ($1.0)))
+  (rehash-size nil :type (or index (single-float (1.0)))
                :read-only t)
   ;; How full the hash table has to get before we rehash
   ;; but only for the initial determination of how many buckets to make.
@@ -149,7 +149,7 @@
   ;; table to be X amount larger *and* that you care at about what load factor the
   ;; new table gets rehashed, but no, you don't get to pick both every time.
   ;; (CLHS says that these are all just "hints" and we're free to ignore)
-  (rehash-threshold nil :type (single-float ($0.0) $1.0) :read-only t)
+  (rehash-threshold nil :type (single-float (0.0) 1.0) :read-only t)
   ;; The current number of entries in the table.
   (%count 0 :type index)
   ;; Index into the Next vector chaining together free slots in the KV
@@ -222,7 +222,7 @@
 (sb-xc:defmacro pack-ht-flags-kind (x) `(ash ,x 4))
 (defmacro ht-flags-kind (flags) `(ldb (byte 2 4) ,flags))
 
-(defconstant default-rehash-size $1.5)
+(defconstant default-rehash-size 1.5)
 ;; Don't raise this number to 8 - if you do it'll increase the memory
 ;; consumption of a default MAKE-HASH-TABLE call by 7% just due to
 ;; padding slots.  This is a "perfect" minimal size.
@@ -248,7 +248,7 @@
       ;; (without pain) so the expanded code can't use the values.
       ,+min-hash-table-size+
       ,default-rehash-size
-      $1.0)))
+      1.0)))
 
 ;; Our hash-tables store precomputed hashes to speed rehash and to guard
 ;; the call of the general comparator.

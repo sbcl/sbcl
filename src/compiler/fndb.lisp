@@ -320,7 +320,7 @@
   (movable foldable flushable))
 
 (defknown (sin cos) (number)
-  (or (float $-1.0 $1.0) (complex float))
+  (or (float -1.0 1.0) (complex float))
   (movable foldable flushable recursive))
 
 (defknown atan
@@ -360,7 +360,7 @@
 (defknown unary-truncate (real) (values integer real)
   (movable foldable flushable no-verify-arg-count))
 
-(defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
+(defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql 0f0))
     (foldable movable flushable fixed-args)
   :folder #'truncate)
 
@@ -369,7 +369,7 @@
             (and
              #+(and 64-bit
                     (not (or riscv ppc64))) ;; they can't survive cold-init
-             (eql $0d0)
+             (eql 0d0)
              double-float))
    (foldable movable flushable fixed-args)
   :folder #'truncate)
@@ -431,11 +431,11 @@
   :derive-type (lambda (call &aux (args (combination-args call))
                                   (type (unless (cdr args) (lvar-type (first args)))))
                  (cond ((and type (csubtypep type (specifier-type 'single-float)))
-                        (specifier-type '(member $1f0 $-1f0)))
+                        (specifier-type '(member 1f0 -1f0)))
                        ((and type (csubtypep type (specifier-type 'double-float)))
-                        (specifier-type '(member $1d0 $-1d0)))
+                        (specifier-type '(member 1d0 -1d0)))
                        (type
-                        (specifier-type '(member $1f0 $-1f0 $1d0 $-1d0)))
+                        (specifier-type '(member 1f0 -1f0 1d0 -1d0)))
                        (t
                         (specifier-type 'float)))))
 
@@ -493,8 +493,8 @@
   (movable foldable flushable))
 (defknown deposit-field (integer byte-specifier integer) integer
   (movable foldable flushable))
-(defknown random ((or (float ($0.0f0)) (integer 1)) &optional random-state)
-  (or (float $0.0f0) (integer 0))
+(defknown random ((or (float (0.0f0)) (integer 1)) &optional random-state)
+  (or (float 0.0f0) (integer 0))
   ())
 (defknown make-random-state (&optional (or random-state (member nil t)))
   random-state (flushable))
@@ -1151,7 +1151,7 @@
 
 (defknown make-hash-table
   (&key (:test function-designator) (:size unsigned-byte)
-        (:rehash-size (or (integer 1) (float ($1.0))))
+        (:rehash-size (or (integer 1) (float (1.0))))
         (:rehash-threshold (real 0 1))
         (:hash-function (or null function-designator))
         (:weakness (member nil :key :value :key-and-value :key-or-value))
@@ -1171,9 +1171,9 @@
 (defknown maphash ((function-designator (t t)) hash-table) null (flushable call))
 (defknown clrhash ((modifying hash-table)) hash-table ())
 (defknown hash-table-count (hash-table) index (flushable))
-(defknown hash-table-rehash-size (hash-table) (or index (single-float ($1.0)))
+(defknown hash-table-rehash-size (hash-table) (or index (single-float (1.0)))
   (foldable flushable))
-(defknown hash-table-rehash-threshold (hash-table) (single-float ($0.0) $1.0)
+(defknown hash-table-rehash-threshold (hash-table) (single-float (0.0) 1.0)
   (foldable flushable))
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) function-designator (foldable flushable))

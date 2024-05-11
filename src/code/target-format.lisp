@@ -687,7 +687,7 @@
           (float-nan-p number))
       (prin1 number stream)
       (multiple-value-bind (num expt) (sb-impl::scale-exponent (abs number))
-        (let* ((k (if (= num $1.0) (1- k) k))
+        (let* ((k (if (= num 1.0) (1- k) k))
                (expt (- expt k))
                (estr (decimal-string (abs expt)))
                (elen (if e (max (length estr) e) (length estr)))

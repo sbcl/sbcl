@@ -185,19 +185,19 @@ means to wait indefinitely.")
              (values whole-seconds
                      (truly-the (integer 0 #.(expt 10 9))
                                 (%unary-truncate (* (- seconds (float whole-seconds seconds))
-                                                    $1f9)))))))
+                                                    1f9)))))))
     (declare (inline split-float))
     (typecase seconds
-      ((single-float $0f0 #.(float most-positive-fixnum $1f0))
+      ((single-float 0f0 #.(float most-positive-fixnum 1f0))
        (split-float))
-      ((double-float $0d0 #.(float most-positive-fixnum $1d0))
+      ((double-float 0d0 #.(float most-positive-fixnum 1d0))
        (split-float))
       (ratio
        (split-ratio-for-sleep seconds))
       (t
        (multiple-value-bind (sec frac)
            (truncate seconds)
-         (values sec (truncate frac $1f-9)))))))
+         (values sec (truncate frac 1f-9)))))))
 
 (declaim (inline %nanosleep))
 (defun %nanosleep (sec nsec)

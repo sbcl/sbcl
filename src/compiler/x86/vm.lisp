@@ -347,11 +347,11 @@
        immediate-sc-number))
     (single-float
        (case value
-         (($0f0 $1f0) fp-constant-sc-number)
+         ((0f0 1f0) fp-constant-sc-number)
          (t fp-single-immediate-sc-number)))
     (double-float
        (case value
-         (($0d0 $1d0) fp-constant-sc-number)
+         ((0d0 1d0) fp-constant-sc-number)
          (t fp-double-immediate-sc-number)))
     #+long-float
     (long-float

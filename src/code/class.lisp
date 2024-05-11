@@ -1063,18 +1063,18 @@ between the ~A definition and the ~A definition"
       :translation (complex single-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-single-float-widetag)
-      :prototype-form ,(complex $0f0 $0f0))
+      :prototype-form ,(complex 0f0 0f0))
      (complex-double-float
       :translation (complex double-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-double-float-widetag)
-      :prototype-form ,(complex $0d0 $0d0))
+      :prototype-form ,(complex 0d0 0d0))
      #+long-float
      (complex-long-float
       :translation (complex long-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-long-float-widetag)
-      :prototype-form ,(complex $0L0 $0L0))
+      :prototype-form ,(complex 0L0 0L0))
      #+sb-simd-pack
      (simd-pack
       :translation simd-pack
@@ -1089,23 +1089,23 @@ between the ~A definition and the ~A definition"
       ;; (%make-simd-pack-256-ub64 42 42 42 42)
       sb-pcl:+slot-unbound+)
      (real :translation real :inherits (number) :prototype-form 0)
-     (float :translation float :inherits (real number) :prototype-form $0f0)
+     (float :translation float :inherits (real number) :prototype-form 0f0)
      (single-float
       :translation single-float
       :inherits (float real number)
       :codes (,sb-vm:single-float-widetag)
-      :prototype-form $0f0)
+      :prototype-form 0f0)
      (double-float
       :translation double-float
       :inherits (float real number)
       :codes (,sb-vm:double-float-widetag)
-      :prototype-form $0d0)
+      :prototype-form 0d0)
      #+long-float
      (long-float
       :translation long-float
       :inherits (float real number)
       :codes (,sb-vm:long-float-widetag)
-      :prototype-form $0L0)
+      :prototype-form 0L0)
      (rational
       :translation rational :inherits (real number) :prototype-form 0)
      (ratio
@@ -1307,14 +1307,11 @@ between the ~A definition and the ~A definition"
                 (list* name :predicate predicate :translation translation (cdr x))))
             *builtin-classoids*)))
 
-;;; The read interceptor has to be disabled to avoid infinite recursion on CTYPEs
-(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* nil))
 #-sb-xc-host
 (define-load-time-global *builtin-classoids* nil)
 #-sb-xc-host
 (!cold-init-forms
  (setq *builtin-classoids* '#.(compute-builtin-classoids)))
-(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* t))
 
 ;;; See also src/code/type-init.lisp where we finish setting up the
 ;;; translations for built-in types.

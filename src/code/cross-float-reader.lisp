@@ -45,8 +45,6 @@
     (single-float (%single-float-rational rational))
     (double-float (%double-float-rational rational))))
 
-(defvar *floating-point-number-buffer* (make-array 100 :element-type 'character))
-
 (defun parse-xfloat-math-file (stream table)
   ;; Ensure that we're reading the correct variant of the file
   ;; in case there is more than one set of floating-point formats.
@@ -120,62 +118,51 @@
            (values-list answer)
            (multiple-value-call #'record-math-op fun args (progn ,@calculation))))))
 
-(defun sb-cold::read-target-float (stream char)
-  (let ((buffer *floating-point-number-buffer*)
-        (index -1)
-        string)
-    (loop (setq char (read-char stream))
-          (cond ((or (digit-char-p char)
-                     (member char '(#\+ #\- #\. #\D #\E #\F #\L #\S) :test #'char-equal))
-                 (setf (aref buffer (incf index)) char))
-                (t
-                 (unread-char char stream)
-                 (return))))
-    (when *read-suppress*
-      (return-from sb-cold::read-target-float nil))
-    (setf string (subseq buffer 0 (1+ index)))
-    (multiple-value-bind (flonum nchars)
-        (with-memoized-math-op (read-from-string (list *read-default-float-format* string))
-          (let* ((marker-pos
-                   (position-if (lambda (x)
-                                  (member x '(#\E #\S #\F #\D #\L) :test #'char-equal))
-                                string))
-                 (exp-marker (if (and marker-pos
-                                      (char-not-equal (char string marker-pos) #\E))
-                                 (char-upcase (char string marker-pos))
-                                 (ecase cl:*read-default-float-format*
-                                   ((cl:single-float cl:short-float) #\F)
-                                   ((cl:double-float cl:long-float)  #\D))))
-                 (significand (if marker-pos (subseq string 0 marker-pos) string))
-                 (dot-pos (position #\. significand))
-                 (integer (if (eql dot-pos 0) 0 (parse-integer significand :start 0 :end dot-pos)))
-                 (fraction (if (and dot-pos (cl:> (length significand) (1+ dot-pos)))
-                               (cl:/ (parse-integer significand :start (1+ dot-pos))
-                                     (cl:expt 10 (cl:- (length significand) (1+ dot-pos))))
-                               0))
-                 (exponent (if marker-pos
-                               (parse-integer string :start (1+ marker-pos))
-                               0))
-                 (rational (cl:* (if (char= (char string 0) #\-)
-                                     (cl:- integer fraction)
-                                     (cl:+ integer fraction))
-                                 (cl:expt 10 exponent)))
-                 (format (ecase exp-marker
-                           ((#\F #\S) 'single-float)
-                           ((#\D #\L) 'double-float))))
-            ;; Since we are working with rationals, we must special-case
-            ;; negative zero (which does not have a natural rational
-            ;; representation: explicitly look for -0 string.
-            (if (or (string= significand "-0.0")
-                    (string= significand "-.0")
-                    (and (or (string= significand "-0") (string= significand "-0."))
-                         (or marker-pos (error "~S has integer syntax" string))))
-                (ecase format
-                  (single-float (values #.(make-single-float (ash -1 31))
-                                        (length string)))
-                  (double-float (values #.(%make-double-float (ash -1 63))
-                                        (length string))))
-                (let ((result (flonum-from-rational rational format)))
-                  (values result (length string))))))
-      (declare (ignore nchars))
-      flonum)))
+(defun sb-cold::read-target-float-from-string (string)
+  (when *read-suppress*
+    (return-from sb-cold::read-target-float-from-string nil))
+  (multiple-value-bind (flonum nchars)
+      (with-memoized-math-op (read-from-string (list *read-default-float-format* (copy-seq string)))
+        (let* ((marker-pos
+                 (position-if (lambda (x)
+                                (member x '(#\E #\S #\F #\D #\L) :test #'char-equal))
+                              string))
+               (exp-marker (if (and marker-pos
+                                    (char-not-equal (char string marker-pos) #\E))
+                               (char-upcase (char string marker-pos))
+                               (ecase cl:*read-default-float-format*
+                                 ((cl:single-float cl:short-float) #\F)
+                                 ((cl:double-float cl:long-float)  #\D))))
+               (significand (if marker-pos (subseq string 0 marker-pos) string))
+               (dot-pos (position #\. significand))
+               (integer (if (eql dot-pos 0) 0 (parse-integer significand :start 0 :end dot-pos)))
+               (fraction (if (and dot-pos (cl:> (length significand) (1+ dot-pos)))
+                             (cl:/ (parse-integer significand :start (1+ dot-pos))
+                                   (cl:expt 10 (cl:- (length significand) (1+ dot-pos))))
+                             0))
+               (exponent (if marker-pos
+                             (parse-integer string :start (1+ marker-pos))
+                             0))
+               (rational (cl:* (if (char= (char string 0) #\-)
+                                   (cl:- integer fraction)
+                                   (cl:+ integer fraction))
+                               (cl:expt 10 exponent)))
+               (format (ecase exp-marker
+                         ((#\F #\S) 'single-float)
+                         ((#\D #\L) 'double-float))))
+          ;; Since we are working with rationals, we must special-case
+          ;; negative zero (which does not have a natural rational
+          ;; representation: explicitly look for -0 string.
+          (if (or (string= significand "-0.0")
+                  (string= significand "-.0")
+                  (and (or (string= significand "-0") (string= significand "-0."))
+                       (or marker-pos (error "~S has integer syntax" string))))
+              (ecase format
+                (single-float (values #.(make-single-float (ash -1 31))
+                                      (length string)))
+                (double-float (values #.(%make-double-float (ash -1 63))
+                                      (length string))))
+              (let ((result (flonum-from-rational rational format)))
+                (values result (length string))))))
+    (declare (ignore nchars))
+    flonum))

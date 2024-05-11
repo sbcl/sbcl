@@ -299,8 +299,7 @@
 ;;; that much less efficient by always having to use the intercepted function)
 ;;; We're also not handling 1+ or 1- or INCF, DECF.
 ;;; It's unlikely that a host floating-pointer value could sneak through
-;;; to one of the un-intercepted functions given the prohibition against
-;;; using floating-point literals and that almost all other functions
+;;; to one of the un-intercepted functions given that almost all other functions
 ;;; are intercepted. Granted there are some roundabout ways to spell a
 ;;; floating-point number that can not be detected, such as:
 ;;;   (* 50 (hash-table-rehash-threshold (make-hash-table)))

@@ -286,7 +286,7 @@ Examples:
 (defconstant bad-next-value #xfefefefe)
 ;;; This constant is referenced via its name in cold load, so it needs to
 ;;; be evaluable in the host.
-(defconstant +min-hash-table-rehash-threshold+ #.(sb-xc:float 1/16 $1.0))
+(defconstant +min-hash-table-rehash-threshold+ #.(sb-xc:float 1/16 1.0))
 
 ;; The GC will set this to 1 if it moves an address-sensitive key. This used
 ;; to be signaled by a bit in the header of the kv vector, but that
@@ -471,9 +471,9 @@ Examples:
                       (min size (ash 1 24)))) ; 16M key/value pairs
            (rehash-size (if (integerp rehash-size)
                             rehash-size
-                            (float rehash-size $1.0))) ; always single-float
+                            (float rehash-size 1.0))) ; always single-float
            (rehash-threshold (max #.+min-hash-table-rehash-threshold+
-                                  (float rehash-threshold $1.0)))) ; always single-float
+                                  (float rehash-threshold 1.0)))) ; always single-float
       (%make-hash-table
        ;; compute flags. The stored KIND bits don't matter for a user-supplied hash
        ;; and/or test fun, however we don't want to imply that it is an EQ table
@@ -598,7 +598,7 @@ Examples:
                         test test-fun hash-fun
                         +min-hash-table-size+
                         #.default-rehash-size
-                        $1.0)))) ; rehash threshold
+                        1.0)))) ; rehash threshold
 
 ;;; I guess we might have more than one representation of a table,
 ;;; hence this small wrapper function. But why not for the others?
@@ -870,11 +870,11 @@ multiple threads accessing the same hash-table without locking."
             ;;   if you specify 1.001 or other float near 1.
             ;;   Anyway, chaining supports load factors in excess of 100%
             (when (eql rehash-size default-rehash-size)
-              (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
+              (cond ((> full-lf 9/10)   ; .9 is unhappy in cross-float due to inexactness
                      ;; If we're going to decrease the size, make sure we definitely
                      ;; don't decrease below the old size.
                      (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
-                    ((< full-lf 55/100) ; and $.55 is similarly unhappy
+                    ((< full-lf 55/100) ; and .55 is similarly unhappy
                      (setq new-size (floor pow2ceil 100/65))))) ; target LF = 65%
             pow2ceil)))
     (values new-size new-n-buckets)))
@@ -2037,7 +2037,7 @@ table itself."
                       `((:test ,#'hash-table-test eql)
                         (:size ,#'hash-table-size ,+min-hash-table-size+)
                         (:rehash-size ,#'hash-table-rehash-size ,default-rehash-size)
-                        (:rehash-threshold ,#'hash-table-rehash-threshold $1.0)
+                        (:rehash-threshold ,#'hash-table-rehash-threshold 1.0)
                         (:synchronized ,#'hash-table-synchronized-p nil)
                         (:weakness ,#'hash-table-weakness nil)))
                      for value = (funcall accessor hash-table)

@@ -111,7 +111,7 @@
                                 (#\2
                                  (substs (cons arg 'sequence2))
                                  'length2)))
-                  (cache-var (symbolicate length-var '#:-cache)))
+                  (cache-var (symbolicate length-var "-CACHE")))
              (new-args arg)
              (rebindings/eager `(,cache-var nil))
              (rebindings/lazy

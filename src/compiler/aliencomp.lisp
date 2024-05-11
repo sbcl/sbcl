@@ -367,8 +367,8 @@
                             alien-rep-type)
                  '(int-sap 0))
                 ((ctypep 0 alien-rep-type) 0)
-                ((ctypep $0.0f0 alien-rep-type) $0.0f0)
-                ((ctypep $0.0d0 alien-rep-type) $0.0d0)
+                ((ctypep 0.0f0 alien-rep-type) 0.0f0)
+                ((ctypep 0.0d0 alien-rep-type) 0.0d0)
                 (t
                  (compiler-error
                   "Aliens of type ~S cannot be represented immediately."

@@ -333,8 +333,8 @@
                                        (single-float 'round-single))
                                      divided :truncate)
                                    ,(ecase rtype
-                                      (double-float $-0.0d0)
-                                      (single-float $-0.0f0)))
+                                      (double-float -0.0d0)
+                                      (single-float -0.0f0)))
                                 float-div)))))
              (single-digit-bignum-p (x)
                #+(or x86-64 x86 ppc64)
@@ -554,7 +554,7 @@
   `(defun ,name (number &optional (divisor 1))
     ,doc
     (multiple-value-bind (res rem) (,op number divisor)
-      (values (float res (if (floatp rem) rem $1.0)) rem))))
+      (values (float res (if (floatp rem) rem 1.0)) rem))))
 
 ;;; Declare these guys inline to let them get optimized a little.
 ;;; ROUND and FROUND are not declared inline since they seem too
@@ -579,7 +579,7 @@
              (truncate number divisor)
            (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
                                   (and (not (minusp number)) (minusp divisor))))
-               (values $-0f0 r)
+               (values -0f0 r)
                (values (float q) r))))
         (((foreach single-float double-float #+long-float long-float)
           (or rational single-float))
@@ -638,7 +638,7 @@
              (round number divisor)
            (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
                                   (and (not (minusp number)) (minusp divisor))))
-               (values $-0f0 r)
+               (values -0f0 r)
                (values (float q) r))))
         (((foreach single-float double-float #+long-float long-float)
           (or rational single-float))
@@ -688,7 +688,7 @@
                          (,(find-symbol (string mode) :cl) number divisor)
                        (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
                                               (and (not (minusp number)) (minusp divisor))))
-                           (values $-0f0 r)
+                           (values -0f0 r)
                            (values (float q) r))))
                     (((foreach single-float double-float)
                       (or rational single-float))

@@ -120,7 +120,7 @@
                        ((any-reg descriptor-reg))
                        (immediate
                         (not (or
-                              (eql (tn-value y) $0f0)
+                              (eql (tn-value y) 0f0)
                               (and (integerp (tn-value y))
                                    (abs-add-sub-immediate-p (fixnumize (tn-value y)))))))
                        (t t))))
@@ -131,7 +131,7 @@
     (let ((value (sc-case y
                    (immediate
                     (let ((value (tn-value y)))
-                     (if (eql value $0f0)
+                     (if (eql value 0f0)
                          single-float-widetag
                          (fixnumize (tn-value y)))))
                    (t y))))

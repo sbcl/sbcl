@@ -176,7 +176,7 @@
           (let ((temp (gensym)))
             `(let ((,temp (abs float2)))
                (if (minusp (single-float-bits float)) (- ,temp) ,temp)))
-          '(if (minusp (single-float-bits float)) $-1f0 $1f0))))
+          '(if (minusp (single-float-bits float)) -1f0 1f0))))
 
 (deftransform float-sign ((float &optional float2)
                           (double-float &optional double-float) *)
@@ -188,7 +188,7 @@
         (let ((temp (gensym)))
           `(let ((,temp (abs float2)))
             (if (minusp ,bits) (- ,temp) ,temp)))
-        `(if (minusp ,bits) $-1d0 $1d0))))
+        `(if (minusp ,bits) -1d0 1d0))))
 
 (deftransform float-sign-bit ((x) (single-float) *)
   `(logand (ash (single-float-bits x) -31) 1))
@@ -220,11 +220,11 @@
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 
 (defknown decode-single-float (single-float)
-  (values single-float single-float-exponent (member $-1f0 $1f0))
+  (values single-float single-float-exponent (member -1f0 1f0))
   (movable foldable flushable))
 
 (defknown decode-double-float (double-float)
-  (values double-float double-float-exponent (member $-1d0 $1d0))
+  (values double-float double-float-exponent (member -1d0 1d0))
   (movable foldable flushable))
 
 (defknown integer-decode-single-float (single-float)
@@ -310,13 +310,13 @@
             (new-lo nil)
             (new-hi nil))
         (when f-hi
-          (if (sb-xc:< (float-sign (type-bound-number f-hi)) $0.0)
+          (if (sb-xc:< (float-sign (type-bound-number f-hi)) 0.0)
               (when ex-lo
                 (setf new-hi (scale-bound f-hi ex-lo)))
               (when ex-hi
                 (setf new-hi (scale-bound f-hi ex-hi)))))
         (when f-lo
-          (if (sb-xc:< (float-sign (type-bound-number f-lo)) $0.0)
+          (if (sb-xc:< (float-sign (type-bound-number f-lo)) 0.0)
               (when ex-hi
                 (setf new-lo (scale-bound f-lo ex-hi)))
               (when ex-lo
@@ -388,8 +388,8 @@
                   (if (minusp y)
                       '(%negate x)
                       'x)))))
-  (def single-float $1.0 $-1.0)
-  (def double-float $1.0d0 $-1.0d0))
+  (def single-float 1.0 -1.0)
+  (def double-float 1.0d0 -1.0d0))
 
 ;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
 (defun maybe-exact-reciprocal (x)
@@ -434,17 +434,17 @@
                                  :policy (zerop float-accuracy))
                 'x)))
   ;; No signed zeros, thanks.
-  (def + single-float 0 $0.0)
-  (def - single-float 0 $0.0)
-  (def + double-float 0 $0.0 $0.0d0)
-  (def - double-float 0 $0.0 $0.0d0))
+  (def + single-float 0 0.0)
+  (def - single-float 0 0.0)
+  (def + double-float 0 0.0 0.0d0)
+  (def - double-float 0 0.0 0.0d0))
 
 ;;; On most platforms (+ x x) is faster than (* x 2)
 (macrolet ((def (type &rest args)
              `(deftransform * ((x y) (,type (constant-arg (member ,@args))))
                 '(+ x x))))
-  (def single-float 2 $2.0)
-  (def double-float 2 $2.0 $2.0d0))
+  (def single-float 2 2.0)
+  (def double-float 2 2.0 2.0d0))
 
 ;;; Prevent ZEROP, PLUSP, and MINUSP from losing horribly. We can't in
 ;;; general float rational args to comparison, since Common Lisp
@@ -519,8 +519,8 @@
                 (deftransform ,name ((x) (single-float) *)
                   #+x86 (cond ((csubtypep (lvar-type x)
                                           (specifier-type
-                                           `(single-float (,(sb-xc:- (expt $2f0 63)))
-                                                          (,(expt $2f0 63)))))
+                                           `(single-float (,(sb-xc:- (expt 2f0 63)))
+                                                          (,(expt 2f0 63)))))
                                 `(coerce (,',prim-quick (coerce x 'double-float))
                                   'single-float))
                                (t
@@ -533,8 +533,8 @@
                (deftransform ,name ((x) (double-float) *)
                  #+x86 (cond ((csubtypep (lvar-type x)
                                          (specifier-type
-                                          `(double-float (,(sb-xc:- (expt $2d0 63)))
-                                                         (,(expt $2d0 63)))))
+                                          `(double-float (,(sb-xc:- (expt 2d0 63)))
+                                                         (,(expt 2d0 63)))))
                                `(,',prim-quick x))
                               (t
                                (compiler-notify
@@ -653,8 +653,8 @@
                (minusp (float-sign arg-lo-val)))
       (setf arg-lo
             (typecase arg-lo-val
-              (single-float $0f0)
-              (double-float $0d0)
+              (single-float 0f0)
+              (double-float 0d0)
               #+long-float
               (long-float 0l0))
             arg-lo-val arg-lo))
@@ -662,10 +662,10 @@
                (plusp (float-sign arg-hi-val)))
       (setf arg-hi
             (typecase arg-lo-val
-              (single-float $-0f0)
-              (double-float $-0d0)
+              (single-float -0f0)
+              (double-float -0d0)
               #+long-float
-              (long-float   $-0L0))
+              (long-float   -0L0))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
              (and (floatp f) (zerop f) (float-sign-bit-set-p f)))
@@ -771,15 +771,15 @@
 
   ;; These functions are only defined for part of the real line. The
   ;; condition selects the desired part of the line.
-  (frob asin $-1d0 $1d0 (sb-xc:- (sb-xc:/ pi 2)) (sb-xc:/ pi 2))
+  (frob asin -1d0 1d0 (sb-xc:- (sb-xc:/ pi 2)) (sb-xc:/ pi 2))
   ;; Acos is monotonic decreasing, so we need to swap the function
   ;; values at the lower and upper bounds of the input domain.
-  (frob acos $-1d0 $1d0 0 pi :increasingp nil)
-  (frob acosh $1d0 nil nil nil)
-  (frob atanh $-1d0 $1d0 -1 1)
+  (frob acos -1d0 1d0 0 pi :increasingp nil)
+  (frob acosh 1d0 nil nil nil)
+  (frob atanh -1d0 1d0 -1 1)
   ;; Kahan says that (sqrt -0.0) is -0.0, so use a specifier that
   ;; includes -0.0.
-  (frob sqrt $-0.0d0 nil 0 nil))
+  (frob sqrt -0.0d0 nil 0 nil))
 
 ;;; Compute bounds for (expt x y). This should be easy since (expt x
 ;;; y) = (exp (* y (log x))). However, computations done this way
@@ -799,7 +799,7 @@
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
-  (case (interval-range-info y $0d0)
+  (case (interval-range-info y 0d0)
     (+
      ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
      ;; obviously non-negative. We just have to be careful for
@@ -827,7 +827,7 @@
 
 ;;; Handle the case when 0 <= x <= 1
 (defun interval-expt-< (x y)
-  (case (interval-range-info x $0d0)
+  (case (interval-range-info x 0d0)
     (+
      ;; The case of 0 <= x <= 1 is easy
      (case (interval-range-info y)
@@ -1047,11 +1047,11 @@
 ;;; Note we must assume that a type including 0.0 may also include
 ;;; -0.0 and thus the result may be complex -infinity + i*pi.
 (defun log-derive-type-aux-1 (x)
-  (elfun-derive-type-simple x #'log $0d0 nil
+  (elfun-derive-type-simple x #'log 0d0 nil
                             ;; (log 0) is an error
                             ;; and there's nothing between 0 and 1 for integers.
                             (and (integer-type-p x)
-                                 $0f0)
+                                 0f0)
                             nil))
 
 (defun log-derive-type-aux-2 (x y same-arg)
@@ -1116,7 +1116,7 @@
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
-           (case (interval-range-info> (numeric-type->interval arg) $0.0)
+           (case (interval-range-info> (numeric-type->interval arg) 0.0)
              (+
               ;; The number is positive, so the phase is 0.
               (make-numeric-type :class 'float
@@ -1164,10 +1164,10 @@
 
 (deftransform realpart ((x) (real) * :important nil)
   'x)
-(deftransform imagpart ((x) ((and single-float (not (eql $-0f0)))) * :important nil)
-  $0f0)
-(deftransform imagpart ((x) ((and double-float (not (eql $-0d0)))) * :important nil)
-  $0d0)
+(deftransform imagpart ((x) ((and single-float (not (eql -0f0)))) * :important nil)
+  0f0)
+(deftransform imagpart ((x) ((and double-float (not (eql -0d0)))) * :important nil)
+  0d0)
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
@@ -1567,7 +1567,7 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [0, pi].
      (trig-derive-type-aux arg
-                           (specifier-type `(float $0d0 ,pi))
+                           (specifier-type `(float 0d0 ,pi))
                            #'cos
                            -1 1
                            nil))
@@ -1683,9 +1683,9 @@
                  (when (csubtypep x (specifier-type 'rational))
                    (try 0))
                  (when (csubtypep x (specifier-type 'double-float))
-                   (try $0d0))
+                   (try 0d0))
                  (when (csubtypep x (specifier-type 'single-float))
-                   (try $0f0))))))
+                   (try 0f0))))))
     (typecase type
       (numeric-type (numeric type))
       (union-type (mapc #'numeric (union-type-types type))))
@@ -1834,8 +1834,8 @@
                                                         (single-float 'round-single))
                                                       div :truncate)
                                                   ,,(ecase type
-                                                      (double-float $-0.0d0)
-                                                      (single-float $-0.0f0)))
+                                                      (double-float -0.0d0)
+                                                      (single-float -0.0f0)))
                                                #-round-float
                                                (locally
                                                    (declare (flushable ,',coerce))
@@ -1895,8 +1895,8 @@
                                                                (single-float 'round-single))
                                                              div :truncate)
                                                          ,,(ecase type
-                                                             (double-float $-0.0d0)
-                                                             (single-float $-0.0f0)))
+                                                             (double-float -0.0d0)
+                                                             (single-float -0.0f0)))
                                                       #-round-float
                                                       (locally
                                                           (declare (flushable ,',coerce))
@@ -1958,44 +1958,44 @@
     (movable foldable flushable))
 
   (deftransform %unary-ftruncate ((x) (single-float))
-    `(cond ((or (typep x '(single-float ($-1f0) ($0f0)))
-                (eql x $-0f0))
-            $-0f0)
-           ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) $1f0)
-                       ,(float (1- (expt 2 sb-vm:single-float-digits)) $1f0)))
-            (float (truncate x) $1f0))
+    `(cond ((or (typep x '(single-float (-1f0) (0f0)))
+                (eql x -0f0))
+            -0f0)
+           ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) 1f0)
+                       ,(float (1- (expt 2 sb-vm:single-float-digits)) 1f0)))
+            (float (truncate x) 1f0))
            (t
             x)))
 
   (deftransform %unary-fround ((x) (single-float))
-    `(cond ((or (typep x '(single-float $-0.5f0 ($0f0)))
-                (eql x $-0f0))
-            $-0f0)
-           ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) $1f0)
-                       ,(float (1- (expt 2 sb-vm:single-float-digits)) $1f0)))
-            (float (round x) $1f0))
+    `(cond ((or (typep x '(single-float -0.5f0 (0f0)))
+                (eql x -0f0))
+            -0f0)
+           ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) 1f0)
+                       ,(float (1- (expt 2 sb-vm:single-float-digits)) 1f0)))
+            (float (round x) 1f0))
            (t
             x)))
 
   #+64-bit
   (progn
     (deftransform %unary-ftruncate ((x) (double-float))
-      `(cond ((or (typep x '(double-float ($-1d0) ($0d0)))
-                  (eql x $-0d0))
-              $-0d0)
-             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) $1d0)
-                         ,(float (1- (expt 2 sb-vm:double-float-digits)) $1d0)))
-              (float (truncate x) $1d0))
+      `(cond ((or (typep x '(double-float (-1d0) (0d0)))
+                  (eql x -0d0))
+              -0d0)
+             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
+                         ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
+              (float (truncate x) 1d0))
              (t
               x)))
 
     (deftransform %unary-fround ((x) (double-float))
-      `(cond ((or (typep x '(double-float $-0.5d0 ($0d0)))
-                  (eql x $-0d0))
-              $-0d0)
-             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) $1d0)
-                         ,(float (1- (expt 2 sb-vm:double-float-digits)) $1d0)))
-              (float (round x) $1d0))
+      `(cond ((or (typep x '(double-float -0.5d0 (0d0)))
+                  (eql x -0d0))
+              -0d0)
+             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
+                         ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
+              (float (round x) 1d0))
              (t
               x))))
 
@@ -2016,7 +2016,7 @@
                    (type (unsigned-byte 32) low))
           (cond
             ((= exp sb-vm:double-float-normal-exponent-max) x)
-            ((<= biased 0) (* x $0d0))
+            ((<= biased 0) (* x 0d0))
             ((>= biased (float-digits x)) x)
             (t
              (let ((frac-bits (- (float-digits x) biased)))
@@ -2039,15 +2039,15 @@
                    (type (unsigned-byte 32) low))
           (cond
             ((= exp sb-vm:double-float-normal-exponent-max) x)
-            ((<= biased -1) (* x $0d0)) ; [0,0.5)
+            ((<= biased -1) (* x 0d0)) ; [0,0.5)
             ((and (= biased 0) (= low 0) (= (ldb sb-vm:double-float-hi-significand-byte high) 0)) ; [0.5,0.5]
-             (* x $0d0))
-            ((= biased 0) (float-sign x $1d0)) ; (0.5,1.0)
+             (* x 0d0))
+            ((= biased 0) (float-sign x 1d0)) ; (0.5,1.0)
             ((= biased 1) ; [1.0,2.0)
              (cond
                ((>= (ldb sb-vm:double-float-hi-significand-byte high) (ash 1 19))
-                (float-sign x $2d0))
-               (t (float-sign x $1d0))))
+                (float-sign x 2d0))
+               (t (float-sign x 1d0))))
             ((>= biased (float-digits x)) x)
             (t
              ;; it's probably possible to do something very contorted
@@ -2056,7 +2056,7 @@
              ;; part, the high integer part, and the exponent of the
              ;; double float.  But in the interest of getting
              ;; something correct to start with, delegate to ROUND.
-             (float (round x) $1d0))))))
+             (float (round x) 1d0))))))
     (deftransform %unary-ftruncate ((x) (double-float))
       `(%unary-ftruncate/double x))
     (deftransform %unary-fround ((x) (double-float))

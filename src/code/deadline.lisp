@@ -54,7 +54,7 @@
      (locally ; FIXME compiler should learn to figure that out
          (declare (type (integer 0 #.internal-seconds-limit) seconds))
        (seconds-to-internal-time seconds)))
-    ((single-float $0.0f0 #.(float safe-internal-seconds-limit $1.0f0))
+    ((single-float 0.0f0 #.(float safe-internal-seconds-limit 1.0f0))
      (seconds-to-internal-time seconds))
     ((and (not single-float) (real 0 #.safe-internal-seconds-limit))
      (seconds-to-internal-time seconds))))

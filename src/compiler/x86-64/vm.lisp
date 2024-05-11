@@ -471,15 +471,15 @@
        immediate-sc-number))
     #+compact-instance-header (layout immediate-sc-number)
     (single-float
-       (if (eql value $0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
+       (if (eql value 0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float
-       (if (eql value $0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
+       (if (eql value 0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
     ((complex single-float)
-       (if (eql value (complex $0f0 $0f0))
+       (if (eql value #c(0f0 0f0))
             fp-complex-single-zero-sc-number
             fp-complex-single-immediate-sc-number))
     ((complex double-float)
-       (if (eql value (complex $0d0 $0d0))
+       (if (eql value #c(0d0 0d0))
             fp-complex-double-zero-sc-number
             fp-complex-double-immediate-sc-number))
     ;; This case has to follow the numeric cases because proxy floating-point numbers

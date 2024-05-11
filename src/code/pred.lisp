@@ -505,16 +505,13 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
         (t nil)))
 
 #-sb-show ;; I don't know why these tests crash with #+sb-show
-(let ((test-cases `(($0.0 $-0.0 t)
-                    ($0.0 $1.0 nil)
-                    ;; There is no cross-compiler #C reader macro.
-                    ;; SB-XC:COMPLEX does not want uncanonical input, i.e. imagpart
-                    ;; of rational 0 which downgrades the result to just an integer.
-                    (1 ,(complex $1.0 $0.0) t)
-                    (,(complex 0 1) ,(complex $0.0 $1.0) t)
+(let ((test-cases '((0.0 -0.0 t)
+                    (0.0 1.0 nil)
+                    (#c(1 0) #c(1.0 0.0) t)
+                    (#c(0 1) #c(0.0 1.0) t)
                     ;; 11/10 is unequal to real 1.1 due to roundoff error.
                     ;; COMPLEX here is a red herring
-                    (,(complex $1.1 $0.0) 11/10 nil)
+                    (#c(1.1 0.0) #c(11/10 0) nil)
                     ("Hello" "hello" t)
                     ("Hello" #(#\h #\E #\l #\l #\o) t)
                     ("Hello" "goodbye" nil))))

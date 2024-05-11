@@ -33,8 +33,8 @@
                  ((single-immediate) (single-reg)
                   (double-immediate) (double-reg))
   (let ((x (tn-value x)))
-    (cond ((or (eql x $0f0)
-               (eql x $0d0))
+    (cond ((or (eql x 0f0)
+               (eql x 0d0))
            (inst fmov y zr-tn))
           ((encode-fp-immediate  x)
            (inst fmov y x))
@@ -409,9 +409,9 @@
                 (:args (x :scs (,sc)))
                 (:arg-types ,ptype (:constant, constant-type)))))
   (frob single-float-compare-zero single-reg single-float
-        (single-float $-0f0 $0f0))
+        (single-float -0f0 0f0))
   (frob double-float-compare-zero double-reg double-float
-        (double-float $-0d0 $0d0)))
+        (double-float -0d0 0d0)))
 
 (macrolet ((frob (translate cond sname dname is-=)
              `(progn

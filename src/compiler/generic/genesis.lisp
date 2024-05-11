@@ -2076,10 +2076,10 @@ core and return a descriptor to it."
 
   #+x86
   (progn
-    (cold-set 'sb-vm::*fp-constant-0d0* (number-to-core $0d0))
-    (cold-set 'sb-vm::*fp-constant-1d0* (number-to-core $1d0))
-    (cold-set 'sb-vm::*fp-constant-0f0* (number-to-core $0f0))
-    (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core $1f0))))
+    (cold-set 'sb-vm::*fp-constant-0d0* (number-to-core 0d0))
+    (cold-set 'sb-vm::*fp-constant-1d0* (number-to-core 1d0))
+    (cold-set 'sb-vm::*fp-constant-0f0* (number-to-core 0f0))
+    (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core 1f0))))
 
 ;;;; functions and fdefinition objects
 

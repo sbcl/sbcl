@@ -51,8 +51,8 @@
                               (let ((shift (1- new-exp)))
                                 (if (< shift (- (1- digits)))
                                     (float-sign x ,(case type
-                                                     (single-float $0f0)
-                                                     (double-float $0d0)))
+                                                     (single-float 0f0)
+                                                     (double-float 0d0)))
                                     ,(case type
                                        (single-float '(single-from-bits sign 0 (ash sig shift)))
                                        (double-float '(double-from-bits sign 0 (ash sig shift)))))))

@@ -1009,7 +1009,7 @@
                      ;; Translate primitive type scs into constant scs
                      ((= sc sb-vm:descriptor-reg-sc-number)
                       (cond #+(or arm64 x86-64)
-                            ((eql (tn-value tn) $0f0)
+                            ((eql (tn-value tn) 0f0)
                              ;; Can be loaded using just SINGLE-FLOAT-WIDETAG.
                              (setf (tn-sc tn)
                                    (svref *backend-sc-numbers* sb-vm:immediate-sc-number)))
