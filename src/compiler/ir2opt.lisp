@@ -966,11 +966,19 @@
            (loop for op in operands
                  for name = (gensym "TN-REF")
                  and tn-ref = `(,accessor ,vop) then `(tn-ref-across ,name)
+                 until (eq op :info)
                  collect `(,name ,tn-ref)
-                 collect `(,op (tn-ref-tn ,name)))))
+                 collect `(,op (tn-ref-tn ,name))))
+         (bind-info (body)
+           (let ((info (cdr (member :info args))))
+             (if info
+                 `((loop named #:vop-bind
+                         with ,info = (vop-codegen-info ,vop)
+                         return (progn ,@body)))
+                 body))))
    `(let* (,@(gen 'vop-args args)
            ,@(gen 'vop-results results))
-      ,@body)))
+      ,@(bind-info body))))
 
 (defun tn-reader (tn &key single-writer
                           single-reader)
@@ -1124,26 +1132,50 @@
       (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))))
 
 (when-vop-existsp (:named sb-vm::rebind)
-  (defoptimizer (vop-optimize fast-symbol-value)
-      (vop)
+  (defoptimizer (vop-optimize fast-symbol-value) (vop)
     (let ((bind (next-vop-is vop '(bind))))
       (when bind
         (vop-bind (symbol) (symbol-value) vop
-          (vop-bind (bind-value) () bind
-            (let ((bind-symbol (car (vop-codegen-info bind))))
-              (when (and (eq symbol-value bind-value)
-                         (constant-tn-p symbol)
-                         (eq bind-symbol (tn-value symbol)))
-                (emit-and-insert-vop (vop-node bind)
-                                     (vop-block bind)
-                                     (template-or-lose 'sb-vm::rebind)
-                                     nil
-                                     nil
-                                     bind
-                                     (list bind-symbol))
-                (delete-vop vop)
-                (delete-vop bind)))))
+          (vop-bind (bind-value :info bind-symbol) () bind
+            (when (and (eq symbol-value bind-value)
+                       (constant-tn-p symbol)
+                       (eq bind-symbol (tn-value symbol)))
+              (emit-and-insert-vop (vop-node bind)
+                                   (vop-block bind)
+                                   (template-or-lose 'sb-vm::rebind)
+                                   nil
+                                   nil
+                                   bind
+                                   (list bind-symbol))
+              (delete-vop vop)
+              (delete-vop bind))))
         nil))))
+
+(when-vop-existsp (:named sb-vm::bind-n)
+  (defoptimizer (vop-optimize bind) (vop)
+    (let ((binds (loop with next = vop
+                       do (setf next (next-vop-is next '(bind)))
+                       while next
+                       collect next)))
+      (when binds
+        (push vop binds)
+        (let (symbols
+              values)
+          (loop for bind in binds
+                do
+                (vop-bind (value :info symbol) () bind
+                  (push symbol symbols)
+                  (push value values)))
+          (setf symbols (nreverse symbols)
+                values (nreverse values))
+          (prog1 (emit-and-insert-vop (vop-node vop)
+                                      (vop-block vop)
+                                      (template-or-lose 'sb-vm::bind-n)
+                                      (reference-tn-list values nil)
+                                      nil
+                                      vop
+                                      (list symbols))
+            (mapc #'delete-vop binds)))))))
 
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))

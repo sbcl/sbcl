@@ -562,3 +562,31 @@
   `(inst str ,reg (@ thread-tn ,(info :variable :wired-tls symbol)))
   #-sb-thread
   `(store-symbol-value ,reg ,symbol))
+
+;;; Load constants, stack-values, reusing when possible
+(defmacro maybe-load (tn &optional (temp 'temp))
+  (once-only ((tn tn))
+    `(sc-case ,tn
+       ((any-reg descriptor-reg)
+        ,tn)
+       ((immediate constant)
+        (cond ((not (sb-c::tn-leaf ,tn))
+               (load-constant vop ,tn ,temp)
+               ,temp)
+              ((eql (tn-value ,tn) 0)
+               zr-tn)
+              ((or (eql prev-constant (tn-value ,tn))
+                   (progn
+                     (setf prev-constant (tn-value ,tn))
+                     nil))
+               temp)
+              ((sc-is ,tn constant)
+               (load-constant vop ,tn ,temp)
+               ,temp)
+              (t
+               (load-immediate vop ,tn ,temp)
+               ,temp)))
+       (control-stack
+        (setf prev-constant nil)
+        (load-stack-tn ,temp ,tn)
+        ,temp))))
