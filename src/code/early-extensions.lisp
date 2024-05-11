@@ -356,6 +356,19 @@
              (setq ,val (pop ,tail))
              (progn ,@body)))))
 
+;;; Like GETHASH if HASH-TABLE contains an entry for KEY.
+;;; Otherwise, evaluate DEFAULT, store the resulting value in
+;;; HASH-TABLE and return two values: 1) the result of evaluating
+;;; DEFAULT 2) NIL.
+(defmacro ensure-gethash (key hash-table default)
+  (with-unique-names (n-key n-hash-table value foundp)
+    `(let ((,n-key ,key)
+           (,n-hash-table ,hash-table))
+       (multiple-value-bind (,value ,foundp) (gethash ,n-key ,n-hash-table)
+         (if ,foundp
+             (values ,value t)
+             (values (setf (gethash ,n-key ,n-hash-table) ,default) nil))))))
+
 ;;; (binding* ({(names initial-value [flag])}*) body)
 ;;; FLAG may be NIL or :EXIT-IF-NULL
 ;;;
