@@ -137,22 +137,20 @@
              (fixup (and known-symbol
                          (make-fixup known-symbol :symbol-tls-index))))
         (cond
+          (known-symbol                 ; e.g. CL:*PRINT-BASE*
+           ;; Known nonzero TLS index, but possibly no per-thread value.
+           ;; The TLS value and global value can be loaded independently.
+           (inst ldr value (@ thread-tn fixup)))
           (t
-           (cond
-             (known-symbol              ; e.g. CL:*PRINT-BASE*
-              ;; Known nonzero TLS index, but possibly no per-thread value.
-              ;; The TLS value and global value can be loaded independently.
-              (inst ldr value (@ thread-tn fixup)))
-             (t
-              (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
-              (inst ldr value (@ thread-tn tls-index))))
-           (unless (symbol-always-has-tls-value-p symbol-tn-ref node)
-             (assemble ()
-               (no-tls-marker value symbol nil LOCAL)
-               (when known-symbol
-                 (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
-               (loadw value symbol symbol-value-slot other-pointer-lowtag)
-               LOCAL)))))
+           (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
+           (inst ldr value (@ thread-tn tls-index))))
+        (unless (symbol-always-has-tls-value-p symbol-tn-ref node)
+          (assemble ()
+            (no-tls-marker value symbol nil LOCAL)
+            (when known-symbol
+              (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
+            (loadw value symbol symbol-value-slot other-pointer-lowtag)
+            LOCAL)))
 
       (when check-boundp
         (assemble ()
