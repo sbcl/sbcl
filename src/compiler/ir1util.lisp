@@ -3395,14 +3395,24 @@ is :ANY, the function name is not checked."
 ;;;
 ;;; Or if there's a binding around NODE.
 (defun sb-vm::symbol-always-has-tls-value-p (symbol node)
-  (or (typep (info :variable :wired-tls symbol)
-             '(or (eql :always-thread-local) fixnum))
-      (when node
-        (do-nested-cleanups (cleanup node)
-          (when (eq (cleanup-kind cleanup) :special-bind)
-            (let* ((node (cleanup-mess-up cleanup))
-                   (args (when (basic-combination-p node)
-                           (basic-combination-args node))))
-              (when (and args
-                         (eq (leaf-source-name (lvar-value (car args))) symbol))
-                (return t))))))))
+  (let ((symbol (if (symbolp symbol)
+                    symbol
+                    (let ((tn (if (tn-p symbol)
+                                  symbol
+                                  (tn-ref-tn symbol))))
+                      (sc-case tn
+                        ((constant sb-vm::immediate)
+                         (tn-value tn))
+                        (t
+                         (return-from sb-vm::symbol-always-has-tls-value-p)))))))
+    (or (typep (info :variable :wired-tls symbol)
+               '(or (eql :always-thread-local) fixnum))
+        (when node
+          (do-nested-cleanups (cleanup node)
+            (when (eq (cleanup-kind cleanup) :special-bind)
+              (let* ((node (cleanup-mess-up cleanup))
+                     (args (when (basic-combination-p node)
+                             (basic-combination-args node))))
+                (when (and args
+                           (eq (leaf-source-name (lvar-value (car args))) symbol))
+                  (return t)))))))))

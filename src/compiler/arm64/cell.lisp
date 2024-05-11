@@ -98,8 +98,7 @@
              (inst b (if set :eq :ne) target)))))
   (define-vop (set)
     (:args (object :scs (descriptor-reg)
-                   :load-if (not (and (sc-is object constant)
-                                      (symbol-always-has-tls-value-p (tn-value object) node))))
+                   :load-if (not (symbol-always-has-tls-value-p object node)))
            (value :scs (descriptor-reg any-reg zero)))
     (:temporary (:sc any-reg) tls-index)
     (:node-var node)
@@ -138,8 +137,6 @@
              (fixup (and known-symbol
                          (make-fixup known-symbol :symbol-tls-index))))
         (cond
-          ((symbol-always-has-tls-value-p known-symbol node)
-           (inst ldr value (@ thread-tn fixup)))
           (t
            (cond
              (known-symbol              ; e.g. CL:*PRINT-BASE*
@@ -149,13 +146,13 @@
              (t
               (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
               (inst ldr value (@ thread-tn tls-index))))
-
-           (assemble ()
-             (no-tls-marker value symbol nil LOCAL)
-             (when known-symbol
-               (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
-             (loadw value symbol symbol-value-slot other-pointer-lowtag)
-             LOCAL))))
+           (unless (symbol-always-has-tls-value-p symbol-tn-ref node)
+             (assemble ()
+               (no-tls-marker value symbol nil LOCAL)
+               (when known-symbol
+                 (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
+               (loadw value symbol symbol-value-slot other-pointer-lowtag)
+               LOCAL)))))
 
       (when check-boundp
         (assemble ()

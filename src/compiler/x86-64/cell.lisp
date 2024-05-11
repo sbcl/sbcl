@@ -288,12 +288,12 @@
   #+sb-thread
   (progn
     ;; This code is tested by 'codegen.impure.lisp'
-    (defun emit-symeval (value symbol symbol-reg check-boundp vop)
+    (defun emit-symeval (value symbol symbol-ref symbol-reg check-boundp vop)
       (let* ((known-symbol-p (sc-is symbol constant immediate))
              (known-symbol (and known-symbol-p (tn-value symbol))))
         ;; In order from best to worst.
         (cond
-          ((symbol-always-has-tls-value-p known-symbol (sb-c::vop-node vop))
+          ((symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
            (setq symbol-reg nil)
            (inst mov value (access-wired-tls-val known-symbol)))
           (t
@@ -360,6 +360,7 @@
       (:translate symbol-value)
       (:policy :fast-safe)
       (:args (symbol :scs (descriptor-reg constant immediate) :to (:result 1)))
+      (:arg-refs symbol-ref)
       ;; TODO: use no temp if the symbol is known to be thread-local
       ;; (probably IR1 should go SYMBOL-VALUE -> SYMBOL-TLS-VALUE)
       (:temporary (:sc descriptor-reg) symbol-reg)
@@ -368,7 +369,7 @@
       (:save-p :compute-only)
       (:variant-vars check-boundp)
       (:variant t)
-      (:generator 9 (emit-symeval value symbol symbol-reg check-boundp vop)))
+      (:generator 9 (emit-symeval value symbol symbol-ref symbol-reg check-boundp vop)))
 
     (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
