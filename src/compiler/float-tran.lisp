@@ -2110,10 +2110,10 @@
     (values (complex re im)
             (locally (declare (notinline complex)) (complex re im)))))
 
-#-sb-xc-host
 (dolist (test '(try-folding-complex-single try-folding-complex-double))
   (multiple-value-bind (a b) (funcall test)
     (assert (eql a b)))
+  #-sb-xc-host
   (let ((code (fun-code-header (symbol-function test))))
     (aver (loop for index from sb-vm:code-constants-offset
                 below (code-header-words code)
@@ -2126,7 +2126,6 @@
           (complex single-float-negative-infinity single-float-negative-infinity)
           (complex single-float-positive-infinity single-float-negative-infinity)))
 
-#-sb-xc-host
 (multiple-value-bind (a b c d) (funcall 'more-folding)
   (assert (sb-ext:float-infinity-p (realpart a)))
   (assert (sb-ext:float-infinity-p (imagpart a)))
@@ -2136,6 +2135,7 @@
   (assert (sb-ext:float-infinity-p (imagpart c)))
   (assert (sb-ext:float-infinity-p (realpart d)))
   (assert (sb-ext:float-infinity-p (imagpart d)))
+  #-sb-xc-host
   (let ((code (fun-code-header (symbol-function 'more-folding))))
     (aver (loop for index from sb-vm:code-constants-offset
                 below (code-header-words code)
