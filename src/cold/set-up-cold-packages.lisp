@@ -130,33 +130,6 @@
             (when (string= (car entry) name)
               (setf (fdefinition (intern name (cddr entry))) host-fun)))))))
 
-;;; an entry in the table which describes the non-standard part (i.e. not
-;;; CL/CL-USER/KEYWORD) of the package structure of the SBCL system
-;;;
-;;; We make no attempt to be fully general; our table doesn't need to be
-;;; able to express features which we don't happen to use.
-(export '(genesis))
-(defstruct package-data
-  ;; a string designator for the package name
-  (name (error "missing PACKAGE-DATA-NAME datum"))
-  ;; a doc string
-  (documentation (error "missing PACKAGE-DOCUMENATION datum"))
-  ;; a list of nicknames
-  nicknames
-  ;; a list of string designators for shadowing symbols
-  shadow
-  ;; a list of string designators for exported symbols which'll be set
-  ;; up at package creation time.
-  export
-  ;; a list of sublists describing imports. Each sublist has the format as an
-  ;; IMPORT-FROM list in DEFPACKAGE: the first element is the name of the
-  ;; package to import from, and the remaining elements are the names of
-  ;; symbols to import.
-  import-from
-  ;; a list of string designators for package names of other packages
-  ;; which this package uses
-  use)
-
 ;;; A symbol in the "shadows" list ALWAYS refers to the symbol
 ;;; in SB-XC when unqualified. Each symbol uncrosses to itself.
 ;;; I'm taking the stance that since we don't seem to have any calls to
@@ -389,130 +362,23 @@
 (defun check-no-new-cl-symbols ()
   (assert (equal *package-symbol-counts* (compute-cl-package-symbol-counts))))
 
-(defun create-target-packages (package-data-list)
-  (hide-host-packages)
-
-  ;; Build all packages that we need, and initialize them as far as we
-  ;; can without referring to any other packages.
-  (dolist (package-data package-data-list)
-    (let ((package (make-package (package-data-name package-data)
-                                 :use nil
-                                 :nicknames (package-data-nicknames package-data))))
-      (dolist (string (package-data-shadow package-data))
-        (shadow string package))
-      (setf (documentation package t) (package-data-documentation package-data))))
-  ;; Now that all packages exist, we can set up package-package
-  ;; references.
-  (dolist (package-data package-data-list)
-    (use-package (substitute "XC-STRICT-CL" "CL"
-                             (package-data-use package-data)
-                             :test 'string=)
-                 (package-data-name package-data))
-    ;; Note: Unlike plain-old DEFPACKAGE, this IMPORT-FROM does
-    ;; potentially intern NAME into the FROM-PACKAGE to make forward
-    ;; references work.
-    (dolist (sublist (package-data-import-from package-data))
-      (let* ((from-package (first sublist))
-             (from-package (if (string= from-package "CL")
-                               "XC-STRICT-CL"
-                               from-package)))
-        (import (mapcar (lambda (name) (intern name from-package))
-                        (rest sublist))
-                (package-data-name package-data))))
-    (dolist (string (package-data-export package-data))
-      (export (intern string (package-data-name package-data))
-              (package-data-name package-data))))
-
-  (unhide-host-format-funs))
-
 (export '*undefined-fun-allowlist*)
 (defvar *undefined-fun-allowlist* (make-hash-table :test 'equal))
 
-(defparameter *package-data-list* '())
-
-;;; Like DEFPACKAGE, but does some special stuff to make forward
-;;; references work.
-(defmacro defpackage* (name &rest options)
-  (let ((flattened-options '()))
-    (dolist (option options)
-      (destructuring-bind (kind . args) option
-        (ecase kind
-          ((:use :export :shadow :nicknames)
-           (let ((existing-option (assoc kind flattened-options)))
-             (if existing-option
-                 (setf (second (second existing-option))
-                       (append (second (second existing-option)) args))
-                 (push (list kind (list 'quote args)) flattened-options))))
-          ((:import-from)
-           (let ((existing-option (assoc kind flattened-options)))
-             (if existing-option
-                 (push args (second (second existing-option)))
-                 (push (list kind (list 'quote (list args))) flattened-options))))
-          ((:documentation)
-           (push option flattened-options)))))
-    `(push (make-package-data :name ',name ,@(mapcan #'identity flattened-options))
-           *package-data-list*)))
-
-(let ((*readtable* *xc-readtable*))
-  (load (find-bootstrap-file "^exports.lisp"))
-  (create-target-packages *package-data-list*))
+(hide-host-packages)
+(let ((*readtable* (copy-readtable *xc-readtable*))
+      (fun (get-macro-character #\" *xc-readtable*)))
+  ;; Sleazy way to substitute "XC-STRICT-CL" for "CL".
+  (set-macro-character #\" (lambda (stream char)
+                             (let ((string (funcall fun stream char)))
+                               (if (string= string "CL")
+                                   "XC-STRICT-CL"
+                                   string))))
+  (load (find-bootstrap-file "^exports.lisp")))
+(unhide-host-format-funs)
 
 (defun read-undefined-fun-allowlist ()
   (with-open-file (data (find-bootstrap-file "^undefined-fun-allowlist.lisp-expr"))
     (let ((*readtable* *xc-readtable*))
       (dolist (name (apply #'append (read data)))
         (setf (gethash name *undefined-fun-allowlist*) t)))))
-
-(defvar *asm-package-use-list*
-  '("SB-ASSEM" "SB-DISASSEM"
-    "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
-    "SB-SYS" ; for SAP accessors
-    ;; Dependence of the assembler on the compiler feels a bit backwards,
-    ;; but assembly needs TN-SC, TN-OFFSET, etc. because the compiler
-    ;; doesn't speak the assembler's language. Rather vice-versa.
-    "SB-C"))
-(defun make-assembler-package (pkg-name)
-  (when (find-package pkg-name)
-    (delete-package pkg-name))
-  (let ((pkg (make-package pkg-name
-                           :use (cons "XC-STRICT-CL" (cddr *asm-package-use-list*)))))
-    ;; Both SB-ASSEM and SB-DISASSEM export these two symbols.
-    ;; Neither is shadowing-imported. If you need one, package-qualify it.
-    (shadow '("SEGMENT" "MAKE-SEGMENT") pkg)
-    (use-package '("SB-ASSEM" "SB-DISASSEM") pkg)
-    pkg))
-
-;; Each backend should have a different package for its instruction set
-;; so that they can co-exist.
-(make-assembler-package (backend-asm-package-name))
-
-;;; Not all things shown by this are actually unused. Some get removed
-;;; by the tree-shaker as intended.
-#+nil
-(defun show-unused-exports (&aux nonexistent uninteresting)
-  (dolist (entry *package-data-list*)
-    (let ((pkg (find-package (package-data-name entry))))
-      (dolist (string (mapcan (lambda (x) (if (stringp x) (list x) x))
-                              (package-data-export entry)))
-        (unless (or (string= string "!" :end1 1) (string= string "*!" :end1 2))
-          (let ((s (find-symbol string pkg)))
-            (cond ((not s)
-                   (push (cons pkg string) nonexistent))
-                  ((and (not (boundp s))
-                        (not (sb-kernel:symbol-%info s))
-                        (not (gethash s sb-c::*backend-parsed-vops*)))
-                   (push s uninteresting))))))))
-  (format t "~&Nonexistent:~%")
-  (dolist (x nonexistent)
-    (format t "  ~a ~a~%" (package-name (car x)) (cdr x)))
-  (format t "~&Possibly uninteresting:~%")
-  ;; FIXME: prints some things that it shouldn't as "uninteresting"
-  ;; including but not limited to:
-  ;;   - alien struct slot names
-  ;;   - catch tag names (e.g. 'TOPLEVEL-CATCHER)
-  ;;   - declarations
-  ;;   - restart names
-  ;;   - object-not-<type>-error
-  ;;   - markers such as SB-SYS:MACRO (in lexenvs)
-  (dolist (x uninteresting)
-    (format t "  ~s~%" x)))

@@ -19,7 +19,9 @@
 ;;; (including not only the final construction of the core file, but
 ;;; also the preliminary steps like e.g. building the cross-compiler
 ;;; and running the cross-compiler to produce target FASL files).
-(defpackage "SB-COLD" (:use "CL"))
+(defpackage "SB-COLD"
+  (:use "CL")
+  (:export genesis))
 
 #+nil ; change to #+sbcl if desired, but at your own risk!
 (when (sb-sys:find-dynamic-foreign-symbol-address "show_gc_generation_throughput")

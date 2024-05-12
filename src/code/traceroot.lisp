@@ -9,7 +9,7 @@
 
 (in-package "SB-IMPL")
 
-;;; Not loaded until warm build. package-data-list only affects symbols
+;;; Not loaded until warm build. exports.lisp only affects symbols
 ;;; that are visible to genesis.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export '(sb-ext::search-roots) 'sb-ext))

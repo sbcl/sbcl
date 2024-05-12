@@ -9,12 +9,8 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;;; the specifications of target packages, except for a few things
-;;;; which are handled elsewhere by other mechanisms:
-;;;;   * some SHADOWing and nickname hackery;
-;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
-;;;;     COMMON-LISP-USER, and KEYWORD.
-;;;;
+;;;; the specification of the standard, non-SBCL-specific packages
+;;;; COMMON-LISP, COMMON-LISP-USER, and KEYWORD are handled elsewhere
 
 ;;;; NOTE:
 ;;;; All uses of #+ and #- reader macros within this file refer to
@@ -38,11 +34,34 @@
 
 (in-package "SB-COLD")
 
-(defpackage* "SB-LOOP"
+(macrolet ((defpackage-if-needed (name &body options)
+             (unless (find-package name)
+               `(defpackage ,name (:use) ,@options))))
+  (defpackage-if-needed "SB-INT")
+  (defpackage-if-needed "SB-KERNEL")
+  (defpackage-if-needed "SB-ALIEN")
+  (defpackage-if-needed "SB-EXT")
+  (defpackage-if-needed "SB-SYS")
+  (defpackage-if-needed "SB-DEBUG")
+  (defpackage-if-needed "SB-FASL")
+  (defpackage-if-needed "SB-GRAY")
+  (defpackage-if-needed "SB-ALIEN-INTERNALS")
+  (defpackage-if-needed "SB-ASSEM")
+  (defpackage-if-needed "SB-C"
+    (:intern "VOP-ARGS" "VOP-RESULTS")
+    (:intern "SB-C"
+             "DEBUG-SOURCE" "DEBUG-SOURCE-NAMESTRING"
+             "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-P"
+             "DEBUG-SOURCE-START-POSITIONS" "MAKE-DEBUG-SOURCE"
+             "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
+             "CORE-DEBUG-SOURCE-FORM"))
+  (defpackage-if-needed "SB-DI"))
+
+(defpackage "SB-LOOP"
   (:documentation "private: implementation details of LOOP")
   (:use "CL" "SB-INT" "SB-KERNEL"))
 
-(defpackage* "SB-UNIX"
+(defpackage "SB-UNIX"
   (:documentation
    "private: a wrapper layer for SBCL itself to use when talking with
 an underlying Unix-y operating system.  This was a public package in
@@ -134,7 +153,7 @@ interface stability.")
    "FD-SETSIZE"))
 
 #+win32
-(defpackage* "SB-WIN32"
+(defpackage "SB-WIN32"
   (:documentation "private: a wrapper layer for Win32 functions needed by
 SBCL itself")
   (:use "CL" "SB-ALIEN" "SB-EXT" "SB-INT" "SB-SYS")
@@ -180,12 +199,12 @@ SBCL itself")
            "WRITE-FILE"
            "WITH-PROCESS-TIMES"))
 
-(defpackage* "SB-FORMAT"
+(defpackage "SB-FORMAT"
   (:documentation "private: implementation of FORMAT and friends")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL")
   (:export "%COMPILER-WALK-FORMAT-STRING" "FORMAT-ERROR" "TOKENS"))
 
-(defpackage* "SB-BIGNUM"
+(defpackage "SB-BIGNUM"
   (:documentation "private: bignum implementation")
   (:use "CL" "SB-KERNEL" "SB-INT" "SB-EXT" "SB-ALIEN" "SB-SYS")
   (:export "%ADD-WITH-CARRY"
@@ -227,9 +246,9 @@ SBCL itself")
 ;; accessed that way are found to belong more appropriately in an
 ;; existing package (e.g. SB-KERNEL or SB-SYS or SB-EXT or SB-FASL),
 ;; I (WHN 19990223) encourage maintainers to move them there..
-(defpackage* "SB-IMPL"
+(defpackage "SB-IMPL"
   (:documentation "private: a grab bag of implementation details")
-  (:import-from "SB-KERNEL" "*PACKAGE-NAMES*")
+  (:intern "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES")
   (:export "FORMAT-MICROSECONDS" "FORMAT-MILLISECONDS" ; for ~/fmt/
 
            "PRINT-TYPE" "PRINT-TYPE-SPECIFIER"
@@ -253,9 +272,10 @@ SBCL itself")
   (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-DEBUG" "SB-EXT"
         "SB-FASL" "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
 
-(defpackage* "SB-SEQUENCE"
+(defpackage "SB-SEQUENCE"
   (:documentation "semi-public: implements something which might eventually
 be submitted as a CDR")
+  (:use)
   (:export "PROTOCOL-UNIMPLEMENTED"
            "PROTOCOL-UNIMPLEMENTED-OPERATION"
 
@@ -289,7 +309,7 @@ be submitted as a CDR")
            "SORT" "STABLE-SORT" "MERGE"))
 
 #+sb-eval
-(defpackage* "SB-EVAL"
+(defpackage "SB-EVAL"
   (:documentation "internal: the evaluator implementation used to execute code without compiling it.")
   (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
   (:export "INTERPRETED-FUNCTION-NAME"
@@ -305,40 +325,14 @@ be submitted as a CDR")
            "EVAL-IN-NATIVE-ENVIRONMENT"
            "*EVAL-LEVEL*"))
 
-#+sb-fasteval
-(defpackage* "SB-INTERPRETER"
-  (:documentation "internal: a new EVAL implementation with semantic preprocessing.")
-  (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
-  (:import-from "SB-C"
-                "PARSE-EVAL-WHEN-SITUATIONS"
-                "MAKE-GLOBAL-VAR" "MAKE-LAMBDA-VAR"
-                "*LEXENV*")
-  (:import-from "SB-ALIEN" "%HEAP-ALIEN" "ALIEN-VALUE")
-  (:import-from "SB-KERNEL" "%%TYPEP")
-  (:export "BASIC-ENV"
-           "ENV-POLICY"
-           "EVAL-IN-ENVIRONMENT"
-           "FIND-LEXICAL-FUN"
-           "FIND-LEXICAL-VAR"
-           "FUN-LAMBDA-EXPRESSION"
-           "FUN-LAMBDA-LIST"
-           "FUN-PROTO-FN"
-           "FUN-SOURCE-LOCATION"
-           "%FUN-FTYPE"
-           "LEXENV-FROM-ENV"
-           "LIST-LOCALS"
-           "PROTO-FN-DOCSTRING"
-           "PROTO-FN-NAME"
-           "PROTO-FN-PRETTY-ARGLIST"
-           "TYPE-CHECK"))
-
-(defpackage* "SB-VM"
+(defpackage "SB-VM"
   (:documentation
    "internal: the default place to hide information about the hardware and data
 structure representations")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-ASSEM" "SB-C"
         "SB-EXT" "SB-FASL" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-UNIX")
   (:import-from "SB-C" "VOP-ARGS" "VOP-RESULTS")
+  (:intern "+FIXUP-KINDS+")
   (:export "*PRIMITIVE-OBJECTS*"
            "+HIGHEST-NORMAL-GENERATION+"
            "+PSEUDO-STATIC-GENERATION+"
@@ -657,7 +651,7 @@ structure representations")
    "SIMD-PACK-256-SIZE"
    "SIMD-PACK-256-WIDETAG"))
 
-(defpackage* "SB-DISASSEM"
+(defpackage "SB-DISASSEM"
   (:documentation "private: stuff related to the implementation of the disassembler")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL" "SB-DI")
   (:export "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
@@ -711,7 +705,7 @@ structure representations")
            "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"
            "SNARF-ERROR-JUNK"))
 
-(defpackage* "SB-DEBUG"
+(defpackage "SB-DEBUG"
   (:documentation
    "sorta public: Eventually this should become the debugger interface, with
 basic stuff like BACKTRACE and ARG. For now, the actual supported interface
@@ -740,7 +734,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 
            "MAP-BACKTRACE" "PRINT-BACKTRACE" "LIST-BACKTRACE"))
 
-(defpackage* "SB-EXT"
+(defpackage "SB-EXT"
   (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-GRAY")
   (:import-from "SB-VM" "WORD")
@@ -907,7 +901,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
    "PACKAGE-LOCALLY-NICKNAMED-BY-LIST"
 
    "PACKAGE-DOES-NOT-EXIST" "READER-PACKAGE-DOES-NOT-EXIST"
-   ;; behaviour on DEFPACKAGE* variance
+   ;; behaviour on DEFPACKAGE variance
 
    "*ON-PACKAGE-VARIANCE*"
 
@@ -1155,7 +1149,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
    "%SIMD-PACK-256-DOUBLES"
    "%SIMD-PACK-256-SINGLES"))
 
-(defpackage* "SB-DI"
+(defpackage "SB-DI"
   (:documentation "private: primitives used to write debuggers")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-VM")
   (:import-from "SB-C"
@@ -1206,7 +1200,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "CODE-LOCATION-KIND" "FLUSH-FRAMES-ABOVE"))
 
 #+sb-dyncount
-(defpackage* "SB-DYNCOUNT"
+(defpackage "SB-DYNCOUNT"
   (:documentation "private: some somewhat-stale code for collecting runtime statistics")
   (:use "CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-BIGNUM"
         "SB-EXT" "SB-INT" "SB-KERNEL" "SB-ASSEM" "SB-SYS")
@@ -1216,7 +1210,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "IR2-COMPONENT-DYNCOUNT-INFO"
            "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
 
-(defpackage* "SB-FASL"
+(defpackage "SB-FASL"
   (:documentation "private: stuff related to FASL load/dump logic (and GENESIS)")
   (:use "CL" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM" "SB-C"
         "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
@@ -1245,7 +1239,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "*!COLD-TOPLEVELS*"
            "COLD-CONS" "COLD-INTERN" "COLD-PUSH"))
 
-(defpackage* "SB-C"
+(defpackage "SB-C"
   (:documentation "private: implementation of the compiler")
   ;; (It seems strange to have the compiler USE SB-ALIEN-INTERNALS,
   ;; but the point seems to be to be able to express things like
@@ -1424,7 +1418,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "XEP-SETUP-SP"
            "LABEL-ID" "FIXUP" "FIXUP-FLAVOR" "FIXUP-NAME" "FIXUP-OFFSET"
            "FIXUP-P" "MAKE-FIXUP"
-           "SLOT"
            "DEF-ALLOC"
            "VAR-ALLOC"
            "SAFE-FDEFN-FUN"
@@ -1485,69 +1478,18 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 
            "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"))
 
-(defpackage* "SB-REGALLOC"
+(defpackage "SB-REGALLOC"
   (:documentation "private: implementation of the compiler's register allocator")
   (:use "CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
         #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
         "SB-KERNEL" "SB-SYS"
         "SB-C")
-  (:import-from "SB-C"
-                "BLOCK-INFO" "BLOCK-LAST" "BLOCK-LOOP" "BLOCK-NEXT"
-                "CLEAR-BIT-VECTOR" "COMPONENT-HEAD" "COMPONENT-TAIL"
-                "DEFEVENT" "DELETE-VOP" "DO-IR2-BLOCKS" "DO-LIVE-TNS"
-                "EMIT-LOAD-TEMPLATE" "EVENT" "FIND-IN"
-                "FINITE-SB" "FINITE-SB-ALWAYS-LIVE"
-                "FINITE-SB-WIRED-MAP" "FINITE-SB-CONFLICTS"
-                "FINITE-SB-CURRENT-SIZE" "FINITE-SB-LAST-BLOCK-COUNT"
-                "FINITE-SB-LAST-OFFSET" "FINITE-SB-LIVE-TNS"
-                "FINITE-SB-SIZE-ALIGNMENT" "FINITE-SB-SIZE-INCREMENT"
-                "GET-OPERAND-INFO" "GLOBAL-CONFLICTS-BLOCK"
-                "GLOBAL-CONFLICTS-CONFLICTS" "GLOBAL-CONFLICTS-KIND"
-                "GLOBAL-CONFLICTS-NEXT-TNWISE" "GLOBAL-CONFLICTS-NUMBER"
-                "GLOBAL-CONFLICTS-NEXT-BLOCKWISE" "GLOBAL-CONFLICTS-TN"
-                "IR2-BLOCK" "IR2-BLOCK-COUNT" "IR2-BLOCK-GLOBAL-TNS"
-                "IR2-BLOCK-LAST-VOP" "IR2-BLOCK-LIVE-IN"
-                "IR2-BLOCK-LOCAL-TN-COUNT" "IR2-BLOCK-LOCAL-TNS"
-                "IR2-BLOCK-NEXT" "IR2-BLOCK-NUMBER" "IR2-BLOCK-PREV"
-                "IR2-BLOCK-START-VOP" "IR2-COMPONENT"
-                "IR2-COMPONENT-GLOBAL-TN-COUNTER"
-                "IR2-COMPONENT-NORMAL-TNS" "IR2-COMPONENT-RESTRICTED-TNS"
-                "IR2-COMPONENT-SPILLED-TNS" "IR2-COMPONENT-SPILLED-VOPS"
-                "IR2-COMPONENT-WIRED-TNS"
-                "LEXENV-LAMBDA" "LISTIFY-RESTRICTIONS"
-                "LOCAL-TN-BIT-VECTOR" "LOCAL-TN-COUNT" "LOCAL-TN-LIMIT"
-                "LOCAL-TN-NUMBER" "LOCAL-TN-VECTOR"
-                "LOOP-DEPTH" "MAKE-TN" "MOVE-OPERAND" "NODE" "NODE-LEXENV"
-                "OPERAND-PARSE-NAME" "POSITION-IN"
-                "PRIMITIVE-TYPE-SCS" "PRINT-TN-GUTS"
-                "SB-KIND" "SB-SIZE"
-                "SC-LOCATIONS" "MAKE-SC-LOCATIONS" "SC-OFFSET-TO-SC-LOCATIONS"
-                "SC-LOCATIONS-COUNT" "SC-LOCATIONS-FIRST" "SC-LOCATIONS-MEMBER"
-                "DO-SC-LOCATIONS"
-                "SC-ALIGNMENT" "SC-ALLOWED-BY-PRIMITIVE-TYPE"
-                "SC-ALTERNATE-SCS" "SC-CONSTANT-SCS" "SC-ELEMENT-SIZE"
-                "SC-LOCATIONS" "SC-MOVE-FUNS" "SC-RESERVE-LOCATIONS"
-                "SC-SAVE-P" "SC-VECTOR"
-                "SET-BIT-VECTOR"
-                "TEMPLATE-NAME"
-                "TN" "TN-COST" "TN-GLOBAL-CONFLICTS" "TN-KIND" "TN-LEAF"
-                "TN-LOCAL" "TN-LOCAL-CONFLICTS" "TN-LOCAL-NUMBER"
-                "TN-NEXT" "TN-NUMBER" "TN-PRIMITIVE-TYPE"
-                "TN-READS" "TN-SAVE-TN" "TN-VERTEX" "TN-WRITES"
-                "TNS-CONFLICT" "TNS-CONFLICT-GLOBAL-GLOBAL"
-                "TNS-CONFLICT-LOCAL-GLOBAL"
-                "VOP" "VOP-ARGS" "VOP-INFO" "VOP-INFO-ARG-LOAD-SCS"
-                "VOP-INFO-MOVE-ARGS" "VOP-NAME"
-                "VOP-INFO-RESULT-LOAD-SCS" "VOP-INFO-SAVE-P"
-                "VOP-NODE"
-                "VOP-PARSE-OR-LOSE" "VOP-PARSE-TEMPS" "VOP-PREV"
-                "VOP-REFS" "VOP-RESULTS" "VOP-SAVE-SET" "VOP-TEMPS")
   (:export "PACK" "TARGET-IF-DESIRABLE" "*REGISTER-ALLOCATION-METHOD*"
            "*PACK-ITERATIONS*"
            "*PACK-ASSIGN-COSTS*" "*PACK-OPTIMIZE-SAVES*"
            "*TN-WRITE-COST*" "*TN-LOOP-DEPTH-MULTIPLIER*"))
 
-(defpackage* "SB-PRETTY"
+(defpackage "SB-PRETTY"
   (:documentation "private: implementation of pretty-printing")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL")
   (:export "NOTE-SIGNIFICANT-SPACE"
@@ -1557,7 +1499,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "*PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR*"
            "!PPRINT-COLD-INIT"))
 
-(defpackage* "SB-SYS"
+(defpackage "SB-SYS"
   (:documentation
    "private: In theory, this \"contains functions and information
 necessary for system interfacing\" (said cmu-user.tex at the time
@@ -1658,7 +1600,7 @@ SB-KERNEL) have been undone, but probably more remain.")
    "WITHOUT-INTERRUPTS"
    "WITH-INTERRUPT-BINDINGS"))
 
-(defpackage* "SB-ALIEN"
+(defpackage "SB-ALIEN"
   ;; FIXME: This nickname is a deprecated hack for backwards
   ;; compatibility with code which assumed the CMU-CL-style
   ;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
@@ -1703,7 +1645,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
            "VOID"
            "WITH-ALIEN"))
 
-(defpackage* "SB-ALIEN-INTERNALS"
+(defpackage "SB-ALIEN-INTERNALS"
   (:documentation "private: stuff for implementing ALIENs and friends")
   (:use "CL")
   (:export "%ALIEN-VALUE"
@@ -1759,11 +1701,11 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
            "PARSE-ALIEN-TYPE" "UNPARSE-ALIEN-TYPE"))
 
 #+(and x86-64 sb-thread)
-(defpackage* "SB-APROF"
+(defpackage "SB-APROF"
   (:documentation "public: the interface to the deterministic consing profiler")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-ALIEN" "SB-SYS"))
 
-(defpackage* "SB-PROFILE"
+(defpackage "SB-PROFILE"
   (:documentation "public: the interface to the profiler")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL")
   (:export "PROFILE" "REPORT" "RESET" "UNPROFILE"))
@@ -1792,7 +1734,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
 ;;;     Or better still, since error names are basically meaningless except
 ;;;     for the ~18 errors that are _not_ object-not-<x>, stop naming them.
 ;;;     C just needs a map from number -> string-to-show.
-(defpackage* "SB-KERNEL"
+(defpackage "SB-KERNEL"
   (:documentation
    "private: Theoretically this 'hides state and types used for package
 integration' (said CMU CL architecture.tex) and that probably was and
@@ -2719,7 +2661,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LONG-FLOAT-HIGH-BITS" "LONG-FLOAT-LOW-BITS"
            "LONG-FLOAT-MID-BITS"))
 
-(defpackage* "SB-ASSEM"
+(defpackage "SB-ASSEM"
   (:documentation "private: the assembler, used by the compiler")
   (:use "CL" "SB-EXT" "SB-INT")
   (:import-from "SB-C" "BRANCH" "FLUSHABLE")
@@ -2766,7 +2708,14 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LABELED-STATEMENT-P"
            "DEFPATTERN"))
 
-(defpackage* "SB-THREAD"
+(defpackage #.(backend-asm-package-name)
+  (:documentation "private: backend-specific assembler mnemonics")
+  (:use "CL" "SB-ASSEM" "SB-DISASSEM"
+        "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
+        "SB-SYS" "SB-C")
+  (:shadow "SEGMENT" "MAKE-SEGMENT"))
+
+(defpackage "SB-THREAD"
   (:documentation "public (but low-level): native thread support")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-KERNEL")
   (:export "*CURRENT-THREAD*"
@@ -2843,7 +2792,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SEMAPHORE-NOTIFICATION"
            "SEMAPHORE-NOTIFICATION-STATUS"))
 
-(defpackage* "SB-WALKER"
+(defpackage "SB-WALKER"
   (:documentation "internal: a code walker used by PCL")
   (:use "CL" "SB-INT" "SB-EXT")
   (:shadow "RECONS")
@@ -2855,12 +2804,12 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "VAR-GLOBALLY-SPECIAL-P"
            "VAR-DECLARATION"))
 
-(defpackage* "SB-UNICODE"
+(defpackage "SB-UNICODE"
   (:documentation "public: algorithms for Unicode data")
   (:use "CL" "SB-INT")
   (:export "NORMALIZE-STRING" "NORMALIZED-P"))
 
-(defpackage* "SB-GRAY"
+(defpackage "SB-GRAY"
   (:documentation
    "public: an implementation of the stream-definition-by-user
 Lisp extension proposal by David N. Gray")
@@ -2882,7 +2831,7 @@ Lisp extension proposal by David N. Gray")
            "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-SEQUENCE"
            "STREAM-WRITE-STRING"))
 
-(defpackage* "SB-INT"
+(defpackage "SB-INT"
   (:documentation
    "private: miscellaneous unsupported extensions to the ANSI spec. Much of
 the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
@@ -3091,8 +3040,6 @@ possibly temporarily, because it might be used internally.")
            "SANE-DEFAULT-PATHNAME-DEFAULTS"
            "SBCL-HOMEDIR-PATHNAME"
            "SIMPLIFY-NAMESTRING"
-           "DEBUG-SOURCE-NAMESTRING"
-           "DEBUG-SOURCE-CREATED"
 
            "*N-BYTES-FREED-OR-PURIFIED*"
 
@@ -3405,7 +3352,7 @@ possibly temporarily, because it might be used internally.")
 
            "BINARY-SEARCH"))
 
-(defpackage* "SB-MOP"
+(defpackage "SB-MOP"
   (:documentation
    "public: the MetaObject Protocol interface, as defined by
 The Art of the Metaobject Protocol, by Kiczales, des Rivieres and Bobrow:
@@ -3525,7 +3472,7 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
            "VALIDATE-SUPERCLASS"
            "WRITER-METHOD-CLASS"))
 
-(defpackage* "SB-PCL"
+(defpackage "SB-PCL"
   (:documentation
    "semi-public: This package includes useful meta-object protocol
 extensions, but even they are not guaranteed to be present in later
@@ -3554,13 +3501,13 @@ package is deprecated in favour of SB-MOP.")
 
            "NO-PRIMARY-METHOD"))
 
-(defpackage* "SB-BROTHERTREE"
+(defpackage "SB-BROTHERTREE"
   (:use "CL" "SB-EXT" "SB-INT")
   (:documentation "internal: 1-2-Brother tree")
   (:shadow "DELETE")
   (:export "INSERT" "DELETE" "FIND<=" "FIND>=" "FIND="))
 
-(defpackage* "SB-LOCKLESS"
+(defpackage "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")
   (:use "CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")
   (:export "+TAIL+" "%NODE-NEXT" "GET-NEXT"
@@ -3572,3 +3519,29 @@ package is deprecated in favour of SB-MOP.")
            "C-SO-FIND/ADDR"
            "SO-KEY" "SO-DATA" "SO-MAPLIST")
   (:shadow "ENDP"))
+
+#+sb-fasteval
+(defpackage "SB-INTERPRETER"
+  (:documentation "internal: a new EVAL implementation with semantic preprocessing.")
+  (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
+  (:import-from "SB-C"
+                "PARSE-EVAL-WHEN-SITUATIONS"
+                "*LEXENV*")
+  (:import-from "SB-ALIEN" "%HEAP-ALIEN" "ALIEN-VALUE")
+  (:import-from "SB-KERNEL" "%%TYPEP")
+  (:export "BASIC-ENV"
+           "ENV-POLICY"
+           "EVAL-IN-ENVIRONMENT"
+           "FIND-LEXICAL-FUN"
+           "FIND-LEXICAL-VAR"
+           "FUN-LAMBDA-EXPRESSION"
+           "FUN-LAMBDA-LIST"
+           "FUN-PROTO-FN"
+           "FUN-SOURCE-LOCATION"
+           "%FUN-FTYPE"
+           "LEXENV-FROM-ENV"
+           "LIST-LOCALS"
+           "PROTO-FN-DOCSTRING"
+           "PROTO-FN-NAME"
+           "PROTO-FN-PRETTY-ARGLIST"
+           "TYPE-CHECK"))

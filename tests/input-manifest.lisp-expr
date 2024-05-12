@@ -9,9 +9,6 @@
  ("brothertree.impure.lisp"
   "src/code/brothertree.lisp")
  ("case.pure.lisp" "tests/case-test.lisp")
- ("chill.test.sh"
-  "src/cold/chill.lisp"
-  "package-data-list.lisp-expr")
  ("clos.impure.lisp"
   "contrib/sb-cltl2.fasl"
   "tests/package-ctor-bug.lisp"

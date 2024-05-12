@@ -21,15 +21,8 @@
 
 (setq *features* (union *features* sb-impl:+internal-features+))
 
-(export 'package-data)
-(defmacro defpackage* (name &rest options)
-  `(let ((*package* (find-package ,name)))
-     (dolist (x ',(loop for option in options
-                        when (eq (first option) :export)
-                          append (rest option)))
-       (let ((symbol (intern x)))
-         (ignore-errors (export symbol))))))
-(load (merge-pathnames "exports.lisp" *load-pathname*))
+(defun backend-asm-package-name ()
+  (package-name sb-assem::*backend-instruction-set-package*))
 
 (sb-ext:unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP"
@@ -39,6 +32,8 @@
   (let ((name (package-name package)))
     (when (sb-int:system-package-p (find-package name))
       (sb-ext:unlock-package package))))
+
+(load (merge-pathnames "exports.lisp" *load-pathname*))
 
 (unless (fboundp 'sb-int:!cold-init-forms)
   (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms)))

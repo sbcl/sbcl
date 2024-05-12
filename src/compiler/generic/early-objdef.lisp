@@ -163,7 +163,7 @@
 ;;; and we have one winner.  The situation is slightly different for 32-bit.
 
 ;; FIXME: our nomenclature is baffling in more ways than implied by comments in
-;; package-data-list regarding use of the word "complex" in both a numerical
+;; exports.lisp regarding use of the word "complex" in both a numerical
 ;; sense and "non-simple" sense:
 ;; - There is no widetag specific to (AND (VECTOR T) (NOT SIMPLE-ARRAY)), i.e.
 ;; COMPLEX-VECTOR-WIDETAG is not the complex version of SIMPLE-VECTOR-WIDETAG

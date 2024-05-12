@@ -1171,9 +1171,9 @@ Test case.
                  (source (sb-c::compiled-debug-info-source cdi)))
             ;; Ensure that the debug-source-namestring of the compiled thing
             ;; reflects the source file of the original interpreted function.
-            (setf (debug-source-namestring source)
+            (setf (sb-c::debug-source-namestring source)
                   (sb-kernel::function-file-namestring f)
-                  (debug-source-created source) nil) ; = unknown
+                  (sb-c::debug-source-created source) nil) ; = unknown
             ;; Skirt a package lock by avoiding (SETF SYMBOL-FUNCTION)
             ;; *technically* this should be a compare-and-swap to ensure that the
             ;; original lambda expression is as expected. To do that, we need

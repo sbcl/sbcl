@@ -455,8 +455,8 @@ If an unsupported TYPE is requested, the function will return NIL.
                (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))))
     (make-definition-source
      :pathname
-     (when (stringp (debug-source-namestring debug-source))
-       (parse-namestring (debug-source-namestring debug-source)))
+     (when (stringp (sb-c::debug-source-namestring debug-source))
+       (parse-namestring (sb-c::debug-source-namestring debug-source)))
      :character-offset
      (if tlf
          (elt (sb-c::debug-source-start-positions debug-source) tlf))
@@ -467,7 +467,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                       (declare (ignore cond))
                       (sb-c::compiled-debug-fun-blocks
                        (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))))
-     :file-write-date (debug-source-created debug-source)
+     :file-write-date (sb-c::debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
 
 (defun translate-source-location (location)

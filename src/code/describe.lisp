@@ -555,7 +555,7 @@
      (binding* ((code (fun-code-header (%fun-fun function)))
                 (info (sb-kernel:%code-debug-info code) :exit-if-null)
                 (source (sb-c::debug-info-source info) :exit-if-null))
-       (acond ((debug-source-namestring source)
+       (acond ((sb-c::debug-source-namestring source)
                (format stream "~@:_Source file: ~A" it))
               ((%simple-fun-lexpr (%fun-fun function))
                (format stream "~@:_Source form:~@:_  ~S" it)))))
