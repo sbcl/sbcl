@@ -321,7 +321,7 @@
 (with-test (:name :block-compile-top-level-closures.self-call.local-calls)
   ;; Test that we can local call ourselves in the same environment despite
   ;; being a top level closure.
-  (assert (not (member #'self-call (ctu:find-named-callees #'self-call)))))
+  (assert (not (member 'self-call (ctu:find-named-callees #'self-call)))))
 
 (with-test (:name :block-compile-top-level-closures.same-environment)
   (ctu:file-compile
@@ -368,7 +368,7 @@
    :block-compile t
    :load t)
   ;; Closure can directly reference the simple fun for SIMPLE.
-  (assert (not (member #'simple (ctu:find-named-callees #'closure))))
+  (assert (not (member 'simple (ctu:find-named-callees #'closure))))
   (multiple-value-bind (val counter)
       (closure)
     (assert (eq val #'simple))

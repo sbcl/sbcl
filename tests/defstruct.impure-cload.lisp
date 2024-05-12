@@ -87,7 +87,7 @@ Evaluation took:
             (ctu:find-named-callees equalp-impl)))
       (case type
         ((parent child)
-         (assert (equal callees `(,#'sb-int:bit-vector-=))))
+         (assert (equal callees '(sb-int:bit-vector-=))))
         (child2
          ;; EQUAL on SIMPLE-BIT-VECTOR gets open-coded
          (assert (not callees)))))))

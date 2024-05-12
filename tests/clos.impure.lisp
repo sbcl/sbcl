@@ -2357,7 +2357,7 @@
      TAG)))
 (with-test (:name :bug-520366)
   (let ((callees (find-named-callees #'bar-520366)))
-    (assert (equal (list #'quux-520366) callees))))
+    (assert (equal '(quux-520366) callees))))
 
 (defgeneric no-applicable-method/retry (x))
 (defmethod no-applicable-method/retry ((x string))

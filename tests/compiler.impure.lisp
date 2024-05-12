@@ -1805,28 +1805,25 @@
   (+ arg0 arg1))
 (declaim (notinline target-fun))
 
-;; That issue aside, neither sb-introspect nor ctu:find-named-callees
-;; can examine an interpreted function for its callees,
-;; so we can't actually use this function.
 (defun test-target-fun-called (fun res)
-  (assert (member #'target-fun
-                  (ctu:find-named-callees #'caller-fun-1)))
+  (assert (member 'target-fun (ctu:find-named-callees #'caller-fun-1)))
   (assert (equal (funcall fun) res)))
 
 (defun caller-fun-1 ()
   (funcall 'target-fun 1 2))
-#-interpreter(test-target-fun-called #'caller-fun-1 3)
+(compile 'caller-fun-1) ; in case #+interpreter
+(test-target-fun-called #'caller-fun-1 3)
 
 (defun caller-fun-2 ()
   (declare (inline target-fun))
   (apply 'target-fun 1 '(3)))
-#-interpreter(test-target-fun-called #'caller-fun-2 4)
+(test-target-fun-called #'caller-fun-2 4)
 
 (defun caller-fun-3 ()
   (flet ((target-fun (a b)
            (- a b)))
     (list (funcall #'target-fun 1 4) (funcall 'target-fun 1 4))))
-#-interpreter(test-target-fun-called #'caller-fun-3 (list -3 5))
+(test-target-fun-called #'caller-fun-3 (list -3 5))
 
 ;;; Reported by NIIMI Satoshi
 ;;; Subject: [Sbcl-devel] compilation error with optimization
@@ -3219,12 +3216,13 @@
        (funcall (if t #'inline-fun) 'a)))
    :load t)
   (assert (equal (ctu:find-named-callees (symbol-function 'new-inline-functional-type-conflict.2))
-                 (list #'print)))
+                 '(print)))
   ;; We want to share the functional on space > speed, so we should
   ;; have 3 code segments: one for
   ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2's XEP, one for
   ;; NEW-INLINE-FUNCTIONAL-TYPE-CONFLICT.2, and one for INLINE-FUN.
-  (assert (= 3 (length (sb-disassem::get-code-segments (sb-kernel::fun-code-header #'new-inline-functional-type-conflict.2)))))
+  (assert (= 3 (length (sb-disassem::get-code-segments
+                        (sb-kernel:fun-code-header #'new-inline-functional-type-conflict.2)))))
   ;; We should have no type information from the arguments, because
   ;; the functional is shared.
   (let ((type (sb-kernel:%simple-fun-type

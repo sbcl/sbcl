@@ -116,7 +116,7 @@
     (loop for i from start repeat count
           for c = (code-header-ref code i)
           when (or (not namep) (equal name (sb-kernel:fdefn-name c)))
-          collect (sb-kernel:fdefn-fun c))))
+          collect (sb-kernel:fdefn-name c))))
 
 (defun find-anonymous-callees (fun &key (type 'function))
   (let ((code (fun-code-header (%fun-fun fun))))
