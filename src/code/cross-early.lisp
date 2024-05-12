@@ -151,6 +151,8 @@
   (and (complexp x) (single-float-p (complexnum-real x))))
 (defun complex-double-float-p (x)
   (and (complexp x) (double-float-p (complexnum-real x))))
+(defun complex-float-p (x)
+  (and (complexp x) (floatp (complexnum-real x))))
 
 ;;; Unlike for type FLOAT, where we don't in practice need lists as specifiers,
 ;;; we do use (COMPLEX foo) specifiers all over the place. But this deftype
@@ -162,6 +164,7 @@
         ((eq spec 'double-float) '(satisfies complex-double-float-p))
         #+long-float
         ((eq spec 'long-float) '(satisfies complex-long-float-p))
+        ((eq spec 'float) '(satisfies complex-float-p))
         (t (error "complex type specifier too complicated: ~s" spec))))
 
 (deftype number () '(or real complex))

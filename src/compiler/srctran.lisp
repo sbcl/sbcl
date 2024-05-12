@@ -603,12 +603,11 @@
     (%make-interval (normalize-bound low)
                     (normalize-bound high))))
 
-;; Some backends have no float traps
+;; Some backends (and the host) have no float traps
 (declaim (inline bad-float-p))
 (defun bad-float-p (value)
   (declare (ignorable value))
-  #+(and (or arm (and arm64 (not darwin)) riscv)
-         (not sb-xc-host))
+  #+(or arm (and arm64 (not darwin)) riscv sb-xc-host)
   (or (and (floatp value)
            (float-infinity-or-nan-p value))
       (and (complex-float-p value)
@@ -621,10 +620,6 @@
 (defun bound-func (f x strict)
   (declare (type function f))
   (when x
-    #+sb-xc-host
-    (when (and (eql f #'log)
-               (zerop x))
-      (return-from bound-func))
     (handler-case
         (let ((bound (funcall f (type-bound-number x))))
           (unless (bad-float-p bound)
