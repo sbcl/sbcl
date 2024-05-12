@@ -205,14 +205,12 @@ during backtrace.
   ;; The corresponding SETF function is defined using code-header-set
   ;; on the slot index.
   (fixups :type t :ref-known (flushable) :ref-trans %code-fixups)
-  ;; This slot usually holds an instance of SB-C::COMPILED-DEBUG-FUN
-  ;; but the debugger can replace it with a cons of that and something else.
-  ;; It could also be the symbol :BPT-LRA, or, as a special case
-  ;; for the assembler code component, a cons holding a hash-table.
-  ;; (the cons points from read-only to static space, but the hash-table
-  ;; wants to be in dynamic space)
-  ;; The corresponding SETF function is defined using code-header-set
-  ;; on the slot index; and there's a special variant if #+darwin-jit.
+  ;; This can be either a DEBUG-INFO object, the symbol :BPT-LRA, or,
+  ;; as a special case for the assembler code component, a cons
+  ;; holding a hash-table. (the cons points from read-only to static
+  ;; space, but the hash-table wants to be in dynamic space) The
+  ;; corresponding SETF function is defined using code-header-set on
+  ;; the slot index; and there's a special variant if #+darwin-jit.
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info)
