@@ -1770,7 +1770,7 @@
 ;; Patch either a ca through a static-space fdefn or an asm routine indirect jump.
 (defun patch-static-space-call (inst spacemap static-asm-code text-asm-code)
   (let* ((new-bytes (make-array 7 :element-type '(unsigned-byte 8)))
-         (addr (machine-ea-disp (car (third inst))))
+         (addr (machine-ea-disp (third inst)))
          (branch-target
           (find-static-call-target-in-text-space
            inst addr spacemap static-asm-code text-asm-code)))
@@ -1816,9 +1816,8 @@
            (this-op (second inst)))
       (when (member this-op '(call jmp))
         ;; is it potentially a call via an fdefn or an asm code indirection?
-        (let* ((operand (third inst))
-               (ea (if (listp operand) (car operand))))
-          (when (and (typep operand '(cons machine-ea (eql :qword)))
+        (let ((ea (third inst)))
+          (when (and (typep ea 'machine-ea)
                      (or (and (eql (machine-ea-base ea) 0) ; [RAX-9]
                               (eql (machine-ea-disp ea) 9)
                               (not (machine-ea-index ea)))
