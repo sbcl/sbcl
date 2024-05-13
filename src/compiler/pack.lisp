@@ -11,62 +11,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-C")
-
-;;; FIXME: Should SB-REGALLOC really need to be a separate package?
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (import '(block-info block-last block-loop block-next
-            clear-bit-vector component-head component-tail
-            defevent delete-vop do-ir2-blocks do-live-tns
-            emit-load-template event find-in
-            finite-sb finite-sb-always-live
-            finite-sb-wired-map finite-sb-conflicts
-            finite-sb-current-size finite-sb-last-block-count
-            finite-sb-last-offset finite-sb-live-tns
-            finite-sb-size-alignment finite-sb-size-increment
-            get-operand-info global-conflicts-block
-            global-conflicts-conflicts global-conflicts-kind
-            global-conflicts-next-tnwise global-conflicts-number
-            global-conflicts-next-blockwise global-conflicts-tn
-            ir2-block ir2-block-count ir2-block-global-tns
-            ir2-block-last-vop ir2-block-live-in
-            ir2-block-local-tn-count ir2-block-local-tns
-            ir2-block-next ir2-block-number ir2-block-prev
-            ir2-block-start-vop ir2-component
-            ir2-component-global-tn-counter
-            ir2-component-normal-tns ir2-component-restricted-tns
-            ir2-component-spilled-tns ir2-component-spilled-vops
-            ir2-component-wired-tns
-            lexenv-lambda listify-restrictions
-            local-tn-bit-vector local-tn-count local-tn-limit
-            local-tn-number local-tn-vector
-            loop-depth make-tn move-operand node node-lexenv
-            operand-parse-name position-in
-            primitive-type-scs print-tn-guts
-            sb-kind sb-size
-            sc-locations make-sc-locations sc-offset-to-sc-locations
-            sc-locations-count sc-locations-first sc-locations-member
-            do-sc-locations
-            sc-alignment sc-allowed-by-primitive-type
-            sc-alternate-scs sc-constant-scs sc-element-size
-            sc-locations sc-move-funs sc-reserve-locations
-            sc-save-p sc-vector
-            set-bit-vector
-            template-name
-            tn tn-cost tn-global-conflicts tn-kind tn-leaf
-            tn-local tn-local-conflicts tn-local-number
-            tn-next tn-number tn-primitive-type
-            tn-reads tn-save-tn tn-vertex tn-writes
-            tns-conflict tns-conflict-global-global
-            tns-conflict-local-global
-            vop vop-args vop-info vop-info-arg-load-scs
-            vop-info-move-args vop-name
-            vop-info-result-load-scs vop-info-save-p
-            vop-node
-            vop-parse-or-lose vop-parse-temps vop-prev
-            vop-refs vop-results vop-save-set vop-temps)
-          "SB-REGALLOC"))
-
 (in-package "SB-REGALLOC")
 
 ;;; for debugging: some parameters controlling which optimizations we
