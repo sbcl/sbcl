@@ -433,3 +433,29 @@
          (tree-equal a '(a (b c) (3/4 (d))) :test #'eql))
     (('(a (b c) (3/4 (d)))) t)
     (('(a (b c) (3/4 (d) e))) nil)))
+
+(with-test (:name :copy-list-derive-type)
+  (assert-type
+   (lambda (l)
+     (declare (optimize space)
+              (cons l))
+     (copy-list l))
+   cons)
+  (assert-type
+   (lambda (l)
+     (declare (optimize space)
+              (list l))
+     (copy-list l))
+   list)
+  (assert-type
+   (lambda (l)
+     (declare (optimize speed (space 0))
+              (cons l))
+     (copy-list l))
+   cons)
+  (assert-type
+   (lambda (l)
+     (declare (optimize speed (space 0))
+              (list l))
+     (copy-list l))
+   list))

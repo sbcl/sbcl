@@ -1023,7 +1023,8 @@
   (flushable no-verify-arg-count)
   :call-type-deriver #'append-call-type-deriver)
 
-(defknown copy-list (proper-or-dotted-list) list (flushable))
+(defknown copy-list (proper-or-dotted-list) list (flushable)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 (defknown sb-impl::copy-list-to (proper-or-dotted-list cons) cons
   (flushable no-verify-arg-count))
 (defknown copy-alist (proper-list) list (flushable))
