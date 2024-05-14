@@ -3348,7 +3348,6 @@ possibly temporarily, because it might be used internally.")
 
            "MISC-INDEX"
            "CLEAR-FLAG"
-           "PACK-3-CODEPOINTS"
 
            "BINARY-SEARCH"))
 
