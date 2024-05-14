@@ -58,7 +58,8 @@
 ;;; Since WITH-PINNED-OBJECT costs nothing on conservative gencgc,
 ;;; that's what I'm going with.
 ;;;
-(defun %instance-sxhash (instance)
+(declaim (inline %instance-sxhash))
+(defun %instance-sxhash (instance header-word)
   ;; LAYOUT must not acquire an extra slot for the stable hash,
   ;; because the bitmap length is derived from the instance length.
   ;; It would probably be simple to eliminate this as a special case
@@ -68,28 +69,31 @@
     ;; This might be wrong if the clos-hash was clobbered to 0
     (return-from %instance-sxhash (layout-clos-hash instance)))
   ;; Non-simple cases: no hash slot, and either unhashed or hashed-not-moved.
-  (let* ((header-word (instance-header-word instance))
-         (addr (with-pinned-objects (instance)
-                 ;; First we have to indicate that a hash was taken from the address
-                 ;; if not already so marked.
-                 (unless (logbitp sb-vm:stable-hash-required-flag header-word)
-                   #-sb-thread (setf (sap-ref-word (int-sap (get-lisp-obj-address instance))
-                                                   (- sb-vm:instance-pointer-lowtag))
-                                     (logior (ash 1 sb-vm:stable-hash-required-flag)
-                                             header-word))
-                   #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
-                 (get-lisp-obj-address instance))))
+  (let* ((addr (sb-c::if-vop-existsp (:named sb-vm::set-instance-hashed-return-address)
+                 (if (logbitp sb-vm:stable-hash-required-flag header-word)
+                     (get-lisp-obj-address instance)
+                     (%primitive sb-vm::set-instance-hashed-return-address instance))
+                 (with-pinned-objects (instance)
+                   ;; First we have to indicate that a hash was taken from the address
+                   ;; if not already so marked.
+                   (unless (logbitp sb-vm:stable-hash-required-flag header-word)
+                     #-sb-thread (setf (sap-ref-word (int-sap (get-lisp-obj-address instance))
+                                                     (- sb-vm:instance-pointer-lowtag))
+                                       (logior (ash 1 sb-vm:stable-hash-required-flag)
+                                               header-word))
+                     #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
+                   (get-lisp-obj-address instance)))))
     ;; perturb the address
     (murmur-hash-word/+fixnum addr)))
 
 (declaim (inline instance-sxhash))
 (defun instance-sxhash (instance)
-  (if (logbitp sb-vm:hash-slot-present-flag
-               (instance-header-word (truly-the instance instance)))
-      ;; easy case: 1 word beyond the apparent length is a word added
-      ;; by GC (which may have resized the object, but we don't need to know).
-      (truly-the hash-code (%instance-ref instance (%instance-length instance)))
-      (%instance-sxhash instance)))
+  (let ((header-word (instance-header-word (truly-the instance instance))))
+    (if (logbitp sb-vm:hash-slot-present-flag header-word)
+        ;; easy case: 1 word beyond the apparent length is a word added
+        ;; by GC (which may have resized the object, but we don't need to know).
+        (truly-the hash-code (%instance-ref instance (%instance-length instance)))
+        (%instance-sxhash instance header-word))))
 
 ;;; Return a pseudorandom number that was assigned on allocation.
 ;;; FIN is a STANDARD-FUNCALLABLE-INSTANCE but we don't care to type-check it.

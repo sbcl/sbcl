@@ -147,18 +147,21 @@
     (move result old-value)
     (inst casal result new-value lip)))
 
-(define-vop (set-instance-hashed)
+#+sb-thread
+(define-vop (set-instance-hashed-return-address)
   (:args (object :scs (descriptor-reg)))
-  ;; oject must be pinned to mark it, so temp reg needn't be the LIP register
   (:temporary (:sc unsigned-reg) baseptr header)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
   (:generator 5
     (inst sub baseptr object instance-pointer-lowtag)
     LOOP
     (cond ((member :arm-v8.1 *backend-subfeatures*)
            (inst movz header (ash 1 stable-hash-required-flag))
-           (inst ldset header header baseptr))
+           (inst ldset header zr-tn baseptr))
           (t
            (inst ldaxr header baseptr)
            (inst orr header header (ash 1 stable-hash-required-flag))
            (inst stlxr tmp-tn header baseptr)
-           (inst cbnz (32-bit-reg tmp-tn) LOOP)))))
+           (inst cbnz (32-bit-reg tmp-tn) LOOP)))
+    (move result object)))

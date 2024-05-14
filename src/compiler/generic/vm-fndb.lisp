@@ -102,8 +102,7 @@
   boolean
   (foldable flushable no-verify-arg-count))
 
-(defknown (sb-impl::instance-sxhash sb-impl::%instance-sxhash)
-    (instance) hash-code (flushable))
+(defknown sb-impl::instance-sxhash (instance) hash-code (flushable))
 ;;; SXHASH values on numbers and strings are predictable, therefore the next batch
 ;;; of functions are flushable. Perhaps not entirely obviously, symbol hashes are
 ;;; predictable because we hash by name.
