@@ -257,6 +257,8 @@ GNAME(funcall_alien_callback):
 	push	%r15    #
 #ifdef LISP_FEATURE_SB_THREAD
         mov     %rcx, THREAD_BASE_REG
+#else
+        LOAD_PIC_VAR(all_threads, THREAD_BASE_REG)
 #endif
         mov     $(3 << N_FIXNUM_TAG_BITS),%rcx
 

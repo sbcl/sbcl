@@ -57,7 +57,8 @@ extern struct alloc_region  gc_alloc_region[6];
                |(uintptr_t)gc_alloc_region[5].start_addr))
 
 extern int gencgc_alloc_profiler;
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD || defined LISP_FEATURE_X86_64
+// x86-64 uses thread slots for the alloc regions even on threadless builds
 # define THREAD_ALLOC_REGION(threadvar,slot) &threadvar-> slot ##_tlab
 #else
 # define THREAD_ALLOC_REGION(threadvar,slot) main_thread_ ##slot ##_region

@@ -157,7 +157,7 @@
         (%make-simd-pack-256-double (a b c d))
         (%make-simd-pack-256-ub64 (a b c d))
         (%simd-pack-256-tag))
-  #+sb-thread (def sb-vm::current-thread-offset-sap)
+  #+(or sb-thread x86-64) (def sb-vm::current-thread-offset-sap)
   (def current-sp ())
   (def current-fp ())
   (def stack-ref (s n))

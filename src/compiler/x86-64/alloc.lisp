@@ -221,20 +221,15 @@
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))
-           (free-pointer #+sb-thread
-                         (let ((slot (if systemp
-                                         (if (eql type +cons-primtype+)
-                                             thread-sys-cons-tlab-slot
-                                             thread-sys-mixed-tlab-slot)
-                                         (if (eql type +cons-primtype+)
-                                             thread-cons-tlab-slot
-                                             thread-mixed-tlab-slot))))
-                           (thread-slot-ea slot #+gs-seg thread-temp))
-                         #-sb-thread
-                         (ea (+ static-space-start
-                                (if (eql type +cons-primtype+)
-                                    cons-region-offset
-                                    mixed-region-offset))))
+           (free-pointer (thread-slot-ea
+                          (if systemp
+                              (if (eql type +cons-primtype+)
+                                   thread-sys-cons-tlab-slot
+                                   thread-sys-mixed-tlab-slot)
+                               (if (eql type +cons-primtype+)
+                                   thread-cons-tlab-slot
+                                   thread-mixed-tlab-slot))
+                           #+gs-seg thread-temp))
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))
@@ -966,8 +961,7 @@
             (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
         (storew* #-compact-instance-header header ; write the widetag and size
                  #+compact-instance-header        ; ... plus the layout pointer
-                 (let ((layout #-sb-thread (static-symbol-value-ea 'function-layout)
-                               #+sb-thread (thread-slot-ea thread-function-layout-slot)))
+                 (let ((layout (thread-slot-ea thread-function-layout-slot)))
                    (cond ((typep header '(unsigned-byte 16))
                           (inst mov temp layout)
                           ;; emit a 2-byte constant, the low 4 of TEMP were zeroed

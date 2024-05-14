@@ -203,7 +203,7 @@ void close_code_region() {
 void gc_close_thread_regions(__attribute__((unused)) struct thread* th,
                              int locking) {
     close_region_arg argv[] = {
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD || defined LISP_FEATURE_X86_64
       { &th->mixed_tlab, PAGE_TYPE_MIXED },
       { &th->cons_tlab, PAGE_TYPE_CONS },
       { &th->sys_mixed_tlab, PAGE_TYPE_MIXED },

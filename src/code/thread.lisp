@@ -34,7 +34,7 @@ stale value, use MUTEX-OWNER instead."
   #+sb-thread (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
   #-sb-thread (extern-alien "all_threads" system-area-pointer))
 
-#-sb-thread
+#+(and (not sb-thread) (not x86-64))
 (progn
   (declaim (inline sb-vm::current-thread-offset-sap))
   (defun sb-vm::current-thread-offset-sap (n)

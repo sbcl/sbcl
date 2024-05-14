@@ -293,8 +293,6 @@
   (:generator 1
     (inst break pending-interrupt-trap)))
 
-#+sb-thread
-(progn
 (define-vop (current-thread-offset-sap/c)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -316,7 +314,7 @@
     (let (#+gs-seg (thread-tn nil))
       (inst mov sap
             (ea thread-segment-reg thread-tn
-                index (ash 1 (- word-shift n-fixnum-tag-bits))))))))
+                index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
 
 (define-vop (halt)
   (:generator 1

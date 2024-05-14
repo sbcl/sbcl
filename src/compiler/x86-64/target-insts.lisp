@@ -498,7 +498,6 @@
             (note (lambda (stream) (prin1 it stream)) dstate)
             (return-from print-mem-ref))))
       ;; Try to reverse-engineer which thread-local binding this is
-      #+sb-thread
       (cond ((and disp ; Test whether disp looks aligned to an object header
                   (not (logtest (- disp 4) sb-vm:lowtag-mask))
                   (not base-reg) (not index-reg))
@@ -533,6 +532,7 @@
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "thread.~(~A~)" symbol))
                          dstate))))
+             #+sb-thread
              (let ((symbol (or (guess-symbol
                                 (lambda (s) (= (symbol-tls-index s) disp)))
                                ;; static symbols aren't in the code header
@@ -542,8 +542,7 @@
                  (return-from print-mem-ref
                    ;; "tls:" refers to the current value of the symbol in TLS
                    (note (lambda (stream) (format stream "tls: ~S" symbol))
-                         dstate)))))
-            ))))
+                         dstate)))))))))
 
 (defun lea-compute-label (value dstate)
   ;; If VALUE should be regarded as a label, return the address.
