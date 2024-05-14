@@ -4181,13 +4181,13 @@ III. initially undefined function references (alphabetically):
       (makunbound '*!cold-toplevels*) ; so no further PUSHes can be done
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
-      (sort-initial-methods)
-      (resolve-deferred-known-funs)
-      (resolve-static-call-fixups)
-      (foreign-symbols-to-core)
       (when core-file-name
-        (finish-symbols))
-      (finalize-load-time-value-noise)
+        (sort-initial-methods)
+        (resolve-deferred-known-funs)
+        (resolve-static-call-fixups)
+        (foreign-symbols-to-core)
+        (finish-symbols)
+        (finalize-load-time-value-noise))
 
       ;; Write results to files.
       (when map-file-name
