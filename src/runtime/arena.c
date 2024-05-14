@@ -509,7 +509,6 @@ static int valid_arena_obj_ptr_p(lispobj ptr)
 static void __attribute__((unused))
 scan_thread_control_stack(lispobj* start, lispobj* end, lispobj lispthread)
 {
-    gc_assert(arena_chain);
     lispobj* where = start;
     for ( ; where < end ; ++where) {
         lispobj word = *where;
@@ -532,12 +531,17 @@ static void scan_thread_words(lispobj* start, lispobj* end)
 
 int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
 {
+    gc_stop_the_world();
+    if (!arena_chain) {
+        fprintf(stderr, "No arenas to examine\n");
+        gc_start_the_world();
+        return 0;
+    }
     target_arena = arena;
     // check for suspcious pointers to arena from thread roots
     searchresult.v = VECTOR(result_buffer);
     stray_pointer_detector_fn = record_if_points_to_arena_interior;
 
-    gc_stop_the_world();
     prepare_for_full_mark_phase();
     fprintf(stderr, "Checking threads...\n");
     struct thread* th;

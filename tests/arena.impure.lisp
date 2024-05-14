@@ -5,6 +5,10 @@
 (defvar *many-arenas*
   (coerce (loop for i below 10 collect (new-arena 1048576)) 'vector))
 
+;;; KEEP THIS AS THE FIRST TEST IN THE FILE. (Or make a new file of tests)
+(test-util:with-test (:name :run-finder-with-no-arenas)
+  (assert (null (c-find-heap->arena))))
+
 (defvar *arena* (aref *many-arenas* 0))
 ;;; This REWIND is strictly unnecessary. It simply should not crash
 (rewind-arena *arena*)
