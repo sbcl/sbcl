@@ -646,7 +646,7 @@ int findhash(
 
     rslinit = initkey(keys, nkeys, *tabb, *alen, *blen, *smax, trysalt,
                       form, final);
-    if (rslinit < 0) return -1;
+    if (rslinit < 0) goto fail;
 
     if (rslinit == 2)
     {      /* initkey actually found a perfect hash, not just distinct (a,b) */
@@ -676,7 +676,7 @@ int findhash(
         {
           duplicates(*tabb, *blen, keys, form);      /* check for duplicates */
        // printf("fatal error: Cannot perfect hash: cannot find distinct (A,B)\n");
-          return -1; // failure
+          goto fail;
         }
         bad_initkey = 0;
         bad_perfect = 0;
@@ -704,7 +704,7 @@ int findhash(
         else
         {
        // printf("fatal error: Cannot perfect hash: cannot build tab[]\n");
-          return -1; // failure
+          goto fail;
         }
         bad_perfect = 0;
       }
@@ -721,6 +721,12 @@ int findhash(
   free((void *)tabh);
   free((void *)tabq);
   return 1; // success
+
+ fail:
+  free(*tabb);
+  free(tabq);
+  free(tabh);
+  return -1;
 }
 
 struct mem_stream {
@@ -1025,8 +1031,7 @@ char* lisp_perfhash_with_options(int flags, unsigned int *key_array, int nkeys)
   struct mem_stream * scratchfile = make_mem_stream();
   char* result = 0;
   if (driver(&form, keylist, nkeys, scratchfile) < 0) {
-    // FIXME: there are memory leaks in findhash ('tabb', 'tabq' ,'tabh')
-    // if it returns with failure. Can we free the working storage here?
+    free(scratchfile->buffer);
   } else {
     result = realloc(scratchfile->buffer, scratchfile->position + 1);
   }
