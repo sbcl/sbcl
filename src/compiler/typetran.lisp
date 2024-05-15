@@ -67,14 +67,17 @@
         (abort-ir1-transform)
         expansion)))
 
-(progn
-  (defun type-other-pointer-p (type)
-    (csubtypep type (specifier-type '(not #1=(or fixnum #+64-bit single-float
-                                                 list function instance character
-                                                 extended-sequence)))))
+(sb-xc:deftype other-pointer ()
+  '(or array
+    (and number (not (or fixnum #+64-bit single-float)))
+    fdefn (and symbol (not null))
+    weak-pointer system-area-pointer code-component))
 
-  (defun type-not-other-pointer-p (type)
-    (csubtypep type (specifier-type '#1#))))
+(defun type-other-pointer-p (type)
+  (csubtypep type (specifier-type 'other-pointer)))
+
+(defun type-not-other-pointer-p (type)
+  (csubtypep type (specifier-type '(not other-pointer))))
 
 ;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
@@ -183,7 +186,7 @@
                              (cond ((and (type-not-other-pointer-p diff)
                                          (type-other-pointer-p type))
                                     `(%other-pointer-p object))
-                                   ((and (type-other-pointer-p type)
+                                   ((and (type-other-pointer-p diff)
                                          (type-not-other-pointer-p type))
                                     `(not (%other-pointer-p object)))))))))
               (t
@@ -1639,16 +1642,11 @@
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))
-  (let ((this-type
-          (specifier-type '(or fixnum
-                            #+64-bit single-float
-                            function
-                            list
-                            instance
-                            character))))
-    (cond ((not (types-equal-or-intersect this-type (lvar-type object))))
-          ((csubtypep (lvar-type object) this-type)
+  (let ((this-type (specifier-type 'other-pointer)))
+    (cond ((not (types-equal-or-intersect (lvar-type object) this-type))
            nil)
+          ((csubtypep (lvar-type object) this-type)
+           t)
           ((give-up-ir1-transform)))))
 
 ;;; BIGNUMP is simpler than INTEGERP, so if we can rule out FIXNUM then ...

@@ -941,3 +941,9 @@
    ((:a) 1)
    (("") 2)
    (((make-array 10 :adjustable t)) nil)))
+
+(with-test (:name :other-pointer-subtypes)
+  (assert-type
+   (lambda (j)
+     (sb-kernel:%other-pointer-p (the (and sequence (not vector)) j)))
+   null))

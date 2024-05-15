@@ -264,8 +264,8 @@
         (s character-widetag character)
         (s other-pointer-lowtag
            (if permit-nil
-               (specifier-type '(not (or cons . #1=(#+64-bit fixnum single-float function cons instance character))))
-               (specifier-type '(not (or list . #1#)))))
+               (specifier-type '(or null sb-c::other-pointer))
+               (specifier-type 'sb-c::other-pointer)))
         (let ((set-bit (logand lowtag-mask (logandc2 lowtag set)))
               (clear-bit (logandc2 lowtag-mask (logior lowtag clear))))
           (cond ((plusp set-bit)

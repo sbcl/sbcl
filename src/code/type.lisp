@@ -2027,6 +2027,8 @@ expansion happened."
                   (classoid-inherits-from type1 'function))
              (values t t)
              (values nil t)))
+        ((and (eq type2 *instance-type*) (alien-type-type-p type1))
+         (values t t))
         (t
          ;; FIXME: This seems to rely on there only being 4 or 5
          ;; NAMED-TYPE values, and the exclusion of various
@@ -2069,6 +2071,7 @@ expansion happened."
          (classoid (when (or (classoid-non-instance-p type1)
                              (classoid-is-or-inherits type1 'function))
                      *empty-type*))
+         (alien-type-type type1)
          (t (empty-unless-hairy type1))))
       ((eq type2 *funcallable-instance-type*)
        (typecase type1
