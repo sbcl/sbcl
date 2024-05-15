@@ -1642,10 +1642,13 @@
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))
-  (let ((this-type (specifier-type 'other-pointer)))
-    (cond ((not (types-equal-or-intersect (lvar-type object) this-type))
+  (let ((type (lvar-type object)))
+    (cond ((not (types-equal-or-intersect type (specifier-type 'other-pointer)))
            nil)
-          ((csubtypep (lvar-type object) this-type)
+          ((or (csubtypep type (specifier-type 'other-pointer))
+               ;; It doesn't negate to this type, so check both
+               (csubtypep type (specifier-type '(not (or fixnum #+64-bit single-float
+                                                                list function instance character)))))
            t)
           ((give-up-ir1-transform)))))
 
