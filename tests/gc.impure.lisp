@@ -531,3 +531,8 @@
                (sb-sys:memory-fault-error (c)
                  (write-to-string c :escape nil)))))
     (assert (search "modify a read-only object" err))))
+
+(with-test (:name :time-measures
+                  :skipped-on (:not (:and (:or :linux :darwin) :sb-thread)))
+  (assert (plusp (sb-thread::thread-sum-stw-pause sb-thread:*current-thread*)))
+  (assert (plusp (sb-thread::thread-gc-virtual-time sb-thread:*current-thread*))))

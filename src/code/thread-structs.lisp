@@ -148,6 +148,11 @@ in future versions."
   (max-stw-pause 0 :type sb-vm:word) ; microseconds
   (sum-stw-pause 0 :type sb-vm:word) ; "
   (ct-stw-pauses 0 :type sb-vm:word) ; to compute the avg
+  ;; Measure elapsed time in GC in the resolution that clock_gettime returns
+  ;; (nanoseconds) for 64-bit, or microseconds for 32-bit.
+  ;; This can indicate >584 years if 64-bit or slightly over an hour if 32-bit.
+  ;; Considering restarting your SBCL before wraparound occurs, if you care.
+  (gc-virtual-time 0 :type sb-vm:word)
 
   ;; On succesful execution of the thread's lambda, a list of values.
   (result 0)

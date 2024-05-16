@@ -1473,8 +1473,8 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
     int my_state = thread_wait_until_not(STATE_STOPPED, thread);
 #ifdef MEASURE_STOP_THE_WORLD_PAUSE
-    extern void thread_accrue_stw_time(struct thread*,struct timespec*);
-    thread_accrue_stw_time(thread, &t_beginpause);
+    extern void thread_accrue_stw_time(struct thread*,struct timespec*,struct timespec*);
+    thread_accrue_stw_time(thread, &t_beginpause, 0);
 #endif
 
     event0("resumed");
