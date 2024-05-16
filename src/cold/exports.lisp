@@ -51,8 +51,7 @@
              "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-P"
              "DEBUG-SOURCE-START-POSITIONS" "MAKE-DEBUG-SOURCE"
              "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
-             "CORE-DEBUG-SOURCE-FORM"))
-  (defpackage-if-needed "SB-DI"))
+             "CORE-DEBUG-SOURCE-FORM")))
 
 (defpackage "SB-EXT"
   (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")
@@ -1589,7 +1588,7 @@ structure representations")
 
 (defpackage "SB-DISASSEM"
   (:documentation "private: stuff related to the implementation of the disassembler")
-  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL" "SB-DI")
+  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL")
   (:export "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
            "*DISASSEM-LOCATION-COLUMN-WIDTH*"
            "ALIGN" ;;  prevent it from being removed, older Slime versions are using it
@@ -1647,7 +1646,7 @@ structure representations")
 basic stuff like BACKTRACE and ARG. For now, the actual supported interface
 is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
-  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL" "SB-DI")
+  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL")
   (:export "*BACKTRACE-FRAME-COUNT*"
            "*DEBUG-BEGINNER-HELP-P*"
            "*DEBUG-CONDITION*"
