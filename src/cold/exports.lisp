@@ -1137,7 +1137,7 @@ SBCL itself")
 
 (defpackage "SB-BIGNUM"
   (:documentation "private: bignum implementation")
-  (:use "CL" "SB-KERNEL" "SB-INT" "SB-EXT" "SB-ALIEN" "SB-SYS")
+  (:use "CL" "SB-INT" "SB-EXT")
   (:export "%ADD-WITH-CARRY"
            "%ALLOCATE-BIGNUM" "%ASHL" "%ASHR"
            "%BIGNUM-LENGTH" "%BIGNUM-REF" "%BIGNUM-REF-WITH-OFFSET"
@@ -1161,14 +1161,20 @@ SBCL itself")
            "BIGNUM-LOGICAL-XOR" "BIGNUM-PLUS-P"
            "BIGNUM-TO-SINGLE-FLOAT" "BIGNUM-TO-DOUBLE-FLOAT"
            "BIGNUM-TRUNCATE" "BIGNUM-TRUNCATE-SINGLE-DIGIT"
-           "MAKE-SMALL-BIGNUM"
+           "BIT-INDEX"
+           "MAKE-SMALL-BIGNUM" "MAXIMUM-BIGNUM-LENGTH"
            "MULTIPLY-BIGNUM-AND-FIXNUM" "MULTIPLY-BIGNUMS"
            "MULTIPLY-FIXNUMS" "NEGATE-BIGNUM"
            "%RANDOM-BIGNUM"
            "SUBTRACT-BIGNUM" "SUBTRACT-FIXNUM-BIGNUM" "SUBTRACT-BIGNUM-FIXNUM"
            "SXHASH-BIGNUM"
+           "SXHASH-BIGNUM-DOUBLE-FLOAT" "SXHASH-BIGNUM-SINGLE-FLOAT"
            "HALF-BIGNUM-ELEMENT-TYPE" "HALF-BIGNUM-INDEX" "HALF-BIGNUM-LENGTH"
-           "%HALF-BIGNUM-REF" "%HALF-BIGFLOOR"))
+           "%HALF-BIGNUM-REF" "%HALF-BIGFLOOR"
+           "UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
+           "UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
+           "%UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
+           "%UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"))
 
 ;; This package is a grab bag for things which used to be internal
 ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
@@ -2520,11 +2526,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%UNARY-TRUNCATE/SINGLE-FLOAT"
            "%UNARY-TRUNCATE/DOUBLE-FLOAT"
            "%UNARY-FROUND" "%UNARY-FTRUNCATE"
-           "UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
-           "UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
-           "%UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
-           "%UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
-           "SXHASH-BIGNUM-DOUBLE-FLOAT" "SXHASH-BIGNUM-SINGLE-FLOAT"
 
            "%WITH-ARRAY-DATA"
            "%WITH-ARRAY-DATA/FP"
@@ -2562,7 +2563,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "ASSERT-ERROR"
            #+sb-unicode "BASE-CHAR-P"
            "BASE-STRING-P"
-           "BIND" "BINDING-STACK-POINTER-SAP" "BIT-INDEX"
+           "BIND" "BINDING-STACK-POINTER-SAP"
            "BOGUS-ARG-TO-VALUES-LIST-ERROR" "BOOLE-CODE"
            "BOUNDING-INDICES-BAD-ERROR" "BYTE-SPECIFIER" "%BYTE-BLT"
            "FUNCTION-DESIGNATOR"
@@ -2723,7 +2724,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "MAKE-SHORT-VALUES-TYPE" "MAKE-SINGLE-VALUE-TYPE"
            "MAKE-VALUE-CELL" "MAKE-VALUES-TYPE"
            "MAPC-MEMBER-TYPE-MEMBERS" "MAPCAR-MEMBER-TYPE-MEMBERS"
-           "MAXIMUM-BIGNUM-LENGTH"
            "MEMBER-TYPE" "MEMBER-TYPE-MEMBERS" "MEMBER-TYPE-P"
            "MEMBER-TYPE-SIZE"
            "MODIFIED-NUMERIC-TYPE"

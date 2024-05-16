@@ -72,7 +72,7 @@
 (sb-xc:deftype half-bignum-length () `(mod ,(1+ (* maximum-bignum-length 2))))
 
 ;;; an index into an integer
-(sb-xc:deftype bit-index ()
+(sb-xc:deftype sb-bignum:bit-index ()
   `(integer 0 ,(- (* (1+ maximum-bignum-length) sb-vm:n-word-bits) 1)))
 
 

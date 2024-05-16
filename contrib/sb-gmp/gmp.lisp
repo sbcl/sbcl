@@ -345,7 +345,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (defmacro with-mpz-results (pairs &body body)
   (loop for (gres size) in pairs
         for res = (gensym "RESULT")
-        collect `(when (> ,size sb-kernel:maximum-bignum-length)
+        collect `(when (> ,size sb-bignum:maximum-bignum-length)
                    (error "Size of result exceeds maxim bignum length")) into checks
         collect `(,gres (struct gmpint)) into declares
         collect `(,res (allocate-bignum ,size))
@@ -405,7 +405,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         collect `(__gmpz_init (addr ,gres)) into inits
         collect `(,size (abs (slot ,gres 'mp_size)))
           into resinits
-        collect `(when (> ,size (1- sb-kernel:maximum-bignum-length))
+        collect `(when (> ,size (1- sb-bignum:maximum-bignum-length))
                    (error "Size of result exceeds maxim bignum length")) into checks
         collect `(,res (allocate-bignum (1+ ,size)))
           into resallocs

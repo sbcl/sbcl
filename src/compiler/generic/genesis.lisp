@@ -3114,7 +3114,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    sb-impl::symbol-name-bits))
         (record (c-symbol-name c) 3/2 #| arb |# c ""))
       ;; Other constants that aren't necessarily grouped into families.
-      (dolist (c '(sb-kernel:maximum-bignum-length
+      (dolist (c '(sb-bignum:maximum-bignum-length
                    sb-vm:n-word-bits sb-vm:n-word-bytes
                    sb-vm:n-lowtag-bits sb-vm:lowtag-mask
                    sb-vm:n-widetag-bits sb-vm:widetag-mask

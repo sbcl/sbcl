@@ -17,9 +17,9 @@
 ;;; Return a nonnegative integer of DIGIT-SIZE many pseudo random bits.
 (declaim (inline random-bignum-digit))
 (defun random-bignum-digit (state)
-  (if (= n-random-chunk-bits digit-size)
-      (random-chunk state)
-      (big-random-chunk state)))
+  (if (= sb-kernel:n-random-chunk-bits digit-size)
+      (sb-kernel:random-chunk state)
+      (sb-kernel:big-random-chunk state)))
 
 ;;; Return a nonnegative integer of N-BITS many pseudo random bits.
 ;;; N-BITS must be nonnegative and less than DIGIT-SIZE.
@@ -28,9 +28,9 @@
   (declare (type (integer 0 #.(1- digit-size)) n-bits)
            (type random-state state))
   (logand (1- (ash 1 n-bits))
-          (if (<= n-bits n-random-chunk-bits)
-              (random-chunk state)
-              (big-random-chunk state))))
+          (if (<= n-bits sb-kernel:n-random-chunk-bits)
+              (sb-kernel:random-chunk state)
+              (sb-kernel:big-random-chunk state))))
 
 ;;; Create a (nonnegative) bignum by concatenating RANDOM-CHUNK and
 ;;; BIT-COUNT many pseudo random bits, normalise and return it.
@@ -40,7 +40,7 @@
   (declare (type bignum-element-type random-chunk)
            (type (integer 0 #.most-positive-fixnum) bit-count)
            (type random-state state))
-  (let* ((n-total-bits (+ 1 n-random-chunk-bits bit-count)) ; sign bit
+  (let* ((n-total-bits (+ 1 sb-kernel:n-random-chunk-bits bit-count)) ; sign bit
          (length (ceiling n-total-bits digit-size))
          (bignum (%allocate-bignum length)))
     ;; DO NOT ASSUME THAT %ALLOCATE-BIGNUM PREZEROS
@@ -60,7 +60,7 @@
                                                        state)
                           (%ashl random-chunk n-random-bits)))
             (let ((shift (- digit-size n-random-bits)))
-              (when (< shift n-random-chunk-bits)
+              (when (< shift sb-kernel:n-random-chunk-bits)
                 (setf (%bignum-ref bignum (1+ n-random-digits))
                       (%digit-logical-shift-right random-chunk shift)))))))
     (%normalize-bignum bignum length)))
@@ -136,26 +136,26 @@
            ;; compiler to make optimal use of the type declaration for
            ;; N-BITS above.
            (let ((n-bits (1- n-bits)))
-             (if (<= n-bits n-random-chunk-bits)
-                 (%digit-logical-shift-right (random-chunk state)
-                                             (- n-random-chunk-bits n-bits))
+             (if (<= n-bits sb-kernel:n-random-chunk-bits)
+                 (%digit-logical-shift-right (sb-kernel:random-chunk state)
+                                             (- sb-kernel:n-random-chunk-bits n-bits))
                  (make-random-bignum n-bits state))))
-          ((<= n-bits n-random-chunk-bits)
-           (let ((shift (- n-random-chunk-bits n-bits))
+          ((<= n-bits sb-kernel:n-random-chunk-bits)
+           (let ((shift (- sb-kernel:n-random-chunk-bits n-bits))
                  (arg (%bignum-ref arg 0)))
              (loop
-              (let ((bits (%digit-logical-shift-right (random-chunk state)
+              (let ((bits (%digit-logical-shift-right (sb-kernel:random-chunk state)
                                                       shift)))
                 (when (< bits arg)
                   (return bits))))))
           (t
            ;; ARG is not a power of two and we need more than one random
            ;; chunk.
-           (let* ((shift (- n-bits n-random-chunk-bits))
-                  (arg-first-chunk (ldb (byte n-random-chunk-bits shift)
+           (let* ((shift (- n-bits sb-kernel:n-random-chunk-bits))
+                  (arg-first-chunk (ldb (byte sb-kernel:n-random-chunk-bits shift)
                                         arg)))
              (loop
-              (let ((random-chunk (random-chunk state)))
+              (let ((random-chunk (sb-kernel:random-chunk state)))
                 ;; If the random value is larger than the corresponding
                 ;; chunk from the most significant bits of ARG we can
                 ;; retry immediately; no need to generate the remaining

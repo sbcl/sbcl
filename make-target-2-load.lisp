@@ -493,9 +493,12 @@ Please check that all strings which were not recognizable to the compiler
        (and (eq accessibility :external)
             (constantp symbol)))
       (#.(find-package "SB-BIGNUM")
-       ;; There are 2 important external symbols for sb-gmp.
+       ;; There are 2 important external symbols for sb-gmp, and 2
+       ;; important external symbols for sb-rotate-byte.
        ;; Other externals can disappear.
        (member symbol '(sb-bignum:%allocate-bignum
+                        sb-bignum:maximum-bignum-length
+                        sb-bignum:bit-index
                         sb-bignum:make-small-bignum)))
       (t
        (if (eq (symbol-package symbol)

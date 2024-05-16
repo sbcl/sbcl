@@ -125,10 +125,10 @@
     (multiple-value-bind (nwords nbits) (floor length sb-vm:n-word-bits)
       (with-bignum-shadow-bits (bit-base bignum length)
         (dotimes (i nwords)
-          (setf (sap-ref-word bit-base 0) sb-ext:most-positive-word
+          (setf (sb-sys:sap-ref-word bit-base 0) sb-ext:most-positive-word
                 bit-base (sap+ bit-base sb-vm:n-word-bytes)))
         (when (plusp nbits)
-          (setf (sap-ref-word bit-base 0)
+          (setf (sb-sys:sap-ref-word bit-base 0)
                 (#+little-endian shift-towards-start
                  #+big-endian shift-towards-end sb-ext:most-positive-word
                  (- nbits))))))
@@ -141,7 +141,7 @@
 
 (defun index-out-of-bounds (bignum i)
   (error "out-of-bounds bignum set @ ~x[~d], len=~d~%"
-         (get-lisp-obj-address bignum) i (%bignum-length bignum)))
+         (sb-kernel:get-lisp-obj-address bignum) i (%bignum-length bignum)))
 
 (declaim (inline %bignum-set))
 (defun %bignum-set (bignum i value)
@@ -161,9 +161,11 @@
 
 (defun bignum-ref-trap (bignum i)
   ;; This error might happen too early in cold-init to report it normally
-  (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned))
-                 (vector-sap #.(format nil "Element %d of bignum %p was never written~%"))
-                 i (get-lisp-obj-address bignum))
+  (sb-alien:alien-funcall
+   (sb-alien:extern-alien "printf" (function void system-area-pointer
+                                             unsigned unsigned))
+   (sb-sys:vector-sap #.(format nil "Element %d of bignum %p was never written~%"))
+   i (sb-kernel:get-lisp-obj-address bignum))
   (sb-vm:ldb-monitor)
   0)
 
@@ -176,28 +178,30 @@
   ;; and not egregious buffer overrun errors.
   (multiple-value-bind (word-index bit-index) (floor i sb-vm:n-word-bits)
     (with-bignum-shadow-bits (bit-base bignum)
-      (let ((sap (sap+ bit-base (* word-index sb-vm:n-word-bytes))))
-        (if (logbitp bit-index (sap-ref-word sap 0)) ; word was never assigned
+      (let ((sap (sb-sys:sap+ bit-base (* word-index sb-vm:n-word-bytes))))
+        (if (logbitp bit-index (sb-sys:sap-ref-word sap 0)) ; word was never assigned
             (truly-the sb-vm:word (bignum-ref-trap bignum i))
-            (sap-ref-word (int-sap (get-lisp-obj-address bignum))
+            (sap-ref-word (sb-sys:int-sap (sb-kernel:get-lisp-obj-address bignum))
                           (- (ash (+ i sb-vm:bignum-digits-offset) sb-vm:word-shift)
                              sb-vm:other-pointer-lowtag)))))))
 
 (defun aver-zeroed-from-index (bignum index)
   (with-pinned-objects (bignum)
-    (let* ((physical-start (sap+ (int-sap (get-lisp-obj-address bignum))
-                                 (- sb-vm:other-pointer-lowtag)))
+    (let* ((physical-start (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address bignum))
+                                        (- sb-vm:other-pointer-lowtag)))
            (physlen-bytes (ash (+ (* (%bignum-length bignum) 2) 2) sb-vm:word-shift))
-           (physical-end (sap+ physical-start physlen-bytes))
-           (word-ptr (sap+ physical-start (ash (1+ index) sb-vm:word-shift))))
+           (physical-end (sb-sys:sap+ physical-start physlen-bytes))
+           (word-ptr (sb-sys:sap+ physical-start (ash (1+ index) sb-vm:word-shift))))
       (loop while (sb-sys:sap< word-ptr physical-end)
-            do (unless (= (sap-ref-word word-ptr 0) 0)
-                 (alien-funcall (extern-alien "printf"
-                                              (function void system-area-pointer unsigned unsigned))
-                                (vector-sap #.(format nil "set-length %p,%d not properly zeroed~%"))
-                                (get-lisp-obj-address bignum) index)
+            do (unless (= (sb-sys:sap-ref-word word-ptr 0) 0)
+                 (sb-alien:alien-funcall
+                  (sb-alien:extern-alien "printf"
+                                         (function void sb-sys:system-area-pointer
+                                                   unsigned unsigned))
+                  (vector-sap #.(format nil "set-length %p,%d not properly zeroed~%"))
+                  (sb-kernel:get-lisp-obj-address bignum) index)
                  (sb-vm:ldb-monitor))
-               (setq word-ptr (sap+ word-ptr 8))))))
+               (setq word-ptr (sb-sys:sap+ word-ptr 8))))))
 )
 
 ;;; DO NOT ASSUME THAT LOW-LEVEL ALLOCATOR PREZEROES THE MEMORY
@@ -537,9 +541,10 @@
 (defmacro bignum-replace (dest src &key (start1 0) (end1 `(%bignum-length ,dest))
                                         (start2 0) (end2 `(%bignum-length ,src)))
   `(macrolet ((@ (obj index)
-                `(sap+ (int-sap (get-lisp-obj-address ,obj))
-                       (- (ash (+ ,index sb-vm:bignum-digits-offset) sb-vm:word-shift)
-                          sb-vm:other-pointer-lowtag))))
+                `(sb-sys:sap+
+                  (sb-sys:int-sap (sb-kernel:get-lisp-obj-address ,obj))
+                  (- (ash (+ ,index sb-vm:bignum-digits-offset) sb-vm:word-shift)
+                   sb-vm:other-pointer-lowtag))))
      (let ((count ,(if (and (eql start1 0) (eql start2 0))
                        `(min ,end1 ,end2)
                        `(min (- ,end1 ,start1) (- ,end2 ,start2)))))
@@ -549,12 +554,19 @@
              ((= count 1)
               (setf (%bignum-ref ,dest ,start1) (%bignum-ref ,src ,start2)))
              ((> count 0)
-              (with-alien ((replace (function system-area-pointer system-area-pointer
-                                     system-area-pointer sb-unix::size-t)
-                           :extern ,(if (eq dest src) "memmove" "memcpy")))
-                (with-pinned-objects (,dest ,src)
-                  (alien-funcall replace (@ ,dest ,start1) (@ ,src ,start2)
-                                 (ash count sb-vm:word-shift)))))))))
+              (sb-alien:with-alien ((replace
+                                     (function sb-alien:system-area-pointer
+                                               sb-alien:system-area-pointer
+                                               sb-alien:system-area-pointer
+                                               sb-unix::size-t)
+                                     :extern ,(if (eq dest src)
+                                                  "memmove"
+                                                  "memcpy")))
+                (sb-sys:with-pinned-objects (,dest ,src)
+                  (sb-alien:alien-funcall replace
+                                          (@ ,dest ,start1)
+                                          (@ ,src ,start2)
+                                          (ash count sb-vm:word-shift)))))))))
 #+bignum-assertions
 (progn
 (defmacro bignum-replace (dest src &key (start1 '0) (end1 `(%bignum-length ,dest))
@@ -1158,7 +1170,7 @@
     (multiple-value-bind (digits n-bits) (truncate x digit-size)
       (let* ((bignum-len (or bignum-len (%bignum-length bignum)))
              (res-len (+ digits bignum-len 1)))
-        (when (> res-len sb-kernel:maximum-bignum-length)
+        (when (> res-len maximum-bignum-length)
           (error "can't represent result of left shift"))
         (if (zerop n-bits)
           (bignum-ashift-left-digits bignum bignum-len digits)
@@ -1228,7 +1240,7 @@
                             (/= left-half 0)))
            (length (+ right-zero-digits
                       (if left-half-p 2 1))))
-      (when (> length sb-kernel:maximum-bignum-length)
+      (when (> length maximum-bignum-length)
         (error "can't represent result of left shift"))
       (let ((result (alloc-zeroing-below length right-zero-digits)))
         (setf (%bignum-ref result right-zero-digits) right-half)
@@ -1319,7 +1331,7 @@
                   (logandc2 (logand #xffffffff
                                     (%bignum-ref bits 1))
                             sb-vm:single-float-hidden-bit))))
-    (make-single-float
+    (sb-kernel:make-single-float
      (if plusp
          res
          (logior res (ash -1 sb-vm:float-sign-shift))))))
@@ -1335,14 +1347,14 @@
                              (64 (ash (%bignum-ref bits 1) -32)))
                            (ash sb-vm:double-float-hidden-bit -32))))
         (lo (logand #xffffffff (%bignum-ref bits 1))))
-    (make-double-float (if plusp
+    (sb-kernel:make-double-float (if plusp
                            hi
                            (logior hi (ash -1 sb-vm:float-sign-shift)))
                        lo)))
 #+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (make-long-float
+  (sb-kernel:make-long-float
    (if plusp
        exp
        (logior exp (ash 1 15)))
@@ -1432,8 +1444,8 @@
               ;; word-sized bignums shouldn't reach here
               (declare ((integer 2) bignum-length))
               (,(case type
-                  (single-float 'make-single-float)
-                  (double-float '%make-double-float))
+                  (single-float 'sb-kernel:make-single-float)
+                  (double-float 'sb-kernel:%make-double-float))
                (if (%bignum-0-or-plusp bignum bignum-length)
                    (let* ((length (truly-the bignum-length (bignum-buffer-integer-length bignum bignum-length)))
                           (shift (- length ,(const 'digits)))
@@ -2169,7 +2181,7 @@
                   rem))))))
 
 (macrolet ((def (type)
-             (let ((decode (symbolicate 'integer-decode- type)))
+             (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
                `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
                   (declare (inline ,decode))
                   (multiple-value-bind (bits exp sign) (,decode number)
@@ -2197,7 +2209,7 @@
   (def single-float))
 
 (macrolet ((def (type)
-             (let ((decode (symbolicate 'integer-decode- type)))
+             (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
                `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
                   (declare (inline ,decode))
                   (multiple-value-bind (bits exp sign) (,decode number)
@@ -2222,7 +2234,7 @@
 
 ;;; Needs to be synchronized with sxhash-bignum
 (macrolet ((def (type)
-             (let ((decode (symbolicate 'integer-decode- type)))
+             (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
                `(defun ,(symbolicate 'sxhash-bignum- type) (number)
                   #-sb-xc-host
                   (declare (inline ,decode))
