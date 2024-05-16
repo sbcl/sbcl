@@ -503,26 +503,38 @@
              ((= ,index-var (+ ,start-index (* n-entries words-per-dirent))))
            ,@body)))))
 
+#+win32
+(defun win32-binary-open (pathname)
+  (alien-funcall (extern-alien "_open" (function int c-string int &optional int))
+                 (native-namestring pathname)
+                 #x8000 ; _O_BINARY
+                 0))
+
 (defmacro with-mapped-core ((sap-var start npages stream) &body body)
-  `(let (,sap-var)
-     (unwind-protect
-          (progn
-            (setq ,sap-var
-                  (alien-funcall
-                   (extern-alien "load_core_bytes"
-                                 (function system-area-pointer
-                                           int int unsigned unsigned int))
-                   (sb-sys:fd-stream-fd ,stream)
-                   (+ ,start +backend-page-bytes+) ; Skip the core header
-                   0 ; place it anywhere
-                   (* ,npages +backend-page-bytes+) ; len
-                   0))
-            ,@body)
-       (when ,sap-var
-         (alien-funcall
-          (extern-alien "os_deallocate"
-                        (function void system-area-pointer unsigned))
-          ,sap-var (* ,npages +backend-page-bytes+))))))
+  (let ((fd (gensym "FD")))
+    `(let (,sap-var
+           (,fd #-win32 (sb-sys:fd-stream-fd ,stream)
+                ;; on Windows, FD-STREAM-FD is a HANDLE rather than an FD.
+                #+win32 (win32-binary-open (sb-int:file-name ,stream))))
+       (unwind-protect
+            (progn
+              (setq ,sap-var
+                    (alien-funcall
+                     (extern-alien "load_core_bytes"
+                                   (function system-area-pointer
+                                             int int unsigned unsigned int))
+                     ,fd
+                     (+ ,start +backend-page-bytes+)  ; Skip the core header
+                     0                                ; place it anywhere
+                     (* ,npages +backend-page-bytes+) ; len
+                     0))
+              ,@body)
+         #+win32 (sb-win32::crt-close ,fd)
+         (when ,sap-var
+           (alien-funcall
+            (extern-alien "os_deallocate"
+                          (function void system-area-pointer unsigned))
+            ,sap-var (* ,npages +backend-page-bytes+)))))))
 
 (defun core-header-nwords (core-header &aux (sum 2))
   ;; SUM starts as 2, as the core's magic number occupies 1 word

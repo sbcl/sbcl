@@ -839,7 +839,10 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
 
 void os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (len) gc_assert(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    if (len) {
+        gc_assert(addr);
+        gc_assert(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    }
 }
 
 /*
@@ -858,28 +861,38 @@ void os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
                       int is_readonly_space)
 {
-    os_commit_memory(addr, len);
+    if (addr) {
+        os_commit_memory(addr, len);
+    } else {
+        addr = VirtualAlloc(NULL, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        gc_assert(addr);
+    }
 #ifdef LISP_FEATURE_64_BIT
     os_vm_offset_t res = _lseeki64(fd, offset, SEEK_SET);
 #else
     os_vm_offset_t res = lseek(fd, offset, SEEK_SET);
 #endif
     gc_assert(res == offset);
-    size_t count;
+    int count;
 
     os_vm_address_t original_addr = addr;
     os_vm_size_t original_len = len;
     while (len) {
         unsigned to_read = len > INT_MAX ? INT_MAX : len;
         count = read(fd, addr, to_read);
+        if (count == -1) {
+            perror("read() failed"); fflush(stderr);
+        }
         addr += count;
         len -= count;
-        gc_assert(count == to_read);
+        gc_assert(count == (int) to_read);
     }
     DWORD old;
     if (is_readonly_space) VirtualProtect(original_addr, original_len, PAGE_READONLY, &old);
-    return (void*)0;
+
+    return original_addr;
 }
+
 static DWORD os_protect_modes[8] = {
     PAGE_NOACCESS,
     PAGE_READONLY,
