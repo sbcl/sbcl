@@ -37,7 +37,7 @@
   ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
   #-sb-thread `(raise ,signal)
   #+sb-thread
-  `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"
+  `(unless (= 0 (alien-funcall (extern-alien "sb_thread_kill"
                                              (function int unsigned int))
                                ,os-thread ,signal))
      (error "pthread_kill() failed")))
