@@ -37,10 +37,8 @@
 (macrolet ((defpackage-if-needed (name &body options)
              (unless (find-package name)
                `(defpackage ,name (:use) ,@options))))
-  (defpackage-if-needed "SB-INT")
   (defpackage-if-needed "SB-KERNEL")
   (defpackage-if-needed "SB-ALIEN")
-  (defpackage-if-needed "SB-EXT")
   (defpackage-if-needed "SB-SYS")
   (defpackage-if-needed "SB-DEBUG")
   (defpackage-if-needed "SB-FASL")
@@ -56,6 +54,939 @@
              "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
              "CORE-DEBUG-SOURCE-FORM"))
   (defpackage-if-needed "SB-DI"))
+
+(defpackage "SB-EXT"
+  (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")
+  (:use "CL")
+  (:export
+   ;; Information about how the program was invoked is
+   ;; nonstandard but very useful.
+   "*POSIX-ARGV*" "*CORE-PATHNAME*" "*RUNTIME-PATHNAME*"
+   "POSIX-GETENV" "POSIX-ENVIRON"
+
+   ;; Customizing initfile locations
+
+   "*USERINIT-PATHNAME-FUNCTION*"
+   "*SYSINIT-PATHNAME-FUNCTION*"
+
+   "*DEFAULT-EXTERNAL-FORMAT*"
+   "*DEFAULT-C-STRING-EXTERNAL-FORMAT*"
+
+   ;; Compare and Swap support
+
+   "CAS"
+   "COMPARE-AND-SWAP"
+   "GET-CAS-EXPANSION"
+
+   ;; Other atomic operations and types related to them
+
+   "ATOMIC-INCF"
+   "ATOMIC-DECF"
+   "ATOMIC-UPDATE"
+   "ATOMIC-PUSH"
+   "ATOMIC-POP"
+   "WORD"
+   "MOST-POSITIVE-WORD"
+
+   ;; Not an atomic operation, but should be used with them
+
+   "SPIN-LOOP-HINT"
+
+   ;; Waiting for arbitrary events.
+
+   "WAIT-FOR"
+
+   ;; Time related things
+
+   "CALL-WITH-TIMING"
+   "GET-TIME-OF-DAY"
+
+   ;; People have various good reasons to mess with the GC.
+
+   "HEAP-ALLOCATED-P"
+   "STACK-ALLOCATED-P"
+   "*AFTER-GC-HOOKS*"
+   "BYTES-CONSED-BETWEEN-GCS"
+   "GC" "GET-BYTES-CONSED"
+   "*GC-RUN-TIME*"
+   "*GC-REAL-TIME*"
+   "PURIFY"
+   "DYNAMIC-SPACE-SIZE"
+   ;; Gencgc only, but symbols exist for manual building
+   ;; convenience on all platforms.
+
+   "GENERATION-AVERAGE-AGE"
+   "GENERATION-BYTES-ALLOCATED"
+   "GENERATION-BYTES-CONSED-BETWEEN-GCS"
+   "GENERATION-MINIMUM-AGE-BEFORE-GC"
+   "GENERATION-NUMBER-OF-GCS"
+   "GENERATION-NUMBER-OF-GCS-BEFORE-PROMOTION"
+   "GC-LOGFILE"
+
+   ;; Stack allocation control
+
+   "*STACK-ALLOCATE-DYNAMIC-EXTENT*"
+
+   ;; Customizing printing of compiler and debugger messages
+
+   "*COMPILER-PRINT-VARIABLE-ALIST*"
+   "*DEBUG-PRINT-VARIABLE-ALIST*"
+   "COMPILE-FILE-LINE"
+   "COMPILE-FILE-POSITION"
+
+   ;; Hooks into init & save sequences
+
+   "*INIT-HOOKS*" "*SAVE-HOOKS*" "*EXIT-HOOKS*"
+   "*FORCIBLY-TERMINATE-THREADS-ON-EXIT*"
+
+   ;; Controlling exiting other threads.
+
+   "*EXIT-TIMEOUT*"
+
+   ;; There is no one right way to report progress on
+   ;; hairy compiles.
+
+   "*COMPILE-PROGRESS*"
+
+   ;; The default behavior for block compilation.
+
+   "*BLOCK-COMPILE-DEFAULT*"
+
+   ;; It can be handy to be able to evaluate expressions involving
+   ;; the thing under examination by CL:INSPECT.
+
+   "*INSPECTED*"
+
+   ;; There is no one right way to do efficiency notes.
+
+   "*EFFICIENCY-NOTE-COST-THRESHOLD*" "*EFFICIENCY-NOTE-LIMIT*"
+
+   ;; There's no one right way to report errors.
+
+   "*ENCLOSING-SOURCE-CUTOFF*"
+   "*UNDEFINED-WARNING-LIMIT*"
+
+   ;; and for dedicated users who really want to customize
+   ;; error reporting, we have
+
+   "DEFINE-SOURCE-CONTEXT"
+   "WITH-CURRENT-SOURCE-FORM"
+
+   ;; and given how many users dislike strict treatment of
+   ;; DEFCONSTANT, let's give them enough rope to escape by
+
+   "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
+   "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
+
+   ;; global lexicals, access to global symbol values
+
+   "DEFGLOBAL"
+   "DEFINE-LOAD-TIME-GLOBAL"
+   "SYMBOL-GLOBAL-VALUE"
+
+   "FILE-EXISTS"
+   "FILE-DOES-NOT-EXIST"
+   "DELETE-FILE-ERROR"
+   "SUPERSEDE"
+   "OVERWRITE"
+   "RENAME"
+   "CREATE"
+   "RETRY"
+
+   ;; package extensions
+   ;;
+   ;; locks
+
+   "PACKAGE-LOCKED-P"
+   "LOCK-PACKAGE"
+   "UNLOCK-PACKAGE"
+   "PACKAGE-IMPLEMENTED-BY-LIST"
+   "PACKAGE-IMPLEMENTS-LIST"
+   "ADD-IMPLEMENTATION-PACKAGE"
+   "REMOVE-IMPLEMENTATION-PACKAGE"
+   "WITH-UNLOCKED-PACKAGES"
+   "PACKAGE-LOCK-VIOLATION"
+   "PACKAGE-LOCKED-ERROR"
+   "SYMBOL-PACKAGE-LOCKED-ERROR"
+   "PACKAGE-LOCKED-ERROR-SYMBOL"
+   "WITHOUT-PACKAGE-LOCKS"
+   "DISABLE-PACKAGE-LOCKS"
+   "ENABLE-PACKAGE-LOCKS"
+   ;; local nicknames
+
+   "ADD-PACKAGE-LOCAL-NICKNAME"
+   "REMOVE-PACKAGE-LOCAL-NICKNAME"
+   "PACKAGE-LOCAL-NICKNAMES"
+   "PACKAGE-LOCALLY-NICKNAMED-BY-LIST"
+
+   "PACKAGE-DOES-NOT-EXIST" "READER-PACKAGE-DOES-NOT-EXIST"
+   ;; behaviour on DEFPACKAGE variance
+
+   "*ON-PACKAGE-VARIANCE*"
+
+   ;; Custom conditions & condition accessors for users to handle.
+
+   "CODE-DELETION-NOTE"
+   "COMPILER-NOTE"
+   "IMPLICIT-GENERIC-FUNCTION-NAME"
+   "IMPLICIT-GENERIC-FUNCTION-WARNING"
+   "INVALID-FASL"
+
+   "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
+   "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
+   "RESOLVE-CONFLICT"
+
+   ;; Deprecation stuff
+
+   "DEPRECATED"              ; declaration
+
+   "DEPRECATION-CONDITION"
+   "DEPRECATION-CONDITION-NAMESPACE"
+   "DEPRECATION-CONDITION-NAME"
+   "DEPRECATION-CONDITION-SOFTWARE"
+   "DEPRECATION-CONDITION-VERSION"
+   "DEPRECATION-CONDITION-REPLACEMENTS"
+   "DEPRECATION-CONDITION-RUNTIME-ERROR"
+   "EARLY-DEPRECATION-WARNING"
+   "LATE-DEPRECATION-WARNING"
+   "FINAL-DEPRECATION-WARNING"
+   "DEPRECATION-ERROR"       ; condition and function
+
+
+   "PRINT-UNREADABLY"
+
+   ;; Readtable normalization control
+
+   "READTABLE-BASE-CHAR-PREFERENCE"
+   "READTABLE-NORMALIZATION"
+
+   ;; and a mechanism for controlling same at compile time
+
+   "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
+
+   ;; and one for controlling same at runtime
+
+   "*MUFFLED-WARNINGS*"
+
+   ;; specification which print errors to ignore ala *break-on-signal*
+
+   "*SUPPRESS-PRINT-ERRORS*"
+
+   ;; extended declarations..
+
+   "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
+   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK"
+
+   ;; ..and variables to control compiler policy
+
+   "*INLINE-EXPANSION-LIMIT*"
+   "*DERIVE-FUNCTION-TYPES*"
+
+   ;; ..and inspector of compiler policy
+
+   "DESCRIBE-COMPILER-POLICY"
+   "RESTRICT-COMPILER-POLICY"
+   "SET-MACRO-POLICY"
+   "FOLD-IDENTICAL-CODE" ; this is a verb, not a compiler policy
+
+   ;; a special form for breaking out of our "declarations
+   ;; are assertions" default
+
+   "TRULY-THE"
+
+   ;; Misc. array and vector tools.
+
+   "ARRAY-STORAGE-VECTOR"
+   "PRIMITIVE-OBJECT-SIZE"
+
+   ;; This is something which must exist inside any Common
+   ;; Lisp implementation, and which someone writing a
+   ;; customized toplevel might well want. It seems perverse
+   ;; to hide it from them..
+
+   "INTERACTIVE-EVAL"
+
+   ;; Used by LOAD and EVAL-WHEN to pass toplevel indexes
+   ;; to compiler.
+
+   "EVAL-TLF"
+
+   ;; weak pointers and finalization
+
+   "CANCEL-FINALIZATION"
+   "FINALIZE"
+   "MAKE-WEAK-POINTER"
+   "WEAK-POINTER"
+   "WEAK-POINTER-P"
+   "WEAK-POINTER-VALUE"
+   "MAKE-WEAK-VECTOR"
+   "WEAK-VECTOR-P"
+   ;; todo: add WEAK-VECTOR-REF here once it's actually not the same as SVREF
+   ;; (currently WEAK-VECTOR-REF is in SB-INT:)
+
+   ;; Hash table extensions
+
+   "DEFINE-HASH-TABLE-TEST"
+   "HASH-TABLE-SYNCHRONIZED-P"
+   "HASH-TABLE-WEAKNESS"
+   "WITH-LOCKED-HASH-TABLE"
+
+   ;; If the user knows we're doing IEEE, he might reasonably
+   ;; want to do this stuff.
+
+   "FLOAT-DENORMALIZED-P"
+   "FLOAT-NAN-P" "FLOAT-TRAPPING-NAN-P"
+   "FLOAT-INFINITY-P"
+   "SHORT-FLOAT-NEGATIVE-INFINITY"
+   "SHORT-FLOAT-POSITIVE-INFINITY"
+   "SINGLE-FLOAT-NEGATIVE-INFINITY"
+   "SINGLE-FLOAT-POSITIVE-INFINITY"
+   "DOUBLE-FLOAT-NEGATIVE-INFINITY"
+   "DOUBLE-FLOAT-POSITIVE-INFINITY"
+   "LONG-FLOAT-NEGATIVE-INFINITY"
+   "LONG-FLOAT-POSITIVE-INFINITY"
+
+   ;; saving Lisp images
+
+   "SAVE-LISP-AND-DIE"
+
+   ;; provided for completeness to make it more convenient
+   ;; to use command-line --disable-debugger functionality
+   ;; in oddball situations (like building core files using
+   ;; scripts which run unattended, when the core files are
+   ;; intended for interactive use)
+
+   "DISABLE-DEBUGGER"
+   "ENABLE-DEBUGGER"
+
+   ;; the mechanism by which {en,dis}able-debugger works is
+   ;; also exported for people writing alternative toplevels
+   ;; (Emacs, CLIM interfaces, etc)
+
+   "*INVOKE-DEBUGGER-HOOK*"
+
+   ;; miscellaneous useful supported extensions
+
+   "QUIT" "EXIT"
+   "*ED-FUNCTIONS*"
+   "*MODULE-PROVIDER-FUNCTIONS*"
+   "MAP-DIRECTORY"
+   "WITH-TIMEOUT" "TIMEOUT"
+   "SEED-RANDOM-STATE"
+   "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
+   "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
+   "DELETE-DIRECTORY"
+   "SET-SBCL-SOURCE-LOCATION"
+   "*DISASSEMBLE-ANNOTATE*"
+   "PRINT-SYMBOL-WITH-PREFIX"
+   "*PRINT-VECTOR-LENGTH*"
+   "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
+   ;;"OBJECT-SIZE"
+
+   ;; stepping interface
+
+   "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
+   "STEP-VALUES-CONDITION"
+   "STEP-CONDITION-FORM" "STEP-CONDITION-RESULT"
+   "STEP-CONTINUE" "STEP-NEXT" "STEP-INTO"
+   "STEP-CONDITION-ARGS" "*STEPPER-HOOK*" "STEP-OUT"
+
+   ;; RUN-PROGRAM is not only useful for users, but also
+   ;; useful to implement parts of SBCL itself, so we're
+   ;; going to have to implement it anyway, so we might
+   ;; as well support it. And then once we're committed
+   ;; to implementing RUN-PROGRAM, it's nice to have it
+   ;; return a PROCESS object with operations defined on
+   ;; that object.
+
+   "RUN-PROGRAM"
+   "PROCESS-ALIVE-P" "PROCESS-CLOSE"
+   "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
+   "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
+   "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
+   "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
+
+   ;; pathnames
+
+   "NATIVE-PATHNAME"
+   "PARSE-NATIVE-NAMESTRING"
+   "NATIVE-NAMESTRING"
+
+   ;; external-format support
+
+   "OCTETS-TO-STRING" "STRING-TO-OCTETS"
+
+   ;; Whether to use the interpreter or the compiler for EVAL
+
+   "*EVALUATOR-MODE*"
+
+   ;; timer
+
+   "TIMER" "MAKE-TIMER" "TIMER-NAME" "TIMER-SCHEDULED-P"
+   "SCHEDULE-TIMER" "UNSCHEDULE-TIMER" "LIST-ALL-TIMERS"
+
+   ;; versioning utility
+
+   "ASSERT-VERSION->="
+   "UNKNOWN-KEYWORD-ARGUMENT"
+   "UNKNOWN-KEYWORD-ARGUMENT-NAME")
+  ;; SIMD pack
+  #+sb-simd-pack
+  (:export
+   "SIMD-PACK"
+   "SIMD-PACK-P"
+   "%MAKE-SIMD-PACK-UB32"
+   "%MAKE-SIMD-PACK-UB64"
+   "%MAKE-SIMD-PACK-DOUBLE"
+   "%MAKE-SIMD-PACK-SINGLE"
+   "%SIMD-PACK-UB8S"
+   "%SIMD-PACK-UB16S"
+   "%SIMD-PACK-UB32S"
+   "%SIMD-PACK-UB64S"
+   "%SIMD-PACK-SB8S"
+   "%SIMD-PACK-SB16S"
+   "%SIMD-PACK-SB32S"
+   "%SIMD-PACK-SB64S"
+   "%SIMD-PACK-DOUBLES"
+   "%SIMD-PACK-SINGLES")
+  #+sb-simd-pack-256
+  (:export
+   "SIMD-PACK-256"
+   "SIMD-PACK-256-P"
+   "%MAKE-SIMD-PACK-256-UB32"
+   "%MAKE-SIMD-PACK-256-UB64"
+   "%MAKE-SIMD-PACK-256-DOUBLE"
+   "%MAKE-SIMD-PACK-256-SINGLE"
+   "%SIMD-PACK-256-UB8S"
+   "%SIMD-PACK-256-UB16S"
+   "%SIMD-PACK-256-UB32S"
+   "%SIMD-PACK-256-UB64S"
+   "%SIMD-PACK-256-SB8S"
+   "%SIMD-PACK-256-SB16S"
+   "%SIMD-PACK-256-SB32S"
+   "%SIMD-PACK-256-SB64S"
+   "%SIMD-PACK-256-DOUBLES"
+   "%SIMD-PACK-256-SINGLES"))
+
+(defpackage "SB-INT"
+  (:documentation
+   "private: miscellaneous unsupported extensions to the ANSI spec. Much of
+the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
+possibly temporarily, because it might be used internally.")
+  (:use "CL")
+  (:export ;; lambda list keyword extensions
+   "&MORE"
+
+   ;; utilities for floating point zero handling
+
+   "FP-ZERO-P"
+
+   ;; Advice to the compiler that it doesn't need to assert types.
+
+   "EXPLICIT-CHECK"
+
+   "WITH-SYSTEM-MUTEX"
+   "HASH-TABLE-LOCK"
+
+   ;; generic set implementation backed by a list that upgrades
+   ;; to a hashtable if a certain size is exceeded.
+
+   "ADD-TO-XSET"
+   "ALLOC-XSET"
+   "MAP-XSET"
+   "XSET"
+   "XSET-COUNT"
+   "XSET-ELTS-HASH"
+   "XSET-EMPTY-P"
+   "XSET-EVERY"
+   "XSET-INTERSECTION"
+   "XSET-MEMBER-P"
+   "XSET-MEMBERS"
+   "XSET-SUBSET-P"
+   "XSET-UNION"
+   "XSET="
+
+   ;; sparse set implementation backed by a lightweight hashtable
+
+   "COPY-SSET"
+   "DO-SSET-ELEMENTS"
+   "MAKE-SSET"
+   "SSET" "SSET-ELEMENT"
+   "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
+   "SSET-MEMBER"
+
+   ;; key-only hash lookup which saves space over a hash-table
+   "MAKE-HASHSET" "HASHSET-INSERT" "HASHSET-REMOVE" "HASHSET-FIND"
+   "HASHSET-INSERT-IF-ABSENT" "HASHSET-COUNT"
+   "HASHSET-MUTEX" "MAP-HASHSET"
+   ;; useful for DX keys that should persist to the heap
+   "SYS-COPY-STRUCT"
+   "ENSURE-HEAP-LIST"
+
+   ;; communication between the runtime and Lisp
+
+   "*CORE-STRING*"
+
+   ;; INFO stuff doesn't belong in a user-visible package, we
+   ;; should be able to change it without apology.
+
+   "*INFO-ENVIRONMENT*"
+   "*RECOGNIZED-DECLARATIONS*"
+   "+INFOS-PER-WORD+"
+   "+FDEFN-INFO-NUM+"
+   "PACKED-INFO"
+   "+NIL-PACKED-INFOS+"
+   "ATOMIC-SET-INFO-VALUE"
+   "CALL-WITH-EACH-GLOBALDB-NAME"
+   "CLEAR-INFO"
+   "CLEAR-INFO-VALUES"
+   "DEFINE-INFO-TYPE"
+   "FIND-FDEFN"
+   "GET-INFO-VALUE-INITIALIZING"
+   "GLOBALDB-SXHASHOID"
+   "GLOBAL-FTYPE"
+   "INFO"
+   "INFO-FIND-AUX-KEY/PACKED"
+   "INFO-GETHASH"
+   "INFO-MAPHASH"
+   "INFO-NUMBER"
+   "INFO-NUMBER-BITS"
+   "PACKED-INFO-FDEFN"
+   "MAKE-INFO-HASHTABLE"
+   "META-INFO"
+   "META-INFO-NUMBER"
+   "PACKED-INFO-FIELD"
+   "PACKED-INFO-INSERT"
+   "PCL-METHODFN-NAME-P"
+   "SET-INFO-VALUE"
+   "SHOW-INFO"
+   "UPDATE-SYMBOL-INFO"
+   "WITH-GLOBALDB-NAME"
+   "%BOUNDP"
+
+   ;; Calling a list of hook functions, plus error handling.
+
+   "CALL-HOOKS"
+   ;; Constant form evaluation
+
+   "CONSTANT-FORM-VALUE"
+
+   ;; stepping control
+
+   "*STEPPING*"
+
+   ;; packages grabbed once and for all
+
+   "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
+
+   ;; hash mixing operations
+
+   "MIX" "MIXF" "WORD-MIX"
+   "MURMUR-HASH-WORD/FIXNUM"
+   "MURMUR-HASH-WORD/+FIXNUM"
+   "SYMBOL-NAME-HASH"
+
+   ;; Macroexpansion that doesn't touch special forms
+
+   "%MACROEXPAND"
+   "%MACROEXPAND-1"
+
+   "*SETF-COMPILER-MACRO-FUNCTION-HOOK*"
+   "*SETF-FDEFINITION-HOOK*"
+   "*SETF-MACRO-FUNCTION-HOOK*"
+
+   ;; error-reporting facilities
+
+   "ARGUMENTS-OUT-OF-DOMAIN-ERROR"
+   "CLOSED-STREAM-ERROR" "CLOSED-SAVED-STREAM-ERROR"
+   "COMPILED-PROGRAM-ERROR"
+   "COMPILER-MACRO-KEYWORD-PROBLEM"
+   "ENCAPSULATED-CONDITION"
+   "INVALID-ARRAY-ERROR"
+   "INVALID-ARRAY-INDEX-ERROR"
+   "INVALID-ARRAY-P"
+   "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
+   "SIMPLE-PARSE-ERROR"
+   "SIMPLE-PROGRAM-ERROR" "%PROGRAM-ERROR"
+   "SIMPLE-READER-ERROR"
+   "SIMPLE-READER-PACKAGE-ERROR"
+   "SIMPLE-REFERENCE-ERROR"
+   "SIMPLE-REFERENCE-WARNING"
+   "SIMPLE-STREAM-ERROR"
+   "SIMPLE-STORAGE-CONDITION"
+   "SIMPLE-STYLE-WARNING"
+   "STREAM-ERROR-POSITION-INFO"
+   "TRY-RESTART"
+
+   "BROKEN-PIPE"
+
+   ;; error-signalling facilities
+
+   "STANDARD-READTABLE-MODIFIED-ERROR"
+   "STANDARD-PPRINT-DISPATCH-TABLE-MODIFIED-ERROR"
+   "ARRAY-BOUNDING-INDICES-BAD-ERROR"
+   "CIRCULAR-LIST-ERROR"
+   "SEQUENCE-BOUNDING-INDICES-BAD-ERROR"
+   "SPECIAL-FORM-FUNCTION"
+   "STYLE-WARN" "SIMPLE-COMPILER-NOTE"
+   "TWO-ARG-CHAR-EQUAL" "TWO-ARG-CHAR-NOT-EQUAL"
+   "TWO-ARG-CHAR-LESSP" "TWO-ARG-CHAR-NOT-LESSP"
+   "TWO-ARG-CHAR-GREATERP" "TWO-ARG-CHAR-NOT-GREATERP"
+   "CHAR-CASE-INFO"
+
+   ;; FIXME: potential SB-EXT exports
+   "CHARACTER-CODING-ERROR"
+   "CHARACTER-DECODING-ERROR" "CHARACTER-DECODING-ERROR-OCTETS"
+   "CHARACTER-ENCODING-ERROR" "CHARACTER-ENCODING-ERROR-CODE"
+   "STREAM-DECODING-ERROR" "STREAM-ENCODING-ERROR"
+   "C-STRING-ENCODING-ERROR"
+   "C-STRING-DECODING-ERROR"
+   "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
+
+   ;; not potential SB-EXT exports
+   "GET-EXTERNAL-FORMAT" "GET-EXTERNAL-FORMAT-OR-LOSE"
+   "MAYBE-DEFAULTED-EXTERNAL-FORMAT"
+
+   ;; bootstrapping magic, to make things happen both in
+   ;; the cross-compilation host compiler's environment and
+   ;; in the cross-compiler's environment
+
+   "DEF!STRUCT" "DEF!TYPE"
+   "*!REMOVABLE-SYMBOLS*"
+
+   ;; bootstrapping macro whose effect is to delay until warm load.
+
+   "!SET-LOAD-FORM-METHOD"
+
+   ;; stuff for hinting to the compiler
+
+   "NAMED-DS-BIND"
+   "NAMED-LAMBDA"
+
+   ;; other variations on DEFFOO stuff useful for bootstrapping
+   ;; and cross-compiling
+
+   "DEFCONSTANT-EQX"
+   "DEFINE-UNSUPPORTED-FUN"
+
+   ;; messing with PATHNAMEs
+
+   "MAKE-TRIVIAL-DEFAULT-PATHNAME"
+   "MAKE-TRIVIAL-DEFAULT-LOGICAL-PATHNAME"
+   "PHYSICALIZE-PATHNAME"
+   "SANE-DEFAULT-PATHNAME-DEFAULTS"
+   "SBCL-HOMEDIR-PATHNAME"
+   "SIMPLIFY-NAMESTRING"
+
+   "*N-BYTES-FREED-OR-PURIFIED*"
+
+   ;; Deprecating stuff
+
+   "DEFINE-DEPRECATED-FUNCTION"
+   "DEFINE-DEPRECATED-VARIABLE"
+   "DEPRECATION-STATE"
+   "DEPRECATION-INFO" "MAKE-DEPRECATION-INFO"
+   "DEPRECATION-INFO-STATE"
+   "DEPRECATION-INFO-SOFTWARE"
+   "DEPRECATION-INFO-VERSION"
+   "DEPRECATION-INFO-REPLACEMENTS"
+   "PRINT-DEPRECATION-MESSAGE"
+   "CHECK-DEPRECATED-THING" "CHECK-DEPRECATED-TYPE"
+   "DEPRECATED-THING-P"
+   "DEPRECATION-WARN"
+   "LOADER-DEPRECATION-WARN"
+
+   ;; miscellaneous non-standard but handy user-level functions..
+
+   "ASSQ" "DELQ" "DELQ1" "MEMQ" "POSQ" "NEQ"
+   "ADJUST-LIST"
+   "ALIGN-UP"
+   "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
+   "SANE-PACKAGE"
+   "COALESCE-TREE-P"
+   "COMPOUND-OBJECT-P"
+   "SWAPPED-ARGS-FUN"
+   "AND/TYPE" "NOT/TYPE"
+   "ANY/TYPE" "EVERY/TYPE"
+   "LIST-ELTS-EQ"
+   "LIST-ELEMENTS-EQL"
+   "TYPE-BOUND-NUMBER" "COERCE-NUMERIC-BOUND"
+   "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
+   "PSXHASH"
+   "%BREAK"
+   "%SIMPLE-ERROR" "%SIMPLE-TYPE-ERROR"
+   "BIT-VECTOR-="
+   "PATHNAME="
+   "%HASH-TABLE-ALIST"
+   "HASH-TABLE-EQUALP"
+   "READ-EVALUATED-FORM" "READ-EVALUATED-FORM-OF-TYPE"
+   "PICK-BEST-SXHASH-BITS"
+
+   "MAKE-UNPRINTABLE-OBJECT"
+   "POSSIBLY-BASE-STRINGIZE" "POSSIBLY-BASE-STRINGIZE-TO-HEAP"
+   "POWER-OF-TWO-CEILING"
+   "PRINT-NOT-READABLE-ERROR"
+   "HASH-TABLE-REPLACE"
+   "HASH-CONS" "RECONS"
+   "SET-CLOSURE-NAME"
+
+   ;; ..and macros..
+
+   "COLLECT"
+   "COPY-LIST-MACRO"
+   "DO-ANONYMOUS" "DOVECTOR" "DOHASH" "DOPLIST"
+   "ENSURE-GETHASH"
+   "GET-SIMILAR"
+   "NAMED-LET"
+   "ONCE-ONLY"
+   "DEFENUM"
+   "DEFPRINTER"
+   "*PRINT-IR-NODES-PRETTY*"
+   "AVER"
+   "DX-FLET" "DX-LET"
+   "AWHEN" "ACOND" "IT"
+   "BINDING*" "EXTRACT-VAR-DECLS"
+   "!DEF-BOOLEAN-ATTRIBUTE"
+   "FUNARG-BIND/CALL-FORMS"
+   "QUASIQUOTE"
+   "COMMA-P"
+   "COMMA-EXPR"
+   "COMMA-KIND"
+   "UNQUOTE"
+   "PACKAGE-ITER-STEP"
+   "WITH-REBOUND-IO-SYNTAX"
+   "WITH-SANE-IO-SYNTAX"
+   "WITH-PROGRESSIVE-TIMEOUT"
+
+   ;; ..and CONDITIONs..
+
+   "BUG"
+   "UNSUPPORTED-OPERATOR"
+
+   "BOOTSTRAP-PACKAGE-NAME"
+   "BOOTSTRAP-PACKAGE-NOT-FOUND"
+   "DEBOOTSTRAP-PACKAGE"
+   "SYSTEM-PACKAGE-P"
+
+   "REFERENCE-CONDITION" "REFERENCE-CONDITION-REFERENCES"
+   "*PRINT-CONDITION-REFERENCES*"
+
+   "DUPLICATE-DEFINITION" "DUPLICATE-DEFINITION-NAME"
+   "SAME-FILE-REDEFINITION-WARNING"
+   "PACKAGE-AT-VARIANCE"
+   "PACKAGE-AT-VARIANCE-ERROR"
+   "ARRAY-INITIAL-ELEMENT-MISMATCH"
+   "INITIAL-ELEMENT-MISMATCH-STYLE-WARNING"
+   "TYPE-WARNING" "TYPE-STYLE-WARNING"
+   "SLOT-INITFORM-TYPE-STYLE-WARNING"
+   "LOCAL-ARGUMENT-MISMATCH"
+   "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
+   "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
+   "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
+
+   ;; ..and DEFTYPEs..
+
+   "HASH-CODE"
+   "INDEX" "LOAD/STORE-INDEX"
+   "SIGNED-BYTE-WITH-A-BITE-OUT"
+   "UNSIGNED-BYTE-WITH-A-BITE-OUT"
+   "SFUNCTION" "UNSIGNED-BYTE*"
+   "CONSTANT-DISPLACEMENT"
+   "EXTENDED-FUNCTION-DESIGNATOR"
+   "EXTENDED-FUNCTION-DESIGNATOR-P"
+   ;; ..and type predicates
+
+   "DOUBLE-FLOAT-P"
+   "LOGICAL-PATHNAME-P"
+   "LONG-FLOAT-P"
+   "SINGLE-FLOAT-P"
+   "FIXNUMP"
+   "BIGNUMP"
+   "RATIOP"
+   "UNBOUND-MARKER-P"
+
+   ;; encapsulation
+
+   "ENCAPSULATE" "ENCAPSULATED-P"
+   "UNENCAPSULATE"
+   "ENCAPSULATE-FUNOBJ"
+
+   ;; various CHAR-CODEs
+
+   "%CHAR-CODE"                 ; the type formerly known as CHAR-CODE
+   "BACKSPACE-CHAR-CODE" "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE"
+   "FORM-FEED-CHAR-CODE" "LINE-FEED-CHAR-CODE"
+   "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
+
+   ;; symbol-hacking idioms
+
+   "GENSYMIFY" "GENSYMIFY*" "KEYWORDICATE" "SYMBOLICATE"
+   "SYMBOLICATE!"
+   "INTERNED-SYMBOL-P" "PACKAGE-SYMBOLICATE"
+   "LOGICALLY-READONLYIZE"
+
+   ;; certainly doesn't belong in public extensions
+   ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
+
+   "CONSTANT-ARG"
+
+   ;; various internal defaults
+
+   "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
+
+   ;; hash caches
+
+   "DEFUN-CACHED"
+   "DROP-ALL-HASH-CACHES"
+
+   ;; time
+
+   "FORMAT-DECODED-TIME"
+   "FORMAT-UNIVERSAL-TIME"
+   "UNIX-TO-UNIVERSAL-TIME"
+
+   ;; used for FORMAT tilde paren
+
+   "MAKE-CASE-FROB-STREAM"
+
+   ;; helpers for C library calls
+
+   "STRERROR" "SIMPLE-PERROR"
+
+   ;; debuggers' little helpers
+
+   #+sb-show "*/SHOW*"
+   #+sb-show "HEXSTR"
+   "/SHOW"  "/NOSHOW"
+   "/SHOW0" "/NOSHOW0"
+
+   ;; cross-compilation bootstrap hacks which turn into
+   ;; placeholders in a target system
+
+   "UNCROSS"
+   "!UNCROSS-FORMAT-CONTROL"
+
+   ;; might as well be shared among the various files which
+   ;; need it:
+
+   "*EOF-OBJECT*"
+
+   ;; allocation to static space
+
+   "MAKE-STATIC-VECTOR"
+
+   ;; alien interface utilities
+
+   "C-STRINGS->STRING-LIST"
+   "NEWCHARSTAR-STRING"
+
+   ;; misc. utilities used internally
+
+   "ADDRESS-BASED-COUNTER-VAL"
+   "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB-EXT?
+
+   "LEGAL-VARIABLE-NAME-P"
+   "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
+   "LEGAL-CLASS-NAME-P"
+   "FUN-NAME-BLOCK-NAME"
+   "FUN-NAME-INLINE-EXPANSION"
+   "LISTEN-SKIP-WHITESPACE"
+   "PACKAGE-INTERNAL-SYMBOL-COUNT" "PACKAGE-EXTERNAL-SYMBOL-COUNT"
+   "PARSE-BODY" "PARSE-LAMBDA-LIST" "MAKE-LAMBDA-LIST"
+   "CHECK-DESIGNATOR"
+   "CHECK-LAMBDA-LIST-NAMES"
+   "LAMBDA-LIST-KEYWORD-MASK"
+   "PARSE-KEY-ARG-SPEC" "PARSE-OPTIONAL-ARG-SPEC"
+   "LL-KWDS-RESTP" "LL-KWDS-KEYP" "LL-KWDS-ALLOWP"
+   "MAKE-MACRO-LAMBDA"
+   "PROPER-LIST-OF-LENGTH-P" "PROPER-LIST-P"
+   "LIST-OF-LENGTH-AT-LEAST-P" "SEQUENCE-OF-LENGTH-AT-LEAST-P"
+   "SINGLETON-P" "ENSURE-LIST"
+   "MISSING-ARG"
+   "FEATUREP"
+   "FLUSH-STANDARD-OUTPUT-STREAMS"
+   "WITH-UNIQUE-NAMES" "MAKE-GENSYM-LIST"
+   "ABOUT-TO-MODIFY-SYMBOL-VALUE"
+   "SELF-EVALUATING-P"
+   "PRINT-PRETTY-ON-STREAM-P"
+   "ARRAY-READABLY-PRINTABLE-P"
+   "LOOKS-LIKE-NAME-OF-SPECIAL-VAR-P"
+   "POSITIVE-PRIMEP"
+   "EVAL-IN-LEXENV"
+   "SIMPLE-EVAL-IN-LEXENV"
+   "FORCE" "DELAY" "PROMISE-READY-P"
+   "FIND-RESTART-OR-CONTROL-ERROR"
+   "LOAD-AS-SOURCE"
+   "DESCRIPTOR-SAP"
+   "DO-PACKED-VARINTS"
+
+   "CLOSURE-EXTRA-VALUES"
+   "PACK-CLOSURE-EXTRA-VALUES"
+   "SET-CLOSURE-EXTRA-VALUES"
+   "+CLOSURE-NAME-INDEX+"
+   "WEAK-VECTOR"
+   "WEAK-VECTOR-LEN"
+   "WEAK-VECTOR-REF"
+
+   ;; These could be moved back into SB-EXT if someone has
+   ;; compelling reasons, but hopefully we can get by
+   ;; without supporting them, at least not as publicly
+   ;; accessible things with fixed interfaces.
+
+   "GET-FLOATING-POINT-MODES"
+   "SET-FLOATING-POINT-MODES"
+   "WITH-FLOAT-TRAPS-MASKED"
+
+   ;; a sort of quasi-unbound tag for use in hash tables
+
+   "+EMPTY-HT-SLOT+"
+
+   ;; low-level i/o stuff
+
+   "DONE-WITH-FAST-READ-CHAR"
+   "FAST-READ-BYTE"
+   "FAST-READ-BYTE-REFILL"
+   "FAST-READ-CHAR"
+   "FAST-READ-CHAR-REFILL"
+   "FAST-READ-S-INTEGER"
+   "FAST-READ-U-INTEGER"
+   "FAST-READ-VAR-U-INTEGER"
+   "FILE-NAME"
+   "FORM-TRACKING-STREAM"
+   "FORM-TRACKING-STREAM-OBSERVER"
+   "FORM-TRACKING-STREAM-P"
+   "FORM-TRACKING-STREAM-FORM-START-BYTE-POS"
+   "FORM-TRACKING-STREAM-FORM-START-CHAR-POS"
+   "LINE/COL-FROM-CHARPOS"
+   "%INTERN"
+   "WITH-FAST-READ-BYTE"
+   "PREPARE-FOR-FAST-READ-CHAR"
+   "OUT-STREAM-FROM-DESIGNATOR"
+   "STRINGIFY-OBJECT"
+   "%WRITE"
+
+   ;; hackery to help set up for cold init
+
+   "!BEGIN-COLLECTING-COLD-INIT-FORMS"
+   "!COLD-INIT-FORMS"
+   "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
+
+   ;; catch tags
+
+   "TOPLEVEL-CATCHER"
+
+   ;; hooks for contrib/ stuff we're insufficiently sure
+   ;; about to add to SB-EXT
+
+   "*REPL-PROMPT-FUN*"
+   "*REPL-READ-FORM-FUN*"
+
+   ;; Character database access
+
+   "MISC-INDEX"
+   "CLEAR-FLAG"
+
+   "BINARY-SEARCH"))
 
 (defpackage "SB-LOOP"
   (:documentation "private: implementation details of LOOP")
@@ -733,421 +1664,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            ;; Replaced by
 
            "MAP-BACKTRACE" "PRINT-BACKTRACE" "LIST-BACKTRACE"))
-
-(defpackage "SB-EXT"
-  (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")
-  (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-GRAY")
-  (:import-from "SB-VM" "WORD")
-  (:import-from "SB-DEBUG" "*DEBUG-PRINT-VARIABLE-ALIST*")
-  (:export
-   ;; Information about how the program was invoked is
-   ;; nonstandard but very useful.
-   "*POSIX-ARGV*" "*CORE-PATHNAME*" "*RUNTIME-PATHNAME*"
-   "POSIX-GETENV" "POSIX-ENVIRON"
-
-   ;; Customizing initfile locations
-
-   "*USERINIT-PATHNAME-FUNCTION*"
-   "*SYSINIT-PATHNAME-FUNCTION*"
-
-   "*DEFAULT-EXTERNAL-FORMAT*"
-   "*DEFAULT-C-STRING-EXTERNAL-FORMAT*"
-
-   ;; Compare and Swap support
-
-   "CAS"
-   "COMPARE-AND-SWAP"
-   "GET-CAS-EXPANSION"
-
-   ;; Other atomic operations and types related to them
-
-   "ATOMIC-INCF"
-   "ATOMIC-DECF"
-   "ATOMIC-UPDATE"
-   "ATOMIC-PUSH"
-   "ATOMIC-POP"
-   "WORD"
-   "MOST-POSITIVE-WORD"
-
-   ;; Not an atomic operation, but should be used with them
-
-   "SPIN-LOOP-HINT"
-
-   ;; Waiting for arbitrary events.
-
-   "WAIT-FOR"
-
-   ;; Time related things
-
-   "CALL-WITH-TIMING"
-   "GET-TIME-OF-DAY"
-
-   ;; People have various good reasons to mess with the GC.
-
-   "HEAP-ALLOCATED-P"
-   "STACK-ALLOCATED-P"
-   "*AFTER-GC-HOOKS*"
-   "BYTES-CONSED-BETWEEN-GCS"
-   "GC" "GET-BYTES-CONSED"
-   "*GC-RUN-TIME*"
-   "*GC-REAL-TIME*"
-   "PURIFY"
-   "DYNAMIC-SPACE-SIZE"
-   ;; Gencgc only, but symbols exist for manual building
-   ;; convenience on all platforms.
-
-   "GENERATION-AVERAGE-AGE"
-   "GENERATION-BYTES-ALLOCATED"
-   "GENERATION-BYTES-CONSED-BETWEEN-GCS"
-   "GENERATION-MINIMUM-AGE-BEFORE-GC"
-   "GENERATION-NUMBER-OF-GCS"
-   "GENERATION-NUMBER-OF-GCS-BEFORE-PROMOTION"
-   "GC-LOGFILE"
-
-   ;; Stack allocation control
-
-   "*STACK-ALLOCATE-DYNAMIC-EXTENT*"
-
-   ;; Customizing printing of compiler and debugger messages
-
-   "*COMPILER-PRINT-VARIABLE-ALIST*"
-   "*DEBUG-PRINT-VARIABLE-ALIST*"
-   "COMPILE-FILE-LINE"
-   "COMPILE-FILE-POSITION"
-
-   ;; Hooks into init & save sequences
-
-   "*INIT-HOOKS*" "*SAVE-HOOKS*" "*EXIT-HOOKS*"
-   "*FORCIBLY-TERMINATE-THREADS-ON-EXIT*"
-
-   ;; Controlling exiting other threads.
-
-   "*EXIT-TIMEOUT*"
-
-   ;; There is no one right way to report progress on
-   ;; hairy compiles.
-
-   "*COMPILE-PROGRESS*"
-
-   ;; The default behavior for block compilation.
-
-   "*BLOCK-COMPILE-DEFAULT*"
-
-   ;; It can be handy to be able to evaluate expressions involving
-   ;; the thing under examination by CL:INSPECT.
-
-   "*INSPECTED*"
-
-   ;; There is no one right way to do efficiency notes.
-
-   "*EFFICIENCY-NOTE-COST-THRESHOLD*" "*EFFICIENCY-NOTE-LIMIT*"
-
-   ;; There's no one right way to report errors.
-
-   "*ENCLOSING-SOURCE-CUTOFF*"
-   "*UNDEFINED-WARNING-LIMIT*"
-
-   ;; and for dedicated users who really want to customize
-   ;; error reporting, we have
-
-   "DEFINE-SOURCE-CONTEXT"
-   "WITH-CURRENT-SOURCE-FORM"
-
-   ;; and given how many users dislike strict treatment of
-   ;; DEFCONSTANT, let's give them enough rope to escape by
-
-   "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
-   "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
-
-   ;; global lexicals, access to global symbol values
-
-   "DEFGLOBAL"
-   "DEFINE-LOAD-TIME-GLOBAL"
-   "SYMBOL-GLOBAL-VALUE"
-
-   "FILE-EXISTS"
-   "FILE-DOES-NOT-EXIST"
-   "DELETE-FILE-ERROR"
-   "SUPERSEDE"
-   "OVERWRITE"
-   "RENAME"
-   "CREATE"
-   "RETRY"
-
-   ;; package extensions
-   ;;
-   ;; locks
-
-   "PACKAGE-LOCKED-P"
-   "LOCK-PACKAGE"
-   "UNLOCK-PACKAGE"
-   "PACKAGE-IMPLEMENTED-BY-LIST"
-   "PACKAGE-IMPLEMENTS-LIST"
-   "ADD-IMPLEMENTATION-PACKAGE"
-   "REMOVE-IMPLEMENTATION-PACKAGE"
-   "WITH-UNLOCKED-PACKAGES"
-   "PACKAGE-LOCK-VIOLATION"
-   "PACKAGE-LOCKED-ERROR"
-   "SYMBOL-PACKAGE-LOCKED-ERROR"
-   "PACKAGE-LOCKED-ERROR-SYMBOL"
-   "WITHOUT-PACKAGE-LOCKS"
-   "DISABLE-PACKAGE-LOCKS"
-   "ENABLE-PACKAGE-LOCKS"
-   ;; local nicknames
-
-   "ADD-PACKAGE-LOCAL-NICKNAME"
-   "REMOVE-PACKAGE-LOCAL-NICKNAME"
-   "PACKAGE-LOCAL-NICKNAMES"
-   "PACKAGE-LOCALLY-NICKNAMED-BY-LIST"
-
-   "PACKAGE-DOES-NOT-EXIST" "READER-PACKAGE-DOES-NOT-EXIST"
-   ;; behaviour on DEFPACKAGE variance
-
-   "*ON-PACKAGE-VARIANCE*"
-
-   ;; Custom conditions & condition accessors for users to handle.
-
-   "CODE-DELETION-NOTE"
-   "COMPILER-NOTE"
-   "IMPLICIT-GENERIC-FUNCTION-NAME"
-   "IMPLICIT-GENERIC-FUNCTION-WARNING"
-   "INVALID-FASL"
-
-   "NAME-CONFLICT" "NAME-CONFLICT-FUNCTION"
-   "NAME-CONFLICT-DATUM" "NAME-CONFLICT-SYMBOLS"
-   "RESOLVE-CONFLICT"
-
-   ;; Deprecation stuff
-
-   "DEPRECATED"              ; declaration
-
-   "DEPRECATION-CONDITION"
-   "DEPRECATION-CONDITION-NAMESPACE"
-   "DEPRECATION-CONDITION-NAME"
-   "DEPRECATION-CONDITION-SOFTWARE"
-   "DEPRECATION-CONDITION-VERSION"
-   "DEPRECATION-CONDITION-REPLACEMENTS"
-   "DEPRECATION-CONDITION-RUNTIME-ERROR"
-   "EARLY-DEPRECATION-WARNING"
-   "LATE-DEPRECATION-WARNING"
-   "FINAL-DEPRECATION-WARNING"
-   "DEPRECATION-ERROR"       ; condition and function
-
-
-   "PRINT-UNREADABLY"
-
-   ;; Readtable normalization control
-
-   "READTABLE-BASE-CHAR-PREFERENCE"
-   "READTABLE-NORMALIZATION"
-
-   ;; and a mechanism for controlling same at compile time
-
-   "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
-
-   ;; and one for controlling same at runtime
-
-   "*MUFFLED-WARNINGS*"
-
-   ;; specification which print errors to ignore ala *break-on-signal*
-
-   "*SUPPRESS-PRINT-ERRORS*"
-
-   ;; extended declarations..
-
-   "ALWAYS-BOUND" "FREEZE-TYPE" "GLOBAL" "INHIBIT-WARNINGS"
-   "MAYBE-INLINE" "START-BLOCK" "END-BLOCK"
-
-   ;; ..and variables to control compiler policy
-
-   "*INLINE-EXPANSION-LIMIT*"
-   "*DERIVE-FUNCTION-TYPES*"
-
-   ;; ..and inspector of compiler policy
-
-   "DESCRIBE-COMPILER-POLICY"
-   "RESTRICT-COMPILER-POLICY"
-   "SET-MACRO-POLICY"
-   "FOLD-IDENTICAL-CODE" ; this is a verb, not a compiler policy
-
-   ;; a special form for breaking out of our "declarations
-   ;; are assertions" default
-
-   "TRULY-THE"
-
-   ;; Misc. array and vector tools.
-
-   "ARRAY-STORAGE-VECTOR"
-   "PRIMITIVE-OBJECT-SIZE"
-
-   ;; This is something which must exist inside any Common
-   ;; Lisp implementation, and which someone writing a
-   ;; customized toplevel might well want. It seems perverse
-   ;; to hide it from them..
-
-   "INTERACTIVE-EVAL"
-
-   ;; Used by LOAD and EVAL-WHEN to pass toplevel indexes
-   ;; to compiler.
-
-   "EVAL-TLF"
-
-   ;; weak pointers and finalization
-
-   "CANCEL-FINALIZATION"
-   "FINALIZE"
-   "MAKE-WEAK-POINTER"
-   "WEAK-POINTER"
-   "WEAK-POINTER-P"
-   "WEAK-POINTER-VALUE"
-   "MAKE-WEAK-VECTOR"
-   "WEAK-VECTOR-P"
-   ;; todo: add WEAK-VECTOR-REF here once it's actually not the same as SVREF
-   ;; (currently WEAK-VECTOR-REF is in SB-INT:)
-
-   ;; Hash table extensions
-
-   "DEFINE-HASH-TABLE-TEST"
-   "HASH-TABLE-SYNCHRONIZED-P"
-   "HASH-TABLE-WEAKNESS"
-   "WITH-LOCKED-HASH-TABLE"
-
-   ;; If the user knows we're doing IEEE, he might reasonably
-   ;; want to do this stuff.
-
-   "FLOAT-DENORMALIZED-P"
-   "FLOAT-NAN-P" "FLOAT-TRAPPING-NAN-P"
-   "FLOAT-INFINITY-P"
-   "SHORT-FLOAT-NEGATIVE-INFINITY"
-   "SHORT-FLOAT-POSITIVE-INFINITY"
-   "SINGLE-FLOAT-NEGATIVE-INFINITY"
-   "SINGLE-FLOAT-POSITIVE-INFINITY"
-   "DOUBLE-FLOAT-NEGATIVE-INFINITY"
-   "DOUBLE-FLOAT-POSITIVE-INFINITY"
-   "LONG-FLOAT-NEGATIVE-INFINITY"
-   "LONG-FLOAT-POSITIVE-INFINITY"
-
-   ;; saving Lisp images
-
-   "SAVE-LISP-AND-DIE"
-
-   ;; provided for completeness to make it more convenient
-   ;; to use command-line --disable-debugger functionality
-   ;; in oddball situations (like building core files using
-   ;; scripts which run unattended, when the core files are
-   ;; intended for interactive use)
-
-   "DISABLE-DEBUGGER"
-   "ENABLE-DEBUGGER"
-
-   ;; the mechanism by which {en,dis}able-debugger works is
-   ;; also exported for people writing alternative toplevels
-   ;; (Emacs, CLIM interfaces, etc)
-
-   "*INVOKE-DEBUGGER-HOOK*"
-
-   ;; miscellaneous useful supported extensions
-
-   "QUIT" "EXIT"
-   "*ED-FUNCTIONS*"
-   "*MODULE-PROVIDER-FUNCTIONS*"
-   "MAP-DIRECTORY"
-   "WITH-TIMEOUT" "TIMEOUT"
-   "SEED-RANDOM-STATE"
-   "TYPEXPAND-1" "TYPEXPAND" "TYPEXPAND-ALL"
-   "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
-   "DELETE-DIRECTORY"
-   "SET-SBCL-SOURCE-LOCATION"
-   "*DISASSEMBLE-ANNOTATE*"
-   "PRINT-SYMBOL-WITH-PREFIX"
-   "*PRINT-VECTOR-LENGTH*"
-   "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
-   ;;"OBJECT-SIZE"
-
-   ;; stepping interface
-
-   "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
-   "STEP-VALUES-CONDITION"
-   "STEP-CONDITION-FORM" "STEP-CONDITION-RESULT"
-   "STEP-CONTINUE" "STEP-NEXT" "STEP-INTO"
-   "STEP-CONDITION-ARGS" "*STEPPER-HOOK*" "STEP-OUT"
-
-   ;; RUN-PROGRAM is not only useful for users, but also
-   ;; useful to implement parts of SBCL itself, so we're
-   ;; going to have to implement it anyway, so we might
-   ;; as well support it. And then once we're committed
-   ;; to implementing RUN-PROGRAM, it's nice to have it
-   ;; return a PROCESS object with operations defined on
-   ;; that object.
-
-   "RUN-PROGRAM"
-   "PROCESS-ALIVE-P" "PROCESS-CLOSE"
-   "PROCESS-CORE-DUMPED" "PROCESS-ERROR" "PROCESS-EXIT-CODE"
-   "PROCESS-INPUT" "PROCESS-KILL" "PROCESS-OUTPUT" "PROCESS-P"
-   "PROCESS-PID" "PROCESS-PLIST" "PROCESS-PTY" "PROCESS-STATUS"
-   "PROCESS-STATUS-HOOK" "PROCESS-WAIT"
-
-   ;; pathnames
-
-   "NATIVE-PATHNAME"
-   "PARSE-NATIVE-NAMESTRING"
-   "NATIVE-NAMESTRING"
-
-   ;; external-format support
-
-   "OCTETS-TO-STRING" "STRING-TO-OCTETS"
-
-   ;; Whether to use the interpreter or the compiler for EVAL
-
-   "*EVALUATOR-MODE*"
-
-   ;; timer
-
-   "TIMER" "MAKE-TIMER" "TIMER-NAME" "TIMER-SCHEDULED-P"
-   "SCHEDULE-TIMER" "UNSCHEDULE-TIMER" "LIST-ALL-TIMERS"
-
-   ;; versioning utility
-
-   "ASSERT-VERSION->="
-   "UNKNOWN-KEYWORD-ARGUMENT"
-   "UNKNOWN-KEYWORD-ARGUMENT-NAME")
-  ;; SIMD pack
-  #+sb-simd-pack
-  (:export
-   "SIMD-PACK"
-   "SIMD-PACK-P"
-   "%MAKE-SIMD-PACK-UB32"
-   "%MAKE-SIMD-PACK-UB64"
-   "%MAKE-SIMD-PACK-DOUBLE"
-   "%MAKE-SIMD-PACK-SINGLE"
-   "%SIMD-PACK-UB8S"
-   "%SIMD-PACK-UB16S"
-   "%SIMD-PACK-UB32S"
-   "%SIMD-PACK-UB64S"
-   "%SIMD-PACK-SB8S"
-   "%SIMD-PACK-SB16S"
-   "%SIMD-PACK-SB32S"
-   "%SIMD-PACK-SB64S"
-   "%SIMD-PACK-DOUBLES"
-   "%SIMD-PACK-SINGLES")
-  #+sb-simd-pack-256
-  (:export
-   "SIMD-PACK-256"
-   "SIMD-PACK-256-P"
-   "%MAKE-SIMD-PACK-256-UB32"
-   "%MAKE-SIMD-PACK-256-UB64"
-   "%MAKE-SIMD-PACK-256-DOUBLE"
-   "%MAKE-SIMD-PACK-256-SINGLE"
-   "%SIMD-PACK-256-UB8S"
-   "%SIMD-PACK-256-UB16S"
-   "%SIMD-PACK-256-UB32S"
-   "%SIMD-PACK-256-UB64S"
-   "%SIMD-PACK-256-SB8S"
-   "%SIMD-PACK-256-SB16S"
-   "%SIMD-PACK-256-SB32S"
-   "%SIMD-PACK-256-SB64S"
-   "%SIMD-PACK-256-DOUBLES"
-   "%SIMD-PACK-256-SINGLES"))
 
 (defpackage "SB-DI"
   (:documentation "private: primitives used to write debuggers")
@@ -2925,526 +3441,6 @@ Lisp extension proposal by David N. Gray")
            "STREAM-UNREAD-CHAR"
            "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-SEQUENCE"
            "STREAM-WRITE-STRING"))
-
-(defpackage "SB-INT"
-  (:documentation
-   "private: miscellaneous unsupported extensions to the ANSI spec. Much of
-the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
-possibly temporarily, because it might be used internally.")
-  (:use "CL" "SB-ALIEN" "SB-GRAY" "SB-FASL" "SB-SYS")
-  (:export ;; lambda list keyword extensions
-           "&MORE"
-
-            ;; utilities for floating point zero handling
-
-           "FP-ZERO-P"
-
-            ;; Advice to the compiler that it doesn't need to assert types.
-
-           "EXPLICIT-CHECK"
-
-           "WITH-SYSTEM-MUTEX"
-           "HASH-TABLE-LOCK"
-
-            ;; generic set implementation backed by a list that upgrades
-            ;; to a hashtable if a certain size is exceeded.
-
-           "ADD-TO-XSET"
-           "ALLOC-XSET"
-           "MAP-XSET"
-           "XSET"
-           "XSET-COUNT"
-           "XSET-ELTS-HASH"
-           "XSET-EMPTY-P"
-           "XSET-EVERY"
-           "XSET-INTERSECTION"
-           "XSET-MEMBER-P"
-           "XSET-MEMBERS"
-           "XSET-SUBSET-P"
-           "XSET-UNION"
-           "XSET="
-
-            ;; sparse set implementation backed by a lightweight hashtable
-
-           "COPY-SSET"
-           "DO-SSET-ELEMENTS"
-           "MAKE-SSET"
-           "SSET" "SSET-ELEMENT"
-           "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
-           "SSET-MEMBER"
-
-           ;; key-only hash lookup which saves space over a hash-table
-           "MAKE-HASHSET" "HASHSET-INSERT" "HASHSET-REMOVE" "HASHSET-FIND"
-           "HASHSET-INSERT-IF-ABSENT" "HASHSET-COUNT"
-           "HASHSET-MUTEX" "MAP-HASHSET"
-           ;; useful for DX keys that should persist to the heap
-           "SYS-COPY-STRUCT"
-           "ENSURE-HEAP-LIST"
-
-            ;; communication between the runtime and Lisp
-
-           "*CORE-STRING*"
-
-            ;; INFO stuff doesn't belong in a user-visible package, we
-            ;; should be able to change it without apology.
-
-           "*INFO-ENVIRONMENT*"
-           "*RECOGNIZED-DECLARATIONS*"
-           "+INFOS-PER-WORD+"
-           "+FDEFN-INFO-NUM+"
-           "PACKED-INFO"
-           "+NIL-PACKED-INFOS+"
-           "ATOMIC-SET-INFO-VALUE"
-           "CALL-WITH-EACH-GLOBALDB-NAME"
-           "CLEAR-INFO"
-           "CLEAR-INFO-VALUES"
-           "DEFINE-INFO-TYPE"
-           "FIND-FDEFN"
-           "GET-INFO-VALUE-INITIALIZING"
-           "GLOBALDB-SXHASHOID"
-           "GLOBAL-FTYPE"
-           "INFO"
-           "INFO-FIND-AUX-KEY/PACKED"
-           "INFO-GETHASH"
-           "INFO-MAPHASH"
-           "INFO-NUMBER"
-           "INFO-NUMBER-BITS"
-           "PACKED-INFO-FDEFN"
-           "MAKE-INFO-HASHTABLE"
-           "META-INFO"
-           "META-INFO-NUMBER"
-           "PACKED-INFO-FIELD"
-           "PACKED-INFO-INSERT"
-           "PCL-METHODFN-NAME-P"
-           "SET-INFO-VALUE"
-           "SHOW-INFO"
-           "UPDATE-SYMBOL-INFO"
-           "WITH-GLOBALDB-NAME"
-           "%BOUNDP"
-
-            ;; Calling a list of hook functions, plus error handling.
-
-           "CALL-HOOKS"
-            ;; Constant form evaluation
-
-           "CONSTANT-FORM-VALUE"
-
-            ;; stepping control
-
-           "*STEPPING*"
-
-            ;; packages grabbed once and for all
-
-           "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
-
-            ;; hash mixing operations
-
-           "MIX" "MIXF" "WORD-MIX"
-           "MURMUR-HASH-WORD/FIXNUM"
-           "MURMUR-HASH-WORD/+FIXNUM"
-           "SYMBOL-NAME-HASH"
-
-            ;; Macroexpansion that doesn't touch special forms
-
-           "%MACROEXPAND"
-           "%MACROEXPAND-1"
-
-           "*SETF-COMPILER-MACRO-FUNCTION-HOOK*"
-           "*SETF-FDEFINITION-HOOK*"
-           "*SETF-MACRO-FUNCTION-HOOK*"
-
-            ;; error-reporting facilities
-
-           "ARGUMENTS-OUT-OF-DOMAIN-ERROR"
-           "CLOSED-STREAM-ERROR" "CLOSED-SAVED-STREAM-ERROR"
-           "COMPILED-PROGRAM-ERROR"
-           "COMPILER-MACRO-KEYWORD-PROBLEM"
-           "ENCAPSULATED-CONDITION"
-           "INVALID-ARRAY-ERROR"
-           "INVALID-ARRAY-INDEX-ERROR"
-           "INVALID-ARRAY-P"
-           "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
-           "SIMPLE-PARSE-ERROR"
-           "SIMPLE-PROGRAM-ERROR" "%PROGRAM-ERROR"
-           "SIMPLE-READER-ERROR"
-           "SIMPLE-READER-PACKAGE-ERROR"
-           "SIMPLE-REFERENCE-ERROR"
-           "SIMPLE-REFERENCE-WARNING"
-           "SIMPLE-STREAM-ERROR"
-           "SIMPLE-STORAGE-CONDITION"
-           "SIMPLE-STYLE-WARNING"
-           "STREAM-ERROR-POSITION-INFO"
-           "TRY-RESTART"
-
-           "BROKEN-PIPE"
-
-            ;; error-signalling facilities
-
-           "STANDARD-READTABLE-MODIFIED-ERROR"
-           "STANDARD-PPRINT-DISPATCH-TABLE-MODIFIED-ERROR"
-           "ARRAY-BOUNDING-INDICES-BAD-ERROR"
-           "CIRCULAR-LIST-ERROR"
-           "SEQUENCE-BOUNDING-INDICES-BAD-ERROR"
-           "SPECIAL-FORM-FUNCTION"
-           "STYLE-WARN" "SIMPLE-COMPILER-NOTE"
-           "TWO-ARG-CHAR-EQUAL" "TWO-ARG-CHAR-NOT-EQUAL"
-           "TWO-ARG-CHAR-LESSP" "TWO-ARG-CHAR-NOT-LESSP"
-           "TWO-ARG-CHAR-GREATERP" "TWO-ARG-CHAR-NOT-GREATERP"
-           "CHAR-CASE-INFO"
-
-           ;; FIXME: potential SB-EXT exports
-           "CHARACTER-CODING-ERROR"
-           "CHARACTER-DECODING-ERROR" "CHARACTER-DECODING-ERROR-OCTETS"
-           "CHARACTER-ENCODING-ERROR" "CHARACTER-ENCODING-ERROR-CODE"
-           "STREAM-DECODING-ERROR" "STREAM-ENCODING-ERROR"
-           "C-STRING-ENCODING-ERROR"
-           "C-STRING-DECODING-ERROR"
-           "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
-
-           ;; not potential SB-EXT exports
-           "GET-EXTERNAL-FORMAT" "GET-EXTERNAL-FORMAT-OR-LOSE"
-           "MAYBE-DEFAULTED-EXTERNAL-FORMAT"
-
-            ;; bootstrapping magic, to make things happen both in
-            ;; the cross-compilation host compiler's environment and
-            ;; in the cross-compiler's environment
-
-           "DEF!STRUCT" "DEF!TYPE"
-           "*!REMOVABLE-SYMBOLS*"
-
-            ;; bootstrapping macro whose effect is to delay until warm load.
-
-           "!SET-LOAD-FORM-METHOD"
-
-            ;; stuff for hinting to the compiler
-
-           "NAMED-DS-BIND"
-           "NAMED-LAMBDA"
-
-            ;; other variations on DEFFOO stuff useful for bootstrapping
-            ;; and cross-compiling
-
-           "DEFCONSTANT-EQX"
-           "DEFINE-UNSUPPORTED-FUN"
-
-            ;; messing with PATHNAMEs
-
-           "MAKE-TRIVIAL-DEFAULT-PATHNAME"
-           "MAKE-TRIVIAL-DEFAULT-LOGICAL-PATHNAME"
-           "PHYSICALIZE-PATHNAME"
-           "SANE-DEFAULT-PATHNAME-DEFAULTS"
-           "SBCL-HOMEDIR-PATHNAME"
-           "SIMPLIFY-NAMESTRING"
-
-           "*N-BYTES-FREED-OR-PURIFIED*"
-
-            ;; Deprecating stuff
-
-           "DEFINE-DEPRECATED-FUNCTION"
-           "DEFINE-DEPRECATED-VARIABLE"
-           "DEPRECATION-STATE"
-           "DEPRECATION-INFO" "MAKE-DEPRECATION-INFO"
-           "DEPRECATION-INFO-STATE"
-           "DEPRECATION-INFO-SOFTWARE"
-           "DEPRECATION-INFO-VERSION"
-           "DEPRECATION-INFO-REPLACEMENTS"
-           "PRINT-DEPRECATION-MESSAGE"
-           "CHECK-DEPRECATED-THING" "CHECK-DEPRECATED-TYPE"
-           "DEPRECATED-THING-P"
-           "DEPRECATION-WARN"
-           "LOADER-DEPRECATION-WARN"
-
-            ;; miscellaneous non-standard but handy user-level functions..
-
-           "ASSQ" "DELQ" "DELQ1" "MEMQ" "POSQ" "NEQ"
-           "ADJUST-LIST"
-           "ALIGN-UP"
-           "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
-           "SANE-PACKAGE"
-           "COALESCE-TREE-P"
-           "COMPOUND-OBJECT-P"
-           "SWAPPED-ARGS-FUN"
-           "AND/TYPE" "NOT/TYPE"
-           "ANY/TYPE" "EVERY/TYPE"
-           "LIST-ELTS-EQ"
-           "LIST-ELEMENTS-EQL"
-           "TYPE-BOUND-NUMBER" "COERCE-NUMERIC-BOUND"
-           "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
-           "PSXHASH"
-           "%BREAK"
-           "%SIMPLE-ERROR" "%SIMPLE-TYPE-ERROR"
-           "BIT-VECTOR-="
-           "PATHNAME="
-           "%HASH-TABLE-ALIST"
-           "HASH-TABLE-EQUALP"
-           "READ-EVALUATED-FORM" "READ-EVALUATED-FORM-OF-TYPE"
-           "PICK-BEST-SXHASH-BITS"
-
-           "MAKE-UNPRINTABLE-OBJECT"
-           "POSSIBLY-BASE-STRINGIZE" "POSSIBLY-BASE-STRINGIZE-TO-HEAP"
-           "POWER-OF-TWO-CEILING"
-           "PRINT-NOT-READABLE-ERROR"
-           "HASH-TABLE-REPLACE"
-           "HASH-CONS" "RECONS"
-           "SET-CLOSURE-NAME"
-
-            ;; ..and macros..
-
-           "COLLECT"
-           "COPY-LIST-MACRO"
-           "DO-ANONYMOUS" "DOVECTOR" "DOHASH" "DOPLIST"
-           "ENSURE-GETHASH"
-           "GET-SIMILAR"
-           "NAMED-LET"
-           "ONCE-ONLY"
-           "DEFENUM"
-           "DEFPRINTER"
-           "*PRINT-IR-NODES-PRETTY*"
-           "AVER"
-           "DX-FLET" "DX-LET"
-           "AWHEN" "ACOND" "IT"
-           "BINDING*" "EXTRACT-VAR-DECLS"
-           "!DEF-BOOLEAN-ATTRIBUTE"
-           "FUNARG-BIND/CALL-FORMS"
-           "QUASIQUOTE"
-           "COMMA-P"
-           "COMMA-EXPR"
-           "COMMA-KIND"
-           "UNQUOTE"
-           "PACKAGE-ITER-STEP"
-           "WITH-REBOUND-IO-SYNTAX"
-           "WITH-SANE-IO-SYNTAX"
-           "WITH-PROGRESSIVE-TIMEOUT"
-
-            ;; ..and CONDITIONs..
-
-           "BUG"
-           "UNSUPPORTED-OPERATOR"
-
-           "BOOTSTRAP-PACKAGE-NAME"
-           "BOOTSTRAP-PACKAGE-NOT-FOUND"
-           "DEBOOTSTRAP-PACKAGE"
-           "SYSTEM-PACKAGE-P"
-
-           "REFERENCE-CONDITION" "REFERENCE-CONDITION-REFERENCES"
-           "*PRINT-CONDITION-REFERENCES*"
-
-           "DUPLICATE-DEFINITION" "DUPLICATE-DEFINITION-NAME"
-           "SAME-FILE-REDEFINITION-WARNING"
-           "PACKAGE-AT-VARIANCE"
-           "PACKAGE-AT-VARIANCE-ERROR"
-           "ARRAY-INITIAL-ELEMENT-MISMATCH"
-           "INITIAL-ELEMENT-MISMATCH-STYLE-WARNING"
-           "TYPE-WARNING" "TYPE-STYLE-WARNING"
-           "SLOT-INITFORM-TYPE-STYLE-WARNING"
-           "LOCAL-ARGUMENT-MISMATCH"
-           "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
-           "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
-           "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
-
-            ;; ..and DEFTYPEs..
-
-           "HASH-CODE"
-           "INDEX" "LOAD/STORE-INDEX"
-           "SIGNED-BYTE-WITH-A-BITE-OUT"
-           "UNSIGNED-BYTE-WITH-A-BITE-OUT"
-           "SFUNCTION" "UNSIGNED-BYTE*"
-           "CONSTANT-DISPLACEMENT"
-           "EXTENDED-FUNCTION-DESIGNATOR"
-           "EXTENDED-FUNCTION-DESIGNATOR-P"
-            ;; ..and type predicates
-
-           "DOUBLE-FLOAT-P"
-           "LOGICAL-PATHNAME-P"
-           "LONG-FLOAT-P"
-           "SINGLE-FLOAT-P"
-           "FIXNUMP"
-           "BIGNUMP"
-           "RATIOP"
-           "UNBOUND-MARKER-P"
-
-            ;; encapsulation
-
-           "ENCAPSULATE" "ENCAPSULATED-P"
-           "UNENCAPSULATE"
-           "ENCAPSULATE-FUNOBJ"
-
-            ;; various CHAR-CODEs
-
-           "%CHAR-CODE" ; the type formerly known as CHAR-CODE
-           "BACKSPACE-CHAR-CODE" "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE"
-           "FORM-FEED-CHAR-CODE" "LINE-FEED-CHAR-CODE"
-           "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
-
-            ;; symbol-hacking idioms
-
-           "GENSYMIFY" "GENSYMIFY*" "KEYWORDICATE" "SYMBOLICATE"
-           "SYMBOLICATE!"
-           "INTERNED-SYMBOL-P" "PACKAGE-SYMBOLICATE"
-           "LOGICALLY-READONLYIZE"
-
-            ;; certainly doesn't belong in public extensions
-            ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
-
-           "CONSTANT-ARG"
-
-            ;; various internal defaults
-
-           "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
-
-            ;; hash caches
-
-           "DEFUN-CACHED"
-           "DROP-ALL-HASH-CACHES"
-
-            ;; time
-
-           "FORMAT-DECODED-TIME"
-           "FORMAT-UNIVERSAL-TIME"
-           "UNIX-TO-UNIVERSAL-TIME"
-
-            ;; used for FORMAT tilde paren
-
-           "MAKE-CASE-FROB-STREAM"
-
-            ;; helpers for C library calls
-
-           "STRERROR" "SIMPLE-PERROR"
-
-            ;; debuggers' little helpers
-
-           #+sb-show "*/SHOW*"
-           #+sb-show "HEXSTR"
-           "/SHOW"  "/NOSHOW"
-           "/SHOW0" "/NOSHOW0"
-
-            ;; cross-compilation bootstrap hacks which turn into
-            ;; placeholders in a target system
-
-           "UNCROSS"
-           "!UNCROSS-FORMAT-CONTROL"
-
-            ;; might as well be shared among the various files which
-            ;; need it:
-
-           "*EOF-OBJECT*"
-
-            ;; allocation to static space
-
-           "MAKE-STATIC-VECTOR"
-
-            ;; alien interface utilities
-
-           "C-STRINGS->STRING-LIST"
-           "NEWCHARSTAR-STRING"
-
-            ;; misc. utilities used internally
-
-           "ADDRESS-BASED-COUNTER-VAL"
-           "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB-EXT?
-
-           "LEGAL-VARIABLE-NAME-P"
-           "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
-           "LEGAL-CLASS-NAME-P"
-           "FUN-NAME-BLOCK-NAME"
-           "FUN-NAME-INLINE-EXPANSION"
-           "LISTEN-SKIP-WHITESPACE"
-           "PACKAGE-INTERNAL-SYMBOL-COUNT" "PACKAGE-EXTERNAL-SYMBOL-COUNT"
-           "PARSE-BODY" "PARSE-LAMBDA-LIST" "MAKE-LAMBDA-LIST"
-           "CHECK-DESIGNATOR"
-           "CHECK-LAMBDA-LIST-NAMES"
-           "LAMBDA-LIST-KEYWORD-MASK"
-           "PARSE-KEY-ARG-SPEC" "PARSE-OPTIONAL-ARG-SPEC"
-           "LL-KWDS-RESTP" "LL-KWDS-KEYP" "LL-KWDS-ALLOWP"
-           "MAKE-MACRO-LAMBDA"
-           "PROPER-LIST-OF-LENGTH-P" "PROPER-LIST-P"
-           "LIST-OF-LENGTH-AT-LEAST-P" "SEQUENCE-OF-LENGTH-AT-LEAST-P"
-           "SINGLETON-P" "ENSURE-LIST"
-           "MISSING-ARG"
-           "FEATUREP"
-           "FLUSH-STANDARD-OUTPUT-STREAMS"
-           "WITH-UNIQUE-NAMES" "MAKE-GENSYM-LIST"
-           "ABOUT-TO-MODIFY-SYMBOL-VALUE"
-           "SELF-EVALUATING-P"
-           "PRINT-PRETTY-ON-STREAM-P"
-           "ARRAY-READABLY-PRINTABLE-P"
-           "LOOKS-LIKE-NAME-OF-SPECIAL-VAR-P"
-           "POSITIVE-PRIMEP"
-           "EVAL-IN-LEXENV"
-           "SIMPLE-EVAL-IN-LEXENV"
-           "FORCE" "DELAY" "PROMISE-READY-P"
-           "FIND-RESTART-OR-CONTROL-ERROR"
-           "LOAD-AS-SOURCE"
-           "DESCRIPTOR-SAP"
-           "DO-PACKED-VARINTS"
-
-           "CLOSURE-EXTRA-VALUES"
-           "PACK-CLOSURE-EXTRA-VALUES"
-           "SET-CLOSURE-EXTRA-VALUES"
-           "+CLOSURE-NAME-INDEX+"
-           "WEAK-VECTOR"
-           "WEAK-VECTOR-LEN"
-           "WEAK-VECTOR-REF"
-
-            ;; These could be moved back into SB-EXT if someone has
-            ;; compelling reasons, but hopefully we can get by
-            ;; without supporting them, at least not as publicly
-            ;; accessible things with fixed interfaces.
-
-           "GET-FLOATING-POINT-MODES"
-           "SET-FLOATING-POINT-MODES"
-           "WITH-FLOAT-TRAPS-MASKED"
-
-            ;; a sort of quasi-unbound tag for use in hash tables
-
-           "+EMPTY-HT-SLOT+"
-
-            ;; low-level i/o stuff
-
-           "DONE-WITH-FAST-READ-CHAR"
-           "FAST-READ-BYTE"
-           "FAST-READ-BYTE-REFILL"
-           "FAST-READ-CHAR"
-           "FAST-READ-CHAR-REFILL"
-           "FAST-READ-S-INTEGER"
-           "FAST-READ-U-INTEGER"
-           "FAST-READ-VAR-U-INTEGER"
-           "FILE-NAME"
-           "FORM-TRACKING-STREAM"
-           "FORM-TRACKING-STREAM-OBSERVER"
-           "FORM-TRACKING-STREAM-P"
-           "FORM-TRACKING-STREAM-FORM-START-BYTE-POS"
-           "FORM-TRACKING-STREAM-FORM-START-CHAR-POS"
-           "LINE/COL-FROM-CHARPOS"
-           "%INTERN"
-           "WITH-FAST-READ-BYTE"
-           "PREPARE-FOR-FAST-READ-CHAR"
-           "OUT-STREAM-FROM-DESIGNATOR"
-           "STRINGIFY-OBJECT"
-           "%WRITE"
-
-            ;; hackery to help set up for cold init
-
-           "!BEGIN-COLLECTING-COLD-INIT-FORMS"
-           "!COLD-INIT-FORMS"
-           "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
-
-            ;; catch tags
-
-           "TOPLEVEL-CATCHER"
-
-            ;; hooks for contrib/ stuff we're insufficiently sure
-            ;; about to add to SB-EXT
-
-           "*REPL-PROMPT-FUN*"
-           "*REPL-READ-FORM-FUN*"
-
-            ;; Character database access
-
-           "MISC-INDEX"
-           "CLEAR-FLAG"
-
-           "BINARY-SEARCH"))
 
 (defpackage "SB-MOP"
   (:documentation
