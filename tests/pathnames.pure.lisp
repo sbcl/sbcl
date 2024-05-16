@@ -985,3 +985,27 @@
   (assert (/= (sxhash #P"AVERB") (sxhash #P"AVEQS")))
   ;; still more
   (assert (/= (sxhash #P"a[bc]d?x") (sxhash #P"a[bc]d?z"))))
+
+;;; Assert that random bits of the symbols :ABSOLUTE,:RELATIVE,:WILD,etc
+;;; aren't used, as CLHS mandates externalizable SXHASH for pathnames.
+;;; Rev a374a7025c broke this, but it was not broken when committed,
+;;; because symbol hashes had not yet been pseudo-randomized.
+(with-test (:name :pathname-hash-not-random :skipped-on (:not :64-bit))
+  (sb-sys:with-pinned-objects (':absolute)
+    (let* ((sap (sb-sys:int-sap (sb-kernel:get-lisp-obj-address ':absolute)))
+           (offset (- (ash sb-vm:symbol-hash-slot sb-vm:word-shift)
+                      sb-vm:other-pointer-lowtag))
+           (original-word (sb-sys:sap-ref-word sap offset))
+           (original-symbol-hash (sb-kernel:symbol-hash :absolute))
+           (known-pnhash (sb-impl::pathname-sxhash '(:absolute "mess")))
+           (n-matched 0))
+      (unwind-protect
+           (dotimes (i (ash 1 10)) ; exhaustive test
+             (setf (ldb (byte 10 22) (sb-sys:sap-ref-word sap offset)) i)
+             (when (= (sb-kernel:symbol-hash :absolute) original-symbol-hash)
+               (incf n-matched))
+             (assert (= (sb-impl::pathname-sxhash '(:absolute "mess"))
+                        known-pnhash)))
+        (setf (sb-sys:sap-ref-word sap offset) original-word))
+      ;; Exactly one of the tested patterns is the unadulterated hash
+      (assert (= n-matched 1)))))

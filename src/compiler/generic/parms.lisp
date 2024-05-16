@@ -422,6 +422,8 @@
 ;;; Reserve some bits of SYMBOL-HASH slot for future use
 #+64-bit
 (progn (defconstant n-symbol-hash-prng-bits 10) ; how many to randomize
+       ;; If changing this constant, then see the test in pathnames.pure
+       ;; named :PATHNAME-HASH-NOT-RANDOM and adjust it as needed.
        (defconstant n-symbol-hash-discard-bits
          (let ((precision (+ 32 n-symbol-hash-prng-bits))) ; total N bits
            (- 64 precision)))
