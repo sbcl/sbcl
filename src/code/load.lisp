@@ -1162,6 +1162,14 @@
           (format *trace-output* fmt (code-object-size object) reason object))))
   object)
 
+;;; Unpack an integer from DUMP-FIXUPs.
+(declaim (inline !unpack-fixup-info))
+(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor-id data)
+  (values (ash packed-info -16)
+          (aref +fixup-kinds+ (ldb (byte 4 0) packed-info))
+          (ldb (byte 4 4) packed-info)
+          (ldb (byte 8 8) packed-info)))
+
 (define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
   ;; The stack looks like:
   ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
@@ -1222,7 +1230,7 @@
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
-          (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
+          (atomic-push (make-weak-pointer code) (cdr sb-c:*code-coverage-info*)))
         (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
@@ -1303,7 +1311,7 @@
 ;;;; fops for code coverage
 
 (define-fop 120 :not-host (fop-record-code-coverage (namestring cc) nil)
-  (setf (gethash namestring (car *code-coverage-info*)) cc)
+  (setf (gethash namestring (car sb-c:*code-coverage-info*)) cc)
   (values))
 
 ;;; Primordial layouts.
@@ -1322,7 +1330,7 @@
   (frob (#x68 t)
         (#x69 structure-object)
         (#x6a condition)
-        (#x6b definition-source-location)
+        (#x6b sb-c::definition-source-location)
         (#x6c sb-c::debug-info)
         (#x6d sb-c::compiled-debug-info)
         (#x6e sb-c::debug-source)

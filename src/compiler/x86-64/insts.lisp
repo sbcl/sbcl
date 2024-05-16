@@ -3408,7 +3408,7 @@
           (setf (sap-ref-64 sap offset) value))))))
   nil)
 
-(defun sb-fasl::pack-fixups-for-reapplication (fixup-notes &aux abs32-fixups imm-fixups)
+(defun sb-c::pack-fixups-for-reapplication (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; Note that call fixups occur in both :REL32 and :ABS32 kinds. We can ignore the :REL32 kind.

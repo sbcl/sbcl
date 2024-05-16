@@ -1211,33 +1211,24 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
 
 (defpackage "SB-FASL"
-  (:documentation "private: stuff related to FASL load/dump logic (and GENESIS)")
-  (:use "CL" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM" "SB-C"
-        "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
+  (:documentation "private: stuff related to fasload logic (and GENESIS)")
+  (:use "CL" "SB-ALIEN" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
   (:import-from "SB-VM" "+FIXUP-KINDS+")
   (:import-from "SB-IMPL" "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES")
   (:export "*ASSEMBLER-ROUTINES*"
-           "GET-ASM-ROUTINE"
+           "%ASM-ROUTINE-TABLE"
            "+BACKEND-FASL-FILE-IMPLEMENTATION+"
+           "COMPUTE-FEATURES-AFFECTING-FASL-FORMAT"
            "*FASL-FILE-TYPE*"
-           "CLOSE-FASL-OUTPUT"
-           "DUMP-ASSEMBLER-ROUTINES"
-           "DUMP-FOP" "DUMP-OBJECT"
-           "FASL-CONSTANT-ALREADY-DUMPED-P"
            "+FASL-FILE-VERSION+"
-           "FASL-DUMP-COMPONENT"
-           "FASL-DUMP-LOAD-TIME-VALUE-LAMBDA"
-           "FASL-DUMP-PARTIAL-SOURCE-INFO"
-           "FASL-DUMP-SOURCE-INFO" "FASL-DUMP-TOPLEVEL-LAMBDA-CALL"
-           "FASL-NOTE-HANDLE-FOR-CONSTANT"
-           "FASL-OUTPUT" "FASL-OUTPUT-P"
-           "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
-           "FASL-VALIDATE-STRUCTURE"
-           "FASL-NOTE-INSTANCE-SAVES-SLOTS"
+           "*FASL-HEADER-STRING-START-STRING*"
+           "+FASL-HEADER-STRING-STOP-CHAR-CODE+"
+           "*FOP-NAME-TO-OPCODE*"
+           "**FOP-SIGNATURES**"
+           "GET-ASM-ROUTINE"
+           "KNOWN-LAYOUT-FOP"
            "*!LOAD-TIME-VALUES*"
-           "OPEN-FASL-OUTPUT"
-           "*!COLD-TOPLEVELS*"
-           "COLD-CONS" "COLD-INTERN" "COLD-PUSH"))
+           "*!COLD-TOPLEVELS*"))
 
 (defpackage "SB-C"
   (:documentation "private: implementation of the compiler")
@@ -1304,6 +1295,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "VOP-NODE"
            "VOP-PARSE-OR-LOSE" "VOP-PARSE-TEMPS" "VOP-PREV"
            "VOP-REFS" "VOP-RESULTS" "VOP-SAVE-SET" "VOP-TEMPS")
+  (:import-from "SB-VM" "+FIXUP-KINDS+")
   (:export "%ALIEN-FUNCALL"
            "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "%UNWIND"
            "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"

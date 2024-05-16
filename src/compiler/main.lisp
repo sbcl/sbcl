@@ -1385,8 +1385,8 @@ necessary, since type inference may take arbitrarily long to converge.")
         ;; compiler data structures (see :IGNORE-IT), and to avoid
         ;; unnecessary top level lambda forcing.
         ((and (null creation-form) (null init-form))
-         (sb-fasl::dump-fop 'sb-fasl::fop-empty-list fasl)
-         (fasl-note-handle-for-constant constant (sb-fasl::dump-pop fasl) fasl)
+         (dump-fop 'fop-empty-list fasl)
+         (fasl-note-handle-for-constant constant (dump-pop fasl) fasl)
          nil)
         ((and
           ;; MAKE-LOAD-FORM-SAVING-SLOTS on the cross-compiler needs
@@ -1682,7 +1682,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                       (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))
                     ;; Dump the code coverage records into the fasl.
-                    (sb-fasl::dump-code-coverage-records
+                    (dump-code-coverage-records
                      (namestring *compile-file-pathname*)
                      (loop for k being each hash-key of code-coverage-records
                            collect (cons k +code-coverage-unmarked+))

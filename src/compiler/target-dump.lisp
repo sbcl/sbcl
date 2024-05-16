@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-FASL")
+(in-package "SB-C")
 
 ;;; Dump a multi-dimensional array. Note: any displacements are folded out.
 ;;;

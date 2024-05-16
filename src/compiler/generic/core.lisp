@@ -54,7 +54,7 @@
      (setf (sb-vm::%simple-fun-self fun) self)))
 
 (flet ((fixup (code-obj offset name kind flavor-id preserved-lists statically-link-p
-               real-code-obj &aux (flavor (aref sb-fasl::+fixup-flavors+ flavor-id)))
+               real-code-obj &aux (flavor (aref +fixup-flavors+ flavor-id)))
          (declare (ignorable statically-link-p preserved-lists))
          ;; NAME depends on the kind and flavor of fixup.
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
@@ -64,7 +64,7 @@
          ;; and the other is LOAD-CODE, both of which pin the code.
          (sb-vm:fixup-code-object
                  code-obj offset
-                 (sb-fasl::fixup-flavor-case flavor-id
+                 (fixup-flavor-case flavor-id
                    (:assembly-routine
                     (let* ((asm-code *assembler-routines*)
                            (index (if (fixnump name)
@@ -145,7 +145,7 @@
           (fixup code-obj offset
                  (fixup-name fixup)
                  (fixup-note-kind note)
-                 (sb-fasl::encoded-fixup-flavor (fixup-flavor fixup))
+                 (encoded-fixup-flavor (fixup-flavor fixup))
                  preserved t
                  real-code-obj)))
       (finish-fixups code-obj preserved))))
@@ -182,7 +182,7 @@
             (when (typep const '(cons (eql :fdefinition)))
               (incf count)
               (setf (second const) (find-or-create-fdefn (second const)))))))
-       (retained-fixups (sb-fasl::pack-fixups-for-reapplication fixup-notes))
+       (retained-fixups (sb-c::pack-fixups-for-reapplication fixup-notes))
        ((code-obj total-nwords)
         (allocate-code-object (component-mem-space component)
                               (align-up n-boxed-words code-boxed-words-align)

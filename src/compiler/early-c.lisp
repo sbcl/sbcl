@@ -71,7 +71,7 @@
   ;; constants. This coalescing is distinct from the coalescing done
   ;; in the dumper, since the effect here is to reduce the number of
   ;; boxed constants appearing in a code component.
-  (similar-constants (sb-fasl::make-similarity-table) :read-only t :type hash-table))
+  (similar-constants (make-similarity-table) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
 (sb-impl::define-thread-local *ir1-namespace*)

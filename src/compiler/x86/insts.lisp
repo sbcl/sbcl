@@ -2435,7 +2435,7 @@
          (setf (sap-ref-32 sap offset) rel-val)))))
   nil)
 
-(defun sb-fasl::pack-fixups-for-reapplication (fixup-notes)
+(defun sb-c::pack-fixups-for-reapplication (fixup-notes)
   (let (abs-fixups rel-fixups imm-fixups)
     (dolist (note fixup-notes)
       (let* ((fixup (fixup-note-fixup note))

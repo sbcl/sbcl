@@ -2917,7 +2917,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (when (>= index end) (return))
     (binding* (((offset kind flavor-id)
                 (!unpack-fixup-info (descriptor-integer (svref fixups (incf index)))))
-               (flavor (aref +fixup-flavors+ flavor-id))
+               (flavor (aref sb-c::+fixup-flavors+ flavor-id))
                (name (cond ((member flavor '(:code-object :card-table-index-mask)) nil)
                            (t (svref fixups (incf index)))))
                (string
@@ -3205,7 +3205,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   #+(and sb-safepoint (not x86-64))
   (progn
   (format t "#define GC_SAFEPOINT_PAGE_ADDR (void*)((char*)STATIC_SPACE_START - ~d)~%"
-          +backend-page-bytes+)
+          sb-c:+backend-page-bytes+)
   (format t "#define GC_SAFEPOINT_TRAP_ADDR (void*)((char*)STATIC_SPACE_START - ~d)~%"
           sb-vm:gc-safepoint-trap-offset))
 

@@ -587,7 +587,7 @@
 ;;; Return a name for PC-OFFSET in CODE. PC-OFFSET is relative to
 ;;; CODE-INSTRUCTIONS.
 (defun pc-offset-to-fun-name (pc-offset code)
-  (if (eq sb-vm::*assembler-routines* code)
+  (if (eq sb-fasl:*assembler-routines* code)
       (block nil
         (maphash (lambda (k v) ; FIXME: OAOO violation, at least twice over
                    (when (<= (car v) pc-offset (cadr v))
