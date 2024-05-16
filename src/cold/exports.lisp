@@ -40,7 +40,6 @@
   (defpackage-if-needed "SB-KERNEL")
   (defpackage-if-needed "SB-ALIEN")
   (defpackage-if-needed "SB-SYS")
-  (defpackage-if-needed "SB-FASL")
   (defpackage-if-needed "SB-GRAY")
   (defpackage-if-needed "SB-ALIEN-INTERNALS")
   (defpackage-if-needed "SB-ASSEM")
@@ -1183,7 +1182,9 @@ SBCL itself")
 ;; I (WHN 19990223) encourage maintainers to move them there..
 (defpackage "SB-IMPL"
   (:documentation "private: a grab bag of implementation details")
-  (:intern "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES")
+  (:intern "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES"
+           "*!LOAD-TIME-VALUES*"
+           "*!COLD-TOPLEVELS*")
   (:export "FORMAT-MICROSECONDS" "FORMAT-MILLISECONDS" ; for ~/fmt/
 
            "PRINT-TYPE" "PRINT-TYPE-SPECIFIER"
@@ -1205,7 +1206,7 @@ SBCL itself")
 
            "%MAKUNBOUND")
   (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-EXT"
-        "SB-FASL" "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
+        "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
 
 (defpackage "SB-SEQUENCE"
   (:documentation "semi-public: implements something which might eventually
@@ -1265,7 +1266,7 @@ be submitted as a CDR")
    "internal: the default place to hide information about the hardware and data
 structure representations")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-ASSEM" "SB-C"
-        "SB-EXT" "SB-FASL" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-UNIX")
+        "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-UNIX")
   (:import-from "SB-C" "VOP-ARGS" "VOP-RESULTS")
   (:intern "+FIXUP-KINDS+")
   (:export "*PRIMITIVE-OBJECTS*"
@@ -1734,7 +1735,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:documentation "private: stuff related to fasload logic (and GENESIS)")
   (:use "CL" "SB-ALIEN" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
   (:import-from "SB-VM" "+FIXUP-KINDS+")
-  (:import-from "SB-IMPL" "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES")
+  (:import-from "SB-IMPL" "FIND-OR-MAYBE-MAKE-DEFERRED-PACKAGE" "WITH-LOADER-PACKAGE-NAMES"
+                "*!LOAD-TIME-VALUES*"
+                "*!COLD-TOPLEVELS*")
   (:export "*ASSEMBLER-ROUTINES*"
            "%ASM-ROUTINE-TABLE"
            "+BACKEND-FASL-FILE-IMPLEMENTATION+"
@@ -1746,9 +1749,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "*FOP-NAME-TO-OPCODE*"
            "**FOP-SIGNATURES**"
            "GET-ASM-ROUTINE"
-           "KNOWN-LAYOUT-FOP"
-           "*!LOAD-TIME-VALUES*"
-           "*!COLD-TOPLEVELS*"))
+           "KNOWN-LAYOUT-FOP"))
 
 (defpackage "SB-C"
   (:documentation "private: implementation of the compiler")
@@ -2355,7 +2356,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
 integration' (said CMU CL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-BIGNUM"
-        "SB-EXT" "SB-FASL" "SB-INT" "SB-SYS" "SB-GRAY")
+        "SB-EXT" "SB-INT" "SB-SYS" "SB-GRAY")
   #+sb-simd-pack
   (:import-from "SB-EXT"
                 "SIMD-PACK"

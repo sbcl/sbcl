@@ -16,7 +16,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 
-(defconstant +backend-fasl-file-implementation+ :arm64)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :arm64)
 
   ;; Can be in the range 4K-64K
 (defconstant +backend-page-bytes+ 65536)

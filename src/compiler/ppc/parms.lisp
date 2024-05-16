@@ -23,7 +23,7 @@
 ;;; 2003-09-08
 #+nil (defconstant sb-assem:+assem-max-locations+ 70)
 
-(defconstant +backend-fasl-file-implementation+ :ppc)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :ppc)
   ;; On Linux, the ABI specifies the page size to be 4k-64k, use the
   ;; maximum of that range. FIXME: it'd be great if somebody would
   ;; find out whether using exact multiples of the page size actually

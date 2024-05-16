@@ -85,7 +85,7 @@
            (or (sbcl-homedir-pathname)
                (return-from module-provide-contrib nil))))
          (fasl-path (merge-pathnames
-                     (make-pathname :type *fasl-file-type*)
+                     (make-pathname :type sb-fasl:*fasl-file-type*)
                      unadorned-path))
          (lisp-path (merge-pathnames (make-pathname :type "lisp")
                                      unadorned-path)))

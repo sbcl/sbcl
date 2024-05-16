@@ -16,7 +16,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 1)
 
-(defconstant +backend-fasl-file-implementation+ :x86-64)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :x86-64)
 (defconstant-eqx +fixup-kinds+ #(:abs32 :*abs32 :rel32 :absolute) #'equalp)
 
 ;;; This size is supposed to indicate something about the actual granularity

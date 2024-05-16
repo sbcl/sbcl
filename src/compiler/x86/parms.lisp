@@ -16,7 +16,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 1)
 
-(defconstant +backend-fasl-file-implementation+ :x86)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :x86)
 (defconstant-eqx +fixup-kinds+ #(:absolute :relative) #'equalp)
 
 ;;; KLUDGE: It would seem natural to set this by asking our C runtime

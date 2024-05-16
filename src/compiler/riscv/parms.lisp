@@ -16,7 +16,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 4) ; FIXME: C
 
-(defconstant +backend-fasl-file-implementation+ #-64-bit :rv32g #+64-bit :rv64g)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ #-64-bit :rv32g #+64-bit :rv64g)
 
 (defconstant +backend-page-bytes+ #+linux 4096 #+netbsd 8192)
 

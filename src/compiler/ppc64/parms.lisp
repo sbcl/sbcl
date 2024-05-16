@@ -18,7 +18,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 
-(defconstant +backend-fasl-file-implementation+ :ppc)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :ppc)
 ;; Granularity at which memory is mapped
 (defconstant +backend-page-bytes+ 65536)
 

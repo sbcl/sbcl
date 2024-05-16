@@ -13,7 +13,7 @@
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 (defconstant sb-assem:+assem-max-locations+ 100)
 
-(defconstant +backend-fasl-file-implementation+ :sparc)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :sparc)
 (defconstant +backend-page-bytes+ 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which

@@ -269,4 +269,4 @@
     ;; was at _least_ as much as this one hash-table lookup.
     (with-pinned-objects (object)
       (setf (sap-ref-word (int-sap (get-lisp-obj-address object)) slot)
-            (get-asm-routine 'funcallable-instance-tramp)))))
+            (sb-fasl:get-asm-routine 'funcallable-instance-tramp)))))

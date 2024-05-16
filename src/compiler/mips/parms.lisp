@@ -13,7 +13,7 @@
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 (defconstant sb-assem:+assem-max-locations+ 68)
 
-(defconstant +backend-fasl-file-implementation+ :mips)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :mips)
 
 ;; backend-page-size is the granularity at which we try to map/unmap.
 ;; linux says getpagesize() is 4k so any multiple thereof is fine.

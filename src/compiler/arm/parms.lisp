@@ -16,7 +16,7 @@
 (defconstant sb-assem:assem-scheduler-p nil)
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 
-(defconstant +backend-fasl-file-implementation+ :arm)
+(defconstant sb-fasl:+backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
 (defconstant +backend-page-bytes+ #-netbsd 4096 #+netbsd 8192)
