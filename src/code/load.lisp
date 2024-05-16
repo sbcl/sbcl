@@ -1191,6 +1191,14 @@
         ;; Don't need the code pinned from here on
         (setf (sb-c::debug-info-source (%code-debug-info code))
               (%fasl-input-partial-source-info (fasl-input)))
+        (let ((stack-index (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))))
+          ;; This is the moral equivalent of a warning from /usr/bin/ld
+          ;; that "gets() is dangerous." You're informed by both the compiler and linker.
+          (dotimes (i n-fdefns)
+            (let ((name (fdefn-name (svref stack (+ stack-index i)))))
+              (when (deprecated-thing-p 'function name)
+                (format *error-output* "~&; While loading ~S:" (sb-c::debug-info-name debug-info))
+                (check-deprecated-thing 'function name)))))
         ;; Boxed constants can be assigned only after figuring out where the range
         ;; of implicitly tagged words is, which requires knowing how many functions
         ;; are in the code component, which requires reading the code trailer.
@@ -1220,11 +1228,6 @@
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
 (define-fop 18 :not-host (fop-fdefn (name))
-  (when (deprecated-thing-p 'function name)
-    ;; This is the moral equivalent of a warning from /usr/bin/ld
-    ;; that "gets() is dangerous." You're informed by both the
-    ;; compiler and linker.
-    (check-deprecated-thing 'function name))
   (find-or-create-fdefn name))
 
 (define-fop 19 :not-host (fop-known-fun (name))
