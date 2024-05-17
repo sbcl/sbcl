@@ -40,7 +40,6 @@
   (defpackage-if-needed "SB-KERNEL")
   (defpackage-if-needed "SB-ALIEN")
   (defpackage-if-needed "SB-SYS")
-  (defpackage-if-needed "SB-GRAY")
   (defpackage-if-needed "SB-ALIEN-INTERNALS")
   (defpackage-if-needed "SB-ASSEM")
   (defpackage-if-needed "SB-C"
@@ -988,6 +987,28 @@ possibly temporarily, because it might be used internally.")
 (defpackage "SB-LOOP"
   (:documentation "private: implementation details of LOOP")
   (:use "CL" "SB-INT" "SB-KERNEL"))
+
+(defpackage "SB-GRAY"
+  (:documentation
+   "public: an implementation of the stream-definition-by-user
+Lisp extension proposal by David N. Gray")
+  (:use "CL" "SB-EXT" "SB-INT")
+  (:export "FUNDAMENTAL-BINARY-STREAM"
+           "FUNDAMENTAL-BINARY-INPUT-STREAM"
+           "FUNDAMENTAL-BINARY-OUTPUT-STREAM" "FUNDAMENTAL-CHARACTER-STREAM"
+           "FUNDAMENTAL-CHARACTER-INPUT-STREAM"
+           "FUNDAMENTAL-CHARACTER-OUTPUT-STREAM"
+           "FUNDAMENTAL-INPUT-STREAM" "FUNDAMENTAL-OUTPUT-STREAM"
+           "FUNDAMENTAL-STREAM"
+           "STREAM-ADVANCE-TO-COLUMN" "STREAM-CLEAR-INPUT"
+           "STREAM-CLEAR-OUTPUT" "STREAM-FILE-POSITION" "STREAM-FINISH-OUTPUT" "STREAM-FORCE-OUTPUT"
+           "STREAM-FRESH-LINE" "STREAM-LINE-COLUMN" "STREAM-LINE-LENGTH"
+           "STREAM-LISTEN" "STREAM-PEEK-CHAR" "STREAM-READ-BYTE"
+           "STREAM-READ-CHAR" "STREAM-READ-CHAR-NO-HANG" "STREAM-READ-LINE"
+           "STREAM-READ-SEQUENCE" "STREAM-START-LINE-P" "STREAM-TERPRI"
+           "STREAM-UNREAD-CHAR"
+           "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-SEQUENCE"
+           "STREAM-WRITE-STRING"))
 
 (defpackage "SB-UNIX"
   (:documentation
@@ -3418,28 +3439,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:documentation "public: algorithms for Unicode data")
   (:use "CL" "SB-INT")
   (:export "NORMALIZE-STRING" "NORMALIZED-P"))
-
-(defpackage "SB-GRAY"
-  (:documentation
-   "public: an implementation of the stream-definition-by-user
-Lisp extension proposal by David N. Gray")
-  (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL")
-  (:export "FUNDAMENTAL-BINARY-STREAM"
-           "FUNDAMENTAL-BINARY-INPUT-STREAM"
-           "FUNDAMENTAL-BINARY-OUTPUT-STREAM" "FUNDAMENTAL-CHARACTER-STREAM"
-           "FUNDAMENTAL-CHARACTER-INPUT-STREAM"
-           "FUNDAMENTAL-CHARACTER-OUTPUT-STREAM"
-           "FUNDAMENTAL-INPUT-STREAM" "FUNDAMENTAL-OUTPUT-STREAM"
-           "FUNDAMENTAL-STREAM"
-           "STREAM-ADVANCE-TO-COLUMN" "STREAM-CLEAR-INPUT"
-           "STREAM-CLEAR-OUTPUT" "STREAM-FILE-POSITION" "STREAM-FINISH-OUTPUT" "STREAM-FORCE-OUTPUT"
-           "STREAM-FRESH-LINE" "STREAM-LINE-COLUMN" "STREAM-LINE-LENGTH"
-           "STREAM-LISTEN" "STREAM-PEEK-CHAR" "STREAM-READ-BYTE"
-           "STREAM-READ-CHAR" "STREAM-READ-CHAR-NO-HANG" "STREAM-READ-LINE"
-           "STREAM-READ-SEQUENCE" "STREAM-START-LINE-P" "STREAM-TERPRI"
-           "STREAM-UNREAD-CHAR"
-           "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-SEQUENCE"
-           "STREAM-WRITE-STRING"))
 
 (defpackage "SB-MOP"
   (:documentation

@@ -152,7 +152,7 @@
     ;; Writing to a string-output-stream adds negligible overhead
     ;; versus the method dispatch for each input character.
     (values (with-output-to-string (s)
-              (let ((ouch (ansi-stream-cout s)))
+              (let ((ouch (sb-kernel:ansi-stream-cout s)))
                 (loop (let ((ch (stream-read-char stream)))
                         (case ch
                           (#\newline (return))
@@ -182,7 +182,7 @@
      (aver (eq :eof eof-value))
      (aver (not recursive-p))
      (stream-read-char stream))
-   #'ill-bin))
+   #'sb-kernel:ill-bin))
 
 (defmethod stream-read-sequence ((stream fundamental-binary-input-stream)
                                  (seq sequence)
@@ -191,7 +191,7 @@
                               (stream-element-type stream))))
     (sb-impl::read-sequence/read-function
      seq stream start end stream-element-mode
-     #'ill-in
+     #'sb-kernel:ill-in
      (lambda (stream eof-error-p eof-value recursive-p)
        (aver (null eof-error-p))
        (aver (eq :eof eof-value))
@@ -262,8 +262,8 @@
 
 (defmethod stream-write-string ((stream fundamental-character-output-stream)
                                 string &optional (start 0) end)
-  (with-array-data ((data string) (offset-start start) (offset-end end)
-                    :check-fill-pointer t)
+  (sb-kernel:with-array-data ((data string) (offset-start start) (offset-end end)
+                              :check-fill-pointer t)
     (sb-impl::write-sequence/vector
      (data simple-string) stream offset-start offset-end #'stream-write-char))
   string)
@@ -339,7 +339,7 @@
                                   (seq sequence)
                                   &optional (start 0) (end nil))
   (sb-impl::write-sequence/write-function
-   seq stream start end 'character #'stream-write-char #'ill-bout))
+   seq stream start end 'character #'stream-write-char #'sb-kernel:ill-bout))
 
 ;; Provide a reasonable default for binary Gray streams.  We might be
 ;; able to do better by specializing on the sequence type, but at
@@ -351,7 +351,7 @@
                               (stream-element-type stream))))
     (sb-impl::write-sequence/write-function
      seq stream start end stream-element-mode
-     #'ill-out #'stream-write-byte)))
+     #'sb-kernel:ill-out #'stream-write-byte)))
 
 
 ;;; binary streams
