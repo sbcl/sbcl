@@ -40,7 +40,6 @@
   (defpackage-if-needed "SB-KERNEL")
   (defpackage-if-needed "SB-ALIEN")
   (defpackage-if-needed "SB-SYS")
-  (defpackage-if-needed "SB-DEBUG")
   (defpackage-if-needed "SB-FASL")
   (defpackage-if-needed "SB-GRAY")
   (defpackage-if-needed "SB-ALIEN-INTERNALS")
@@ -1206,7 +1205,7 @@ SBCL itself")
            ;; other
 
            "%MAKUNBOUND")
-  (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-DEBUG" "SB-EXT"
+  (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-EXT"
         "SB-FASL" "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
 
 (defpackage "SB-SEQUENCE"

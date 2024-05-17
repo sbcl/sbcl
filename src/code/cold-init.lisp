@@ -53,7 +53,7 @@
   (progn
     (setq *break-on-signals* nil)
     (setq sb-kernel::*current-error-depth* 0))
-  (setq *stack-top-hint* nil))
+  (setq sb-debug:*stack-top-hint* nil))
 
 (defun !printer-control-init ()
   (setq *print-readably* nil

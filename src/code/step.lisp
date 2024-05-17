@@ -71,7 +71,7 @@
               (eq args :unknown)
               (list args)))
     (finish-output *debug-io*)
-    (let ((*stack-top-hint* (sb-di::find-stepped-frame)))
+    (let ((sb-debug:*stack-top-hint* (sb-di::find-stepped-frame)))
       (invoke-debugger condition))))
 
 ;;; In the TTY debugger we're not interested in STEP returning
