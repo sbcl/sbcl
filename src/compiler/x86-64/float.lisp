@@ -111,8 +111,6 @@
   ((double-reg) (double-stack))
   (inst movsd  (ea-for-df-stack y) x))
 
-(eval-when (:compile-toplevel :execute)
-  (setf cl:*read-default-float-format* 'cl:single-float))
 
 ;;;; complex float move functions
 

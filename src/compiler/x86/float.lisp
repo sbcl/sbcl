@@ -182,31 +182,28 @@
 ;;; stored in a more precise form on chip. Anyhow, might as well use
 ;;; the feature. It can be turned off by hacking the
 ;;; "immediate-constant-sc" in vm.lisp.
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format*
-        #+long-float 'cl:long-float #-long-float 'cl:double-float))
 (define-move-fun (load-fp-constant 2) (vop x y)
   ((fp-constant) (single-reg double-reg #+long-float long-reg))
   (let ((value (tn-value x)))
     (with-empty-tn@fp-top(y)
-      (cond ((or (eql value 0f0) (eql value 0d0) #+long-float (eql value 0l0))
+      (cond ((zerop value)
              (inst fldz))
-            ((sb-xc:= value 1e0)
+            ((sb-xc:= value 1l0)
              (inst fld1))
             #+long-float
-            ((= value (coerce pi *read-default-float-format*))
+            ((= value pi)
              (inst fldpi))
             #+long-float
-            ((= value (log 10e0 2e0))
+            ((= value (log 10l0 2l0))
              (inst fldl2t))
             #+long-float
-            ((= value (log 2.718281828459045235360287471352662e0 2e0))
+            ((= value (log 2.718281828459045235360287471352662L0 2l0))
              (inst fldl2e))
             #+long-float
-            ((= value (log 2e0 10e0))
+            ((= value (log 2l0 10l0))
              (inst fldlg2))
             #+long-float
-            ((= value (log 2e0 2.718281828459045235360287471352662e0))
+            ((= value (log 2l0 2.718281828459045235360287471352662L0))
              (inst fldln2))
             (t (warn "ignoring bogus i387 constant ~A" value))))))
 
@@ -220,8 +217,6 @@
          (inst fld value))
         (double-reg
          (inst fldd value))))))
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'cl:single-float))
 
 ;;;; complex float move functions
 

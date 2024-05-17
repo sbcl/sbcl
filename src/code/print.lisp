@@ -1750,42 +1750,34 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; denormalized, we must pull out a large factor, since there is more
 ;;; negative exponent range than positive range.
 
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format*
-        #+long-float 'cl:long-float #-long-float 'cl:double-float))
 (defun scale-exponent (original-x)
   (let* ((x (coerce original-x 'long-float)))
     (multiple-value-bind (sig exponent) (decode-float x)
       (declare (ignore sig))
-      (if (= x 0.0e0)
-          (values (float 0.0e0 original-x) 1)
+      (if (= x 0.0l0)
+          (values (float 0.0l0 original-x) 1)
           (let* ((ex (locally (declare (optimize (safety 0)))
                        (the fixnum
-                         (round (* exponent
-                                   #-long-float (log 2d0 10)
-                                   #+long-float
-                                   (error "(log 2 10) not computed"))))))
+                         (round (* exponent (log 2l0 10))))))
                  (x (if (minusp ex)
                         (if (float-denormalized-p x)
                             #-long-float
-                            (* x 1.0e16 (expt 10.0e0 (- (- ex) 16)))
+                            (* x 1.0l16 (expt 10.0l0 (- (- ex) 16)))
                             #+long-float
-                            (* x 1.0e18 (expt 10.0e0 (- (- ex) 18)))
-                            (* x 10.0e0 (expt 10.0e0 (- (- ex) 1))))
-                        (/ x 10.0e0 (expt 10.0e0 (1- ex))))))
-            (do ((d 10.0e0 (* d 10.0e0))
+                            (* x 1.0l18 (expt 10.0l0 (- (- ex) 18)))
+                            (* x 10.0l0 (expt 10.0l0 (- (- ex) 1))))
+                        (/ x 10.0l0 (expt 10.0l0 (1- ex))))))
+            (do ((d 10.0l0 (* d 10.0l0))
                  (y x (/ x d))
                  (ex ex (1+ ex)))
-                ((< y 1.0e0)
-                 (do ((m 10.0e0 (* m 10.0e0))
+                ((< y 1.0l0)
+                 (do ((m 10.0l0 (* m 10.0l0))
                       (z y (* y m))
                       (ex ex (1- ex)))
-                     ((>= z 0.1e0)
+                     ((>= z 0.1l0)
                       (values (float z original-x) ex))
                    (declare (long-float m) (integer ex))))
               (declare (long-float d))))))))
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'cl:single-float))
 
 ;;;; entry point for the float printer
 

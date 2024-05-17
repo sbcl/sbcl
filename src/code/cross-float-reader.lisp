@@ -108,7 +108,8 @@
   ;; a problem of non-canononical symbols, it's easiest to just always canonicalize
   ;; for COERCE, and nothing else.
   `(let ((fun ',(intern (string name) "CL"))
-         (args ,(if (string= name 'coerce)
+         (args ,(if (or (string= name 'coerce)
+                        (string= name 'read-from-string))
                     `(canonical-math-op-args ,key-expr)
                     key-expr)))
      (multiple-value-bind (answer foundp)
@@ -117,6 +118,8 @@
        (if foundp
            (values-list answer)
            (multiple-value-call #'record-math-op fun args (progn ,@calculation))))))
+
+(defvar *read-default-float-format* 'single-float)
 
 (defun sb-cold::read-target-float-from-string (string)
   (when *read-suppress*
@@ -130,9 +133,10 @@
                (exp-marker (if (and marker-pos
                                     (char-not-equal (char string marker-pos) #\E))
                                (char-upcase (char string marker-pos))
-                               (ecase cl:*read-default-float-format*
-                                 ((cl:single-float cl:short-float) #\F)
-                                 ((cl:double-float cl:long-float)  #\D))))
+                               (ecase *read-default-float-format*
+                                 ((single-float short-float) #\F)
+                                 ((double-float) #\D)
+                                 ((long-float) #\L))))
                (significand (if marker-pos (subseq string 0 marker-pos) string))
                (dot-pos (position #\. significand))
                (integer (if (eql dot-pos 0) 0 (parse-integer significand :start 0 :end dot-pos)))
@@ -149,7 +153,8 @@
                                (cl:expt 10 exponent)))
                (format (ecase exp-marker
                          ((#\F #\S) 'single-float)
-                         ((#\D #\L) 'double-float))))
+                         ((#\D #-long-float #\L) 'double-float)
+                         #+long-float ((#\L) 'long-float))))
           ;; Since we are working with rationals, we must special-case
           ;; negative zero (which does not have a natural rational
           ;; representation: explicitly look for -0 string.

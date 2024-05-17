@@ -631,13 +631,6 @@
                   collect (float-or-complex-float-type type lo hi))))
     (t (specifier-type 'number))))
 
-(eval-when (:compile-toplevel :execute)
-  ;; So the problem with this hack is that it's actually broken.  If
-  ;; the host does not have long floats, then setting *R-D-F-F* to
-  ;; LONG-FLOAT doesn't actually buy us anything.  FIXME.
-  (setf *read-default-float-format*
-        #+long-float 'cl:long-float #-long-float 'cl:double-float))
-
 ;;; Test whether the numeric-type ARG is within the domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
 ;;; be distinct.
@@ -680,8 +673,6 @@
                     (not (and (fp-neg-zero-p domain-high)
                               (fp-pos-zero-p arg-hi)))))))))
 
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'cl:single-float))
 
 ;;; Handle monotonic functions of a single variable whose domain is
 ;;; possibly part of the real line. ARG is the variable, FUN is the

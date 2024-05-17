@@ -137,6 +137,7 @@
 ;;; alternate symbols.
 (defparameter *shadows*
   '("FLOAT" "SHORT-FLOAT" "SINGLE-FLOAT" "DOUBLE-FLOAT" "LONG-FLOAT"
+    "*READ-DEFAULT-FLOAT-FORMAT*"
     "REAL" "COMPLEX" "NUMBER"
     ;; "RATIONAL" is here for the same reason as the preceding:
     ;; we don't want to mess up all tests of the form (IF (EQ X 'RATIONAL) ...)
@@ -314,8 +315,7 @@
     ;; removing that to add to the externals, each time shrinking the hashset
     ;; of internals back to nothing. Is there way to not do that?
     (export (intern name package-name) package-name))
-  (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
-                  "ARRAY-ELEMENT-TYPE"
+  (dolist (name '("ARRAY-ELEMENT-TYPE"
                   "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
                   "MAKE-ARRAY"
                   "SIMPLE-VECTOR"
