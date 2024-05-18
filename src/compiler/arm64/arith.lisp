@@ -1559,6 +1559,32 @@
     (inst adc n digit-a digit-b)
     (inst str n (@ r (extend index :lsl 3)))))
 
+(define-vop (bignum-negate-loop)
+  (:args (a* :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length)
+         (r* :scs (descriptor-reg) :to :save))
+  (:arg-types bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index a r)
+  (:results (last1 :scs (unsigned-reg))
+            (last2 :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 10
+    (inst add-sub a a* #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub r r* #1#)
+    (inst mov last2 0)
+    (inst subs index zr-tn zr-tn) ;; set carry
+    (move length l)
+    LOOP
+    (move last1 last2)
+    (inst ldr last2 (@ a (extend index :lsl 3)))
+    (inst mvn last2 last2)
+    (inst adcs last2 last2 zr-tn)
+    (inst str last2 (@ r (extend index :lsl 3)))
+    (inst add index index 1)
+    (inst sub length length 1)
+    (inst cbnz length LOOP)))
+
 (define-vop (sub-w/borrow)
   (:translate sb-bignum:%subtract-with-borrow)
   (:policy :fast-safe)
