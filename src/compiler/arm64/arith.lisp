@@ -1578,8 +1578,7 @@
     LOOP
     (move last1 last2)
     (inst ldr last2 (@ a (extend index :lsl 3)))
-    (inst mvn last2 last2)
-    (inst adcs last2 last2 zr-tn)
+    (inst sbcs last2 zr-tn last2)
     (inst str last2 (@ r (extend index :lsl 3)))
     (inst add index index 1)
     (inst sub length length 1)
