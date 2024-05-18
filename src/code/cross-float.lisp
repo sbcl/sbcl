@@ -436,12 +436,10 @@
                    (error "missing entry for (LOG ~A 10)" number))))
             (t (error "missing entries for (LOG ~A ~A)" number base)))))))
 
-;;; Canonicalize and write out the memoization table. Order it by function,
-;;; then number of arguments, then each argument's value. Rational precedes
-;;; single-float which precedes double-float, then order by bits.
+;;; Canonicalize and write out the memoization table.
 (defun dump-math-memoization-table (table stream)
   (format stream ";;; This file is machine-generated. DO NOT EDIT~2%")
-  (format stream ":DEFAULT~%(~%")
+  (format stream "~%(~%")
   (labels ((spelling-of (expr)
              ;; MUST not write package prefixes !
              ;; e.g. avoid writing a line like (COERCE (-33619991 SB-XC:DOUBLE-FLOAT) ...)

@@ -46,10 +46,7 @@
     (double-float (%double-float-rational rational))))
 
 (defun parse-xfloat-math-file (stream table)
-  ;; Ensure that we're reading the correct variant of the file
-  ;; in case there is more than one set of floating-point formats.
-  (assert (eq (read stream) :default))
-  (let ((pkg (make-package "SB-FLOAT-GENIE" :use '("CL")))
+  (let ((pkg (make-package "SB-FLOAT-GENIE" :use '("XC-STRICT-CL")))
         (line 0))
     (import 'make-single-float pkg)
     (import 'make-double-float pkg)
@@ -86,32 +83,10 @@
     (setf (gethash (cons fun args) table) values))
   (values-list values))
 
-;;; Disallow non-canonical symbols in the float math cache,
-;;; or it gets very confusing as to whether the cache is dirty.
-(defun canonical-math-op-args (expr)
-  ;; Try to avoid consing a new list unless we have to.
-  (labels ((check (expr)
-             (cond ((consp expr) (and (check (car expr)) (check (cdr expr))))
-                   ((symbolp expr) (eq (cl:symbol-package expr) *cl-package*))
-                   (t)))
-           (recons (expr)
-             (cond ((consp expr) (cons (recons (car expr)) (recons (cdr expr))))
-                   ((symbolp expr) (intern (string expr) *cl-package*))
-                   (t expr))))
-    (if (check expr) expr (recons expr))))
-
 (defmacro with-memoized-math-op ((name key-expr) &body calculation)
   (assert (symbolp name))
-  ;; In theory I could make this so that only a cache miss has to call SANIFY-MATH-OP-ARGS
-  ;; so that in the frequently-occuring cases we do not have to make an extra pass over
-  ;; the expression to determine whether was is canonical. But since only COERCE can have
-  ;; a problem of non-canononical symbols, it's easiest to just always canonicalize
-  ;; for COERCE, and nothing else.
-  `(let ((fun ',(intern (string name) "CL"))
-         (args ,(if (or (string= name 'coerce)
-                        (string= name 'read-from-string))
-                    `(canonical-math-op-args ,key-expr)
-                    key-expr)))
+  `(let ((fun ',name)
+         (args ,key-expr))
      (multiple-value-bind (answer foundp)
          (dx-let ((cache-key (cons fun args)))
            (gethash cache-key (get-float-ops-cache)))

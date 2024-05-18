@@ -2,9 +2,6 @@
   (with-open-file (stream name :if-does-not-exist nil)
     (when stream
       (format t "; Checking ~S~%" (pathname stream))
-      ;; Ensure that we're reading the correct variant of the file
-      ;; in case there is more than one set of floating-point formats.
-      (assert (eq (read stream) :default))
       (sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
         (let ((*readtable* (copy-readtable)))
           ;; No need to do a full-blown read-time-eval.
