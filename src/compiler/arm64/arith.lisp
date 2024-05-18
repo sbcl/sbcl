@@ -1534,15 +1534,12 @@
   (:generator 10
     (inst add-sub a a* #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
     (inst add-sub r r* #1#)
-    (move length la)
-
-    (inst adds index zr-tn zr-tn) ;; clear the carry flag
 
     (inst ldr digit-a (@ a))
-    (inst adcs n digit-a b)
+    (inst adds n digit-a b)
     (inst str n (@ r))
-    (inst add index index 1)
-    (inst sub length length 1)
+    (inst mov index 1)
+    (inst sub length la 1)
 
     (inst asr digit-b b 63)
     (inst cbz length DONE)

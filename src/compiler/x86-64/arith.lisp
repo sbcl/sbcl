@@ -3416,25 +3416,24 @@
 
 (define-vop (bignum-add-word-loop)
   (:args (a :scs (descriptor-reg) :to :save)
-         (b :scs (unsigned-reg) :to :save)
+         (b :scs (unsigned-reg) :target n)
          (la :scs (unsigned-reg) :target length)
          (r :scs (descriptor-reg)))
   (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) n)
   (:temporary (:sc unsigned-reg :from (:argument 2)) length)
-  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
+  (:temporary (:sc unsigned-reg) index sign-digit-a sign-digit-b)
   (:generator 10
-    (move length la)
     (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
-    (inst mov sign-digit-b b)
+    (inst mov sign-digit-b n)
     (inst sar sign-digit-a 63)
     (inst sar sign-digit-b 63)
+    (move n b)
+    (move length la)
 
-    (zeroize index) ;; clears CF as well
-
-    (inst mov n b)
-    (inst adc n (ea #1# a))
+    (inst add n (ea #1# a))
     (inst mov (ea #1# r) n)
-    (inst inc index)
+    (inst mov index 1)
     (inst dec length)
     (inst jmp :z DONE)
 
