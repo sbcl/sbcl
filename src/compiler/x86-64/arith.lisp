@@ -3365,8 +3365,8 @@
      (inst and :dword carry 1))))
 
 (define-vop (bignum-add-loop)
-  (:args (a :scs (descriptor-reg))
-         (b :scs (descriptor-reg))
+  (:args (a :scs (descriptor-reg) :to :save)
+         (b :scs (descriptor-reg) :to :save)
          (la :scs (unsigned-reg) :target remaining-length)
          (lb :scs (unsigned-reg) :target length)
          (r :scs (descriptor-reg)))
@@ -3375,8 +3375,8 @@
   (:temporary (:sc unsigned-reg :from (:argument 3)) remaining-length)
   (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
   (:generator 10
-    (move length lb)
     (move remaining-length la)
+    (move length lb)
     (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
     (inst mov sign-digit-b (ea (- #1# 8) b lb 8))
     (inst sar sign-digit-a 63)
@@ -3415,8 +3415,8 @@
     (inst mov (ea #1# r index 8) sign-digit-a)))
 
 (define-vop (bignum-add-word-loop)
-  (:args (a :scs (descriptor-reg))
-         (b :scs (unsigned-reg))
+  (:args (a :scs (descriptor-reg) :to :save)
+         (b :scs (unsigned-reg) :to :save)
          (la :scs (unsigned-reg) :target length)
          (r :scs (descriptor-reg)))
   (:arg-types bignum unsigned-num unsigned-num bignum)
