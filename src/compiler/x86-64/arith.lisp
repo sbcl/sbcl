@@ -3432,8 +3432,8 @@
     (zeroize index) ;; clears CF as well
 
     (inst mov n b)
-    (inst adc n (ea #1# a index 8))
-    (inst mov (ea #1# r index 8) n)
+    (inst adc n (ea #1# a))
+    (inst mov (ea #1# r) n)
     (inst inc index)
     (inst dec length)
     (inst jmp :z DONE)
