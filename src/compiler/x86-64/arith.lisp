@@ -3412,7 +3412,45 @@
 
     DONE
     (inst adc sign-digit-a sign-digit-b)
-    (inst mov :qword (ea #1# r index 8) sign-digit-a)))
+    (inst mov (ea #1# r index 8) sign-digit-a)))
+
+(define-vop (bignum-add-word-loop)
+  (:args (a :scs (descriptor-reg))
+         (b :scs (unsigned-reg))
+         (la :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
+  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
+  (:generator 10
+    (move length la)
+    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
+    (inst mov sign-digit-b b)
+    (inst sar sign-digit-a 63)
+    (inst sar sign-digit-b 63)
+
+    (zeroize index) ;; clears CF as well
+
+    (inst mov n b)
+    (inst adc n (ea #1# a index 8))
+    (inst mov (ea #1# r index 8) n)
+    (inst inc index)
+    (inst dec length)
+    (inst jmp :z DONE)
+
+    LOOP-A
+    (inst mov n (ea #1# a index 8))
+    (inst adc n sign-digit-b)
+    (inst mov (ea #1# r index 8) n)
+
+    (inst inc index)
+    (inst dec length)
+
+    (inst jmp :nz LOOP-A)
+
+    DONE
+    (inst adc sign-digit-a sign-digit-b)
+    (inst mov (ea #1# r index 8) sign-digit-a)))
 
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
@@ -3437,8 +3475,8 @@
            (move result a)
            (inst sbb result b)))
     (unless (eq (tn-kind borrow) :unused)
-     (inst mov borrow 1)
-     (inst sbb :dword borrow 0))))
+      (inst mov borrow 1)
+      (inst sbb :dword borrow 0))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
