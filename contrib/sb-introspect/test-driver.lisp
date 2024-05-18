@@ -71,6 +71,7 @@
   t)
 
 (test-util:with-test (:name definition-source.1 :skipped-on :no-source-locs)
+  #+sb-devel
   (assert (consp (find-definition-sources-by-name 'vectorp :vop)))
   (assert (consp (find-definition-sources-by-name 'check-type :macro))))
 

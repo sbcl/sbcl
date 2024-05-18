@@ -3562,9 +3562,9 @@
               (or
                (memq (vop-name vop) safe-vops)
                (and vop
-                    (memq (car (sb-c::vop-parse-translate
-                                (sb-c::vop-parse-or-lose (vop-name vop))))
-                          safe-translates))
+                    (loop for fun in safe-translates
+                          thereis (memq (sb-c::vop-info vop) 
+                                        (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun)))))
                (and (not safe-vops)
                     (not safe-translates))))))))
 

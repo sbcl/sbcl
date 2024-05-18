@@ -138,7 +138,7 @@
                    (loop (let ((line (read-line f nil)))
                            (unless line (return))
                            (let ((count (read-from-string line))
-                                 (name (read-from-string line t nil :start 8)))
+                                 (name (subseq line 8)))
                              (incf (gethash name aggregate-vop-usage 0) count))))
                    (when deletep (delete-file f))))))
       (dolist (file files)

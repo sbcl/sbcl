@@ -191,23 +191,26 @@
                 ;; with non-cold-init lambdas. Though the cold-init function is
                 ;; never called post-build, it is not discarded. Also, I suspect
                 ;; that the following loop should print nothing, but it does:
-#|
-                (sb-vm:map-allocated-objects
-                  (lambda (obj type size)
-                    (declare (ignore size))
-                    (when (= type sb-vm:code-header-widetag)
-                      (let ((name (sb-c::debug-info-name
-                                   (sb-kernel:%code-debug-info obj))))
-                        (when (and (stringp name) (search "COLD-INIT-FORMS" name))
-                          (print obj)))))
-                  :dynamic)
-|#
+                #|
+                (sb-vm:map-allocated-objects ;
+                (lambda (obj type size) ;
+                (declare (ignore size)) ;
+                (when (= type sb-vm:code-header-widetag) ;
+                (let ((name (sb-c::debug-info-name ;
+                (sb-kernel:%code-debug-info obj)))) ;
+                (when (and (stringp name) (search "COLD-INIT-FORMS" name)) ;
+                (print obj)))))         ;
+                :dynamic)               ;
+                |#
                 (fmakunbound symbol)
                 (unintern symbol package))))))
   (sb-int:dohash ((k v) sb-c::*backend-parsed-vops*)
     (declare (ignore k))
     (setf (sb-c::vop-parse-body v) nil))
+  ;; Used for inheriting from other VOPs, not needed in the target.
+  (setf sb-c::*backend-parsed-vops* (make-hash-table))
   result)
+
 
 ;;; Check for potentially bad format-control strings
 (defun scan-format-control-strings ()
@@ -449,13 +452,16 @@ Please check that all strings which were not recognizable to the compiler
       (#.(find-package "SB-VM")
        (or (eq accessibility :external)
            ;; overapproximate what we need for contribs and tests
-           (member symbol '(sb-vm::map-referencing-objects
+           (member symbol `(sb-vm::map-referencing-objects
                             sb-vm::map-stack-references
                             sb-vm::reconstitute-object
                             sb-vm::points-to-arena
                             ;; need this for defining a vop which
                             ;; tests the x86-64 allocation profiler
                             sb-vm::pseudo-atomic
+                            ,@(or #+(or x86 x86-64) '(sb-vm::%vector-cas-pair
+                                                      sb-vm::%instance-cas-pair
+                                                      sb-vm::%cons-cas-pair))
                             ;; Naughty outside-world code uses these.
                             #+x86-64 sb-vm::reg-in-size))
            (let ((s (string symbol))) (and (search "THREAD-" s) (search "-SLOT" s)))

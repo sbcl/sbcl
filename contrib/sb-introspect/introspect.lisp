@@ -181,8 +181,10 @@ constant pool."
                               vop
                               (gethash (sb-c::vop-info-name vop)
                                        sb-c::*backend-parsed-vops*))
-          for name = (sb-c::vop-parse-name vop-parse)
-          for loc = (sb-c::vop-parse-source-location vop-parse)
+          for name = (and vop-parse
+                          (sb-c::vop-parse-name vop-parse))
+          for loc = (and vop-parse
+                         (sb-c::vop-parse-source-location vop-parse))
           when loc
           collect (let ((source (translate-source-location loc)))
                     (setf (definition-source-description source)
