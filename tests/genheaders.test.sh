@@ -35,7 +35,7 @@ EOF
 src=$TEST_DIRECTORY/test.c
 obj=$TEST_DIRECTORY/test.o
 # no files exist if the generator test was entirely skipped
-if [ -r $TEST_DIRECTORY/array.h ]
+if [ -r $TEST_DIRECTORY/cons.h ]
 then
     for i in $TEST_DIRECTORY/*.h
     do
