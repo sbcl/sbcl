@@ -3364,6 +3364,56 @@
      (inst set :c carry)
      (inst and :dword carry 1))))
 
+(define-vop (bignum-add-loop)
+  (:args (a :scs (descriptor-reg))
+         (b :scs (descriptor-reg))
+         (la :scs (unsigned-reg) :target remaining-length)
+         (lb :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg)))
+  (:arg-types bignum bignum unsigned-num bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
+  (:temporary (:sc unsigned-reg :from (:argument 3)) remaining-length)
+  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
+  (:generator 10
+    (move length lb)
+    (move remaining-length la)
+    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
+    (inst mov sign-digit-b (ea (- #1# 8) b lb 8))
+    (inst sar sign-digit-a 63)
+    (inst sar sign-digit-b 63)
+
+    (inst sub remaining-length length)
+    (inst inc remaining-length)
+
+    (zeroize index) ;; clears CF as well
+
+    LOOP-B
+    (inst mov n (ea #1# b index 8))
+    (inst adc n (ea #1# a index 8))
+    (inst mov (ea #1# r index 8) n)
+    (inst inc index)
+    (inst dec length)
+    (inst jmp :nz LOOP-B)
+
+    ;; Add the sign digit with carry to the remaining digits of the longest bignum
+    (move length remaining-length) ;; remaining length + 1
+    (inst dec length)
+    (inst jmp :z DONE)
+
+    LOOP-A
+    (inst mov n (ea #1# a index 8))
+    (inst adc n sign-digit-b)
+    (inst mov (ea #1# r index 8) n)
+
+    (inst inc index)
+    (inst dec length)
+
+    (inst jmp :nz LOOP-A)
+
+    DONE
+    (inst adc sign-digit-a sign-digit-b)
+    (inst mov :qword (ea #1# r index 8) sign-digit-a)))
+
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
 (define-vop (sub-w/borrow)
