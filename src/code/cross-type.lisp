@@ -333,7 +333,7 @@
      (ctype-of-number x))
     (array
      ;; It is critical not to inquire of the host for the array's element type.
-     (let ((etype (specifier-type (sb-xc:array-element-type x))))
+     (let ((etype (specifier-type (array-element-type x))))
        (make-array-type (array-dimensions x)
                         ;; complexp relies on the host implementation,
                         ;; but in practice any array for which we need to

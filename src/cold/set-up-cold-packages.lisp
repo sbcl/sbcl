@@ -238,6 +238,7 @@
 
     ;; The cross-compiler itself shouldn't really need to use the host
     ;; versions of these in target code except in exceptional cases.
+    "ARRAY-ELEMENT-TYPE"
     "CHAR-CODE"
     "CODE-CHAR"
     "COMPILE-FILE"
@@ -315,8 +316,7 @@
     ;; removing that to add to the externals, each time shrinking the hashset
     ;; of internals back to nothing. Is there way to not do that?
     (export (intern name package-name) package-name))
-  (dolist (name '("ARRAY-ELEMENT-TYPE"
-                  "DEFMACRO" "DEFSTRUCT" "DEFTYPE"
+  (dolist (name '("DEFMACRO" "DEFSTRUCT" "DEFTYPE"
                   "MAKE-ARRAY"
                   "SIMPLE-VECTOR"
                   "TYPEP"

@@ -129,7 +129,7 @@
           ((unboxed-array (*))
            (and (sb-xc:typep y '(simple-array * 1))
                 (= (length x) (length y))
-                (equal (sb-xc:array-element-type x) (sb-xc:array-element-type y))
+                (equal (array-element-type x) (array-element-type y))
                 (or (typep x '(array nil (*)))
                     (dotimes (i (length x) t)
                       (unless (= (aref x i) (aref y i)) (return nil))))))

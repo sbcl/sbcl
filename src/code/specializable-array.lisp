@@ -101,7 +101,7 @@
   (if (bit-vector-p x)
       sb-vm:simple-bit-vector-widetag
       (sb-vm:saetp-typecode
-       (find (sb-xc:array-element-type x)
+       (find (array-element-type x)
              sb-vm:*specialized-array-element-type-properties*
              :key #'sb-vm:saetp-specifier :test #'equal))))
 
