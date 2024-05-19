@@ -3451,6 +3451,29 @@
     (inst adc sign-digit-a sign-digit-b)
     (inst mov (ea #1# r index 8) sign-digit-a)))
 
+(define-vop (bignum-negate-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg) :to :save))
+  (:arg-types bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index)
+  (:results (last1 :scs (unsigned-reg))
+            (last2 :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 10
+    (zeroize last2)
+    (zeroize index)
+    (move length l)
+    LOOP
+    (move last1 last2)
+    (inst mov last2 0)
+    (inst sbb last2 (ea #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst mov (ea #1# r index 8) last2)
+    (inst inc index)
+    (inst dec length)
+    (inst jmp :nz LOOP)))
+
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
 (define-vop (sub-w/borrow)
