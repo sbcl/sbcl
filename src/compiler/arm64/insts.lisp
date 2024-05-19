@@ -3563,7 +3563,7 @@
                (memq (vop-name vop) safe-vops)
                (and vop
                     (loop for fun in safe-translates
-                          thereis (memq (sb-c::vop-info vop) 
+                          thereis (memq (sb-c::vop-info vop)
                                         (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun)))))
                (and (not safe-vops)
                     (not safe-translates))))))))

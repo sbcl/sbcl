@@ -1024,13 +1024,14 @@
                (loop with carry = 1
                      with i = 0
                      do
-                     (when (= i len-x)
-                       (return))
+
                      (setf last1 last2)
                      (setf (values last2 carry)
                            (%add-with-carry (%lognot (%bignum-ref x i)) 0 carry))
                      (setf (%bignum-ref res i) last2)
-                     (incf i)))
+                     (incf i)
+                     (when (= i len-x)
+                       (return))))
              (when (/= len-res len-x)
                (setf (%bignum-ref res len-x) 0)
                (shiftf last1 last2 0))
@@ -1049,7 +1050,23 @@
 ;;; stay in the provided allocated bignum.
 (declaim (maybe-inline negate-bignum-buffer-in-place))
 (defun negate-bignum-buffer-in-place (bignum bignum-len)
-  (bignum-negate-loop bignum bignum-len bignum)
+  (let* ((carry
+           (multiple-value-bind (value carry)
+               (%add-with-carry (%lognot (%bignum-ref bignum 0)) 1 0)
+             (setf (%bignum-ref bignum 0) value)
+             carry))
+         (i 1)
+         (end bignum-len))
+    (declare (type bit carry)
+             (type bignum-index i)
+             (type bignum-length end))
+    (loop (when (= i end) (return))
+          (multiple-value-bind (value temp)
+              (%add-with-carry (%lognot (%bignum-ref bignum i)) 0 carry)
+            (setf (%bignum-ref bignum i) value)
+            (setf carry temp))
+          (incf i))
+    carry)
   bignum)
 
 (defun negate-bignum-in-place (bignum)
