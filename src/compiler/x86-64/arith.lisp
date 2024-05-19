@@ -3474,6 +3474,23 @@
     (inst dec length)
     (inst jmp :nz LOOP)))
 
+(define-vop (bignum-negate-in-place-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length))
+  (:arg-types bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index temp)
+  (:generator 10
+    (zeroize index)
+    (move length l)
+    LOOP
+    (inst mov temp 0)
+    (inst sbb temp #1=(ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst mov #1# temp)
+    (inst inc index)
+    (inst dec length)
+    (inst jmp :nz LOOP)))
+
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
 (define-vop (sub-w/borrow)

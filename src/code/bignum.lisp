@@ -970,36 +970,6 @@
 
 
 ;;;; negation
-
-;;; This negates bignum-len digits of bignum, storing the resulting digits into
-;;; result (possibly EQ to bignum) and returning whatever end-carry there is.
-(defmacro bignum-negate-loop
-    (bignum bignum-len &optional (result nil resultp))
-  (with-unique-names (carry end value last)
-    `(let* (,@(if (not resultp) `(,last))
-            (,carry
-             (multiple-value-bind (,value ,carry)
-                 (%add-with-carry (%lognot (%bignum-ref ,bignum 0)) 1 0)
-               ,(if resultp
-                    `(setf (%bignum-ref ,result 0) ,value)
-                    `(setf ,last ,value))
-               ,carry))
-            (i 1)
-            (,end ,bignum-len))
-       (declare (type bit ,carry)
-                (type bignum-index i)
-                (type bignum-length ,end))
-       (loop
-         (when (= i ,end) (return))
-         (multiple-value-bind (,value temp)
-             (%add-with-carry (%lognot (%bignum-ref ,bignum i)) 0 ,carry)
-           ,(if resultp
-                `(setf (%bignum-ref ,result i) ,value)
-                `(setf ,last ,value))
-           (setf ,carry temp))
-         (incf i))
-       ,(if resultp carry `(values ,carry ,last)))))
-
 (declaim (inline negate-bignum))
 (defun negate-bignum (x &optional (fully-normalize t))
   (declare (type bignum x)
@@ -1050,23 +1020,26 @@
 ;;; stay in the provided allocated bignum.
 (declaim (maybe-inline negate-bignum-buffer-in-place))
 (defun negate-bignum-buffer-in-place (bignum bignum-len)
-  (let* ((carry
-           (multiple-value-bind (value carry)
-               (%add-with-carry (%lognot (%bignum-ref bignum 0)) 1 0)
-             (setf (%bignum-ref bignum 0) value)
-             carry))
-         (i 1)
-         (end bignum-len))
-    (declare (type bit carry)
-             (type bignum-index i)
-             (type bignum-length end))
-    (loop (when (= i end) (return))
-          (multiple-value-bind (value temp)
-              (%add-with-carry (%lognot (%bignum-ref bignum i)) 0 carry)
-            (setf (%bignum-ref bignum i) value)
-            (setf carry temp))
-          (incf i))
-    carry)
+  (declare (bignum-length bignum-len))
+  (sb-c::if-vop-existsp (:named sb-vm::bignum-negate-in-place-loop)
+    (sb-sys:%primitive sb-vm::bignum-negate-in-place-loop bignum bignum-len)
+    (let* ((carry
+            (multiple-value-bind (value carry)
+                (%add-with-carry (%lognot (%bignum-ref bignum 0)) 1 0)
+              (setf (%bignum-ref bignum 0) value)
+              carry))
+          (i 1)
+          (end bignum-len))
+     (declare (type bit carry)
+              (type bignum-index i)
+              (type bignum-length end))
+     (loop (when (= i end) (return))
+           (multiple-value-bind (value temp)
+               (%add-with-carry (%lognot (%bignum-ref bignum i)) 0 carry)
+             (setf (%bignum-ref bignum i) value)
+             (setf carry temp))
+           (incf i))
+     carry))
   bignum)
 
 (defun negate-bignum-in-place (bignum)

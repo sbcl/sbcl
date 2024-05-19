@@ -1584,6 +1584,22 @@
     (inst sub length length 1)
     (inst cbnz length LOOP)))
 
+(define-vop (bignum-negate-in-place-loop)
+  (:args (a* :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length))
+  (:arg-types bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) a)
+  (:generator 10
+    (inst subs a a* (- other-pointer-lowtag (* bignum-digits-offset n-word-bytes))) ;; set carry
+    (move length l)
+    LOOP
+    (inst ldr tmp-tn (@ a))
+    (inst sbcs tmp-tn zr-tn tmp-tn)
+    (inst str tmp-tn (@ a n-word-bytes :post-index))
+    (inst sub length length 1)
+    (inst cbnz length LOOP)))
+
 (define-vop (sub-w/borrow)
   (:translate sb-bignum:%subtract-with-borrow)
   (:policy :fast-safe)
