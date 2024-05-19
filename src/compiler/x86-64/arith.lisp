@@ -3364,154 +3364,6 @@
      (inst set :c carry)
      (inst and :dword carry 1))))
 
-(define-vop (bignum-add-loop)
-  (:args (a :scs (descriptor-reg) :to :save)
-         (b :scs (descriptor-reg) :to :save)
-         (la :scs (unsigned-reg) :target remaining-length)
-         (lb :scs (unsigned-reg) :target length)
-         (r :scs (descriptor-reg)))
-  (:arg-types bignum bignum unsigned-num bignum unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
-  (:temporary (:sc unsigned-reg :from (:argument 3)) remaining-length)
-  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
-  (:generator 10
-    (move remaining-length la)
-    (move length lb)
-    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
-    (inst mov sign-digit-b (ea (- #1# 8) b lb 8))
-    (inst sar sign-digit-a 63)
-    (inst sar sign-digit-b 63)
-
-    (inst sub remaining-length length)
-    (inst inc remaining-length)
-
-    (zeroize index) ;; clears CF as well
-
-    LOOP-B
-    (inst mov n (ea #1# b index 8))
-    (inst adc n (ea #1# a index 8))
-    (inst mov (ea #1# r index 8) n)
-    (inst inc index)
-    (inst dec length)
-    (inst jmp :nz LOOP-B)
-
-    ;; Add the sign digit with carry to the remaining digits of the longest bignum
-    (move length remaining-length) ;; remaining length + 1
-    (inst dec length)
-    (inst jmp :z DONE)
-
-    LOOP-A
-    (inst mov n (ea #1# a index 8))
-    (inst adc n sign-digit-b)
-    (inst mov (ea #1# r index 8) n)
-
-    (inst inc index)
-    (inst dec length)
-
-    (inst jmp :nz LOOP-A)
-
-    DONE
-    (inst adc sign-digit-a sign-digit-b)
-    (inst mov (ea #1# r index 8) sign-digit-a)))
-
-(define-vop (bignum-add-word-loop)
-  (:args (a :scs (descriptor-reg) :to :save)
-         (b :scs (unsigned-reg) :target n)
-         (la :scs (unsigned-reg) :target length)
-         (r :scs (descriptor-reg)))
-  (:arg-types bignum unsigned-num unsigned-num bignum)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) n)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
-  (:temporary (:sc unsigned-reg) index sign-digit-a sign-digit-b)
-  (:generator 10
-    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
-    (inst mov sign-digit-b n)
-    (inst sar sign-digit-a 63)
-    (inst sar sign-digit-b 63)
-    (move n b)
-    (move length la)
-
-    (inst add n (ea #1# a))
-    (inst mov (ea #1# r) n)
-    (inst mov index 1)
-    (inst dec length)
-    (inst jmp :z DONE)
-
-    LOOP-A
-    (inst mov n (ea #1# a index 8))
-    (inst adc n sign-digit-b)
-    (inst mov (ea #1# r index 8) n)
-
-    (inst inc index)
-    (inst dec length)
-
-    (inst jmp :nz LOOP-A)
-
-    DONE
-    (inst adc sign-digit-a sign-digit-b)
-    (inst mov (ea #1# r index 8) sign-digit-a)))
-
-(define-vop (bignum-negate-loop)
-  (:args (a :scs (descriptor-reg) :to :save)
-         (l :scs (unsigned-reg) :target length)
-         (r :scs (descriptor-reg) :to :save))
-  (:arg-types bignum unsigned-num bignum)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
-  (:temporary (:sc unsigned-reg) index)
-  (:results (last1 :scs (unsigned-reg))
-            (last2 :scs (unsigned-reg)))
-  (:result-types unsigned-num unsigned-num)
-  (:generator 10
-    (zeroize last2)
-    (zeroize index)
-    (move length l)
-    LOOP
-    (move last1 last2)
-    (inst mov last2 0)
-    (inst sbb last2 (ea #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
-    (inst mov (ea #1# r index 8) last2)
-    (inst inc index)
-    (inst dec length)
-    (inst jmp :nz LOOP)))
-
-(define-vop (bignum-negate-in-place-loop)
-  (:args (a :scs (descriptor-reg) :to :save)
-         (l :scs (unsigned-reg) :target length))
-  (:arg-types bignum unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
-  (:temporary (:sc unsigned-reg) index temp)
-  (:generator 10
-    (zeroize index)
-    (move length l)
-    LOOP
-    (inst mov temp 0)
-    (inst sbb temp #1=(ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
-    (inst mov #1# temp)
-    (inst inc index)
-    (inst dec length)
-    (inst jmp :nz LOOP)))
-
-(define-vop (bignum-negate-last-two-loop)
-  (:args (a :scs (descriptor-reg) :to :save)
-         (l :scs (unsigned-reg) :target length))
-  (:arg-types bignum unsigned-num)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
-  (:temporary (:sc unsigned-reg) index)
-  (:results (last1 :scs (unsigned-reg))
-            (last2 :scs (unsigned-reg)))
-  (:result-types unsigned-num unsigned-num)
-  (:generator 10
-    (zeroize last2)
-    (zeroize index)
-    (move length l)
-    LOOP
-    (move last1 last2)
-    (inst mov last2 0)
-    (inst sbb last2 (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
-    (inst inc index)
-    (inst dec length)
-    (inst jmp :nz LOOP)))
-
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
 (define-vop (sub-w/borrow)
@@ -3537,6 +3389,154 @@
     (unless (eq (tn-kind borrow) :unused)
       (inst mov borrow 1)
       (inst sbb :dword borrow 0))))
+
+(define-vop (bignum-add-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (b :scs (descriptor-reg) :to :save)
+         (la :scs (unsigned-reg) :target remaining-length)
+         (lb :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg)))
+  (:arg-types bignum bignum unsigned-num bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
+  (:temporary (:sc unsigned-reg :from (:argument 3)) remaining-length)
+  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
+  (:generator 10
+    (move remaining-length la :dword)
+    (move length lb :dword)
+    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
+    (inst mov sign-digit-b (ea (- #1# 8) b lb 8))
+    (inst sar sign-digit-a 63)
+    (inst sar sign-digit-b 63)
+
+    (inst sub :dword remaining-length length)
+    (inst inc :dword remaining-length)
+
+    (zeroize index) ;; clears CF as well
+
+    LOOP-B
+    (inst mov n (ea #1# b index 8))
+    (inst adc n (ea #1# a index 8))
+    (inst mov (ea #1# r index 8) n)
+    (inst inc :dword index)
+    (inst dec :dword length)
+    (inst jmp :nz LOOP-B)
+
+    ;; Add the sign digit with carry to the remaining digits of the longest bignum
+    (move length remaining-length :dword) ;; remaining length + 1
+    (inst dec :dword length)
+    (inst jmp :z DONE)
+
+    LOOP-A
+    (inst mov n (ea #1# a index 8))
+    (inst adc n sign-digit-b)
+    (inst mov (ea #1# r index 8) n)
+
+    (inst inc :dword index)
+    (inst dec :dword length)
+
+    (inst jmp :nz LOOP-A)
+
+    DONE
+    (inst adc sign-digit-a sign-digit-b)
+    (inst mov (ea #1# r index 8) sign-digit-a)))
+
+(define-vop (bignum-add-word-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (b :scs (unsigned-reg) :target n)
+         (la :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) n)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) length)
+  (:temporary (:sc unsigned-reg) index sign-digit-a sign-digit-b)
+  (:generator 10
+    (inst mov sign-digit-a (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) a la 8))
+    (inst mov sign-digit-b n)
+    (inst sar sign-digit-a 63)
+    (inst sar sign-digit-b 63)
+    (move n b)
+    (move length la :dword)
+
+    (inst add n (ea #1# a))
+    (inst mov (ea #1# r) n)
+    (inst mov :dword index 1)
+    (inst dec :dword length)
+    (inst jmp :z DONE)
+
+    LOOP-A
+    (inst mov n (ea #1# a index 8))
+    (inst adc n sign-digit-b)
+    (inst mov (ea #1# r index 8) n)
+
+    (inst inc :dword index)
+    (inst dec :dword length)
+
+    (inst jmp :nz LOOP-A)
+
+    DONE
+    (inst adc sign-digit-a sign-digit-b)
+    (inst mov (ea #1# r index 8) sign-digit-a)))
+
+(define-vop (bignum-negate-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg) :to :save))
+  (:arg-types bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index)
+  (:results (last1 :scs (unsigned-reg))
+            (last2 :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 10
+    (zeroize last2)
+    (zeroize index)
+    (move length l :dword)
+    LOOP
+    (move last1 last2)
+    (inst mov last2 0)
+    (inst sbb last2 (ea #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst mov (ea #1# r index 8) last2)
+    (inst inc :dword index)
+    (inst dec :dword length)
+    (inst jmp :nz LOOP)))
+
+(define-vop (bignum-negate-in-place-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length))
+  (:arg-types bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index temp)
+  (:generator 10
+    (zeroize index)
+    (move length l :dword)
+    LOOP
+    (inst mov temp 0)
+    (inst sbb temp #1=(ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst mov #1# temp)
+    (inst inc :dword index)
+    (inst dec :dword length)
+    (inst jmp :nz LOOP)))
+
+(define-vop (bignum-negate-last-two-loop)
+  (:args (a :scs (descriptor-reg) :to :save)
+         (l :scs (unsigned-reg) :target length))
+  (:arg-types bignum unsigned-num)
+  (:temporary (:sc unsigned-reg :from (:argument 1)) length)
+  (:temporary (:sc unsigned-reg) index)
+  (:results (last1 :scs (unsigned-reg))
+            (last2 :scs (unsigned-reg)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 10
+    (zeroize last2)
+    (zeroize index)
+    (move length l :dword)
+    LOOP
+    (move last1 last2)
+    (inst mov last2 0)
+    (inst sbb last2 (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst inc :dword index)
+    (inst dec :dword length)
+    (inst jmp :nz LOOP)))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)

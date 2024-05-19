@@ -1478,6 +1478,28 @@
     (unless (eq (tn-kind carry) :unused)
       (inst cset carry :cs))))
 
+(define-vop (sub-w/borrow)
+  (:translate sb-bignum:%subtract-with-borrow)
+  (:policy :fast-safe)
+  (:args (a :scs (unsigned-reg))
+         (b :scs (unsigned-reg))
+         (c :scs (unsigned-reg any-reg immediate)))
+  (:arg-types unsigned-num unsigned-num positive-fixnum)
+  (:results (result :scs (unsigned-reg))
+            (borrow :scs (unsigned-reg) :from :eval))
+  (:optional-results borrow)
+  (:result-types unsigned-num positive-fixnum)
+  (:generator 4
+    (cond ((and (sc-is c immediate)
+                (eql (tn-value c) 1))
+           (inst subs result a b))
+          (t
+           (inst cmp c 1)
+           (inst sbcs result a b)))
+
+    (unless (eq (tn-kind borrow) :unused)
+      (inst cset borrow :cs))))
+
 (define-vop (bignum-add-loop)
   (:args (a* :scs (descriptor-reg))
          (b* :scs (descriptor-reg))
@@ -1619,28 +1641,6 @@
     (inst sbcs last2 zr-tn last2)
     (inst sub length length 1)
     (inst cbnz length LOOP)))
-
-(define-vop (sub-w/borrow)
-  (:translate sb-bignum:%subtract-with-borrow)
-  (:policy :fast-safe)
-  (:args (a :scs (unsigned-reg))
-         (b :scs (unsigned-reg))
-         (c :scs (unsigned-reg any-reg immediate)))
-  (:arg-types unsigned-num unsigned-num positive-fixnum)
-  (:results (result :scs (unsigned-reg))
-            (borrow :scs (unsigned-reg) :from :eval))
-  (:optional-results borrow)
-  (:result-types unsigned-num positive-fixnum)
-  (:generator 4
-    (cond ((and (sc-is c immediate)
-                (eql (tn-value c) 1))
-           (inst subs result a b))
-          (t
-           (inst cmp c 1)
-           (inst sbcs result a b)))
-
-    (unless (eq (tn-kind borrow) :unused)
-      (inst cset borrow :cs))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
