@@ -70,6 +70,8 @@
            function-with-layout-p
            non-null-symbol-p)
     (t) boolean (movable foldable flushable))
+(defknown unsigned-byte-x-p
+    (t (integer 1)) boolean (movable foldable flushable))
 
 (defknown car-eq-if-listp (t t) boolean (movable foldable flushable))
 

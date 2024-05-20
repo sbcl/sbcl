@@ -399,6 +399,13 @@
              ((type= type (specifier-type '(or word sb-vm:signed-word)))
               `(or (typep ,object 'sb-vm:signed-word)
                    (typep ,object 'word)))
+             ((and (vop-existsp :translate unsigned-byte-x-p)
+                   (eql (numeric-type-class type) 'integer)
+                   (eql low 0)
+                   (integerp high)
+                   (= (logcount (1+ high)) 1)
+                   (zerop (rem (integer-length high) sb-vm:n-word-bits)))
+              `(unsigned-byte-x-p ,object ,(integer-length high)))
              (t
               `(and (typep ,object ',base)
                     ,(transform-numeric-bound-test object type base)))))

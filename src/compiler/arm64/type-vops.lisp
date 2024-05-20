@@ -329,6 +329,59 @@
       (values))
     NOT-TARGET))
 
+(define-vop (unsigned-byte-x-p type-predicate)
+  (:arg-types * (:constant (integer 1)))
+  (:translate sb-c::unsigned-byte-x-p)
+  (:info target not-p x)
+  (:temporary (:sc unsigned-reg) last-digit)
+  (:generator 10
+    (let* ((type (tn-ref-type args))
+           (fixnum-p (types-equal-or-intersect type (specifier-type 'fixnum)))
+           (integer-p (csubtypep type (specifier-type 'integer)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
+           (unsigned-p (not (types-equal-or-intersect type (specifier-type '(integer * -1))))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (cond ((not other-pointer-p)
+                 ;; Move to a temporary and mask off the lowtag,
+                 ;; but leave the sign bit for testing for positive fixnums.
+                 ;; When using 32-bit registers that bit will not be visible.
+                 (inst and last-digit value (logior (ash 1 (1- n-word-bits)) lowtag-mask)))
+                (fixnum-p
+                 (move last-digit value)))
+          (when fixnum-p
+            (%test-fixnum last-digit nil (if unsigned-p
+                                             yep
+                                             fixnum) nil))
+          (unless other-pointer-p
+            (inst cmp (32-bit-reg last-digit) other-pointer-lowtag)
+            (inst b :ne nope))
+          ;; Get the header.
+          (loadw temp value 0 other-pointer-lowtag)
+          (unless integer-p
+            (inst and tmp-tn temp widetag-mask)
+            (inst cmp tmp-tn bignum-widetag)
+            (inst b :ne nope))
+          #.(assert (= (integer-length bignum-widetag) 5))
+          (inst add last-digit value (lsr temp 5))
+          (inst ldr last-digit (@ last-digit (- other-pointer-lowtag)))
+          (inst lsr temp temp n-widetag-bits)
+          (inst cmp temp (add-sub-immediate (1+ (/ x n-word-bits))))
+          (inst b :gt nope)
+          (inst b :lt fixnum)
+          ;; Is it a sign-extended sign bit
+          (inst cbnz last-digit nope)
+
+          fixnum
+          (unless unsigned-p
+            (if not-p
+                (inst tbnz* last-digit (1- n-word-bits) target)
+                (inst tbz* last-digit (1- n-word-bits) target))))))
+    NOT-TARGET))
+
 (define-vop (unsigned-byte-64-p-move-to-word unsigned-byte-64-p)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
