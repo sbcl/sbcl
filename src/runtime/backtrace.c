@@ -56,13 +56,10 @@ debug_function_name_from_pc (struct code* code, void *pc)
 
     uword_t offset = (char*)pc - code_text_start(code);
 
-    struct vector *v;
-    int i, len;
-
-    v = VECTOR(di->fun_map);
-
-    len = vector_len(v);
+    struct vector *v = VECTOR(di->fun_map);
+    sword_t len = vector_len(v);
     unsigned char *map = (unsigned char*)v->data;
+
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
     int compressed = widetag_of(&v->header) == SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG;
     if (compressed)
@@ -76,7 +73,7 @@ debug_function_name_from_pc (struct code* code, void *pc)
     lispobj last_name = 0;
     lispobj name = di->name;
 
-    i = 0;
+    int i = 0;
     while (i < len) {
         unsigned char options = map[i++];
         unsigned char flags = map[i++];
