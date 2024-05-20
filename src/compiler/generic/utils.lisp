@@ -441,7 +441,7 @@
 
 ;;; Convert # of "big digits" (= words, sometimes called "limbs") to a header value.
 (defmacro bignum-header-for-length (n)
-  (logior (ash n n-widetag-bits) bignum-widetag))
+  `(logior (ash ,n n-widetag-bits) bignum-widetag))
 
 (defmacro id-bits-offset ()
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))

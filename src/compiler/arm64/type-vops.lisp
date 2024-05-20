@@ -371,9 +371,16 @@
           (inst lsr temp temp n-widetag-bits)
           (inst cmp temp (add-sub-immediate (1+ (/ x n-word-bits))))
           (inst b :gt nope)
-          (inst b :lt fixnum)
+          (inst b :lt (if unsigned-p
+                          yep
+                          fixnum))
           ;; Is it a sign-extended sign bit
-          (inst cbnz last-digit nope)
+          (cond ((not unsigned-p)
+                 (inst cbnz last-digit nope))
+                (not-p
+                 (inst cbnz last-digit target))
+                (t
+                 (inst cbz last-digit target)))
 
           fixnum
           (unless unsigned-p
