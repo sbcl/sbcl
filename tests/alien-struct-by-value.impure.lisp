@@ -14,11 +14,20 @@
 ;(in-package :cl-user)
 ;;;; Bug 313202: C struct pass/return by value
 ;;; Compile and load shared library
-(unless (probe-file "alien-struct-by-value.so")
-  (sb-ext:run-program "/bin/sh" '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                                  "-o" "alien-struct-by-value.so"
-                                  "alien-struct-by-value.c")))
-(load-shared-object (truename "alien-struct-by-value.so"))
+
+#+win32
+(with-scratch-file (dll "dll")
+  (sb-ext:run-program "gcc" `("-shared" "-o" ,dll "alien-struct-by-value.c")
+                      :search t)
+  (load-shared-object dll))
+#-win32
+(progn
+  (unless (probe-file "alien-struct-by-value.so")
+    (sb-ext:run-program "/bin/sh" '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                                    "-o" "alien-struct-by-value.so"
+                                    "alien-struct-by-value.c")))
+  (load-shared-object (truename "alien-struct-by-value.so")))
+
 (defmacro assert-unimplemented (def)
   `(assert-error (eval ',def)))
 ;;; Tiny struct, alignment 8
@@ -55,4 +64,4 @@
      (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))))
 
 ;;; Clean up
-(delete-file "alien-struct-by-value.so")
+#-win32 (delete-file "alien-struct-by-value.so")

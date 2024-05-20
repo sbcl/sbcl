@@ -490,13 +490,13 @@ UNIX epoch: January 1st 1970."
   "Return file write date, represented as CL universal time."
   (with-alien ((file-attributes file-attributes))
     (syscall (("GetFileAttributesEx" t) lispbool
-              system-string int file-attributes)
+              system-string int (* file-attributes))
              (and result
                   (- (floor (deref (cast (slot file-attributes 'mtime)
                                          (* filetime)))
                             +filetime-unit+)
                      +common-lisp-epoch-filetime-seconds+))
-             native-namestring 0 file-attributes)))
+             native-namestring 0 (addr file-attributes))))
 
 (defun native-probe-file-name (native-namestring)
   "Return truename \(using GetLongPathName\) as primary value,
@@ -507,7 +507,7 @@ absense."
   (with-alien ((file-attributes file-attributes)
                (buffer long-pathname-buffer))
     (syscall (("GetFileAttributesEx" t) lispbool
-              system-string int file-attributes)
+              system-string int (* file-attributes))
              (values
               (syscall (("GetLongPathName" t) dword
                         system-string long-pathname-buffer dword)
@@ -516,7 +516,7 @@ absense."
               (and result
                    (attribute-file-kind
                     (slot file-attributes 'attributes))))
-             native-namestring 0 file-attributes)))
+             native-namestring 0 (addr file-attributes))))
 
 (defun native-delete-file (native-namestring)
   (syscall (("DeleteFile" t) lispbool system-string)
@@ -532,7 +532,7 @@ absense."
   (when namestring
     (with-alien ((find-data find-data))
       (with-handle (handle (syscall (("FindFirstFile" t) handle
-                                     system-string find-data)
+                                     system-string (* find-data))
                                     (if (eql result invalid-handle)
                                         (if errorp
                                             (win32-error "FindFirstFile")
@@ -540,7 +540,7 @@ absense."
                                         result)
                                     (concatenate 'string
                                                  namestring "*.*")
-                                    find-data)
+                                    (addr find-data))
                     :close-operator find-close)
         (let ((more t))
           (dx-flet ((one-iter ()
@@ -552,8 +552,9 @@ absense."
                                  (attributes (slot find-data 'attributes)))
                              (setf more
                                    (syscall (("FindNextFile" t) lispbool
-                                             handle find-data) result
-                                             handle find-data))
+                                             handle (* find-data))
+                                            result
+                                            handle (addr find-data)))
                              (cond ((equal name ".") (go :next))
                                    ((equal name "..") (go :next))
                                    (t
