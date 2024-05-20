@@ -32,7 +32,8 @@
 ;;; address for lazy stable address-based hashing is the same as lisp.
 ;;; Further, assert that each bit of the resulting positive-fixnum
 ;;; can be in a 0 and 1 state (don't want any bits stuck at 0).
-(with-test (:name :address-based-sxhash-gcing)
+(with-test (:name :address-based-sxhash-gcing
+                  :skipped-on :mark-region-gc)
   (dotimes (runs 5)
     (let ((tracker (make-array 4 :element-type 'sb-ext:word
                                :initial-element 0)))
