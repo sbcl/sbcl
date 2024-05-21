@@ -15,21 +15,27 @@
 ;;;; Bug 313202: C struct pass/return by value
 ;;; Compile and load shared library
 
+(defvar *soname*)
 #+win32
 (with-scratch-file (dll "dll")
   (sb-ext:run-program "gcc" `("-shared" "-o" ,dll "alien-struct-by-value.c")
                       :search t)
-  (load-shared-object dll))
+  (setq *soname* dll))
 #-win32
 (progn
   (unless (probe-file "alien-struct-by-value.so")
     (sb-ext:run-program "/bin/sh" '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
                                     "-o" "alien-struct-by-value.so"
                                     "alien-struct-by-value.c")))
-  (load-shared-object (truename "alien-struct-by-value.so")))
+  (setq *soname* (truename "alien-struct-by-value.so")))
+(load-shared-object *soname*)
 
 (defmacro assert-unimplemented ((&whole def dar name ret &optional (arg nil argp)))
-  `(assert-error (eval '(progn ,def ,(if argp `(with-alien ((x ,(second arg))) (,name x)) '(name))))))
+  (declare (ignore dar ret))
+  ;; all the "caught 1 fatal ERROR" notices are scary to those not expecting to see them
+  `(let ((*error-output* (make-broadcast-stream)))
+     (assert-error (eval '(progn ,def
+                           ,(if argp `(with-alien ((x ,(second arg))) (,name x)) '(name)))))))
 
 ;;; Tiny struct, alignment 8
 (define-alien-type nil (struct tiny-align-8 (m0 (integer 64))))
@@ -65,4 +71,4 @@
      (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))))
 
 ;;; Clean up
-#-win32 (delete-file "alien-struct-by-value.so")
+#-win32 (ignore-errors (delete-file *soname*))

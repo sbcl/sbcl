@@ -1,7 +1,8 @@
 ;;; This comment might make sourceforge stop thinking that the file
 ;;; is binary its diff view.
 ;;; Or not.
-(("aprof.impure.lisp"
+(("alien-struct-by-value.impure.lisp" "tests/alien-struct-by-value.so")
+ ("aprof.impure.lisp"
   "src/code/aprof.lisp"
   "src/code/shaketree.lisp")
  ("avltree.pure.lisp" "tests/bbtree-test-util.lisp")
