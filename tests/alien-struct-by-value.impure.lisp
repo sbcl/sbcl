@@ -29,7 +29,7 @@
   (load-shared-object (truename "alien-struct-by-value.so")))
 
 (defmacro assert-unimplemented ((&whole def dar name ret &optional (arg nil argp)))
-  `(assert-error (eval '(progn ,def ,(if argp `(with-alien ((x ,(second arg))) (,name (addr x))) '(name))))))
+  `(assert-error (eval '(progn ,def ,(if argp `(with-alien ((x ,(second arg))) (,name x)) '(name))))))
 
 ;;; Tiny struct, alignment 8
 (define-alien-type nil (struct tiny-align-8 (m0 (integer 64))))
