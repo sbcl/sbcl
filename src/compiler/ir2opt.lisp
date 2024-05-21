@@ -1139,7 +1139,8 @@
           (vop-bind (bind-value :info bind-symbol) () bind
             (when (and (eq symbol-value bind-value)
                        (constant-tn-p symbol)
-                       (eq bind-symbol (tn-value symbol)))
+                       (eq bind-symbol (tn-value symbol))
+                       (very-temporary-p symbol-value))
               (emit-and-insert-vop (vop-node bind)
                                    (vop-block bind)
                                    (template-or-lose 'sb-vm::rebind)

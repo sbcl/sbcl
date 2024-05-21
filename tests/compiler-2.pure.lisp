@@ -4428,3 +4428,13 @@
            (sort x f :key key)))
     ((nil #'funcall nil) (condition 'program-error))
     ((nil #'list nil) nil)))
+
+(with-test (:name :dont-rebind)
+  (let ((* :dont-rebind))
+   (checked-compile-and-assert
+    ()
+    `(lambda ()
+       (let* ((x *)
+              (* x))
+         x))
+    (() :dont-rebind))))

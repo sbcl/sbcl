@@ -3,6 +3,7 @@
 changes relative to sbcl-2.4.4:
   * enhancement: try to find source locations for code expanded from macros
     that copy its input forms. When (> debug 1).
+  * optimization: faster bignum addition and negation on arm64, x86-64.
 
 changes in sbcl-2.4.4 relative to sbcl-2.4.3:
   * minor incompatible change: after-GC hooks are now called in the finalizer
