@@ -1702,8 +1702,13 @@ uninterned."
         (let ((internal (package-internal-symbols package))
               (external (package-external-symbols package)))
           (dolist (sym syms)
-            (add-symbol external sym)
-            (nuke-symbol internal sym t))))
+            ;; no error if this condition is false: inaccessibility
+            ;; and subsequent conflicts handled above by IMPORT can
+            ;; mean that some symbols in the original export list are
+            ;; not exportable.
+            (when (eql (find-symbol (symbol-name sym) package) sym)
+              (add-symbol external sym)
+              (nuke-symbol internal sym t)))))
       t)))
 
 ;;; Check that all symbols are accessible, then move from external to internal.

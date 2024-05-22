@@ -3,6 +3,8 @@
 changes relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT are
     resolved once for each name, rather than pairwise.
+  * bug fix: EXPORT could be tricked into exporting two distinct symbols of
+    the same name from the same package.
 
 changes in sbcl-2.4.5 relative to sbcl-2.4.4:
   * incompatible change: attempting to pass or return alien structs by value
