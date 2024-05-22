@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.5:
+  * enhancement: name conflicts resulting from colliding symbols in IMPORT are
+    resolved once for each name, rather than pairwise.
+
 changes in sbcl-2.4.5 relative to sbcl-2.4.4:
   * incompatible change: attempting to pass or return alien structs by value
     now signals errors.  Previously, such attempts would silently tend to

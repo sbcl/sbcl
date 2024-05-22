@@ -1485,15 +1485,21 @@ Experimental: interface subject to change."
              (name-conflict-symbols c)))))
 
 (defun name-conflict (package function datum &rest symbols)
-  (flet ((importp (c)
+  (flet ((import1p (c)
            (declare (ignore c))
-           (eq 'import function))
+           (and (eq 'import function)
+                ;; exactly two symbols are involved in the conflict
+                (null (cddr symbols)) (null (cdr datum))
+                ;; one of the symbols is already accessible in the package
+                (nth-value 1 (find-symbol (symbol-name (car datum)) package))))
          (use-or-export-p (c)
            (declare (ignore c))
            (or (eq 'use-package function)
                (eq 'export function)))
          (old-symbol ()
-           (car (remove datum symbols))))
+           (ecase function
+             ((export use-package) (car (remove datum symbols)))
+             (import (find-symbol (symbol-name (car datum)) package)))))
     (let ((pname (package-name package)))
       (restart-case
           (error 'name-conflict :package package :symbols symbols
@@ -1525,19 +1531,18 @@ Experimental: interface subject to change."
           (dolist (s symbols)
             (when (eq s (find-symbol (symbol-name s) package))
               (unintern s package))))
-        ;; IMPORT
+        ;; IMPORT with a pair of symbols conflicting.
         (shadowing-import-it ()
           :report (lambda (s)
                     (format s "Shadowing-import ~S, uninterning ~S."
-                            datum (old-symbol)))
-          :test importp
+                            (car datum) (old-symbol)))
+          :test import1p
           (shadowing-import datum package))
         (dont-import-it ()
           :report (lambda (s)
                     (format s "Don't import ~S, keeping ~S."
-                            datum
-                            (car (remove datum symbols))))
-          :test importp)
+                            (car datum) (old-symbol)))
+          :test import1p)
         ;; General case. This is exposed via SB-EXT.
         (resolve-conflict (chosen-symbol)
           :report "Resolve conflict."
@@ -1562,7 +1567,7 @@ Experimental: interface subject to change."
                     (return (list (nth (1- i) symbols))))))))
           (multiple-value-bind (package-symbol status)
               (find-symbol (symbol-name chosen-symbol) package)
-            (let* ((accessiblep status)     ; never NIL here
+            (let* ((accessiblep status)
                    (presentp (and accessiblep
                                   (not (eq :inherited status)))))
               (ecase function
@@ -1585,7 +1590,7 @@ Experimental: interface subject to change."
                      (if (eq package-symbol chosen-symbol)
                          nil                ; re-importing the same symbol
                          (shadowing-import (list chosen-symbol) package))
-                     (shadowing-import (list chosen-symbol) package)))))))))))
+                     (import (list chosen-symbol) package)))))))))))
 
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
@@ -1745,6 +1750,22 @@ uninterned."
 ;;; in the keyword package, then IMPORT should share that characteristic of INTERN.
 ;;; As noted at SB-INT:SELF-EVALUATING-P, there is precedent for it.
 ;;;
+(defmacro do-symbol-name-groups (((name syms) symbols) &body body)
+  (sb-int:with-unique-names (table sym next entryp k v)
+    `(let ((,table (make-hash-table :test 'equal)))
+       (dolist (,sym ,symbols)
+         (pushnew ,sym (gethash (symbol-name ,sym) ,table)))
+       (block nil
+         (with-hash-table-iterator (,next ,table)
+           (loop
+             (multiple-value-bind (,entryp ,k ,v)
+                 (,next)
+               (unless ,entryp
+                 (return))
+               (let ((,name ,k)
+                     (,syms (nreverse ,v)))
+                 ,@body))))))))
+
 (defun import (symbols &optional (package (sane-package)))
   "Make SYMBOLS accessible as internal symbols in PACKAGE. If a symbol is
 already accessible then it has no effect. If a name conflict would result from
@@ -1755,18 +1776,16 @@ the importation, then a correctable error is signalled."
            (homeless (remove-if #'sb-xc:symbol-package symbols))
            (syms ()))
       (with-single-package-locked-error ()
-        (dolist (sym symbols)
-          (multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
+        (do-symbol-name-groups ((n ss) symbols)
+          (multiple-value-bind (s w) (find-symbol n package)
             (cond ((not w)
-                   (let ((found (member sym syms :test #'string=)))
-                     (if found
-                         (when (not (eq (car found) sym))
-                           (setf syms (remove (car found) syms))
-                           (name-conflict package 'import sym sym (car found)))
-                         (push sym syms))))
-                  ((not (eq s sym))
-                   (name-conflict package 'import sym sym s))
-                  ((eq w :inherited) (push sym syms)))))
+                   (if (not (null (cdr ss)))
+                       (apply #'name-conflict package 'import ss ss)
+                       (push (car ss) syms)))
+                  ((and (eql (car ss) s) (null (cdr ss)))
+                   (if (eq w :inherited) (push s syms)))
+                  (t
+                   (apply #'name-conflict package 'import ss (adjoin s ss))))))
         (when (or homeless syms)
           (let ((union (delete-duplicates (append homeless syms))))
             (assert-package-unlocked package "importing symbol~P ~{~A~^, ~}"

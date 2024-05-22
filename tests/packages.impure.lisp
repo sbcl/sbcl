@@ -272,7 +272,7 @@ if a restart was invoked."
       (is (eq 'CL:NIL
               (sym "BAZ" "NIL"))))))
 
-(with-test (:name :import-single-conflict :fails-on :sbcl)
+(with-test (:name :import-single-conflict)
   (with-packages (("FOO" (:export "NIL"))
                   ("BAR" (:export "NIL"))
                   ("BAZ" (:use)))
@@ -372,6 +372,19 @@ if a restart was invoked."
            (assert (eq (intern "FOO" p1) (intern "FOO" p2))))
       (when p1 (delete-package p1))
       (when p2 (delete-package p2)))))
+
+(with-test (:name :no-quick-name-conflict-resolution-import-two)
+  (let ((p (make-package "NO-QUICK-NAME-CONFLICT-RESOLUTION-IMPORT-TWO")))
+    (unwind-protect
+         (handler-bind ((name-conflict
+                          (lambda (c)
+                            (assert (not (find-restart 'sb-impl::dont-import-it)))
+                            (assert (not (find-restart 'sb-impl::shadowing-import-it)))
+                            (invoke-restart 'abort))))
+           (restart-case
+               (import (list (make-symbol "FOO") (make-symbol "FOO")) p)
+             (abort ())))
+      (when p (delete-package p)))))
 
 (with-test (:name :quick-name-conflict-resolution-export.1)
   (let (p1 p2)
