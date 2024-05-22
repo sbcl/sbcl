@@ -20,15 +20,15 @@
 (with-scratch-file (dll "dll")
   (sb-ext:run-program "gcc" `("-shared" "-o" ,dll "alien-struct-by-value.c")
                       :search t)
-  (setq *soname* dll))
+  (load-shared-object dll))
 #-win32
 (progn
   (unless (probe-file "alien-struct-by-value.so")
     (sb-ext:run-program "/bin/sh" '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
                                     "-o" "alien-struct-by-value.so"
                                     "alien-struct-by-value.c")))
-  (setq *soname* (truename "alien-struct-by-value.so")))
-(load-shared-object *soname*)
+  (setq *soname* (truename "alien-struct-by-value.so"))
+  (load-shared-object *soname*))
 
 (defmacro assert-unimplemented ((&whole def dar name ret &optional (arg nil argp)))
   (declare (ignore dar ret))
