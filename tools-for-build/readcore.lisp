@@ -69,16 +69,24 @@
   (let* ((hashset (translate (symbol-global-value symbol) spacemap))
          (storage (translate (sb-impl::hashset-storage hashset) spacemap))
          (cells (translate (sb-impl::hss-cells storage) spacemap))
+         (hv (translate (sb-impl::hss-hash-vector storage) spacemap))
+         (pslv (translate (sb-impl::hss-psl-vector storage) spacemap))
          (n (length (the simple-vector cells)))
+         (capacity (- n 3))
          (*print-pretty* nil)
+         (*print-base* 16)
+         (*print-radix* t)
          (*print-length* nil)
          (*print-level* nil))
     (dotimes (i n)
-      (let ((elt (svref cells i)))
-        ;; skip unused cells, but do show NIL and unbound-maker
-        (unless (eql elt 0) ; unused
-          (format t " [~4d]=~S~%" i (convert-to-host-object elt spacemap)))))))
+      (let ((elt (convert-to-host-object (svref cells i) spacemap)))
+        (cond ((>= i capacity) ; trailing data
+               (format t " (~5d ~S)~%" i elt))
+              ;; skip over never-used cells, but do show NIL and unbound-maker
+              ((not (eq elt 0))
+               (format t " (~5d #x~4,'0x ~D ~S)~%" i (aref hv i) (aref pslv i) elt)))))))
 
+(export 'dump-pathname-hashsets)
 (defun dump-pathname-hashsets (corefile-name)
   (with-open-file (input corefile-name :element-type '(unsigned-byte 8))
     (binding* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
