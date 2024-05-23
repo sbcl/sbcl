@@ -182,7 +182,7 @@ if a restart was invoked."
       (is (equal (list (sym "BAZ" "SYM") :internal)
                  (multiple-value-list (sym "BAZ" "SYM")))))))
 
-(with-test (:name :use-package-conflict-set :fails-on :sbcl)
+(with-test (:name :use-package-conflict-set)
   (with-packages (("FOO" (:export "SYM"))
                   ("QUX" (:export "SYM"))
                   ("BAR" (:intern "SYM"))
@@ -479,6 +479,27 @@ if a restart was invoked."
            (assert (eq (intern "BAR" p1) (intern "BAR" p2))))
       (when p1 (delete-package p1))
       (when p2 (delete-package p2)))))
+
+(with-test (:name :no-quick-name-conflict-resolution-use-package-two)
+  (let (p1 p2 p3)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "NO-QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE-TWO.1")
+                 p2 (make-package "NO-QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE-TWO.2")
+                 p3 (make-package "NO-QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE-TWO.3"))
+           (export (intern "FOO" p1) p1)
+           (export (intern "FOO" p2) p2)
+           (handler-bind ((name-conflict
+                            (lambda (c)
+                              (assert (not (find-restart 'sb-impl::keep-old)))
+                              (assert (not (find-restart 'sb-impl::take-new)))
+                              (invoke-restart 'abort))))
+             (restart-case
+                 (use-package (list p1 p2) p3)
+               (abort ()))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2))
+      (when p3 (delete-package p3)))))
 
 (with-test (:name (:package-at-variance-restarts :shadow))
   (let ((p nil)
