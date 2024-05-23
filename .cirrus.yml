@@ -27,10 +27,10 @@ task:
     memory: 2G
   install_script:
     - apt-get -qq update
-    - apt-get -qq -y install sbcl strace
+    - apt-get -qq -y install sbcl strace libzstd-dev
   build_script:
     - echo '"1.9.99.999"' > version.lisp-expr
-    - ./make.sh
+    - ./make.sh --with-sb-core-compression
 
   test_script:
     - cd tests; ./run-tests.sh --slow

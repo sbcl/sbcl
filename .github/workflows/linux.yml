@@ -21,15 +21,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - name: instal host sbcl
+    - name: install host sbcl
       run: |
         sudo apt-get -qq update | true
-        sudo apt-get -qq install sbcl libcapstone-dev
-    - name: instal host gcc-multilib
+        sudo apt-get -qq install sbcl libcapstone-dev libzstd-dev
+    - name: install host gcc-multilib
       if: matrix.arch == 'x86'
-      run:  |
-        sudo sysctl -w vm.mmap_rnd_compat_bits=8
-        sudo apt-get -qq --no-install-recommends install gcc-multilib
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get -qq update | true
+        sudo apt-get -qq --no-install-recommends install gcc-multilib libzstd-dev:i386
 
     - name: backend-sub-features
       if: matrix.subfeatures == 'sse4'
@@ -38,7 +39,7 @@ jobs:
     - name: build
       env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-      run: ./make.sh ${{ matrix.options }} --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
+      run: ./make.sh ${{ matrix.options }} --with-sb-core-compression --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
     - name: test
       run: cd tests; ./run-tests.sh --slow
     - name: test
