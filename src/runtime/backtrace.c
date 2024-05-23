@@ -19,13 +19,13 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <stdlib.h>
 #include "genesis/sbcl.h"
 #include "runtime.h"
 #include "globals.h"
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
-#include <wchar.h>
 #include "arch.h"
 #include "genesis/compiled-debug-info.h"
 #include "genesis/hash-table.h"
