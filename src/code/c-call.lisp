@@ -140,6 +140,7 @@
 ;; All platforms have passing SAP defined, which causes passing record by value
 ;; to silently corrupt.
 ;; -- Rongcui
+#-arm64
 (define-alien-type-method (record :arg-tn) (type state)
   (declare (ignore type state))
   (error "Passing structs by value is unsupported on this platform."))

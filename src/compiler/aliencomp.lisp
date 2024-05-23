@@ -627,8 +627,14 @@
         (args #-arm args #+arm (reverse args))
         #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
-    (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
+    (multiple-value-bind (nsp stack-frame-size arg-tns result-tns preprocess-tns)
         (make-call-out-tns type)
+      ;; Either there's no preprocess step, or there's one for each argument
+      (assert (or (not preprocess-tns) (= (length arg-tns) (length preprocess-tns)))
+              (arg-tns preprocess-tns)
+              "SBCL BUG: (%ALIEN-FUNCALL) ~
+length of ARG-TNS (~A) is not the same as PREPROCESS-TNS (~A)"
+              (length arg-tns) (length preprocess-tns))
       #+x86
       (vop set-fpu-word-for-c call block)
       ;; Save the stack pointer, it will get aligned and subtracting
@@ -639,6 +645,13 @@
       #+c-stack-is-control-stack
       (vop current-stack-pointer call block stack-pointer)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
+      ;; Perform preprocess operations, which are either NIL or a TN function.
+      ;; Some architectures such as ARM64 require copying arguments to adjust alignment
+      ;; or to pass large structs. These operations must be performed before passing arguments.
+      (loop for tn in #-arm preprocess-tns #+arm (reverse preprocess-tns)
+            for arg in args
+            do (when tn (funcall tn arg call block nsp)))
+
       ;; KLUDGE: This is where the second half of the ARM
       ;; register-pressure change lives (see above).
       (dolist (tn #-arm arg-tns #+arm (reverse arg-tns))
