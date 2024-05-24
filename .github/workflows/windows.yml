@@ -27,7 +27,7 @@ jobs:
       run: |
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
         export PATH
-        ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+        ./make.sh --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make installer
       run: |
         ./make-windows-installer.sh

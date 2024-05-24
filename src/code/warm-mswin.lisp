@@ -83,7 +83,7 @@
   (process handle)
   (exit-code uint))
 
-(defun zero-alien (alien type)
+(defmacro zero-alien (alien type)
   `(alien-funcall (extern-alien "memset" (function void system-area-pointer int unsigned))
                   (alien-sap ,alien) 0 (alien-size ,type :bytes)))
 
