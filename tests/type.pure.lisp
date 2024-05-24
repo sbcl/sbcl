@@ -305,8 +305,9 @@
                             (loop for d from c below size do
                                   (test a b c d op deriver))))))))))
 
-(with-test (:name (:type-derivation :logical-operations :scaling
-                                    :broken-on :mark-region-gc) :slow t)
+(with-test (:name (:type-derivation :logical-operations :scaling)
+            :broken-on :mark-region-gc
+            :slow t)
   (let ((type-x1 (sb-c::specifier-type `(integer ,(expt 2 10000)
                                                  ,(expt 2 10000))))
         (type-x2 (sb-c::specifier-type `(integer ,(expt 2 100000)
