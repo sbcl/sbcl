@@ -18,6 +18,8 @@ changes relative to sbcl-2.4.4:
     ** make the editcore utility work on Windows.  (thanks to Luís Borges de
        Oliveira)
     ** fix memory initialization in RUN-PROGRAM on Windows.
+    ** resolve a deadlock in %INTERRUPT-THREAD on Darwin.  (lp#2062940,
+       reported by Yan)
   * enhancement: when (> debug 1), try to find source locations for code
     expanded from macros that copy their input forms.
   * bug fix: the method-combination generic function caches were missing some
@@ -25,6 +27,8 @@ changes relative to sbcl-2.4.4:
     (reported by Didier Verna)
   * bug fix: SXHASH on equal PATHNAME objects could return different values in
     different cores.  (reported by Luís Borges de Oliveira)
+  * bug fix: spurious compiler warnings on SORT in some circumstances.
+    (lp#2065609, reported by William G Lederer)
   * optimization: faster bignum addition and negation on arm64, x86-64.
   * optimization: faster type tests for (unsigned-byte X) for X being
     multiples of the platform word size, on arm64, x86-64.
