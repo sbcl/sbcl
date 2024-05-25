@@ -1,9 +1,33 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.4:
-  * enhancement: try to find source locations for code expanded from macros
-    that copy its input forms. When (> debug 1).
+  * incompatible change: attempting to pass or return alien structs by value
+    now signals errors.  Previously, such attempts would silently tend to
+    corrupt registers or memory; there is work in progress to allow such calls
+    conforming to the platform ABI.  (thanks to Rongcui Dong)
+  * minor incompatible change: function debug info is compressed only if the
+    system is compiled with libzstd, rather than falling back to a pure-lisp
+    compression implementation.
+  * minor incompatible change: the compiler will warn in more cases when it
+    can detect incorrectly-typed arguments to FORMAT directives ~C and ~R
+  * minor incompatible change: strings are converted to a more compact
+    representation if possible before being used as docstrings.
+  * platform support:
+    ** explicitly include stdlib.h where needed on OpenBSD.  (thanks to
+       Sebastien Marie)
+    ** make the editcore utility work on Windows.  (thanks to Luís Borges de
+       Oliveira)
+    ** fix memory initialization in RUN-PROGRAM on Windows.
+  * enhancement: when (> debug 1), try to find source locations for code
+    expanded from macros that copy their input forms.
+  * bug fix: the method-combination generic function caches were missing some
+    of the generic functions constructed during the PCL build itself.
+    (reported by Didier Verna)
+  * bug fix: SXHASH on equal PATHNAME objects could return different values in
+    different cores.  (reported by Luís Borges de Oliveira)
   * optimization: faster bignum addition and negation on arm64, x86-64.
+  * optimization: faster type tests for (unsigned-byte X) for X being
+    multiples of the platform word size, on arm64, x86-64.
 
 changes in sbcl-2.4.4 relative to sbcl-2.4.3:
   * minor incompatible change: after-GC hooks are now called in the finalizer
