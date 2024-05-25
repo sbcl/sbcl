@@ -1396,9 +1396,7 @@
 ;;;; dumping structures
 
 (defun dump-structure (struct file)
-  (unless (or (gethash struct (fasl-output-valid-structures file))
-              ;; Assume that DEBUG-FUNs are always valid to dump.
-              (typep struct 'debug-fun))
+  (unless (gethash struct (fasl-output-valid-structures file))
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)
