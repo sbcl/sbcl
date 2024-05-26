@@ -1471,10 +1471,8 @@
 
 ;;;; code coverage
 
-(defun dump-code-coverage-records (namestring cc file)
-  (declare (type string namestring)
-           (type list cc))
-  (dump-object namestring file)
+(defun dump-code-coverage-records (cc file)
+  (declare (type list cc))
   (dump-object cc file)
   (dump-fop 'fop-record-code-coverage file))
 

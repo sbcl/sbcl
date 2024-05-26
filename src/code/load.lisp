@@ -1310,8 +1310,10 @@
 
 ;;;; fops for code coverage
 
-(define-fop 120 :not-host (fop-record-code-coverage (namestring paths) nil)
-  (setf (gethash namestring (car *code-coverage-info*))
+(define-fop 120 :not-host (fop-record-code-coverage (paths) nil)
+  (setf (gethash (sb-c::debug-source-namestring
+                  (%fasl-input-partial-source-info (fasl-input)))
+                 (car *code-coverage-info*))
         (mapcar #'list paths))
   (values))
 
