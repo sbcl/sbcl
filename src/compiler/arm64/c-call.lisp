@@ -218,10 +218,10 @@
 ;;; Essentially performs the following C operation:
 ;;; memcpy(fp + fpoff, from_ptr, size)
 (define-vop (move-to-stack)
-  (:args (from-ptr :scs (sap-reg)) ;; NL2
-         (fp :scs (any-reg))) ;; NL1
+  (:args (from-ptr :scs (sap-reg))
+         (fp :scs (any-reg)))
   (:info size fpoff)
-  (:temporary (:scs (non-descriptor-reg)) temp temp-h) ;; NL0
+  (:temporary (:scs (non-descriptor-reg)) temp temp-h)
   (:generator
    0
    ;; Temporarily hold the source addr
