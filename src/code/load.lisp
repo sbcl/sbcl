@@ -917,13 +917,11 @@
 (define-fop 39 (fop-int-const2) (number-to-core 2))
 (define-fop 40 (fop-int-const-neg1) (number-to-core -1))
 
-(define-fop 70 (fop-ratio (num den))
-  #+sb-xc-host (number-pair-to-core num den sb-vm:ratio-widetag)
-  #-sb-xc-host (%make-ratio num den))
+(define-fop 70 :not-host (fop-ratio (num den))
+  (%make-ratio num den))
 
-(define-fop 71 (fop-complex (realpart imagpart))
-  #+sb-xc-host (number-pair-to-core realpart imagpart sb-vm:complex-rational-widetag)
-  #-sb-xc-host (%make-complex realpart imagpart))
+(define-fop 71 :not-host (fop-complex (realpart imagpart))
+  (%make-complex realpart imagpart))
 
 (macrolet ((fast-read-single-float ()
              '(make-single-float (fast-read-s-integer 4)))
@@ -1258,11 +1256,8 @@
 
 ;;; Modify a slot of the code boxed constants.
 (define-fop 20 (fop-alter-code ((:operands index) code value) nil)
-  (flet (#+sb-xc-host
-         ((setf code-header-ref) (value code index)
-            (write-wordindexed code index value)))
-    (setf (code-header-ref code index) value)
-    (values)))
+  (setf (code-header-ref code index) value)
+  (values))
 
 ;;; Set the named constant value in the boxed constants, setting up
 ;;; backpatching information if the symbol is not yet bound. Forward

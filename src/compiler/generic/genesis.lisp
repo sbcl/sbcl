@@ -2300,6 +2300,9 @@ core and return a descriptor to it."
                      sb-vm:other-pointer-lowtag)
                   (descriptor-gspace code)))
 
+(defun (setf code-header-ref) (value code index)
+  (write-wordindexed code index value))
+
 ;;; These are fairly straightforward translations of the similarly named accessor
 ;;; from src/code/simple-fun.lisp
 (defun code-trailer-ref (code offset)
@@ -2614,6 +2617,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
                          sb-vm:array-elements-slot
                          (make-fixnum-descriptor total-elements)))
     result))
+
+;;;; cold fops for loading numbers
+
+(define-cold-fop (fop-ratio)
+    (let ((den (pop-stack)))
+      (number-pair-to-core (pop-stack) den sb-vm:ratio-widetag)))
+
+(define-cold-fop (fop-complex)
+  (let ((im (pop-stack)))
+    (number-pair-to-core (pop-stack) im sb-vm:complex-rational-widetag)))
 
 
 ;;;; cold fops for calling (or not calling)
