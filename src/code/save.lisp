@@ -338,8 +338,8 @@ sufficiently motivated to do lengthy fixes."
     ;; recreate it so that we don't preserve an empty vector taking up 16KB
     (setq sb-kernel::*forward-referenced-layouts* (make-hash-table :test 'equal)))
   ;; Clean up the simulated weak list of covered code components.
-  (rplacd sb-c:*code-coverage-info*
-          (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
+  (rplacd *code-coverage-info*
+          (delete-if-not #'weak-pointer-value (cdr *code-coverage-info*)))
   (sb-kernel::rebuild-ctype-hashsets)
   (drop-all-hash-caches)
   (os-deinit)

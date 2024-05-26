@@ -960,6 +960,10 @@ possibly temporarily, because it might be used internally.")
    "*REPL-PROMPT-FUN*"
    "*REPL-READ-FORM-FUN*"
 
+   ;; for SB-COVER
+
+   "*CODE-COVERAGE-INFO*"
+
    ;; Character database access
 
    "MISC-INDEX"
@@ -2770,11 +2774,6 @@ be submitted as a CDR")
 
            "BRANCH-IF" "MULTIWAY-BRANCH-IF-EQ"
            "JUMP-TABLE" "CASE-TO-JUMP-TABLE"
-           ;; for SB-COVER
-
-           "*CODE-COVERAGE-INFO*" "CODE-COVERAGE-RECORD-MARKED"
-           "CLEAR-CODE-COVERAGE" "RESET-CODE-COVERAGE"
-           "+CODE-COVERAGE-UNMARKED+"
            ;; for SB-INTROSPECT
 
            "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"))

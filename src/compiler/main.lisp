@@ -1685,7 +1685,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                     (dump-code-coverage-records
                      (namestring *compile-file-pathname*)
                      (loop for k being each hash-key of code-coverage-records
-                           collect (cons k +code-coverage-unmarked+))
+                           collect k)
                      *compile-object*)))
                 nil)))
       ;; Some errors are sufficiently bewildering that we just fail

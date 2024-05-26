@@ -59,6 +59,15 @@
 (declaim (type cons sb-kernel::*gc-epoch*))
 (define-load-time-global sb-kernel::*gc-epoch* '(nil . nil))
 
+;;; Stores the code coverage instrumentation results. The CAR is a
+;;; hashtable. The CDR is a list of weak pointers to code objects
+;;; having coverage marks embedded in the unboxed constants. Keys in
+;;; the hashtable are namestrings, the value is a list of (CONS PATH
+;;; VISITED).
+(define-load-time-global *code-coverage-info*
+    (list (make-hash-table :test 'equal :synchronized t)))
+(declaim (type (cons hash-table) *code-coverage-info*))
+
 ;;; Default evaluator mode (interpreter / compiler)
 
 (declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)

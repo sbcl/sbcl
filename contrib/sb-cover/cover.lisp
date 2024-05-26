@@ -18,7 +18,14 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf (sb-int:system-package-p *package*) t))
 
-(defmacro code-coverage-hashtable () `(car sb-c:*code-coverage-info*))
+(defmacro code-coverage-hashtable () `(car sb-int:*code-coverage-info*))
+
+(defun reset-code-coverage ()
+  (maphash (lambda (info cc)
+             (declare (ignore info))
+             (dolist (cc-entry cc)
+               (setf (cdr cc-entry) nil)))
+           (car sb-int:*code-coverage-info*)))
 
 ;;;; New coverage representation.
 ;;;; One byte per coverage mark is stored in the unboxed constants of the code.
@@ -77,13 +84,14 @@
 into the database when the FASL files (produced by compiling
 STORE-COVERAGE-DATA optimization policy set to 3) are loaded again into the
 image."
-  (sb-c:clear-code-coverage))
+  (clrhash (car sb-int:*code-coverage-info*))
+  (setf (cdr sb-int:*code-coverage-info*) nil))
 
 (macrolet
     ((do-instrumented-code ((var &optional result) &body body)
        ;; Scan list of weak-pointers to all coverage-instrumented code,
        ;; binding VAR to each object, and removing broken weak-pointers.
-       `(let ((predecessor sb-c:*code-coverage-info*))
+       `(let ((predecessor sb-int:*code-coverage-info*))
           (loop
            (let ((cell (cdr predecessor)))
              (unless cell (return ,result))
@@ -141,7 +149,7 @@ image."
         (t                              ; reset everything
          (do-instrumented-code (code)
            (reset-coverage code))
-         (sb-c:reset-code-coverage))))
+         (reset-code-coverage))))
 
 ;;; Transfer data from new-style coverage marks into old-style.
 ;;; Update only data for FILENAME if supplied, or all files if NIL.
@@ -151,7 +159,7 @@ image."
   (declare (ignorable filename))
   ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
   ;; source paths to the legacy coverage record for that path in that file,
-  ;;   e.g. (1 4 1) -> ((1 4 1) . SB-C::%CODE-COVERAGE-UNMARKED%)
+  ;;   e.g. (1 4 1) -> ((1 4 1) . NIL)
   (let ((namestring->path-tables (make-hash-table :test 'equal))
         (coverage-records (code-coverage-hashtable))
         (n-marks 0))
@@ -594,7 +602,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            unless (member (caar record) '(:then :else))
            collect (list mode
                          (car record)
-                         (if (sb-c:code-coverage-record-marked record)
+                         (if (cdr record)
                              1
                              2))))
     (:branch
@@ -604,7 +612,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            (when (member (car path) '(:then :else))
              (setf (gethash (cdr path) hash)
                    (logior (gethash (cdr path) hash 0)
-                           (ash (if (sb-c:code-coverage-record-marked record)
+                           (ash (if (cdr record)
                                     1
                                     2)
                                 (if (eql (car path) :then)

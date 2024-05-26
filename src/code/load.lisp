@@ -1230,7 +1230,7 @@
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
-          (atomic-push (make-weak-pointer code) (cdr sb-c:*code-coverage-info*)))
+          (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
         (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
@@ -1310,8 +1310,9 @@
 
 ;;;; fops for code coverage
 
-(define-fop 120 :not-host (fop-record-code-coverage (namestring cc) nil)
-  (setf (gethash namestring (car sb-c:*code-coverage-info*)) cc)
+(define-fop 120 :not-host (fop-record-code-coverage (namestring paths) nil)
+  (setf (gethash namestring (car *code-coverage-info*))
+        (mapcar #'list paths))
   (values))
 
 ;;; Primordial layouts.
