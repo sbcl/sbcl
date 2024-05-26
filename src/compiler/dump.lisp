@@ -1345,20 +1345,15 @@
             (remhash entry (fasl-output-patch-table file)))))))
   (values))
 
-(defun dump-push-previously-dumped-fun (fun fasl-output)
-  (declare (type clambda fun))
-  (let ((handle (gethash (leaf-info fun)
-                         (fasl-output-entry-table fasl-output))))
-    (aver handle)
-    (dump-push handle fasl-output))
-  (values))
-
 ;;; Dump a FOP-FUNCALL to call an already-dumped top level lambda at
 ;;; load time.
 (defun fasl-dump-toplevel-lambda-call (fun fasl-output)
-  (declare (type clambda fun))
-  (dump-push-previously-dumped-fun fun fasl-output)
-  (dump-fop 'fop-funcall-for-effect fasl-output 0)
+  (declare (type clambda fun) (type fasl-output fasl-output))
+  (let ((handle (gethash (leaf-info fun)
+                         (fasl-output-entry-table fasl-output))))
+    (aver handle)
+    (dump-push handle fasl-output)
+    (dump-fop 'fop-funcall-for-effect fasl-output 0))
   (values))
 
 ;;; Dump some information to allow partial reconstruction of the
