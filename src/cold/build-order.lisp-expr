@@ -352,7 +352,6 @@
  ("src/compiler/codegen")
  ;; Compiling this requires fop definitions from code/load.lisp.
  ("src/compiler/dump")
- ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
  ("src/compiler/generic/core" :not-host)
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT

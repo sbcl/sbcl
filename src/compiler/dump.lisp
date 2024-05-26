@@ -654,6 +654,34 @@
   (sub-dump-object (denominator x) file)
   (dump-fop 'fop-ratio file))
 
+#+(and long-float x86)
+(defun dump-long-float (float file)
+  (declare (long-float float))
+  (let ((exp-bits (long-float-exp-bits float))
+        (high-bits (long-float-high-bits float))
+        (low-bits (long-float-low-bits float)))
+    ;; We could get away with DUMP-WORD here, since the x86 has 4-byte words,
+    ;; but we prefer to make things as explicit as possible.
+    ;;     --njf, 2004-08-16
+    (dump-integer-as-n-bytes low-bits 4 file)
+    (dump-integer-as-n-bytes high-bits 4 file)
+    (dump-integer-as-n-bytes exp-bits 2 file)))
+
+#+(and long-float sparc)
+(defun dump-long-float (float file)
+  (declare (long-float float))
+  (let ((exp-bits (long-float-exp-bits float))
+        (high-bits (long-float-high-bits float))
+        (mid-bits (long-float-mid-bits float))
+        (low-bits (long-float-low-bits float)))
+    ;; We could get away with DUMP-WORD here, since the sparc has 4-byte
+    ;; words, but we prefer to make things as explicit as possible.
+    ;;     --njf, 2004-08-16
+    (dump-integer-as-n-bytes low-bits 4 file)
+    (dump-integer-as-n-bytes mid-bits 4 file)
+    (dump-integer-as-n-bytes high-bits 4 file)
+    (dump-integer-as-n-bytes exp-bits 4 file)))
+
 (defun dump-integer (n file)
   (typecase n
     ((signed-byte 8)
@@ -861,8 +889,7 @@
 (defun dump-array (x file)
   (if (vectorp x)
       (dump-vector x file)
-      #-sb-xc-host (dump-multi-dim-array x file)
-      #+sb-xc-host (bug "Can't dump multi-dim array")))
+      (dump-multi-dim-array x file)))
 
 ;;; Dump the vector object. If it's not simple, then actually dump a
 ;;; simple realization of it. But we enter the original in the EQ or SIMILAR
@@ -952,6 +979,20 @@
                             0
                             (ceiling (* length bits-per-elt) sb-vm:n-byte-bits)
                             #+sb-xc-host bits-per-elt)))
+
+;;; Dump a multi-dimensional array. Note: any displacements are folded out.
+(defun dump-multi-dim-array (array file)
+  (note-potential-circularity array file)
+  (let ((rank (array-rank array)))
+    (dotimes (i rank)
+      (dump-integer (array-dimension array i) file))
+    (with-array-data ((vector array) (start) (end))
+      (if (and (= start 0) (= end (length vector)))
+          (sub-dump-object vector file)
+          (sub-dump-object (subseq vector start end) file)))
+    (dump-fop 'fop-array file rank)
+    (eq-save-object array file)))
+
 
 ;;; Dump string-ish things.
 

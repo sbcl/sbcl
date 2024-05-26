@@ -2588,16 +2588,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
        ((= index end) (set-readonly result))
     (write-wordindexed result index (svref stack stackptr))))
 
-; (not-cold-fop fop-array) ; the syntax doesn't work
-#+nil
-;; This code is unexercised. The only use of FOP-ARRAY is from target-dump.
-;; It would be a shame to delete it though, as it might come in handy.
-(define-cold-fop (fop-array)
-  (let* ((rank (read-word-arg (fasl-input-stream)))
-         (data-vector (pop-stack))
-         (result (allocate-object *dynamic*
-                                  (+ sb-vm:array-dimensions-offset rank)
-                                  sb-vm:other-pointer-lowtag)))
+(define-cold-fop (fop-array (rank))
+  (let ((data-vector (pop-stack))
+        (result (allocate-object *dynamic*
+                                 (+ sb-vm:array-dimensions-offset rank)
+                                 sb-vm:other-pointer-lowtag)))
     (write-header-data+tag result rank sb-vm:simple-array-widetag)
     (write-wordindexed result sb-vm:array-fill-pointer-slot *nil-descriptor*)
     (write-wordindexed result sb-vm:array-data-slot data-vector)
