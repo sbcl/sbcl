@@ -719,15 +719,7 @@ NOTE:
                                         (alien-fun-type-result-type type)
                                         (make-result-state))
             :arg-pps (arg-pps)
-            :arg-tn-mover #'arg-tn-mover)
-      #+nil
-      (values (make-normal-tn *fixnum-primitive-type*)
-              (arg-state-stack-frame-size arg-state)
-              (arg-tns)
-              (invoke-alien-type-method :result-tn
-                                        (alien-fun-type-result-type type)
-                                        (make-result-state))
-              (arg-pps)))))
+            :arg-tn-mover #'arg-tn-mover))))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
