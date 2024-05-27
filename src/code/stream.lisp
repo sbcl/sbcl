@@ -2420,35 +2420,43 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       (declare (ignore %frc-method%))
       (unless %frc-buffer%
         (return-from ansi-stream-read-string-from-frc-buffer nil))
-      (labels ((refill-buffer ()
-                 (prog1 (fast-read-char-refill stream nil)
-                   (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
-               (add-chunk ()
-                 (let* ((end (length %frc-buffer%))
-                        (len (min (- end %frc-index%)
-                                  (- needed read))))
-                   (declare (type index end len read needed))
-                   (string-dispatch (simple-base-string simple-character-string)
-                       seq
-                     (replace seq %frc-buffer%
-                              :start1 (+ start read)
-                              :end1 (+ start read len)
-                              :start2 %frc-index%
-                              :end2 (+ %frc-index% len)))
-                   (incf read len)
-                   (incf %frc-index% len)
-                   (when (or (eql needed read) (not (refill-buffer)))
-                     (done-with-fast-read-char)
-                     (return-from ansi-stream-read-string-from-frc-buffer
-                       (+ start read))))))
-        (declare (inline refill-buffer))
-        (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
-                   (not (refill-buffer)))
-          ;; EOF had been reached before we read anything
-          ;; at all. But READ-SEQUENCE never signals an EOF error.
-          (done-with-fast-read-char)
-          (return-from ansi-stream-read-string-from-frc-buffer start))
-        (loop (add-chunk))))))
+      ;; Read directly into the string when possible
+      (if (and (= %frc-index% +ansi-stream-in-buffer-length+)
+               (>= needed (/ +ansi-stream-in-buffer-length+ 2))
+               (typep seq '(simple-array character (*)))
+               (fd-stream-p stream)
+               (fd-stream-ibuf stream)
+               (eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8))
+          (fd-stream-read-n-characters/utf-8-to-string stream seq start needed)
+          (labels ((refill-buffer ()
+                     (prog1 (fast-read-char-refill stream nil)
+                       (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
+                   (add-chunk ()
+                     (let* ((end (length %frc-buffer%))
+                            (len (min (- end %frc-index%)
+                                      (- needed read))))
+                       (declare (type index end len read needed))
+                       (string-dispatch (simple-base-string simple-character-string)
+                                        seq
+                         (replace seq %frc-buffer%
+                                  :start1 (+ start read)
+                                  :end1 (+ start read len)
+                                  :start2 %frc-index%
+                                  :end2 (+ %frc-index% len)))
+                       (incf read len)
+                       (incf %frc-index% len)
+                       (when (or (eql needed read) (not (refill-buffer)))
+                         (done-with-fast-read-char)
+                         (return-from ansi-stream-read-string-from-frc-buffer
+                           (+ start read))))))
+            (declare (inline refill-buffer))
+            (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
+                       (not (refill-buffer)))
+              ;; EOF had been reached before we read anything
+              ;; at all. But READ-SEQUENCE never signals an EOF error.
+              (done-with-fast-read-char)
+              (return-from ansi-stream-read-string-from-frc-buffer start))
+            (loop (add-chunk)))))))
 
 
 ;;;; WRITE-SEQUENCE
