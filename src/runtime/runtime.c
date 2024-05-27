@@ -646,10 +646,8 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 
     interrupt_init();
 #ifdef LISP_FEATURE_UNIX
-    /* Not sure why anyone sends signals to this process so early.
-     * But win32 models the signal mask as part of 'struct thread'
-     * which doesn't exist yet, so don't do this */
-    block_blockable_signals(0);
+    /* Use SETMASK instead of BLOCK to clear the inhereted sigmask. */
+    thread_sigmask(SIG_SETMASK, &blockable_sigset, 0);
 #endif
 
     /* Check early to see if this executable has an embedded core,
