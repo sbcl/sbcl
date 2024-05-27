@@ -399,6 +399,17 @@ Implementation notes:
 
 ;;;; Stage C
 
+(defun arg-tn-mover (value node block nsp tn sc move-arg-vop)
+  (let* ((primitive-type (sb-c::tn-primitive-type tn))
+         ;; If the destination is a stack TN make sure
+         ;; the temporary TN is a register.
+         (scn (if (sb-c::sc-number-stack-p sc)
+                  (car (sb-c::primitive-type-scs primitive-type))
+                  (sc-number sc)))
+         (temp-tn (make-representation-tn primitive-type scn)))
+    (sb-c::emit-move node block (sb-c::lvar-tn node block value) temp-tn)
+    (sb-c::emit-move-arg-template node block move-arg-vop temp-tn nsp tn)))
+
 (defun int-arg (state prim-type reg-sc stack-sc &optional (size 8))
   "Pass ints by AAPCS64: GP register (C.9) or stack (C.13, C.14, C.16, C.17).
 
@@ -683,11 +694,11 @@ NOTE:
           (align-up (arg-state-stack-frame-size arg-state) 16))
     ;; Finally, collect all the TNs and preprocess emitters.
     (collect ((arg-tns)
-              (preprocess-tns))
+              (arg-pps))
       (let ((fpoff (arg-state-stack-frame-size arg-state)))
         ;; Apply FPOFF to preprocess operations
         (dolist (pp (pp-state-pps (arg-state-pp-state arg-state)))
-          (preprocess-tns (if pp (funcall pp fpoff))))
+          (arg-pps (if pp (funcall pp fpoff))))
         ;; Generate stage C. If not normal TN (i.e. is deferred), generate deferred.
         (loop for tn in tns
               for defer in defers
@@ -701,13 +712,22 @@ NOTE:
       (let ((frame-size (arg-state-stack-frame-size arg-state)))
         (setf (arg-state-stack-frame-size arg-state)
               (align-up frame-size 8)))
+      (list (make-normal-tn *fixnum-primitive-type*)
+            (arg-state-stack-frame-size arg-state)
+            (arg-tns)
+            (invoke-alien-type-method :result-tn
+                                        (alien-fun-type-result-type type)
+                                        (make-result-state))
+            :arg-pps (arg-pps)
+            :arg-tn-mover #'arg-tn-mover)
+      #+nil
       (values (make-normal-tn *fixnum-primitive-type*)
               (arg-state-stack-frame-size arg-state)
               (arg-tns)
               (invoke-alien-type-method :result-tn
                                         (alien-fun-type-result-type type)
                                         (make-result-state))
-              (preprocess-tns)))))
+              (arg-pps)))))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)

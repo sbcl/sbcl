@@ -614,7 +614,7 @@
               ((function type &rest args) call block)
   (let ((type (if (constant-lvar-p type)
                   (lvar-value type)
-                  (error "Something is broken.")))
+                  (error "BUG: %ALIEN-FUNCALL LVar is not constant.")))
         (lvar (node-lvar call))
         ;; KLUDGE: On ARM systems our register pressure is so high
         ;; that if we process register args before stack args we end
@@ -624,9 +624,112 @@
         ;; in reverse order here doesn't change the semantics, but we
         ;; deal with all of the stack arguments before the wired
         ;; register arguments become live.
-        (args #-arm args #+arm (reverse args))
+        ;(args #-arm args #+arm (reverse args))
         #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
+    (destructuring-bind
+        (;; TN for NSP and amount of stack space to reserve
+         nsp stack-frame-size
+         ;; TNs for arguments and results. Can be list of TNs or functions
+         arg-tns result-tns
+         &key ; Optional arguments
+         ;; A function to reorder processing of arguments.
+         remapper
+         ;; A function called before everything else. Useful for setting up
+         ;; hardware state.
+         ;;
+         ;; Called with (ENTRY-HOOK CALL BLOCK)
+         entry-hook
+         ;; A list of preprocessors for each argument. Useful for
+         ;; realigning/copying argument.
+         ;;
+         ;; After stack allocation, before arguments are processed, for each ARG
+         ;; in ARGS, and each PP in ARG-PPS, (PP ARG CALL BLOCK NSP) is called.
+         arg-pps
+         ;; A function moving an argument to its TN. Called when TN in ARG-TNS
+         ;; is a value. Called with (ARN-TN-MOVER ARG CALL BLOCK NSP TN SC
+         ;; MOVE-ARG-VOP).
+         arg-tn-mover
+         ;; A function called after C function returns and stack is deallocated.
+         ;; Useful for resetting hardware. Called with (EXIT-HOOK CALL BLOCK).
+         exit-hook
+         ;; A function called at the end to move C result back to Lisp. Called
+         ;; with (RESULT-MOVER CALL BLOCK RESULT-TN LVAR). If NIL, uses
+         ;; default implementation.
+         result-mover
+         &aux
+         (args (if remapper (funcall remapper args) args))
+         (arg-tns (if remapper (funcall remapper arg-tns) arg-tns))
+         (arg-pps (if remapper (funcall remapper arg-pps) arg-pps)))
+        (make-call-out-tns type)
+      ;; Safety checks
+      (aver (= (length args) (length arg-tns)))
+      (aver (or (not arg-pps) (= (length arg-tns) (length arg-pps))))
+      ;; Entry hook
+      (when entry-hook (funcall entry-hook call block))
+      ;; Save the stack pointer, it will get aligned and subtracting
+      ;; the size will not restore the original value, and some
+      ;; things, like SB-C::CALL-VARIABLE, use the stack pointer to
+      ;; calculate the number of saved values.
+      ;; See alien.impure.lisp/:stack-misalignment
+      #+c-stack-is-control-stack
+      (vop current-stack-pointer call block stack-pointer)
+      (vop alloc-number-stack-space call block stack-frame-size nsp)
+      ;; Preprocess operations. Some architectures such as ARM64 require copying
+      ;; arguments to adjust alignment or to pass large structs. These
+      ;; operations must be performed before passing arguments.
+      (loop for pp in arg-pps for arg in args
+            do (when pp (funcall pp arg call block nsp)))
+      ;; Process arguments
+      (loop
+        for arg in args for tn in arg-tns
+        do (cond
+             ((functionp tn) (funcall tn arg call block nsp))
+             ;; If TN is just a TN, copy it by default.
+             (t
+              (let* ((sc (tn-sc tn))
+                     (scn (sc-number sc))
+                     (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
+                (aver arg)
+                (unless (= (length move-arg-vops) 1)
+                  (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
+
+                (when (eq (sb-kind (sc-sb sc)) :unbounded) ;; stacks are unbounded
+                  ;; Avoid allocating this TN on the caller's stack
+                  (setf (tn-kind tn) :arg-pass))
+                (funcall arg-tn-mover arg call block nsp tn sc (first move-arg-vops))))))
+      ;; Reserve results and call
+      (let* ((result-tns (ensure-list result-tns))
+             (arg-operands
+              (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
+             (result-operands
+              (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
+        ;; Make C call
+        (cond
+          ;; If CALL-OUT-NAMED exists
+          #+#.(cl:if (sb-c::vop-existsp :named sb-vm::call-out-named) '(and) '(or))
+          ((and (constant-lvar-p function) (stringp (lvar-value function)))
+           (vop* call-out-named call block (arg-operands) (result-operands)
+                 (lvar-value function)
+                 (sb-alien::alien-fun-type-varargs type)))
+          (t
+           (vop* call-out call block
+                 ((lvar-tn call block function) arg-operands)
+                 (result-operands))))
+        ;; Deallocate stack
+        #-c-stack-is-control-stack
+        (vop dealloc-number-stack-space call block stack-frame-size)
+        #+c-stack-is-control-stack
+        (vop reset-stack-pointer call block stack-pointer)
+        ;; Exit hook
+        (when exit-hook (funcall exit-hook call block))
+        ;; Copying result from C to lisp
+        (cond
+          (result-mover
+           (funcall result-mover call block result-tns lvar))
+          (t
+           (move-lvar-result call block result-tns lvar)))))
+    #+nil
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns preprocess-tns)
         (make-call-out-tns type)
       ;; Either there's no preprocess step, or there's one for each argument
