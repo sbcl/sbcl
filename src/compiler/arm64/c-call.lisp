@@ -687,7 +687,8 @@ NOTE:
     ;; Stage B, updating arg-state-pp-state with preprocessing emitters.
     (stage-b (alien-fun-type-arg-types type) (arg-state-pp-state arg-state))
     ;; Stage C, generating TNs and deferred TNs
-    (setf (values tns defers) (stage-c (alien-fun-type-arg-types type) arg-state variadic))
+    (setf (values tns defers)
+          (stage-c (alien-fun-type-arg-types type) arg-state #+darwin variadic))
     ;; Now we know how much stack Stage C takes, we know where Stage B copies can go.
     ;; We are pedantic and align to the maximum possible requirement.
     (setf (arg-state-stack-frame-size arg-state)
