@@ -20,6 +20,8 @@ changes relative to sbcl-2.4.4:
     ** fix memory initialization in RUN-PROGRAM on Windows.
     ** resolve a deadlock in %INTERRUPT-THREAD on Darwin.  (lp#2062940,
        reported by Yan)
+    ** hang on startup under some terminal emulators on OS X 14.5.
+       (lp#2067313, reported by Richard M Kreuter)
   * enhancement: when (> debug 1), try to find source locations for code
     expanded from macros that copy their input forms.
   * bug fix: the method-combination generic function caches were missing some
