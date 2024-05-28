@@ -7,8 +7,8 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy: 
-      matrix: 
+    strategy:
+      matrix:
         options: [--with-sb-thread, --without-sb-thread, --without-sb-unicode]
         arch: [x86, x86-64]
         subfeatures: ['']
@@ -31,6 +31,7 @@ jobs:
         sudo dpkg --add-architecture i386
         sudo apt-get -qq update | true
         sudo apt-get -qq --no-install-recommends install gcc-multilib libzstd-dev:i386
+        sudo sysctl -w vm.mmap_rnd_compat_bits=8
 
     - name: backend-sub-features
       if: matrix.subfeatures == 'sse4'
