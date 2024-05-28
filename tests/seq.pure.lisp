@@ -822,3 +822,12 @@
   (checked-compile `(lambda (x)
                       (declare (optimize (debug 2) (space 0)))
                       (sort x #'< :key #'car))))
+
+(with-test (:name :sort-inline-return-value)
+  (checked-compile-and-assert
+   ()
+   `(lambda (v)
+      (declare ((vector t) v))
+      (locally (declare (optimize (space 0)))
+        (sort v #'<)))
+   (((vector 2 1)) #(1 2) :test #'equalp)))
