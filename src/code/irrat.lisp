@@ -60,6 +60,8 @@
   (def %sin-quick (x))
   (def %sqrt (x))
   (def %log (x))
+  (def %log1p (x))
+  (def %log2 (x))
   (def %exp (x)))
 
 #+(or x86-64 arm-vfp arm64 riscv) ;; for constant folding

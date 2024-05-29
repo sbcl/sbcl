@@ -4,6 +4,8 @@ changes relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT and
     USE-PACKAGE are resolved once for each name, rather than between pairwise
     colliding symbols.
+  * platform support:
+    ** fix constant-folding of %log1p and %log2 on 32-bit x86.
   * bug fix: EXPORT could be tricked into exporting two distinct symbols of
     the same name from the same package.
 
