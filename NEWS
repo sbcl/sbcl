@@ -8,6 +8,8 @@ changes relative to sbcl-2.4.5:
     ** fix constant-folding of %log1p and %log2 on 32-bit x86.
   * bug fix: EXPORT could be tricked into exporting two distinct symbols of
     the same name from the same package.
+  * bug fix: two-argument calls to LOG with arguments of different precision
+    do not lose accuracy through insufficiently-precise intermediate values.
 
 changes in sbcl-2.4.5 relative to sbcl-2.4.4:
   * incompatible change: attempting to pass or return alien structs by value

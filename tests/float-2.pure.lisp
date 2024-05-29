@@ -457,6 +457,11 @@ fractional bits."
                  (declare ((double-float 0d0) d))
                  (when (< d 1.0d0)
                    (log d)))
+               (or null (double-float * 0.0d0)))
+  (assert-type (lambda (d)
+                 (declare ((double-float 0d0) d))
+                 (when (< d 1.0d0)
+                   (log d 2.0d0)))
                (or null (double-float * 0.0d0))))
 
 (with-test (:name (ftruncate :minus-zeros :one-arg))

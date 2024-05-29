@@ -565,8 +565,27 @@
   `(%pow x (coerce y 'double-float)))
 
 ;;; ANSI says log with base zero returns zero.
-(deftransform log ((x y) (float float) float)
-  '(if (zerop y) y (/ (log x) (log y))))
+(deftransform log ((x y) (single-float single-float) single-float :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(if (zerop y)
+       0.0f0
+       (coerce (/ (%log (coerce x 'double-float)) (%log (coerce y 'double-float)))
+               'single-float)))
+(deftransform log ((x y) (single-float double-float) double-float :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(if (zerop y)
+       0.0d0
+       (/ (%log (coerce x 'double-float)) (%log y))))
+(deftransform log ((x y) (double-float single-float) double-float :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(if (zerop y)
+       0.0d0
+       (/ (%log x) (%log (coerce y 'double-float)))))
+(deftransform log ((x y) (double-float double-float) double-float :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(if (zerop y)
+       0.0d0
+       (/ (%log x) (%log y))))
 
 ;;; Handle some simple transformations.
 

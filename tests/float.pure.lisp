@@ -317,8 +317,7 @@
     (assert (= (length (remove-duplicates pvals)) 1))
     (assert (> (first pvals) 0))))
 
-(with-test (:name (:log :same-base-different-precision)
-                  :fails-on :sbcl)
+(with-test (:name (:log :same-base-different-precision))
   (let ((twos (list 2 2.0f0 2.0d0 #c(2.0f0 0.0f0) #c(2.0d0 0.0d0))))
     (let ((result (loop for number in twos
                         append (loop for base in twos
