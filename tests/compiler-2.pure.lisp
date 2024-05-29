@@ -4438,3 +4438,12 @@
               (* x))
          x))
     (() :dont-rebind))))
+
+(with-test (:name :multiple-uses-type-derivation)
+  (assert-type
+   (lambda (x a b)
+     (funcall (ecase x
+                (0 #'+)
+                (1 (lambda (x y) (- x y))))
+              a b))
+   number))

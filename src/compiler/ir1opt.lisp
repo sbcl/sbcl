@@ -1169,20 +1169,36 @@
                 (let* ((fun (basic-combination-fun node))
                        (uses (lvar-uses fun))
                        (leaf (when (ref-p uses) (ref-leaf uses))))
-                  (multiple-value-bind (type defined-type)
-                      (cond ((global-var-p leaf)
-                             (values (leaf-type leaf) (leaf-defined-type leaf)))
-                            ((eq kind :unknown-keys)
-                             (values (lvar-fun-type fun t t) nil))
-                            (t
-                             (values nil nil)))
-                    (when (or (and (eq kind :unknown-keys)
-                                   (fun-type-p type))
-                              (and (fun-type-p defined-type)
-                                   (not (fun-type-p type))))
-                      (validate-call-type node type leaf)))
-                  (unless (eq (basic-combination-kind node) kind)
-                    (ir1-optimize-combination node))))))
+                  (cond ((consp uses)
+                         (loop with union
+                               for use in uses
+                               do
+                               (if (ref-p use)
+                                   (let ((type (node-fun-type use)))
+                                     (if (fun-type-p type)
+                                         (let ((return (fun-type-returns type)))
+                                           (setf union
+                                                 (if union
+                                                     (values-type-union union return)
+                                                     return)))
+                                         (return)))
+                                   (return))
+                               finally (derive-node-type node union)))
+                        (t
+                         (multiple-value-bind (type defined-type)
+                             (cond ((global-var-p leaf)
+                                    (values (leaf-type leaf) (leaf-defined-type leaf)))
+                                   ((eq kind :unknown-keys)
+                                    (values (lvar-fun-type fun t t) nil))
+                                   (t
+                                    (values nil nil)))
+                           (when (or (and (eq kind :unknown-keys)
+                                          (fun-type-p type))
+                                     (and (fun-type-p defined-type)
+                                          (not (fun-type-p type))))
+                             (validate-call-type node type leaf)))
+                         (unless (eq (basic-combination-kind node) kind)
+                           (ir1-optimize-combination node))))))))
         (:known
          (aver info)
          (clear-reoptimize-args)
