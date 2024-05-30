@@ -148,6 +148,13 @@
              (incf new-size (xref-size new-xrefs))
              (aver (vectorp new-xrefs))
              (let ((info (%simple-fun-info fun)))
+               ;; Don't actually save xref for the internals.
+               #-(and sb-xref-for-internals sb-devel)
+               (setf (%simple-fun-info fun)
+                     (if (typep info '(cons t simple-vector))
+                         (car info)
+                         nil))
+               #+(and sb-xref-for-internals sb-devel)
                (if (typep info '(cons t simple-vector))
                    (rplacd info new-xrefs)
                    (setf (%simple-fun-info fun) new-xrefs))))))
