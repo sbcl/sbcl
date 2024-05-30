@@ -286,7 +286,7 @@
            (if (typep fop-symbol '(cons (eql quote) (cons symbol null)))
                (cadr fop-symbol)
                (error "Bad 1st arg to DUMP-FOP: ~S" fop-symbol)))
-         (val (or (gethash (intern (symbol-name fop-symbol) "SB-FASL")
+         (val (or (gethash (intern (symbol-name fop-symbol) #.(find-package "SB-FASL"))
                            *fop-name-to-opcode*)
                   (error "compiler bug: ~S is not a legal fasload operator."
                          fop-symbol)))
