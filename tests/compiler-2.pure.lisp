@@ -4448,3 +4448,20 @@
                 (2 'logand))
               a b))
    number))
+
+(with-test (:name :undefined-system-fun)
+  (checked-compile-and-assert
+      (:optimize :safe :allow-warnings t)
+      `(lambda ()
+         #'nil)
+    (() (condition 'undefined-function)))
+  (checked-compile-and-assert
+      (:optimize :safe :allow-warnings t)
+      `(lambda ()
+         #'(setf *standard-output*))
+    (() (condition 'undefined-function)))
+  (checked-compile-and-assert
+      (:optimize :safe :allow-warnings t)
+      `(lambda ()
+         (nil))
+    (() (condition 'undefined-function))))
