@@ -124,14 +124,14 @@
                         node
                         nil)))))))
 
-(defun internal-name-p (what)
+(defun xref-internal-name-p (what)
   ;; Unless we're building with SB-XREF-FOR-INTERNALS, don't store
   ;; XREF information for internals. We define anything with a symbol
   ;; from either an implementation package or from COMMON-LISP as
   ;; internal
   (typecase what
     (list
-     (every #'internal-name-p what))
+     (every #'xref-internal-name-p what))
     (symbol
      (or (eq '.anonymous. what)
          #-sb-xref-for-internals
@@ -141,18 +141,18 @@
     (t t)))
 
 (defun record-xref (kind what context node path)
-  (unless (internal-name-p what)
+  (unless (xref-internal-name-p what)
     (push (cons what
                 (source-path-form-number (or path
                                              (node-source-path node))))
           (getf (functional-xref context) kind))))
 
 (defun record-macroexpansion (what block path)
-  (unless (internal-name-p what)
+  (unless (xref-internal-name-p what)
     (push (list :macroexpands what path) (block-xrefs block))))
 
 (defun record-call (what block path)
-  (unless (internal-name-p what)
+  (unless (xref-internal-name-p what)
     (push (list :calls what path) (block-xrefs block))))
 
 

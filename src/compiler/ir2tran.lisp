@@ -152,16 +152,7 @@
        ;; might try to redefine it and get the old definition. And
        ;; they shouldn't be expected to understand the failure mode
        ;; and the remedy.
-       (let ((internal
-               (and #-sb-xc-host (fboundp name)
-                    (named-let internal-p ((what name))
-                      (typecase what
-                        (list (every #'internal-p what))
-                        (symbol
-                         (let ((pkg (sb-xc:symbol-package what)))
-                           (or (and pkg (system-package-p pkg))
-                               (eq pkg *cl-package*))))
-                        (t t)))))
+       (let ((internal (internal-name-p name))
              (could-early-bind
               ;: Existence of globaldb info is a certificate that the function definition
               ;; will not change. Though functions named (CAS CAR) and (SETF SVREF) lack

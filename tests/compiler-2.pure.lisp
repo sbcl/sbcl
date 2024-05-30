@@ -4447,7 +4447,27 @@
                 (1 (lambda (x y) (- x y)))
                 (2 'logand))
               a b))
-   number))
+   number)
+  (assert-type
+   (lambda (x a b)
+     (let ((f (ecase x
+                (0 '+)
+                (2 'logand))))
+       (when a
+         (funcall f a b))))
+   (or null number)))
+
+(with-test (:name :multiple-uses-to-fdefn)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (x a b)
+         (let ((fun (ecase x
+                      (0 'a)
+                      (1 'b))))
+           (when a
+             (funcall fun a b))))
+    ((0 nil 2) nil)
+    ((0 1 2) (condition 'undefined-function))))
 
 (with-test (:name :undefined-system-fun)
   (checked-compile-and-assert

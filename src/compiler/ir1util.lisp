@@ -3416,3 +3416,14 @@ is :ANY, the function name is not checked."
                 (when (and args
                            (eq (leaf-source-name (lvar-value (car args))) symbol))
                   (return t)))))))))
+
+(defun internal-name-p (name)
+  (and #-sb-xc-host (fboundp name)
+       (named-let internal-p ((what name))
+         (typecase what
+           (list (every #'internal-p what))
+           (symbol
+            (let ((pkg (sb-xc:symbol-package what)))
+              (or (and pkg (system-package-p pkg))
+                  (eq pkg *cl-package*))))
+           (t t)))))

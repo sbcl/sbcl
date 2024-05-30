@@ -7516,12 +7516,14 @@
   (ensure-source-fun-form thing env :give-up t))
 
 ;;; Change 'f to #'f
-(defoptimizer (%coerce-callable-for-call optimizer) ((fun))
+(defoptimizer (%coerce-callable-for-call optimizer) ((fun) node)
   (let ((uses (lvar-uses fun)))
-   (when (consp uses)
-     (loop for use in uses
-           when (ref-p use)
-           do (let ((leaf (ref-leaf use)))
-                (when (constant-p leaf)
-                  (change-ref-leaf use (find-global-fun (constant-value leaf) t) :recklessly t))))))
+    (when (consp uses)
+      (loop for use in uses
+            when (ref-p use)
+            do (let ((leaf (ref-leaf use)))
+                 (when (and (constant-p leaf)
+                            (or (internal-name-p (constant-value leaf))
+                                (almost-immediately-used-p fun use)))
+                   (change-ref-leaf use (find-global-fun (constant-value leaf) t) :recklessly t))))))
   nil)
