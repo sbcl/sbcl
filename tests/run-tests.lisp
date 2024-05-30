@@ -262,7 +262,8 @@
       sb-di::*compiled-debug-funs*
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*
-      sb-unicode::*name->char-buffers*)))
+      sb-unicode::*name->char-buffers*
+      sb-impl::*fdefn-of-nil*)))
 
 (defun collect-symbol-values ()
   (let (result)

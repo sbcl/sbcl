@@ -7482,3 +7482,46 @@
 (defun key-lists-for-or-eq-transform-p (key-lists)
   (and (= (length key-lists) 1)
        (or-eq-transform-p (first key-lists))))
+
+(defun ensure-lvar-fun-form (lvar lvar-name &key (coercer '%coerce-callable-to-fun)
+                                                 give-up)
+  (aver (and lvar-name (symbolp lvar-name)))
+  (if (csubtypep (lvar-type lvar) (specifier-type 'function))
+      lvar-name
+      (let ((cname (lvar-constant-global-fun-name lvar)))
+        (cond (cname
+               (if (lvar-annotations lvar)
+                   `(with-annotations ,(lvar-annotations lvar)
+                      (global-function ,cname))
+                   `(global-function ,cname)))
+              (give-up
+               (give-up-ir1-transform
+                ;; No ~S here because if fallback is shown, it wants no quotes.
+                "~A is not known to be a function"
+                ;; LVAR-NAME is not what to show - if only it were that easy.
+                (source-variable-or-else lvar "callable expression")))
+              (t
+               `(,coercer ,lvar-name))))))
+
+(deftransform %coerce-callable-to-fun ((thing) * * :node node)
+  "optimize away possible call to FDEFINITION at runtime"
+  (ensure-lvar-fun-form thing 'thing :give-up t))
+
+;;; Behaves just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
+(deftransform %coerce-callable-for-call ((thing) * * :node node)
+  "optimize away possible call to FDEFINITION at runtime"
+  (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
+
+(define-source-transform %coerce-callable-to-fun (thing &environment env)
+  (ensure-source-fun-form thing env :give-up t))
+
+;;; Change 'f to #'f
+(defoptimizer (%coerce-callable-for-call optimizer) ((fun))
+  (let ((uses (lvar-uses fun)))
+   (when (consp uses)
+     (loop for use in uses
+           when (ref-p use)
+           do (let ((leaf (ref-leaf use)))
+                (when (constant-p leaf)
+                  (change-ref-leaf use (find-global-fun (constant-value leaf) t) :recklessly t))))))
+  nil)

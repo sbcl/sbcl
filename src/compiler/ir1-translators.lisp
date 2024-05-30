@@ -741,26 +741,6 @@ be a lambda expression."
              (cl:symbol-package name)
              name)
         fallback)))
-
-(defun ensure-lvar-fun-form (lvar lvar-name &key (coercer '%coerce-callable-to-fun)
-                                                 give-up)
-  (aver (and lvar-name (symbolp lvar-name)))
-  (if (csubtypep (lvar-type lvar) (specifier-type 'function))
-      lvar-name
-      (let ((cname (lvar-constant-global-fun-name lvar)))
-        (cond (cname
-               (if (lvar-annotations lvar)
-                   `(with-annotations ,(lvar-annotations lvar)
-                      (global-function ,cname))
-                   `(global-function ,cname)))
-              (give-up
-               (give-up-ir1-transform
-                ;; No ~S here because if fallback is shown, it wants no quotes.
-                "~A is not known to be a function"
-                ;; LVAR-NAME is not what to show - if only it were that easy.
-                (source-variable-or-else lvar "callable expression")))
-              (t
-               `(,coercer ,lvar-name))))))
 
 ;;;; FUNCALL
 (def-ir1-translator %funcall ((function &rest args) start next result)
@@ -803,19 +783,6 @@ be a lambda expression."
                                       :coercer '%coerce-callable-for-call
                                       :extendedp nil)
              ,@args))
-
-(deftransform %coerce-callable-to-fun ((thing) * * :node node)
-  "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t))
-
-;;; Bevahes just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
-(deftransform %coerce-callable-for-call ((thing) * * :node node)
-  "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
-
-(define-source-transform %coerce-callable-to-fun (thing &environment env)
-  (ensure-source-fun-form thing env :give-up t))
-
 
 ;;;; LET and LET*
 ;;;;

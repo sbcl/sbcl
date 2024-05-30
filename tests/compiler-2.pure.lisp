@@ -4444,6 +4444,7 @@
    (lambda (x a b)
      (funcall (ecase x
                 (0 #'+)
-                (1 (lambda (x y) (- x y))))
+                (1 (lambda (x y) (- x y)))
+                (2 'logand))
               a b))
    number))
