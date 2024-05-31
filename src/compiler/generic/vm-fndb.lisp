@@ -681,6 +681,9 @@
 (defknown (setf fdefn-fun) (function fdefn) function ())
 (defknown fdefn-makunbound (fdefn) (values) ())
 ;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
+;;; For the most part this simple-fun is not needed, as ir2 conversion directly selects
+;;; the vop of this name; however, the expansion of handler-bind puts in a call to it
+;;; to trap unbound handlers in safe code, and we want that to work in the interpreter.
 (defknown safe-fdefn-fun (fdefn) function ())
 
 (defknown %simple-fun-type (function) t (flushable))

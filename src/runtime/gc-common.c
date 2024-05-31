@@ -1018,8 +1018,7 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
     return FDEFN_SIZE;
 }
 static lispobj trans_fdefn(lispobj object) {
-    return gc_copy_object(object, FDEFN_SIZE,
-                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
+    return gc_copy_object(object, FDEFN_SIZE, small_mixed_region, PAGE_TYPE_SMALL_MIXED);
 }
 static sword_t size_fdefn(lispobj __attribute__((unused)) *where) {
     return FDEFN_SIZE;

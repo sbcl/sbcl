@@ -3348,7 +3348,7 @@
                                           (setf val (ash val -8))))))))))
 
 ;;; Return an address which when _dereferenced_ will return ADDR
-(defun asm-routine-indirect-address (addr)
+(defun sb-vm::asm-routine-indirect-address (addr)
   (let ((i (sb-fasl::asm-routine-index-from-addr addr)))
     (declare (ignorable i))
     #-immobile-space (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*)
@@ -3370,7 +3370,7 @@
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
   (when (and (eq flavor :assembly-routine) (eq kind :*abs32))
-    (setq value (asm-routine-indirect-address value)))
+    (setq value (sb-vm::asm-routine-indirect-address value)))
   (let ((sap (code-instructions code)))
     (case flavor
       (:card-table-index-mask ; the VALUE is nbits, so convert it to an AND mask

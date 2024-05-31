@@ -577,7 +577,7 @@
 (defun read-page-table (stream n-ptes nbytes data-page &optional (print nil))
   (declare (ignore nbytes))
   (let ((table (make-array n-ptes)))
-    (file-position stream (* (1+ data-page) sb-c:+backend-page-bytes+))
+    (file-position stream (* (1+ data-page) +backend-page-bytes+))
     (dotimes (i n-ptes)
       (let* ((bitmap (make-array *bitmap-bits-per-page* :element-type 'bit))
              (temp (make-array *bitmap-bytes-per-page* :element-type '(unsigned-byte 8))))
@@ -944,7 +944,7 @@
          (setq initfun (%vector-raw-bits core-header ptr)))))
     (values total-npages (reverse space-list) card-mask-nbits core-dir-start initfun)))
 
-(defconstant +lispwords-per-corefile-page+ (/ sb-c:+backend-page-bytes+ n-word-bytes))
+(defconstant +lispwords-per-corefile-page+ (/ +backend-page-bytes+ n-word-bytes))
 
 (defun rewrite-core (directory spacemap card-mask-nbits initfun core-header offset output
                      &aux (dynamic-space (get-space dynamic-core-space-id spacemap)))
@@ -979,13 +979,13 @@
     (dolist (dir-entry directory)
       (destructuring-bind (page id paddr vaddr nwords) dir-entry
         (declare (ignore id vaddr))
-        (aver (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page))))
+        (aver (= (file-position output) (* +backend-page-bytes+ (1+ page))))
         (let* ((npages (ceiling nwords +lispwords-per-corefile-page+))
-               (nbytes (* npages sb-c:+backend-page-bytes+))
+               (nbytes (* npages +backend-page-bytes+))
                (wrote
                 (sb-unix:unix-write (sb-impl::fd-stream-fd output) paddr 0 nbytes)))
           (aver (= wrote nbytes)))))
-    (aver (= (file-position output) (* sb-c:+backend-page-bytes+ (1+ page-count))))
+    (aver (= (file-position output) (* +backend-page-bytes+ (1+ page-count))))
     #+mark-region-gc ; write the bitmap
     (dovector (pte (space-page-table dynamic-space))
       (let ((bitmap (page-bitmap pte)))
@@ -1116,7 +1116,7 @@
                        fwdmap)
               (incf freeptr reserved-amount)
               (format nil "~&Code: ~D objects, ~D bytes~%" (length codeblobs) freeptr))
-            (let* ((new-space-nbytes (align-up freeptr sb-c:+backend-page-bytes+))
+            (let* ((new-space-nbytes (align-up freeptr +backend-page-bytes+))
                    (new-space (sb-sys:allocate-system-memory new-space-nbytes)))
               ;; Write header of "vector 1"
               (setf (sap-ref-word new-space 0) simple-array-unsigned-byte-32-widetag

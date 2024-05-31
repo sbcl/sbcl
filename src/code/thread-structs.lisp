@@ -151,7 +151,7 @@ in future versions."
   ;; Measure elapsed time in GC in the resolution that clock_gettime returns
   ;; (nanoseconds) for 64-bit, or microseconds for 32-bit.
   ;; This can indicate >584 years if 64-bit or slightly over an hour if 32-bit.
-  ;; Considering restarting your SBCL before wraparound occurs, if you care.
+  ;; Consider restarting your SBCL before wraparound occurs, if you care.
   (gc-virtual-time 0 :type sb-vm:word)
 
   ;; On succesful execution of the thread's lambda, a list of values.

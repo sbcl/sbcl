@@ -2059,8 +2059,7 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
 
         if (is_lisp_pointer(ptr)) {
             lispobj fixed = follow_fp(ptr);
-            if (fixed != ptr)
-                UNALIGNED_STORE32(fixup_where, fixed);
+            if (fixed != ptr) UNALIGNED_STORE32(fixup_where, fixed);
             continue;
         }
         // Call to asm routine or linkage table entry using "CALL [#xNNNN]" form.

@@ -118,7 +118,8 @@
          ;; Return fixups amenable to static linking
          (aref preserved-lists 0)))
 
-  (defun apply-fasl-fixups (code-obj fixups index count real-code-obj &aux (end (1- (+ index count))))
+  (defun apply-fasl-fixups (code-obj fixups index count real-code-obj
+                            &aux (end (1- (+ index count))))
     (dx-let ((preserved (make-array 5 :initial-element nil)))
       (let ((retained-fixups (svref fixups index)))
         (incf index)

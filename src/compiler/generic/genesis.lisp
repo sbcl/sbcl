@@ -1675,11 +1675,9 @@ core and return a descriptor to it."
                    (error "host-constant-to-core: can't convert ~S"
                           value))))))))
 
-;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
+;; Look up the target's descriptor for #'FUN where FUN is a host or cold symbol.
 (defun cold-symbol-function (symbol &optional (errorp t))
-  (let* ((symbol (if (symbolp symbol)
-                     symbol
-                     (warm-symbol symbol)))
+  (let* ((symbol (if (symbolp symbol) symbol (warm-symbol symbol)))
          (f (cold-fdefn-fun (ensure-cold-fdefn symbol))))
     (cond ((not (cold-null f)) f)
           (errorp (error "Expected a definition for ~S in cold load" symbol))
@@ -1706,11 +1704,6 @@ core and return a descriptor to it."
          (bug "~S in bad package for target: ~A" symbol package)))
 
   (or (get symbol 'cold-intern-info)
-      ;; KLUDGE: there is no way to automatically know which macros are handled
-      ;; by sb-fasteval as special forms. An extra slot should be created in
-      ;; any symbol naming such a macro, though things still work if the slot
-      ;; doesn't exist, as long as only a deferred interpreter processor is used
-      ;; and not an immediate processor.
       (let* ((pkg-info
               (when core-file-name (cold-find-package-info (sb-xc:package-name package))))
              (handle (allocate-symbol sb-vm:symbol-size
@@ -2142,7 +2135,6 @@ core and return a descriptor to it."
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
         (let ((fdefn (allocate-otherptr gspace sb-vm:fdefn-size sb-vm:fdefn-widetag)))
-          (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
           (when core-file-name
             (write-wordindexed fdefn sb-vm:fdefn-name-slot cold-name)
             (write-wordindexed fdefn sb-vm:fdefn-fun-slot *nil-descriptor*)
@@ -2152,7 +2144,7 @@ core and return a descriptor to it."
                              (read-bits-wordindexed fdefn 0)))
             (when (typep warm-name '(and symbol (not null)))
               (write-wordindexed (cold-intern warm-name) sb-vm:symbol-fdefn-slot fdefn)))
-          fdefn))))
+          (setf (gethash warm-name *cold-fdefn-objects*) fdefn)))))
 
 (defun cold-fun-entry-addr (fun)
   (aver (= (descriptor-lowtag fun) sb-vm:fun-pointer-lowtag))
@@ -2164,9 +2156,7 @@ core and return a descriptor to it."
   (aver (= (descriptor-widetag function) sb-vm:simple-fun-widetag))
   (let ((fdefn (ensure-cold-fdefn
                 ;; (SETF f) was descriptorized when dumped, symbols were not.
-                (if (symbolp name)
-                    (cold-intern name)
-                    name))))
+                (if (symbolp name) (cold-intern name) name))))
     (let ((existing (read-wordindexed fdefn sb-vm:fdefn-fun-slot)))
       (unless (or (cold-null existing) (descriptor= existing function))
         (error "Function multiply defined: ~S. Was ~x is ~x" name

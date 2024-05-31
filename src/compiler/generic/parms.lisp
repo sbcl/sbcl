@@ -303,7 +303,7 @@
 |#
 
 (defconstant-eqx common-static-fdefns
-    '(;; This the standard set of assembly routines that need to call into lisp.
+    '(;; This is the standard set of assembly routines that need to call into lisp.
       ;; A few backends add TWO-ARG-/= and others to this, in their {arch}/parms
       two-arg-+
       two-arg--
@@ -337,7 +337,7 @@
       vector-hairy-data-vector-set/check-bounds
       vector-hairy-data-vector-ref/check-bounds
       %ldb
-      sb-kernel:vector-unsigned-byte-8-p)
+      vector-unsigned-byte-8-p)
   #'equalp)
 
 ;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about
