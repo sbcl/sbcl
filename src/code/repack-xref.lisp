@@ -19,51 +19,6 @@
 
 (in-package "SB-C")
 
-(labels ((functoid-simple-fun (functoid)
-           ;; looks like this is supposed to ignore INTERPRETED-FUNCTION ?
-           (typecase functoid
-             (simple-fun functoid)
-             (closure
-              (let ((fun (%closure-fun functoid)))
-                (if (and (eq (%fun-name fun) 'sb-impl::encapsulation))
-                    (functoid-simple-fun
-                     (sb-impl::encapsulation-info-definition
-                      (sb-impl::encapsulation-info functoid)))
-                    fun))))))
-  ;;; Note that this function is used by sb-introspect.
-  (defun map-simple-funs (function)
-    (let ((function (%coerce-callable-to-fun function)))
-      (labels ((process (name value)
-                 (awhen (functoid-simple-fun value)
-                   (funcall function name it))))
-        (call-with-each-globaldb-name
-         (lambda (name)
-           ;; Methods are processed with their generic function
-           (unless (typep name '(cons (member sb-pcl::slow-method sb-pcl::fast-method)))
-             (let ((f (or (and (symbolp name) (macro-function name))
-                          (and (legal-fun-name-p name) (fboundp name)))))
-               (typecase f
-                 (generic-function
-                  (loop for method in (sb-mop:generic-function-methods f)
-                        for fun = (sb-pcl::safe-method-fast-function method)
-                        when fun do (process (sb-kernel:%fun-name fun) fun)))
-                 (function
-                  (process name f)))))
-           #+sb-xref-for-internals
-           (let ((info (info :function :info name)))
-             (when info
-               (loop for transform in (fun-info-transforms info)
-                     for fun = (transform-function transform)
-                     ;; Defined using :defun-only and a later %deftransform.
-                     unless (symbolp fun)
-                     do (process transform fun))))))
-        #+sb-xref-for-internals
-        (dohash ((name vop) *backend-template-names*)
-          (declare (ignore name))
-          (let ((fun (vop-info-generator-function vop)))
-            (when fun
-              (process vop fun))))))))
-
 ;;; Repack all xref data vectors in the system, potentially making
 ;;; them compact, but without changing their meaning:
 ;;;
@@ -86,7 +41,10 @@
         (counts-by-name (make-hash-table :test #'equal))
         (all-unpacked '())
         (old-size 0)
-        (new-size 0))
+        (new-size 0)
+        (code-objects (make-array 64000 :fill-pointer 0)))
+    (sb-vm:map-code-objects (lambda (code) (vector-push-extend code code-objects)))
+
     (flet ((xref-size (xref)
              ;; Disregarding overhead for array headers, required
              ;; space is number of octets in nested octet-vector plus
@@ -97,31 +55,30 @@
       ;; Unpack (using old values of
       ;; **MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}**) xref data and count
       ;; occurrence frequencies of names.
-      (map-simple-funs
-       (lambda (name fun)
-         (declare (ignore name))
-         (binding* ((xrefs (%simple-fun-xrefs fun) :exit-if-null)
-                    (seen (make-hash-table :test #'equal))
-                    (unpacked '()))
-           ;; Record size of the xref data for this simple fun.
-           (incf old-size (xref-size xrefs))
-           (map-packed-xref-data
-            (lambda (kind name number)
-              ;; Count NAME, but only once for each FUN.
-              (unless (gethash name seen)
-                (setf (gethash name seen) t)
-                (incf (cdr (ensure-gethash name counts-by-name
-                                           (let ((cell (cons name 0)))
-                                             (push cell counts)
-                                             cell)))))
-              ;; Store (KIND NAME NUMBER) tuple for repacking.
-              (setf (getf unpacked kind) (nconc (getf unpacked kind)
-                                                (list (cons name number)))))
-            xrefs)
-           (unless unpacked (break))
-           ;; Store FUN and UNPACKED for repacking.
-           (push (cons fun unpacked) all-unpacked))))
-
+      (dovector (code code-objects)
+        (dotimes (i (code-n-entries code))
+          (let ((fun (%code-entry-point code i)))
+            (binding* ((xrefs (%simple-fun-xrefs fun) :exit-if-null)
+                       (seen (make-hash-table :test #'equal))
+                       (unpacked '()))
+              ;; Record size of the xref data for this simple fun.
+              (incf old-size (xref-size xrefs))
+              (map-packed-xref-data
+               (lambda (kind name number)
+                 ;; Count NAME, but only once for each FUN.
+                 (unless (gethash name seen)
+                   (setf (gethash name seen) t)
+                   (incf (cdr (ensure-gethash name counts-by-name
+                                (let ((cell (cons name 0)))
+                                  (push cell counts)
+                                  cell)))))
+                 ;; Store (KIND NAME NUMBER) tuple for repacking.
+                 (setf (getf unpacked kind) (nconc (getf unpacked kind)
+                                                   (list (cons name number)))))
+               xrefs)
+              (unless unpacked (break))
+              ;; Store FUN and UNPACKED for repacking.
+              (push (cons fun unpacked) all-unpacked)))))
       ;; Update **MOST-COMMON-XREF-NAMES-BY-{INDEX,NAME}**.
       (let* ((sorted-names (mapcar #'car (stable-sort counts #'> :key #'cdr)))
              (new-names (subseq sorted-names 0 (min (length sorted-names)
