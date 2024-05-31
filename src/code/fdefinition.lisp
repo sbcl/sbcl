@@ -104,20 +104,17 @@
                   symbol))
           (t def))))
 
-(defglobal *fdefn-of-nil* 0) ; God help you if you access this damn thing
+(define-load-time-global *fdefn-of-nil* (make-fdefn nil))
 (declaim (ftype (sfunction (t) fdefn) find-or-create-fdefn))
 (defun find-or-create-fdefn (name)
   (cond
     ((symbolp name)
      (let ((fdefn (sb-vm::%symbol-fdefn name)))
-       (if (or (eq fdefn nil) (eq fdefn 0))
-           (let* ((new (make-fdefn name))
-                  (actual
-                   (if name
-                       (sb-vm::cas-symbol-fdefn name 0 new)
-                       (cas *fdefn-of-nil* 0 new))))
-             (if (eql actual 0) new (the fdefn actual)))
-           fdefn)))
+       (cond ((and fdefn (neq fdefn 0)) fdefn)
+             ((null name) *fdefn-of-nil*)
+             (t (let* ((new (make-fdefn name))
+                       (actual (sb-vm::cas-symbol-fdefn name 0 new)))
+                  (if (eql actual 0) new (the fdefn actual)))))))
     ((find-fdefn name))
     (t
       ;; We won't reach here if the name was not legal
