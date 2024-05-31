@@ -79,8 +79,16 @@
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry combination mv-combination cast exit
-         enclose combination cdynamic-extent jump-table))
+    ((or creturn cif entry mv-combination cast exit
+         enclose cdynamic-extent jump-table))
+    (combination
+     (let ((name (combination-fun-debug-name node)))
+       (when (equal name '(cas symbol-value))
+         (let ((symbol (third (combination-args node))))
+           (when (constant-lvar-p symbol)
+             ;; It also references the symbol, but it's probably not
+             ;; the primary reason for doing CAS.
+             (record-xref :sets (lvar-value symbol) context node nil))))))
     (ref
      (let ((leaf (ref-leaf node)))
        (typecase leaf
