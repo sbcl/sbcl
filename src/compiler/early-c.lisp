@@ -21,10 +21,10 @@
 ;;; so accounting for the fixnum tag and 1 bit for the sign,
 ;;; this leaves 30 bits. Of course this number is ridiculous
 ;;; as a call with that many args would consume 8 GB of stack,
-;;; but it's surely not as ridiculous as MOST-POSITIVE-FIXNUM.
+;;; but it's surely not as ridiculous as ARRAY-DIMENSION-LIMIT.
 (defconstant call-arguments-limit
   #+x86-64 (ash 1 30)
-  #-x86-64 most-positive-fixnum
+  #-x86-64 array-dimension-limit
   "The exclusive upper bound on the number of arguments which may be passed
   to a function, including &REST args.")
 (defconstant lambda-parameters-limit call-arguments-limit
