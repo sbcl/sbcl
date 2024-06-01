@@ -2860,18 +2860,6 @@
   #+sb-xc-host context
   #-sb-xc-host (source-to-string context))
 
-(defun cast-mismatch-from-inlined-p (cast node)
-  (let* ((path (node-source-path node))
-         (transformed (memq 'transformed path))
-         (inlined))
-    (cond ((and transformed
-                (not (eq (memq 'transformed (node-source-path cast))
-                         transformed))))
-          ((setf inlined
-                 (memq 'inlined path))
-           (not (eq (memq 'inlined (node-source-path cast))
-                    inlined))))))
-
 ;;; Delete or move around casts when possible
 (defun maybe-delete-cast (cast)
   (let ((lvar (cast-lvar cast))

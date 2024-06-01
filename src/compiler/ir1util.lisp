@@ -3298,8 +3298,7 @@ is :ANY, the function name is not checked."
                            (return-from process-lvar-type-annotation)))
                       (t
                        'type-warning)))
-         (type (lvar-type-annotation-type annotation))
-         (dest (lvar-dest lvar)))
+         (type (lvar-type-annotation-type annotation)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
@@ -3314,16 +3313,26 @@ is :ANY, the function name is not checked."
           ((consp uses)
            (let ((condition (case condition
                               (type-warning 'type-style-warning)
-                              (t condition))))
+                              (t condition)))
+                 bad)
              (loop for use in uses
                    for dtype = (node-derived-type use)
-                   unless (or (cast-mismatch-from-inlined-p dest use)
-                              (values-types-equal-or-intersect dtype type))
-                   do (%compile-time-type-error-warn use
-                                                     (type-specifier type)
-                                                     (type-specifier dtype)
-                                                     (list (node-source-form use))
-                                                     :condition condition)))))))
+                   unless (values-types-equal-or-intersect dtype type)
+                   do (push use bad))
+             (when bad
+               (loop for bad-use in bad
+                     for path = (source-path-before-transforms bad-use)
+                     ;; Are all uses from the same transform bad?
+                     when (or (not path)
+                              (loop for use in uses
+                                    always (or (memq use bad)
+                                               (neq path (source-path-before-transforms use)))))
+                     do
+                     (%compile-time-type-error-warn bad-use
+                                                    (type-specifier type)
+                                                    (type-specifier (node-derived-type bad-use))
+                                                    (list (node-source-form bad-use))
+                                                    :condition condition))))))))
 
 (defun process-lvar-sequence-bounds-annotation (lvar annotation)
   (destructuring-bind (start end) (lvar-dependent-annotation-deps annotation)
@@ -3427,3 +3436,22 @@ is :ANY, the function name is not checked."
               (or (and pkg (system-package-p pkg))
                   (eq pkg *cl-package*))))
            (t t)))))
+
+(defun cast-mismatch-from-inlined-p (cast node)
+  (let* ((path (node-source-path node))
+         (transformed (memq 'transformed path))
+         (inlined))
+    (cond ((and transformed
+                (not (eq (memq 'transformed (node-source-path cast))
+                         transformed))))
+          ((setf inlined
+                 (memq 'inlined path))
+           (not (eq (memq 'inlined (node-source-path cast))
+                    inlined))))))
+
+(defun source-path-before-transforms (node)
+  (let* ((path (node-source-path node))
+         (first (position-if (lambda (x) (memq x '(transformed inlined)))
+                             path :from-end t)))
+    (if first
+        (nthcdr (+ first 2) path))))

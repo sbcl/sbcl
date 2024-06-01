@@ -4485,3 +4485,14 @@
       `(lambda ()
          (nil))
     (() (condition 'undefined-function))))
+
+(with-test (:name :multiple-uses-type-mismatch-from-transforms)
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda (m)
+                         (sb-kernel:the* (fixnum :use-annotations t) (or m (make-array 10))))
+                      :allow-style-warnings t)))
+  (checked-compile
+   `(lambda (m s)
+      (declare (optimize speed))
+      (sb-kernel:the* (fixnum :use-annotations t) (or m (position 10 (the list s)))))))
