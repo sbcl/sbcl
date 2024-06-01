@@ -847,7 +847,8 @@
                           (if (fixnump size) nil size))))))
 
   (define-vop (allocate-list-on-stack)
-    (:args (length :scs (any-reg immediate))
+    (:args (length :scs (any-reg (immediate
+                                  (typep (* (tn-value tn) n-word-bytes 2) 'sc-offset))))
            (element :scs (any-reg descriptor-reg)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
@@ -859,11 +860,16 @@
       (let ((size (calc-size-in-bytes length next))
             (loop (gen-label)))
         (when (sb-c::make-list-check-overflow-p node)
-          (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error size)))
+          (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error
+                                               (if (integerp size)
+                                                   (list size)
+                                                   size))))
             (inst sub rsp-tn size)
             (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
             ;; avoid clearing condition codes
-            (inst lea rsp-tn (ea rsp-tn size))
+            (inst lea rsp-tn (if (integerp size)
+                                 (ea size rsp-tn)
+                                 (ea rsp-tn size)))
             (inst jmp :be overflow)))
         (stack-allocation size list-pointer-lowtag result)
         (compute-end)

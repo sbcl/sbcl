@@ -2204,3 +2204,15 @@
                                                 :element-type '(unsigned-byte 8))))
                   (opaque-identity v)))
                :stream (make-broadcast-stream)))
+
+(with-test (:name :make-list-large-immediate)
+  (checked-compile
+   '(lambda ()
+     (let ((x (make-list (1- (ash most-positive-fixnum (- (+ sb-vm:word-shift 1)))))))
+       (declare (dynamic-extent x))
+       (car x))))
+  (checked-compile
+   '(lambda ()
+     (let ((x (make-list 100000 :initial-element 1)))
+       (declare (dynamic-extent x))
+       (reduce #'+ x)))))

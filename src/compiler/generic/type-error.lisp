@@ -154,7 +154,9 @@
     (dolist (where values)
       (write-var-integer
        ;; WHERE can be either a TN or a packed SC number + offset
-       (cond ((not (tn-p where))
+       (cond ((consp where)
+              (make-sc+offset immediate-sc-number (car where)))
+             ((not (tn-p where))
               where)
              ((and (sc-is where immediate)
                    (fixnump (tn-value where)))
