@@ -477,11 +477,27 @@
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar)))
          (value (cast-value cast))
-         (atype (cast-asserted-type cast)))
+         (atype (cast-asserted-type cast))
+         bad)
     (do-uses (use value)
-      (let ((dtype (node-derived-type use)))
-        (unless (or (values-types-equal-or-intersect dtype atype)
-                    (cast-mismatch-from-inlined-p cast use))
+      (unless (values-types-equal-or-intersect (node-derived-type use) atype)
+        (push use bad)))
+    (loop for use in bad
+          for path = (source-path-before-transforms use)
+          ;; Are all uses from the same transform bad?
+          when (or (not path)
+                   (and
+                    (do-uses (use value t)
+                      (unless (or (memq use bad)
+                                  (neq path (source-path-before-transforms use)))
+                        (return)))
+                    ;; maybe-delete-cast may have hoisted out a good use
+                    lvar
+                    (or (atom (lvar-uses lvar))
+                        (do-uses (use lvar t)
+                          (unless (eq path (source-path-before-transforms use))
+                            (return))))))
+          do
           (let* ((*compiler-error-context* use)
                  (dtype (node-derived-type use))
                  (what (when (and (combination-p dest)
@@ -505,7 +521,7 @@
                          :format-control
                          "~:[Result~;~:*~A~] is a ~/sb-impl:print-type/, ~
                        ~<~%~9T~:;not a ~/sb-impl:print-type/.~>"
-                         :format-arguments (list what dtype atype)))))))))
+                         :format-arguments (list what dtype atype)))))))
   (values))
 
 ;;; Loop over all blocks in COMPONENT that have TYPE-CHECK set,

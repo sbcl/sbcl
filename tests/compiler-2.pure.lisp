@@ -4495,4 +4495,13 @@
   (checked-compile
    `(lambda (m s)
       (declare (optimize speed))
-      (sb-kernel:the* (fixnum :use-annotations t) (or m (position 10 (the list s)))))))
+      (sb-kernel:the* (fixnum :use-annotations t) (or m (position 10 (the list s))))))
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda (m)
+                         (the fixnum (or m (make-array 10))))
+                      :allow-style-warnings t)))
+  (checked-compile
+   `(lambda (m s)
+      (declare (optimize speed))
+      (the fixnum (or m (position 10 (the list s)))))))
