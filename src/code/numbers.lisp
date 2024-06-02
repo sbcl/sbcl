@@ -1819,7 +1819,6 @@ and the number of 0 bits if INTEGER is negative."
                        (declare (integer x))
                        (etypecase x
                          ((signed-byte ,width) x)
-                         (fixnum (sb-c::mask-signed-field ,width x))
                          (bignum (sb-c::mask-signed-field ,width x)))))
                 (,name ,@(loop for arg in lambda-list
                                collect `(prepare-argument ,arg)))))))

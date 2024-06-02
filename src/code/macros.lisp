@@ -1093,9 +1093,7 @@ invoked. In that case it will store into PLACE and start over."
                      ;; - if ERRORP is non-nil, though this isn't technically an "otherwise"
                      ;;   clause, in acts just like one.
                      (if errorp
-                         (setq errorp :none)
-                         (style-warn "T clause in ~S makes subsequent clauses unreachable:~%~S"
-                                     name specified-clauses)))
+                         (setq errorp :none)))
                    (when case-clauses ; try the TYPECASE into CASE reduction
                      (let ((typespec (ignore-errors (typexpand keyoid))))
                        (cond ((typep typespec '(cons (eql member) (satisfies proper-list-p)))
@@ -1124,7 +1122,26 @@ invoked. In that case it will store into PLACE and start over."
                               (unless (member (car tail) (cdr tail))
                                 (list (car tail))))
                             keys)))
-
+    (when (eq test 'typep)
+      (let (types)
+        (loop for key in keys
+              for clause in specified-clauses
+              do
+              (with-current-source-form (clause)
+                (let ((type (specifier-type key)))
+                  (when type
+                    (let ((existing (loop for (prev . spec) in types
+                                          when (and (csubtypep type prev)
+                                                    (not (or (and (eq prev (specifier-type 'single-float))
+                                                                  (eq key 'short-float))
+                                                             #-long-float
+                                                             (and (eq prev (specifier-type 'double-float))
+                                                                  (eq key 'long-float)))))
+                                          return spec)))
+                      (if existing
+                          (style-warn "Clause ~s is shadowed by ~s"
+                                      key existing)
+                          (push (cons type key) types)))))))))
     ;; Try hash-based dispatch only if expanding for the compiler
     (when (and (neq errorp 'cerror)
                (sb-c::compiling-p lexenv)

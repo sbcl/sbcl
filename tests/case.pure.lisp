@@ -71,3 +71,9 @@
                          (a 1)
                          (2 10))))
                    :allow-notes nil))
+
+(with-test (:name :duplicate-typecase)
+  (assert (nth-value 3
+                     (checked-compile '(lambda (x)
+                                        (typecase x (number 1) (integer 2)))
+                                      :allow-style-warnings t))))
