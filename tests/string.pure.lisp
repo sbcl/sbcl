@@ -374,3 +374,7 @@ claim that any particular result from these edge cases constitutes a bug.
            simple-string)
     (check (string-upcase (the character x))
            (simple-string 1))))
+
+(with-test (:name :downcase-ascii)
+  (assert (string= (string-downcase (code-char 192))
+                   (string (char-downcase (code-char 192))))))

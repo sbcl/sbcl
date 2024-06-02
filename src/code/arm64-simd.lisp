@@ -69,7 +69,7 @@
              collect `(touch-object ,var))))
 
 (defmacro simd-string-case (a source destination index fallback)
-  `(let ((ascii-p (simd-mask-32 192))
+  `(let ((ascii-p (simd-mask-32 191))
          (a-mask (simd-mask-32 ,(char-code a)))
          (z-mask (simd-mask-32 25))
          (flip (simd-mask-32 #x20)))
