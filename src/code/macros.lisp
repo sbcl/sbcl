@@ -1129,7 +1129,8 @@ invoked. In that case it will store into PLACE and start over."
               do
               (with-current-source-form (clause)
                 (let ((type (specifier-type key)))
-                  (when type
+                  (when (and type
+                             (neq type *empty-type*))
                     (let ((existing (loop for (prev . spec) in types
                                           when (and (csubtypep type prev)
                                                     (not (or (and (eq prev (specifier-type 'single-float))
