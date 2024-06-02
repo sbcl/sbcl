@@ -1574,7 +1574,7 @@
   (define-2-x-5-instructions srad 31 794) ; shift right algebraic doubleword
   (define-2-x-10-instructions cntlzw 31 26)
   (define-2-x-10-instructions cntlzd 31 58)
-  (define-x-10-instruction popcntd 31 506 0)
+  (define-x-10-instruction popcntd 31 506 nil)
   (define-2-x-5-instructions and 31 28)
 
   (define-4-xo-instructions subf 31 40)
