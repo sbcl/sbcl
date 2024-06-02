@@ -50,7 +50,9 @@
      (inst movdqa res (register-inline-constant :sse value))))
 
 (defmacro simd-string-case (a source destination index fallback)
-  `(let ((ascii-p (simd-mask 191))
+  `(let ((ascii-p (simd-mask ,(if (char= a #\a)
+                                  223
+                                  191)))
          (a-mask (simd-mask ,(+ (expt 2 31) (char-code a))))
          (z-mask (simd-mask ,(+ (expt 2 31) 25)))
          (flip (simd-mask #x20)))
