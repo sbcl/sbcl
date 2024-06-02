@@ -1470,3 +1470,16 @@ redefinition."
                                      (:copier nil))
                            (a 0 :type sb-vm:word :read-only t)))))
     (typep (funcall name :a 3) name)))
+
+(defstruct type-mismatch
+  (v (make-array 10) :type fixnum))
+
+(with-test (:name :default-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-type-mismatch))
+                      :allow-warnings t)))
+  (checked-compile
+   `(lambda (m)
+      (make-type-mismatch :v m))))

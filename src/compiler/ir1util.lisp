@@ -3288,28 +3288,33 @@ is :ANY, the function name is not checked."
 
 (defun process-lvar-type-annotation (lvar annotation)
   (let* ((uses (lvar-uses lvar))
-         (condition (case (lvar-type-annotation-context annotation)
-                      (:initform
+         (context (lvar-type-annotation-context annotation))
+         (condition (typecase context
+                      (defstruct-slot-description
                        (if (policy (if (consp uses)
                                        (car uses)
                                        uses)
                                (zerop type-check))
                            'slot-initform-type-style-warning
-                           (return-from process-lvar-type-annotation)))
+                           context))
                       (t
                        'type-warning)))
          (type (lvar-type-annotation-type annotation)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
-           (%compile-time-type-error-warn annotation (type-specifier type)
-                                          (type-specifier (lvar-type lvar))
-                                          (let ((path (lvar-annotation-source-path annotation)))
-                                            (if (eq (car path) 'detail)
-                                                (second path)
-                                                (list
-                                                 (if (eq (car path) 'original-source-start)
-                                                     (find-original-source path)
-                                                     (car path)))))
-                                          :condition condition))
+           (if (symbolp condition)
+               (%compile-time-type-error-warn annotation (type-specifier type)
+                                              (type-specifier (lvar-type lvar))
+                                              (let ((path (lvar-annotation-source-path annotation)))
+                                                (if (eq (car path) 'detail)
+                                                    (second path)
+                                                    (list
+                                                     (if (eq (car path) 'original-source-start)
+                                                         (find-original-source path)
+                                                         (car path)))))
+                                              :condition condition)
+               (setf (sb-kernel::dsd-bits condition)
+                     (logior sb-kernel::dsd-default-error
+                             (sb-kernel::dsd-bits condition)))))
           ((consp uses)
            (let ((condition (case condition
                               (type-warning 'type-style-warning)
@@ -3328,11 +3333,15 @@ is :ANY, the function name is not checked."
                                     always (or (memq use bad)
                                                (neq path (source-path-before-transforms use)))))
                      do
-                     (%compile-time-type-error-warn bad-use
-                                                    (type-specifier type)
-                                                    (type-specifier (node-derived-type bad-use))
-                                                    (list (node-source-form bad-use))
-                                                    :condition condition))))))))
+                     (if (symbolp condition)
+                         (%compile-time-type-error-warn bad-use
+                                                        (type-specifier type)
+                                                        (type-specifier (node-derived-type bad-use))
+                                                        (list (node-source-form bad-use))
+                                                        :condition condition)
+                         (setf (sb-kernel::dsd-bits condition)
+                               (logior sb-kernel::dsd-default-error
+                                       (sb-kernel::dsd-bits condition)))))))))))
 
 (defun process-lvar-sequence-bounds-annotation (lvar annotation)
   (destructuring-bind (start end) (lvar-dependent-annotation-deps annotation)

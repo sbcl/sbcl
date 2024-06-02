@@ -122,7 +122,7 @@
   ;; Packed integer with 4 subfields.
   ;; FIXNUM is ok for the host - it's guaranteed to be at least 16 signed bits
   ;; and we don't have structures whose slot indices run into the thousands.
-  (bits 0 :type fixnum :read-only t)
+  (bits 0 :type fixnum)
   (default nil :read-only t))                    ; default value expression
 (declaim (freeze-type defstruct-slot-description))
 
@@ -130,10 +130,13 @@
   ;; Ensure that rsd-index is representable in 3 bits. (Can easily be changed)
   (assert (<= (1+ (length *raw-slot-data*)) 8)))
 
-(defconstant sb-vm:dsd-index-shift   7)
+(defconstant sb-vm:dsd-index-shift   8)
 (defconstant sb-vm:dsd-raw-type-mask #b111)
+(defconstant dsd-default-error (ash 1 7))
+
 (defun pack-dsd-bits (index read-only safe-p always-boundp gc-ignorable rsd-index)
   (logior (ash index sb-vm:dsd-index-shift)
+          ;; (ash 1 7) meaning DEFAULT doesn't match TYPE is set during compilation of the constructor.
           (if read-only (ash 1 6) 0)
           (if safe-p (ash 1 5) 0)
           (if always-boundp (ash 1 4) 0)
@@ -2041,10 +2044,9 @@ or they must be declared locally notinline at each call site.~@:>"
                    (source-form (and (boundp '*dsd-source-form*)
                                      (cdr (assq dsd *dsd-source-form*)))))
                (cond ((and default
-                           (neq type t)
                            (not pretty))
                       `(the* (,type :source-form ,source-form
-                                    :context :initform
+                                    :context ,dsd
                                     :use-annotations t)
                              ,default))
                      ((and default source-form
