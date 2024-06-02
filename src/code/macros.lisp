@@ -1136,7 +1136,10 @@ invoked. In that case it will store into PLACE and start over."
                                                                   (eq key 'short-float))
                                                              #-long-float
                                                              (and (eq prev (specifier-type 'double-float))
-                                                                  (eq key 'long-float)))))
+                                                                  (eq key 'long-float))
+                                                             (and (csubtypep type (specifier-type 'array))
+                                                                  ;; Ignore due to upgrading
+                                                                  (sb-kernel::ctype-array-any-specialization-p prev)))))
                                           return spec)))
                       (if existing
                           (style-warn "Clause ~s is shadowed by ~s"

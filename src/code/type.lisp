@@ -4478,6 +4478,23 @@ used for a COMPLEX component.~:@>"
       (determine type))
     types))
 
+(defun ctype-array-any-specialization-p (type)
+  (labels ((process-compound-type (types)
+             (loop for type in types
+                   unless (or (hairy-type-p type)
+                              (negation-type-p type))
+                   do (determine type)))
+           (determine (type)
+             (typecase type
+               (array-type
+                (unless (eq (array-type-element-type type) *wild-type*)
+                  (return-from ctype-array-any-specialization-p t)))
+               (union-type
+                (process-compound-type (union-type-types type)))
+               (intersection-type
+                (process-compound-type (intersection-type-types type))))))
+    (determine type)))
+
 ;;; Union unparsing involves looking for certain important type atoms in our
 ;;; internal representation - a/k/a "interned types" - those which have a unique
 ;;; object that models them; and then deciding whether some conjunction of
