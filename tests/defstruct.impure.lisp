@@ -1473,6 +1473,7 @@ redefinition."
 
 (defstruct type-mismatch
   (v (make-array 10) :type fixnum))
+(compile 'make-type-mismatch)
 
 (with-test (:name :default-type-mismatch)
   (assert (nth-value 2
