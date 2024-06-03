@@ -274,11 +274,10 @@
    (let* #())
    ()))
 
-(with-test (:name (:source-path typep :invalid-type-specifier))
+(with-test (:name (:source-path typep :unknown-type-specifier))
   (assert-condition-source-paths
    (typep 1 'undefined-type)
-   ;; both the style-warning and the note count
-   (2) (2)))
+   (2)))
 
 (with-test (:name :dead-code-note-after-transforms)
   (assert
