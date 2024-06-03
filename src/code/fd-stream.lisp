@@ -52,7 +52,7 @@
 (define-load-time-global *available-buffers* ()
   "List of available buffers.")
 
-(defconstant +bytes-per-buffer+ (* 8 1024)
+(defconstant +bytes-per-buffer+ (* 32 1024)
   "Default number of bytes per buffer.")
 
 (defun alloc-buffer (&optional (size +bytes-per-buffer+))

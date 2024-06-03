@@ -126,7 +126,7 @@
 (macrolet ((test (inxf expected &environment env)
              `(with-test (:name (,(macroexpand 'name env) ,inxf))
                 (with-open-file (s *test-path* :external-format ',inxf)
-                  (let* ((string (make-string 10000))
+                  (let* ((string (make-string 100000))
                          (count (read-sequence string s)))
                     (assert (equal (map 'list 'char-code (subseq string 0 count)) ,expected))))))
            (with-test-file ((id bytes) &body body)
@@ -176,14 +176,11 @@
     (tests 516)
     (tests 517)
 
-    (with-test (:name :fd-stream-bytes-per-buffer)
-      (assert (= sb-impl::+bytes-per-buffer+ 8192)))
-
-    (tests 8190)
-    (tests 8191)
-    (tests 8192)
-    (tests 8193)
-    (tests 8194)))
+    (tests #.(- sb-impl::+bytes-per-buffer+ 2))
+    (tests #.(- sb-impl::+bytes-per-buffer+ 1))
+    (tests #.sb-impl::+bytes-per-buffer+)
+    (tests #.(+ sb-impl::+bytes-per-buffer+ 1))
+    (tests #.(+ sb-impl::+bytes-per-buffer+ 3))))
 
 (macrolet ((test (inxf expected &environment env)
              `(progn
