@@ -514,3 +514,67 @@
       FALSE
       (inst mov res null-tn)
       DONE)))
+
+(defun simd-copy-utf8-bytes-to-character-string (requested total-copied start string ibuf)
+  (declare (type index start requested total-copied)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (string)
+    (let* ((head (sb-impl::buffer-head ibuf))
+           (tail (sb-impl::buffer-tail ibuf))
+           (left (- requested total-copied))
+           (result-characters (logand left -16))
+           (string-bytes (logand (- tail head) -16))
+           (n (min result-characters string-bytes))
+           (string-start (truly-the fixnum (* (+ start total-copied) 4)))
+           (copied
+             (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                          ((byte-array sap-reg t))
+                          ((32-bit-array sap-reg t) (vector-sap string))
+                          ((ascii-mask complex-double-reg))
+                          ((bytes complex-double-reg))
+                          ((16-bits complex-double-reg))
+                          ((32-bits complex-double-reg))
+                          ((32-bits-2 complex-double-reg))
+                          ((string-start any-reg) string-start)
+                          ((end unsigned-reg))
+                          ((head any-reg) head)
+                          ((n any-reg) n)
+                          ((32-bits-3 complex-double-reg))
+                          ((32-bits-4 complex-double-reg))
+                          ((16-bits-2 complex-double-reg))
+                          ((temp complex-double-reg)))
+                 ((res unsigned-reg unsigned-num))
+               (inst movi ascii-mask 128 :16b)
+               (inst add byte-array* byte-array* (lsr head 1))
+               (inst mov byte-array byte-array*)
+               (inst add end byte-array* (lsr n 1))
+               (inst add 32-bit-array 32-bit-array (lsr string-start 1))
+               (inst b start)
+
+               LOOP
+               (inst ldr bytes (@ byte-array))
+               (inst s-and temp bytes ascii-mask)
+               (inst umaxv temp temp :4s)
+               (inst umov tmp-tn temp 0 :s)
+               (inst cbnz tmp-tn DONE)
+               (inst add byte-array byte-array 16)
+
+               (inst ushll 16-bits :8h bytes :8b)
+               (inst ushll 32-bits :4s 16-bits :4h)
+
+               (inst ushll2 16-bits-2 :8h bytes :16b)
+               (inst ushll2 32-bits-2 :4s 16-bits :8h)
+
+               (inst ushll 32-bits-3 :4s 16-bits-2 :4h)
+               (inst ushll2 32-bits-4 :4s 16-bits-2 :8h)
+               (inst stp 32-bits 32-bits-2 (@ 32-bit-array 64 :post-index))
+               (inst stp 32-bits-3 32-bits-4 (@ 32-bit-array -32))
+
+               start
+               (inst cmp byte-array end)
+               (inst b :lt LOOP)
+
+               DONE
+               (inst sub res byte-array byte-array*))))
+      (setf (sb-impl::buffer-head ibuf) (+ head copied))
+      (incf total-copied copied))))

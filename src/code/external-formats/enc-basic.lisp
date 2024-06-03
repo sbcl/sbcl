@@ -614,8 +614,9 @@
   (def :cr define-utf8->string/cr utf8->string/cr bytes-per-utf8-character simple-get-utf8-char/cr)
   (def :crlf define-utf8-string/crlf utf8->string/crlf bytes-per-utf8-character/crlf simple-get-utf8-char/crlf))
 
-#+(and sb-unicode 64-bit little-endian)
-(defun copy-utf8-bytes-to-character-string (requested total-copied start buffer ibuf)
+#+(and sb-unicode 64-bit little-endian
+       (not arm64)) ;; have true simd definitions
+(defun sb-vm::simd-copy-utf8-bytes-to-character-string (requested total-copied start buffer ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (buffer)
@@ -682,10 +683,10 @@
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8 total-copied)))
   #+(and sb-unicode 64-bit little-endian)
-  (let ((new-total (copy-utf8-bytes-to-character-string requested total-copied
-                                                        start buffer (fd-stream-ibuf stream))))
+  (let ((new-total (sb-vm::simd-copy-utf8-bytes-to-character-string requested total-copied
+                                                                    start buffer (fd-stream-ibuf stream))))
     ;; Make sure to change this 1 whenever
-    ;; copy-utf8-bytes-to-character-string starts processing more than
+    ;; simd-copy-utf8-bytes-to-character-string starts processing more than
     ;; just ascii characters.
     (fill sbuffer 1 :start (+ start total-copied) :end (+ start new-total))
     (setf total-copied new-total))
@@ -766,8 +767,8 @@
        (return total-copied)))
    #+(and sb-unicode 64-bit little-endian)
    (setf total-copied
-         (copy-utf8-bytes-to-character-string requested total-copied
-                                              start string (fd-stream-ibuf stream)))
+         (sb-vm::simd-copy-utf8-bytes-to-character-string requested total-copied
+                                                          start string (fd-stream-ibuf stream)))
    (let* ((ibuf (fd-stream-ibuf stream))
           (head (buffer-head ibuf))
           (tail (buffer-tail ibuf))
@@ -776,6 +777,7 @@
      (declare (type index head tail))
      (do ((size nil nil))
          ((or (= tail head) (= requested total-copied)))
+
        (setf decode-break-reason
              (block decode-break-reason
                (when (< (- tail head) 1) (return))

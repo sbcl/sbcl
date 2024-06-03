@@ -3094,7 +3094,7 @@
 
 (macrolet
     ((def (name q u op)
-       `(define-instruction ,name (segment rd sized rn sizen shift)
+       `(define-instruction ,name (segment rd sized rn sizen &optional (shift 0))
           (:printer simd-shift-by-imm ((q ,q) (u ,u) (op ,op)))
           (:emitter
            (let ((immh 0)
