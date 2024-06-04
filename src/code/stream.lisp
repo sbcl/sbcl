@@ -2423,11 +2423,14 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       ;; Read directly into the string when possible
       (if (and (= %frc-index% +ansi-stream-in-buffer-length+)
                (>= needed (/ +ansi-stream-in-buffer-length+ 2))
-               (typep seq '(simple-array character (*)))
                (fd-stream-p stream)
                (fd-stream-ibuf stream)
                (eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8))
-          (fd-stream-read-n-characters/utf-8-to-string stream seq start needed)
+          (cond #+sb-unicode
+                ((typep seq 'simple-base-string)
+                 (fd-stream-read-n-characters/utf-8-to-base-string stream seq start needed))
+                (t
+                 (fd-stream-read-n-characters/utf-8-to-string stream seq start needed)))
           (labels ((refill-buffer ()
                      (prog1 (fast-read-char-refill stream nil)
                        (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
