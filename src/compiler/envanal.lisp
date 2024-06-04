@@ -304,7 +304,7 @@
                 (or (not pkg)
                     (package-locked-p pkg)
                     (system-package-p pkg)
-                    (eq pkg (find-package "COMMON-LISP"))
+                    (eq pkg *cl-package*)
                     (basic-combination-fun-info node)))
               (policy node (= safety 0)))
           (dolist (arg-spec dxable-args)
