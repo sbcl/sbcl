@@ -615,7 +615,7 @@
   (def :crlf define-utf8-string/crlf utf8->string/crlf bytes-per-utf8-character/crlf simple-get-utf8-char/crlf))
 
 #+(and sb-unicode 64-bit little-endian
-       (not arm64)) ;; have true simd definitions
+       (not (or arm64 x86-64))) ;; have true simd definitions
 (defun sb-vm::simd-copy-utf8-bytes-to-character-string (requested total-copied start buffer ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))

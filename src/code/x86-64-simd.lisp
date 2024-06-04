@@ -641,3 +641,95 @@
       FALSE
       (load-symbol res nil)
       DONE)))
+
+(defun simd-copy-utf8-bytes-to-character-string (requested total-copied start string ibuf)
+  (declare (type index start requested total-copied)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string)
+    (let* ((head (sb-impl::buffer-head ibuf))
+           (tail (sb-impl::buffer-tail ibuf))
+           (left (- requested total-copied))
+           (result-characters (logand left -16))
+           (string-bytes (logand (- tail head) -16))
+           (n (min result-characters string-bytes))
+           (string-start (truly-the fixnum (* (+ start total-copied) 4)))
+           (copied
+             (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                          ((byte-array sap-reg t))
+                          ((32-bit-array sap-reg t) (vector-sap string))
+                          ((ascii-mask int-sse-reg))
+                          ((bytes int-sse-reg))
+                          ((16-bits int-sse-reg))
+                          ((32-bits int-sse-reg))
+                          ((32-bits-2 int-sse-reg))
+                          ((string-start unsigned-reg) string-start)
+                          ((end unsigned-reg))
+                          ((head unsigned-reg) head)
+                          ((n unsigned-reg) n)
+                          ((32-bits-4 int-sse-reg))
+                          ((temp int-sse-reg))
+                          ((zero)))
+                 ((res unsigned-reg unsigned-num))
+               (let ((16-bits-2 bytes)
+                     (32-bits-3 bytes))
+                (assemble ()
+                  (inst movdqa ascii-mask (register-inline-constant :sse (concat-ub8 (loop for i below 16 collect 128))))
+
+                  (inst add byte-array* head)
+                  (inst mov byte-array byte-array*)
+                  (inst lea end (ea byte-array* n))
+                  (inst add 32-bit-array string-start)
+                  (inst pxor zero zero)
+                  (inst jmp start)
+
+
+                  LOOP
+                  (inst movdqu bytes (ea byte-array))
+                  (move temp bytes)
+                  (inst pand temp ascii-mask)
+                  (inst pmovmskb head temp)
+                  (inst test head head)
+                  (inst jmp :nz done)
+                  (inst add byte-array 16)
+                  (move 16-bits bytes)
+                  (inst punpcklbw 16-bits zero)
+                  (move 32-bits-2 16-bits)
+
+
+                  (move 32-bits 16-bits)
+                  (inst punpcklwd 32-bits zero)
+
+                  (inst movdqu (ea 32-bit-array) 32-bits)
+                  (inst psrldq 32-bits-2 8)
+                  (inst punpcklwd 32-bits-2 zero)
+
+                  (inst movdqu (ea 16 32-bit-array) 32-bits-2)
+
+                  (move 16-bits-2 bytes)
+
+                  (inst psrldq 16-bits-2 8)
+                  (inst punpcklbw 16-bits-2 zero)
+                  (move 32-bits-4 16-bits-2)
+                  (move 32-bits-3 16-bits-2)
+
+                  (inst punpcklwd 32-bits-3 zero)
+
+                  (inst movdqu (ea 32 32-bit-array) 32-bits-3)
+                  (inst psrldq 32-bits-4 8)
+                  (inst punpcklwd 32-bits-4 zero)
+
+                  (inst movdqu (ea 48 32-bit-array) 32-bits-4)
+
+                  (inst add 32-bit-array (* 16 4))
+
+
+                  start
+                  (inst cmp byte-array end)
+                  (inst jmp :l LOOP)
+
+                  DONE))
+
+               (inst sub byte-array byte-array*)
+               (move res byte-array))))
+      (setf (sb-impl::buffer-head ibuf) (+ head copied))
+      (incf total-copied copied))))
