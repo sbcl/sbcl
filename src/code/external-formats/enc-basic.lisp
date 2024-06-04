@@ -663,7 +663,8 @@
       (setf (buffer-head ibuf) head)
       total-copied)))
 
-#+(and sb-unicode 64-bit little-endian)
+#+(and sb-unicode 64-bit little-endian
+       (not (or x86-64))) ;; have true simd definitions
 (defun sb-vm::simd-copy-utf8-bytes-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
