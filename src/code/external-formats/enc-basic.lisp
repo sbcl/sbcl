@@ -849,9 +849,10 @@
          (when (stream-decoding-error-and-handle stream decode-break-reason 1)
            (return-from fd-stream-read-n-characters/utf-8-to-string total-copied))
          (return)))
-     (when (or (= requested total-copied)
-               (null (catch 'eof-input-catcher (refill-input-buffer stream))))
+     (when (= requested total-copied)
        (setf (buffer-head ibuf) head)
+       (return total-copied))
+     (unless (catch 'eof-input-catcher (refill-input-buffer stream))
        (return total-copied)))))
 
 #+sb-unicode
@@ -921,9 +922,10 @@
          (when (stream-decoding-error-and-handle stream decode-break-reason 1)
            (return-from fd-stream-read-n-characters/utf-8-to-base-string total-copied))
          (return)))
-     (when (or (= requested total-copied)
-               (null (catch 'eof-input-catcher (refill-input-buffer stream))))
+     (when (= requested total-copied)
        (setf (buffer-head ibuf) head)
+       (return total-copied))
+     (unless (catch 'eof-input-catcher (refill-input-buffer stream))
        (return total-copied)))))
 
 (define-external-format/variable-width (:utf-8 :utf8) t
