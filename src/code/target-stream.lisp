@@ -114,6 +114,37 @@
                          (return char)
                          (incf %frc-index%))))
                 (done-with-fast-read-char))))))
+        ((typep stream 'string-input-stream)
+         (let ((limit (string-input-stream-limit stream))
+               (string (string-input-stream-string stream))
+               (index (string-input-stream-index stream)))
+           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+           (case peek-type
+             ((nil)
+              (if (>= index limit)
+                  (eof-or-lose stream eof-error-p eof-value)
+                  (char string index)))
+             ((t)
+              (let ((rt *readtable*))
+                (prog1
+                    (loop
+                     (when (>= index limit)
+                       (return (eof-or-lose stream eof-error-p eof-value)))
+                     (let ((char (char string index)))
+                       (if (whitespace[2]p char rt)
+                           (incf index)
+                           (return char))))
+                  (setf (string-input-stream-index stream) index))))
+             (t
+              (prog1
+                  (loop
+                   (when (>= index limit)
+                     (return (eof-or-lose stream eof-error-p eof-value)))
+                   (let ((char (char string index)))
+                     (if (char= char peek-type)
+                         (return char)
+                         (incf index))))
+                (setf (string-input-stream-index stream) index))))))
         ((typep stream 'echo-stream)
          (echo-stream-peek-char stream peek-type eof-error-p eof-value))
         (t
