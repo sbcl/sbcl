@@ -831,3 +831,20 @@
       (locally (declare (optimize (space 0)))
         (sort v #'<)))
    (((vector 2 1)) #(1 2) :test #'equalp)))
+
+(with-test (:name :read-sequence-type)
+  (assert-type
+   (lambda (stream)
+     (let ((seq (make-string 100)))
+       (read-sequence seq stream)))
+   (mod 101))
+  (assert-type
+   (lambda (stream n)
+     (let ((seq (make-string n)))
+       (read-sequence seq stream :end 10)))
+   (mod 11))
+  (assert-type
+   (lambda (stream)
+     (let ((seq (make-string 10)))
+       (read-sequence seq stream :start 1)))
+   (integer 1 10)))
