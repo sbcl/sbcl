@@ -72,14 +72,56 @@
 (declaim (inline ansi-stream-peek-char))
 (defun ansi-stream-peek-char (peek-type stream eof-error-p eof-value
                               recursive-p)
-  (cond ((typep stream 'echo-stream)
+  (cond ((ansi-stream-cin-buffer stream)
+         (prepare-for-fast-read-char stream
+           (declare (ignore %frc-method%))
+           (case peek-type
+             ((nil)
+              (block nil
+                (if (= %frc-index% +ansi-stream-in-buffer-length+)
+                    (let ((index-or-nil (fast-read-char-refill %frc-stream% eof-error-p)))
+                      (when (null index-or-nil)
+                        (return eof-value))
+                      (aref %frc-buffer% (truly-the (mod #.+ansi-stream-in-buffer-length+)
+                                                    index-or-nil)))
+                    (aref %frc-buffer% %frc-index%))))
+             ((t)
+              (let ((rt *readtable*))
+                (prog1
+                    (loop
+                     (when (= %frc-index% +ansi-stream-in-buffer-length+)
+                       (let ((index-or-nil (fast-read-char-refill %frc-stream% eof-error-p)))
+                         (when (null index-or-nil)
+                           (return eof-value))
+                         (setf %frc-index% (truly-the (mod #.+ansi-stream-in-buffer-length+)
+                                                      index-or-nil))))
+                     (let ((char (aref %frc-buffer% %frc-index%)))
+                       (if (whitespace[2]p char rt)
+                           (incf %frc-index%)
+                           (return char))))
+                  (done-with-fast-read-char))))
+             (t
+              (prog1
+                  (loop
+                   (when (= %frc-index% +ansi-stream-in-buffer-length+)
+                     (let ((index-or-nil (fast-read-char-refill %frc-stream% eof-error-p)))
+                       (when (null index-or-nil)
+                         (return eof-value))
+                       (setf %frc-index% (truly-the (mod #.+ansi-stream-in-buffer-length+)
+                                                    index-or-nil))))
+                   (let ((char (aref %frc-buffer% %frc-index%)))
+                     (if (char= char peek-type)
+                         (return char)
+                         (incf %frc-index%))))
+                (done-with-fast-read-char))))))
+        ((typep stream 'echo-stream)
          (echo-stream-peek-char stream peek-type eof-error-p eof-value))
         (t
          (generalized-peeking-mechanism
-          peek-type eof-value char
-          (ansi-stream-read-char stream eof-error-p :eof recursive-p)
-          :eof
-          (ansi-stream-unread-char char stream)))))
+             peek-type eof-value char
+             (ansi-stream-read-char stream eof-error-p :eof recursive-p)
+             :eof
+             (ansi-stream-unread-char char stream)))))
 
 (defun peek-char (&optional (peek-type nil)
                             (stream *standard-input*)
