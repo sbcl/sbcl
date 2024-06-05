@@ -1182,6 +1182,27 @@
                      nil))
              0)))
 
+(with-test (:name :read-sequence-bounds)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (string stream)
+                        (declare (simple-string string))
+                        (loop for i below (read-sequence string stream)
+                              count (char= (char string i) #\a)))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (string stream)
+                        (declare (simple-string string))
+                        (loop for p = (read-sequence string stream)
+                              while (plusp p)
+                              sum
+                              (loop for i below p
+                                    count (char= (char string i) #\a))))
+                     nil))
+             0)))
+
 (with-test (:name :map-equality-constraints)
   (checked-compile-and-assert
    ()
