@@ -176,6 +176,23 @@
   (print-reg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
+(defun print-rel32-disp (value stream dstate)
+  (cond ((not stream) (operand value dstate))
+        (t
+         (or (when (and (typep value 'word)
+                        (not (logtest value lowtag-mask))
+                        (< text-space-start value (sap-int *text-space-free-pointer*)))
+               (multiple-value-bind (fun ok)
+                   (make-lisp-obj (+ value -16 fun-pointer-lowtag) nil)
+                 (when ok
+                   (let ((name (%fun-name fun)))
+                     (note (if (and (symbolp name) (eq (fboundp name) fun))
+                               (lambda (stream) (format stream "#'~A" name))
+                               (lambda (stream) (princ fun stream)))
+                           dstate)))))
+             (maybe-note-assembler-routine value nil dstate))
+         (print-label value stream dstate))))
+
 (defun print-jmp-ea (value stream dstate)
   (cond ((null stream) (operand value dstate))
         ((typep value 'machine-ea)

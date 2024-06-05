@@ -184,8 +184,8 @@
                         (and (search mnemonic line)
                              (search operand line)))
                       lines)))
-    (assert (find-line "CALL" "FUNCTION GENSYM"))
-    (assert (find-line "JMP" "FUNCTION PRINT")))))
+    (assert (find-line "CALL" "#'GENSYM"))
+    (assert (find-line "JMP" "#'PRINT")))))
 
 (with-test (:name :c-call :skipped-on :win32)
   (let* ((lines (split-string

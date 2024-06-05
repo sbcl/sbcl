@@ -188,21 +188,7 @@
                (if (sb-disassem::dstate-absolutize-jumps dstate)
                    (+ (dstate-next-addr dstate) value)
                    value))
-  :printer (lambda (value stream dstate)
-             (cond ((not stream) (operand value dstate))
-                   (t
-                    (or (when (and (typep value 'word)
-                                   (< text-space-start value (sap-int *text-space-free-pointer*)))
-                          (multiple-value-bind (fun ok)
-                              (make-lisp-obj (+ value -16 fun-pointer-lowtag) nil)
-                            (when ok
-                              (let ((name (%fun-name fun)))
-                                (note (if (and (symbolp name) (eq (fboundp name) fun))
-                                          (lambda (stream) (format stream "#'~A" name))
-                                          (lambda (stream) (princ fun stream)))
-                                      dstate)))))
-                        (maybe-note-assembler-routine value nil dstate))
-                    (print-label value stream dstate)))))
+  :printer #'print-rel32-disp)
 
 (define-arg-type accum
   :printer (lambda (value stream dstate)
