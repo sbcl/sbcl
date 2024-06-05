@@ -65,18 +65,15 @@ fi
 set +e # no exit on error
 ${exefile} --noprint n<<EOF
 (in-package sb-impl)
-(defun disassembly-contains-query-read-char ()
-  (search "FDEFN QUERY-READ-CHAR"
-          (with-output-to-string (ss) (disassemble 'y-or-n-p :stream ss))))
-(assert (not (disassembly-contains-query-read-char)))
+(defun asm-string () (with-output-to-string (ss) (disassemble 'y-or-n-p :stream ss)))
+(assert (search "#'QUERY-READ-CHAR" (asm-string)))
 (defun query-read-char () #\y) ; will undo static linkage
-(assert (disassembly-contains-query-read-char))
+(assert (search "FDEFN QUERY-READ-CHAR" (asm-string)))
 (if (let ((*query-io* (make-broadcast-stream))) (y-or-n-p)) (exit :code 42))
 EOF
 status=$?
 if [ $status -eq 42 ]
 then
-  echo
   echo "Undo static linkage: PASS"
 else
   exit 1

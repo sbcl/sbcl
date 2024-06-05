@@ -189,16 +189,20 @@
                    (+ (dstate-next-addr dstate) value)
                    value))
   :printer (lambda (value stream dstate)
-             (cond (stream
-                    ;; This use of MAYBE-NOTE-STATIC-LISPOBJ gets us the
-                    ;; code blob called using canonical 'CALL rel32' form.
-                    (or #+immobile-space
-                        (and (integerp value)
-                             (maybe-note-static-lispobj value dstate))
-                        (maybe-note-assembler-routine value nil dstate))
-                    (print-label value stream dstate))
+             (cond ((not stream) (operand value dstate))
                    (t
-                    (operand value dstate)))))
+                    (or (when (and (typep value 'word)
+                                   (< text-space-start value (sap-int *text-space-free-pointer*)))
+                          (multiple-value-bind (fun ok)
+                              (make-lisp-obj (+ value -16 fun-pointer-lowtag) nil)
+                            (when ok
+                              (let ((name (%fun-name fun)))
+                                (note (if (and (symbolp name) (eq (fboundp name) fun))
+                                          (lambda (stream) (format stream "#'~A" name))
+                                          (lambda (stream) (princ fun stream)))
+                                      dstate)))))
+                        (maybe-note-assembler-routine value nil dstate))
+                    (print-label value stream dstate)))))
 
 (define-arg-type accum
   :printer (lambda (value stream dstate)
@@ -1172,7 +1176,7 @@
                      (values (label+addend-label disp) (label+addend-addend disp))
                      (values disp 0))
                (when (eq addend :code)
-                 (setq addend (- sb-vm:other-pointer-lowtag (component-header-length))))
+                 (setq addend (- other-pointer-lowtag (component-header-length))))
                ;; To point at ADDEND bytes beyond the label, pretend that the PC
                ;; at which the EA occurs is _smaller_ by that amount.
                (emit-dword-displacement-backpatch
@@ -3538,9 +3542,9 @@
     (when (and (gpr-tn-p dst1)
                (location= dst2 dst1)
                (eq size1 :qword)
-               (eql src1 (lognot sb-vm:fixnum-tag-mask))
+               (eql src1 (lognot fixnum-tag-mask))
                (member size2 '(:dword :qword))
-               (typep src2 `(integer ,sb-vm:n-fixnum-tag-bits 63)))
+               (typep src2 `(integer ,n-fixnum-tag-bits 63)))
       (add-stmt-labels next (stmt-labels stmt))
       (delete-stmt stmt)
       next)))
