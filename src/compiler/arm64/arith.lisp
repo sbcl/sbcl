@@ -2273,7 +2273,7 @@
       (inst asr temp2 y 63)
       (inst adds r x y)
       (inst adc temp1 temp1 temp2)
-      (inst tbnz temp1 0 error))))
+      (inst tbnz* temp1 0 error))))
 
 (define-vop (overflow+unsigned)
   (:translate overflow+)
@@ -2716,7 +2716,7 @@
            (fits (csubtypep (tn-ref-type amount-ref)
                             (specifier-type `(integer -63 63)))))
       (when signed
-        (inst tbnz number 63 error))
+        (inst tbnz* number 63 error))
       (cond ((numberp amount)
              (cond ((< amount -63)
                     (inst mov r 0))
@@ -2813,7 +2813,7 @@
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
-        (inst tbnz x 0 error))
+        (inst tbnz* x 0 error))
       (inst adds r x (if (sc-is y any-reg)
                          y
                          (lsl y n-fixnum-tag-bits)))
@@ -2835,7 +2835,7 @@
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
-        (inst tbnz x 0 error))
+        (inst tbnz* x 0 error))
       (inst subs r x (if (sc-is y any-reg)
                          y
                          (lsl y n-fixnum-tag-bits)))
@@ -2857,7 +2857,7 @@
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type y-ref) (specifier-type 'fixnum))
-        (inst tbnz y 0 error))
+        (inst tbnz* y 0 error))
       (inst subs r x y)
       (inst b :vs error))))
 
@@ -2898,7 +2898,7 @@
                                         vop
                                         'sb-kernel::mul-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
-        (inst tbnz x 0 error))
+        (inst tbnz* x 0 error))
       (cond ((eql shift 0)
              (move r x))
             (shift
