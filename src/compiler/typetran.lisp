@@ -1123,11 +1123,6 @@
                 `(and (%instancep object)
                       (logtest (,get-flags (%instance-layout object)) ,flag)))))
 
-          ;; TODO: remove after April 2021 release.
-          ((eq name 'sb-kernel::random-class)
-           (style-warn "~S should not appear in a TYPEP test" name)
-           nil)
-
           ;; Next easiest: Sealed and no subtypes. Typically for DEFSTRUCT only.
           ;; Even if you don't seal a DEFCLASS, we're allowed to assume that things
           ;; won't change, as per CLHS 3.2.2.3 on Semantic Constraints:
