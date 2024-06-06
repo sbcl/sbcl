@@ -159,16 +159,6 @@ static inline int is_cons_half(lispobj obj)
  */
 #define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
 
-/* Tiny payload count is expressed in 8 bits. Objects in this size category
- * can reside in immobile space: SYMBOL, FDEFN.
- * Header:  gen# | flags |   size |    tag
- *         -----   ------  ------   ------
- *        8 bits   8 bits  8 bits | 8 bits
- * FDEFN  flag bits: 1 bit for statically-linked
- * SYMBOL flag bits: 1 bit for present in initial core image
- */
-#define TINY_BOXED_NWORDS(obj) ((HeaderValue(obj) & 0xFF) | 1)
-
 // other_immediate_lowtag_p is the least strict of the tests for whether a word
 // is potentially an object header, merely checking whether the bits fit the general
 // pattern of header widetags without regard for whether some headered object type
