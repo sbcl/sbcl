@@ -3544,11 +3544,11 @@
           (destructuring-bind (flag label) (stmt-operands next)
             (when (case flag
                     (:eq
-                     (setf (stmt-mnemonic stmt) 'tbz
+                     (setf (stmt-mnemonic stmt) 'tbz*
                            (stmt-operands stmt)
                            (list value (1- (integer-length mask)) label)))
                     (:ne
-                     (setf (stmt-mnemonic stmt) 'tbnz
+                     (setf (stmt-mnemonic stmt) 'tbnz*
                            (stmt-operands stmt)
                            (list value (1- (integer-length mask)) label))))
               (delete-stmt next)
