@@ -1961,7 +1961,7 @@
                                             (ldb (byte 1 5) bit)
                                             0
                                             (ldb (byte 5 0) bit)
-                                            (ash (- (label-position label) posn) -2)
+                                            (the (signed-byte 14) (ash (- (label-position label) posn) -2))
                                             (gpr-offset rt))))))
 
 (define-instruction tbnz (segment rt bit label)
@@ -1975,7 +1975,7 @@
                                             (ldb (byte 1 5) bit)
                                             1
                                             (ldb (byte 5 0) bit)
-                                            (ash (- (label-position label) posn) -2)
+                                            (the (signed-byte 14) (ash (- (label-position label) posn) -2))
                                             (gpr-offset rt))))))
 
 (define-instruction tbnz* (segment rt bit label)
@@ -1983,10 +1983,11 @@
    (aver (label-p label))
    (check-type bit (integer 0 63))
    (labels ((compute-delta (position &optional magic-value)
-              (- (label-position label
-                                 (when magic-value position)
-                                 magic-value)
-                 position))
+              (ash (- (label-position label
+                                      (when magic-value position)
+                                      magic-value)
+                      position)
+                   -2))
             (multi-instruction-emitter (segment position)
               (declare (ignore position))
               (assemble (segment)
@@ -1997,7 +1998,7 @@
                                     (ldb (byte 1 5) bit)
                                     1
                                     (ldb (byte 5 0) bit)
-                                    (ash (- (label-position label) posn) -2)
+                                    (compute-delta posn)
                                     (gpr-offset rt)))
             (multi-instruction-maybe-shrink (segment chooser posn magic-value)
               (declare (ignore chooser))
@@ -2016,10 +2017,11 @@
    (aver (label-p label))
    (check-type bit (integer 0 63))
    (labels ((compute-delta (position &optional magic-value)
-              (- (label-position label
-                                 (when magic-value position)
-                                 magic-value)
-                 position))
+              (ash (- (label-position label
+                                      (when magic-value position)
+                                      magic-value)
+                      position)
+                   -2))
             (multi-instruction-emitter (segment position)
               (declare (ignore position))
               (assemble (segment)
@@ -2030,7 +2032,7 @@
                                     (ldb (byte 1 5) bit)
                                     0
                                     (ldb (byte 5 0) bit)
-                                    (ash (- (label-position label) posn) -2)
+                                    (compute-delta posn)
                                     (gpr-offset rt)))
             (multi-instruction-maybe-shrink (segment chooser posn magic-value)
               (declare (ignore chooser))
