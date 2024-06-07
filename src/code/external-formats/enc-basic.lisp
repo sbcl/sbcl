@@ -688,7 +688,7 @@
               (when (logtest word ascii-mask)
                 (setf head ibuf-offset)
                 (incf total-copied
-                      (truncate (- string-offset string-start) 4))
+                      (- string-offset string-start))
                 (return))
               (setf (sap-ref-word string-sap string-offset) word))
             finally (incf head n)
