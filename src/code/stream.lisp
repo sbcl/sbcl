@@ -2421,16 +2421,19 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       (unless %frc-buffer%
         (return-from ansi-stream-read-string-from-frc-buffer nil))
       ;; Read directly into the string when possible
-      (if (and (= %frc-index% +ansi-stream-in-buffer-length+)
+      (or (and (= %frc-index% +ansi-stream-in-buffer-length+)
                (>= needed (/ +ansi-stream-in-buffer-length+ 2))
                (fd-stream-p stream)
                (fd-stream-ibuf stream)
-               (eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8))
-          (cond #+sb-unicode
-                ((typep seq 'simple-base-string)
-                 (fd-stream-read-n-characters/utf-8-to-base-string stream seq start needed))
-                (t
-                 (fd-stream-read-n-characters/utf-8-to-string stream seq start needed)))
+               (cond #+sb-unicode
+                     ((typep seq 'simple-base-string)
+                      (cond
+                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
+                         (fd-stream-read-n-characters/utf-8-to-base-string stream seq start needed))
+                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
+                         (fd-stream-read-n-characters/utf-8-crlf-to-base-string stream seq start needed))))
+                     ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
+                      (fd-stream-read-n-characters/utf-8-to-string stream seq start needed))))
           (labels ((refill-buffer ()
                      (prog1 (fast-read-char-refill stream nil)
                        (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
