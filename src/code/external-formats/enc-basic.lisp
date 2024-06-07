@@ -1122,13 +1122,17 @@
            (string-sap (vector-sap string))
            (string-start (+ start total-copied))
            (string-offset string-start)
-           (end (+ head n)))
+           (end (+ head n))
+           (last-head head)
+           (last-offset string-offset))
       (declare (optimize sb-c::preserve-single-use-debug-variables
                          sb-c::preserve-constants))
       (loop while (= (sap-ref-8 sap (1- end)) 13)
             do (decf end 1))
       (loop while (< head end)
             do
+            (setf last-head head
+                  last-offset string-offset)
             (let ((word (sap-ref-16 sap head)))
               (when (logtest word ascii-mask)
                 (return))
@@ -1145,8 +1149,8 @@
                      (setf (sap-ref-16 string-sap string-offset) word)
                      (incf head 2)
                      (incf string-offset 2)))))
-      (setf (buffer-head ibuf) head)
-      (truly-the index (+ total-copied (- string-offset string-start))))))
+      (setf (buffer-head ibuf) last-head)
+      (truly-the index (+ total-copied (- last-offset string-start))))))
 
 (defun fd-stream-read-n-characters/utf-8-crlf-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
