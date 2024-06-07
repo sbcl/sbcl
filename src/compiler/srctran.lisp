@@ -7527,3 +7527,14 @@
                                 (almost-immediately-used-p fun use)))
                    (change-ref-leaf use (find-global-fun (constant-value leaf) t) :recklessly t))))))
   nil)
+
+(defoptimizer (open derive-type) ((filename
+                                   &key
+                                   if-exists
+                                   if-does-not-exist
+                                   &allow-other-keys))
+  (when (and (or (not if-exists)
+                 (not (types-equal-or-intersect (lvar-type if-exists) (specifier-type 'null))))
+             (or (not if-does-not-exist)
+                 (not (types-equal-or-intersect (lvar-type if-does-not-exist) (specifier-type 'null)))))
+    (specifier-type 'stream)))
