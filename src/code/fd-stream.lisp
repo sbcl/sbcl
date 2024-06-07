@@ -2535,11 +2535,11 @@
               (sb-kernel::%file-error
                pathname
                "~@<The path ~2I~_~S ~I~_does not exist.~:>" pathname))
-             (t '(:return nil))))
+             (t '(:return t))))
           (#-win32 #.sb-unix:eexist
            #+win32 #.sb-win32::error_file_exists
            (if (null if-exists)
-               '(:return nil)
+               '(:return t)
                (restart-case
                    (signal-it 'file-exists)
                  (supersede ()
@@ -2757,13 +2757,13 @@
                                                   :element-type element-type)))
                             (close stream)
                             stream)))))
-             (destructuring-bind (&key (return nil returnp)
+             (destructuring-bind (&key return
                                        new-filename
                                        new-if-exists
                                        new-if-does-not-exist)
                  (%open-error pathname errno if-exists if-does-not-exist)
-               (when returnp
-                 (return return))
+               (when return
+                 (return))
                (when new-filename
                  (setf filename new-filename))
                (when new-if-exists
