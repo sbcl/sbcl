@@ -190,6 +190,9 @@
                                (lambda (stream) (format stream "#'~A" name))
                                (lambda (stream) (princ fun stream)))
                            dstate)))))
+             #+immobile-space
+             (when (integerp value)
+               (maybe-note-static-lispobj value dstate))
              (maybe-note-assembler-routine value nil dstate))
          (print-label value stream dstate))))
 
