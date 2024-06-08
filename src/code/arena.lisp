@@ -13,7 +13,6 @@
           switch-to-arena
           rewind-arena
           unuse-arena
-          thread-current-arena
           in-same-arena
           dump-arena-objects
           arena-contents
