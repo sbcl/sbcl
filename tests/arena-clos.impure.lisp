@@ -1,4 +1,5 @@
-(setq *evaluator-mode* :compile)
+#+(or (not system-tlabs) interpreter) (invoke-restart 'run-tests::skip-file)
+
 (defmethod translate ((x (eql :a)) val) (* 1 val))
 (defmethod translate ((x (eql :b)) val) (* 2 val))
 (defmethod translate ((x (eql :c)) val) (* 3 val))
