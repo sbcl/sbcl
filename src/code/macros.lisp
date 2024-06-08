@@ -1224,7 +1224,9 @@ invoked. In that case it will store into PLACE and start over."
           ;;    is /type equivalent/ to (or type1 type2 ...)"
           (when (symbolp unparsed)
             (return-from etypecase-error-spec `',unparsed))))))
-  `',types)
+  ;; This constant can make its way into generic function dispatch.
+  ;; The compiled code must not to point to an arena if one is active.
+  `',(ensure-heap-list types))
 
 (sb-xc:defmacro case (&whole form &environment env &rest r)
   (declare (sb-c::lambda-list (keyform &body cases)) (ignore r))

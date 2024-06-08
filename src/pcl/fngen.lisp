@@ -132,6 +132,9 @@
                (unless (fgen-system old)
                  (setf (fgen-system old) system)))
               (t
+               (unless (eql (sb-vm:thread-current-arena) 0)
+                 (setq generator-lambda (sb-vm:without-arena (copy-tree generator-lambda))
+                       gensyms (ensure-heap-list gensyms)))
                (setf (gethash test table)
                      (make-fgen gensyms generator generator-lambda system))))))))
 

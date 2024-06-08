@@ -1407,7 +1407,8 @@
              (:assoc
               alist)
              (:hash-table
-              (let ((table (make-hash-table :test (if (car mp) 'eq 'eql))))
+              (let ((table (sb-vm:without-arena
+                            (make-hash-table :test (if (car mp) 'eq 'eql)))))
                 (dolist (k+m alist)
                   (setf (gethash (car k+m) table) (cdr k+m)))
                 table)))))))
