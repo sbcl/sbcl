@@ -2863,10 +2863,11 @@
   (rd 5 0))
 
 (define-instruction-format (simd-extract 32
-                            :default-printer '(:name :tab rd ", " rn ", " rm))
+                            :default-printer '(:name :tab rd ", " rn ", " rm ", #" imm4))
   (op3 :field (byte 1 31) :value #b0)
   (op4 :field (byte 9 21) :value #b101110000)
   (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+  (imm4 :field (byte 4 11))
   (op6 :field (byte 1 15) :value #b0)
   (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
