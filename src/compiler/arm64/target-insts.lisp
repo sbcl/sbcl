@@ -321,6 +321,24 @@
                        "2S"
                        "4S"))))))
 
+(defun print-simd-table-regs (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (len offset) value
+    (format stream "{")
+    (loop for i to len
+          do (format stream " V~d.16B" (+ i offset))
+             (unless (= i len)
+               (write-char #\, stream)))
+    (format stream " }")))
+
+(defun print-simd-b-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q offset) value
+    (format stream "V~d.~a" offset
+            (if (zerop q)
+                "8B"
+                "16B"))))
+
 (defun print-simd-modified-imm (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (abc cmode defgh) value
@@ -420,6 +438,25 @@
              (if imm4
                  (ash imm4 (- index))
                  (ash imm5 (- (1+ index))))))))
+
+(defun print-simd-dup-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (offset q imm5) value
+    (format stream "V~d.~a" offset
+            (cond ((= imm5 #b1)
+                   (if (zerop q)
+                       "8B"
+                       "16B"))
+                  ((= imm5 #b10)
+                   (if (zerop q)
+                       "4H"
+                       "8H"))
+                  ((= imm5 #b100)
+                   (if (zerop q)
+                       "2S"
+                       "4S"))
+                  ((= imm5 #b1000)
+                   "2D")))))
 
 (defun print-sys-reg (value stream dstate)
   (declare (ignore dstate))

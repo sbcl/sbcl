@@ -906,7 +906,7 @@
       (setf arg res))
     (inst fmov v arg)
     (inst cnt v v :8b)
-    ;; GCC uses (inst addv v :b v :8b)
+    ;; GCC uses (inst addv v v :8b)
     ;; but clang uses:
     (inst uaddlv v :h v :8b)
     (inst fmov res v)))
