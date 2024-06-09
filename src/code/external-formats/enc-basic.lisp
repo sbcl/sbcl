@@ -737,7 +737,6 @@
               (block decode-break-reason
                 (when (< (- tail head) 1) (return))
                 (let ((byte (sap-ref-8 sap head)))
-                  (declare (ignorable byte))
                   (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
                   (when (> size (- tail head)) (return))
                   (let ((index (+ start total-copied)))
@@ -815,7 +814,6 @@
              (block decode-break-reason
                (when (< (- tail head) 1) (return))
                (let ((byte (sap-ref-8 sap head)))
-                 (declare (ignorable byte))
                  (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
                  (when (> size (- tail head)) (return))
                  (let ((index (+ start total-copied)))
@@ -888,7 +886,6 @@
              (block decode-break-reason
                (when (< (- tail head) 1) (return))
                (let ((byte (sap-ref-8 sap head)))
-                 (declare (ignorable byte))
                  (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
                  (when (> size (- tail head)) (return))
                  (let ((index (+ start total-copied)))
@@ -1106,7 +1103,8 @@
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :newline-variant :crlf)
 
-#+(and sb-unicode 64-bit little-endian)
+#+(and sb-unicode 64-bit little-endian
+       (not (or arm64))) ;; have true simd definitions
 (defun sb-vm::simd-copy-utf8-crlf-bytes-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
@@ -1142,7 +1140,7 @@
                      (incf head 2)
                      (incf string-offset 1))
                     ((= (ash word -8) 13)
-                     (setf (sap-ref-8 string-sap string-offset) (ldb (byte 8 0) word))
+                     (setf (sap-ref-8 string-sap string-offset) word)
                      (incf head 1)
                      (incf string-offset 1))
                     (t
@@ -1192,7 +1190,6 @@
                  (setf requested-refill t)
                  (return))
                (let ((byte (sap-ref-8 sap head)))
-                 (declare (ignorable byte))
                  (setf requested-refill nil)
                  (setq size
                        (cond ((= (- tail head) 1) 1)
