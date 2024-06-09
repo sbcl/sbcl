@@ -275,18 +275,34 @@
                        "2D"))))
       (destructuring-bind (q immh offset) value
         (format stream "V~d.~a" offset
-                (cond ((logbitp 0 immh)
+                (cond ((= immh 1)
                        (if (zerop q)
                            "8B"
                            "16B"))
-                      ((logbitp 1 immh)
+                      ((= (ash immh -1) 1)
                        (if (zerop q)
                            "4H"
                            "8H"))
-                      ((logbitp 2 immh)
+                      ((= (ash immh -2) 1)
                        (if (zerop q)
                            "2S"
-                           "4S")))))))
+                           "4S"))
+                      ((= (ash immh -3) 1)
+                       "2D"))))))
+
+(defun print-simd-immh-shift-right (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (immh immb) value
+    (let ((imm (logior (ash immh 3) immb)))
+      (format stream "#~a" (- (ash 1 (1- (integer-length imm)))
+                              (ldb (byte (1- (integer-length imm)) 0)
+                                   imm))))))
+(defun print-simd-immh-shift-left (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (immh immb) value
+    (let ((imm (logior (ash immh 3) immb)))
+      (format stream "#~a" (ldb (byte (1- (integer-length imm)) 0)
+                                imm)))))
 
 (defun print-simd-reg-cmode (value stream dstate)
   (declare (ignore dstate))

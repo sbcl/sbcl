@@ -113,6 +113,8 @@
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
 
   (define-arg-type simd-immh-reg :printer #'print-simd-immh-reg)
+  (define-arg-type simd-immh-shift-left :printer #'print-simd-immh-shift-left)
+  (define-arg-type simd-immh-shift-right :printer #'print-simd-immh-shift-right)
   (define-arg-type simd-modified-imm :printer #'print-simd-modified-imm)
   (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
 
@@ -3082,13 +3084,12 @@
   (rd 5 0))
 
 (define-instruction-format (simd-shift-by-imm 32
-                            :default-printer '(:name :tab rd ", " rn))
+                            :default-printer '(:name :tab rd ", " rn ", " shift))
   (o1 :field (byte 1 31) :value #b0)
   (q :field (byte 1 30))
   (u :field (byte 1 29))
   (op2 :field (byte 6 23) :value #b011110)
-  (immh :field (byte 4 19))
-  (immb :field (byte 3 16))
+  (shift :fields (list (byte 4 19) (byte 3 16)) :type 'simd-immh-shift-left)
   (op :field (byte 5 11))
   (op3 :field (byte 1 10) :value #b1)
   (rn :fields (list (byte 1 30) (byte 4 19) (byte 5 5)) :type 'simd-immh-reg)
@@ -3133,6 +3134,56 @@
                                      (fpr-offset rd)))))))
   (def ushll #b0 #b1 #b10100)
   (def ushll2 #b1 #b1 #b10100))
+
+(macrolet
+    ((def (name u op)
+       `(define-instruction ,name (segment rd rn size shift)
+          (:printer simd-shift-by-imm ((u ,u) (op ,op)
+                                       ,@(if (eq name 'sri)
+                                             `((shift nil :type 'simd-immh-shift-right)))
+                                       (rd nil :fields (list (byte 1 30) (byte 4 19) (byte 5 0))
+                                               :type 'simd-immh-reg)))
+          (:emitter
+           (let ((immh 0)
+                 (immb 0)
+                 (q 0)
+                 (shift ,(if (eq name 'sri)
+                             `(ldb (byte 6 0) (- shift))
+                             `shift)))
+             (ecase size
+               (:8b
+                (setf immh #b1
+                      q 0))
+               (:16b
+                (setf immh #b1
+                      q 1))
+               (:4h
+                (setf immh #b10
+                      q 0))
+               (:8h
+                (setf immh #b10
+                      q 1))
+               (:2s
+                (setf immh #b100
+                      q 0))
+               (:4s
+                (setf immh #b100
+                      q 1))
+               (:2d
+                (setf immh #b1000
+                      q 1)))
+             (setf immh (logior immh (ldb (byte (1- (integer-length immh)) 3) shift))
+                   immb (ldb (byte 3 0) shift))
+             (emit-simd-shift-by-imm segment
+                                     q
+                                     ,u
+                                     immh
+                                     immb
+                                     ,op
+                                     (fpr-offset rn)
+                                     (fpr-offset rd)))))))
+  (def sli #b1 #b01010)
+  (def sri #b1 #b01000))
 
 (def-emitter simd-modified-imm
   (#b0 1 31)
