@@ -312,6 +312,10 @@
                    (if (zerop q)
                        "8B"
                        "16B"))
+                  ((eq (logandc2 cmode #b10) #b1000)
+                   (if (zerop q)
+                       "4H"
+                       "8H"))
                   ((zerop (logand cmode #b1001))
                    (if (zerop q)
                        "2S"
@@ -324,7 +328,8 @@
             (cond ((eq cmode #b1110)
                    0)
                   ((zerop (logand cmode #b1001))
-                   (ash cmode 2)))))
+                   (ash cmode 2))
+                  (t 0))))
       (princ (dpb abc (byte 3 5) defgh) stream)
       (when (plusp shift)
         (format stream ", LSL #~d" shift)))))

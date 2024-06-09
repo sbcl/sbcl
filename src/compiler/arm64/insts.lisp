@@ -3199,7 +3199,7 @@
   (rd 5 0))
 
 (define-instruction-format (simd-modified-imm 32
-                            :default-printer '(:name :tab rd ", " imm))
+                            :default-printer '(:name :tab rd ", #" imm))
   (o1 :field (byte 1 31) :value #b0)
   (q :field (byte 1 30))
   (op :field (byte 1 29))
@@ -3225,6 +3225,10 @@
              (ecase size
                ((:8b :16b)
                 (setf cmode #b1110))
+               ((:4h :8h)
+                (setf cmode (ecase shift
+                              (8 #b1010)
+                              (0 #b1000))))
                ((:2s :4s)
                 (setf cmode
                       (ash (ecase shift
@@ -3233,7 +3237,7 @@
                              (16 2)
                              (24 3))
                            1))))
-             (emit-simd-modified-imm  segment
+             (emit-simd-modified-imm segment
                                      (encode-vector-size size)
                                      op
                                      abc
