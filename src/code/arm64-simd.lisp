@@ -642,7 +642,6 @@
                          (- (- tail head) 16)) ;; read one more chunk
                     (- 16)))
          (string-start (+ start total-copied))
-         (end (+ head n))
          (shuffle-table (load-time-value (let ((table (make-array (* 256 8) :element-type '(unsigned-byte 8))))
                                            (loop for row below 256
                                                  do (loop with indexes = (loop for i below 8
@@ -673,7 +672,7 @@
                            ((temp2 complex-double-reg))
                            ((temp3 complex-double-reg))
                            ((string-start any-reg) string-start)
-                           ((end unsigned-reg) end)
+                           ((end any-reg) n)
                            ((head any-reg) head)
                            ((bit-mask complex-double-reg))
                            ((shuffle-table sap-reg) (vector-sap shuffle-table))
@@ -685,11 +684,13 @@
                 (inst movi ascii-mask 128 :16b)
                 (inst mov tmp-tn #x0A0D)
                 (inst dup crlf-mask tmp-tn :8h)
-                (inst add byte-array* byte-array* (lsr head 1))
-                (inst mov byte-array byte-array*)
+
+                (inst add byte-array byte-array* (lsr head 1))
+                (inst add end byte-array (lsr end 1))
+
                 (inst add char-array* char-array* (lsr string-start 1))
                 (inst mov char-array char-array*)
-                (inst add end byte-array end)
+
                 (load-inline-constant bit-mask :oword (concat-ub8 (append (loop for i downfrom 7 to 0
                                                                                 collect (ash 1 i))
                                                                           (loop for i downfrom 7 to 0
