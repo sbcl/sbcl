@@ -1381,7 +1381,8 @@
   (aver (= (length (fd-stream-instead stream)) 0))
   (let* ((ibuf (fd-stream-ibuf stream))
          (sap (buffer-sap ibuf)))
-    (cond ((and (typep buffer '(simple-array (unsigned-byte 8) (*)))
+    (cond #+soft-card-marks ; read(2) doesn't like write-protected buffers
+          ((and (typep buffer '(simple-array (unsigned-byte 8) (*)))
                 (>= requested 256)
                 (eq (fd-stream-fd-type stream) :regular)
                 ;; TODO: handle non-empty initial buffers
