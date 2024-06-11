@@ -887,3 +887,141 @@
                 (inst sub new-head byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ total-copied copied)))))))
+
+#+sb-unicode
+(def-variant simd-copy-utf8-crlf-bytes-to-character-string :ssse3+popcnt (requested total-copied start string ibuf)
+  (declare (type index start requested total-copied)
+           (optimize speed (safety 0)))
+  (let* ((head (sb-impl::buffer-head ibuf))
+         (tail (sb-impl::buffer-tail ibuf))
+         (n (logand (min (- requested total-copied)
+                         (- (- tail head) 16)) ;; read one more chunk
+                    (- 16)))
+         (string-start (* (+ start total-copied) 4))
+         (shuffle-table (load-time-value (let ((table (make-array (* 256 8) :element-type '(unsigned-byte 8))))
+                                           (loop for row below 256
+                                                 do (loop with indexes = (loop for i below 8
+                                                                               unless (logbitp i row)
+                                                                               collect i)
+                                                          for column below 8
+                                                          for index = (or (pop indexes)
+                                                                          0)
+                                                          do
+                                                          (setf (aref table (+ (* row 8) column))
+                                                                index)))
+                                           table))))
+    (if (<= n 0)
+        total-copied
+        (with-pinned-objects (string)
+          (multiple-value-bind (new-head copied)
+              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                           ((byte-array sap-reg t))
+                           ((char-array* sap-reg t) (vector-sap string))
+                           ((char-array sap-reg t))
+                           ((crlf-mask complex-double-reg))
+                           ((bytes complex-double-reg))
+                           ((next-bytes complex-double-reg))
+                           ((shifted complex-double-reg))
+                           ((temp complex-double-reg))
+                           ((string-start unsigned-reg) string-start)
+                           ((end unsigned-reg) n)
+                           ((head unsigned-reg) head)
+                           ((shuffle-table sap-reg) (vector-sap shuffle-table))
+                           ((shuffle-mask complex-double-reg))
+                           ((shuffle-mask2 complex-double-reg))
+                           ((32-bits-2 int-sse-reg))
+                           ((zero int-sse-reg)))
+                  ((new-head unsigned-reg positive-fixnum :from :load)
+                   (copied unsigned-reg positive-fixnum :from :load))
+                (inst movdqa crlf-mask (register-inline-constant :sse (concat-ub8 (loop for i below 8
+                                                                                        collect #x0A
+                                                                                        collect #x0D))))
+                (inst pxor zero zero)
+                (inst lea byte-array (ea head byte-array*))
+                (inst add end byte-array)
+
+                (inst add char-array* string-start)
+                (inst mov char-array char-array*)
+
+
+                LOOP
+                (inst movdqu bytes (ea byte-array))
+                ;; Shift bytes right to find CRLF starting at odd indexes
+                ;; grab the first byte from the next vector to check if it
+                ;; it's an LF
+                (inst movdqu shifted (ea 1 byte-array))
+
+                (inst pmovmskb head bytes) ;; any high bit set? not ascii
+                (inst test :dword head head)
+                (inst jmp :nz done)
+
+
+                ;; Compare both variants
+                (move temp bytes)
+                (inst pcmpeqw temp crlf-mask)
+                (inst pcmpeqw shifted crlf-mask)
+                ;; pcmpeqw will have FFFF, shifting in different directions and then combining
+                ;; will have FF in the right places for CR in the original chunk.
+                (inst psrlw-imm temp 8)
+                (inst psllw-imm shifted 8)
+                (inst por temp shifted)
+
+                ;; Get a 16-bit mask
+                (inst pmovmskb copied temp)
+
+                ;; Split into two 8-bit parts
+                (inst mov :byte head copied)
+                (inst shr :dword copied 8)
+
+                (move next-bytes bytes)
+                (inst punpckhqdq next-bytes next-bytes)
+                (inst movq shuffle-mask (ea shuffle-table head 8))
+                (inst movq shuffle-mask2 (ea shuffle-table copied 8))
+                (inst pshufb bytes shuffle-mask)
+                (inst pshufb next-bytes shuffle-mask2)
+
+                ;; Widen
+                (inst punpcklbw bytes zero)
+                (move 32-bits-2 bytes)
+
+                (inst punpcklwd bytes zero)
+
+                (inst psrldq 32-bits-2 8)
+                (inst punpcklwd 32-bits-2 zero)
+
+                (inst movdqu (ea char-array) bytes)
+                (inst movdqu (ea 16 char-array) 32-bits-2)
+
+                (inst add char-array 32)
+                (inst popcnt :dword head head)
+                (inst shl head 2)
+                (inst sub char-array head)
+
+                (inst punpcklbw next-bytes zero)
+                (move 32-bits-2 next-bytes)
+
+                (inst punpcklwd next-bytes zero)
+
+                (inst psrldq 32-bits-2 8)
+                (inst punpcklwd 32-bits-2 zero)
+
+                (inst movdqu (ea char-array) next-bytes)
+                (inst movdqu (ea 16 char-array) 32-bits-2)
+
+                (inst add char-array 32)
+                (inst popcnt :dword copied copied)
+                (inst shl copied 2)
+                (inst sub char-array copied)
+
+                (inst add byte-array 16)
+
+                (inst cmp byte-array end)
+                (inst jmp :l LOOP)
+
+                DONE
+                (inst mov copied char-array)
+                (inst sub copied char-array*)
+                (inst mov new-head byte-array)
+                (inst sub new-head byte-array*))
+            (setf (sb-impl::buffer-head ibuf) new-head)
+            (truly-the index (+ total-copied (truncate copied 4))))))))

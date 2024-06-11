@@ -876,7 +876,7 @@
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
                 (inst ldr (reg-in-sc shuffle-mask 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
                 (inst tbl temp (list bytes) shuffle-mask :8b)
-                
+
                 ;; Widen
                 (inst ushll 16-bits :8h temp :8b)
                 (inst ushll 32-bits :4s 16-bits :4h)
