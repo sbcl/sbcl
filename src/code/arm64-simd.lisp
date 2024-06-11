@@ -700,9 +700,9 @@
                 (inst umaxv temp temp :4s)
                 (inst umov tmp-tn temp 0 :s)
                 (inst cbnz tmp-tn DONE)
-                (inst add byte-array byte-array 16)
 
                 LOOP
+                (inst add byte-array byte-array 16)
                 (inst s-mov bytes next-bytes)
                 (inst ldr next-bytes (@ byte-array))
 
@@ -737,7 +737,7 @@
                 (inst addv temp temp2 :8b)
                 (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
                 (inst ldr (reg-in-sc shuffle-mask 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
-                (inst tbl temp (list bytes) shuffle-mask)
+                (inst tbl temp (list bytes) shuffle-mask :8b)
                 (inst str (reg-in-sc temp 'double-reg) (@ char-array 8 :post-index))
                 (inst sub char-array char-array count)
 
@@ -754,14 +754,13 @@
 
                 (inst ldr (reg-in-sc shuffle-mask2 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
                 (inst ins bytes 0 bytes 1 :d)
-                (inst tbl temp (list bytes) shuffle-mask2)
+                (inst tbl temp (list bytes) shuffle-mask2 :8b)
                 (inst str (reg-in-sc temp 'double-reg) (@ char-array 8 :post-index))
                 (inst sub char-array char-array count)
-                (inst add byte-array byte-array 16)
 
                 (inst cmp byte-array end)
                 (inst b :lt LOOP)
-                (inst sub byte-array byte-array 16)
+
                 DONE
                 (inst sub copied char-array char-array*)
                 (inst sub new-head byte-array byte-array*))

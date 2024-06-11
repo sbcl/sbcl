@@ -489,3 +489,12 @@
 
 (def-cpu-feature :avx2
     (plusp (sb-alien:extern-alien "avx2_supported" int)))
+
+(def-cpu-feature :ssse3+popcnt
+    (when (>= (sb-vm::%cpu-identification 0 0) 1)
+      (multiple-value-bind (eax ebx ecx) (sb-vm::%cpu-identification 1 0)
+        (declare (ignore eax ebx))
+        (= (logand #1=(logior (ash 1 9)   ;; ssse3
+                              (ash 1 23)) ;; popcnt
+                   ecx)
+           #1#))))
