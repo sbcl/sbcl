@@ -1144,7 +1144,8 @@
       (setf (buffer-head ibuf) head)
       (truly-the index (+ total-copied (- string-offset string-start))))))
 
-#+(and sb-unicode 64-bit little-endian)
+#+(and sb-unicode 64-bit little-endian
+       (not arm64)) ;; have true simd definitions or might be redefined with def-variant
 (defun sb-vm::simd-copy-utf8-crlf-bytes-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))

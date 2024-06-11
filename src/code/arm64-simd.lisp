@@ -530,18 +530,18 @@
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                           ((byte-array sap-reg t))
                           ((32-bit-array sap-reg t) (vector-sap string))
-                          ((ascii-mask complex-double-reg))
-                          ((bytes complex-double-reg))
-                          ((16-bits complex-double-reg))
-                          ((32-bits complex-double-reg))
-                          ((32-bits-2 complex-double-reg))
                           ((string-start any-reg) string-start)
                           ((end unsigned-reg))
                           ((head any-reg) head)
                           ((n any-reg) n)
+                          ((ascii-mask complex-double-reg))
+                          ((bytes complex-double-reg))
+                          ((16-bits complex-double-reg))
+                          ((16-bits-2 complex-double-reg))
+                          ((32-bits complex-double-reg))
+                          ((32-bits-2 complex-double-reg))
                           ((32-bits-3 complex-double-reg))
                           ((32-bits-4 complex-double-reg))
-                          ((16-bits-2 complex-double-reg))
                           ((temp complex-double-reg)))
                  ((res unsigned-reg unsigned-num))
                (inst movi ascii-mask 128 :16b)
@@ -766,3 +766,152 @@
                 (inst sub new-head byte-array byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ total-copied copied)))))))
+
+(defun simd-copy-utf8-crlf-bytes-to-character-string (requested total-copied start string ibuf)
+  (declare (type index start requested total-copied)
+           (optimize speed (safety 0)))
+  (let* ((head (sb-impl::buffer-head ibuf))
+         (tail (sb-impl::buffer-tail ibuf))
+         (n (logand (min (- requested total-copied)
+                         (- (- tail head) 16)) ;; read one more chunk
+                    (- 16)))
+         (string-start (+ start total-copied))
+         (shuffle-table (load-time-value (let ((table (make-array (* 256 8) :element-type '(unsigned-byte 8))))
+                                           (loop for row below 256
+                                                 do (loop with indexes = (loop for i below 8
+                                                                               unless (logbitp i row)
+                                                                               collect i)
+                                                          for column below 8
+                                                          for index = (or (pop indexes)
+                                                                          0)
+                                                          do
+                                                          (setf (aref table (+ (* row 8) column))
+                                                                index)))
+                                           table))))
+
+    (if (<= n 0)
+        total-copied
+        (with-pinned-objects-in-registers (string)
+          (multiple-value-bind (new-head copied)
+              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
+                           ((byte-array sap-reg t))
+                           ((char-array* sap-reg t) (vector-sap string))
+                           ((char-array sap-reg t))
+                           ((ascii-mask complex-double-reg))
+                           ((crlf-mask complex-double-reg))
+                           ((bytes complex-double-reg))
+                           ((next-bytes complex-double-reg))
+                           ((shifted complex-double-reg))
+                           ((temp complex-double-reg))
+                           ((temp2 complex-double-reg))
+                           ((temp3 complex-double-reg))
+                           ((string-start any-reg) string-start)
+                           ((end any-reg) n)
+                           ((head any-reg) head)
+                           ((bit-mask complex-double-reg))
+                           ((shuffle-table sap-reg) (vector-sap shuffle-table))
+                           ((shuffle-mask complex-double-reg))
+                           ((shuffle-mask2 complex-double-reg))
+                           ((16-bits complex-double-reg))
+                           ((16-bits-2 complex-double-reg))
+                           ((32-bits complex-double-reg))
+                           ((32-bits-2 complex-double-reg))
+                           ((count unsigned-reg)))
+                  ((new-head unsigned-reg positive-fixnum :from :load)
+                   (copied unsigned-reg positive-fixnum :from :load))
+                (inst movi ascii-mask 128 :16b)
+                (inst mov tmp-tn #x0A0D)
+                (inst dup crlf-mask tmp-tn :8h)
+
+                (inst add byte-array byte-array* (lsr head 1))
+                (inst add end byte-array (lsr end 1))
+
+                (inst add char-array* char-array* (lsl string-start (- 2 1)))
+                (inst mov char-array char-array*)
+
+                (load-inline-constant bit-mask :oword (concat-ub8 (append (loop for i downfrom 7 to 0
+                                                                                collect (ash 1 i))
+                                                                          (loop for i downfrom 7 to 0
+                                                                                collect (ash 1 i)))))
+                (inst ldr next-bytes (@ byte-array))
+                (inst s-and temp next-bytes ascii-mask)
+                (inst umaxv temp temp :4s)
+                (inst umov tmp-tn temp 0 :s)
+                (inst cbnz tmp-tn DONE)
+
+                LOOP
+                (inst add byte-array byte-array 16)
+                (inst s-mov bytes next-bytes)
+                (inst ldr next-bytes (@ byte-array))
+
+                (inst s-and temp next-bytes ascii-mask)
+                (inst umaxv temp temp :4s)
+                (inst umov tmp-tn temp 0 :s)
+                (inst cbnz tmp-tn DONE)
+
+                ;; Shift bytes right to find CRLF starting at odd indexes
+                ;; and grab the first byte from the next vector to check if it
+                ;; it's an LF
+                (inst ext shifted bytes next-bytes 1 :16b)
+                ;; Compare both variants
+                (inst cmeq temp bytes crlf-mask :8h)
+                (inst cmeq temp2 shifted crlf-mask :8h)
+
+
+                ;; SLI retains the destination parts, matching elements
+                ;; will have FFFF, shifting and inserting will combine
+                ;; them with zeros producing just one FF
+                (inst sli temp temp2 :8h 8)
+
+                ;; Count matches
+                (inst ushr temp3 temp :16b 7)
+                (inst addv temp2 temp3 :8b)
+                (inst fmov count (reg-in-sc temp2 'single-reg))
+
+                ;; bit-mask has powers of two for each byte index,
+                ;; adding them together will produce an 8-bit mask.
+                (inst s-and temp2 temp bit-mask)
+
+                (inst addv temp temp2 :8b)
+                (inst fmov tmp-tn (reg-in-sc temp 'single-reg))
+                (inst ldr (reg-in-sc shuffle-mask 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst tbl temp (list bytes) shuffle-mask :8b)
+                
+                ;; Widen
+                (inst ushll 16-bits :8h temp :8b)
+                (inst ushll 32-bits :4s 16-bits :4h)
+                (inst ushll2 16-bits-2 :8h temp :16b)
+                (inst ushll2 32-bits-2 :4s 16-bits :8h)
+                (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
+                (inst sub char-array char-array (lsl count 2))
+
+                ;; Second half
+
+                ;; Count matches
+                (inst ins temp3 0 temp3 1 :d)
+                (inst addv temp3 temp3 :8b)
+                (inst fmov count (reg-in-sc temp3 'single-reg))
+
+                (inst ins temp2 0 temp2 1 :d)
+                (inst addv temp2 temp2 :8b)
+                (inst fmov tmp-tn (reg-in-sc temp2 'single-reg))
+
+                (inst ldr (reg-in-sc shuffle-mask2 'double-reg) (@ shuffle-table (extend tmp-tn :lsl 3)))
+                (inst ins bytes 0 bytes 1 :d)
+                (inst tbl temp (list bytes) shuffle-mask2 :8b)
+
+                (inst ushll 16-bits :8h temp :8b)
+                (inst ushll 32-bits :4s 16-bits :4h)
+                (inst ushll2 16-bits-2 :8h temp :16b)
+                (inst ushll2 32-bits-2 :4s 16-bits :8h)
+                (inst stp 32-bits 32-bits-2 (@ char-array 32 :post-index))
+                (inst sub char-array char-array (lsl count 2))
+
+                (inst cmp byte-array end)
+                (inst b :lt LOOP)
+
+                DONE
+                (inst sub copied char-array char-array*)
+                (inst sub new-head byte-array byte-array*))
+            (setf (sb-impl::buffer-head ibuf) new-head)
+            (truly-the index (+ total-copied (ash copied -2))))))))
