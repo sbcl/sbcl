@@ -776,6 +776,7 @@
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
       (incf total-copied copied))))
 
+#+sb-unicode
 (def-variant simd-copy-utf8-crlf-bytes-to-base-string :ssse3+popcnt (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
