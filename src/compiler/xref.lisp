@@ -43,38 +43,39 @@
 (defun call-with-block-external-functionals (block fun)
   (let* ((functional (block-home-lambda block))
          (seen nil))
-    (labels ((local-function-name-p (name)
-               (and (consp name)
-                    (member (car name)
-                            '(flet labels lambda))))
-             (handle-refs (functional)
-               ;; Recurse only if we haven't already seen the
-               ;; functional.
-               (unless (memq functional seen)
-                 (push functional seen)
-                 (loop for ref in (functional-refs functional)
-                       thereis (handle-functional (node-home-lambda ref)))))
-             (handle-functional (functional)
-               ;; If a functional looks like a global function (has a
-               ;; XEP, isn't a local function or a lambda) record xref
-               ;; information for it. Otherwise recurse on the
-               ;; home-lambdas of all references to the functional.
-               (when (functional-kind-eq functional external)
-                 (let ((entry (functional-entry-fun functional)))
-                   (when entry
-                     (let ((name (functional-debug-name entry)))
-                       ;; Is it a lambda inside another function?
-                       (when (or (not (local-function-name-p name))
-                                 (not (handle-refs functional)))
-                         (funcall fun entry)
-                         (return-from handle-functional t))))))
-               (handle-refs functional)))
-      (unless (or (functional-kind-eq functional deleted)
-                  ;; If the block came from an inlined global
-                  ;; function, ignore it.
-                  (and (functional-inline-expanded functional)
-                       (symbolp (functional-debug-name functional))))
-        (handle-functional functional)))))
+    (when (policy functional (plusp store-xref-data))
+      (labels ((local-function-name-p (name)
+                 (and (consp name)
+                      (member (car name)
+                              '(flet labels lambda))))
+               (handle-refs (functional)
+                 ;; Recurse only if we haven't already seen the
+                 ;; functional.
+                 (unless (memq functional seen)
+                   (push functional seen)
+                   (loop for ref in (functional-refs functional)
+                         thereis (handle-functional (node-home-lambda ref)))))
+               (handle-functional (functional)
+                 ;; If a functional looks like a global function (has a
+                 ;; XEP, isn't a local function or a lambda) record xref
+                 ;; information for it. Otherwise recurse on the
+                 ;; home-lambdas of all references to the functional.
+                 (when (functional-kind-eq functional external)
+                   (let ((entry (functional-entry-fun functional)))
+                     (when entry
+                       (let ((name (functional-debug-name entry)))
+                         ;; Is it a lambda inside another function?
+                         (when (or (not (local-function-name-p name))
+                                   (not (handle-refs functional)))
+                           (funcall fun entry)
+                           (return-from handle-functional t))))))
+                 (handle-refs functional)))
+        (unless (or (functional-kind-eq functional deleted)
+                    ;; If the block came from an inlined global
+                    ;; function, ignore it.
+                    (and (functional-inline-expanded functional)
+                         (symbolp (functional-debug-name functional))))
+          (handle-functional functional))))))
 
 (defun record-node-xrefs (node context)
   (declare (type node node))
