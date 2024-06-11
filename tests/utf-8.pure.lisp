@@ -211,6 +211,11 @@
                 (with-open-file (s *test-path* :external-format ',inxf)
                   (let* ((string (make-string 100000))
                          (count (read-sequence string s)))
+                    (assert (equal (map 'list 'char-code (subseq string 0 count)) ,expected)))))
+             `(with-test (:name (,(macroexpand 'name env) ,inxf :base-string))
+                (with-open-file (s *test-path* :external-format ',inxf)
+                  (let* ((string (make-string 100000 :element-type 'base-char))
+                         (count (read-sequence string s)))
                     (assert (equal (map 'list 'char-code (subseq string 0 count)) ,expected))))))
            (with-test-file ((id bytes) &body body)
              `(progn
