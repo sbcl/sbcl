@@ -193,7 +193,8 @@
   (let ((lambda `(lambda ,closure-variables
                    ,@(when (member 'miss-fn closure-variables)
                        `((declare (type function miss-fn))))
-                   (declare (optimize (sb-c:store-source-form 0)))
+                   (declare (optimize (sb-c:store-source-form 0)
+                                      (sb-c::store-xref-data 0)))
                    (declare (optimize (sb-c::store-closure-debug-pointer 3)))
                    #'(lambda ,args
                        (let () ; What is this LET doing?

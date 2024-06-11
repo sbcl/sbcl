@@ -151,7 +151,8 @@
 (defun get-new-fun-generator (lambda test code-converter)
   (multiple-value-bind (code gensyms) (compute-code lambda code-converter)
     (let ((generator-lambda `(lambda ,gensyms
-                               (declare (optimize (sb-c:store-source-form 0)))
+                               (declare (optimize (sb-c:store-source-form 0)
+                                                  (sb-c::store-xref-data 0)))
                                (function ,code))))
       (let ((generator (pcl-compile generator-lambda :safe)))
         (ensure-fgen test gensyms generator generator-lambda nil)
