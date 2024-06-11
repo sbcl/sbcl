@@ -533,7 +533,14 @@
       (declare ((unsigned-byte 8) a))
       (dpb a (byte 63 8)
            81))
-   ((90) 23121)))
+   ((90) 23121))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((unsigned-byte 8) a))
+      (dpb a (byte 32 32)
+           1))
+   ((1) 4294967297)))
 
 (with-test (:name :mask-field-size-overflow)
   (checked-compile-and-assert

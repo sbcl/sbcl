@@ -993,8 +993,8 @@
   (:policy :fast-safe)
   (:generator 2
     (move res y)
-    (inst bfm res x (- (1- n-word-bits) posn) (1- (if (> (+ size posn)
-                                                         n-word-bits)
+    (inst bfm res x (- (1- n-word-bits) posn) (1- (if (>= (+ size posn)
+                                                          n-word-bits)
                                                       (- (1- n-word-bits) posn)
                                                       size)))))
 
@@ -1013,8 +1013,8 @@
     (move res y)
     (inst bfm res x (if (= posn 0)
                         0
-                        (- n-word-bits posn)) (1- (if (> (+ size posn)
-                                                         n-word-bits)
+                        (- n-word-bits posn)) (1- (if (>= (+ size posn)
+                                                          n-word-bits)
                                                       (- n-word-bits posn)
                                                       size)))))
 
@@ -1033,8 +1033,8 @@
     (move res y)
     (inst bfm res x (if (= posn 0)
                         0
-                        (- n-word-bits posn)) (1- (if (> (+ size posn)
-                                                         n-word-bits)
+                        (- n-word-bits posn)) (1- (if (>= (+ size posn)
+                                                          n-word-bits)
                                                       (- n-word-bits posn)
                                                       size)))))
 
