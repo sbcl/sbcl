@@ -133,7 +133,7 @@ Attach gdb: @code{gdb -p <pidof sbcl>} and get backtraces for all threads:
 @item
 If multiple threads are in play then still in gdb, try to get Lisp
 backtrace for all threads: @code{thread apply all call
-backtrace_from_fp($ebp, 100)}. Substitute @code{$ebp} with @code{$rbp}
+backtrace_from_fp($ebp, 100, 0)}. Substitute @code{$ebp} with @code{$rbp}
 on x86-64. The backtraces will appear in the stdout of the SBCL
 process.
 
