@@ -539,7 +539,7 @@
             (error "unknown TRACE option: ~S" name))
            ((stringp name)
             (let ((package (find-undeleted-package-or-lose name)))
-              (do-all-symbols (symbol (find-package name))
+              (do-symbols (symbol package)
                 (when (eql package (symbol-package symbol))
                   (when (and (fboundp symbol)
                              (not (macro-function symbol))
