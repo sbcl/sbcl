@@ -602,8 +602,7 @@
                          sizebuf
                          +ansi-stream-in-buffer-extra+
                          (- +ansi-stream-in-buffer-length+
-                            +ansi-stream-in-buffer-extra+)
-                         nil))
+                            +ansi-stream-in-buffer-extra+)))
          (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
     (cond ((zerop count)

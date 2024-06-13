@@ -1619,8 +1619,7 @@
                (tail (buffer-tail obuf)))
            ,out-expr))
        ,@(unless fd-stream-read-n-characters
-           `((defun ,in-function (stream buffer sbuffer start requested eof-error-p
-                                  &aux (total-copied 0))
+           `((defun ,in-function (stream buffer sbuffer start requested &aux (total-copied 0))
                (declare (type fd-stream stream)
                         (type index start requested total-copied)
                         (type ansi-stream-cin-buffer buffer)
@@ -1708,32 +1707,24 @@
                        ;; (where this check will be false). This allows establishing
                        ;; high-level handlers for decode errors (for example
                        ;; automatically resyncing in Lisp comments).
-                       (when (plusp total-copied)
-                         (return-from ,in-function total-copied))
-                       (when (stream-decoding-error-and-handle
-                              stream decode-break-reason unit)
-                         (if eof-error-p
-                             (error 'end-of-file :stream stream)
-                             (return-from ,in-function total-copied)))
+                       (unless (plusp total-copied)
+                         (stream-decoding-error-and-handle stream decode-break-reason unit))
                        ;; we might have been given stuff to use instead, so
                        ;; we have to return (and trust our caller to know
                        ;; what to do about TOTAL-COPIED being 0).
                        (return-from ,in-function total-copied)))
                    (setf (buffer-head ibuf) head)
                    ;; Maybe we need to refill the stream buffer.
-                   (cond (;; If was data in the stream buffer, we're done.
+                   (when (or
+                          ;; If there was data in the stream buffer, we're done.
                           (plusp total-copied)
-                          (return total-copied))
-                         (;; If EOF, we're done in another way.
-                          (or (eq decode-break-reason 'eof)
-                              (null (catch 'eof-input-catcher
-                                      (refill-input-buffer stream))))
-                          (if eof-error-p
-                              (error 'end-of-file :stream stream)
-                              (return total-copied)))
-                         ;; Otherwise we refilled the stream buffer, so fall
-                         ;; through into another pass of the loop.
-                         ))))))
+                          ;; If EOF, we're also done
+                          (null (catch 'eof-input-catcher
+                                  (refill-input-buffer stream))))
+                     (return total-copied))
+                   ;; Otherwise we refilled the stream buffer, so fall
+                   ;; through into another pass of the loop.
+                   )))))
        (def-input-routine/variable-width ,in-char-function (character
                                                             ,external-format
                                                             ,in-size-expr

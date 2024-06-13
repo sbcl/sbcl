@@ -117,7 +117,6 @@
 ;;; streams extension)
 (defstruct (ansi-stream (:constructor nil)
                         (:copier nil))
-
   ;; input buffer
   ;;
   ;; (If a stream does not have an input buffer, then the IN-BUFFER
@@ -140,7 +139,10 @@
   ;; A character FD-STREAM uses this method to transfer octets from the
   ;; source buffer into characters of the destination buffer.
   (n-bin #'ill-bin :type                        ; n-byte input function
-   (sfunction (stream (simple-unboxed-array (*)) (or ansi-stream-csize-buffer null) index index t) index))
+   (sfunction (stream (simple-unboxed-array (*)) (or ansi-stream-csize-buffer null) index index
+                      ;; EOF-ERROR-P, not used by character streams
+                      &optional t)
+              index))
 
   ;; output functions
   (cout #'ill-out :type function)               ; WRITE-CHAR function

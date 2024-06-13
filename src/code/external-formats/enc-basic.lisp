@@ -781,7 +781,7 @@
        (incf total-copied))
      (setf (buffer-head ibuf) head)))
 
-(defun fd-stream-read-n-characters/utf-8 (stream string size-buffer start requested eof-error-p &aux (total-copied 0))
+(defun fd-stream-read-n-characters/utf-8 (stream string size-buffer start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type ansi-stream-cin-buffer string)
@@ -818,20 +818,13 @@
         (declare (type index head tail))
         (flet ((decode-break (reason)
                  (setf (buffer-head ibuf) head)
-                 (when (plusp total-copied)
-                   (return-from outer total-copied))
-                 (when (stream-decoding-error-and-handle stream reason 1)
-                   (if eof-error-p
-                       (error 'end-of-file :stream stream)
-                       (return-from outer total-copied)))
-                 (return-from outer total-copied)
-                 (return)))
+                 (unless (plusp total-copied)
+                   (stream-decoding-error-and-handle stream reason 1))
+                 (return-from outer total-copied)))
           (utf8-char-loop :size-buffer t))
-        (cond ((plusp total-copied) (return total-copied))
-              ((null (catch 'eof-input-catcher (refill-input-buffer stream)))
-               (if eof-error-p
-                   (error 'end-of-file :stream stream)
-                   (return total-copied))))))))
+        (when (or (plusp total-copied)
+                  (null (catch 'eof-input-catcher (refill-input-buffer stream))))
+          (return total-copied))))))
 
 ;;; Bypass the character buffer, the caller must ensure that it's empty
 (defun fd-stream-read-n-characters/utf-8-to-string (stream string start requested &aux (total-copied 0))
