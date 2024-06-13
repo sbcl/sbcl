@@ -659,7 +659,9 @@
                        (when (constantp last env)
                          (let ((lastval (constant-form-value last env)))
                            (when (listp lastval)
-                             (setq dims (append (butlast (cdr dims)) lastval))
+                             (setq dims (append (butlast (cdr dims))
+                                                (loop for v in  lastval
+                                                      collect `(quote ,v))))
                              t))))))
               (proper-list-p dims)
               (not (singleton-p dims)))

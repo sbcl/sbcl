@@ -854,3 +854,10 @@
    (lambda (n f)
      (make-array n :element-type 'character :fill-pointer f))
    (array character)))
+
+(with-test (:name :backquote-transform)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (a)
+                         (make-array `(,a (+ 1 2))))
+                      :allow-warnings t))))
