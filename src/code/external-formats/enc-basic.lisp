@@ -616,7 +616,7 @@
 
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64))) ;; have true simd definitions
-(defun sb-vm::simd-copy-utf8-bytes-to-character-string (requested total-copied start string ibuf)
+(defun sb-vm::simd-copy-utf8-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -665,7 +665,7 @@
 
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64))) ;; have true simd definitions
-(defun sb-vm::simd-copy-utf8-bytes-to-base-string (requested total-copied start string ibuf)
+(defun sb-vm::simd-copy-utf8-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -696,11 +696,96 @@
       (setf (buffer-head ibuf) head)
       total-copied)))
 
-(defun fd-stream-read-n-characters/utf-8 (stream buffer sbuffer start requested eof-error-p &aux (total-copied 0))
+(defmacro utf8-char-loop (&key size-buffer
+                               crlf)
+  `(do ()
+       ((or (= tail head)
+            (= requested total-copied)))
+     (let ((byte (sap-ref-8 sap head))
+           (index (+ start total-copied)))
+       (setf (aref string index)
+             (code-char
+              (cond
+                ,@(and crlf
+                       `(((and (= byte 13)
+                               (let ((new-head (+ head 2)))
+                                 (cond ((and (<= new-head tail)
+                                             (= (sap-ref-8 sap (1+ head)) 10))
+                                        (incf head 2)
+                                        ,@(when size-buffer
+                                            `((setf (aref size-buffer index) 2)))
+                                        10)
+                                       (eof
+                                        nil)
+                                       (t
+                                        (setf requested-refill t)
+                                        (return))))))))
+                ((< byte 128)
+                 (incf head)
+                 ,@(when size-buffer
+                     `((setf (aref size-buffer index) 1)))
+                 byte)
+                ((< byte 194)
+                 (decode-break 1))
+                ((< byte 224)
+                 (let ((new-head (+ head 2)))
+                   (if (> new-head tail)
+                       (return))
+                   (prog1
+                       (let ((byte2 (sap-ref-8 sap (1+ head))))
+                         (unless (<= 128 byte2 191)
+                           (decode-break 2))
+                         (dpb byte (byte 5 6) byte2))
+                     ,@(when size-buffer
+                         `((setf (aref size-buffer index) 2)))
+                     (setf head new-head))))
+                ((< byte 240)
+                 (let ((new-head (+ head 3)))
+                   (if (> new-head tail)
+                       (return))
+                   (prog1
+                       (let ((byte2 (sap-ref-8 sap (1+ head)))
+                             (byte3 (sap-ref-8 sap (+ 2 head))))
+                         (unless
+                             (and (<= 128 byte2 191)
+                                  (<= 128 byte3 191)
+                                  (or (/= byte 224) (<= 160 byte2 191))
+                                  (or (/= byte 237) (<= 128 byte2 159)))
+                           (decode-break 3))
+                         (dpb byte (byte 4 12)
+                              (dpb byte2 (byte 6 6) byte3)))
+                     ,@(when size-buffer
+                         `((setf (aref size-buffer index) 3)))
+                     (setf head new-head))))
+                (t
+                 (let ((new-head (+ head 4)))
+                   (if (> new-head tail)
+                       (return))
+                   (prog1
+                       (let ((byte2 (sap-ref-8 sap (1+ head)))
+                             (byte3 (sap-ref-8 sap (+ 2 head)))
+                             (byte4 (sap-ref-8 sap (+ 3 head))))
+                         (unless
+                             (and (<= 128 byte2 191)
+                                  (<= 128 byte3 191)
+                                  (<= 128 byte4 191)
+                                  (or (/= byte 240) (<= 144 byte2 191))
+                                  (or (/= byte 244) (<= 128 byte2 143)))
+                           (decode-break 4))
+                         (dpb byte (byte 3 18)
+                              (dpb byte2 (byte 6 12)
+                                   (dpb byte3 (byte 6 6) byte4))))
+                     ,@(when size-buffer
+                         `((setf (aref size-buffer index) 4)))
+                     (setf head new-head)))))))
+       (incf total-copied))
+     (setf (buffer-head ibuf) head)))
+
+(defun fd-stream-read-n-characters/utf-8 (stream string size-buffer start requested eof-error-p &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
-           (type ansi-stream-cin-buffer buffer)
-           (type ansi-stream-csize-buffer sbuffer))
+           (type ansi-stream-cin-buffer string)
+           (type ansi-stream-csize-buffer size-buffer))
   (when (fd-stream-eof-forced-p stream)
     (setf (fd-stream-eof-forced-p stream) nil)
     (return-from fd-stream-read-n-characters/utf-8 0))
@@ -708,222 +793,121 @@
        (index (+ start total-copied) (1+ index)))
       ((= (fill-pointer instead) 0)
        (setf (fd-stream-listen stream) nil))
-    (setf (aref buffer index) (vector-pop instead))
-    (setf (aref sbuffer index) 0)
+    (setf (aref string index) (vector-pop instead))
+    (setf (aref size-buffer index) 0)
     (incf total-copied)
     (when (= requested total-copied)
       (when (= (fill-pointer instead) 0)
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8 total-copied)))
   #+(and sb-unicode 64-bit little-endian)
-  (let ((new-total (sb-vm::simd-copy-utf8-bytes-to-character-string requested total-copied
-                                                                    start buffer (fd-stream-ibuf stream))))
+  (let ((new-total (sb-vm::simd-copy-utf8-to-character-string requested total-copied
+                                                              start string (fd-stream-ibuf stream))))
     ;; Make sure to change this 1 whenever
-    ;; simd-copy-utf8-bytes-to-character-string starts processing more than
+    ;; simd-copy-utf8-to-character-string starts processing more than
     ;; just ascii characters.
-    (fill sbuffer 1 :start (+ start total-copied) :end (+ start new-total))
+    (fill size-buffer 1 :start (+ start total-copied) :end (+ start new-total))
     (setf total-copied new-total))
-  (do ()
-      (())
-    (let* ((ibuf (fd-stream-ibuf stream))
-           (head (buffer-head ibuf))
-           (tail (buffer-tail ibuf))
-           (sap (buffer-sap ibuf))
-           (decode-break-reason nil))
-      (declare (type index head tail))
-      (do ((size nil nil))
-          ((or (= tail head) (= requested total-copied)))
-        (setf decode-break-reason
-              (block decode-break-reason
-                (when (< (- tail head) 1) (return))
-                (let ((byte (sap-ref-8 sap head)))
-                  (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
-                  (when (> size (- tail head)) (return))
-                  (let ((index (+ start total-copied)))
-                    (setf (aref buffer index)
-                          (code-char
-                           (ecase size
-                             (1 byte)
-                             (2
-                              (let ((byte2 (sap-ref-8 sap (1+ head))))
-                                (unless (<= 128 byte2 191) (return-from decode-break-reason 2))
-                                (dpb byte (byte 5 6) byte2)))
-                             (3
-                              (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))))
-                                (unless
-                                    (and (<= 128 byte2 191) (<= 128 byte3 191) (or (/= byte 224) (<= 160 byte2 191))
-                                         (or (/= byte 237) (<= 128 byte2 159)))
-                                  (return-from decode-break-reason 3))
-                                (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
-                             (4
-                              (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))) (byte4 (sap-ref-8 sap (+ 3 head))))
-                                (unless
-                                    (and (<= 128 byte2 191) (<= 128 byte3 191) (<= 128 byte4 191) (or (/= byte 240) (<= 144 byte2 191))
-                                         (or (/= byte 244) (<= 128 byte2 143)))
-                                  (return-from decode-break-reason 4))
-                                (dpb byte (byte 3 18) (dpb byte2 (byte 6 12) (dpb byte3 (byte 6 6) byte4))))))))
-                    (setf (aref sbuffer index) size))
-                  (incf total-copied)
-                  (incf head size))
-                nil))
-        (setf (buffer-head ibuf) head)
-        (when decode-break-reason
-          (when (plusp total-copied) (return-from fd-stream-read-n-characters/utf-8 total-copied))
-          (when (stream-decoding-error-and-handle stream decode-break-reason 1)
-            (if eof-error-p
-                (error 'end-of-file :stream stream)
-                (return-from fd-stream-read-n-characters/utf-8 total-copied)))
-          (return-from fd-stream-read-n-characters/utf-8 total-copied)))
-      (setf (buffer-head ibuf) head)
-      (cond ((plusp total-copied) (return total-copied))
-            ((null (catch 'eof-input-catcher (refill-input-buffer stream)))
-             (if eof-error-p
-                 (error 'end-of-file :stream stream)
-                 (return total-copied)))))))
+  (block outer
+    (do ()
+        (())
+      (let* ((ibuf (fd-stream-ibuf stream))
+             (head (buffer-head ibuf))
+             (tail (buffer-tail ibuf))
+             (sap (buffer-sap ibuf)))
+        (declare (type index head tail))
+        (flet ((decode-break (reason)
+                 (setf (buffer-head ibuf) head)
+                 (when (plusp total-copied)
+                   (return-from outer total-copied))
+                 (when (stream-decoding-error-and-handle stream reason 1)
+                   (if eof-error-p
+                       (error 'end-of-file :stream stream)
+                       (return-from outer total-copied)))
+                 (return-from outer total-copied)
+                 (return)))
+          (utf8-char-loop :size-buffer t))
+        (cond ((plusp total-copied) (return total-copied))
+              ((null (catch 'eof-input-catcher (refill-input-buffer stream)))
+               (if eof-error-p
+                   (error 'end-of-file :stream stream)
+                   (return total-copied))))))))
 
 ;;; Bypass the character buffer, the caller must ensure that it's empty
 (defun fd-stream-read-n-characters/utf-8-to-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type (simple-array character (*)) string))
-  (loop
-   (do ((instead (fd-stream-instead stream))
-        (index (+ start total-copied) (1+ index)))
-       ((= (fill-pointer instead) 0)
-        (setf (fd-stream-listen stream) nil))
-     (setf (aref string index) (vector-pop instead))
-     (incf total-copied)
-     (when (= requested total-copied)
-       (when (= (fill-pointer instead) 0)
-         (setf (fd-stream-listen stream) nil))
-       (return total-copied)))
-   #+(and sb-unicode 64-bit little-endian)
-   (setf total-copied
-         (sb-vm::simd-copy-utf8-bytes-to-character-string requested total-copied
-                                                          start string (fd-stream-ibuf stream)))
-   (let* ((ibuf (fd-stream-ibuf stream))
-          (head (buffer-head ibuf))
-          (tail (buffer-tail ibuf))
-          (sap (buffer-sap ibuf))
-          (decode-break-reason nil))
-     (declare (type index head tail))
-     (do ((size nil nil))
-         ((or (= tail head) (= requested total-copied)))
-
-       (setf decode-break-reason
-             (block decode-break-reason
-               (when (< (- tail head) 1) (return))
-               (let ((byte (sap-ref-8 sap head)))
-                 (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
-                 (when (> size (- tail head)) (return))
-                 (let ((index (+ start total-copied)))
-                   (setf (aref string index)
-                         (code-char
-                          (ecase size
-                            (1 byte)
-                            (2
-                             (let ((byte2 (sap-ref-8 sap (1+ head))))
-                               (unless (<= 128 byte2 191) (return-from decode-break-reason 2))
-                               (dpb byte (byte 5 6) byte2)))
-                            (3
-                             (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))))
-                               (unless
-                                   (and (<= 128 byte2 191) (<= 128 byte3 191) (or (/= byte 224) (<= 160 byte2 191))
-                                        (or (/= byte 237) (<= 128 byte2 159)))
-                                 (return-from decode-break-reason 3))
-                               (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
-                            (4
-                             (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))) (byte4 (sap-ref-8 sap (+ 3 head))))
-                               (unless
-                                   (and (<= 128 byte2 191) (<= 128 byte3 191) (<= 128 byte4 191) (or (/= byte 240) (<= 144 byte2 191))
-                                        (or (/= byte 244) (<= 128 byte2 143)))
-                                 (return-from decode-break-reason 4))
-                               (dpb byte (byte 3 18) (dpb byte2 (byte 6 12) (dpb byte3 (byte 6 6) byte4)))))))))
-                 (incf total-copied)
-                 (incf head size))
-               nil))
-       (setf (buffer-head ibuf) head)
-       (when decode-break-reason
-         (when (stream-decoding-error-and-handle stream decode-break-reason 1)
-           (return-from fd-stream-read-n-characters/utf-8-to-string total-copied))
-         (return)))
-     (when (= requested total-copied)
-       (setf (buffer-head ibuf) head)
-       (return total-copied))
-     (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-       (return total-copied)))))
+  (block outer
+    (loop
+     (do ((instead (fd-stream-instead stream))
+          (index (+ start total-copied) (1+ index)))
+         ((= (fill-pointer instead) 0)
+          (setf (fd-stream-listen stream) nil))
+       (setf (aref string index) (vector-pop instead))
+       (incf total-copied)
+       (when (= requested total-copied)
+         (when (= (fill-pointer instead) 0)
+           (setf (fd-stream-listen stream) nil))
+         (return total-copied)))
+     #+(and sb-unicode 64-bit little-endian)
+     (setf total-copied
+           (sb-vm::simd-copy-utf8-to-character-string requested total-copied
+                                                      start string (fd-stream-ibuf stream)))
+     (let* ((ibuf (fd-stream-ibuf stream))
+            (head (buffer-head ibuf))
+            (tail (buffer-tail ibuf))
+            (sap (buffer-sap ibuf)))
+       (declare (type index head tail))
+       (flet ((decode-break (reason)
+                (setf (buffer-head ibuf) head)
+                (when (stream-decoding-error-and-handle stream reason 1)
+                  (return-from outer total-copied))
+                (return)))
+         (utf8-char-loop))
+       (when (= requested total-copied)
+         (setf (buffer-head ibuf) head)
+         (return total-copied))
+       (unless (catch 'eof-input-catcher (refill-input-buffer stream))
+         (return total-copied))))))
 
 #+sb-unicode
 (defun fd-stream-read-n-characters/utf-8-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type simple-base-string string))
-  (loop
-   (do ((instead (fd-stream-instead stream))
-        (index (+ start total-copied) (1+ index)))
-       ((= (fill-pointer instead) 0)
-        (setf (fd-stream-listen stream) nil))
-     (setf (aref string index) (vector-pop instead))
-     (incf total-copied)
-     (when (= requested total-copied)
-       (when (= (fill-pointer instead) 0)
-         (setf (fd-stream-listen stream) nil))
-       (return total-copied)))
-   #+(and sb-unicode 64-bit little-endian)
-   (setf total-copied
-         (sb-vm::simd-copy-utf8-bytes-to-base-string requested total-copied
-                                                     start string (fd-stream-ibuf stream)))
-   (let* ((ibuf (fd-stream-ibuf stream))
-          (head (buffer-head ibuf))
-          (tail (buffer-tail ibuf))
-          (sap (buffer-sap ibuf))
-          (decode-break-reason nil))
-     (declare (type index head tail))
-     (do ((size nil nil))
-         ((or (= tail head) (= requested total-copied)))
-
-       (setf decode-break-reason
-             (block decode-break-reason
-               (when (< (- tail head) 1) (return))
-               (let ((byte (sap-ref-8 sap head)))
-                 (setq size (cond ((< byte 128) 1) ((< byte 194) (return-from decode-break-reason 1)) ((< byte 224) 2) ((< byte 240) 3) (t 4)))
-                 (when (> size (- tail head)) (return))
-                 (let ((index (+ start total-copied)))
-                   (setf (aref string index)
-                         (code-char
-                          (ecase size
-                            (1 byte)
-                            (2
-                             (let ((byte2 (sap-ref-8 sap (1+ head))))
-                               (unless (<= 128 byte2 191) (return-from decode-break-reason 2))
-                               (dpb byte (byte 5 6) byte2)))
-                            (3
-                             (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))))
-                               (unless
-                                   (and (<= 128 byte2 191) (<= 128 byte3 191) (or (/= byte 224) (<= 160 byte2 191))
-                                        (or (/= byte 237) (<= 128 byte2 159)))
-                                 (return-from decode-break-reason 3))
-                               (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
-                            (4
-                             (let ((byte2 (sap-ref-8 sap (1+ head))) (byte3 (sap-ref-8 sap (+ 2 head))) (byte4 (sap-ref-8 sap (+ 3 head))))
-                               (unless
-                                   (and (<= 128 byte2 191) (<= 128 byte3 191) (<= 128 byte4 191) (or (/= byte 240) (<= 144 byte2 191))
-                                        (or (/= byte 244) (<= 128 byte2 143)))
-                                 (return-from decode-break-reason 4))
-                               (dpb byte (byte 3 18) (dpb byte2 (byte 6 12) (dpb byte3 (byte 6 6) byte4)))))))))
-                 (incf total-copied)
-                 (incf head size))
-               nil))
-       (setf (buffer-head ibuf) head)
-       (when decode-break-reason
-         (when (stream-decoding-error-and-handle stream decode-break-reason 1)
-           (return-from fd-stream-read-n-characters/utf-8-to-base-string total-copied))
-         (return)))
-     (when (= requested total-copied)
-       (setf (buffer-head ibuf) head)
-       (return total-copied))
-     (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-       (return total-copied)))))
+  (block outer
+    (loop
+     (do ((instead (fd-stream-instead stream))
+          (index (+ start total-copied) (1+ index)))
+         ((= (fill-pointer instead) 0)
+          (setf (fd-stream-listen stream) nil))
+       (setf (aref string index) (vector-pop instead))
+       (incf total-copied)
+       (when (= requested total-copied)
+         (when (= (fill-pointer instead) 0)
+           (setf (fd-stream-listen stream) nil))
+         (return total-copied)))
+     #+(and sb-unicode 64-bit little-endian)
+     (setf total-copied
+           (sb-vm::simd-copy-utf8-to-base-string requested total-copied
+                                                 start string (fd-stream-ibuf stream)))
+     (let* ((ibuf (fd-stream-ibuf stream))
+            (head (buffer-head ibuf))
+            (tail (buffer-tail ibuf))
+            (sap (buffer-sap ibuf)))
+       (declare (type index head tail))
+       (flet ((decode-break (reason)
+                (setf (buffer-head ibuf) head)
+                (when (stream-decoding-error-and-handle stream reason 1)
+                  (return-from outer total-copied))
+                (return)))
+         (utf8-char-loop))
+       (when (= requested total-copied)
+         (setf (buffer-head ibuf) head)
+         (return total-copied))
+       (unless (catch 'eof-input-catcher (refill-input-buffer stream))
+         (return total-copied))))))
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1105,7 +1089,7 @@
 
 #+(and sb-unicode 64-bit little-endian
        (not arm64)) ;; have true simd definitions or might be redefined with def-variant
-(defun sb-vm::simd-copy-utf8-crlf-bytes-to-base-string (requested total-copied start string ibuf)
+(defun sb-vm::simd-copy-utf8-crlf-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1146,7 +1130,7 @@
 
 #+(and sb-unicode 64-bit little-endian
        (not arm64)) ;; have true simd definitions or might be redefined with def-variant
-(defun sb-vm::simd-copy-utf8-crlf-bytes-to-character-string (requested total-copied start string ibuf)
+(defun sb-vm::simd-copy-utf8-crlf-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -1194,110 +1178,42 @@
            (type (simple-array character (*)) string))
   (let (requested-refill
         eof)
-    (loop
-     (do ((instead (fd-stream-instead stream))
-          (index (+ start total-copied) (1+ index)))
-         ((= (fill-pointer instead) 0)
-          (setf (fd-stream-listen stream) nil))
-       (setf (aref string index) (vector-pop instead))
-       (incf total-copied)
-       (when (= requested total-copied)
-         (when (= (fill-pointer instead) 0)
-           (setf (fd-stream-listen stream) nil))
-         (return total-copied)))
-     #+(and sb-unicode 64-bit little-endian)
-     (setf total-copied
-           (sb-vm::simd-copy-utf8-crlf-bytes-to-character-string requested total-copied
-                                                                 start string (fd-stream-ibuf stream)))
-     (let* ((ibuf (fd-stream-ibuf stream))
-            (head (buffer-head ibuf))
-            (tail (buffer-tail ibuf))
-            (sap (buffer-sap ibuf))
-            (decode-break-reason nil))
-       (declare (type index head tail))
-       (do ((size nil nil))
-           ((or (= tail head) (= requested total-copied)))
+    (block outer
+      (loop
+       (do ((instead (fd-stream-instead stream))
+            (index (+ start total-copied) (1+ index)))
+           ((= (fill-pointer instead) 0)
+            (setf (fd-stream-listen stream) nil))
+         (setf (aref string index) (vector-pop instead))
+         (incf total-copied)
+         (when (= requested total-copied)
+           (when (= (fill-pointer instead) 0)
+             (setf (fd-stream-listen stream) nil))
+           (return total-copied)))
+       #+(and sb-unicode 64-bit little-endian)
+       (setf total-copied
+             (sb-vm::simd-copy-utf8-crlf-to-character-string requested total-copied
+                                                             start string (fd-stream-ibuf stream)))
 
-         (setf decode-break-reason
-               (block decode-break-reason
-                 (when
-                     (>
-                      (if requested-refill
-                          1
-                          2)
-                      (- tail head))
-                   (setf requested-refill t)
-                   (return))
-                 (let ((byte (sap-ref-8 sap head)))
-                   (setf requested-refill nil)
-                   (setq size
-                         (cond ((= (- tail head) 1) 1)
-                               ((and (= byte 13)
-                                     (= (sap-ref-8 sap (+ head 1)) 10))
-                                2)
-                               ((< byte 128) 1)
-                               ((< byte 194)
-                                (return-from decode-break-reason 1))
-                               ((< byte 224) 2) ((< byte 240) 3) (t 4)))
-                   (when (> size (- tail head)) (return))
-                   (let ((index (+ start total-copied)))
-                     (setf (aref string index)
-                           (code-char
-                            (ecase size
-                              (1 byte)
-                              (2
-                               (if (= byte 13)
-                                   10
-                                   (let ((byte2 (sap-ref-8 sap (1+ head))))
-                                     (unless (<= 128 byte2 191)
-                                       (return-from decode-break-reason 2))
-                                     (dpb byte (byte 5 6) byte2))))
-                              (3
-                               (let ((byte2 (sap-ref-8 sap (1+ head)))
-                                     (byte3 (sap-ref-8 sap (+ 2 head))))
-                                 (unless
-                                     (and (<= 128 byte2 191)
-                                          (<= 128 byte3 191)
-                                          (or (/= byte 224)
-                                              (<= 160 byte2 191))
-                                          (or (/= byte 237)
-                                              (<= 128 byte2 159)))
-                                   (return-from decode-break-reason 3))
-                                 (dpb byte (byte 4 12)
-                                      (dpb byte2 (byte 6 6) byte3))))
-                              (4
-                               (let ((byte2 (sap-ref-8 sap (1+ head)))
-                                     (byte3 (sap-ref-8 sap (+ 2 head)))
-                                     (byte4 (sap-ref-8 sap (+ 3 head))))
-                                 (unless
-                                     (and (<= 128 byte2 191)
-                                          (<= 128 byte3 191)
-                                          (<= 128 byte4 191)
-                                          (or (/= byte 240)
-                                              (<= 144 byte2 191))
-                                          (or (/= byte 244)
-                                              (<= 128 byte2 143)))
-                                   (return-from decode-break-reason 4))
-                                 (dpb byte (byte 3 18)
-                                      (dpb byte2 (byte 6 12)
-                                           (dpb byte3 (byte 6 6)
-                                                byte4)))))))))
-                   (incf total-copied)
-                   (incf head size))
-                 nil))
-         (setf (buffer-head ibuf) head)
-         (when decode-break-reason
-           (when (stream-decoding-error-and-handle stream decode-break-reason 1)
-             (return-from fd-stream-read-n-characters/utf-8-crlf-to-character-string total-copied))
-           (return)))
-       (when (or (= requested total-copied)
-                 eof)
-         (setf (buffer-head ibuf) head)
-         (return total-copied))
-       (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (if requested-refill
-             (setf eof t)
-             (return total-copied)))))))
+       (let* ((ibuf (fd-stream-ibuf stream))
+              (head (buffer-head ibuf))
+              (tail (buffer-tail ibuf))
+              (sap (buffer-sap ibuf)))
+         (declare (type index head tail))
+         (flet ((decode-break (reason)
+                  (setf (buffer-head ibuf) head)
+                  (when (stream-decoding-error-and-handle stream reason 1)
+                    (return-from outer total-copied))
+                  (return)))
+           (utf8-char-loop :crlf t))
+         (when (or (= requested total-copied)
+                   eof)
+           (setf (buffer-head ibuf) head)
+           (return total-copied))
+         (unless (catch 'eof-input-catcher (refill-input-buffer stream))
+           (if requested-refill
+               (setf eof t)
+               (return total-copied))))))))
 
 (defun fd-stream-read-n-characters/utf-8-crlf-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
@@ -1305,107 +1221,38 @@
            (type simple-base-string string))
   (let (requested-refill
         eof)
-   (loop
-    (do ((instead (fd-stream-instead stream))
-         (index (+ start total-copied) (1+ index)))
-        ((= (fill-pointer instead) 0)
-         (setf (fd-stream-listen stream) nil))
-      (setf (aref string index) (vector-pop instead))
-      (incf total-copied)
-      (when (= requested total-copied)
-        (when (= (fill-pointer instead) 0)
-          (setf (fd-stream-listen stream) nil))
-        (return total-copied)))
-    #+(and sb-unicode 64-bit little-endian)
-    (setf total-copied
-          (sb-vm::simd-copy-utf8-crlf-bytes-to-base-string requested total-copied
-                                                           start string (fd-stream-ibuf stream)))
-    (let* ((ibuf (fd-stream-ibuf stream))
-           (head (buffer-head ibuf))
-           (tail (buffer-tail ibuf))
-           (sap (buffer-sap ibuf))
-           (decode-break-reason nil))
-      (declare (type index head tail))
-      (do ((size nil nil))
-          ((or (= tail head) (= requested total-copied)))
-
-        (setf decode-break-reason
-              (block decode-break-reason
-                (when
-                    (>
-                     (if requested-refill
-                         1
-                         2)
-                     (- tail head))
-                  (setf requested-refill t)
-                  (return))
-                (let ((byte (sap-ref-8 sap head)))
-                  (setf requested-refill nil)
-                  (setq size
-                        (cond ((= (- tail head) 1) 1)
-                              ((and (= byte 13)
-                                    (= (sap-ref-8 sap (+ head 1)) 10))
-                               2)
-                              ((< byte 128) 1)
-                              ((< byte 194)
-                               (return-from decode-break-reason 1))
-                              ((< byte 224) 2) ((< byte 240) 3) (t 4)))
-                  (when (> size (- tail head)) (return))
-                  (let ((index (+ start total-copied)))
-                    (setf (aref string index)
-                          (code-char
-                           (ecase size
-                             (1 byte)
-                             (2
-                              (if (= byte 13)
-                                  10
-                                  (let ((byte2 (sap-ref-8 sap (1+ head))))
-                                    (unless (<= 128 byte2 191)
-                                      (return-from decode-break-reason 2))
-                                    (dpb byte (byte 5 6) byte2))))
-                             (3
-                              (let ((byte2 (sap-ref-8 sap (1+ head)))
-                                    (byte3 (sap-ref-8 sap (+ 2 head))))
-                                (unless
-                                    (and (<= 128 byte2 191)
-                                         (<= 128 byte3 191)
-                                         (or (/= byte 224)
-                                             (<= 160 byte2 191))
-                                         (or (/= byte 237)
-                                             (<= 128 byte2 159)))
-                                  (return-from decode-break-reason 3))
-                                (dpb byte (byte 4 12)
-                                     (dpb byte2 (byte 6 6) byte3))))
-                             (4
-                              (let ((byte2 (sap-ref-8 sap (1+ head)))
-                                    (byte3 (sap-ref-8 sap (+ 2 head)))
-                                    (byte4 (sap-ref-8 sap (+ 3 head))))
-                                (unless
-                                    (and (<= 128 byte2 191)
-                                         (<= 128 byte3 191)
-                                         (<= 128 byte4 191)
-                                         (or (/= byte 240)
-                                             (<= 144 byte2 191))
-                                         (or (/= byte 244)
-                                             (<= 128 byte2 143)))
-                                  (return-from decode-break-reason 4))
-                                (dpb byte (byte 3 18)
-                                     (dpb byte2 (byte 6 12)
-                                          (dpb byte3 (byte 6 6)
-                                               byte4)))))))))
-                  (incf total-copied)
-                  (incf head size))
-                nil))
-        (setf (buffer-head ibuf) head)
-        (when decode-break-reason
-          (when (stream-decoding-error-and-handle stream decode-break-reason 1)
-            (return-from fd-stream-read-n-characters/utf-8-crlf-to-base-string total-copied))
-          (return)))
-      (when (or (= requested total-copied)
-                eof)
-        (setf (buffer-head ibuf) head)
-        (return total-copied))
-      (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-        (if requested-refill
-            (setf eof t)
-            (return total-copied)))))))
+    (block outer
+      (loop
+       (do ((instead (fd-stream-instead stream))
+            (index (+ start total-copied) (1+ index)))
+           ((= (fill-pointer instead) 0)
+            (setf (fd-stream-listen stream) nil))
+         (setf (aref string index) (vector-pop instead))
+         (incf total-copied)
+         (when (= requested total-copied)
+           (when (= (fill-pointer instead) 0)
+             (setf (fd-stream-listen stream) nil))
+           (return total-copied)))
+       #+(and sb-unicode 64-bit little-endian)
+       (setf total-copied
+             (sb-vm::simd-copy-utf8-crlf-to-base-string requested total-copied
+                                                        start string (fd-stream-ibuf stream)))
+       (let* ((ibuf (fd-stream-ibuf stream))
+              (head (buffer-head ibuf))
+              (tail (buffer-tail ibuf))
+              (sap (buffer-sap ibuf)))
+         (declare (type index head tail))
+         (flet ((decode-break (reason)
+                  (setf (buffer-head ibuf) head)
+                  (when (stream-decoding-error-and-handle stream reason 1)
+                    (return-from outer total-copied))
+                  (return)))
+           (utf8-char-loop :crlf t))
+         (when (or (= requested total-copied)
+                   eof)
+           (setf (buffer-head ibuf) head)
+           (return total-copied))
+         (unless (catch 'eof-input-catcher (refill-input-buffer stream))
+           (if requested-refill
+               (setf eof t)
+               (return total-copied))))))))

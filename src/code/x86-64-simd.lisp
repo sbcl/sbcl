@@ -643,7 +643,7 @@
       DONE)))
 
 #+sb-unicode
-(defun simd-copy-utf8-bytes-to-character-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -730,7 +730,7 @@
       (incf total-copied copied))))
 
 #+sb-unicode
-(defun simd-copy-utf8-bytes-to-base-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
@@ -777,7 +777,7 @@
       (incf total-copied copied))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-bytes-to-base-string :ssse3+popcnt (requested total-copied start string ibuf)
+(def-variant simd-copy-utf8-crlf-to-base-string :ssse3+popcnt (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -889,7 +889,7 @@
             (truly-the index (+ total-copied copied)))))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-bytes-to-character-string :ssse3+popcnt (requested total-copied start string ibuf)
+(def-variant simd-copy-utf8-crlf-to-character-string :ssse3+popcnt (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))

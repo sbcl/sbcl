@@ -515,7 +515,7 @@
       (inst mov res null-tn)
       DONE)))
 
-(defun simd-copy-utf8-bytes-to-character-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
@@ -579,7 +579,7 @@
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
       (incf total-copied copied))))
 
-(defun simd-copy-utf8-bytes-to-base-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (string)
@@ -633,7 +633,7 @@
             do (setf result (logior (ash result 8) ub8)))
       result)))
 
-(defun simd-copy-utf8-crlf-bytes-to-base-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-crlf-to-base-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
@@ -767,7 +767,7 @@
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ total-copied copied)))))))
 
-(defun simd-copy-utf8-crlf-bytes-to-character-string (requested total-copied start string ibuf)
+(defun simd-copy-utf8-crlf-to-character-string (requested total-copied start string ibuf)
   (declare (type index start requested total-copied)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
