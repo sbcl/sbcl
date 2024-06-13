@@ -1312,6 +1312,12 @@
   (let ((b (& val #xf)))
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
+(#(19627350 3269DBE1 3932B57B 49A5AA56 5F494B7F 656564B4 668E03DD 7C968C45 7D224C44 C3C1E2DD C3EABF48 CE38123D)
+ "(UNMUFFLE-CONDITIONS MUFFLE-CONDITIONS MAYBE-INLINE NOTINLINE INLINE FTYPE OPTIMIZE IGNORABLE IGNORE TYPE DYNAMIC-EXTENT SPECIAL)"
+ "((let ((tab #a((8) (unsigned-byte 8) 12 14 11 0 4 5 0 2)))
+  (let ((b (& (>> val 7) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 (#(19627350 3932B57B 82FDFC4E C3C1E2DD)
  "(NIL NOTINLINE MAYBE-INLINE INLINE)"
  "(  (& val 3) )")

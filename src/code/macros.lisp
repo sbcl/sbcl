@@ -1393,6 +1393,58 @@ invoked. In that case it will store into PLACE and start over."
        (declare (type unsigned-byte ,var))
        ,@body)))
 
+(defun segregate-dolist-decls (var decls)
+  (collect ((bound-type-decls)
+            (bound-nontype-decls)
+            (free-decls))
+    (dolist (decl decls)
+      (aver (eq (car decl) 'declare))
+      (dolist (expr (cdr decl))
+        (let ((head (car expr))
+              (tail (cdr expr)))
+          (cond ((consp head) ; compound type specifier
+                 (when (member var tail) (bound-type-decls head))
+                 (awhen (remove var tail) (free-decls `(,head ,@it))))
+                ((not (symbolp head)) (free-decls expr)) ; bogus
+                (t
+                 (case head
+                   ((special dynamic-extent)
+                    ;; dynamic-extent makes no sense but this logic has to correctly
+                    ;; recognize all the standard atoms that DECLARE accepts.
+                    (when (member var tail) (bound-nontype-decls `(,head ,var)))
+                    (awhen (remove var tail) (free-decls `(,head ,@it))))
+                   (type
+                    (when (member var (cdr tail)) (bound-type-decls (cadr expr)))
+                    (awhen (remove var (cdr tail)) (free-decls `(type ,(cadr expr) ,@it))))
+                   ((ignore ignorable)
+                    (awhen (remove var tail) (free-decls `(,head ,@it))))
+                   ((optimize ftype inline notinline maybe-inline
+                     muffle-conditions unmuffle-conditions)
+                    (free-decls expr))
+                   (t
+                    ;; Assume that any decl pertaining to bindings must have the symbol appear
+                    ;; in TAIL. Is this true of custom decls? I would certainly think so.
+                    (cond ((not (member var tail)) (free-decls expr))
+                          ((info :declaration :known head)
+                           ;; Declaimed declaration can't be a type decl.
+                           (bound-nontype-decls expr))
+                          ((not (sb-c::careful-specifier-type head))
+                           ;; If can't be parsed, then what is it? A free decl is as good as anything
+                           (free-decls expr))
+                          ((contains-unknown-type-p (sb-c::careful-specifier-type head))
+                           ;; Stuff it into bound-nontype decls which is no worse
+                           ;; than what FILTER-DOLIST-DECLARATIONS could do.
+                           (bound-nontype-decls expr))
+                          (t
+                           ;; A valid type declaration can pertain to some non-bound vars and/or
+                           ;; the bound var, nicely handling (STRING x y iterationvar).
+                           (when (member var tail) (bound-type-decls head))
+                           (awhen (remove var tail) (free-decls `(,head ,@it))))))))))))
+    (values (mapcar (lambda (x) `(type ,x ,var)) (bound-type-decls))
+            (mapcar (lambda (x) `(type (or null ,x) ,var)) (bound-type-decls))
+            (bound-nontype-decls)
+            (free-decls))))
+
 (sb-xc:defmacro dolist ((var list &optional (result nil)) &body body &environment env)
   ;; We repeatedly bind the var instead of setting it so that we never
   ;; have to give the var an arbitrary value such as NIL (which might
@@ -1403,6 +1455,8 @@ invoked. In that case it will store into PLACE and start over."
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (binding* (((forms decls) (parse-body body nil))
+             ((iter-type-decl res-type-decl other-decl free-decl)
+              (segregate-dolist-decls var decls))
              (n-list (gensym "LIST"))
              (start (gensym "START"))
              ((clist members clist-ok)
@@ -1432,27 +1486,23 @@ invoked. In that case it will store into PLACE and start over."
                            ;; But it doesn't detect the mismatch because the SETF
                            ;; mixes in T with the initial type.
                            `(the* (list :use-annotations t :source-form ,list) ,list))))
+         ,@(when free-decl `((declare ,@free-decl)))
          (tagbody
             ,start
             (unless (endp ,n-list)
               (let ((,var ,(if clist-ok
                                `(truly-the (member ,@members) (car ,n-list))
                                `(car ,n-list))))
-                (declare (ignorable ,var))
-                ,@decls
+                (declare ,@iter-type-decl ,@other-decl (ignorable ,var))
                 (setq ,n-list (cdr ,n-list))
                 (tagbody ,@forms))
-              (go ,start))))
-       ,(if result
-            `(let ((,var nil))
-               ;; Filter out TYPE declarations (VAR gets bound to NIL,
-               ;; and might have a conflicting type declaration) and
-               ;; IGNORE (VAR might be ignored in the loop body, but
-               ;; it's used in the result form).
-               ,@(filter-dolist-declarations decls)
+              (go ,start)))
+         ;; still within the scope of decls pertinent to other than the VAR binding
+         ,@(when result
+            `((let ((,var nil))
+               ,@(if (or res-type-decl other-decl) `((declare ,@res-type-decl ,@other-decl)))
                ,var
-               ,result)
-            nil))))
+               ,result)))))))
 
 
 ;;;; Miscellaneous macros:
