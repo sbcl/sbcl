@@ -176,7 +176,7 @@ lose:
     lose("This runtime was not built with zstd-compressed core support... aborting")
 #else
 static void inflate_core_bytes(int fd, os_vm_offset_t offset,
-                               os_vm_address_t addr, int len)
+                               os_vm_address_t addr, uword_t len)
 {
 # ifdef LISP_FEATURE_WIN32
     /* Ensure the memory is committed so zstd doesn't segfault trying
