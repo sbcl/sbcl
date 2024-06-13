@@ -2349,7 +2349,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
-    ;; Sort by index into linkage table
+    ;; Sort by index into alien linkage table
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
              (lambda (pair &aux (key (car pair))
                                 (sym (string-literal-to-core
@@ -3721,7 +3721,7 @@ as is fairly common for structure accessors.)")
                     "classoids" "layouts"
                     "packages" "symbols"
                     "type specifiers"
-                    "linkage table" #+sb-thread "TLS map")))
+                    "alien linkage table" #+sb-thread "TLS map")))
     (dotimes (i (length sections))
       (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
   (format t "=================~2%")
@@ -3844,7 +3844,7 @@ III. initially undefined function references (alphabetically):
                               host-obj))))
           sorted))
 
-  (format t "~%~|~%IX. linkage table:~2%")
+  (format t "~%~|~%IX. alien linkage table:~2%")
   (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
                        #'< :key #'cdr))
     (let ((name (car entry)))

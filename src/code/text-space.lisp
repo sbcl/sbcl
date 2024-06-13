@@ -19,8 +19,8 @@
           (mov-ea (find-inst #x8B (get-inst-space)))
           (mov-imm-acc (find-inst #xB8 (get-inst-space)))
           (dstate (make-dstate nil))
-          (sap (int-sap 0))
-          (seg (sb-disassem::%make-segment :sap-maker (lambda () sap))))
+          (code-sap (int-sap 0))
+          (seg (sb-disassem::%make-segment :sap-maker (lambda () code-sap))))
      (declare (ignorable mov-ea mov-imm-acc))
      (macrolet ((do-functions ((fun-var addr-var) &body body)
                   ;; Loop over all embedded functions
@@ -29,8 +29,8 @@
                             (,addr-var (+ (get-lisp-obj-address ,fun-var)
                                           (- fun-pointer-lowtag)
                                           (ash simple-fun-insts-offset word-shift))))
-                       (with-pinned-objects (sap) ; Mutate SAP to point to fun
-                         (setf (sap-ref-word (int-sap (get-lisp-obj-address sap))
+                       (with-pinned-objects (code-sap) ; Mutate SAP to point to fun
+                         (setf (sap-ref-word (int-sap (get-lisp-obj-address code-sap))
                                              (- n-word-bytes other-pointer-lowtag))
                                ,addr-var))
                        (setf (seg-virtual-location seg) ,addr-var
@@ -47,10 +47,8 @@
 
 #+immobile-code
 (defun sb-vm::collect-immobile-code-relocs ()
-  (let ((code-components
-         (make-array 20000 :element-type 'sb-vm:word :fill-pointer 0 :adjustable t))
-        (relocs
-         (make-array 100000 :element-type 'sb-vm:word :fill-pointer 0 :adjustable t))
+  (let ((code-components (make-array 20000 :element-type 'word :fill-pointer 0 :adjustable t))
+        (relocs (make-array 100000 :element-type 'word :fill-pointer 0 :adjustable t))
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
@@ -92,7 +90,7 @@
 
       ;; Immobile space - code components can jump to immobile space,
       ;; read-only space, and C runtime routines.
-      (sb-vm:map-allocated-objects
+      (map-allocated-objects
        (lambda (code type size)
          (declare (ignore size))
          (when (and (= type code-header-widetag) (plusp (code-n-entries code)))
