@@ -559,7 +559,7 @@ The system may fail to start.\n",
      */
     getrlimit (RLIMIT_DATA, &rl);
     if (dynamic_space_size + READ_ONLY_SPACE_SIZE + STATIC_SPACE_SIZE +
-        ALIEN_LINKAGE_TABLE_SPACE_SIZE + wantfree > rl.rlim_cur)
+        ALIEN_LINKAGE_SPACE_SIZE + wantfree > rl.rlim_cur)
         fprintf (stderr,
                  "RUNTIME WARNING: data size resource limit may be too low,\n"
                  "  try decreasing the dynamic space size with --dynamic-space-size\n"

@@ -2974,8 +2974,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
       #+cheneygc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
       #-immobile-space
-      (let ((end (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size)))
-        (check sb-vm:alien-linkage-table-space-start end :linkage-table)))))
+      (let ((end (+ sb-vm:alien-linkage-space-start sb-vm:alien-linkage-space-size)))
+        (check sb-vm:alien-linkage-space-start end :linkage-table)))))
 
 ;;;; emitting C header file
 

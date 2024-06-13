@@ -19,7 +19,7 @@ also utilized to allow references to as-of-yet unknown aliens.
 The SBCL implementation is somewhat simplified from the CMUCL one by
 Timothy Moore, but the basic idea and mechanism remain identical:
 instead of having addresses from @code{dlsym(3)} in the core, we have
-addresses to an mmapped memory area (@code{ALIEN_LINKAGE_TABLE_SPACE}) that
+addresses to an mmapped memory area (@code{ALIEN_LINKAGE_SPACE}) that
 is initialized at startup to contain jumps & references to the correct
 addresses, based on information stored on the lisp side in
 @code{*LINKAGE-INFO*}.
@@ -72,7 +72,7 @@ is used by SB-POSIX.)
 
 Find a memory area for the linkage-table, and add it for the OS in
 @file{src/compiler/target/parms.lisp} by defining
-@code{SB-VM:ALIEN-LINKAGE-TABLE-SPACE-START}. See existing ports and CMUCL for
+@code{SB-VM:ALIEN-LINKAGE-SPACE-START}. See existing ports and CMUCL for
 examples.
 
 @subsubsection Porting to new architectures

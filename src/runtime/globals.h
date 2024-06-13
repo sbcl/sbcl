@@ -107,7 +107,7 @@ extern lispobj *static_code_space_free_pointer;
 extern lispobj *text_space_highwatermark;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern lispobj *fixedobj_free_pointer;
-extern lispobj ALIEN_LINKAGE_TABLE_SPACE_START;
+extern lispobj ALIEN_LINKAGE_SPACE_START;
 #endif
 extern os_vm_address_t anon_dynamic_space_start;
 extern lispobj* tlsf_mem_start; // meaningful only if immobile space

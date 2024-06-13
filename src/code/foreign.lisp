@@ -51,7 +51,7 @@
     (or (with-system-mutex ((hash-table-lock ht))
           (or (gethash key ht)
               (let* ((index (hash-table-count ht))
-                     (capacity (floor sb-vm:alien-linkage-table-space-size
+                     (capacity (floor sb-vm:alien-linkage-space-size
                                       sb-vm:alien-linkage-table-entry-size)))
                 (when (< index capacity)
                   (multiple-value-bind (defined real-address) (dlsym-wrapper t)
@@ -176,9 +176,9 @@ symbol designates a variable. May enter the symbol into the linkage-table."
   (declare (ignorable sap))
   (let ((addr (sap-int sap)))
     (declare (ignorable addr))
-    (when (<= sb-vm:alien-linkage-table-space-start
+    (when (<= sb-vm:alien-linkage-space-start
               addr
-              (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size))
+              (+ sb-vm:alien-linkage-space-start sb-vm:alien-linkage-space-size))
       (return-from sap-foreign-symbol
         (alien-linkage-index-to-name
          (sb-vm::alien-linkage-table-index-from-address addr))))

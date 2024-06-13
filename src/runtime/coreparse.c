@@ -692,8 +692,8 @@ static os_vm_address_t reserve_space(int space_id, int attr,
     if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
         // Carve out the text space from the earlier request that was made
         // for the fixedobj space.
-        ALIEN_LINKAGE_TABLE_SPACE_START = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
-        return (os_vm_address_t)(ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE);
+        ALIEN_LINKAGE_SPACE_START = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
+        return (os_vm_address_t)(ALIEN_LINKAGE_SPACE_START + ALIEN_LINKAGE_SPACE_SIZE);
     }
 #endif
     if (size == 0) return addr;
@@ -755,9 +755,9 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         // ELF core without immobile space has alien linkage space below static space.
-        ALIEN_LINKAGE_TABLE_SPACE_START =
+        ALIEN_LINKAGE_SPACE_START =
             (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
-                                       ALIEN_LINKAGE_TABLE_SPACE_SIZE);
+                                       ALIEN_LINKAGE_SPACE_SIZE);
 #endif
     } else
 #endif
@@ -766,7 +766,7 @@ process_directory(int count, struct ndir_entry *entry,
     {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size +=
-            text_space_size + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
+            text_space_size + ALIEN_LINKAGE_SPACE_SIZE;
 #endif
     }
 

@@ -58,8 +58,8 @@
 (define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long)
 
 #+immobile-space
-(define-symbol-macro sb-vm:alien-linkage-table-space-start
-    (extern-alien "ALIEN_LINKAGE_TABLE_SPACE_START" unsigned))
+(define-symbol-macro sb-vm:alien-linkage-space-start
+    (extern-alien "ALIEN_LINKAGE_SPACE_START" unsigned))
 
 #+darwin-jit
 (define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)

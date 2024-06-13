@@ -302,7 +302,7 @@
   (assert (not (sb-kernel:immobile-space-addr-p
                 (+ sb-vm:fixedobj-space-start
                    sb-vm:fixedobj-space-size
-                   sb-vm:alien-linkage-table-space-size
+                   sb-vm:alien-linkage-space-size
                    sb-vm:text-space-size)))))
 
 (with-test (:name :unique-code-serialno :skipped-on :interpreter)

@@ -310,7 +310,7 @@
           (let ((text-space (get-space immobile-text-core-space-id spacemap)))
             (if text-space
                 (let ((text-addr (space-addr text-space)))
-                  (make-bounds (- text-addr alien-linkage-table-space-size) text-addr))
+                  (make-bounds (- text-addr alien-linkage-space-size) text-addr))
                 (make-bounds 0 0))))
          (linkage-entry-size
           (symbol-global-value

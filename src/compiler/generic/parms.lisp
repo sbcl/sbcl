@@ -38,7 +38,7 @@
   #-sb-xc-host (symbol-value 'default-dynamic-space-size))
 
 ;; By happenstance this is the same as small-space-size.
-(defconstant alien-linkage-table-space-size #x100000)
+(defconstant alien-linkage-space-size #x100000)
 
 ;; Define START/END constants for GC spaces.
 ;; Assumptions:
@@ -85,7 +85,7 @@
         ((spaces (append `((read-only ,ro-space-size)
                            #+(and win32 x86-64)
                            (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
-                           #-immobile-space (alien-linkage-table ,alien-linkage-table-space-size)
+                           #-immobile-space (alien-linkage ,alien-linkage-space-size)
                            ;; safepoint on 64-bit uses a relocatable trap page just below the card mark
                            ;; table, which works nicely assuming a register is wired to the card table
                            #+(and sb-safepoint (not x86-64))
@@ -97,7 +97,7 @@
                            (static-code ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
-                           (alien-linkage-table ,alien-linkage-table-space-size)
+                           (alien-linkage ,alien-linkage-space-size)
                            (text ,text-space-size*))))
          (ptr small-spaces-start)
          (small-space-forms
@@ -107,7 +107,7 @@
                           (member space '(fixedobj text permgen
                                           #+relocatable-static-space safepoint
                                           #+relocatable-static-space static
-                                          #+immobile-space alien-linkage-table
+                                          #+immobile-space alien-linkage
                                           read-only)))
                         (start ptr)
                         (end (+ ptr size)))

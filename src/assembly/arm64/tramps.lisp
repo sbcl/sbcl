@@ -60,7 +60,7 @@
                       #-sb-thread
                       (progn
                         ;; Each of these loads of a fixup loads the address of a linkage table entry,
-                        ;; that is, if ALIEN-LINKAGE-TABLE-SPACE-START is #xF0200000, then the first load puts
+                        ;; that is, if ALIEN-LINKAGE-SPACE-START is #xF0200000, then the first load puts
                         ;; #xF0200000+something, not the address of current_control_frame_pointer,
                         ;; into register nl2.
                         ;; This is kinda dumb because first of all we could have calculated the address

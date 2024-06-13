@@ -1636,9 +1636,8 @@
         (when (eq (second inst) 'call)
           (let ((operand (third inst)))
             (when (and (integerp operand)
-                       (>= operand alien-linkage-table-space-start)
-                       (< operand (+ alien-linkage-table-space-start
-                                     alien-linkage-table-space-size)))
+                       (>= operand alien-linkage-space-start)
+                       (< operand (+ alien-linkage-space-start alien-linkage-space-size)))
               (let* ((index (position (int-sap operand) *c-linkage-redirects*
                                       :key #'cdr :test #'sap=))
                      (branch-target (+ c-linkage-vector-vaddr

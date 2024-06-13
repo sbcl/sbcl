@@ -513,7 +513,7 @@ arch_install_interrupt_handlers()
 void
 arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
-    char *reloc_addr = (char*)ALIEN_LINKAGE_TABLE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
+    char *reloc_addr = (char*)ALIEN_LINKAGE_SPACE_START + index * ALIEN_LINKAGE_TABLE_ENTRY_SIZE;
     if (datap) {
         *(uword_t *)reloc_addr = (uword_t)target_addr;
         return;
