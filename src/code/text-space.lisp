@@ -150,15 +150,15 @@
                         ((and (eq inst mov-imm-acc)
                               ;; ensure not a 64-bit move
                               (eql (sb-disassem::dstate-inst-properties dstate) 0))
-                         (let ((value (sap-ref-32 sap (1+ (dstate-cur-offs dstate)))))
+                         (let ((value (sap-ref-32 code-sap (1+ (dstate-cur-offs dstate)))))
                            (dolist (fdefn all-fdefns)
                              (when (eql (get-lisp-obj-address fdefn) value)
                                (pushnew fdefn observable-fdefns)))))
                         ;; find FDEFNs in code header as the source of MOV EA to register
                         ((and (eq inst mov-ea)
-                              (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8B)
-                              (rip-relative-p (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
-                         (let ((addr (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                              (eql (sap-ref-8 code-sap (dstate-cur-offs dstate)) #x8B)
+                              (rip-relative-p (sap-ref-8 code-sap (1+ (dstate-cur-offs dstate)))))
+                         (let ((addr (+ (signed-sap-ref-32 code-sap (+ (dstate-cur-offs dstate) 2))
                                         (dstate-next-addr dstate))))
                            (when (and (not (logtest addr (ash sb-vm:lowtag-mask -1))) ; aligned
                                       (<= boxed-begin addr) (< addr boxed-end))
@@ -178,7 +178,7 @@
                                               (return fdefn)))))
                                (when (and fdefn (neq (info :function :inlinep (fdefn-name fdefn))
                                                      'notinline))
-                                 (push (cons (+ (sap- sap code-insts)
+                                 (push (cons (+ (sap- code-sap code-insts)
                                                 (1+ (sb-disassem:dstate-cur-offs dstate)))
                                              fdefn)
                                        fixups)))))))))
