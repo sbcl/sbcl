@@ -21,6 +21,11 @@
   (stack-frame-size 0))
 (declaim (freeze-type arg-state))
 
+(defun arg-tn-mover (value node block nsp tn sc move-arg-vop)
+  (declare (ignore sc))
+  (emit-move-arg-template node block
+                          move-arg-vop (lvar-tn call block value) nsp tn))
+
 (define-alien-type-method (integer :arg-tn) (type state)
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -121,12 +126,17 @@
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
-      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number esp-offset)
-              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
-              (arg-tns)
-              (invoke-alien-type-method :result-tn
-                                        (alien-fun-type-result-type type)
-                                        (make-result-state))))))
+      (list (make-wired-tn* 'positive-fixnum any-reg-sc-number esp-offset)
+            (* (arg-state-stack-frame-size arg-state) n-word-bytes)
+            (arg-tns)
+            (invoke-alien-type-method :result-tn
+                                      (alien-fun-type-result-type type)
+                                      (make-result-state))
+            :arg-tn-mover #'arg-tn-mover
+            :entry-hook (lambda (node block) ; Set FPU to 64-bit
+                          (vop set-fpu-word-for-c call block))
+            :exit-hook (lambda (node block) ; Reset FPU to 53-bit
+                         (vop set-fpu-word-for-lisp call block))))))
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
