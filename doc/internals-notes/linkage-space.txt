@@ -1,0 +1,52 @@
+Linkage space largely does away with using FDEFNs as the indirection
+between a function name and a function as callable object.
+The space is a contiguous range of memory, arbitrarily located,
+and allocated upon startup. One word is allocated for each callable
+entry point referenced from compiled code.
+
+The mapping from name to index within the space is stored in the name
+itself. "Names" come in two kinds: symbols and fdefns. A name which is
+a symbol no longer uses an FDEFN at all. The symbol is the name.
+An FDEFN is a holder of a compound name like (SETF CAR). For either
+kind of name, there are enough bits in to reference a linkage space
+cell by its index, as well as to hold a tagged pointer to the 1st-class
+object for the function it is bound to.  These serve the same purpose
+as fdefn->fun and fdefn->raw_addr in non-linkage-space architectures.
+
+The advantages of linkage space over using FDEFNs are as follows:
+
+* Linkage entries have 4x the density for any given number of function
+  names (1 word vs 4 for an fden),
+
+* A linkage cell is consumed only if compiled code calls compiled code.
+  (Never wasting a cell on macros, unless at some point the macro was
+  assumed to be a function)
+
+* Code headers do not contain a boxed constant per named callee.
+
+* The linkage table call still uses only 1 instruction in the best case,
+  or 2 instructions worst case, which is exactly the same as status quo.
+
+* 3 fewer variants of CALL vop on x86-64 exist
+
+* Two fixup types are removed, and subsumed by :LISP-LINKAGE-CELL fixup.
+
+* No storing machine code in the header of an fdefn, potentially
+  better for CPU by not cross-contaminating code and data,
+  and removing the need to make fixedobj pages executable.
+
+* Eliminate possible cross-cache-line misaligned store in remove-static-links
+  by doing away with so-called static linking unless producing an ELF core.
+
+* Text space defrag is easier because there are no calls to fixobj space.
+  Heap relocation on startup is similarly easier.
+
+* Identical-code-folding never has to rewrite machine instructions.
+
+* Much more sharing of logic for +/- immobile-space is possible,
+  especially in regard to writing ELF cores, which fastly improves the
+  situation for #+mark-region-gc that lacks immobile space.
+
+* The restriction on sub-2GC immobile text space is lifted.
+
+* Immobile fixedobj space is more available for immobile symbols.
