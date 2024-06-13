@@ -385,19 +385,7 @@ static int is_memsize_arg(char *argv[], int argi, int argc, int *merge_core_page
         if ((argi+1) >= argc) lose("missing argument for --dynamic-space-size");
         dynamic_space_size = parse_size_arg(argv[argi+1],
                                             "--dynamic-space-size");
-#ifdef MAX_DYNAMIC_SPACE_END
-        if (!((DYNAMIC_SPACE_START <
-                       DYNAMIC_SPACE_START+dynamic_space_size) &&
-                      (DYNAMIC_SPACE_START+dynamic_space_size <=
-                       MAX_DYNAMIC_SPACE_END))) {
-            char* suffix = "";
-            char* size = argv[argi-1];
-            if (!strchr(size, 'B') && !strchr(size, 'b')) suffix = " [MB]";
-            lose("--dynamic-space-size argument %s%s is too large, max %lu KB",
-                 size, suffix, (MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START) / 1024);
-        }
-#endif
-        return 2;
+        return 2; // return number of elements of argv[] consumed
     }
     if (!strcmp(arg, "--control-stack-size")) {
         if ((argi+1) >= argc) lose("missing argument for --control-stack-size");

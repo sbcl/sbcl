@@ -141,19 +141,6 @@
 (defconstant most-negative-exactly-double-float-integer
   (- (expt 2 double-float-digits)))
 
-;;;; Point where continuous area starting at dynamic-space-start bumps into
-;;;; next space. Computed for genesis/constants.h, not used in Lisp.
-#+(and generational sb-xc-host)
-(defconstant max-dynamic-space-end
-    (let ((stop (1- (ash 1 n-word-bits)))
-          (start dynamic-space-start))
-      (dolist (other-start (list read-only-space-start static-space-start
-                                 alien-linkage-space-start))
-        (declare (notinline <)) ; avoid dead code note
-        (when (< start other-start)
-          (setf stop (min stop other-start))))
-      stop))
-
 ;; The lowest index that you can pass to %INSTANCE-REF accessing
 ;; a slot of data that is not the instance-layout.
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.

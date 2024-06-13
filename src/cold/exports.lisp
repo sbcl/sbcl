@@ -3100,7 +3100,6 @@ structure representations")
            "*CONTROL-STACK-START*" "*CONTROL-STACK-END*"
            "CONTROL-STACK-POINTER-VALID-P"
            "DYNAMIC-SPACE-START"
-           "MAX-DYNAMIC-SPACE-END"
            "PAGE-TABLE"
            "FIND-PAGE-INDEX"
            "NEXT-FREE-PAGE"
