@@ -443,13 +443,16 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
             }
             continue;
-        case FDEFN_WIDETAG:
-            adjust_pointers(where+1, 2, adj);
+        case FDEFN_WIDETAG: {
+            struct fdefn* f = (void*)where;
+            adjust_pointers(&f->name, 1, adj);
+            adjust_pointers(&f->fun, 1, adj);
             // For most architectures, 'raw_addr' doesn't satisfy is_lisp_pointer()
             // so adjust_pointers() would ignore it. Therefore we need to
             // forcibly adjust it. This is correct whether or not there are tag bits.
-            adjust_word_at(where+3, adj);
+            adjust_word_at((lispobj*)&f->raw_addr, adj);
             continue;
+        }
         case CODE_HEADER_WIDETAG:
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
