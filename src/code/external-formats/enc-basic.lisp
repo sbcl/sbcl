@@ -663,6 +663,57 @@
       (setf (buffer-head ibuf) head)
       total-copied)))
 
+#+(and sb-unicode 64-bit little-endian)
+(defun sb-vm::simd-copy-utf8-crlf-to-character-string-with-size (requested total-copied start string ibuf size-buffer)
+  (declare (type index start requested total-copied)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string size-buffer)
+    (let* ((head (buffer-head ibuf))
+           (tail (buffer-tail ibuf))
+           (sap (buffer-sap ibuf))
+           (n (logand (min (- requested total-copied)
+                           (- (- tail head) 1))
+                      (- 2)))
+           (repeat (ldb (byte 16 0) #x0101010101010101))
+           (ascii-mask (* 128 repeat))
+           (string-sap (vector-sap string))
+           (size-sap (vector-sap size-buffer))
+           (size-offset (+ start total-copied))
+           (string-start (* size-offset 4))
+           (string-offset string-start)
+           (end (+ head n)))
+      (declare (index size-offset))
+      (declare (optimize sb-c::preserve-single-use-debug-variables
+                         sb-c::preserve-constants))
+      (loop while (< head end)
+            do
+            (let ((word (sap-ref-16 sap head)))
+              (when (logtest word ascii-mask)
+                (return))
+              (cond ((= word #x0A0D)
+                     (setf (sap-ref-32 string-sap string-offset) 10
+                           (sap-ref-8 size-sap size-offset) 2)
+                     (incf head 2)
+                     (incf string-offset 4)
+                     (incf size-offset 1))
+                    ((= (ash word -8) 13)
+                     (setf (sap-ref-32 string-sap string-offset) (ldb (byte 8 0) word)
+                           (sap-ref-8 size-sap size-offset) 1)
+                     (incf head 1)
+                     (incf string-offset 4)
+                     (incf size-offset 1))
+                    (t
+                     (setf (sap-ref-64 string-sap string-offset)
+                           (dpb (ldb (byte 8 8) word)
+                                (byte 32 32)
+                                (ldb (byte 8 0) word))
+                           (sap-ref-16 size-sap size-offset) #x0101)
+                     (incf head 2)
+                     (incf string-offset 8)
+                     (incf size-offset 2)))))
+      (setf (buffer-head ibuf) head)
+      (truly-the index (+ total-copied (truncate (- string-offset string-start) 4))))))
+
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64))) ;; have true simd definitions
 (defun sb-vm::simd-copy-utf8-to-base-string (requested total-copied start string ibuf)
@@ -697,7 +748,8 @@
       total-copied)))
 
 (defmacro utf8-char-loop (&key size-buffer
-                               crlf)
+                               crlf
+                               (eof t))
   `(do ()
        ((or (= tail head)
             (= requested total-copied)))
@@ -715,10 +767,11 @@
                                         ,@(when size-buffer
                                             `((setf (aref size-buffer index) 2)))
                                         10)
-                                       (eof
-                                        nil)
+                                       ,@(and eof
+                                          `((eof nil)))
                                        (t
-                                        (setf requested-refill t)
+                                        ,@(and eof
+                                               `((setf requested-refill t)))
                                         (return))))))))
                 ((< byte 128)
                  (incf head)
@@ -826,8 +879,49 @@
                   (null (catch 'eof-input-catcher (refill-input-buffer stream))))
           (return total-copied))))))
 
+(defun fd-stream-read-n-characters/utf-8/crlf (stream string size-buffer start requested &aux (total-copied 0))
+  (declare (type fd-stream stream)
+           (type index start requested total-copied)
+           (type ansi-stream-cin-buffer string)
+           (type ansi-stream-csize-buffer size-buffer))
+  (when (fd-stream-eof-forced-p stream)
+    (setf (fd-stream-eof-forced-p stream) nil)
+    (return-from fd-stream-read-n-characters/utf-8/crlf 0))
+  (do ((instead (fd-stream-instead stream))
+       (index (+ start total-copied) (1+ index)))
+      ((= (fill-pointer instead) 0)
+       (setf (fd-stream-listen stream) nil))
+    (setf (aref string index) (vector-pop instead))
+    (setf (aref size-buffer index) 0)
+    (incf total-copied)
+    (when (= requested total-copied)
+      (when (= (fill-pointer instead) 0)
+        (setf (fd-stream-listen stream) nil))
+      (return-from fd-stream-read-n-characters/utf-8/crlf total-copied)))
+  #+(and sb-unicode 64-bit little-endian)
+  (setf total-copied (sb-vm::simd-copy-utf8-crlf-to-character-string-with-size requested total-copied
+                                                                               start string (fd-stream-ibuf stream)
+                                                                               size-buffer))
+  (block outer
+    (do ()
+        (())
+      (let* ((ibuf (fd-stream-ibuf stream))
+             (head (buffer-head ibuf))
+             (tail (buffer-tail ibuf))
+             (sap (buffer-sap ibuf)))
+        (declare (type index head tail))
+        (flet ((decode-break (reason)
+                 (setf (buffer-head ibuf) head)
+                 (unless (plusp total-copied)
+                   (stream-decoding-error-and-handle stream reason 1))
+                 (return-from outer total-copied)))
+          (utf8-char-loop :size-buffer t :crlf t :eof nil))
+        (when (or (plusp total-copied)
+                  (null (catch 'eof-input-catcher (refill-input-buffer stream))))
+          (return total-copied))))))
+
 ;;; Bypass the character buffer, the caller must ensure that it's empty
-(defun fd-stream-read-n-characters/utf-8-to-string (stream string start requested &aux (total-copied 0))
+(defun fd-stream-read-sequence/utf-8-to-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type (simple-array character (*)) string))
@@ -865,7 +959,7 @@
          (return total-copied))))))
 
 #+sb-unicode
-(defun fd-stream-read-n-characters/utf-8-to-base-string (stream string start requested &aux (total-copied 0))
+(defun fd-stream-read-sequence/utf-8-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type simple-base-string string))
@@ -1040,9 +1134,12 @@
              (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
   ((2 1)
    (cond
-     ((= (- tail head) 1) 1)
-     ((and (= byte 13) (= (sap-ref-8 sap (+ head 1)) 10)) 2)
-     ((< byte #x80) 1)
+     ((< byte #x80)
+      (if (and (= byte 13)
+               (> (- tail head) 1)
+               (= (sap-ref-8 sap (+ head 1)) 10))
+          2
+          1))
      ((< byte #xc2) (return-from decode-break-reason 1))
      ((< byte #xe0) 2)
      ((< byte #xf0) 3)
@@ -1078,6 +1175,7 @@
   utf8->string/crlf-aref
   string/crlf->utf8
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
+  :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8/crlf
   :newline-variant :crlf)
 
 #+(and sb-unicode 64-bit little-endian
@@ -1105,8 +1203,7 @@
             (let ((word (sap-ref-16 sap head)))
               (when (logtest word ascii-mask)
                 (return))
-              (cond ((= word
-                        (dpb 10 (byte 8 8) 13))
+              (cond ((= word #x0A0D)
                      (setf (sap-ref-8 string-sap string-offset) 10)
                      (incf head 2)
                      (incf string-offset 1))
@@ -1146,8 +1243,7 @@
             (let ((word (sap-ref-16 sap head)))
               (when (logtest word ascii-mask)
                 (return))
-              (cond ((= word
-                        (dpb 10 (byte 8 8) 13))
+              (cond ((= word #x0A0D)
                      (setf (sap-ref-32 string-sap string-offset) 10)
                      (incf head 2)
                      (incf string-offset 4))
@@ -1165,7 +1261,7 @@
       (setf (buffer-head ibuf) head)
       (truly-the index (+ total-copied (truncate (- string-offset string-start) 4))))))
 
-(defun fd-stream-read-n-characters/utf-8-crlf-to-character-string (stream string start requested &aux (total-copied 0))
+(defun fd-stream-read-sequence/utf-8-crlf-to-character-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type (simple-array character (*)) string))
@@ -1208,7 +1304,7 @@
                (setf eof t)
                (return total-copied))))))))
 
-(defun fd-stream-read-n-characters/utf-8-crlf-to-base-string (stream string start requested &aux (total-copied 0))
+(defun fd-stream-read-sequence/utf-8-crlf-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type simple-base-string string))
