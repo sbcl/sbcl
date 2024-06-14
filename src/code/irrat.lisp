@@ -405,6 +405,8 @@
                  (typep base '(or double-float (complex double-float))))
              0.0d0
              0.0f0))
+        ((eql number 0)
+         (error 'division-by-zero :operands (list number base) :operation 'log))
         ((and (typep number '(rational 0))
               (typep base '(rational 0)))
          (coerce (/ (truly-the double-float (log2/nonnegative-rational number))
@@ -458,6 +460,8 @@
            (((complex double-float) (foreach double-float (complex double-float)))
             (/ (log number) (log base))))))
       (let ((log2e 1.4426950408889634d0))
+        (when (eql number 0)
+          (error 'division-by-zero :operands (list number) :operation 'log))
         (number-dispatch ((number number))
           (((foreach fixnum bignum))
            (if (minusp number)

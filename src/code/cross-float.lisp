@@ -400,6 +400,8 @@
 
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
+  (when (eql number 0)
+    (error 'division-by-zero :operation 'log :operands `(,number ,@(when base-p base))))
   (with-memoized-math-op (log (if base-p (list number base) number))
     (let ((format (pick-float-result-format number (if base-p base 0))))
       (if (zerop number)
