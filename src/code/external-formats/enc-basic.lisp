@@ -782,8 +782,10 @@
                  (decode-break 1))
                 ((< byte 224)
                  (let ((new-head (+ head 2)))
-                   (if (> new-head tail)
-                       (return))
+                   (when (> new-head tail)
+                     ,@(and eof
+                            `((setf incomplete t)))
+                     (return))
                    (prog1
                        (let ((byte2 (sap-ref-8 sap (1+ head))))
                          (unless (<= 128 byte2 191)
@@ -794,8 +796,10 @@
                      (setf head new-head))))
                 ((< byte 240)
                  (let ((new-head (+ head 3)))
-                   (if (> new-head tail)
-                       (return))
+                   (when (> new-head tail)
+                     ,@(and eof
+                            `((setf incomplete t)))
+                     (return))
                    (prog1
                        (let ((byte2 (sap-ref-8 sap (1+ head)))
                              (byte3 (sap-ref-8 sap (+ 2 head))))
@@ -812,8 +816,10 @@
                      (setf head new-head))))
                 (t
                  (let ((new-head (+ head 4)))
-                   (if (> new-head tail)
-                       (return))
+                   (when (> new-head tail)
+                     ,@(and eof
+                            `((setf incomplete t)))
+                     (return))
                    (prog1
                        (let ((byte2 (sap-ref-8 sap (1+ head)))
                              (byte3 (sap-ref-8 sap (+ 2 head)))
@@ -874,7 +880,8 @@
                  (unless (plusp total-copied)
                    (stream-decoding-error-and-handle stream reason 1))
                  (return-from outer total-copied)))
-          (utf8-char-loop :size-buffer t))
+          (utf8-char-loop :size-buffer t
+                          :eof nil))
         (when (or (plusp total-copied)
                   (null (catch 'eof-input-catcher (refill-input-buffer stream))))
           (return total-copied))))))
@@ -944,7 +951,8 @@
      (let* ((ibuf (fd-stream-ibuf stream))
             (head (buffer-head ibuf))
             (tail (buffer-tail ibuf))
-            (sap (buffer-sap ibuf)))
+            (sap (buffer-sap ibuf))
+            incomplete)
        (declare (type index head tail))
        (flet ((decode-break (reason)
                 (setf (buffer-head ibuf) head)
@@ -956,7 +964,9 @@
          (setf (buffer-head ibuf) head)
          (return total-copied))
        (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (return total-copied))))))
+         (when (or (not incomplete)
+                   (stream-decoding-error-and-handle stream (- tail head) 1))
+           (return total-copied)))))))
 
 #+sb-unicode
 (defun fd-stream-read-sequence/utf-8-to-base-string (stream string start requested &aux (total-copied 0))
@@ -982,7 +992,8 @@
      (let* ((ibuf (fd-stream-ibuf stream))
             (head (buffer-head ibuf))
             (tail (buffer-tail ibuf))
-            (sap (buffer-sap ibuf)))
+            (sap (buffer-sap ibuf))
+            incomplete)
        (declare (type index head tail))
        (flet ((decode-break (reason)
                 (setf (buffer-head ibuf) head)
@@ -994,7 +1005,9 @@
          (setf (buffer-head ibuf) head)
          (return total-copied))
        (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (return total-copied))))))
+         (when (or (not incomplete)
+                   (stream-decoding-error-and-handle stream (- tail head) 1))
+           (return total-copied)))))))
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1265,8 +1278,7 @@
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type (simple-array character (*)) string))
-  (let (requested-refill
-        eof)
+  (let (eof)
     (block outer
       (loop
        (do ((instead (fd-stream-instead stream))
@@ -1287,7 +1299,9 @@
        (let* ((ibuf (fd-stream-ibuf stream))
               (head (buffer-head ibuf))
               (tail (buffer-tail ibuf))
-              (sap (buffer-sap ibuf)))
+              (sap (buffer-sap ibuf))
+              requested-refill
+              incomplete)
          (declare (type index head tail))
          (flet ((decode-break (reason)
                   (setf (buffer-head ibuf) head)
@@ -1302,14 +1316,15 @@
          (unless (catch 'eof-input-catcher (refill-input-buffer stream))
            (if requested-refill
                (setf eof t)
-               (return total-copied))))))))
+               (when (or (not incomplete)
+                         (stream-decoding-error-and-handle stream (- tail head) 1))
+                 (return total-copied)))))))))
 
 (defun fd-stream-read-sequence/utf-8-crlf-to-base-string (stream string start requested &aux (total-copied 0))
   (declare (type fd-stream stream)
            (type index start requested total-copied)
            (type simple-base-string string))
-  (let (requested-refill
-        eof)
+  (let (eof)
     (block outer
       (loop
        (do ((instead (fd-stream-instead stream))
@@ -1329,7 +1344,9 @@
        (let* ((ibuf (fd-stream-ibuf stream))
               (head (buffer-head ibuf))
               (tail (buffer-tail ibuf))
-              (sap (buffer-sap ibuf)))
+              (sap (buffer-sap ibuf))
+              requested-refill
+              incomplete)
          (declare (type index head tail))
          (flet ((decode-break (reason)
                   (setf (buffer-head ibuf) head)
@@ -1344,4 +1361,6 @@
          (unless (catch 'eof-input-catcher (refill-input-buffer stream))
            (if requested-refill
                (setf eof t)
-               (return total-copied))))))))
+               (when (or (not incomplete)
+                         (stream-decoding-error-and-handle stream (- tail head) 1))
+                 (return total-copied)))))))))
