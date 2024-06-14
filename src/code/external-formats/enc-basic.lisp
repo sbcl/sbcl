@@ -853,17 +853,17 @@
       (when (= (fill-pointer instead) 0)
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8 total-copied)))
-  #+(and sb-unicode 64-bit little-endian)
-  (let ((new-total (sb-vm::simd-copy-utf8-to-character-string requested total-copied
-                                                              start string (fd-stream-ibuf stream))))
-    ;; Make sure to change this 1 whenever
-    ;; simd-copy-utf8-to-character-string starts processing more than
-    ;; just ascii characters.
-    (fill size-buffer 1 :start (+ start total-copied) :end (+ start new-total))
-    (setf total-copied new-total))
   (block outer
     (do ()
         (())
+      #+(and sb-unicode 64-bit little-endian)
+      (let ((new-total (sb-vm::simd-copy-utf8-to-character-string requested total-copied
+                                                                  start string (fd-stream-ibuf stream))))
+        ;; Make sure to change this 1 whenever
+        ;; simd-copy-utf8-to-character-string starts processing more than
+        ;; just ascii characters.
+        (fill size-buffer 1 :start (+ start total-copied) :end (+ start new-total))
+        (setf total-copied new-total))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))
@@ -898,13 +898,13 @@
       (when (= (fill-pointer instead) 0)
         (setf (fd-stream-listen stream) nil))
       (return-from fd-stream-read-n-characters/utf-8/crlf total-copied)))
-  #+(and sb-unicode 64-bit little-endian)
-  (setf total-copied (sb-vm::simd-copy-utf8-crlf-to-character-string-with-size requested total-copied
-                                                                               start string (fd-stream-ibuf stream)
-                                                                               size-buffer))
   (block outer
     (do ()
         (())
+      #+(and sb-unicode 64-bit little-endian)
+      (setf total-copied (sb-vm::simd-copy-utf8-crlf-to-character-string-with-size requested total-copied
+                                                                                   start string (fd-stream-ibuf stream)
+                                                                                   size-buffer))
       (let* ((ibuf (fd-stream-ibuf stream))
              (head (buffer-head ibuf))
              (tail (buffer-tail ibuf))
