@@ -3369,7 +3369,7 @@ unsigned prefuzz_ht_hash(lispobj h0)
       + fixnum_ashr(h0, 12)
       + fixnum_ashr(h0, 20);
     // the mask looks wrong for 32-bit, but I'm not trying to debug 32-bit.
-    return fixnum_value(sum & (make_fixnum((1L<<31)-1)));
+    return fixnum_value(sum & (make_fixnum(((uword_t)1<<31)-1)));
 #else
     lose("Unimplemented");
 #endif

@@ -628,7 +628,7 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
                           __attribute__((unused)) FILE* file)
 {
     int errors = 0;
-#ifdef LISP_FEATURE_64_BIT
+#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_64_BIT
     char *kinds[4] = {"EQ","EQL","EQUAL","EQUALP"};
     lispobj* data = VECTOR(ht->pairs)->data;
     uint32_t* hvdata = ht->hash_vector != NIL ?
