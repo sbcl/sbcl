@@ -337,9 +337,9 @@
   . #.(destroyed-c-registers))
 
 #+win32
+(progn
 (defconstant win64-seh-direct-thunk-addr win64-seh-data-addr)
-#+win32
-(defconstant win64-seh-indirect-thunk-addr (+ win64-seh-data-addr 8))
+(defconstant win64-seh-indirect-thunk-addr (+ win64-seh-data-addr 8)))
 
 (defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
   (declare (ignorable varargsp))
@@ -402,17 +402,24 @@
                         (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
                         (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn))))))
 
-  ;; On win64, we don't support immobile space (yet) and calls go through one of
-  ;; the thunks defined in set_up_win64_seh_data(). If the linkage table is
-  ;; involved, RBX either points to a linkage table trampoline or to the linkage
-  ;; table operand; this simplifies UNDEFINED-ALIEN-TRAMP's job.
+  ;; On win64, calls go through one of the thunks defined in set_up_win64_seh_data().
   #+win32
   (cond ((tn-p fun)
          (move rbx fun)
          (inst mov rax win64-seh-direct-thunk-addr)
          (inst call rax))
         (t
-         (inst mov rbx (make-fixup fun :foreign 8))
+         ;; RBX is loaded with the address of the word containing the address in the alien
+         ;; linkage table of the alien function to call. This informs UNDEFINED-ALIEN-TRAMP
+         ;; which table cell was referenced, if undefined.
+         #+immobile-space ; relocatable table
+         (cond ((sb-c::code-immobile-p vop)
+                (inst lea rbx (rip-relative-ea (make-fixup fun :foreign 8))))
+               (t
+                (inst mov rbx (make-fixup fun :alien-code-linkage-index 8))
+                (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot))))
+         ;; else, wired table base address
+         #-immobile-space (inst mov rbx (make-fixup fun :foreign 8))
          (inst mov rax win64-seh-indirect-thunk-addr)
          (inst call rax)))
 

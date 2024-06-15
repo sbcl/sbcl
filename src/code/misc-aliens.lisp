@@ -55,7 +55,7 @@
     (let ((addr (get-lisp-obj-address x)))
       (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
 
-(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long)
+(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) sb-kernel::os-vm-size-t)
 
 #+immobile-space
 (define-symbol-macro sb-vm:alien-linkage-space-start
