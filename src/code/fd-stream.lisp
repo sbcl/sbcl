@@ -700,7 +700,8 @@
                    tail (buffer-tail obuf)))))
        ;; FIXME: Why this here? Doesn't seem necessary.
        ,@(unless (eq (car buffering) :none)
-          `((synchronize-stream-output ,stream-var)))
+          `((when (fd-stream-synchronize-output ,stream-var)
+              (synchronize-stream-output ,stream-var))))
        ,(if restart
             `(block output-nothing
                ,@body
