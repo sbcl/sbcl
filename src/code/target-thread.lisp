@@ -2075,7 +2075,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   #-sb-thread (declare (ignore function name arguments))
   #-sb-thread (error "Not supported in unithread builds.")
   #+sb-thread
-  (let ((name (when name (possibly-base-stringize name))))
+  (let ((name (when name (possibly-base-stringize-to-heap name))))
     (assert (or (atom arguments) (null (cdr (last arguments))))
             (arguments)
             "Argument passed to ~S, ~S, is an improper list."

@@ -662,3 +662,15 @@
                        symbol))
           (format t "~s -> ~s~%" obj (cdr x))
           (format t "~s -> ~s~%" (type-of obj) (cdr x))))))
+
+(defun start-a-thread (arg)
+  (sb-vm:with-arena (*arena*)
+    (let ((name (format nil "worker~d" arg)))
+      (sb-thread:make-thread
+       (lambda () (print 'hi (make-broadcast-stream)))
+       :name name))))
+
+(test-util:with-test (:name :thread-name-not-in-arena)
+  (let ((thread (start-a-thread 1)))
+    (sb-thread:join-thread thread)
+    (assert (heap-allocated-p (sb-thread:thread-name thread)))))
