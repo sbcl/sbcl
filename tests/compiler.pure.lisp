@@ -6073,10 +6073,16 @@
     ((5.0f-9) #C(-4.123312f37 -0.0))))
 
 (with-test (:name :reducing-constants.2)
-  (checked-compile-and-assert (:allow-style-warnings t)
-      `(lambda () (*  1.0 2 (expt 2 127)))
-    (() #-no-float-traps (condition 'floating-point-overflow)
-        #+no-float-traps sb-ext:single-float-positive-infinity)))
+  (let* ((style-warning-p nil)
+         (fun (checked-compile `(lambda () (* 1.0 2 (expt 2 127)))
+                               :allow-style-warnings t
+                               :condition-transform (lambda (x)
+                                                      (when (typep x 'style-warning)
+                                                        (setf style-warning-p t))
+                                                      x))))
+    (handler-case (funcall fun)
+      (floating-point-overflow () (assert style-warning-p))
+      (:no-error (x) (assert (not style-warning-p)) (assert (eql x sb-ext:single-float-positive-infinity))))))
 
 (with-test (:name (logbitp :past fixnum))
   (checked-compile-and-assert ()
