@@ -108,12 +108,6 @@ Otherwise, use the Sparc register names")
       (aref reg-symbols index)
       (aref sparc-reg-symbols index)))
 
-;; FIXME: pathetic. DSTATE-PROPERTIES is the perfect place for this list.
-(defvar *note-sethi-inst* nil
-  "An alist for the disassembler indicating the target register and
-value used in a SETHI instruction.  This is used to make annotations
-about function addresses and register values.")
-
 (defvar *pseudo-atomic-set* nil)
 
 (defun sign-extend-immed-value (val) ; FIXME: why reinvent SIGN-EXTEND ?

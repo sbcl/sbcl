@@ -13,6 +13,9 @@
 
 (in-package "SB-SPARC-ASM")
 
+(defmacro seen-sethi (dstate)
+  `(sb-disassem::dstate-known-register-contents ,dstate))
+
 (defun sethi-arg-printer (value stream dstate)
     (format stream "%hi(#x~8,'0x)" (ash value 10))
     ;; Save the immediate value and the destination register from this
@@ -23,7 +26,7 @@
                               (dstate-byte-order dstate)))
            (imm22 (ldb (byte 22 0) word))
            (rd (ldb (byte 5 25) word)))
-      (push (cons rd imm22) *note-sethi-inst*)))
+      (push (cons rd imm22) (seen-sethi dstate))))
 
 ;; Look at the current instruction and see if we can't add some notes
 ;; about what's happening.
@@ -66,12 +69,12 @@
     ;; a SETHI without any additional instruction because the low bits
     ;; were zero.)
     (unless (and (zerop format) (= #b100 (ldb (byte 3 22) word)))
-      (let ((sethi (assoc rd *note-sethi-inst*)))
+      (let ((sethi (assoc rd (seen-sethi dstate))))
         (when sethi
-          (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))))))
+          (setf (seen-sethi dstate) (delete sethi (seen-sethi dstate))))))))
 
 (defun handle-add-inst (rs1 immed-val rd dstate)
-  (let* ((sethi (assoc rs1 *note-sethi-inst*)))
+  (let* ((sethi (assoc rs1 (seen-sethi dstate))))
     (cond
       (sethi
        ;; RS1 was used in a SETHI instruction.  Assume that
@@ -84,7 +87,7 @@
          (or (note-code-constant addr dstate :absolute)
              (maybe-note-assembler-routine addr t dstate)
              (note (format nil "~A = #x~8,'0X" (get-reg-name rd) addr) dstate)))
-       (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))
+       (setf (seen-sethi dstate) (delete sethi (seen-sethi dstate))))
       ((= rs1 null-offset)
        ;; We have an ADD %NULL, <n>, RD instruction.  This is a
        ;; reference to a static symbol.
@@ -100,7 +103,7 @@
 
 (defun handle-jmpl-inst (rs1 immed-val rd dstate)
   (declare (ignore rd))
-  (let* ((sethi (assoc rs1 *note-sethi-inst*)))
+  (let ((sethi (assoc rs1 (seen-sethi dstate))))
     (when sethi
       ;; RS1 was used in a SETHI instruction.  Assume that
       ;; this is the offset part of the SETHI instruction for
@@ -110,7 +113,7 @@
       ;; final value.
       (let ((addr (+ immed-val (ash (cdr sethi) 10))))
         (maybe-note-assembler-routine addr t dstate)
-        (setf *note-sethi-inst* (delete sethi *note-sethi-inst*))))))
+        (setf (seen-sethi dstate) (delete sethi (seen-sethi dstate)))))))
 
 (defun handle-ld/st-inst (rs1 immed-val rd dstate)
   (declare (ignore rd))
@@ -125,11 +128,11 @@
      (or (maybe-note-nil-indexed-symbol-slot-ref immed-val dstate)
          #+nil (sb-disassem::maybe-note-static-function immed-val dstate)))
     (t
-     (let ((sethi (assoc rs1 *note-sethi-inst*)))
+     (let ((sethi (assoc rs1 (seen-sethi dstate))))
        (when sethi
          (let ((addr (+ immed-val (ash (cdr sethi) 10))))
            (maybe-note-assembler-routine addr nil dstate)
-           (setf *note-sethi-inst* (delete sethi *note-sethi-inst*))))))))
+           (setf (seen-sethi dstate) (delete sethi (seen-sethi dstate)))))))))
 
 (defun handle-andcc-inst (rs1 immed-val rd dstate)
   (declare (ignorable rs1 immed-val rd dstate))

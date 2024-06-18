@@ -262,9 +262,6 @@
       sb-di::*compiled-debug-funs*
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*
-      ;; This is a workaround for what would seem to be a bug in the sparc
-      ;; disassembler's way of carrying state across instructions.
-      ,(maybe "SB-SPARC-ASM" "*NOTE-SETHI-INST*")
       sb-unicode::*name->char-buffers*)))
 
 (defun collect-symbol-values ()
