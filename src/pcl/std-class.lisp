@@ -1005,7 +1005,11 @@
   (when cpl
     (let ((first (car cpl)))
       (dolist (c (cdr cpl))
-        (pushnew c (slot-value first 'can-precede-list) :test #'eq)))
+        ;; This is (PUSHNEW c (SLOT-VALUE FIRST 'can-precede-list) :TEST #'EQ)))
+        ;; but avoids consing in an arena. Perhaps the ADJOIN transform could sense
+        ;; whether to change %ADJOIN-EQ to SYS-TLAB-ADJOIN-EQ ?
+        (with-slots (can-precede-list) first
+          (setf can-precede-list (sys-tlab-adjoin-eq c can-precede-list)))))
     (update-class-can-precede-p (cdr cpl))))
 
 (defun class-can-precede-p (class1 class2)

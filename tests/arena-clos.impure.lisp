@@ -18,3 +18,18 @@
 
 (f :c)
 (assert (not (sb-vm:c-find-heap->arena)))
+
+(defmethod zook ((x list))
+  (format t "is-list~%"))
+(defmethod zook ((x null))
+  (format t "is-null~%")
+  (call-next-method))
+(defmethod zook ((x (eql nil)))
+  (format t "is-eql-nil~%")
+  (call-next-method))
+(defvar *a* (sb-vm:new-arena 1048576))
+(defun g ()
+  (sb-vm:with-arena (*a*)
+    (zook nil)))
+(g)
+(assert (not (sb-vm:c-find-heap->arena)))

@@ -278,6 +278,10 @@
              (let ((combin (generic-function-method-combination gf)))
                (and (long-method-combination-p combin)
                     (long-method-combination-args-lambda-list combin)))))
+          ;; FIXME: this name in the lambda almost completely defeats
+          ;; the fngen cache when compiling method combinations
+          ;; since no two expressions will be EQUAL. Perhaps we should
+          ;; teach fngen to remove the name?
           (name `(emf ,(generic-function-name gf))))
       (cond
         (mc-args-p

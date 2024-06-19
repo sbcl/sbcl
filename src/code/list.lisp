@@ -1468,6 +1468,10 @@
   (def (test-not)
       (not (funcall test-not x target))))
 
+(defun sys-tlab-adjoin-eq (item list)
+  (declare (sb-c::tlab :system))
+  (if (memq item list) list (cons item list)))
+
 (defun sys-tlab-append (a b)
   (declare (sb-c::tlab :system))
   (named-let recurse ((a a) (b b))

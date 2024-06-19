@@ -73,7 +73,7 @@
     ;; of the vop operand restrictions or something that I don't understand.
     ;; Which is to say, PCL compilation reliably broke when changed to INDEX.
     (if applyp
-        (values (sb-impl::sys-tlab-append required '(&more .more-context. .more-count.))
+        (values (sys-tlab-append required '(&more .more-context. .more-count.))
                 required
                 '((sb-c:%listify-rest-args
                    .more-context. (the (and unsigned-byte fixnum)

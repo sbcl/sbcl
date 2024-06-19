@@ -1692,7 +1692,7 @@ register."
         (result '()))
     (flet ((push-var (tag-and-info &optional var-count)
              (push (if var-count
-                       (sb-impl::sys-tlab-append tag-and-info
+                       (sys-tlab-append tag-and-info
                                (loop :repeat var-count :collect
                                      (compiled-debug-fun-lambda-list-var
                                       args (incf i) vars)))

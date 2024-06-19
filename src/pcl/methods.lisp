@@ -1381,7 +1381,9 @@
 (defun methods-converter (form generic-function)
   (cond ((and (consp form) (eq (car form) 'methods))
          (cons '.methods.
-               (get-effective-method-function1 generic-function (cadr form))))
+               ;; force to heap since the method list is stored in the %CACHE slot
+               (get-effective-method-function1 generic-function
+                                               (ensure-heap-list (cadr form)))))
         ((and (consp form) (eq (car form) 'unordered-methods))
          (default-secondary-dispatch-function generic-function))))
 
@@ -1413,8 +1415,7 @@
                   (setf (gethash (car k+m) table) (cdr k+m)))
                 table)))))))
 
-(defun compute-secondary-dispatch-function1 (generic-function net
-                                             &optional function-p)
+(defun compute-secondary-dispatch-function1 (generic-function net &optional function-p)
   (cond
    ((and (eq (car net) 'methods) (not function-p))
     (get-effective-method-function1 generic-function (cadr net)))
