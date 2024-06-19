@@ -79,6 +79,14 @@
 ;;; the size of a stream in-buffer
 (defconstant +ansi-stream-in-buffer-length+ 512)
 
+;;; the amount of space we leave at the start of the in-buffer for
+;;; unreading
+;;;
+;;; (It's 4 instead of 1 to allow word-aligned copies.)
+(defconstant +ansi-stream-in-buffer-extra+
+  4) ; FIXME: should be symbolic constant
+
+
 (deftype ansi-stream-in-buffer ()
   `(simple-array (unsigned-byte 8) (,+ansi-stream-in-buffer-length+)))
 
@@ -153,9 +161,10 @@
   (misc #'no-op-placeholder :type (function (stream (integer 0 17) t) *))
 
   ;; Absolute character position, acting also as a generalized boolean
-  ;; in lieu of testing FORM-TRACKING-STREAM-P to see if we must
-  ;; maintain correctness of the slot in ANSI-STREAM-UNREAD-CHAR.
-  (input-char-pos nil :type (or null index)))
+  ;; in lieu of testing FORM-TRACKING-STREAM-P.
+  (input-char-pos nil :type (or null (or (integer #.(- +ansi-stream-in-buffer-length+)
+                                                  0)
+                                         index))))
 
 ;;; SYNONYM-STREAM type is needed by ANSI-STREAM-{INPUT,OUTPUT}-STREAM-P
 ;;; and also needed by OPEN (though not obviously), which is compiled
@@ -345,7 +354,7 @@
 ;;; using integers eliminates the load of many code header constants.
 ;;; Streams which don't want to handle every operation (don't end in a T clause)
 ;;; should specify :DEFAULT NIL to avoid an error.
-(defmacro stream-misc-case ((operation &key (default 'error)) &rest clauses)
+(defmacro stream-misc-case ((operation &key (default 'error)) &body clauses)
   (let* ((otherwise)
          (clauses
           (mapcar (lambda (clause)

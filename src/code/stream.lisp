@@ -435,11 +435,7 @@
     (when (minusp index) (error "nothing to unread"))
     (cond (buffer
            (setf (aref buffer index) character)
-           (setf (ansi-stream-in-index stream) index)
-           ;; Ugh. an ANSI-STREAM with a char buffer never gives a chance to
-           ;; the stream's misc routine to handle the UNREAD operation.
-           (when (ansi-stream-input-char-pos stream)
-             (decf (ansi-stream-input-char-pos stream))))
+           (setf (ansi-stream-in-index stream) index))
           (t
            (call-ansi-stream-misc stream :unread character)))))
 
@@ -576,13 +572,6 @@
                            end (- numbytes num-buffered) eof-error-p)
                   num-buffered)))))))
 
-;;; the amount of space we leave at the start of the in-buffer for
-;;; unreading
-;;;
-;;; (It's 4 instead of 1 to allow word-aligned copies.)
-(defconstant +ansi-stream-in-buffer-extra+
-  4) ; FIXME: should be symbolic constant
-
 ;;; This function is called by the FAST-READ-CHAR expansion to refill
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
 ;;; and hence must be an N-BIN method. It's also called by other stream
@@ -591,8 +580,6 @@
 ;;; otherwise return the new index into CIN-BUFFER.
 (defun fast-read-char-refill (stream eof-error-p)
   (when (ansi-stream-input-char-pos stream)
-    ;; Characters between (ANSI-STREAM-IN-INDEX %FRC-STREAM%)
-    ;; and +ANSI-STREAM-IN-BUFFER-LENGTH+ have to be re-scanned.
     (update-input-char-pos stream))
   (let* ((ibuf (ansi-stream-cin-buffer stream))
          (sizebuf (ansi-stream-csize-buffer stream))
@@ -640,14 +627,19 @@
                  (t
                   (setf (aref ibuf index) value)
                   (setf (aref sizebuf index) size)
+                  (when (ansi-stream-input-char-pos stream)
+                    (decf (ansi-stream-input-char-pos stream) index)
+                    (setf (form-tracking-stream-last-newline stream) index))
                   (setf (ansi-stream-in-index stream) index))))))
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
+             ;; Move the read characters to the end of the buffer,
+             ;; that way the end is always at +ansi-stream-in-buffer-length+.
              (#.(let* ((n-character-array-bits
-                        (sb-vm:saetp-n-bits
-                         (find 'character
-                               sb-vm:*specialized-array-element-type-properties*
-                               :key #'sb-vm:saetp-specifier)))
+                         (sb-vm:saetp-n-bits
+                          (find 'character
+                                sb-vm:*specialized-array-element-type-properties*
+                                :key #'sb-vm:saetp-specifier)))
                        (bash-function (intern (format nil "UB~D-BASH-COPY" n-character-array-bits)
                                               (find-package "SB-KERNEL"))))
                   bash-function)
@@ -655,7 +647,10 @@
                 ibuf start
                 count)
              (replace sizebuf sizebuf :start1 start :end1 (+ start count)
-                      :start2 +ansi-stream-in-buffer-extra+))
+                                      :start2 +ansi-stream-in-buffer-extra+))
+           (when (ansi-stream-input-char-pos stream)
+             (decf (ansi-stream-input-char-pos stream) start)
+             (setf (form-tracking-stream-last-newline stream) start))
            (setf (ansi-stream-in-index stream) start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to

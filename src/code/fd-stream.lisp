@@ -199,13 +199,13 @@
             (:constructor %make-form-tracking-stream)
             (:include fd-stream
                       (misc #'tracking-stream-misc)
-                      (input-char-pos 0))
+             (input-char-pos (- +ansi-stream-in-buffer-length+)))
             (:copier nil))
   ;; a function which is called for events on this stream.
   (observer (lambda (x y z) (declare (ignore x y z))) :type function)
   ;;  A vector of the character position of each #\Newline seen
   (newlines (make-array 10 :fill-pointer 0 :adjustable t))
-  (last-newline -1 :type index-or-minus-1)
+  (last-newline +ansi-stream-in-buffer-length+ :type (integer 0 #.+ansi-stream-in-buffer-length+))
   ;; Better than reporting that a reader error occurred at a position
   ;; before any whitespace (or equivalently, a macro producing no value),
   ;; we can note the position at the first "good" character.
@@ -213,23 +213,24 @@
   (form-start-char-pos))
 
 (defun line/col-from-charpos
-    (stream &optional (charpos (ansi-stream-input-char-pos stream)))
+    (stream &optional (charpos (form-tracking-stream-current-char-pos stream)))
+  (track-newlines stream)
   (let ((newlines (form-tracking-stream-newlines stream)))
-   (if charpos
-       (let ((index (position charpos newlines :test #'>= :from-end t)))
-         ;; Line numbers traditionally begin at 1, columns at 0.
-         (if index
-             ;; INDEX is 1 less than the number of newlines seen
-             ;; up to and including this startpos.
-             ;; e.g. index=0 => 1 newline seen => line=2
-             (cons (+ index 2)
-                   ;; 1 char after the newline = column 0
-                   (- charpos (aref newlines index) 1))
-             ;; zero newlines were seen
-             (cons 1 charpos)))
-       ;; No charpos means the error is before reading the first char
-       ;; e.g. an encoding error. Take the last Newline.
-       (cons (1+ (length newlines)) 0))))
+    (if charpos
+        (let ((index (position charpos newlines :test #'>= :from-end t)))
+          ;; Line numbers traditionally begin at 1, columns at 0.
+          (if index
+              ;; INDEX is 1 less than the number of newlines seen
+              ;; up to and including this startpos.
+              ;; e.g. index=0 => 1 newline seen => line=2
+              (cons (+ index 2)
+                    ;; 1 char after the newline = column 0
+                    (- charpos (aref newlines index) 1))
+              ;; zero newlines were seen
+              (cons 1 charpos)))
+        ;; No charpos means the error is before reading the first char
+        ;; e.g. an encoding error. Take the last Newline.
+        (cons (1+ (length newlines)) 0))))
 
 ;;;; CORE OUTPUT FUNCTIONS
 
@@ -2795,22 +2796,27 @@
              (fd-stream-pathname stream))))
     :simple (s-%file-name stream new-name)))
 
-;; Fix the INPUT-CHAR-POS slot of STREAM after having consumed characters
-;; from the CIN-BUFFER. This operation is done upon exit from a FAST-READ-CHAR
-;; loop, and for each buffer refill inside the loop.
-(defun update-input-char-pos (stream &optional (end +ansi-stream-in-buffer-length+))
-  (do ((chars (ansi-stream-cin-buffer stream))
-       (pos (form-tracking-stream-input-char-pos stream))
-       (i (ansi-stream-in-index stream) (1+ i)))
+(defun track-newlines (stream &optional (end (ansi-stream-in-index stream)))
+  (do ((start (form-tracking-stream-input-char-pos stream))
+       (chars (or (ansi-stream-cin-buffer stream)
+                  (return-from track-newlines)))
+       (i (form-tracking-stream-last-newline stream) (1+ i)))
       ((>= i end)
-       (setf (form-tracking-stream-input-char-pos stream) pos))
+       (setf (form-tracking-stream-last-newline stream) i))
     (let ((char (aref chars i)))
-      (when (and (eql char #\Newline)
-                 ;; record it only if it wasn't unread and re-read
-                 (> pos (form-tracking-stream-last-newline stream)))
-        (vector-push-extend pos (form-tracking-stream-newlines stream))
-        (setf (form-tracking-stream-last-newline stream) pos))
-      (incf pos))))
+      (when (eql char #\Newline)
+        (vector-push-extend (+ start i)
+                            (form-tracking-stream-newlines stream))))))
+
+;; Fix the INPUT-CHAR-POS slot of STREAM after having consumed characters
+;; before refilling cin-buffer.
+(defun update-input-char-pos (stream)
+  (track-newlines stream +ansi-stream-in-buffer-length+)
+  (incf (form-tracking-stream-input-char-pos stream) +ansi-stream-in-buffer-length+))
+
+(defun form-tracking-stream-current-char-pos (stream)
+  (+ (form-tracking-stream-input-char-pos stream)
+     (ansi-stream-in-index stream)))
 
 (defun tracking-stream-misc (stream operation arg1)
   ;; The :UNREAD operation will never be invoked because STREAM has a buffer,
@@ -2818,5 +2824,9 @@
   ;; But we do need to prevent attempts to change the absolute position.
   (stream-misc-case (operation)
     (:set-file-position (simple-stream-perror "~S is not positionable" stream))
-    (t ; call next method
+    (t
+     (stream-misc-case (operation :default nil)
+       (:close
+        (track-newlines stream)))
+     ;; call next method
      (fd-stream-misc-routine stream operation arg1))))

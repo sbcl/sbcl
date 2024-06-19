@@ -723,7 +723,7 @@ standard Lisp readtable when NIL."
                              (or (file-string-length stream (string char)) 0))
                           (form-tracking-stream-form-start-char-pos stream)
                           ;; likewise
-                          (1- (form-tracking-stream-input-char-pos stream))))
+                          (1- (form-tracking-stream-current-char-pos stream))))
                   (multiple-value-bind (result-p result)
                       (read-maybe-nothing stream char)
                     (unless (zerop result-p)
@@ -761,13 +761,13 @@ standard Lisp readtable when NIL."
         (when (and supplied-p start-pos)
           (funcall (form-tracking-stream-observer stream)
                    start-pos
-                   (form-tracking-stream-input-char-pos stream) result))
+                   (form-tracking-stream-current-char-pos stream) result))
         (values (if supplied-p 1 0) result))
     ;; KLUDGE: not capturing anything in the lambda avoids closure consing
     stream
     (and (form-tracking-stream-p stream)
          ;; Subtract 1 because the position points _after_ CHAR.
-         (1- (form-tracking-stream-input-char-pos stream)))
+         (1- (form-tracking-stream-current-char-pos stream)))
     (invoke-cmt-entry ((get-raw-cmt-entry char *readtable*) #'read-token)
                       stream char)))
 
