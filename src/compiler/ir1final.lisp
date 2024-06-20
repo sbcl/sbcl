@@ -271,7 +271,9 @@
                                           (translate-two-args (global-var-%source-name leaf)))))
                                  (*compiler-error-context* node))
                             (and replacement
-                                 (find-global-fun replacement t)))))
+                                 (prog1
+                                     (find-global-fun replacement t)
+                                   (record-late-xref :calls replacement ref))))))
                  (cond ((ref-p ref)
                         (let ((replacement (translate ref)))
                           (when replacement

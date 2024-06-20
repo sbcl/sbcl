@@ -7484,12 +7484,15 @@
        (or-eq-transform-p (first key-lists))))
 
 (defun ensure-lvar-fun-form (lvar lvar-name &key (coercer '%coerce-callable-to-fun)
-                                                 give-up)
+                                                 give-up
+                                                 node)
   (aver (and lvar-name (symbolp lvar-name)))
   (if (csubtypep (lvar-type lvar) (specifier-type 'function))
       lvar-name
       (let ((cname (lvar-constant-global-fun-name lvar)))
         (cond (cname
+               (when node
+                 (record-late-xref :calls cname node))
                (if (lvar-annotations lvar)
                    `(with-annotations ,(lvar-annotations lvar)
                       (global-function ,cname))
@@ -7505,12 +7508,12 @@
 
 (deftransform %coerce-callable-to-fun ((thing) * * :node node)
   "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t))
+  (ensure-lvar-fun-form thing 'thing :give-up t :node node))
 
 ;;; Behaves just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
 (deftransform %coerce-callable-for-call ((thing) * * :node node)
   "optimize away possible call to FDEFINITION at runtime"
-  (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
+  (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call :node node))
 
 (define-source-transform %coerce-callable-to-fun (thing &environment env)
   (ensure-source-fun-form thing env :give-up t))
@@ -7525,7 +7528,9 @@
                  (when (and (constant-p leaf)
                             (or (internal-name-p (constant-value leaf))
                                 (almost-immediately-used-p fun use)))
-                   (change-ref-leaf use (find-global-fun (constant-value leaf) t) :recklessly t))))))
+                   (let ((name (constant-value leaf)))
+                     (record-late-xref :calls name use)
+                     (change-ref-leaf use (find-global-fun name t) :recklessly t)))))))
   nil)
 
 (defoptimizer (open derive-type) ((filename

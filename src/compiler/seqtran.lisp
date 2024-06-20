@@ -579,7 +579,7 @@
                 (t
                  (values key (ensure-lvar-fun-form key 'key))))))
     (let ((test-expr `(%funcall pred ,(if key '(%funcall key target) 'target)))
-          (pred-expr (ensure-lvar-fun-form pred 'pred)))
+          (pred-expr (ensure-lvar-fun-form pred 'pred :node node)))
       (when (member name '(member-if-not assoc-if-not rassoc-if-not))
         (setf test-expr `(not ,test-expr)))
       (labels ((open-code (tail)

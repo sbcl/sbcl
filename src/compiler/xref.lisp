@@ -164,6 +164,12 @@
   (unless (xref-internal-name-p what)
     (push (list :calls what path) (block-xrefs block))))
 
+(defun record-late-xref (kind what node)
+  (unless (policy node (zerop store-xref-data))
+    (call-with-block-external-functionals (node-block node)
+                                          (lambda (functional)
+                                            (record-xref kind what functional node nil)))))
+
 
 ;;;; Packing of xref tables
 ;;;;
