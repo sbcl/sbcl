@@ -1324,4 +1324,33 @@
                     :error t)))
         (assert (zerop (process-exit-code process))))))
 
+(with-test (:name (open :default-external-format :newline))
+  (with-open-file (f *test-path*
+                     :direction :output
+                     :element-type '(unsigned-byte 8)
+                     :if-exists :supersede)
+    (let ((string (format nil "Hello~C~CWorld" #\Return #\Linefeed)))
+      (write-sequence (map '(vector (unsigned-byte 8)) 'char-code string) f)))
+  (let ((*default-external-format* '(:ascii :newline :crlf)))
+    (with-open-file (f *test-path*)
+      (let ((string (make-string (length "Hello  World "))))
+        (read-sequence string f)
+        (assert (string= string (format nil "Hello~CWorld" #\Newline) :end1 11))))))
+
+(with-test (:name (compile-file :default-external-format :newline))
+  (let ((path (scratch-file-name "lisp")))
+    (with-open-file (f path
+                       :direction :output
+                       :element-type '(unsigned-byte 8)
+                       :if-exists :supersede)
+      (let ((string (format nil "(defun foo (x) (format nil (formatter \"Hello~~~C~C  ~~A World\") x))" #\Return #\Linefeed)))
+        (write-sequence (map '(vector (unsigned-byte 8)) 'char-code string) f)))
+    (let ((*default-external-format* '(:ascii :newline :crlf))
+          (*error-output* (make-broadcast-stream)))
+      (multiple-value-bind (output failurep warningsp)
+          (compile-file path :verbose nil)
+        (declare (ignore output))
+        (assert (null failurep))
+        (assert (null warningsp))))))
+
 (delete-file *test-path*)

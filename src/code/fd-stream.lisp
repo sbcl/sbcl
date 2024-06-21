@@ -2447,7 +2447,7 @@
                                         external-format))
          (external-format-entry (get-external-format defaulted-external-format))
          (canonized-external-format
-          (and external-format-entry (canonize-external-format external-format external-format-entry))))
+          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
     (unless external-format-entry
       (unwind-protect
            (error "Undefined external-format: ~S" external-format)
@@ -2593,7 +2593,7 @@
                                         external-format))
          (external-format-entry (get-external-format defaulted-external-format))
          (canonized-external-format
-          (and external-format-entry (canonize-external-format external-format external-format-entry))))
+          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
     (unless external-format-entry
       (error "Undefined external-format: ~S" external-format))
     ;; Calculate useful stuff.
