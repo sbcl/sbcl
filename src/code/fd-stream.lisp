@@ -1989,7 +1989,8 @@
         (when (and buffer-p
                    (not bivalent-stream-p)
                    ;; temporary disable on :io streams
-                   (not output-p))
+                   (or dual-channel-p
+                       (not output-p)))
           (cond (character-stream-p
                  (setf (ansi-stream-cin-buffer fd-stream)
                        (make-array +ansi-stream-in-buffer-length+
