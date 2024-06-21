@@ -1598,8 +1598,8 @@ unspecified elements into a completed to-pathname based on the to-wildname."
   (when (string= word "")
     ;; https://www.lispworks.com/documentation/HyperSpec/Body/19_cbb.htm
     (error 'namestring-parse-error
-           :complaint "A string of length 0 is not a valid value for any
-~ component of a logical pathname"
+           :complaint "A string of length 0 is not a valid value for any ~
+                       component of a logical pathname"
            :args (list word)
            :namestring word :offset 0))
   (dotimes (i (length word) (string-upcase word))
