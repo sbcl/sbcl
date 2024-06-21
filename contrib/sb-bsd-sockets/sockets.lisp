@@ -289,7 +289,6 @@ request an input stream and get an output stream in response\)."
                     :dual-channel-p t
                     :input input
                     :output output
-                    :input-buffer-p t
                     :element-type element-type
                     :buffering buffering
                     :external-format external-format
