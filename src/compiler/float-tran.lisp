@@ -1969,8 +1969,7 @@
     (movable foldable flushable))
 
   (deftransform %unary-ftruncate ((x) (single-float))
-    `(cond ((or (typep x '(single-float (-1f0) (0f0)))
-                (eql x -0f0))
+    `(cond ((typep x '(or (single-float (-1f0) (0f0)) (eql -0f0)))
             -0f0)
            ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) 1f0)
                        ,(float (1- (expt 2 sb-vm:single-float-digits)) 1f0)))
@@ -1979,8 +1978,7 @@
             x)))
 
   (deftransform %unary-fround ((x) (single-float))
-    `(cond ((or (typep x '(single-float -0.5f0 (0f0)))
-                (eql x -0f0))
+    `(cond ((typep x '(or (single-float -0.5f0 (0f0)) (eql -0f0)))
             -0f0)
            ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) 1f0)
                        ,(float (1- (expt 2 sb-vm:single-float-digits)) 1f0)))
@@ -1991,8 +1989,7 @@
   #+64-bit
   (progn
     (deftransform %unary-ftruncate ((x) (double-float))
-      `(cond ((or (typep x '(double-float (-1d0) (0d0)))
-                  (eql x -0d0))
+      `(cond ((typep x '(or (double-float (-1d0) (0d0)) (eql -0d0)))
               -0d0)
              ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
                          ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
@@ -2001,8 +1998,7 @@
               x)))
 
     (deftransform %unary-fround ((x) (double-float))
-      `(cond ((or (typep x '(double-float -0.5d0 (0d0)))
-                  (eql x -0d0))
+      `(cond ((typep x '(or (double-float -0.5d0 (0d0)) (eql -0d0)))
               -0d0)
              ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
                          ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))

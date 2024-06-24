@@ -2100,17 +2100,17 @@
 (defoptimizer (%unary-truncate derive-type) ((number))
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
-                       #'%unary-truncate))
+                       #'truncate))
 
 (defoptimizer (%unary-truncate/single-float derive-type) ((number))
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
-                       #'%unary-truncate))
+                       #'truncate))
 
 (defoptimizer (%unary-truncate/double-float derive-type) ((number))
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
-                       #'%unary-truncate))
+                       #'truncate))
 
 (defoptimizer (unary-truncate derive-type) ((number))
   (let* ((one (specifier-type '(integer 1 1)))
@@ -2120,7 +2120,7 @@
                                     #'truncate))
          (rem (one-arg-derive-type number
                                    (lambda (x) (truncate-derive-type-rem-aux x one nil))
-                                   #'rem)))
+                                   (lambda (x) (nth-value 1 (truncate x 1))))))
     (when (and quot rem)
       (make-values-type (list quot rem)))))
 
@@ -2163,7 +2163,7 @@
       (one-arg-derive-type number
                            #'(lambda (n)
                                (ftruncate-derive-type-quot-aux n divisor nil))
-                           #'%unary-ftruncate))))
+                           #'ftruncate))))
 
 #+round-float
 (macrolet ((derive (type)
@@ -2211,7 +2211,7 @@
                                         ,(if high
                                              (round high)
                                              '*))))))
-                       #'%unary-round))
+                       #'round))
 
 ;;; Define optimizers for FLOOR and CEILING.
 (macrolet

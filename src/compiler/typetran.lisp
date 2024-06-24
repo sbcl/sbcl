@@ -563,7 +563,39 @@
              `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
 
 (defun source-transform-union-numeric-typep (object types)
-  (cond ((not (every #'numeric-type-p types))
+  (cond ((and (= (length types) 2)
+              ;; Transform (or (double-float * (0d0)) (eql -0d0))
+              (destructuring-bind (a b) types
+                (multiple-value-bind (member numeric) (cond ((member-type-p a)
+                                                             (values a b))
+                                                            ((member-type-p b)
+                                                             (values b a)))
+                  (let ((double))
+                    (and (numeric-type-p numeric)
+                         (= (member-type-size member) 1)
+                         (or (setf double (sb-kernel::member-type-member-p -0d0 member))
+                             (sb-kernel::member-type-member-p -0f0 member))
+                         (let ((low (numeric-type-low numeric))
+                               (high (numeric-type-high numeric))
+                               (type (if double
+                                         'double-float
+                                         'single-float)))
+                           (when (and (eq (numeric-type-class numeric) 'float)
+                                      (eq (numeric-type-complexp numeric) :real)
+                                      (equal high (if double
+                                                      '(0d0)
+                                                      '(0f0))))
+                             `(and ,(if double
+                                        `(double-float-p ,object)
+                                        `(single-float-p ,object))
+                                   ,(if low
+                                        `(and (float-sign-bit-set-p (truly-the ,type ,object))
+                                              (,@(if (consp low)
+                                                     `(< ,(car low))
+                                                     `(<= ,low))
+                                               (truly-the ,type ,object)))
+                                        `(float-sign-bit-set-p (truly-the ,type ,object))))))))))))
+        ((not (every #'numeric-type-p types))
          nil)
         ((and (= (length types) 2)
               ;; (and subtype-of-integer (not (eql x)))
