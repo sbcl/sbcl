@@ -3127,7 +3127,6 @@
 
 (flet ((emit* (segment ea subcode)
          (aver (not (register-p ea)))
-         (aver (eq (operand-size ea) :dword))
          (emit-prefixes segment ea nil :dword)
          (emit-bytes segment #x0f #xae)
          (emit-ea segment ea subcode)))

@@ -315,7 +315,7 @@
                                   (subseq string (1+ (position #\newline string))
                                           (1- (length string)))))) ; chop final newline
       (declare (ignorable line))
-      (print line)
+      ;;(print line)
       )))
 
 #+x86-64
@@ -352,3 +352,8 @@
     ;; 3-operand form with 32-bit signed imm
     (try `(imul :dword ,rbx-tn ,(ea rdx-tn) #xbaba))
     (try `(imul :qword ,rbx-tn ,(ea rdx-tn) #xbaba))))
+
+(test-util:with-test (:name :mxcsr-loadstore :skipped-on (not :x86-64))
+  ;; This just assserts that we can assemble
+  (try `(ldmxcsr ,(ea rax-tn)))
+  (try `(stmxcsr ,(ea rax-tn))))
