@@ -1869,10 +1869,32 @@
                `(deftransform ,name ((number &optional divisor)
                                      (,type
                                       &optional (or ,type ,@other-float-arg-types integer))
-                                     *)
+                                     * :result result :node node)
+                  (declare (ignorable result node))
                   (block nil
                     (let ((one-p (or (not divisor)
                                      (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
+                      ;; Compute only the remainder
+                      #+round-float
+                      (when (mv-bind-unused-p result 0)
+                        (setf (node-derived-type node)
+                              (values-specifier-type '(values integer ,type &optional)))
+                        (erase-lvar-type result)
+                        (return
+                          `(let* ,(if one-p
+                                      `((div number))
+                                      `((f-divisor (,',coerce divisor))
+                                        (div (/ number f-divisor))))
+                             (values 0
+                                     (- number (* ,@(unless one-p
+                                                      '(f-divisor))
+                                                  (- (,',(ecase type
+                                                           (double-float 'round-double)
+                                                           (single-float 'round-single))
+                                                      div ,,(keywordicate name))
+                                                     ,,(ecase type
+                                                         (double-float -0.0d0)
+                                                         (single-float -0.0f0)))))))))
                       #+round-float
                       (when-vop-existsp (:translate %unary-ceiling)
                         (when one-p

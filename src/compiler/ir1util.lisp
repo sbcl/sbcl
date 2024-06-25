@@ -266,6 +266,16 @@
               (when (functional-kind-eq fun mv-let)
                 (let-lvar-dest (node-lvar (car refs)))))))))))
 
+(defun mv-bind-unused-p (lvar nth-value)
+  (when lvar
+    (let ((dest (lvar-dest lvar)))
+      (when (and (mv-combination-p dest)
+                 (eq (basic-combination-kind dest) :local))
+        (let ((fun (combination-lambda dest)))
+          (when (functional-kind-eq fun mv-let)
+            (let ((var (nth nth-value (lambda-vars fun))))
+              (notany #'node-lvar (leaf-refs var)))))))))
+
 (defun combination-matches (name args combination)
   (and (combination-p combination)
        (let ((fun (combination-fun combination)))
@@ -278,25 +288,26 @@
                                  (eql (lvar-value  arg) arg-m))))))))
 
 (defun erase-lvar-type (lvar)
-  (setf (lvar-%derived-type lvar) nil)
-  (let ((dest (lvar-dest lvar)))
-    (cond ((cast-p dest)
-           (derive-node-type dest *wild-type* :from-scratch t)
-           (erase-lvar-type (node-lvar dest)))
-          ((and (basic-combination-p dest)
-                (eq (basic-combination-kind dest) :local))
-           (let ((fun (combination-lambda dest)))
-             (flet ((erase (var)
-                      (setf (lambda-var-type var) *universal-type*)
-                      (loop for ref in (leaf-refs var)
-                            do (derive-node-type ref *wild-type* :from-scratch t)
-                               (erase-lvar-type (node-lvar ref)))))
-               (if (functional-kind-eq fun mv-let)
-                   (mapc #'erase (lambda-vars fun))
-                   (erase
-                    (nth (position-or-lose lvar
-                                           (basic-combination-args dest))
-                         (lambda-vars fun))))))))))
+  (when lvar
+    (setf (lvar-%derived-type lvar) nil)
+    (let ((dest (lvar-dest lvar)))
+      (cond ((cast-p dest)
+             (derive-node-type dest *wild-type* :from-scratch t)
+             (erase-lvar-type (node-lvar dest)))
+            ((and (basic-combination-p dest)
+                  (eq (basic-combination-kind dest) :local))
+             (let ((fun (combination-lambda dest)))
+               (flet ((erase (var)
+                        (setf (lambda-var-type var) *universal-type*)
+                        (loop for ref in (leaf-refs var)
+                              do (derive-node-type ref *wild-type* :from-scratch t)
+                                 (erase-lvar-type (node-lvar ref)))))
+                 (if (functional-kind-eq fun mv-let)
+                     (mapc #'erase (lambda-vars fun))
+                     (erase
+                      (nth (position-or-lose lvar
+                                             (basic-combination-args dest))
+                           (lambda-vars fun)))))))))))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
