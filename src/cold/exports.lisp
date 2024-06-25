@@ -623,6 +623,7 @@ possibly temporarily, because it might be used internally.")
    "C-STRING-ENCODING-ERROR"
    "C-STRING-DECODING-ERROR"
    "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
+   "FORM-SOURCE-BOUNDS"
 
    ;; not potential SB-EXT exports
    "GET-EXTERNAL-FORMAT" "GET-EXTERNAL-FORMAT-OR-LOSE"

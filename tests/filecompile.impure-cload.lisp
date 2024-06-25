@@ -73,3 +73,37 @@
 
 (with-test (:name :compile-file-stream-line-column)
   (assert (equal (foo-char-macro) '((31) (26)))))
+
+(defglobal *form-grid-coordinates* (make-array 3 :fill-pointer 0))
+
+(defmacro annotate-me (&whole thing &body body)
+  (multiple-value-bind (start end) (sb-int:form-source-bounds thing)
+    (vector-push-extend (vector start end) *form-grid-coordinates*)
+    `(progn ,@body)))
+
+(defun kickme (x y)
+  (declare (integer x y))
+  "foo"
+  (progn
+    (annotate-me (+ (annotate-me (progn (* x
+;;; ^ This left paranthesis is at line 88 column 4
+;;;                 ^ and this one is line 88 column 20
+                                         5)))
+                  (annotate-me (logcount y)))
+               )))
+;;;             ^ this right parenthesis is at line 93 column 16
+
+;;; Hint: move around in Emacs to visually confirm that this output
+;;; looks right, then plug the numbers into the test below.
+#+nil(format t "~&According to compiler: ~S~%" *form-grid-coordinates*)
+
+(with-test (:name :form-grid-coords-golden-test)
+  (flet ((assert-line/col-is (index start end)
+           (let ((actual (aref *form-grid-coordinates* index)))
+             (assert (equal start (aref actual 0)))
+             (assert (equal end (aref actual 1))))))
+    (assert-line/col-is 0 '(88 . 4) '(93 . 16))
+    ;; Somehow we can't figure out where annotation 1 ends precisely
+    ;; but we do see that newlines occurred.
+    (assert-line/col-is 1 '(88 . 20) '(92 . -1))
+    (assert-line/col-is 2 '(92 . 18) '(92 . 44))))
