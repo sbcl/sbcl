@@ -1990,16 +1990,17 @@
                (let* ((debug-fun (seg-debug-fun segment))
                       (name (and debug-fun (sb-di:debug-fun-name debug-fun))))
                  (when name
-                   (format stream " ~Vt ; " *disassem-note-column*)
-                   (case (sb-c::compiled-debug-fun-kind
-                          (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))
-                     (:external
-                      (format stream "(XEP ~s)" name))
-                     (:optional
-                      (format stream "(&OPTIONAL ~s)" name))
-                     (:more
-                      (format stream "(&MORE ~s)" name))
-                     (t (prin1 name stream)))))))
+                   (format stream " ~Vt " *disassem-note-column*)
+                   (pprint-logical-block (stream nil :per-line-prefix "; ")
+                     (case (sb-c::compiled-debug-fun-kind
+                            (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun))
+                       (:external
+                        (format stream "(XEP ~s)" name))
+                       (:optional
+                        (format stream "(&OPTIONAL ~s)" name))
+                       (:more
+                        (format stream "(&MORE ~s)" name))
+                       (t (prin1 name stream))))))))
         ;; One origin per segment is printed. As with the per-line display,
         ;; the segment is thought of as immovable for rendering of addresses,
         ;; though in fact the disassembler transiently allows movement.
