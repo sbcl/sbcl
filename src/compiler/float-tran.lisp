@@ -1820,41 +1820,66 @@
                `(deftransform truncate ((x &optional y)
                                         (,type
                                          &optional (or ,type ,@other-float-arg-types integer))
-                                        * :result result)
+                                        * :result result :node node)
                   (let* ((result-type (and result
                                            (lvar-derived-type result)))
                          (compute-all (and (or (eq result-type *wild-type*)
                                                (values-type-p result-type))
-                                           (not (type-single-value-p result-type)))))
-                    (if (or (not y)
-                            (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))
-                        (if compute-all
-                            `(unary-truncate x)
-                            `(let ((res (,',unary x)))
-                               ;; Dummy secondary value!
-                               (values res x)))
-                        (if compute-all
-                            `(let* ((f (,',coerce y))
-                                    (div (/ x f))
-                                    (res (,',unary div)))
-                               (values res
-                                       (- x (* f
-                                               #+round-float
-                                               (- (,',(ecase type
+                                           (not (type-single-value-p result-type))))
+                         (one-p (or (not y)
+                                    (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
+                    (cond
+                      ;; Compute only the remainder
+                      #+round-float
+                      ((mv-bind-unused-p result 0)
+                       (setf (node-derived-type node)
+                             (values-specifier-type '(values integer ,type &optional)))
+                       (erase-lvar-type result)
+                       `(let* ,(if one-p
+                                   `((div x))
+                                   `((f-divisor (,',coerce y))
+                                     (div (/ x f-divisor))))
+                          (values 0
+                                  (- x (* ,@(unless one-p
+                                                   '(f-divisor))
+                                               (+ (,',(ecase type
                                                         (double-float 'round-double)
                                                         (single-float 'round-single))
-                                                      div :truncate)
+                                                   div :truncate)
+                                                  ;; Turn -0 into 0
                                                   ,,(ecase type
-                                                      (double-float -0.0d0)
-                                                      (single-float -0.0f0)))
-                                               #-round-float
-                                               (locally
-                                                   (declare (flushable ,',coerce))
-                                                 (,',coerce res))))))
-                            `(let* ((f (,',coerce y))
-                                    (res (,',unary (/ x f))))
-                               ;; Dummy secondary value!
-                               (values res x)))))))))
+                                                      (double-float 0.0d0)
+                                                      (single-float 0.0f0))))))))
+                      (t
+                       (if one-p
+                           (if compute-all
+                               `(unary-truncate x)
+                               `(let ((res (,',unary x)))
+                                  ;; Dummy secondary value!
+                                  (values res x)))
+                           (if compute-all
+                               `(let* ((f (,',coerce y))
+                                       (div (/ x f))
+                                       (res (,',unary div)))
+                                  (values res
+                                          (- x (* f
+                                                  #+round-float
+                                                  (+ (,',(ecase type
+                                                           (double-float 'round-double)
+                                                           (single-float 'round-single))
+                                                      div :truncate)
+                                                     ;; Turn -0 into 0
+                                                     ,,(ecase type
+                                                         (double-float 0.0d0)
+                                                         (single-float 0.0f0)))
+                                                  #-round-float
+                                                  (locally
+                                                      (declare (flushable ,',coerce))
+                                                    (,',coerce res))))))
+                               `(let* ((f (,',coerce y))
+                                       (res (,',unary (/ x f))))
+                                  ;; Dummy secondary value!
+                                  (values res x)))))))))))
   (def single-float ())
   (def double-float (single-float)))
 
@@ -1888,13 +1913,14 @@
                              (values 0
                                      (- number (* ,@(unless one-p
                                                       '(f-divisor))
-                                                  (- (,',(ecase type
+                                                  (+ (,',(ecase type
                                                            (double-float 'round-double)
                                                            (single-float 'round-single))
                                                       div ,,(keywordicate name))
+                                                     ;; Turn -0 into 0
                                                      ,,(ecase type
-                                                         (double-float -0.0d0)
-                                                         (single-float -0.0f0)))))))))
+                                                         (double-float 0.0d0)
+                                                         (single-float 0.0f0)))))))))
                       #+round-float
                       (when-vop-existsp (:translate %unary-ceiling)
                         (when one-p
@@ -1923,13 +1949,14 @@
                                     (rem (- number (* ,@(unless one-p
                                                           '(f-divisor))
                                                       #+round-float
-                                                      (- (,',(ecase type
+                                                      (+ (,',(ecase type
                                                                (double-float 'round-double)
                                                                (single-float 'round-single))
                                                              div :truncate)
+                                                         ;; Turn -0 into 0
                                                          ,,(ecase type
-                                                             (double-float -0.0d0)
-                                                             (single-float -0.0f0)))
+                                                             (double-float 0.0d0)
+                                                             (single-float 0.0f0)))
                                                       #-round-float
                                                       (locally
                                                           (declare (flushable ,',coerce))
