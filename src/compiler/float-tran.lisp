@@ -2227,3 +2227,8 @@
   (def >)
   (def <=)
   (def >=))
+
+(deftransform phase ((n))
+  (splice-fun-args n 'complex 2)
+  `(lambda (x y)
+     (atan y x)))
