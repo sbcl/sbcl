@@ -679,7 +679,9 @@
         ((1) (values `(or single-float ,long (complex single-float) (complex ,long)) t)
          :test #'car-type-equal))
       (checked-compile-and-assert () '(lambda (x y) (ctu:compiler-derived-type (atan x y)))
-        ((1 2) (values `(or ,long single-float (complex ,long) (complex single-float)) t) :test #'car-type-equal)))))
+        ((1 2) (values `(float ,(- pi) ,pi)
+                       t)
+         :test #'car-type-equal)))))
 
 (with-test (:name :comparison-transform-overflow)
   (checked-compile-and-assert

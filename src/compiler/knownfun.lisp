@@ -570,3 +570,19 @@
           (when (and (assert-lvar-type arg list-type policy)
                      (not trusted))
             (reoptimize-lvar arg)))))
+
+;;; It's either (number) or (real real)
+(defun atan-call-type-deriver (call trusted)
+  (let* ((policy (lexenv-policy (node-lexenv call)))
+         (args (combination-args call)))
+    (case (length args)
+      (1
+       (when (and (assert-lvar-type (car args) (specifier-type 'number) policy)
+                  (not trusted))
+         (reoptimize-lvar (car args))))
+      (2
+       (loop for arg in args
+             do
+             (when (and (assert-lvar-type arg (specifier-type 'real) policy)
+                        (not trusted))
+               (reoptimize-lvar arg)))))))
