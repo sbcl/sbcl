@@ -531,6 +531,10 @@ Experimental: interface subject to change."
                     ((< sb-vm:read-only-space-start addr
                         (sap-int sb-vm:*read-only-space-free-pointer*))
                      :read-only)
+                    #+permgen
+                    ((< sb-vm:permgen-space-start addr
+                        (sap-int sb-vm:*permgen-space-free-pointer*))
+                     :permgen)
                     ;; Without immobile-space, the text range is
                     ;; more-or-less an extension of static space.
                     #-immobile-space
