@@ -1486,6 +1486,18 @@
     (def op)))
 
 (flet ((def (op)
+           (%deftransform op nil '(function (single-float real) (values t single-float))
+                          #'single-float-real-contagion nil)
+           (%deftransform op nil '(function (real single-float) (values t single-float))
+                          #'real-single-float-contagion nil)
+           (%deftransform op nil '(function (double-float real))
+                          #'double-float-real-contagion nil)
+           (%deftransform op nil '(function (real double-float))
+                          #'real-double-float-contagion nil)))
+  (dolist (op '(floor ceiling round truncate ffloor fceiling fround ftruncate))
+    (def op)))
+
+(flet ((def (op)
          (%deftransform op nil `(function (single-float (integer ,most-negative-exactly-single-float-integer
                                                                  ,most-positive-exactly-single-float-integer)))
                         #'single-float-real-contagion nil)
