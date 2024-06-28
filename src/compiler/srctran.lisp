@@ -265,6 +265,11 @@
          (append-args (make-gensym-list (length args))))
     `(lambda (,@list-args ,@append-args) (list* ,@list-args (append ,@append-args)))))
 
+(defoptimizer (append externally-checkable-type) ((&rest lists) node lvar)
+  (if (eq lvar (car (last lists)))
+      (specifier-type t)
+      (specifier-type 'list)))
+
 (flet ((remove-nil (fun args)
          (let ((remove
                  (loop for (arg . rest) on args
