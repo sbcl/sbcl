@@ -571,6 +571,25 @@
                      (not trusted))
             (reoptimize-lvar arg)))))
 
+(defun nconc-call-type-deriver (call trusted)
+  (let* ((policy (lexenv-policy (node-lexenv call)))
+         (args (combination-args call))
+         (list-type (specifier-type 'list)))
+    ;; All but the last argument should be proper lists
+    (loop for (arg next) on args
+          while next
+          do
+          (add-annotation
+           arg
+           (make-lvar-proper-sequence-annotation
+            :kind 'proper-or-dotted-list))
+          (when (policy policy (> check-constant-modification 0))
+            (add-annotation arg
+                            (make-lvar-modified-annotation :caller 'nconc)))
+          (when (and (assert-lvar-type arg list-type policy)
+                     (not trusted))
+            (reoptimize-lvar arg)))))
+
 ;;; It's either (number) or (real real)
 (defun atan-call-type-deriver (call trusted)
   (let* ((policy (lexenv-policy (node-lexenv call)))

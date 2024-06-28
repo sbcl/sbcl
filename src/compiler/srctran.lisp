@@ -270,6 +270,9 @@
       (specifier-type t)
       (specifier-type 'list)))
 
+(setf (fun-info-externally-checkable-type (fun-info-or-lose 'nconc))
+      #'append-externally-checkable-type-optimizer)
+
 (flet ((remove-nil (fun args)
          (let ((remove
                  (loop for (arg . rest) on args

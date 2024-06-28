@@ -1020,9 +1020,8 @@
 ;;; express that in this syntax, append-call-type-deriver does that.
 (defknown append (&rest t) t (flushable)
   :call-type-deriver #'append-call-type-deriver)
-(defknown sb-impl::append2 (list t) t
-  (flushable no-verify-arg-count)
-  :call-type-deriver #'append-call-type-deriver)
+(defknown sb-impl::append2 (proper-list t) t
+  (flushable no-verify-arg-count))
 
 (defknown copy-list (proper-or-dotted-list) list (flushable)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
@@ -1032,7 +1031,8 @@
 (defknown copy-tree (t) t (flushable recursive))
 (defknown revappend (proper-list t) t (flushable))
 
-(defknown nconc (&rest (modifying t :butlast t)) t ())
+(defknown nconc (&rest (modifying t :butlast t)) t ()
+  :call-type-deriver #'nconc-call-type-deriver)
 
 (defknown nreconc ((modifying list) t) t (important-result))
 (defknown butlast (proper-or-dotted-list &optional unsigned-byte) list (flushable))
