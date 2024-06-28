@@ -2244,3 +2244,8 @@
   (splice-fun-args n 'complex 2)
   `(lambda (x y)
      (atan y x)))
+
+(defoptimizer (atan externally-checkable-type) ((y &rest x) node)
+  (if x
+      (specifier-type 'real)
+      (specifier-type 'number)))
