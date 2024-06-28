@@ -1264,15 +1264,15 @@
         (cond
           (real-result-p re-type)
           (maybe-rat-result-p
-           (type-union element-type
-                       (specifier-type
-                        `(complex ,(numeric-type-class element-type)))))
+           (let ((complex (specifier-type
+                           `(complex ,(numeric-type-class element-type)))))
+             (if (types-equal-or-intersect im-type (specifier-type '(eql 0)))
+                 (type-union element-type complex)
+                 complex)))
           (t
            (make-numeric-type :class (numeric-type-class element-type)
                               :format (numeric-type-format element-type)
-                              :complexp (if definitely-rat-result-p
-                                            :real
-                                            :complex)))))
+                              :complexp :complex))))
       (specifier-type 'complex)))
 
 (defoptimizer (complex derive-type) ((re &optional im))
