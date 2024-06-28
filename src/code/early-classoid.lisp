@@ -569,6 +569,9 @@
       (member-type
        (!alloc-member-type bits (member-type-xset x) (member-type-fp-zeroes x))))))
 #-sb-xc-host
+(macrolet ((safe-member-type-elt-p (obj)
+             `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
+                  (heap-allocated-p ,obj))))
 (defun copy-ctype (x &optional (flags 0))
   (declare (type ctype x))
   (declare (sb-c::tlab :system) (inline !new-xset))
@@ -594,7 +597,7 @@
              ;; which is not dealt with here (hash-table in the arena)
              (cond ((listp data)
                     ;; the XSET can be empty if a MEMBER type contains only FP zeros.
-                    ;; While we could use (load-time-value) to referece a constant empty xset
+                    ;; While we could use (load-time-value) to reference a constant empty xset
                     ;; there's really no point to doing that.
                     (collect ((elts))
                       (dolist (x data (!new-xset (elts) (xset-extra xset)))
@@ -654,6 +657,7 @@
         #+sb-simd-pack-256
         (simd-pack-256-type (!alloc-simd-pack-256-type bits (simd-pack-256-type-tag-mask x)))
         (alien-type-type (!alloc-alien-type-type bits (alien-type-type-alien-type x)))))))
+) ; end  MACROLET
 
 #-sb-xc-host
 (progn

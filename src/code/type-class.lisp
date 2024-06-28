@@ -780,10 +780,6 @@
 (define-load-time-global *eql-type-cache* ; like EQL-SPECIALIZER-TABLE in PCL
     (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
 
-(defmacro safe-member-type-elt-p (obj)
-  `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
-       (heap-allocated-p ,obj)))
-
 #-sb-xc-host
 (defun ctype-hashset-insert-if-absent (hashset key function)
   (or (hashset-find hashset key)
