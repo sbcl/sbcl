@@ -560,8 +560,8 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
             lispobj *sp = os_get_csp(th);
 #else
             int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
-            if (ici != 1) lose("can't find interrupt context");
-            lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
+            if (ici == 0) lose("can't find interrupt context");
+            lispobj sp = *os_context_register_addr(nth_interrupt_context(ici-1, th), reg_SP);
 #endif
             scan_thread_control_stack((lispobj*)sp, th->control_stack_end, th->lisp_thread);
         }
