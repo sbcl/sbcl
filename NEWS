@@ -4,12 +4,28 @@ changes relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT and
     USE-PACKAGE are resolved once for each name, rather than between pairwise
     colliding symbols.
+  * enhancement: calls to structure constructors with type mismatches cause
+    compile-time warnings.
   * platform support:
     ** fix constant-folding of %log1p and %log2 on 32-bit x86.
+    ** fix the encoding of popcntd on ppc64
   * bug fix: EXPORT could be tricked into exporting two distinct symbols of
     the same name from the same package.
   * bug fix: two-argument calls to LOG with arguments of different precision
     do not lose accuracy through insufficiently-precise intermediate values.
+  * bug fix: :NEWLINE options in *DEFAULT-EXTERNAL-FORMAT* are respected when
+    opening files.  (reported by Marco Antoniotti)
+  * bug fix: extend type declarations for the iteration variable of DOLIST
+    with NULL during the evaluation of the result clause.  (lp#942237)
+  * bug fix: #\uE0 (LATIN CAPITAL LETTER A WITH GRAVE) was incorrectly not
+    downcased with STRING-DOWNCASE.  (lp#2067841, reported by Matt Kaufmann)
+  * bug fix: backquoted lists as arguments to MAKE-ARRAY were miscompiled.
+    (lp#2069345, reported by Dan Bothell)
+  * bug fix: resolve the circularity between the type system and the CLOS
+    metaobject protocol more robustly.  (lp#2069502, reported by Jan Moringen)
+  * bug fix: misplaced tilde in a logical pathname error message.
+    (lp#2069995, thanks to Marco Heisig)
+  * optimization: various speedups to UTF-8 based external format streams.
 
 changes in sbcl-2.4.5 relative to sbcl-2.4.4:
   * incompatible change: attempting to pass or return alien structs by value
