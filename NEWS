@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.5:
+changes in sbcl-2.4.6 relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT and
     USE-PACKAGE are resolved once for each name, rather than between pairwise
     colliding symbols.
