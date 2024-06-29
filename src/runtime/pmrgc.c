@@ -84,12 +84,6 @@ static inline bool page_boxed_p(page_index_t page) {
     return boxed_type_p(page_table[page].type & PAGE_TYPE_MASK);
 }
 
-/* Calculate the start address for the given page number. */
-inline char *page_address(page_index_t page_num)
-{
-    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
-}
-
 /* Calculate the address where the allocation region associated with
  * the page starts. */
 static inline void *

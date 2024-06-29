@@ -7,6 +7,7 @@
 /* Set line size so that every line byte corresponds to one mark
  * bitmap byte. */
 #define LINE_SIZE (8 << N_LOWTAG_BITS)
+#define LINES_PER_PAGE (GENCGC_PAGE_BYTES / LINE_SIZE)
 
 extern uword_t *allocation_bitmap;
 extern _Atomic(uword_t) *mark_bitmap;
@@ -22,9 +23,10 @@ static inline line_index_t address_line(void *address) {
   return ((uintptr_t)address - DYNAMIC_SPACE_START) / LINE_SIZE;
 }
 
+static inline line_index_t page_to_line(page_index_t p) { return p*LINES_PER_PAGE; }
+
 #define for_lines_in_page(l, p) \
-  for (line_index_t l = address_line(page_address(p)), limit = address_line(page_address(p + 1)); \
-       l < limit; l++)
+  for (line_index_t l = page_to_line(p), limit = l+LINES_PER_PAGE; l < limit; l++)
 
 /* Line metadata */
 /* Two highest bits are unused, then a bit for "fresh" lines which need

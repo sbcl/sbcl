@@ -171,8 +171,8 @@ void pre_search_for_small_space(sword_t nbytes, int page_type,
         ((state->allow_free_pages && page_free_p(page)) ||
          (page_table[page].type == page_type &&
           page_table[page].gen != PSEUDO_STATIC_GENERATION))) {
-      line_index_t where = address_line(page_address(page));
-      line_index_t last_line = address_line(page_address(page + 1));
+      line_index_t where = page_to_line(page);
+      line_index_t last_line = where + LINES_PER_PAGE;
       while (where < last_line) {
         line_index_t chunk_start = find_free_line(where, last_line);
         if (chunk_start == -1) break;
@@ -244,8 +244,7 @@ bool try_allocate_small_from_pages(sword_t nbytes, struct alloc_region *region,
          (page_table[where].type == page_type &&
           page_table[where].gen != PSEUDO_STATIC_GENERATION)) &&
         try_allocate_small(nbytes, region,
-                           address_line(page_address(where)),
-                           address_line(page_address(where + 1)))) {
+                           page_to_line(where), page_to_line(where + 1))) {
       // mark-region has a different way of zeroing, so just tell prepare_pages
       // that the page is unboxed if it's boxed, so that it doesn't try to zero.
       if (!page_table[where].type)
@@ -351,24 +350,27 @@ void mr_update_closed_region(struct alloc_region *region, generation_index_t gen
 
 static generation_index_t generation_to_collect = 0;
 
-#define ANY(x) ((x) != 0)
+static inline uword_t object_index(lispobj object) {
+  return (uword_t)((object - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS);
+}
+static inline lispobj* index_to_object(uword_t index) {
+  return index*2 + (lispobj*)DYNAMIC_SPACE_START;
+}
+static inline uword_t mark_bitmap_word_index(void *where) {
+  return object_index((uword_t)where) / N_WORD_BITS;
+}
 static bool object_marked_p(lispobj object) {
-  uword_t index = (uword_t)((object - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS);
-  uword_t bit_index = index % N_WORD_BITS, word_index = index / N_WORD_BITS;
-  return ANY(mark_bitmap[word_index] & ((uword_t)(1) << bit_index));
+  uword_t index = object_index(object);
+  return (mark_bitmap[index / N_WORD_BITS] >> (index % N_WORD_BITS)) & 1;
 }
 static bool set_mark_bit(lispobj object) {
-  uword_t index = (uword_t)((object - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS);
+  uword_t index = object_index(object);
   uword_t bit_index = index % N_WORD_BITS, word_index = index / N_WORD_BITS;
   uword_t bit = ((uword_t)(1) << bit_index);
   /* Avoid doing an atomic op if we're obviously not going to win it. */
   if (mark_bitmap[word_index] & bit) return 0;
   /* Return if we claimed successfully i.e. the bit was 0 before. */
-  return !ANY(atomic_fetch_or(mark_bitmap + word_index, bit) & bit);
-}
-
-static uword_t mark_bitmap_word_index(void *where) {
-  return ((uword_t)where - DYNAMIC_SPACE_START) / (N_WORD_BITS << N_LOWTAG_BITS);
+  return ((~atomic_fetch_or(mark_bitmap + word_index, bit)) >> bit_index) & 1;
 }
 
 static bool in_dynamic_space(lispobj object) {
@@ -631,16 +633,13 @@ static void __attribute__((noinline)) trace_everything() {
 /* Conservative pointer scanning */
 
 bool allocation_bit_marked(void *address) {
-  uword_t first_bit_index = ((uword_t)(address) - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS;
-  uword_t first_word_index = first_bit_index / N_WORD_BITS;
-  uword_t masked_out = allocation_bitmap[first_word_index] & ((uword_t)(1) << (first_bit_index % N_WORD_BITS));
-  return ANY(masked_out);
+  uword_t i = object_index((uword_t)address);
+  return (allocation_bitmap[i / N_WORD_BITS] >> (i % N_WORD_BITS)) & 1;
 }
 
 void set_allocation_bit_mark(void *address) {
-  uword_t first_bit_index = ((uword_t)(address) - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS;
-  uword_t first_word_index = first_bit_index / N_WORD_BITS;
-  allocation_bitmap[first_word_index] |= ((uword_t)(1) << (first_bit_index % N_WORD_BITS));
+  uword_t i = object_index((uword_t)address);
+  allocation_bitmap[i / N_WORD_BITS] |= (uword_t)1 << (i % N_WORD_BITS);
 }
 
 static void compute_allocations(void *address) {
@@ -648,8 +647,8 @@ static void compute_allocations(void *address) {
   page_index_t this_page = find_page_index(address);
   /* Spans of fresh lines exist inside pages, so don't search outside the
    * bounds of this page. */
-  line_index_t first_line = address_line(page_address(this_page)),
-               last_line = address_line(page_address(this_page + 1));
+  line_index_t first_line = page_to_line(this_page),
+               last_line = first_line + LINES_PER_PAGE;
   /* Don't unfreshen lines when the mutator could still be
    * allocating into them. Forgetting this causes
    * brothertree.impure.lisp to fail. */
@@ -700,7 +699,7 @@ static lispobj *find_object(uword_t address, uword_t start) {
     return allocation_bit_marked(np) ? np : 0;
   } else {
     if (fresh) compute_allocations(np);
-    uword_t first_bit_index = (address - DYNAMIC_SPACE_START) >> N_LOWTAG_BITS;
+    uword_t first_bit_index = object_index(address);
     sword_t first_word_index = first_bit_index / N_WORD_BITS;
     sword_t last_word_index = mark_bitmap_word_index((void*)start);
     for (sword_t i = first_word_index; i >= last_word_index; i--) {
@@ -708,7 +707,7 @@ static lispobj *find_object(uword_t address, uword_t start) {
       /* Find the last object which is not after this pointer. */
       while (word) {
         int last_bit_set = N_WORD_BITS - 1 - __builtin_clzl(word);
-        lispobj *location = (lispobj*)(DYNAMIC_SPACE_START) + 2 * (N_WORD_BITS * i + last_bit_set);
+        lispobj *location = index_to_object(N_WORD_BITS * i + last_bit_set);
         if (location <= np) {
           /* Found a candidate - now check that the pointer is inside
            * this object, and make sure not to produce an embedded
@@ -858,7 +857,6 @@ static void reset_pinned_pages() {
   memset(gc_page_pins, 0, page_table_pages);
 }
 
-#define LINES_PER_PAGE (GENCGC_PAGE_BYTES / LINE_SIZE)
 static void __attribute__((noinline)) sweep_pages() {
   /* next_free_page is only maintained for page walking - we
    * reuse partially filled pages, so it's not useful for allocation */

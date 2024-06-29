@@ -160,7 +160,11 @@ static inline page_index_t find_page_index(void *addr)
     }
     return (-1);
 }
-extern char *page_address(page_index_t);
+/* Calculate the start address for the given page number. */
+static inline char *page_address(page_index_t page_num)
+{
+    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
+}
 
 /* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following
