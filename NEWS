@@ -4,8 +4,8 @@ changes relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT and
     USE-PACKAGE are resolved once for each name, rather than between pairwise
     colliding symbols.
-  * enhancement: calls to structure constructors with type mismatches cause
-    compile-time warnings.
+  * enhancement: calls to structure constructors with type mismatches in
+    default initforms cause compile-time warnings.
   * platform support:
     ** fix constant-folding of %log1p and %log2 on 32-bit x86.
     ** fix the encoding of popcntd on ppc64
@@ -25,7 +25,8 @@ changes relative to sbcl-2.4.5:
     metaobject protocol more robustly.  (lp#2069502, reported by Jan Moringen)
   * bug fix: misplaced tilde in a logical pathname error message.
     (lp#2069995, thanks to Marco Heisig)
-  * optimization: various speedups to UTF-8 based external format streams.
+  * optimization: various speedups to UTF-8 based external format streams and
+    other stream routines.
 
 changes in sbcl-2.4.5 relative to sbcl-2.4.4:
   * incompatible change: attempting to pass or return alien structs by value
