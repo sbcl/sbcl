@@ -61,7 +61,7 @@ extern uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
 #else
 extern uword_t DYNAMIC_SPACE_START;
 #endif
-extern uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START, PERMGEN_SPACE_START;
+extern uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 extern unsigned int text_space_size;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
@@ -92,6 +92,9 @@ extern lispobj *current_binding_stack_pointer;
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
 extern lispobj *permgen_space_free_pointer;
+extern uword_t permgen_bounds[2];
+#define PERMGEN_SPACE_START permgen_bounds[0]
+#define CORE_PERMGEN_END permgen_bounds[1]
 
 static inline bool readonly_space_p(lispobj ptr) {
     return ptr >= READ_ONLY_SPACE_START && (lispobj*)ptr < read_only_space_free_pointer;

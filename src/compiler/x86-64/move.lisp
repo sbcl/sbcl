@@ -66,7 +66,8 @@
   (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)
                :unused-if (or (not (sc-is x immediate))
                               (typep (encode-value-if-immediate x)
-                                     '(or (signed-byte 32) #+immobile-space fixup))))
+                                     '(or (signed-byte 32)
+                                          #+(or immobile-space permgen) fixup))))
               temp)
   (:generator 0
     (if (sc-is x immediate)
@@ -88,7 +89,7 @@
      (cond ((and (numberp val) (zerop val)) (zeroize target))
            (t (inst mov target val))))
     ;; Likewise if the value is small enough.
-    ((typep val '(or (signed-byte 32) #+immobile-space fixup))
+    ((typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup))
      ;; This logic is similar to that of STOREW*.
      ;; It would be nice to pull it all together in one place.
      ;; The basic idea is that storing any byte-aligned 8-bit value

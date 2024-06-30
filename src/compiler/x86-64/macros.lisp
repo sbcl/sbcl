@@ -430,10 +430,18 @@
                                               (and (integerp value)
                                                    (plausible-signed-imm32-operand-p (,(if tagged 'fixnumize 'progn) value)))))))))
        (:arg-types ,type tagged-num ,el-type)
+       (:arg-refs obj-ref ind-ref val-ref)
        (:vop-var vop)
        ,@(and barrier
               `((:temporary (:sc unsigned-reg) val-temp)))
        (:generator 4
+         #+permgen
+         ,@(when (string= name 'instance-index-set)
+             `((when (and (eq (tn-ref-type obj-ref) (specifier-type 'layout))
+                          ;; since ANY-REG is non-pointer, OBJECT doesn't need remembering
+                          (not (sc-is value any-reg)))
+                 (inst push object)
+                 (invoke-asm-routine 'call 'gc-remember-layout vop))))
          ,@(when (eq translate 'sb-bignum:%bignum-set)
              '((bignum-index-check object index 0 vop)))
          (let ((ea (if (sc-is index immediate)

@@ -460,8 +460,9 @@
      (when (or (static-symbol-p value)
                ;; The cross-compiler always uses immobile-space if it exists.
                #+(and immobile-space sb-xc-host) t
-               ;; With #+immobile-symbols, all interned symbols are in immobile-space.
-               #+immobile-symbols (sb-xc:symbol-package value)
+               ;; With either of these two features, all interned symbols are
+               ;; as-if static
+               #+(or permgen immobile-symbols) (sb-xc:symbol-package value)
                #-sb-xc-host
                (if (immobile-space-obj-p value)
                    (or (= (generation-of value) +pseudo-static-generation+)

@@ -1052,8 +1052,22 @@ collect_garbage(generation_index_t last_gen)
      *   in a unithread build.
      * So we need to close them for those two cases.
      */
+    extern void remset_union(lispobj);
     struct thread *th;
-    for_each_thread(th) gc_close_thread_regions(th, 0);
+    for_each_thread(th) {
+        gc_close_thread_regions(th, 0);
+#ifdef LISP_FEATURE_PERMGEN
+        // transfer the thread-local remset to the global remset
+        remset_union(th->remset);
+        th->remset = 0;
+#endif
+    }
+#ifdef LISP_FEATURE_PERMGEN
+    extern lispobj remset_transfer_list;
+    // transfer the remsets from threads that exited
+    remset_union(remset_transfer_list);
+    remset_transfer_list = 0;
+#endif
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_lisp_gcs, last_gen);
 
@@ -1980,6 +1994,9 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     // Just don't worry about NIL, it's seldom the problem
     // if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
     if (verify(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &state, 0)) goto out;
+    if (verbose)
+        fprintf(stderr, " [permgen]");
+    if (verify(PERMGEN_SPACE_START, permgen_space_free_pointer, &state, 0)) goto out;
     if (verbose)
         fprintf(stderr, " [dynamic]");
     state.flags |= VERIFYING_GENERATIONAL;

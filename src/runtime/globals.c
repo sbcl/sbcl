@@ -52,7 +52,6 @@ lispobj *current_binding_stack_pointer;
 
 lispobj *read_only_space_free_pointer;
 lispobj *static_space_free_pointer;
-lispobj *permgen_space_free_pointer;
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 lispobj *static_code_space_free_pointer;
@@ -94,7 +93,10 @@ void globals_init(void)
 #endif
 }
 
-uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START, PERMGEN_SPACE_START;
+uword_t permgen_bounds[2];
+lispobj *permgen_space_free_pointer;
+
+uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 lispobj *text_space_highwatermark;
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
 /* this is a KLUDGE. If #+immobile-space then text_space_size gets statically

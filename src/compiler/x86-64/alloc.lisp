@@ -200,7 +200,7 @@
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
 (defun allocation (type size lowtag alloc-tn node temp thread-temp
                    &key overflow
-                   &aux (systemp (system-tlab-p type node)))
+                        (systemp (system-tlab-p type node)))
   (declare (ignorable thread-temp))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.

@@ -288,6 +288,20 @@
     t))
 
 #+permgen
+(progn
+(defun sb-impl::allocate-permgen-symbol (name)
+  (with-system-mutex (*allocator-mutex* :without-gcing t)
+    (let ((freeptr *permgen-space-free-pointer*))
+      (setf *permgen-space-free-pointer*
+            (sap+ freeptr (ash symbol-size word-shift)))
+      (aver (<= (sap-int *permgen-space-free-pointer*)
+                (+ permgen-space-start permgen-space-size)))
+      (setf (sap-ref-word freeptr 0) symbol-widetag)
+      (setf (sap-ref-lispobj freeptr (ash symbol-name-slot word-shift)) name
+            (sap-ref-lispobj freeptr (ash symbol-info-slot word-shift)) nil
+            (sap-ref-word freeptr (ash symbol-value-slot word-shift))
+            unbound-marker-widetag)
+      (%make-lisp-obj (sap-int (sap+ freeptr other-pointer-lowtag))))))
 (defun sb-kernel::allocate-permgen-layout (nwords)
   (with-system-mutex (*allocator-mutex* :without-gcing t)
     (let ((freeptr *permgen-space-free-pointer*))
@@ -298,4 +312,4 @@
                 (+ permgen-space-start permgen-space-size)))
       (setf (sap-ref-word freeptr 0)
             (logior (ash nwords instance-length-shift) instance-widetag))
-      (%make-lisp-obj (sap-int (sap+ freeptr instance-pointer-lowtag))))))
+      (%make-lisp-obj (sap-int (sap+ freeptr instance-pointer-lowtag)))))))

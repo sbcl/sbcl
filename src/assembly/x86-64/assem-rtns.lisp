@@ -478,3 +478,103 @@
       (inst stc)
       (inst leave)
       (inst ret))))
+
+;; Adding to the thread-local remset has to be pseudo-atomic because GC takes
+;; ownership of the the vector when it inserts rememberd objects into the common
+;; remset and it assigns 0 into the thread slot.
+;;
+;; For now, a CALL to this routine need not be inside a pseudo-atomic section
+;; because objects are _never_ _removed_ from the permgen remembered set.
+;; This wouldn't be the case if we use the same remembered sets for immobile-space.
+;; If the GC were to remove objects that lack old->young pointers, then the store
+;; would indeed have to be pseudo-atomic with respect to the bit test.
+;;
+(eval-when (:load-toplevel :execute)
+  ;; I want to try different parameters using 'slam' on this file
+  ;; without getting complaints about uneql constants
+  (defparameter remset-vector-capacity 124)
+  (defparameter remset-vector-len (fixnumize (+ remset-vector-capacity 2)))
+  (defparameter remset-vector-words (+ remset-vector-len vector-data-offset)))
+#+(and permgen sb-assembling)
+(progn
+(define-assembly-routine (remset-insert (:return-style :none)) ()
+  (let ((insert (gen-label)))
+  (assemble ()
+  (inst push rbx-tn)
+  ;; Stack:
+  ;;     object
+  ;;     return PC
+  ;;     RAX spill
+  ;;     RBX spill <- sp now
+  ;;     RCX spill
+  ;; Filter out non-permgen objects. RAX is the object
+  (inst mov rbx-tn (rip-relative-ea (make-fixup "permgen_bounds" :foreign-dataref)))
+  (inst cmp rax-tn (ea rbx-tn))
+  (inst jmp :b SET-BIT-AND-DONE)
+  (inst cmp rax-tn (ea 8 rbx-tn))
+  (inst jmp :ae SET-BIT-AND-DONE)
+  (inst push rcx-tn)
+  (pseudo-atomic ()
+   (inst lfence) ; Don't speculate load of RBX prior to setting P-A
+   (inst mov rbx-tn (thread-slot-ea thread-remset-slot)) ; current remset into RBX
+   (inst test :dword rbx-tn rbx-tn)
+   (inst jmp :z GROW)
+   ;; vector element 0 = item count (max. REMSET-VECTOR-CAPACITY)
+   (inst mov :dword rcx-tn (object-slot-ea rbx-tn vector-data-offset other-pointer-lowtag))
+   (inst cmp :byte rcx-tn (fixnumize remset-vector-capacity))
+   (inst jmp :e GROW)
+   (emit-label INSERT)
+   ;; Check that another thread didn't also insert into its remset.
+   ;; Alternatively, GC could de-duplicate though it currently does not.
+   (inst test :byte rax-tn #b1000) ; SYMBOLP if bit 3
+   (inst jmp :z INSTANCEP)
+   ;; it's a non-NIL symbol
+   (inst bts :lock :dword (ea (- other-pointer-lowtag) rax-tn) 31)
+   (inst jmp MAYBE-SKIP)
+   INSTANCEP
+   (inst bts :lock :dword (ea (- instance-pointer-lowtag) rax-tn) 31)
+   MAYBE-SKIP (inst jmp :c DONE-PA)
+   (inst add :byte (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag) rbx-tn)
+         (fixnumize 1))
+   (inst mov (ea (- (ash (+ 2 vector-data-offset) word-shift) other-pointer-lowtag)
+                 rbx-tn rcx-tn 4)
+         rax-tn) ; RAX=object, RBX=vector, RCX=index(fixnum)
+   DONE-PA)
+  (inst pop rcx-tn)
+  DONE
+  (inst pop rbx-tn) (inst pop rax-tn)
+  (inst ret 8) ; remove arg
+  SET-BIT-AND-DONE
+  ;; layouts and symbol that are not below the core permgen limit reach here.
+  ;; Mark them as remembered to prevent further calls to the slow path.
+  (inst and rax-tn #x-10)
+  (inst or :lock :byte (ea 3 rax-tn) #x80)
+  (inst jmp DONE)
+  GROW
+  ;; if temps regs were needed here, RAX or RBX would be fine to use and reload
+  (allocation simple-vector-widetag (ash remset-vector-words word-shift)
+              ;; lowtag, result-tn, node, allocation-temp
+              0 rcx-tn nil nil thread-tn :systemp t)
+  ;; ASSUMPTION: pre-zeroed memory
+  (inst mov :byte (object-slot-ea rcx-tn 0 0) simple-vector-widetag) ; header
+  (inst mov :byte (object-slot-ea rcx-tn vector-length-slot 0) remset-vector-len)
+  (inst mov (object-slot-ea rcx-tn (1+ vector-data-offset) 0) rbx-tn) ; link buffers
+  (inst lea rbx-tn (ea other-pointer-lowtag rcx-tn)) ; tagify
+  (inst mov (thread-slot-ea thread-remset-slot) rbx-tn) ; writeback
+  (zeroize rcx-tn)
+  (inst jmp INSERT))))
+(define-assembly-routine (gc-remember-symbol (:return-style :none)) ()
+  (inst push rax-tn)
+  (inst mov rax-tn (ea (ash 2 word-shift) rsp-tn)) ; OBJECT
+  (inst test :byte (ea (- 3 other-pointer-lowtag) rax-tn) #x80)
+  (inst jmp :z (make-fixup 'remset-insert :assembly-routine))
+  (inst pop rax-tn)
+  (inst ret 8))
+(define-assembly-routine (gc-remember-layout (:return-style :none)) ()
+  (inst push rax-tn)
+  (inst mov rax-tn (ea (ash 2 word-shift) rsp-tn)) ; OBJECT
+  (inst test :byte (ea (- 3 instance-pointer-lowtag) rax-tn) #x80)
+  (inst jmp :z (make-fixup 'remset-insert :assembly-routine))
+  (inst pop rax-tn)
+  (inst ret 8))
+)

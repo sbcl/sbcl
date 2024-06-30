@@ -58,8 +58,17 @@
              (emit-code-page-gengc-barrier object val-temp)
              (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
-           (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value name)
+           (if (eq name '%set-symbol-global-value)
+               (emit-symbol-write-barrier vop object val-temp (vop-nth-arg 1 vop) value)
+               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value name))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
+
+(defun add-symbol-to-remset (vop symbol)
+  (declare (ignorable vop symbol))
+  #+permgen
+  (unless (and (sc-is symbol immediate) (static-symbol-p (tn-value symbol)))
+    (inst push symbol)
+    (invoke-asm-routine 'call 'gc-remember-symbol vop)))
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -71,10 +80,11 @@
                    #|:from (:argument 1)|# :to :result :target result)
               rax)
   (:info name offset lowtag)
-  (:ignore name)
   (:results (result :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 5
+     (when (member name '(cas-symbol-fdefn sb-impl::cas-symbol-%info))
+       (add-symbol-to-remset vop object))
      (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop) new)
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
@@ -88,10 +98,13 @@
   (:generator 1
     (inst mov result (unbound-marker-bits))))
 
-(defmacro emit-symbol-write-barrier (sym &rest rest)
+(defun emit-symbol-write-barrier (vop symbol temp newval-tn-ref newval)
+  (when (require-gengc-barrier-p symbol newval-tn-ref newval)
+    (add-symbol-to-remset vop symbol))
   ;; IMMEDIATE sc means that the symbol is static or immobile.
   ;; Static symbols are roots, and immobile symbols use page fault handling.
-  `(unless (sc-is ,sym immediate) (emit-gengc-barrier ,sym ,@rest)))
+  (unless (sc-is symbol immediate)
+    (emit-gengc-barrier symbol nil temp newval-tn-ref newval)))
 
 (define-vop (%set-symbol-global-value)
   (:args (symbol :scs (descriptor-reg immediate))
@@ -100,7 +113,7 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
-    (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
+    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop) value)
     (emit-store (if (sc-is symbol immediate)
                       (symbol-slot-ea (tn-value symbol) symbol-value-slot)
                       (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))
@@ -170,7 +183,7 @@
              (inst add cell thread-tn))))
     (inst cmp :qword (ea cell) no-tls-value-marker)
     (inst jmp :ne STORE)
-    (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
+    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop) value)
     (get-symbol-value-slot-ea cell symbol)
     STORE
     (emit-store (ea cell) value val-temp)))
@@ -234,7 +247,7 @@
     (:policy :fast-safe)
     (:vop-var vop)
     (:generator 10
-      (emit-symbol-write-barrier symbol nil rax (vop-nth-arg 2 vop) new)
+      (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop) new)
       (load-oldval)
       (inst cmpxchg :lock (if (sc-is symbol immediate)
                               (symbol-slot-ea (tn-value symbol) symbol-value-slot)
@@ -270,7 +283,7 @@
       (inst cmp :qword (ea cell) no-tls-value-marker)
       (inst jmp :ne CAS))
       ;; GLOBAL. All logic that follows is for both + and - sb-thread
-      (emit-symbol-write-barrier symbol nil cell (vop-nth-arg 2 vop) new)
+      (emit-symbol-write-barrier vop symbol cell (vop-nth-arg 2 vop) new)
       (get-symbol-value-slot-ea cell symbol)
       CAS
       (load-oldval)
@@ -852,6 +865,7 @@
 (define-vop (instance-set-multiple)
   (:args (instance :scs (descriptor-reg))
          (values :more t :scs (descriptor-reg constant immediate)))
+  (:arg-refs obj-ref)
   (:temporary (:sc unsigned-reg) val-temp)
   ;; Would like to try to store adjacent 0s (and/or NILs) using 16 byte stores.
   (:temporary (:sc int-sse-reg) xmm-temp)
@@ -879,6 +893,8 @@
       (setq use-xmm-p (or (>= (logcount zerop-mask) 3)
                           (loop for slot below max-index
                              thereis (= (ldb (byte 2 slot) zerop-mask) #b11))))
+      (when (eq (tn-ref-type obj-ref) (specifier-type 'layout))
+        (bug "unexpected set-multiple"))
       (emit-gengc-barrier instance nil val-temp values)
       (when use-xmm-p
         (inst xorpd xmm-temp xmm-temp))

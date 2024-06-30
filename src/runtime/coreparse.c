@@ -1185,6 +1185,11 @@ void gc_load_corefile_ptes(int card_table_nbits,
     generations[gen].bytes_allocated = bytes_allocated;
     gc_assert((ssize_t)bytes_allocated <= (ssize_t)(n_ptes * GENCGC_PAGE_BYTES));
 
+    /* Record the demarcation point in permgen space between objects mapped from core
+     * and new objects so that GC can potentially treat them differently.
+     * (below it: visit only if touched, above it: always visit) */
+    permgen_bounds[1] = (uword_t)permgen_space_free_pointer;
+
     // Adjust for discrepancies between actually-allocated space addresses
     // and desired addresses.
     if (adj->n_ranges) relocate_heap(adj);

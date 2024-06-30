@@ -308,6 +308,13 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  core_start_pos,
                  core_compression_level), ++count;
 #ifdef LISP_FEATURE_PERMGEN
+    {
+#define REMEMBERED_BIT (uword_t)0x80000000
+        lispobj* where = (void*)PERMGEN_SPACE_START;
+        // clear every object's bit
+        for ( ; where < permgen_space_free_pointer ; where += object_size(where) )
+            *where &= ~REMEMBERED_BIT;
+    }
     output_space(file,
                  PERMGEN_CORE_SPACE_ID,
                  (lispobj *)PERMGEN_SPACE_START,
@@ -605,6 +612,10 @@ static void prepare_dynamic_space_for_final_gc(struct thread* thread)
         }
     }
 #ifdef LISP_FEATURE_MARK_REGION_GC
+#ifdef LISP_FEATURE_PERMGEN
+    extern void remember_all_permgen();
+    remember_all_permgen();
+#endif
     for (generation_index_t g = 1; g <= PSEUDO_STATIC_GENERATION; g++) {
       generations[0].bytes_allocated += generations[g].bytes_allocated;
       generations[g].bytes_allocated = 0;

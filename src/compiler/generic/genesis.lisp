@@ -780,8 +780,13 @@
    LENGTH must count the header word itself as 1 word.  The header word is
    initialized with the payload size as (1- LENGTH), and WIDETAG."
   (let ((des (allocate-cold-descriptor gspace (ash length sb-vm:word-shift)
-                                       sb-vm:other-pointer-lowtag)))
-    (write-header-word des (sb-vm::compute-object-header length widetag))
+                                       sb-vm:other-pointer-lowtag))
+        (header-word (sb-vm::compute-object-header length widetag)))
+    #+permgen
+    (when (and (= widetag sb-vm:symbol-widetag) (eq gspace *static*))
+      ;; Set the "in-remset" bit so rutime won't call REMEMBER-OBJECT on static symbols
+      (setf header-word (logior header-word (ash 1 31))))
+    (write-header-word des header-word)
     des))
 (defvar *simple-vector-0-descriptor*)
 (defun allocate-vector (widetag length words &optional (gspace *dynamic*))
@@ -1144,7 +1149,9 @@ core and return a descriptor to it."
           (cold-assign-tls-index cold-sym tls-index)))
       tls-index)))
 
-(defvar *cold-symbol-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defvar *cold-symbol-gspace* (or #+permgen '*permgen*
+                                 #+immobile-space '*immobile-fixedobj*
+                                 '*dynamic*))
 (defun encode-symbol-name (package-id name)
   (declare (ignorable package-id))
   (logior #+compact-symbol (ash package-id sb-impl::symbol-name-bits)

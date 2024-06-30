@@ -21,7 +21,7 @@
 
 #+permgen
 (progn
-(define-alien-variable ("PERMGEN_SPACE_START" sb-vm:permgen-space-start) sb-kernel::os-vm-size-t)
+(define-alien-variable ("permgen_bounds" sb-vm:permgen-space-start) sb-kernel::os-vm-size-t)
 (define-alien-variable ("permgen_space_free_pointer" sb-vm:*permgen-space-free-pointer*)
     system-area-pointer))
 

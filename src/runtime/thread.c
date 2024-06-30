@@ -461,11 +461,27 @@ init_new_thread(struct thread *th,
 #endif
 }
 
+lispobj remset_transfer_list;
+
 static void
 unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
 {
     block_blockable_signals(0);
+#ifdef LISP_FEATURE_PERMGEN
+    lispobj my_remset = th->remset;
+    if (my_remset) {
+        lispobj tail = remset_transfer_list;
+        while (1) {
+            VECTOR(my_remset)->data[1] = tail;
+            lispobj actual_old = __sync_val_compare_and_swap(
+                &remset_transfer_list, tail, my_remset);
+            if (actual_old == tail) break;
+            tail = actual_old;
+        }
+        th->remset = 0;
+    }
+#endif
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);

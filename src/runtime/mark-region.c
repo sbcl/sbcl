@@ -923,13 +923,63 @@ void mr_trace_bump_range(lispobj* start, lispobj *end) {
   }
 }
 
+/* This limit is adequate for testing, but a better way to handle it
+ * would be to size the remset at half the objects in core permgen.
+ * If that limit is reached, then don't remember individual objects
+ * but instead flag all of permgen as needing to be scavenged. */
+#define REMSET_GLOBAL_MAX 20000
+lispobj permgen_remset[REMSET_GLOBAL_MAX];
+int permgen_remset_count;
+
+static void remset_append1(lispobj x)
+{
+    int n = permgen_remset_count;
+    if (n == REMSET_GLOBAL_MAX) lose("global remset overflow");
+    permgen_remset[n] = x;
+    ++permgen_remset_count;
+}
+
+void remset_union(lispobj remset)
+{
+    while (remset) {
+        struct vector* v = VECTOR(remset);
+        int count = fixnum_value(v->data[0]);
+        int i;
+        for (i=0; i<count; ++i) remset_append1(v->data[i+2]);
+        remset = v->data[1];
+    }
+}
+
+void remember_all_permgen()
+{
+    permgen_bounds[1] = PERMGEN_SPACE_START;
+    memset(permgen_remset, 0, permgen_remset_count*N_WORD_BYTES);
+    permgen_remset_count = 0;
+}
+
 extern lispobj lisp_init_function;
 static void trace_static_roots() {
   source_object = native_pointer(NIL) - 1;
   trace_other_object((lispobj*)NIL_SYMBOL_SLOTS_START);
   mr_trace_bump_range((lispobj*)STATIC_SPACE_OBJECTS_START,
                       static_space_free_pointer);
-  mr_trace_bump_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
+#ifdef LISP_FEATURE_PERMGEN
+  if (new_space == PSEUDO_STATIC_GENERATION) {
+    remember_all_permgen();
+  }
+  // Remembered objects below the core permgen end, and all objects above it, are roots.
+  mr_trace_bump_range((lispobj*)permgen_bounds[1], permgen_space_free_pointer);
+  int i, n = permgen_remset_count;
+  if (gencgc_verbose)
+    printf("remset count: %d, permgen new-obj-range %p..%p (%d words)\n", n,
+           (void*)permgen_bounds[1], permgen_space_free_pointer,
+           (int)(permgen_space_free_pointer - (lispobj*)(permgen_bounds[1])));
+  for (i=0; i<n; ++i) {
+    lispobj o = permgen_remset[i];
+    source_object = native_pointer(o);
+    trace_object(o);
+  }
+#endif
 
   // TODO: use an explicit remembered set of modified objects in this range
   if (TEXT_SPACE_START) mr_trace_bump_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark);

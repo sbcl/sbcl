@@ -395,6 +395,11 @@ distinct from the global value. Can also be SETF."
           (logior-array-flags name sb-vm:+vector-shareable+))) ; Set "logically read-only" bit
        (name-hash (calc-symbol-name-hash name (length name)))
        (symbol
+         #+permgen
+         (truly-the symbol (if (eql kind 0) ; uninterned
+                               (sb-vm::%alloc-symbol name)
+                               (allocate-permgen-symbol name)))
+         #-permgen
          (truly-the symbol
           ;; If no immobile-space, easy: all symbols go in dynamic-space
           #-immobile-space (sb-vm::%alloc-symbol name)

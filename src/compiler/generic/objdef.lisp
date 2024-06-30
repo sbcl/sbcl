@@ -645,6 +645,7 @@ during backtrace.
   (symbol-tlab :c-type "struct alloc_region" :length 3)
   (sys-mixed-tlab :c-type "struct alloc_region" :length 3)
   (sys-cons-tlab :c-type "struct alloc_region" :length 3)
+  (remset)
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)
   (tot-bytes-alloc-unboxed)
