@@ -1141,7 +1141,12 @@
      (ecase (sb-name (sc-sb (tn-sc thing)))
        (stack
         (emit-ea segment (ea (frame-byte-offset (tn-offset thing)) rbp-tn) reg))
-       (constant
+       ((constant sb-vm::immediate-constant)
+        (when (eq (sb-name (sc-sb (tn-sc thing))) 'sb-vm::immediate-constant)
+          ;; Assert that THING is definitely present in boxed constants. If not
+          ;; you'll get "NIL is not of type INTEGER" (because TN-OFFSET is NIL)
+          (let ((val (tn-value thing)))
+            (aver (and (symbolp val) (not (static-symbol-p val))))))
         ;; To access the constant at index 5 out of 6 constants, that's simply
         ;; word index -1 from the origin label, and so on.
         (emit-ea segment
@@ -1536,7 +1541,16 @@
               (emit* segment sizes dst src nil))))
 
 (flet ((emit* (segment thing gpr-opcode mem-opcode subcode)
-         (let ((size (or (operand-size thing) :qword)))
+         (let ((size
+                ;; Immediate SYMBOL in immobile-space will fail in OPERAND-SIZE
+                ;; because SC-OPERAND-SIZE = NIL. Push (make-fixup x :immobile-symbol))
+                ;; would work, but requires recording it in code-fixups.
+                (cond ((and (tn-p thing)
+                            (sc-is thing sb-vm::immediate)
+                            (symbolp (tn-value thing)))
+                       :qword)
+                      ((operand-size thing))
+                      (t :qword))))
            (aver (or (eq size :qword) (eq size :word)))
            (emit-prefixes segment thing nil (if (eq size :word) :word :do-not-set))
            (cond ((gpr-p thing)
