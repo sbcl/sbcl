@@ -211,7 +211,8 @@
 
 (defun compile (name &optional (definition (or (and (symbolp name)
                                                     (macro-function name))
-                                               (fdefinition name))))
+                                               (fdefinition name))
+                                           defp))
   "Produce a compiled function from DEFINITION. If DEFINITION is a
 lambda-expression, it is coerced to a function. If DEFINITION is an
 interpreted function, it is compiled. If DEFINITION is already a compiled
@@ -235,9 +236,13 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
       ((compiled-definition warnings-p failure-p)
       (if (or (compiled-function-p definition)
               (sb-pcl::generic-function-p definition))
-          ;; We're not invoking COMPILE. This is a minor bug if this is
-          ;; a GENERIC-FUNCTION whose methods are interpreted.
-          (values (make-unbound-marker) nil nil)
+          ;; We're not invoking COMPILE. If NAME isn't NIL then we need to
+          ;; ensure that DEFINITION (if supplied) gets bound to NAME even if
+          ;; (COMPILED-FUNCTION-P #'NAME) => NIL afterwards.
+          ;; This is a minor bug if DEFINITION is a GENERIC-FUNCTION with
+          ;; at least one interpreted method.
+          (values (if (and name defp) definition (make-unbound-marker))
+                  nil nil)
           (multiple-value-bind (sexpr lexenv)
               (if (not (typep definition 'interpreted-function))
                   (values (the cons definition) (make-null-lexenv))
@@ -248,7 +253,10 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
     (accumulate-compiler-time '*compile-elapsed-time* start-sec start-nsec)
     (values (cond (name
                    ;; Do NOT assign anything into the symbol if we did not
-                   ;; actually invoke the compiler
+                   ;; actually invoke the compiler and DEFINITION was not given.
+                   ;; In that case it's not observable whether NAME get reassigned,
+                   ;; but since there is nonzero overhead to setting
+                   ;; an fdefinition, don't do it if it has no effect.
                    (unless (unbound-marker-p compiled-definition)
                      (if (and (symbolp name) (macro-function name))
                          (setf (macro-function name) compiled-definition)

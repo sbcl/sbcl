@@ -235,3 +235,15 @@
                      (multiple-value-list
                       (funcall fun '(1 2 3 4 5 6 7 8 . 10))))
                    '(1 2 3 4 5 6 7 8)))))
+
+(with-test (:name :compile--install-named-definition)
+  ;; (compiled-function-p #'make-load-form) => NIL because there could be
+  ;; interpreted MAKE-LOAD-FORM methods which COMPILE does not compile,
+  ;; though of course in the baseline image there aren't any.
+  (compile 'blech #'make-load-form)
+  ;; FUNCALL just avoids a style-warning on unknown names.
+  (assert (eq (car (funcall 'blech #p"foo.bar")) 'sb-impl::intern-pathname))
+  (compile 'flem (compile nil '(lambda (x) (+ x 3))))
+  (assert (= (funcall 'flem 9) 12))
+  (compile 'flem (compile nil '(lambda (x) (* x 3))))
+  (assert (= (funcall 'flem 9) 27)))
