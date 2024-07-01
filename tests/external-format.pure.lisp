@@ -1349,7 +1349,8 @@
           (*error-output* (make-broadcast-stream)))
       (multiple-value-bind (output failurep warningsp)
           (compile-file path :verbose nil)
-        (declare (ignore output))
+        (delete-file output)
+        (delete-file path)
         (assert (null failurep))
         (assert (null warningsp))))))
 

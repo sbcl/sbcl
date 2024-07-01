@@ -70,3 +70,5 @@
                                                                  #x00))
     (test :ucs-4le '())
     (test (:ucs-4le :replacement #\?) '(#\? #\?))))
+
+(delete-file *test-path*)

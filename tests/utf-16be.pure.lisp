@@ -93,3 +93,5 @@
     ;; of replacement characters given as part of the external format
     (test :utf-16be '(2 nil 4 2 2))
     (test (:utf-16be :replacement #\?) '(2 nil 4 2 2))))
+
+(delete-file *test-path*)

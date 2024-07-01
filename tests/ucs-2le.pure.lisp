@@ -85,3 +85,5 @@
     ;; of replacement characters given as part of the external format
     (test :ucs-2le '(2 2 nil 2 2))
     (test (:ucs-2le :replacement #\?) '(2 2 nil 2 2))))
+
+(delete-file *test-path*)

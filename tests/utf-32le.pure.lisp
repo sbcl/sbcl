@@ -108,3 +108,5 @@
     ;; of replacement characters given as part of the external format
     (test :utf-32le '(4 nil 4 4 4))
     (test (:utf-32le :replacement #\?) '(4 nil 4 4 4))))
+
+(delete-file *test-path*)
