@@ -574,3 +574,11 @@
      (declare (integer x))
      (log x))
    (or (complex single-float) (single-float 0.0))))
+
+(with-test (:name :floor-derive-type)
+  (assert-type
+   (lambda (a b)
+     (declare ((integer -10 0) b)
+              ((unsigned-byte 8) a))
+     (floor a b))
+   (values (integer -255 0) (integer -9 0) &optional)))
