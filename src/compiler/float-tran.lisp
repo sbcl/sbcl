@@ -1807,96 +1807,13 @@
   (def single-float)
   (def double-float))
 
-;;; Convert (TRUNCATE x y) to the obvious implementation.
-;;;
-;;; ...plus hair: Insert explicit coercions to appropriate float types: Python
-;;; is reluctant it generate explicit integer->float coercions due to
-;;; precision issues (see SAFE-SINGLE-COERCION-P &co), but this is not an
-;;; issue here as there is no DERIVE-TYPE optimizer on specialized versions of
-;;; %UNARY-TRUNCATE, so the derived type of TRUNCATE remains the best we can
-;;; do here -- which is fine. Also take care not to add unnecassary division
-;;; or multiplication by 1, since we are not able to always eliminate them,
-;;; depending on FLOAT-ACCURACY. Finally, leave out the secondary value when
-;;; we know it is unused: COERCE is not flushable.
-(macrolet ((def (type other-float-arg-types)
-             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
-                    (unary-to-bignum (symbolicate '%unary-truncate- type '-to-bignum))
+;#+64-bit
+(macrolet ((def (name type other-float-arg-types)
+             (let* ((unary-to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
                     (coerce (symbolicate "%" type))
-                    (unary `(lambda (number)
-                              (if (typep number
-                                         '(,type
-                                           ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
-                                           ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                                  (truly-the fixnum (,unary number))
-                                  (,unary-to-bignum number)))))
-               `(deftransform truncate ((x &optional y)
-                                        (,type
-                                         &optional (or ,type ,@other-float-arg-types integer))
-                                        * :result result :node node)
-                  (let* ((result-type (and result
-                                           (lvar-derived-type result)))
-                         (compute-all (and (or (eq result-type *wild-type*)
-                                               (values-type-p result-type))
-                                           (not (type-single-value-p result-type))))
-                         (one-p (or (not y)
-                                    (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
-                    (cond
-                      ;; Compute only the remainder
-                      ((mv-bind-unused-p result 0)
-                       (setf (node-derived-type node)
-                             (values-specifier-type '(values integer ,type &optional)))
-                       (erase-lvar-type result)
-                       `(let* ,(if one-p
-                                   `((div x))
-                                   `((f-divisor (,',coerce y))
-                                     (div (/ x f-divisor))))
-                          (values 0
-                                  (- x (* ,@(unless one-p
-                                                   '(f-divisor))
-                                               (+ (,',(ecase type
-                                                        (double-float 'round-double)
-                                                        (single-float 'round-single))
-                                                   div :truncate)
-                                                  ;; Turn -0 into 0
-                                                  ,,(ecase type
-                                                      (double-float 0.0d0)
-                                                      (single-float 0.0f0))))))))
-                      (t
-                       (if one-p
-                           (if compute-all
-                               `(unary-truncate x)
-                               `(let ((res (,',unary x)))
-                                  ;; Dummy secondary value!
-                                  (values res x)))
-                           (if compute-all
-                               `(let* ((f (,',coerce y))
-                                       (div (/ x f))
-                                       (res (,',unary div)))
-                                  (values res
-                                          (- x (* f
-                                                  (+ (,',(ecase type
-                                                           (double-float 'round-double)
-                                                           (single-float 'round-single))
-                                                      div :truncate)
-                                                     ;; Turn -0 into 0
-                                                     ,,(ecase type
-                                                         (double-float 0.0d0)
-                                                         (single-float 0.0f0)))))))
-                               `(let* ((f (,',coerce y))
-                                       (res (,',unary (/ x f))))
-                                  ;; Dummy secondary value!
-                                  (values res x)))))))))))
-  (def single-float ())
-  (def double-float (single-float)))
-
-;;; truncate on bignum floats will always have a remainder of zero
-;;; on 64-bit, so ceiling and floor are the same as truncate.
-#+64-bit
-(macrolet ((def (name type other-float-arg-types
-                 fixup)
-             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
-                    (unary-to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
-                    (coerce (symbolicate "%" type)))
+                    (fixnum-type `(,type
+                                   ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
+                                   ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))))
                `(deftransform ,name ((number &optional divisor)
                                      (,type
                                       &optional (or ,type ,@other-float-arg-types integer))
@@ -1905,109 +1822,33 @@
                   (block nil
                     (let ((one-p (or (not divisor)
                                      (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
-                      ;; Compute only the remainder
-                      (when (mv-bind-unused-p result 0)
-                        (setf (node-derived-type node)
-                              (values-specifier-type '(values integer ,type &optional)))
-                        (erase-lvar-type result)
-                        (return
-                          `(let* ,(if one-p
-                                      `((div number))
-                                      `((f-divisor (,',coerce divisor))
-                                        (div (/ number f-divisor))))
-                             (values 0
-                                     (- number (* ,@(unless one-p
-                                                      '(f-divisor))
-                                                  (+ (,',(ecase type
-                                                           (double-float 'round-double)
-                                                           (single-float 'round-single))
-                                                      div ,,(keywordicate name))
-                                                     ;; Turn -0 into 0
-                                                     ,,(ecase type
-                                                         (double-float 0.0d0)
-                                                         (single-float 0.0f0)))))))))
-                      (when-vop-existsp (:translate %unary-ceiling)
-                        (when one-p
-                          (return
-                            `(if (typep number
-                                        '(,',type
-                                          ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
-                                          ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                                 (values (truly-the fixnum (,',(symbolicate '%unary- name) number))
-                                         (- number
-                                            (,',(ecase type
-                                                  (double-float 'round-double)
-                                                  (single-float 'round-single))
-                                             number ,,(keywordicate name))))
-                                 (,',unary-to-bignum number)))))
-                      `(let* ,(if one-p
-                                  `((f-divisor 1)
-                                    (div number))
-                                  `((f-divisor (,',coerce divisor))
-                                    (div (/ number f-divisor))))
-                         (if (typep div
-                                    '(,',type
-                                      ,',(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
-                                      ,',(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
-                             (let* ((tru (truly-the fixnum (,',unary div)))
-                                    (rem (- number (* ,@(unless one-p
-                                                          '(f-divisor))
-                                                      (+ (,',(ecase type
-                                                               (double-float 'round-double)
-                                                               (single-float 'round-single))
-                                                             div :truncate)
-                                                         ;; Turn -0 into 0
-                                                         ,,(ecase type
-                                                             (double-float 0.0d0)
-                                                             (single-float 0.0f0)))))))
-                               ,',fixup)
-                             (,',unary-to-bignum div)))))))))
-  (def floor single-float ()
-    #1=(if (and (not (zerop rem))
-                (if (minusp f-divisor)
-                    (plusp number)
-                    (minusp number)))
-           (values
-            ;; the above conditions wouldn't hold when tru is m-n-f
-            (truly-the fixnum (1- tru))
-            (+ rem f-divisor))
-           (values tru rem)))
-  (def floor double-float (single-float)
-    #1#)
-  (def ceiling single-float ()
-    #2=(if (and (not (zerop rem))
-                (if (minusp f-divisor)
-                    (minusp number)
-                    (plusp number)))
-           (values (+ tru 1) (- rem f-divisor))
-           (values tru rem)))
-  (def ceiling double-float (single-float)
-    #2#))
-
-#-64-bit
-(macrolet ((def (number-type divisor-type)
-             `(progn
-                (deftransform floor ((number divisor) (,number-type ,divisor-type) * :node node)
-                  `(let ((divisor (coerce divisor ',',number-type)))
-                     (multiple-value-bind (tru rem) (truncate number divisor)
-                       (if (and (not (zerop rem))
-                                (if (minusp divisor)
-                                    (plusp number)
-                                    (minusp number)))
-                           (values (1- tru) (+ rem divisor))
-                           (values tru rem)))))
-
-                (deftransform ceiling ((number divisor) (,number-type ,divisor-type) * :node node)
-                  `(let ((divisor (coerce divisor ',',number-type)))
-                     (multiple-value-bind (tru rem) (truncate number divisor)
-                       (if (and (not (zerop rem))
-                                (if (minusp divisor)
-                                    (minusp number)
-                                    (plusp number)))
-                           (values (+ tru 1) (- rem divisor))
-                           (values tru rem))))))))
-  (def double-float (or float integer))
-  (def single-float (or single-float integer)))
+                      `(let* (,@(if one-p
+                                    `((div number))
+                                    `((f-divisor (,',coerce divisor))
+                                      (div (/ number f-divisor))))
+                              (quot
+                                (,',(ecase type
+                                      (double-float 'round-double)
+                                      (single-float 'round-single))
+                                 div ,,(keywordicate name))))
+                         (values (if (typep div ',',fixnum-type)
+                                     ,',(if-vop-existsp (:translate %unary-ceiling)
+                                           `(truly-the fixnum (,(symbolicate '%unary- name) div))
+                                           `(%unary-truncate (truly-the ,fixnum-type quot)))
+                                     (,',unary-to-bignum quot))
+                                 (- number (* ,@(unless one-p
+                                                  '(f-divisor))
+                                              (+ quot
+                                                 ;; Turn -0 into 0
+                                                 ,,(ecase type
+                                                     (double-float 0.0d0)
+                                                     (single-float 0.0f0)))))))))))))
+  (def floor single-float ())
+  (def floor double-float (single-float))
+  (def ceiling single-float ())
+  (def ceiling double-float (single-float))
+  (def truncate single-float ())
+  (def truncate double-float (single-float)))
 
 #-round-float
 (progn

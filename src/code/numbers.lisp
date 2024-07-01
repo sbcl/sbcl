@@ -320,19 +320,8 @@
   The second returned value is the remainder."
   (declare (explicit-check))
   (macrolet ((truncate-float (rtype)
-               `(let* ((float-div (coerce divisor ',rtype))
-                       (divided (/ number float-div))
-                       (res (unary-truncate divided)))
-                  (values res
-                          (- number
-                             (* (+ (,(ecase rtype
-                                       (double-float 'round-double)
-                                       (single-float 'round-single))
-                                    divided :truncate)
-                                   ,(ecase rtype
-                                      (double-float 0.0d0)
-                                      (single-float 0.0f0)))
-                                float-div)))))
+               `(truncate (coerce number ',rtype)
+                          (coerce divisor ',rtype)))
              (single-digit-bignum-p (x)
                #+(or x86-64 x86 ppc64)
                `(or (typep ,x 'word)

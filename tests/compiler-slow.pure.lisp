@@ -184,7 +184,7 @@
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (floor -114658225103614 84619.58))
-    (() (values -1354984705 8473228.0)))
+    (() (values -1354984704 8388608.0)))
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (floor -302254842 50510.5))
@@ -192,11 +192,11 @@
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (ceiling 114658225103614 84619.58))
-    (() (values 1354984705 -8473228.0)))
+    (() (values 1354984704 -8388608.0)))
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (ceiling 285493348393 94189.93))
-   (() (values 3031039 0.0))))
+   (() (values 3031040 -65536.0))))
 
 (with-test (:name :check-function-designator-cast-key-lambda-var)
   (checked-compile-and-assert
