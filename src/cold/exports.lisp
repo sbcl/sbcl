@@ -1620,7 +1620,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%UNARY-TRUNCATE" "UNARY-TRUNCATE"
            "%UNARY-TRUNCATE/SINGLE-FLOAT"
            "%UNARY-TRUNCATE/DOUBLE-FLOAT"
-           "%UNARY-FROUND" "%UNARY-FTRUNCATE"
+           "%UNARY-FROUND"
 
            "%WITH-ARRAY-DATA"
            "%WITH-ARRAY-DATA/FP"

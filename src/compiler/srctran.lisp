@@ -2135,45 +2135,35 @@
 (deftransform unary-truncate ((number) (integer))
   '(values number 0))
 
-#-round-float
-(progn
-  (defun ftruncate-derive-type-quot (number-type divisor-type)
-    ;; The bounds are the same as for truncate. However, the first
-    ;; result is a float of some type. We need to determine what that
-    ;; type is. Basically it's the more contagious of the two types.
-    (let ((q-type (truncate-derive-type-quot number-type divisor-type))
-          (format (numeric-type-format
-                   (numeric-contagion number-type divisor-type))))
-      (make-numeric-type :class 'float
-                         :format format
-                         :low (coerce-for-bound (numeric-type-low q-type) format)
-                         :high (coerce-for-bound (numeric-type-high q-type) format))))
 
-  (defun ftruncate-derive-type-quot-aux (n d same-arg)
-    (declare (ignore same-arg))
-    (when (and (numeric-type-real-p n)
-               (numeric-type-real-p d))
-      (ftruncate-derive-type-quot n d)))
+(defun ftruncate-derive-type-quot (number-type divisor-type)
+  ;; The bounds are the same as for truncate. However, the first
+  ;; result is a float of some type. We need to determine what that
+  ;; type is. Basically it's the more contagious of the two types.
+  (let ((q-type (truncate-derive-type-quot number-type divisor-type))
+        (format (numeric-type-format
+                 (numeric-contagion number-type divisor-type))))
+    (make-numeric-type :class 'float
+                       :format format
+                       :low (coerce-for-bound (numeric-type-low q-type) format)
+                       :high (coerce-for-bound (numeric-type-high q-type) format))))
 
-
-  (defoptimizer (ftruncate derive-type) ((number divisor))
-    (let ((quot
-            (two-arg-derive-type number divisor
-                                 #'ftruncate-derive-type-quot-aux #'ftruncate))
-          (rem (two-arg-derive-type number divisor
-                                    #'truncate-derive-type-rem-aux #'rem)))
-      (when (and quot rem)
-        (make-values-type (list quot rem)))))
+(defun ftruncate-derive-type-quot-aux (n d same-arg)
+  (declare (ignore same-arg))
+  (when (and (numeric-type-real-p n)
+             (numeric-type-real-p d))
+    (ftruncate-derive-type-quot n d)))
 
 
-  (defoptimizer (%unary-ftruncate derive-type) ((number))
-    (let ((divisor (specifier-type '(integer 1 1))))
-      (one-arg-derive-type number
-                           #'(lambda (n)
-                               (ftruncate-derive-type-quot-aux n divisor nil))
-                           #'ftruncate))))
+(defoptimizer (ftruncate derive-type) ((number divisor))
+  (let ((quot
+          (two-arg-derive-type number divisor
+                               #'ftruncate-derive-type-quot-aux #'ftruncate))
+        (rem (two-arg-derive-type number divisor
+                                  #'truncate-derive-type-rem-aux #'rem)))
+    (when (and quot rem)
+      (make-values-type (list quot rem)))))
 
-#+round-float
 (macrolet ((derive (type)
              `(case (lvar-value mode)
                 ,@(loop for mode in '(:round :floor :ceiling :truncate)

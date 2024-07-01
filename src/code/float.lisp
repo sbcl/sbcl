@@ -896,15 +896,11 @@
                    rounded))))))))
 
 #-round-float
-(macrolet ((def (name op)
-             `(defun ,name (number)
-                (number-dispatch ((number real))
-                                 ((integer) (float number))
-                                 ((ratio) (float (,op (numerator number) (denominator number))))
-                                 (((foreach single-float double-float #+long-float long-float))
-                                  (,name number))))))
-  (def %unary-ftruncate truncate)
-  (def %unary-fround round))
+(defun %unary-fround (number)
+  (number-dispatch ((number real))
+    ((integer) (float number))
+    ((ratio) (float (round (numerator number) (denominator number))))
+    (((foreach single-float double-float)) (%unary-fround number))))
 
 (defun rational (x)
   "RATIONAL produces a rational number for any real numeric argument. This is

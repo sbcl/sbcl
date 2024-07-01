@@ -1842,7 +1842,6 @@
                                     (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
                     (cond
                       ;; Compute only the remainder
-                      #+round-float
                       ((mv-bind-unused-p result 0)
                        (setf (node-derived-type node)
                              (values-specifier-type '(values integer ,type &optional)))
@@ -1875,7 +1874,6 @@
                                        (res (,',unary div)))
                                   (values res
                                           (- x (* f
-                                                  #+round-float
                                                   (+ (,',(ecase type
                                                            (double-float 'round-double)
                                                            (single-float 'round-single))
@@ -1883,11 +1881,7 @@
                                                      ;; Turn -0 into 0
                                                      ,,(ecase type
                                                          (double-float 0.0d0)
-                                                         (single-float 0.0f0)))
-                                                  #-round-float
-                                                  (locally
-                                                      (declare (flushable ,',coerce))
-                                                    (,',coerce res))))))
+                                                         (single-float 0.0f0)))))))
                                `(let* ((f (,',coerce y))
                                        (res (,',unary (/ x f))))
                                   ;; Dummy secondary value!
@@ -1912,7 +1906,6 @@
                     (let ((one-p (or (not divisor)
                                      (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
                       ;; Compute only the remainder
-                      #+round-float
                       (when (mv-bind-unused-p result 0)
                         (setf (node-derived-type node)
                               (values-specifier-type '(values integer ,type &optional)))
@@ -1933,7 +1926,6 @@
                                                      ,,(ecase type
                                                          (double-float 0.0d0)
                                                          (single-float 0.0f0)))))))))
-                      #+round-float
                       (when-vop-existsp (:translate %unary-ceiling)
                         (when one-p
                           (return
@@ -1960,7 +1952,6 @@
                              (let* ((tru (truly-the fixnum (,',unary div)))
                                     (rem (- number (* ,@(unless one-p
                                                           '(f-divisor))
-                                                      #+round-float
                                                       (+ (,',(ecase type
                                                                (double-float 'round-double)
                                                                (single-float 'round-single))
@@ -1968,11 +1959,7 @@
                                                          ;; Turn -0 into 0
                                                          ,,(ecase type
                                                              (double-float 0.0d0)
-                                                             (single-float 0.0f0)))
-                                                      #-round-float
-                                                      (locally
-                                                          (declare (flushable ,',coerce))
-                                                        (,',coerce tru))))))
+                                                             (single-float 0.0f0)))))))
                                ,',fixup)
                              (,',unary-to-bignum div)))))))))
   (def floor single-float ()
@@ -2024,19 +2011,10 @@
 
 #-round-float
 (progn
-  (defknown (%unary-ftruncate %unary-fround) (real) float (movable foldable flushable))
+  (defknown (%unary-fround) (real) float (movable foldable flushable))
   #-64-bit
-  (defknown (%unary-ftruncate/double %unary-fround/double) (double-float) double-float
-    (movable foldable flushable))
-
-  (deftransform %unary-ftruncate ((x) (single-float))
-    `(cond ((typep x '(or (single-float (-1f0) (0f0)) (eql -0f0)))
-            -0f0)
-           ((typep x '(single-float ,(float (- (expt 2 sb-vm:single-float-digits)) 1f0)
-                       ,(float (1- (expt 2 sb-vm:single-float-digits)) 1f0)))
-            (float (truncate x) 1f0))
-           (t
-            x)))
+  (defknown (%unary-fround/double) (double-float) double-float
+      (movable foldable flushable))
 
   (deftransform %unary-fround ((x) (single-float))
     `(cond ((typep x '(or (single-float -0.5f0 (0f0)) (eql -0f0)))
@@ -2048,87 +2026,66 @@
             x)))
 
   #+64-bit
-  (progn
-    (deftransform %unary-ftruncate ((x) (double-float))
-      `(cond ((typep x '(or (double-float (-1d0) (0d0)) (eql -0d0)))
-              -0d0)
-             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
-                         ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
-              (float (truncate x) 1d0))
-             (t
-              x)))
-
-    (deftransform %unary-fround ((x) (double-float))
-      `(cond ((typep x '(or (double-float -0.5d0 (0d0)) (eql -0d0)))
-              -0d0)
-             ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
-                         ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
-              (float (round x) 1d0))
-             (t
-              x))))
+  (deftransform %unary-fround ((x) (double-float))
+    `(cond ((typep x '(or (double-float -0.5d0 (0d0)) (eql -0d0)))
+            -0d0)
+           ((typep x '(double-float ,(float (- (expt 2 sb-vm:double-float-digits)) 1d0)
+                       ,(float (1- (expt 2 sb-vm:double-float-digits)) 1d0)))
+            (float (round x) 1d0))
+           (t
+            x)))
 
   #-64-bit
   (progn
     #-sb-xc-host
-    (progn
-      (defun %unary-ftruncate/double (x)
-        (declare (muffle-conditions compiler-note))
-        (declare (type double-float x))
-        (declare (optimize speed (safety 0)))
-        (let* ((high (double-float-high-bits x))
-               (low (double-float-low-bits x))
-               (exp (ldb sb-vm:double-float-hi-exponent-byte high))
-               (biased (the double-float-exponent
-                            (- exp sb-vm:double-float-bias))))
-          (declare (type (signed-byte 32) high)
-                   (type (unsigned-byte 32) low))
-          (cond
-            ((= exp sb-vm:double-float-normal-exponent-max) x)
-            ((<= biased 0) (* x 0d0))
-            ((>= biased (float-digits x)) x)
-            (t
-             (let ((frac-bits (- (float-digits x) biased)))
-               (cond ((< frac-bits 32)
-                      (setf low (logandc2 low (- (ash 1 frac-bits) 1))))
-                     (t
-                      (setf low 0)
-                      (setf high (logandc2 high (- (ash 1 (- frac-bits 32)) 1)))))
-               (make-double-float high low))))))
-      (defun %unary-fround/double (x)
-        (declare (muffle-conditions compiler-note))
-        (declare (type double-float x))
-        (declare (optimize speed (safety 0)))
-        (let* ((high (double-float-high-bits x))
-               (low (double-float-low-bits x))
-               (exp (ldb sb-vm:double-float-hi-exponent-byte high))
-               (biased (the double-float-exponent
-                            (- exp sb-vm:double-float-bias))))
-          (declare (type (signed-byte 32) high)
-                   (type (unsigned-byte 32) low))
-          (cond
-            ((= exp sb-vm:double-float-normal-exponent-max) x)
-            ((<= biased -1) (* x 0d0)) ; [0,0.5)
-            ((and (= biased 0) (= low 0) (= (ldb sb-vm:double-float-hi-significand-byte high) 0)) ; [0.5,0.5]
-             (* x 0d0))
-            ((= biased 0) (float-sign x 1d0)) ; (0.5,1.0)
-            ((= biased 1) ; [1.0,2.0)
-             (cond
-               ((>= (ldb sb-vm:double-float-hi-significand-byte high) (ash 1 19))
-                (float-sign x 2d0))
-               (t (float-sign x 1d0))))
-            ((>= biased (float-digits x)) x)
-            (t
-             ;; it's probably possible to do something very contorted
-             ;; to avoid consing intermediate bignums, by performing
-             ;; arithmetic on the fractional part, the low integer
-             ;; part, the high integer part, and the exponent of the
-             ;; double float.  But in the interest of getting
-             ;; something correct to start with, delegate to ROUND.
-             (float (round x) 1d0))))))
-    (deftransform %unary-ftruncate ((x) (double-float))
-      `(%unary-ftruncate/double x))
+    (defun %unary-fround/double (x)
+      (declare (muffle-conditions compiler-note))
+      (declare (type double-float x))
+      (declare (optimize speed (safety 0)))
+      (let* ((high (double-float-high-bits x))
+             (low (double-float-low-bits x))
+             (exp (ldb sb-vm:double-float-hi-exponent-byte high))
+             (biased (the double-float-exponent
+                          (- exp sb-vm:double-float-bias))))
+        (declare (type (signed-byte 32) high)
+                 (type (unsigned-byte 32) low))
+        (cond
+          ((= exp sb-vm:double-float-normal-exponent-max) x)
+          ((<= biased -1) (* x 0d0))    ; [0,0.5)
+          ((and (= biased 0) (= low 0) (= (ldb sb-vm:double-float-hi-significand-byte high) 0)) ; [0.5,0.5]
+           (* x 0d0))
+          ((= biased 0) (float-sign x 1d0)) ; (0.5,1.0)
+          ((= biased 1)                     ; [1.0,2.0)
+           (cond
+             ((>= (ldb sb-vm:double-float-hi-significand-byte high) (ash 1 19))
+              (float-sign x 2d0))
+             (t (float-sign x 1d0))))
+          ((>= biased (float-digits x)) x)
+          (t
+           ;; it's probably possible to do something very contorted
+           ;; to avoid consing intermediate bignums, by performing
+           ;; arithmetic on the fractional part, the low integer
+           ;; part, the high integer part, and the exponent of the
+           ;; double float.  But in the interest of getting
+           ;; something correct to start with, delegate to ROUND.
+           (float (round x) 1d0)))))
     (deftransform %unary-fround ((x) (double-float))
-      `(%unary-fround/double x))))
+      `(%unary-fround/double x)))
+
+  (macrolet ((def (name type &optional (suffix ""))
+               `(deftransform ,name ((x mode) (t (constant-arg t)))
+                  (let ((fun (case (lvar-value mode)
+                               (:floor ,(format nil "floor~a" suffix))
+                               (:ceiling ,(format nil "ceil~a" suffix))
+                               (:truncate ,(format nil "trunc~a" suffix)))))
+                    `(locally
+                         (declare (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
+                       (alien-funcall (%alien-value
+                                       (foreign-symbol-sap ,fun nil) 0
+                                       ,(parse-alien-type '(function ,type ,type) nil))
+                                      x))))))
+    (def round-single single-float "f")
+    (def round-double double-float)))
 
 #+round-float
 (deftransform fround ((number &optional divisor) (double-float &optional t))

@@ -325,16 +325,13 @@
                        (res (unary-truncate divided)))
                   (values res
                           (- number
-                             (* #-round-float
-                                (coerce res ',rtype)
-                                #+round-float
-                                (- (,(ecase rtype
+                             (* (+ (,(ecase rtype
                                        (double-float 'round-double)
                                        (single-float 'round-single))
-                                     divided :truncate)
+                                    divided :truncate)
                                    ,(ecase rtype
-                                      (double-float -0.0d0)
-                                      (single-float -0.0f0)))
+                                      (double-float 0.0d0)
+                                      (single-float 0.0f0)))
                                 float-div)))))
              (single-digit-bignum-p (x)
                #+(or x86-64 x86 ppc64)
@@ -563,104 +560,43 @@
 (declaim (inline fceiling ffloor ftruncate))
 
 #-round-float
-(progn
-  (defun ftruncate (number &optional (divisor 1))
-    "Same as TRUNCATE, but returns first value as a float."
-    (declare (explicit-check))
-    (macrolet ((ftruncate-float (rtype)
-                 `(let* ((float-div (coerce divisor ',rtype))
-                         (res (%unary-ftruncate (/ number float-div))))
-                    (values res
-                            (- number
-                               (* (coerce res ',rtype) float-div))))))
-      (number-dispatch ((number real) (divisor real))
-        (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
-         (multiple-value-bind (q r)
-             (truncate number divisor)
-           (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
-                                  (and (not (minusp number)) (minusp divisor))))
-               (values -0f0 r)
-               (values (float q) r))))
-        (((foreach single-float double-float #+long-float long-float)
-          (or rational single-float))
-         (if (eql divisor 1)
-             (let ((res (%unary-ftruncate number)))
-               (values res (- number (coerce res '(dispatch-type number)))))
-             (ftruncate-float (dispatch-type number))))
-        #+long-float
-        ((long-float (or single-float double-float long-float))
-         (ftruncate-float long-float))
-        #+long-float
-        (((foreach double-float single-float) long-float)
-         (ftruncate-float long-float))
-        ((double-float (or single-float double-float))
-         (ftruncate-float double-float))
-        ((single-float double-float)
-         (ftruncate-float double-float))
-        (((foreach fixnum bignum ratio)
-          (foreach single-float double-float #+long-float long-float))
-         (ftruncate-float (dispatch-type divisor))))))
+(defun fround (number &optional (divisor 1))
+  "Same as ROUND, but returns first value as a float."
+  (declare (explicit-check))
+  (macrolet ((fround-float (rtype)
+               `(let* ((float-div (coerce divisor ',rtype))
+                       (res (%unary-fround (/ number float-div))))
+                  (values res
+                          (- number
+                             (* (coerce res ',rtype) float-div))))))
+    (number-dispatch ((number real) (divisor real))
+      (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
+       (multiple-value-bind (q r)
+           (round number divisor)
+         (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
+                                (and (not (minusp number)) (minusp divisor))))
+             (values -0f0 r)
+             (values (float q) r))))
+      (((foreach single-float double-float #+long-float long-float)
+        (or rational single-float))
+       (if (eql divisor 1)
+           (let ((res (%unary-fround number)))
+             (values res (- number (coerce res '(dispatch-type number)))))
+           (fround-float (dispatch-type number))))
+      #+long-float
+      ((long-float (or single-float double-float long-float))
+       (fround-float long-float))
+      #+long-float
+      (((foreach double-float single-float) long-float)
+       (fround-float long-float))
+      ((double-float (or single-float double-float))
+       (fround-float double-float))
+      ((single-float double-float)
+       (fround-float double-float))
+      (((foreach fixnum bignum ratio)
+        (foreach single-float double-float #+long-float long-float))
+       (fround-float (dispatch-type divisor))))))
 
-  (defun ffloor (number &optional (divisor 1))
-    "Same as FLOOR, but returns first value as a float."
-    (declare (explicit-check))
-    (multiple-value-bind (tru rem) (ftruncate number divisor)
-      (if (and (not (zerop rem))
-               (if (minusp divisor)
-                   (plusp number)
-                   (minusp number)))
-          (values (1- tru) (+ rem divisor))
-          (values tru rem))))
-
-  (defun fceiling (number &optional (divisor 1))
-    "Same as CEILING, but returns first value as a float."
-    (declare (explicit-check))
-    (multiple-value-bind (tru rem) (ftruncate number divisor)
-      (if (and (not (zerop rem))
-               (if (minusp divisor)
-                   (minusp number)
-                   (plusp number)))
-          (values (+ tru 1) (- rem divisor))
-          (values tru rem))))
-
-  (defun fround (number &optional (divisor 1))
-    "Same as ROUND, but returns first value as a float."
-    (declare (explicit-check))
-    (macrolet ((fround-float (rtype)
-                 `(let* ((float-div (coerce divisor ',rtype))
-                         (res (%unary-fround (/ number float-div))))
-                    (values res
-                            (- number
-                               (* (coerce res ',rtype) float-div))))))
-      (number-dispatch ((number real) (divisor real))
-        (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
-         (multiple-value-bind (q r)
-             (round number divisor)
-           (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
-                                  (and (not (minusp number)) (minusp divisor))))
-               (values -0f0 r)
-               (values (float q) r))))
-        (((foreach single-float double-float #+long-float long-float)
-          (or rational single-float))
-         (if (eql divisor 1)
-             (let ((res (%unary-fround number)))
-               (values res (- number (coerce res '(dispatch-type number)))))
-             (fround-float (dispatch-type number))))
-        #+long-float
-        ((long-float (or single-float double-float long-float))
-         (fround-float long-float))
-        #+long-float
-        (((foreach double-float single-float) long-float)
-         (fround-float long-float))
-        ((double-float (or single-float double-float))
-         (fround-float double-float))
-        ((single-float double-float)
-         (fround-float double-float))
-        (((foreach fixnum bignum ratio)
-          (foreach single-float double-float #+long-float long-float))
-         (fround-float (dispatch-type divisor)))))))
-
-#+round-float
 (macrolet ((def (name mode docstring)
              `(defun ,name (number &optional (divisor 1))
                 ,docstring
@@ -703,20 +639,22 @@
                       (foreach single-float double-float))
                      (ftruncate-float (dispatch-type divisor))))))))
   (def ftruncate :truncate
-       "Same as TRUNCATE, but returns first value as a float.")
+    "Same as TRUNCATE, but returns first value as a float.")
 
   (def ffloor :floor
-       "Same as FLOOR, but returns first value as a float.")
+    "Same as FLOOR, but returns first value as a float.")
 
   (def fceiling :ceiling
-       "Same as CEILING, but returns first value as a float.")
+    "Same as CEILING, but returns first value as a float.")
+
+  #+round-float
   (def fround :round
     "Same as ROUND, but returns first value as a float.")
 
   (macrolet ((def (name)
                `(defun ,name (x mode)
                   (ecase mode
-                    ,@(loop for m in '(:round :floor :ceiling :truncate)
+                    ,@(loop for m in '(#-round-float :round :floor :ceiling :truncate)
                             collect `(,m (,name x ,m)))))))
 
 

@@ -2318,14 +2318,13 @@
            sb-thread::call-with-recursive-system-lock)
     ((function ()) t) *))
 
-#+round-float
 (progn
-  (defknown round-double (double-float #1=(member :round :floor :ceiling :truncate))
+  (defknown round-double (double-float #1=(member #+round-float :round :floor :ceiling :truncate))
       double-float
-      (foldable flushable movable always-translatable))
+      (foldable flushable movable #+round-float always-translatable))
 
   (defknown round-single (single-float #1#) single-float
-      (foldable flushable movable always-translatable)))
+      (foldable flushable movable #+round-float always-translatable)))
 
 (defknown (overflow* overflow+ overflow-
            overflow-ash)

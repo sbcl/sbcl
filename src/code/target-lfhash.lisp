@@ -343,7 +343,7 @@
   (let* ((old-count (info-env-count env))
          (old-storage (info-env-storage env))
          ;; the new storage begins life at ~50% capacity
-         (new-storage (make-info-storage (ceiling old-count .5)))
+         (new-storage (make-info-storage (* old-count 2)))
          (old-capacity (info-storage-capacity old-storage))
          (new-capacity (info-storage-capacity new-storage)))
 
