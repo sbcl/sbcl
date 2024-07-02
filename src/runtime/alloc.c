@@ -283,13 +283,11 @@ lispobj alloc_code_object(unsigned total_words, unsigned boxed)
     // 'boxed_size' is an untagged word expressing the number of *bytes* in the boxed section
     // (so CODE-INSTRUCTIONS can simply add rather than shift and add).
     code->boxed_size = boxed * N_WORD_BYTES;
-    code->debug_info = 0;
-    code->fixups = 0;
-    lispobj* p = &code->constants[0], *end = (lispobj*)code + boxed;
-    /* Must intialize to an arbitrary non-pointer value so that GC doesn't crash after the
-     * size is assigned (at some point prior to storing the constants) */
-    for ( ; p < end ; ++p) *p = 0;
-    *p = 0; // 'p' now points to the jump table count word which must be 0
+    // GC mustn't see uninitialized data. And one word past the boxed words (which holds the
+    // count of following words containing absolute jump addresses) must also be pre-zeroed.
+    lispobj* begin = 1 + &code->boxed_size, *end = (lispobj*)code + boxed + 1;
+    memset(begin, 0, (char*)end - (char*)begin);
+
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
     THREAD_JIT_WP(1);
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
