@@ -439,7 +439,7 @@
 (defmacro bignum-header-for-length (n)
   `(logior (ash ,n n-widetag-bits) bignum-widetag))
 
-(defmacro id-bits-offset ()
+(defmacro id-bits-offset () ; FIXME: could this be a constant ?
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
 

@@ -188,7 +188,7 @@
                      (translate (symbol-name (translate x spacemap)) spacemap))
                  x)))))
 
-(defun core-package-from-id (id core)
+(defun core-pkgname-from-id (id core)
   (if (/= id 0)
       (let ((package (aref (core-pkg-id->package core) id)))
         (translate (package-%name (truly-the package package))
@@ -1499,14 +1499,35 @@
 ;;;
 ;;; Shared substructure / circularity are OK (I think)
 ;;;
-(defparameter *allowed-instance-types*
-  '(sb-c::compiled-debug-info sb-c::debug-source))
-(defparameter *ignored-instance-types*
-  '("CORE-DEBUG-SOURCE"))
+(defglobal *allowed-instance-types*
+  #(sb-c::compiled-debug-info sb-c::debug-source))
+(defglobal *allowed-instance-type-ids*
+  (map 'vector (lambda (x) (layout-id (find-layout x)))
+       *allowed-instance-types*))
 
-(dolist (type *allowed-instance-types*)
+(dovector (type *allowed-instance-types*)
   (let ((dd (find-defstruct-description type)))
     (assert (= (sb-kernel::dd-bitmap dd) +layout-all-tagged+))))
+
+(defglobal *ignored-instance-type-ids*
+  `(,(layout-id (find-layout 'sb-c::core-debug-source))))
+(defglobal *package-type-id* (layout-id (find-layout 'package)))
+
+;;; SB-KERNEL:LAYOUT-ID would perform a type-check (that may crash
+;;; on the target core). This is cribbed from that function.
+(defun %layout-id (layout)
+  (aver (logtest +structure-layout-flag+ (layout-flags (truly-the layout layout))))
+  ;; Depthoid 2 stores its ID at index 0 and so on. The IDs of T and
+  ;; STRUCTURE-OBJECT are not present.
+  (let* ((sap (sap+ (int-sap (get-lisp-obj-address layout))
+                    (- (sb-vm::id-bits-offset) instance-pointer-lowtag)))
+         (depthoid (the (integer 2) (sb-kernel:layout-depthoid layout)))
+         (id (signed-sap-ref-32 sap (ash (- depthoid 2) 2))))
+    id))
+
+(defun ensure-pkg-exists (name)
+  (or (find-package name)
+      (make-package (copy-seq (the string name)))))
 
 (defun extract-object-from-core (sap core &optional proxy-symbols
                                  &aux (spacemap (core-spacemap core))
@@ -1536,23 +1557,13 @@
                         (rplacd new (recurse (word 1)))
                         new))
                      (#.instance-pointer-lowtag
+                      ;; Any instance type that we can handle must have a layout-id
+                      ;; which matches the host's layout-id for the same classoid.
                       (let* ((layout
                               (truly-the layout
                                (translate (%instance-layout (translated-obj)) spacemap)))
-                             (classoid
-                              (truly-the classoid
-                                (translate (layout-classoid layout) spacemap)))
-                             (classoid-name
-                              (truly-the symbol
-                              (translate (classoid-name classoid) spacemap)))
-                             (classoid-name-string
-                              (translate (symbol-name classoid-name) spacemap))
-                             (allowed
-                              (find classoid-name-string *allowed-instance-types*
-                                    :test 'string=)))
-                        ;; In general, I want to correctly intern the symbol into the host
-                        ;; and then perform FIND-LAYOUT on that symbol.
-                        ;; These few cases are enough to get by.
+                             (id (%layout-id layout))
+                             (allowed (position id *allowed-instance-type-ids*)))
                         (cond
                           (allowed
                            (let* ((nslots (%instance-length (translated-obj)))
@@ -1562,23 +1573,21 @@
                                     ;; skip the layout slot if #-compact-instance-header
                                     (if (= instance-data-start 1) 1 0)
                                     0)))
-                             (setf (%instance-layout new) (find-layout allowed))
+                             (setf (%instance-layout new)
+                                   (find-layout (svref *allowed-instance-types* allowed)))
                              (dotimes (i nslots new)
                                (unless (logbitp i exclude-slot-mask)
                                  (setf (%instance-ref new i)
                                        (recurse (word (+ instance-slots-offset i))))))))
-                          ((string= classoid-name-string "PACKAGE")
+                          ((= id *package-type-id*)
                            ;; oh dear, this is completely wrong
-                           (let ((package-name
-                                  (translate
-                                   (sb-impl::package-%name (truly-the package (translated-obj)))
-                                   spacemap)))
-                             (memoize (or (find-package package-name)
-                                          (make-package package-name)))))
-                          ((member classoid-name-string *ignored-instance-types* :test 'string=)
+                           (let* ((pkg (truly-the package (translated-obj)))
+                                  (name (translate (sb-impl::package-%name pkg) spacemap)))
+                             (memoize (ensure-pkg-exists name))))
+                          ((member id *ignored-instance-type-ids*)
                            (sb-kernel:make-unbound-marker))
                           (t
-                           (error "Not done: type ~s" classoid-name-string)))))
+                           (error "Not done: type ~d" id)))))
                      (#.fun-pointer-lowtag
                       ;; CORE-DEBUG-SOURCE has a :FUNCTION but don't care the value
                       #'error)
@@ -1595,14 +1604,12 @@
                               ((= widetag symbol-widetag)
                                (let* ((sym (translated-obj))
                                       (name (translate (symbol-name sym) spacemap))
-                                      (pkg-name (core-package-from-id (symbol-package-id sym)
+                                      (pkg-name (core-pkgname-from-id (symbol-package-id sym)
                                                                       core)))
                                  (memoize (if (null pkg-name)
                                               (make-symbol name)
                                               (without-package-locks
-                                                  (intern name
-                                                          (or (find-package pkg-name)
-                                                              (make-package pkg-name))))))))
+                                                  (intern name (ensure-pkg-exists pkg-name)))))))
                               ((< widetag symbol-widetag) ; a number of some kind
                                (copy-number-to-heap (translated-obj)))
                               (t
