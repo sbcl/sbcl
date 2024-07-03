@@ -575,3 +575,4 @@
               (parse-alien-type '(integer 9) nil)))
   (assert (eq (parse-alien-type '(* (struct nil (x int) (y int))) nil)
               (parse-alien-type '(* (struct nil (x int) (y int))) nil))))
+
