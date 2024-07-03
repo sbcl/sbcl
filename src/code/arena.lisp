@@ -90,13 +90,14 @@ one or more times, not to exceed MAX-EXTENSIONS times"
     ;; If the amount to grow by is too small, then a single cons cell plus the default slack
     ;; can exceed the threshold for being oversized. But if a cons cell goes in a standalone
     ;; (oversized) block, scavenging goes haywire, and I don't really want to change how it works.
-    (setf (arena-size-limit (truly-the arena arena))
-          (+ size (the fixnum (* max-extensions growth-amount)))
-          (arena-growth-amount arena) (max growth-amount (* 8 1024 1024))
-          (arena-index arena) index
-          (arena-hidden arena) nil
-          (arena-token arena) 1
-          (arena-userdata arena) nil)
+    (let ((growth-amount (max growth-amount (* 8 1024 1024))))
+      (setf (arena-size-limit (truly-the arena arena))
+            (+ size (the fixnum (* max-extensions growth-amount)))
+            (arena-growth-amount arena) growth-amount
+            (arena-index arena) index
+            (arena-hidden arena) nil
+            (arena-token arena) 1
+            (arena-userdata arena) nil))
     arena))
 
 ;;; Destroy memory associated with ARENA, unlinking it from the global chain.
@@ -189,6 +190,11 @@ one or more times, not to exceed MAX-EXTENSIONS times"
   ;; Inform GC as of now not to look in the arena
   (setf (arena-hidden arena) t)
   (arena-mprotect arena t))
+;; FIXME: for the pattern "unhide / rewind / with-arena" to be safe, there has to be
+;; another state introduced which is "hidden + ignored-during-GC".  This is needed
+;; in case an auto-triggered collection skipped over the arena. Then there is race
+;; with the next auto-triggered GC in between unhide + rewind, beacause any pointers
+;; in the un-hidden arena may point to garbage.
 (defun unhide-arena (arena)
   (aver (arena-hidden arena))
   (arena-mprotect arena nil)
