@@ -320,9 +320,10 @@ corresponds to NAME, or NIL if there is none."
 
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
-           (type (unsigned-byte 32) len))
+           (type index len))
   (int-syscall (#-win32 "read" #+win32 "win32_unix_read"
-                int (* char) int) fd buf len))
+                ssize-t (* char) size-t)
+               fd buf len))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
 ;;; length to write. It attempts to write len bytes to the device
@@ -334,11 +335,11 @@ corresponds to NAME, or NIL if there is none."
   ;; full calls to SB-ALIEN-INTERNALS:DEPORT-ALLOC and DEPORT.
   (declare (optimize (debug 1)))
   (declare (type unix-fd fd)
-           (type (unsigned-byte 32) offset len))
+           (type index offset len))
   (flet ((%write (sap)
            (declare (system-area-pointer sap))
            (int-syscall (#-win32 "write" #+win32 "win32_unix_write"
-                         int (* char) int)
+                         ssize-t (* char) size-t)
                         fd
                         (with-alien ((ptr (* char) sap))
                           (addr (deref ptr offset)))
