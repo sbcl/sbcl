@@ -119,7 +119,7 @@
                  (or #+x86-64 (%primitive !fast-alloc-immobile-symbol)
                      (alloc-immobile-fixedobj
                       symbol-size
-                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))))
+                      (compute-object-header (1- symbol-size) symbol-widetag))))))
     ;; symbol-hash and package ID start out as 0
     (%primitive set-slot symbol name 'make-symbol symbol-name-slot other-pointer-lowtag)
     (%primitive set-slot symbol nil 'make-symbol symbol-info-slot other-pointer-lowtag)

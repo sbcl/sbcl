@@ -1197,7 +1197,7 @@
   (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
   (:temporary (:sc unsigned-reg) header)
   (:generator 1
-    ;; fixedobj_pages linkage entry: 1 PTE per page, 12-byte struct
+    ;; fixedobj_pages alien linkage entry: 1 PTE per page, 12-byte struct
     (inst mov rbx (rip-relative-ea (make-fixup "fixedobj_pages" :foreign-dataref)))
     ;; fixedobj_page_hint: 1 hint per sizeclass. C type = uint32_t
     (inst mov rax (rip-relative-ea (make-fixup "fixedobj_page_hint" :foreign-dataref)))
@@ -1231,7 +1231,7 @@
        (inst test :dword rax 1)
        (inst jmp :nz FAIL) ; not a fixnum implies already taken
        ;; try to claim this word of memory
-       (inst mov header (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))
+       (inst mov header (compute-object-header (1- symbol-size) symbol-widetag))
        (inst cmpxchg :lock (ea result) header)
        (inst jmp :ne FAIL) ; already taken
        ;; compute new free_index = spacing + old header + free_index
