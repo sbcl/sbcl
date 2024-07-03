@@ -677,14 +677,14 @@
 (defknown make-fdefn (t) fdefn (flushable movable))
 (defknown fdefn-p (t) boolean (movable foldable flushable))
 (defknown fdefn-name (fdefn) t (foldable flushable))
-(defknown fdefn-fun (fdefn) (or function null) (flushable))
+(defknown fdefn-fun ((or fdefn #+linkage-space symbol)) (or function null) (flushable))
 (defknown (setf fdefn-fun) (function fdefn) function ())
 (defknown fdefn-makunbound (fdefn) (values) ())
 ;;; FDEFN -> FUNCTION, trapping if not FBOUNDP
 ;;; For the most part this simple-fun is not needed, as ir2 conversion directly selects
 ;;; the vop of this name; however, the expansion of handler-bind puts in a call to it
 ;;; to trap unbound handlers in safe code, and we want that to work in the interpreter.
-(defknown safe-fdefn-fun (fdefn) function ())
+(defknown safe-fdefn-fun ((or fdefn #+linkage-space symbol)) function ())
 
 (defknown %simple-fun-type (function) t (flushable))
 

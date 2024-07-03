@@ -883,5 +883,5 @@ functions when called with no arguments."
                    tracing-wrapper))))))
     ;; Possibly update #'NAME to point to the tracing wrapper
     (when (and namep (eq (fboundp name) traced-fun))
-      (setf (fdefn-fun (find-fdefn name)) tracing-wrapper))
+      (fset name tracing-wrapper))
     tracing-wrapper))

@@ -544,6 +544,7 @@ possibly temporarily, because it might be used internally.")
    "UPDATE-SYMBOL-INFO"
    "WITH-GLOBALDB-NAME"
    "%BOUNDP"
+   "ENSURE-LINKAGE-INDEX"
 
    ;; Calling a list of hook functions, plus error handling.
 
@@ -866,6 +867,7 @@ possibly temporarily, because it might be used internally.")
 
    "ADDRESS-BASED-COUNTER-VAL"
    "DEFINE-FUNCTION-NAME-SYNTAX" "VALID-FUNCTION-NAME-P" ; should be SB-EXT?
+   "PERMANENT-FNAME-P" "FSET"
 
    "LEGAL-VARIABLE-NAME-P"
    "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
@@ -2883,7 +2885,7 @@ structure representations")
            "CLOSURE-INFO-OFFSET"
            "CODE-BOXED-SIZE-SLOT"
            "CODE-CONSTANTS-OFFSET" "CODE-SLOTS-PER-SIMPLE-FUN"
-           "CODE-FIXUPS-SLOT"
+           "CODE-FIXUPS-SLOT" "CODE-LINKAGE-ELTS-SLOT"
            "CODE-DEBUG-INFO-SLOT"
            "CODE-HEADER-SIZE-SHIFT"
            "CODE-HEADER-WIDETAG" "COMPLEX-ARRAY-WIDETAG"
@@ -3002,6 +3004,7 @@ structure representations")
            "N-LOWTAG-BITS"
            "N-FIXNUM-TAG-BITS"
            "N-FIXNUM-BITS"
+           "N-LINKAGE-INDEX-BITS"
            "N-POSITIVE-FIXNUM-BITS"
            "NIL-VALUE"
            "NFP-SAVE-OFFSET"

@@ -2218,6 +2218,19 @@ static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t
                 return where;
         }
 #endif
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        else if (widetag == SYMBOL_WIDETAG) {
+            struct symbol* s = (void*)where;
+            if (!ptr_ok_to_writeprotect(linkage_cell_taggedptr(symbol_linkage_index(s)), gen))
+                return where;
+            // Process the value and info slots normally, and the bit-packed package ID + name
+            // can't be younger, so that slot's contents are irrelevant
+        } else if (widetag == FDEFN_WIDETAG) {
+            struct fdefn* f = (void*)where;
+            if (!ptr_ok_to_writeprotect(linkage_cell_taggedptr(fdefn_linkage_index(f)), gen))
+                return where;
+        }
+#endif
         // Scan all the rest of the words even if some of them are raw bits.
         // At worst this overestimates the set of pointer words.
         sword_t index;
@@ -3537,6 +3550,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
     heap_scavenge((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
     heap_scavenge((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    extern void scavenge_elf_linkage_space();
+    scavenge_elf_linkage_space();
+#endif
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
     // TODO: use an explicit remembered set of modified objects in this range
     if (TEXT_SPACE_START) heap_scavenge((lispobj*)TEXT_SPACE_START, text_space_highwatermark);
@@ -4006,6 +4023,9 @@ collect_garbage(generation_index_t last_gen)
     // This could be done in the background somehow maybe.
     page_index_t max_nfp = initial_nfp > next_free_page ? initial_nfp : next_free_page;
     memset(gc_page_pins, 0, max_nfp);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    sweep_linkage_space();
+#endif
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -4442,6 +4462,8 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
             }
         }
 #endif
+        extern void scav_code_linkage_cells(struct code*);
+        scav_code_linkage_cells(code);
 
         // What does this have to do with DARWIN_JIT?
 #if defined LISP_FEATURE_64_BIT && !defined LISP_FEATURE_DARWIN_JIT
@@ -4728,6 +4750,9 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(s->value, &s->value);
         CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        CHECK(linkage_cell_taggedptr(symbol_linkage_index(s)), &s->fdefn);
+#endif
         CHECK(decode_symbol_name(s->name), &s->name);
         return 0;
     }
@@ -4735,7 +4760,11 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         struct fdefn* f = (void*)object;
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        CHECK(linkage_cell_taggedptr(fdefn_linkage_index(f)), &f->fun);
+#else
         CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
+#endif
         return 0;
     }
     for (i=1; i<nwords; ++i) CHECK(object[i], object+i);
@@ -4966,7 +4995,7 @@ void gc_show_pte(lispobj obj)
     printf("not in GC'ed space\n");
 }
 
-static int count_immobile_objects(__attribute__((unused)) int gen, int res[4])
+static int count_immobile_objects(__attribute__((unused)) int gen, int res[3])
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     lispobj* where = (lispobj*)FIXEDOBJ_SPACE_START;
@@ -4975,8 +5004,7 @@ static int count_immobile_objects(__attribute__((unused)) int gen, int res[4])
         if (immobile_obj_generation(where) == gen) {
             switch (widetag_of(where)) {
             case INSTANCE_WIDETAG: ++res[0]; break;
-            case FDEFN_WIDETAG: ++res[1]; break;
-            case SYMBOL_WIDETAG: ++res[2]; break;
+            case SYMBOL_WIDETAG: ++res[1]; break;
             }
         }
         where += object_size(where);
@@ -4985,11 +5013,11 @@ static int count_immobile_objects(__attribute__((unused)) int gen, int res[4])
     end = text_space_highwatermark;
     while (where < end) {
         if (widetag_of(where) != FILLER_WIDETAG && immobile_obj_generation(where) == gen)
-            ++res[3];
+            ++res[2];
         where += object_size(where);
     }
 #endif
-    return (res[0] | res[1] | res[2] | res[3]) != 0;
+    return (res[0] | res[1] | res[2]) != 0;
 }
 
 /* Count the number of pages in the given generation.
@@ -5031,16 +5059,16 @@ void gc_gen_report_to_file(int filedes, FILE *file)
 
     /* Print the heap stats. */
     char header1[] =
-            "        Immobile Object Counts\n";
+            "     | Immobile Objects |\n";
     OUTPUT(header1, sizeof header1-1);
     char header2[] =
-            " Gen layout fdefn symbol   code  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
+            " Gen layout symbol   code  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
             " Waste%       Alloc        Trig   Dirty GCs Mem-age\n";
     OUTPUT(header2, sizeof header2-1);
 
     generation_index_t gen_num, begin, end;
-    int immobile_matrix[8][4], have_immobile_obj = 0;
-    int immobile_totals[4];
+    int immobile_matrix[8][3], have_immobile_obj = 0;
+    int immobile_totals[3];
     memset(immobile_matrix, 0, sizeof immobile_matrix);
     memset(immobile_totals, 0, sizeof immobile_totals);
     for (gen_num = 0; gen_num <= 6; ++gen_num) {
@@ -5049,7 +5077,6 @@ void gc_gen_report_to_file(int filedes, FILE *file)
         immobile_totals[0] += immobile_matrix[gen_num][0];
         immobile_totals[1] += immobile_matrix[gen_num][1];
         immobile_totals[2] += immobile_matrix[gen_num][2];
-        immobile_totals[3] += immobile_matrix[gen_num][3];
     }
     // Print from the lowest gen that has any allocated pages.
     for (begin = 0; begin <= PSEUDO_STATIC_GENERATION; ++begin)
@@ -5088,6 +5115,7 @@ void gc_gen_report_to_file(int filedes, FILE *file)
             double pct_waste = eden_pages > 0 ?
                                (double)waste / (double)npage_bytes(eden_pages) * 100 : 0.0;
             if (eden_pages) {
+              printf("HORKED\n");
                 int linelen = snprintf(linebuf, sizeof linebuf,
                         "  E %6d %6d %6d %6d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%14"PAGE_INDEX_FMT
                         "%14"PAGE_INDEX_FMT
@@ -5139,11 +5167,11 @@ void gc_gen_report_to_file(int filedes, FILE *file)
           (double)waste / (double)npage_bytes(tot_pages) * 100 : 0.0;
         int linelen =
             snprintf(linebuf, sizeof linebuf,
-                "  %d %6d %6d %6d %6d"
+                "  %d %6d %6d %6d"
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT" %6.1f %11"OS_VM_SIZE_FMT" %11"OS_VM_SIZE_FMT,
-                gen_num, objct[0], objct[1], objct[2], objct[3],
+                gen_num, objct[0], objct[1], objct[2],
                 pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
                 pagect[6], pagect[7], pagect[8],
                 pct_waste, words_allocated<<WORD_SHIFT,
@@ -5163,12 +5191,12 @@ void gc_gen_report_to_file(int filedes, FILE *file)
     int *objct = immobile_totals;
     int linelen =
         snprintf(linebuf, sizeof linebuf,
-            "Tot %6d %6d %6d %6d"
+            "Tot %6d %6d %6d"
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT" %6.1f%12"OS_VM_SIZE_FMT
             " [%.1f%% of %"OS_VM_SIZE_FMT" max]\n",
-            objct[0], objct[1], objct[2], objct[3],
+            objct[0], objct[1], objct[2],
             coltot[0], coltot[1], coltot[2], coltot[3], coltot[4], coltot[5], coltot[6],
             coltot[7], coltot[8], pct_waste,
             (uintptr_t)bytes_allocated, heap_use_frac, (uintptr_t)dynamic_space_size);

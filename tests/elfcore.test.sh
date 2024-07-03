@@ -46,8 +46,6 @@ EOF
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
 (sb-vm::%alloc-immobile-symbol "junk") ; crashed 'cause I forgot to use rip-relative-EA
-;; I think this tests immobile space exhaustion
-(dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
 
 ;; Test that the link step did not use --export-dynamic
 (assert (gethash '("TEXT_SPACE_START") (car sb-sys:*linkage-info*))) ; C symbol exists
@@ -64,12 +62,6 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-us
               (> (sb-kernel:code-n-entries obj) 0))
      (assert (/= (sb-kernel:%code-serialno obj) 0))))
  :all)
-;; This just needs any function that when ELFinated has its packed fixups rewritten.
-;; If the packed value is a bignum, it goes into a C data section.
-(let* ((code (sb-kernel:fun-code-header #'compile-file))
-       (fixups (sb-vm::%code-fixups code)))
-  (assert (typep fixups 'bignum))
-  (assert (not (heap-allocated-p fixups))))
 EOF
 (cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o shrinkwrap-sbcl.core)
 

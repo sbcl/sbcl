@@ -505,6 +505,7 @@ static void watch_deferred(lispobj *where, uword_t start, uword_t end);
 #define TRACE_NAME trace_other_object
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME mr_alivep_funs
 #define STRENGTHEN_WEAK_REFS 0
+#include "var-io.h"
 #include "trace-object.inc"
 
 static void trace_object(lispobj object) {

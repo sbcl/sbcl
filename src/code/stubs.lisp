@@ -91,6 +91,7 @@
   (def %fun-pointer-widetag)
   (def %closure-fun)
   (def %closure-index-ref (closure index))
+  (def make-fdefn)
   (def fdefn-name)
   (def fdefn-fun)
   (def fdefn-makunbound)

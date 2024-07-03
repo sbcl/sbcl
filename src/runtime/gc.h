@@ -114,6 +114,9 @@ char *page_card_mark_string(page_index_t page, char *result);
 extern int valid_tagged_pointer_p(lispobj);
 extern lispobj *component_ptr_from_pc(char *pc);
 
+#define linkage_cell_taggedptr(index) fun_taggedptr_from_self(linkage_space[index])
+extern void sweep_linkage_space();
+
 #include "immobile-space.h" // provides dummy stubs if #-immobile-space
 #ifdef LISP_FEATURE_MARK_REGION_GC
 #include "pmrgc-impl.h"

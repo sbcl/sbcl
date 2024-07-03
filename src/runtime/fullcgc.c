@@ -22,6 +22,7 @@
 #include "queue.h"
 #include "os.h"
 #include "validate.h"
+#include "var-io.h"
 
 #include <stdio.h>
 #ifndef LISP_FEATURE_WIN32

@@ -579,21 +579,8 @@
              (error (if (eq kind :special) 'special-form-function 'undefined-function)
                     :name  (second fun-name))))
           t
-          fun-name))
-        (fdefn (find-or-create-fdefn symbol)))
-
-    ;; In most cases, install the guard closure in the usual way.
-    #-(and x86-64 immobile-code) (setf (fdefn-fun fdefn) closure)
-
-    ;; Do something slightly different for immobile code: fmakunbound, assigning
-    ;; FUN = NIL and RAW-ADDR = UNDEFINED-TRAMP; then overwrite the NIL with the
-    ;; above closure. This is better than assigning a closure, because closures
-    ;; require a new closure-calling trampoline to be consed.
-    #+(and x86-64 immobile-code)
-    (progn (fdefn-makunbound fdefn)
-           (%primitive sb-vm::set-undefined-fdefn-fun fdefn closure))
-
-    fdefn))
+          fun-name)))
+    (fset symbol closure)))
 
 ;;;; Iterating over closure values
 

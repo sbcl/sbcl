@@ -66,3 +66,26 @@ use as a BLOCK name in the function in question."
 
 #+sb-xc-host
 (!function-names-init)
+
+;;; Packages in which all external symbols will definitely survive tree-shaking.
+(define-load-time-global *immortal-externals-pkgs*
+    (let ((L (mapcar 'find-package
+                   '("SB-ASSEM" "SB-BROTHERTREE" "SB-C" "SB-DISASSEM" "SB-FORMAT" "SB-IMPL"
+                     "SB-KERNEL" "SB-MOP" "SB-PCL" "SB-PRETTY" "SB-PROFILE" "SB-REGALLOC"
+                     "SB-SYS" "SB-UNICODE" "SB-UNIX" "SB-WALKER"))))
+      #-sb-xc-host (loop for x in L sum (ash 1 (package-id x)))
+      #+sb-xc-host L))
+
+;;; Return T if we can skip storing the linkage index for NAME in code that uses it
+(defun permanent-fname-p (name)
+  (declare (notinline info))
+  (let* ((stem (cond ((symbolp name) name)
+                     ((member (car name) '(setf cas)) (cadr name))
+                     (t (return-from permanent-fname-p nil))))
+         (pkg (sb-xc:symbol-package stem)))
+    (or (eq pkg *cl-package*)
+        (and #+sb-xc-host (member pkg *immortal-externals-pkgs*)
+             #-sb-xc-host (logbitp (symbol-package-id stem) *immortal-externals-pkgs*)
+             (eq (nth-value 1 (find-symbol (string stem) pkg)) :external)
+             ;; Loader wants all deprecated refs so it can style-warn.
+             (not (info :function :deprecated name))))))

@@ -189,25 +189,6 @@
   ;; (I guess we can only THROW at this point, so it doesn't matter)
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
-;;; the closure trampoline - entered when a global function is a closure
-;;; and the function is called "by name" (normally, as when it is the
-;;; head of a form) via an FDEFN. Register %RAX holds the fdefn address,
-;;; but the simple-fun which underlies the closure expects %RAX to be the
-;;; closure itself. So we grab the closure out of the fdefn pointed to,
-;;; then jump to the simple-fun that the closure points to.
-;;;
-;;; Immobile code uses a different strategy to call a closure that has been
-;;; installed as a globally named function. The fdefn contains a jump opcode
-;;; to a tiny code component specific to the particular closure.
-;;; The trampoline is responsible for loading RAX, since named calls don't.
-;;; However, #+immobile-code might still need CLOSURE-TRAMP for any fdefn
-;;; for which the compiler chooses not to use "direct" call convention.
-(define-assembly-routine
-    (closure-tramp (:return-style :none))
-    ()
-  (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
-  (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
-
 #+debug-gc-barriers
 (define-assembly-routine (check-barrier (:return-style :none)) ()
   (inst push rax-tn)

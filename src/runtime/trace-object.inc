@@ -136,19 +136,41 @@ static void TRACE_NAME(lispobj* where)
         break; // scan slots normally
     }
 #endif
-    case CODE_HEADER_WIDETAG:
+    case CODE_HEADER_WIDETAG: {
         scan_to = code_header_words((struct code*)where);
+        __attribute__((unused)) struct code* code = (struct code*)where;
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        const unsigned int smallvec_elts =
+            (GENCGC_PAGE_BYTES - offsetof(struct vector,data)) / N_WORD_BYTES;
+        if (code->linkage_elts) {
+            lispobj name_map = SYMBOL(LINKAGE_NAME_MAP)->value;
+            gc_assert(simple_vector_p(name_map));
+            struct vector* outer_vector = VECTOR(name_map);
+            struct varint_unpacker unpacker;
+            varint_unpacker_init(&unpacker, code->linkage_elts);
+            int prev_index = 0, index;
+            while (varint_unpack(&unpacker, &index) && index != 0) {
+                index += prev_index;
+                prev_index = index;
+                int index_high = (unsigned int)index / smallvec_elts;
+                int index_low = (unsigned int)index % smallvec_elts;
+                lispobj smallvec = outer_vector->data[index_high];
+                gc_assert(other_pointer_p(smallvec));
+                struct vector* inner_vector = VECTOR(smallvec);
+                // Ensure liveness of function name
+                ACTION(inner_vector->data[index_low], 0, SOURCE_NORMAL);
+            }
+        }
+#endif
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        {
-        struct code* code = (struct code*)where;
         lispobj* where = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
         lispobj* limit = where + code_n_named_calls(code);
         for ( ; where < limit ; ++where )
             ACTION(*where | OTHER_POINTER_LOWTAG, where, SOURCE_ZERO_TAG);
         // Fall into general case. Untagged fdefns will be ignored as fixnums.
-        }
 #endif
         break;
+    }
     case SYMBOL_WIDETAG:
         {
         struct symbol* s = (void*)where;
@@ -156,13 +178,23 @@ static void TRACE_NAME(lispobj* where)
         ORDINARY_SLOT(s->value);
         ORDINARY_SLOT(s->info);
         ORDINARY_SLOT(s->fdefn);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        int i = symbol_linkage_index(s);
+        ACTION(linkage_cell_taggedptr(i), linkage_space+i, SOURCE_LINKAGE_CELL);
+#endif
         }
         return;
     case FDEFN_WIDETAG: {
         struct fdefn *fdefn = (struct fdefn*)where;
+        ORDINARY_SLOT(fdefn->name);
+        ORDINARY_SLOT(fdefn->fun);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        int i = fdefn_linkage_index(fdefn);
+        ACTION(linkage_cell_taggedptr(i), linkage_space+i, SOURCE_LINKAGE_CELL);
+#else
         ACTION(decode_fdefn_rawfun(fdefn), (lispobj*)&fdefn->raw_addr, SOURCE_FDEFN_RAW);
-        scan_to = 3;
-        break;
+#endif
+        return;
     }
     case WEAK_POINTER_WIDETAG:
         weakptr = (struct weak_pointer*)where;

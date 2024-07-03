@@ -214,8 +214,12 @@ during backtrace.
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info)
+  ;; A packed integer representing a set of 32-bit integers sorted, delta-encoded,
+  ;; and varint-encoded. The set describes the linkage cells needed by this object.
+  (linkage-elts)
   (constants :rest-p t))
 
+#-linkage-space
 (define-primitive-object (fdefn :type fdefn
                                 :lowtag other-pointer-lowtag
                                 :widetag fdefn-widetag)
@@ -227,20 +231,15 @@ during backtrace.
   ;;   they store a descriptorized (fun-pointer lowtag)
   ;;   pointer to the closure tramp
   ;; - all others store a native pointer to the function entry address
-  ;;   or closure tramp. x86-64 with immobile-code constrains this
-  ;;   to holding the address of a SIMPLE-FUN or an object that
-  ;;   has the simple-fun call convention- either a generic-function with
-  ;;   a self-contained trampoline, or closure or funcallable-instance
-  ;;   wrapped in a simplifying trampoline.
+  ;;   or closure tramp.
   (raw-addr :c-type "char *"))
-
-;;; Reader for FDEFN-RAW-ADDR. The usual IR2 converter would return
-;;; descriptor-reg and so its result would need shifting by n-fixnum-tag-bits.
-#-sb-xc-host
-(defun fdefn-raw-addr (fdefn)
-  (with-pinned-objects (fdefn)
-    (sap-ref-word (int-sap (get-lisp-obj-address fdefn))
-                  (- (ash fdefn-raw-addr-slot word-shift) other-pointer-lowtag))))
+#+linkage-space
+(define-primitive-object (fdefn :type fdefn
+                                :lowtag other-pointer-lowtag
+                                :widetag fdefn-widetag)
+  (name :ref-trans fdefn-name)
+  (unused)
+  (fun :type (or function null)))
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
@@ -389,16 +388,13 @@ during backtrace.
   (value :init :unbound
          :set-trans %set-symbol-global-value
          :set-known ())
-
-  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
-  ;; for symbols. If we ensured that any function bound to a symbol had a
-  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
-  ;; then we would only need to store that function's raw entry address here,
-  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
-  ;; to a symbol would need a tiny trampoline, which is already the case
-  ;; for #+immobile-code.
-  (fdefn :ref-trans %symbol-fdefn :ref-known ()
-         :cas-trans cas-symbol-fdefn)
+  ;; Symbols either store an fdefn or a function. The better way is a function.
+  ;; This slot *MUST* coincide with the FDEFN-FUN slot. (This is AVERed)
+  ;; The slot name is "FDEFN" even it holds a function. This makes some C code
+  ;; (notably trace-object.inc and traceroot) unchanged for +/- linkage-space.
+  #+linkage-space (fdefn)
+  #-linkage-space (fdefn :ref-trans %symbol-fdefn :ref-known ()
+                         :cas-trans cas-symbol-fdefn)
   ;; The private accessor for INFO reads the slot verbatim.
   ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
   ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
@@ -507,6 +503,7 @@ during backtrace.
 (defconstant-eqx +thread-header-slot-names+
     `#(#+x86-64
        ,@'(t-nil-constants
+           linkage-table
            alien-linkage-table-base
            msan-xor-constant
            ;; The following slot's existence must NOT be conditional on #+msan

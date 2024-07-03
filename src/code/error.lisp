@@ -88,9 +88,10 @@
                             ;; functions, but the use itself is flushable, so employ SAFE-FDEFN-FUN.
                             (dummy-forms `#',name)
                             (when (sb-c:policy env (= safety 3))
-                              (dummy-forms `(sb-c:safe-fdefn-fun
-                                             (load-time-value
-                                              (find-or-create-fdefn ',name) t)))))
+                              (let ((f (if (or #+linkage-space (symbolp name))
+                                           `',name
+                                           `(load-time-value (find-or-create-fdefn ',name) t))))
+                              (dummy-forms `(sb-c:safe-fdefn-fun ,f)))))
                           `(load-time-value
                             (cons ,test (the (function-designator (condition)) ',name))
                             t))))

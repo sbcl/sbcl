@@ -392,22 +392,6 @@ sigtrap_handler(int __attribute__((unused)) signal,
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
     trap = *(unsigned char *)OS_CONTEXT_PC(context);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (trap == trap_UndefinedFunction) {
-        // The interrupted PC pins this fdefn. Sigtrap is delivered on the ordinary stack,
-        // not the alternate stack.
-        // (FIXME: an interior pointer to an fdefn _should_ pin it, but doesn't)
-        lispobj* fdefn = (lispobj*)(OS_CONTEXT_PC(context) & ~LOWTAG_MASK);
-        if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
-            // Return to undefined-tramp
-            OS_CONTEXT_PC(context) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
-            // with RAX containing the FDEFN
-            *os_context_register_addr(context,reg_RAX) =
-                make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
-            return;
-        }
-    }
-#endif
     handle_trap(context, trap);
 }
 
@@ -598,18 +582,9 @@ lispobj entrypoint_taggedptr(uword_t entrypoint) {
     return make_lispobj(phdr, FUN_POINTER_LOWTAG);
 }
 
-/* Return the lisp object that fdefn's raw_addr slot jumps to.
- * In the event that the referenced object was forwarded, this returns the un-forwarded
- * object (the forwarded value is used to assert some invariants though).
- * If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
- *
- * Some legacy baggage is evident: in the first implementation of immobile fdefns,
- * an fdefn used a 'jmp rel32' (relative to itself), and so you could decode the
- * jump target only given the address of the fdefn. That is no longer true; fdefns use
- * absolute jumps. Therefore it is possible to call entrypoint_taggedptr() with any
- * raw_addr, whether or not you know the fdefn whence the raw_addr was obtained. */
+// Return the lisp object that fdefn jumps to.
 lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
-    return entrypoint_taggedptr((uword_t)fdefn->raw_addr);
+    return entrypoint_taggedptr(linkage_space[fdefn_linkage_index(fdefn)]);
 }
 
 #ifdef LISP_FEATURE_SB_THREAD

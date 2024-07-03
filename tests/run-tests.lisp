@@ -224,6 +224,8 @@
       sb-c::*compile-file-elapsed-time*
       sb-c::*phash-lambda-cache*
       ,(maybe "SB-IMPL" "*RUN-GC-HOOKS*")
+      ,(maybe "SB-VM" "*FNAME-MAP-AVAILABLE-ELTS*")
+      ,(maybe "SB-VM" "*FNAME-MAP-OBSERVED-GC-EPOCH*")
       sb-impl::**finalizer-store**
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*

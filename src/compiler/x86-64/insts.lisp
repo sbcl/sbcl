@@ -26,6 +26,7 @@
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
             sb-vm::ymm-reg
+            sb-vm::linkage-addr->name
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 (defconstant +lock-prefix-present+ #x80)
@@ -3370,10 +3371,18 @@
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 ;;; The code object we're fixing up is pinned whenever this is called.
+(symbol-macrolet
+    (#-sb-xc-host (sb-vm::lisp-linkage-space-addr
+                   (sb-alien:extern-alien "linkage_space" sb-alien:unsigned)))
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
-  (when (and (eq flavor :assembly-routine) (eq kind :*abs32))
-    (setq value (sb-vm::asm-routine-indirect-address value)))
+  (cond ((eq flavor :linkage-cell)
+         (setq value (let ((index (ash value word-shift)))
+                       (ecase kind
+                         #+immobile-space (:rel32 (+ sb-vm::lisp-linkage-space-addr index))
+                         (:abs32 index)))))
+        ((and (eq flavor :assembly-routine) (eq kind :*abs32))
+         (setq value (sb-vm::asm-routine-indirect-address value))))
   (let ((sap (code-instructions code)))
     (case flavor
       (:card-table-index-mask ; the VALUE is nbits, so convert it to an AND mask
@@ -3409,7 +3418,7 @@
           ;; These are used for jump tables and are not recorded in %code-fixups.
           ;; GC knows to adjust the values if code is moved.
           (setf (sap-ref-64 sap offset) value))))))
-  nil)
+  nil))
 
 (defun sb-c::pack-fixups-for-reapplication (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
@@ -3423,7 +3432,7 @@
             #+(or permgen immobile-space)
             ((and (eq (fixup-note-kind note) :abs32)
                   (memq flavor ; these all point to fixedobj space
-                        '(:fdefn-call :layout :immobile-symbol :symbol-value)))
+                        '(:layout :immobile-symbol :symbol-value)))
              (push offset abs32-fixups))))))
 
 ;;; Coverage support

@@ -16,8 +16,6 @@
   ;; Loop over all code objects
   `(let* ((call (find-inst #xE8 (get-inst-space)))
           (jmp  (find-inst #xE9 (get-inst-space)))
-          (mov-ea (find-inst #x8B (get-inst-space)))
-          (mov-imm-acc (find-inst #xB8 (get-inst-space)))
           (dstate (make-dstate nil))
           (code-sap (int-sap 0))
           (seg (sb-disassem::%make-segment :sap-maker (lambda () code-sap))))
@@ -62,7 +60,7 @@
               (lambda (offset operand inst)
                 (declare (ignore inst))
                 (let ((lispobj (if (immobile-space-addr-p operand)
-                                   (sb-vm::find-called-object operand)
+                                   nil
                                    0)))
                   (vector-push-extend (+ offset extra-offset) relocs)
                   (vector-push-extend (get-lisp-obj-address lispobj) relocs)))
@@ -114,150 +112,46 @@
     (vector-push-extend (fill-pointer relocs) code-components)
     (values code-components relocs)))
 
-(export 'sb-vm::statically-link-core "SB-VM")
-(declaim (inline rip-relative-p))
-(defun rip-relative-p (modrm-byte) (= (logand modrm-byte #b11000111) #b00000101))
-
-#+immobile-code
-(defun sb-vm::statically-link-core (&key callers)
-  (do-text-space-code (code)
-    (when (or (not callers)
-              (and (plusp (code-n-entries code))
-                   (member (%simple-fun-name (%code-entry-point code 0)) callers)))
-      (let* ((fixups)
-             (all-fdefns
-              (do ((i sb-vm:code-constants-offset (1+ i))
-                   (end (code-header-words code))
-                   (list))
-                  ((= i end) list)
-                (let ((const (code-header-ref code i)))
-                  (typecase const
-                    (fdefn (push const list))
-                    ;; CONS may occur due to previous invocation of statically-link.
-                    ((cons fdefn) (push (car const) list))))))
-             (observable-fdefns) ; ones that an instruction explicitly dereferences
-             (code-begin (- (get-lisp-obj-address code) sb-vm:other-pointer-lowtag))
-             (code-end (+ code-begin (sb-vm::code-object-size code)))
-             (boxed-begin (+ code-begin (* sb-vm:code-constants-offset sb-vm:n-word-bytes)))
-             (boxed-end (+ code-begin (* (code-header-words code) sb-vm:n-word-bytes)))
-             (code-insts (code-instructions code)))
-        (do-functions (fun addr)
-          ;; Loop over function's assembly code
-          (dx-flet ((process-inst (chunk inst)
-                      (cond
-                        ;; find FDEFNs as the source of move-immediate-to-register.
-                        ;; There can be false positives, but that's OK.
-                        ((and (eq inst mov-imm-acc)
-                              ;; ensure not a 64-bit move
-                              (eql (sb-disassem::dstate-inst-properties dstate) 0))
-                         (let ((value (sap-ref-32 code-sap (1+ (dstate-cur-offs dstate)))))
-                           (dolist (fdefn all-fdefns)
-                             (when (eql (get-lisp-obj-address fdefn) value)
-                               (pushnew fdefn observable-fdefns)))))
-                        ;; find FDEFNs in code header as the source of MOV EA to register
-                        ((and (eq inst mov-ea)
-                              (eql (sap-ref-8 code-sap (dstate-cur-offs dstate)) #x8B)
-                              (rip-relative-p (sap-ref-8 code-sap (1+ (dstate-cur-offs dstate)))))
-                         (let ((addr (+ (signed-sap-ref-32 code-sap (+ (dstate-cur-offs dstate) 2))
-                                        (dstate-next-addr dstate))))
-                           (when (and (not (logtest addr (ash sb-vm:lowtag-mask -1))) ; aligned
-                                      (<= boxed-begin addr) (< addr boxed-end))
-                             (let ((const (sap-ref-lispobj (int-sap addr) 0)))
-                               (when (fdefn-p const)
-                                 (pushnew const observable-fdefns))))))
-                        ;; find FDEFN as the target of JMP/CALL
-                        ((or (eq inst jmp) (eq inst call))
-                         (let ((target (+ (near-jump-displacement chunk dstate)
-                                          (dstate-next-addr dstate))))
-                           ;; Can't be an FDEFN if within the same code object
-                           (unless (and (<= code-begin target) (< target code-end))
-                             (let ((fdefn (dolist (fdefn all-fdefns)
-                                            (when (= target (+ (get-lisp-obj-address fdefn)
-                                                               ;; KLUDGE: 2 = address of 'jmp' inst
-                                                               (- 2 other-pointer-lowtag)))
-                                              (return fdefn)))))
-                               (when (and fdefn (neq (info :function :inlinep (fdefn-name fdefn))
-                                                     'notinline))
-                                 (push (cons (+ (sap- code-sap code-insts)
-                                                (1+ (sb-disassem:dstate-cur-offs dstate)))
-                                             fdefn)
-                                       fixups)))))))))
-            (map-segment-instructions #'process-inst seg dstate)))
-        (sb-vm::statically-link-code-obj code fixups observable-fdefns)))))
-
-;;; While concurrent use of un-statically-link is unlikely, misuse could easily
-;;; cause heap corruption. It's preventable by ensuring that this is atomic
-;;; with respect to other mutations of the same fdefn.
-;;; The issue is that if the fdefn loses the pointer to the underlying code
-;;; via (setf fdefn-fun) before we were done removing the static links,
-;;; then there could be no remaining pointers visible to GC.
-;;; The only way to detect the current set of references is to find uses of the
-;;; current jump address, which means we need to fix them *all* before anyone
-;;; else gets an opportunity to change the fdefn-fun of this same fdefn again.
-(defun sb-impl::undo-static-linkage (fdefn &aux (fun-entry (sb-vm::fdefn-raw-addr fdefn)))
-  (unless (sb-vm::fdefn-has-static-callers fdefn)
-    (return-from sb-impl::undo-static-linkage))
-  (sb-int:with-system-mutex (sb-vm::*static-linker-lock*)
+;;; Ensure that any caller of FNAME jumps via the linkage table
+;;; and not directly to the current functional binding.
+(defun sb-vm::unbypass-linkage (fname fun-entry index &aux (all (permanent-fname-p fname)))
+  ;; Permanent names are never mentioned in the code header, so we may have to
+  ;; scan all code. Otherwise, only scan code that explicitly uses INDEX.
+  (flet ((index-used-p (packed &aux (pos 0))
+           (sb-c::do-packed-varints (loc packed pos)
+             (when (= loc index)
+               (return-from index-used-p t)))))
     (do-text-space-code (code)
-      ;; Examine only those code components which potentially use FDEFN.
-      (binding* ((fdefn-index
-                  (multiple-value-bind (fdefns-start count) (code-header-fdefn-range code)
-                    (dotimes (i count)
-                      (let ((constant (code-header-ref code (+ fdefns-start i))))
-                        (when (or (eq constant fdefn)
-                                  (and (consp constant) (eq (car constant) fdefn)))
-                          (return (+ fdefns-start i))))))
-                  :exit-if-null))
-        #-immobile-code
-        (let ((header-slot-addr
-               (+ (get-lisp-obj-address code)
-                  (- (ash fdefn-index word-shift) other-pointer-lowtag))))
-          (do-functions (fun addr)
-            (map-segment-instructions
-             (lambda (chunk inst)
-               (when (or (eq inst jmp) (eq inst call))
-                 ;; If the jump is to FUN-ENTRY, rewrite this call into
-                 ;; MOV RAX,[RIP-n] ; CALL [RAX+9]
-                 (let ((disp (truly-the (signed-byte 32) (near-jump-displacement chunk dstate))))
-                   (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
-                     ;; 5 bytes prior has to be the start of a 5-byte NOP.
-                     ;; Just trust that it is that.
-                     (let ((sap (sap+ (int-sap (dstate-cur-addr dstate)) -5)))
-                       (setf (sap-ref-8 sap 0) #x48
-                             (sap-ref-8 sap 1) #x8B
-                             (sap-ref-8 sap 2) #x05
-                             (signed-sap-ref-32 sap 3)
-                             (- 3 (- (dstate-next-addr dstate) header-slot-addr))
-                             (sap-ref-8 sap 7) #xFF
-                             (sap-ref-8 sap 8) (if (eq inst jmp) #x60 #x50)
-                             (sap-ref-8 sap 9) 9))))))
-             seg dstate)))
-        #+immobile-code
-        (flet ((fix (sap oldval)
-                 (let* ((fdefn-entry (sb-vm::fdefn-entry-address fdefn))
-                        (newval (the (signed-byte 32)
-                                     (- fdefn-entry (sap-int (sap+ sap 4))))))
-                   ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
-                   ;; that self-modifying code works correctly, so the fetcher
-                   ;; should never see a torn write.
-                   (cas (sap-ref-32 sap 0)
-                        (ldb (byte 32 0) oldval)
-                        (ldb (byte 32 0) newval)))))
-          (let ((constant (code-header-ref code fdefn-index)))
-            (setf (code-header-ref code fdefn-index) fdefn)
-            (if (listp constant) ; list of saved fixup offsets
-                (dolist (offset (cdr constant))
-                  (let ((sap (sap+ (code-instructions code) offset)))
-                    (fix sap (signed-sap-ref-32 sap 0))))
-                (do-functions (fun addr)
-                  (map-segment-instructions
-                   (lambda (chunk inst)
-                     (when (or (eq inst jmp) (eq inst call))
-                       ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
-                       ;; TRULY-THE because near-jump-displacement isn't a known fun.
-                       (let ((disp (truly-the (signed-byte 32)
-                                              (near-jump-displacement chunk dstate))))
-                         (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
-                           (fix (sap+ (int-sap (dstate-cur-addr dstate)) 1) disp)))))
-                   seg dstate)))))))
-    (sb-vm::set-fdefn-has-static-callers fdefn 0)))
+      (when (or all (index-used-p (code-header-ref code code-linkage-elts-slot)))
+        (do-functions (fun addr)
+          (map-segment-instructions
+           (lambda (chunk inst)
+             (when (or (eq inst jmp) (eq inst call))
+               ;; If the jump is to FUN-ENTRY, change it to a linkage space indirection
+               (let ((disp (truly-the (signed-byte 32) (near-jump-displacement chunk dstate))))
+                 (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
+                   (let ((sap (int-sap (dstate-cur-addr dstate)))
+                         (cell (sap+ sb-vm::elf-linkage-space (ash index word-shift))))
+                     (declare (ignorable cell))
+                     #+immobile-space
+                     (cond ((eq inst jmp)
+                            (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
+                            (setf (sap-ref-16 sap 0) #x25ff  ; JMP [RIP+n]
+                                  (signed-sap-ref-32 sap 2) (sap- cell (sap+ sap 6))))
+                           (t
+                            (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
+                            (setf (sap-ref-16 sap -1) #x15ff   ; CALL [RIP+n]
+                                  (signed-sap-ref-32 sap 1) (sap- cell (sap+ sap 5)))))
+                     #-immobile-space
+                     (cond ((eq inst jmp)
+                            (aver (= (sap-ref-32 sap -4) #xF0458B49)) ; MOV RAX, [R13-16]
+                            (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
+                            (setf (sap-ref-16 sap 0) #xa0ff   ; JMP [RAX+n]
+                                  (signed-sap-ref-32 sap 2) (ash index word-shift)))
+
+                           (t
+                            (aver (= (sap-ref-32 sap -5) #xF0458B49)) ; MOV RAX, [R13-16]
+                            (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
+                            (setf (sap-ref-16 sap -1) #x90ff   ; CALL [RAX+n]
+                                  (signed-sap-ref-32 sap 1) (ash index word-shift)))))))))
+           seg dstate))))))

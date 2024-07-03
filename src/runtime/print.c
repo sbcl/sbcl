@@ -554,6 +554,11 @@ static void print_fun_or_otherptr(lispobj obj)
         int pkgid = symbol_package_id(sym) << N_FIXNUM_TAG_BITS;
         print_obj("pkgid: ", pkgid);
 #endif
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        int fname_index = symbol_linkage_index(sym);
+        printf("\nindex: %x linkage_table[index]: %p",
+               fname_index, (void*)linkage_space[fname_index]);
+#endif
         break;
 
 #if N_WORD_BITS == 32
@@ -701,8 +706,7 @@ static void print_fun_or_otherptr(lispobj obj)
         break;
 
     case FDEFN_WIDETAG:
-        print_slots(fdefn_slots, 2, ptr);
-        print_obj("entry: ", decode_fdefn_rawfun((struct fdefn*)(ptr-1)));
+        print_slots(fdefn_slots, 3, ptr);
         break;
 
     // Make some vectors printable from C, for when all hell breaks lose

@@ -64,6 +64,38 @@ extern void bind_variable(lispobj symbol, lispobj value,void *thread);
 extern void unbind(void *thread);
 extern void unbind_to_here(lispobj *bsp,void *thread);
 
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
+# define FUN_SELF_FIXNUM_TAGGED 1
+# define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
+# define fun_self_from_taggedptr(funptr) funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
+# define fun_taggedptr_from_self(self) self - 2*N_WORD_BYTES + FUN_POINTER_LOWTAG
+#else
+# define FUN_SELF_FIXNUM_TAGGED 0
+# define fun_self_from_baseptr(simple_fun) make_lispobj(simple_fun,FUN_POINTER_LOWTAG)
+# define fun_self_from_taggedptr(funptr) funptr
+# define fun_taggedptr_from_self(self) self
+#endif
+
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+
+#define LINKAGE_INDEX_MASK ((1<<N_LINKAGE_INDEX_BITS)-1)
+
+static inline unsigned int fdefn_linkage_index(struct fdefn* f) {
+    return (f->header >> 16) & LINKAGE_INDEX_MASK;
+}
+static inline unsigned int symbol_linkage_index(struct symbol* s) {
+    // never look at NIL's hash slot's low bits
+    if ((uword_t)s == (STATIC_SPACE_START + NIL_SYMBOL_SLOTS_OFFSET)) return 0;
+    return s->hash & LINKAGE_INDEX_MASK;
+}
+
+static lispobj __attribute__((unused)) symbol_function(struct symbol* s) {
+    return s->fdefn;
+}
+#define StaticSymbolFunction(x) fun_taggedptr_from_self(linkage_space[x##_fname_index])
+
+#else
+
 #include "genesis/static-symbols.h"
 static lispobj __attribute__((unused)) symbol_function(struct symbol* symbol)
 {
@@ -73,4 +105,5 @@ static lispobj __attribute__((unused)) symbol_function(struct symbol* symbol)
 #define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
 /* Return 'fun' given a tagged pointer to an fdefn. */
 static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }
+#endif
 extern lispobj decode_fdefn_rawfun(struct fdefn *fdefn);

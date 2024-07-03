@@ -48,12 +48,8 @@
      (lambda (object widetag size &aux touchedp)
        (declare (ignore size))
        (macrolet ((rewrite (place &aux (accessor (if (listp place) (car place))))
-                    ;; SYMBOL-NAME, SYMBOL-PACKAGE, SYMBOL-%INFO have no setters,
-                    ;; but nor are they possibly affected by code folding.
-                    ;; {%INSTANCE,%FUN}-LAYOUT have setters but they are not spelled
-                    ;; SETF, nor are they affected by code folding.
-                    (unless (member accessor '(symbol-name symbol-package symbol-%info
-                                               %fun-layout %instance-layout))
+                    ;; {%INSTANCE,%FUN}-LAYOUT are not affected by ICF.
+                    (unless (member accessor '(%fun-layout %instance-layout))
                       `(let* ((oldval ,place) (newval (forward oldval)))
                          (unless (eq newval oldval)
                            ,(case accessor
@@ -74,10 +70,6 @@
                                                    '(setf weak-pointer-value)
                                                    weak-pointer-value-slot
                                                    other-pointer-lowtag))))
-                              (%primitive
-                               (ecase (cadr place)
-                                 (fast-symbol-global-value
-                                  `(setf (symbol-global-value ,@(cddr place)) newval))))
                               (t
                                `(setf ,place newval)))
                            t)))))
@@ -90,21 +82,21 @@
               (setf (svref object 1) 1)))
            (code-component
             :override
-            ;; We must perform replacements inside the raw bytes, otherwise GC lossage
-            ;; could result. e.g. suppose the header contains #<FDEFN FOO> which points
-            ;; to #<FOO>, and a machine instruction contains "CALL #<FOO>". If the ICF
-            ;; pass replaces #<FOO> with #<BAR>, the instruction needs to change, because
-            ;; if it didn't, there would be no traceable pointer from code to #<FOO>.
-            (machine-code-icf object #'forward map print)
             (loop for i from code-constants-offset below (code-header-words object)
                   do (when (rewrite (code-header-ref object i))
                        (setq any-change t))))
+           (symbol
+            :override
+            (let* ((oldval (%symbol-function object))
+                   (newval (forward oldval)))
+              (unless (eq newval oldval)
+                (fset object newval))))
            (fdefn
             :override
             (let* ((oldval (fdefn-fun object))
                    (newval (forward oldval)))
               (unless (eq newval oldval)
-                (setf (fdefn-fun object) newval))))
+                (fset object newval))))
            (closure
             :override
             (let* ((oldval (%closure-fun object))
@@ -157,12 +149,9 @@
                (* (length words1) n-word-bytes))))))
 
 #-x86-64
-(progn
 (defun compute-code-signature (code dstate)
   (declare (ignore dstate))
   code)
-(defun machine-code-icf (code mapper replacements print)
-  (declare (ignore code mapper replacements print))))
 
 (defun code-equivalent-p (obj1 obj2 &aux (code1 (car obj1)) (code2 (car obj2)))
   (declare (ignorable code1 code2))

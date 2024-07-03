@@ -48,6 +48,8 @@
 (declaim (muffle-conditions compiler-note))
 
 (eval-when (:compile-toplevel :execute)
+  (when (member :linkage-space sb-impl:+internal-features+)
+    (pushnew :linkage-space *features*))
   (when (member :immobile-space sb-impl:+internal-features+)
     (pushnew :immobile-space *features*)))
 (eval-when (:execute)
@@ -858,10 +860,12 @@
          (loop for i from 2 below (code-header-words obj)
                do (visit (code-header-ref obj i))))
         ((symbolp obj)
+         #+linkage-space (visit (sap-ref-lispobj sap (ash symbol-fdefn-slot word-shift)))
          (visit (sap-ref-lispobj sap (ash symbol-value-slot word-shift))))
         ((weak-pointer-p obj)
          (visit (sap-ref-lispobj sap (ash weak-pointer-value-slot word-shift))))
         ((fdefn-p obj)
+         #-linkage-space
          (let ((raw (sap-ref-word sap (ash fdefn-raw-addr-slot word-shift))))
            (unless (in-bounds-p raw (space-bounds static-core-space-id spacemap))
              (awhen (remap (%make-lisp-obj (+ raw (ash -2 word-shift) fun-pointer-lowtag)))
@@ -1007,7 +1011,7 @@
   (aver (= (%vector-raw-bits core-header offset) directory-core-entry-type-code))
   (let ((nwords (+ (* (length directory) 5) 2)))
     (setf (%vector-raw-bits core-header (incf offset)) nwords))
-  (let ((page-count 0)
+  (let ((page-count (linkage-space-npages (core-header-linkage-space-info parsed-header)))
         (n-ptes (length (space-page-table dynamic-space))))
     (dolist (dir-entry directory)
       (setf (car dir-entry) page-count)
@@ -1031,6 +1035,21 @@
                         end-core-entry-type-code 2))
       (setf (%vector-raw-bits core-header (incf offset)) word))
     (write-sequence core-header output)
+    #+linkage-space
+    (binding* ((linkage-info (core-header-linkage-space-info parsed-header))
+               (count (linkage-space-count linkage-info))
+               (nbytes (ash count word-shift))
+               ((npages remainder) (ceiling nbytes +backend-page-bytes+))
+               (words (linkage-space-cells linkage-info))
+               (pad-bytes (- remainder))
+               (padding (make-array pad-bytes
+                                    :element-type '(unsigned-byte 8)
+                                    :initial-element 0)))
+      (assert (= npages (linkage-space-npages linkage-info)))
+      (assert (zerop (rem (+ nbytes pad-bytes) +backend-page-bytes+)))
+      (with-pinned-objects (words padding)
+        (assert (= (sb-unix:unix-write fd (vector-sap words) 0 nbytes)))
+        (assert (= (sb-unix:unix-write fd (vector-sap padding) 0 (length padding))))))
     ;; write out the data from each space
     (dolist (dir-entry directory)
       (destructuring-bind (page id paddr vaddr nwords) dir-entry
@@ -1097,6 +1116,22 @@
 (defconstant simple-array-uword-widetag
   #+64-bit simple-array-unsigned-byte-64-widetag
   #-64-bit simple-array-unsigned-byte-32-widetag)
+
+(defun adjust-linkage-space (spacemap parsed-header fwdmap)
+  (let ((dspace-bounds (space-bounds dynamic-core-space-id spacemap))
+        (cells (linkage-space-cells
+                (core-header-linkage-space-info parsed-header))))
+    (dotimes (i (length cells))
+      (let ((entrypoint (aref cells i)))
+        (when (and (in-bounds-p entrypoint dspace-bounds)
+                   (= (sap-ref-8 (int-sap (translate-ptr entrypoint spacemap))
+                                 (ash -2 word-shift))
+                      simple-fun-widetag))
+          (let* ((lispobj (%make-lisp-obj (+ entrypoint (ash -2 word-shift) fun-pointer-lowtag)))
+                 (new (remap-to-quasi-static-code lispobj spacemap fwdmap)))
+            (setf (aref cells i) (+ (get-lisp-obj-address new)
+                                    (- fun-pointer-lowtag)
+                                    (ash 2 word-shift)))))))))
 
 (defun move-dynamic-code-to-text-space (input-pathname output-pathname)
   ;; Remove old files
@@ -1182,6 +1217,7 @@
                     (fixnumize c-linkage-reserved-words))
               ;; Transport code contiguously into new space
               (transport-dynamic-space-code codeblobs spacemap new-space reserved-amount)
+              #+linkage-space (adjust-linkage-space spacemap parsed-header fwdmap)
               ;; Walk spaces except for newspace, changing any pointers that
               ;; should point to new space.
               (dolist (space-id `(,dynamic-core-space-id ,static-core-space-id
@@ -1234,9 +1270,7 @@
 ;;; $ run-sbcl.sh
 ;;; * (load "tools-for-build/editcore")
 ;;; * (sb-editcore:move-dynamic-code-to-text-space "step1.core" "step2.core")
-;;; * (sb-editcore:redirect:text-space-calls "step2.core")
-;;; Now "step2.core" has a text space, and all lisp-to-lisp calls bypass their FDEFN.
-;;; At this point split-core on "step2.core" can run in the manner of elfcore.test.sh
+;;; Now "step2.core" has a text space and you can run split-core on it
 
 (defun get-code-segments (code vaddr core)
   (let ((di (%code-debug-info code))
@@ -1344,12 +1378,11 @@
             found)))
 
 (defun persist-to-file (spacemap core-offset stream)
-  (aver (zerop core-offset))
   (dolist (space-id `(,static-core-space-id
                       ,immobile-text-core-space-id
                       ,dynamic-core-space-id))
     (let ((space (get-space space-id spacemap)))
-      (file-position stream (* (1+ (space-data-page space)) +backend-page-bytes+))
+      (file-position stream (+ (* (1+ (space-data-page space)) +backend-page-bytes+) core-offset))
       (sb-unix:unix-write (sb-impl::fd-stream-fd stream)
                           (space-physaddr space spacemap)
                           0
@@ -1473,6 +1506,7 @@
             (t
              (let ((first 1) (last (ash (size-of sap) (- word-shift))))
                (case widetag
+                 #-linkage-space
                  (#.fdefn-widetag ; wordindex 3 is an untagged simple-fun entry address
                   (let ((bits (load-bits-wordindexed sap fdefn-raw-addr-slot)))
                     (unless (or (eq bits 0)
@@ -1694,7 +1728,7 @@
 
 ;;; Gather all the objects in the order we want to reallocate them in.
 ;;; This relies on MAPHASH in SBCL iterating in insertion order.
-(defun visit-everything (spacemap initfun
+(defun visit-everything (spacemap initfun linkage-info
                          &optional print
                          &aux (seen (make-visited-table))
                               (defer-debug-info
@@ -1725,6 +1759,13 @@
                         (when print (format t "~&Popped ~x~%" descriptor))
                         (trace-obj #'visit descriptor spacemap)))))
     (root (make-descriptor initfun))
+    (dotimes (i (linkage-space-count linkage-info))
+      (let ((word (aref (linkage-space-cells linkage-info) i)))
+        (unless (= word 0)
+          (let ((header (sap-ref-word (int-sap (translate-ptr word spacemap))
+                                      (ash -2 word-shift))))
+            (when (= (logand header widetag-mask) funcallable-instance-widetag)
+              (root (fun-entry->descriptor word)))))))
     (trace-symbol #'visit (compute-nil-symbol-sap spacemap))
     (call-with-each-static-object #'root spacemap)
     (transitive-closure)
@@ -1886,7 +1927,7 @@
                (sap+ (int-sap new-vaddr) (ash 2 word-shift))))))
     new-vaddr))
 
-(defun fixup-compacted (old-spacemap new-spacemap seen &optional print)
+(defun fixup-compacted (linkage-cells old-spacemap new-spacemap seen &optional print)
   (labels
       ((visit (sap slot value widetag)
            (unless (descriptor-p value) (return-from visit))
@@ -1896,7 +1937,7 @@
              (case (logand most-positive-word (logior (ash slot 8) widetag))
                ((#.instance-widetag #.funcallable-instance-widetag)
                 (set-layout sap widetag newspace-ptr))
-               ((#.(logior (ash fdefn-raw-addr-slot 8) fdefn-widetag)
+               ((#-linkage-space #.(logior (ash fdefn-raw-addr-slot 8) fdefn-widetag)
                  #.(logior (ash closure-fun-slot 8) closure-widetag))
                 (setf (sap-ref-word sap (ash slot word-shift))
                       (+ newspace-ptr (- (ash simple-fun-insts-offset word-shift)
@@ -1924,6 +1965,13 @@
     (call-with-each-static-object
        (lambda (descriptor) (trace-obj #'visit descriptor old-spacemap))
        old-spacemap)
+    (dotimes (i (length linkage-cells))
+      (let ((val (aref linkage-cells i)))
+        (unless (= val 0)
+          (let* ((function (fun-entry->descriptor val))
+                 (new-function (forward function))
+                 (diff (- new-function (descriptor-bits function))))
+            (incf (aref linkage-cells i) diff)))))
     (when print (format t "~&Fixing dynamic space~%"))
     (dohash ((old-taggedptr new-taggedptr) seen)
       (declare (ignorable old-taggedptr))
@@ -1950,6 +1998,7 @@
         (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
                (seen (visit-everything spacemap
                                        (core-header-initfun parsed-header)
+                                       (core-header-linkage-space-info parsed-header)
                                        print))
                (oldspace (get-space dynamic-core-space-id spacemap)))
           ;;(summarize-object-counts spacemap seen)
@@ -1984,7 +2033,9 @@
             ;; pass 2: visit every object again, fixing pointers
             ;; Start by removing objects from SEEN that were not forwarded
             (maphash (lambda (key value) (if (eq value t) (remhash key seen))) seen)
-            (fixup-compacted spacemap new-spacemap seen)
+            (fixup-compacted (linkage-space-cells
+                              (core-header-linkage-space-info parsed-header))
+                             spacemap new-spacemap seen)
             (setf (core-header-initfun parsed-header)
                   (gethash (core-header-initfun parsed-header) seen))
             (flet ((n (spaces)

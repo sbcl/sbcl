@@ -1184,7 +1184,7 @@
       ;; This happened by virtue of calling fop-fdefn for each.
       (loop for stack-index from (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))
             repeat n-fdefns
-            do (aver (typep (svref stack stack-index) 'fdefn)))
+            do (aver (typep (svref stack stack-index) '(or fdefn #+linkage-space symbol))))
       (binding* (((code total-nwords)
                   (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
@@ -1203,7 +1203,8 @@
           ;; This is the moral equivalent of a warning from /usr/bin/ld
           ;; that "gets() is dangerous." You're informed by both the compiler and linker.
           (dotimes (i n-fdefns)
-            (let ((name (fdefn-name (svref stack (+ stack-index i)))))
+            (let* ((thing (svref stack (+ stack-index i)))
+                   (name (if (fdefn-p thing) (fdefn-name thing))))
               (when (deprecated-thing-p 'function name)
                 (format *error-output* "~&; While loading ~S:" (sb-c::debug-info-name debug-info))
                 (check-deprecated-thing 'function name)))))
@@ -1227,6 +1228,10 @@
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
               (incf stack-index)))
+        #+linkage-space ; Scan packed linkage index list for deprecated names
+        (dolist (index (sb-c:unpack-code-fixup-locs
+                        (code-header-ref code sb-vm:code-linkage-elts-slot)))
+          (check-deprecated-thing 'function (sb-vm::linkage-addr->name index :index)))
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.

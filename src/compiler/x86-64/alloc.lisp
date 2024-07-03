@@ -929,7 +929,6 @@
          (emit-label leave-pa)))
       done))) ; label needed by calc-size-in-bytes
 
-#-immobile-space
 (define-vop (make-fdefn)
   (:policy :fast-safe)
   (:translate make-fdefn)
@@ -939,11 +938,7 @@
   (:node-var node)
   (:generator 37
     (alloc-other fdefn-widetag fdefn-size result node nil thread-tn
-      (lambda ()
-        (storew name result fdefn-name-slot other-pointer-lowtag)
-        (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
-        (storew (make-fixup 'undefined-tramp :assembly-routine)
-                result fdefn-raw-addr-slot other-pointer-lowtag)))))
+      (lambda () (storew name result fdefn-name-slot other-pointer-lowtag)))))
 
 (define-vop (make-closure)
   (:info label length stack-allocate-p)

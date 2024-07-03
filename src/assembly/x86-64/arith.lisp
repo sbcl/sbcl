@@ -12,7 +12,12 @@
 (in-package "SB-VM")
 
 #-sb-assembling ; avoid redefinition warning
-(progn
+(macrolet ((static-fun-addr (name)
+             #+immobile-code `(rip-relative-ea (make-fixup ,name :linkage-cell))
+             #-immobile-code
+             `(progn
+                (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
+                (ea (make-fixup ,name :linkage-cell) rax-tn))))
 (defun both-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst or :dword temp y)
@@ -22,10 +27,6 @@
   (inst mov :dword temp x)
   (inst and :dword temp y)
   (inst test :byte temp fixnum-tag-mask))
-
-(defun static-fun-addr (name)
-  #+immobile-code (make-fixup name :static-call)
-  #-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
 (defun call-static-fun (fun arg-count)
   (inst push rbp-tn)

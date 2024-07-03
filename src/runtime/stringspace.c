@@ -74,6 +74,8 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
         lispobj name = decode_symbol_name(s->name);
         gc_assert(is_lisp_pointer(name));
         set_symbol_name(s, func(name, arg));
+    } else if (widetag == FDEFN_WIDETAG) {
+        // nothing to do
     } else if (widetag == CODE_HEADER_WIDETAG) {
         int boxedlen = code_header_words((struct code*)object), i;
         // first 4 slots are header, boxedlen, fixups, debuginfo

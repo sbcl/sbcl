@@ -966,22 +966,7 @@ We could try a few things to mitigate this:
                `(,functoid (symbol-package ,obj) ,@more))
             ,.(make-case 'fdefn
                `(fdefn-name ,obj)
-               `(fdefn-fun ,obj)
-               ;; While it looks like we could easily allow a pointer to a movable object
-               ;; in the fdefn-raw-addr slot, it is not exactly trivial- at a bare minimum,
-               ;; translating the raw-addr to a lispobj might have to be pseudoatomic,
-               ;; since we don't know what object to pin when reconstructing it.
-               ;; For simple-funs in dynamic space, it doesn't have to be pseudoatomic
-               ;; because a reference to the interior of code pins the code.
-               ;; Closure trampolines would be fine as well. That leaves funcallable instances
-               ;; as the pain point. Those could go on pages of code as well, but see the
-               ;; comment in conservative_root_p() in gencgc as to why that alone
-               ;; would be inadequate- we require a properly tagged descriptor
-               ;; to enliven any object other than code.
-               #+(and immobile-code x86-64)
-               `(%make-lisp-obj
-                 (alien-funcall (extern-alien "decode_fdefn_rawfun" (function unsigned unsigned))
-                                (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
+               `(fdefn-fun ,obj))
             ,.(make-case* 'code-component
                `(loop for .i. from 2 below (code-header-words ,obj)
                       do (,functoid (code-header-ref ,obj .i.) ,@more)))

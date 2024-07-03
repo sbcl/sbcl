@@ -213,39 +213,6 @@
   (update-dynamic-space-code-tree fin)
   fin)
 
-#+immobile-space
-(defun alloc-immobile-fdefn ()
-  (alloc-immobile-fixedobj fdefn-size
-                           (logior (ash undefined-fdefn-header 16)
-                                   fdefn-widetag))) ; word 0
-
-(defun fdefn-has-static-callers (fdefn)
-  (declare (type fdefn fdefn))
-  (with-pinned-objects (fdefn)
-    (logbitp 7 (sap-ref-8 (int-sap (get-lisp-obj-address fdefn))
-                          (- 1 other-pointer-lowtag)))))
-
-(eval-when (:compile-toplevel)
-(define-vop (set-fdefn-has-static-callers)
-  (:args (fdefn :scs (descriptor-reg)))
-  (:generator 1
-    ;; atomic because the immobile gen# is in the same byte
-    (inst or :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x80)))
-(define-vop (unset-fdefn-has-static-callers)
-  (:args (fdefn :scs (descriptor-reg)))
-  (:generator 1
-    ;; atomic because the immobile gen# is in the same byte
-    (inst and :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x7f))))
-
-(defun set-fdefn-has-static-callers (fdefn newval)
-  (declare (type fdefn fdefn) (type bit newval))
-  (if (= newval 0)
-      (%primitive unset-fdefn-has-static-callers fdefn)
-      (%primitive set-fdefn-has-static-callers fdefn))
-  fdefn)
-
-#+immobile-code
-(progn
 (sb-kernel:!defstruct-with-alternate-metaclass closure-trampoline
   :slot-names ()
   :constructor %alloc-closure-trampoline
@@ -254,25 +221,34 @@
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
 
-(defun set-fdefn-fun (fun fdefn)
-  (declare (type fdefn fdefn) (type function fun))
-  (let ((jmp-target (if (closurep fun)
-                        (let ((instance (%alloc-closure-trampoline)))
-                          (setf (%funcallable-instance-fun instance) fun)
-                          instance)
-                        fun)))
-    (with-pinned-objects (jmp-target)
-      ;; CLOSURE-CALLEE accesses the self pointer of a funcallable
-      ;; instance w/ builtin trampoline, or a simple-fun.
-      ;; But the result is shifted by N-FIXNUM-TAG-BITS because
-      ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
-      (%primitive set-direct-callable-fdefn-fun fdefn fun
-                  (get-lisp-obj-address (%closure-callee jmp-target)))))
-  nil)
+(defmethod print-object ((self closure-trampoline) stream)
+  (print-unreadable-object (self stream :identity t)
+    (let ((payload (%primitive slot self 'function
+                               funcallable-instance-function-slot fun-pointer-lowtag)))
+      (write-string (if (functionp payload) "Tramp " "Undefined-fun ") stream)
+      (prin1 payload stream))))
 
-) ; end PROGN
+(defun ensure-simplistic (function name)
+  (when (and (functionp function) (not (closurep function)))
+    (return-from ensure-simplistic function))
+  (let ((tramp (%alloc-closure-trampoline)))
+    (with-pinned-objects (tramp)
+      (if (or (eql function 0) (null function))
+          (let* ((asm-code (sb-fasl::get-asm-routine 'undefined-tramp))
+                 (base (sap+ (int-sap (get-lisp-obj-address tramp)) (- fun-pointer-lowtag)))
+                 (sap (sap+ base 23)))
+            (setf (sap-ref-16 sap 1) #x2524
+                  (sap-ref-32 sap 3) (asm-routine-indirect-address asm-code)
+                  ;; The undefined function name is stored in the "function" slot.
+                  ;; The slot setter doesn't like this of course.
+                  (sap-ref-lispobj base (ash funcallable-instance-function-slot word-shift))
+                  name))
+          (setf (%funcallable-instance-fun tramp) function)))
+    tramp))
 
-;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
+(defun stepper-fun (closure) (ensure-simplistic closure nil))
+
+;;; Find an immobile FUNCTION given an interior pointer to it.
 #+immobile-space
 (defun find-called-object (address)
   (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
@@ -284,9 +260,7 @@
          (%simple-fun-from-entrypoint
           (make-lisp-obj (logior obj other-pointer-lowtag))
           address))
-        (#.fdefn-widetag
-         (make-lisp-obj (logior obj other-pointer-lowtag)))
-        (#.funcallable-instance-widetag
+        (#.funcallable-instance-widetag ; FIXME: do we use this case?
          (make-lisp-obj (logior obj fun-pointer-lowtag)))))))
 
 ;;; Undo the effects of XEP-ALLOCATE-FRAME
@@ -306,151 +280,6 @@
                                             (- (ash simple-fun-self-slot word-shift)
                                                fun-pointer-lowtag))))))
 
-(defun singly-occurs-p (thing things &aux (len (length things)))
-  ;; Return T if THING occurs exactly once in vector THINGS,
-  ;; assuming that it occurs at all.
-  (declare (simple-vector things))
-  (dotimes (i len)
-    (when (eq (svref things i) thing)
-      ;; re-using I as the index is OK because we leave the outer loop
-      ;; after this.
-      (return (loop (cond ((>= (incf i) len) (return t))
-                          ((eq thing (svref things i)) (return nil))))))))
-
-(define-load-time-global *static-linker-lock* (sb-thread:make-mutex :name "static linker"))
-
-(define-load-time-global *never-statically-link* '(find-package))
-;;; Remove calls via fdefns from CODE. This is called after compiling
-;;; to memory, or when saving a core.
-;;; Do not replace globally notinline functions, because notinline has
-;;; an extra connotation of ensuring that replacement of the function
-;;; under that name always works. It usually works to replace a statically
-;;; linked function, but with a caveat: un-statically-linking requires calling
-;;; MAP-OBJECTS-IN-RANGE, which is unreliable in the presence of
-;;; multiple threads. Unfortunately, some users dangerously redefine
-;;; builtin functions, and moreover, while there are multiple threads.
-(defun statically-link-code-obj (code fixups &optional observable-fdefns)
-  (declare (ignorable code fixups observable-fdefns))
-  #+immobile-code
-  (binding* (((fdefns-start fdefns-count) (code-header-fdefn-range code))
-             (replacements (make-array fdefns-count :initial-element nil))
-             (ambiguous (make-array fdefns-count :initial-element 0 :element-type 'bit))
-             (any-replacements nil)
-             (any-ambiguous nil))
-    ;; For each fdefn, decide two things:
-    ;; * whether the fdefn can be replaced by its function - possible only when
-    ;;   that function is in immobile space and needs no trampoline.
-    ;; * whether the replacement creates ambiguitity - if #'F and #'G are the same
-    ;;   function, then substituting that function in for the fdefn of F and G
-    ;;   requires storing locations at which replacement was done
-    (dotimes (i fdefns-count)
-      (let* ((fdefn (code-header-ref code (+ fdefns-start i)))
-             (fun (when (fdefn-p fdefn) (fdefn-fun fdefn))))
-        (when (and (immobile-space-obj-p fun)
-                   (not (closurep fun))
-                   (not (member (fdefn-name fdefn) *never-statically-link* :test 'equal))
-                   (neq (info :function :inlinep (fdefn-name fdefn)) 'notinline))
-          (setf any-replacements t (aref replacements i) fun))))
-    (dotimes (i fdefns-count)
-      (when (and (aref replacements i)
-                 (not (singly-occurs-p (aref replacements i) replacements)))
-        (setf any-ambiguous t (bit ambiguous i) 1)))
-    (unless any-replacements
-      (return-from statically-link-code-obj))
-    ;; Map each fixup to an index in REPLACEMENTS (which currently holds functions,
-    ;; not fdefns, so we have to scan the code header).
-    ;; This can be done outside the lock
-    (flet ((index-of (fdefn)
-             (dotimes (i fdefns-count)
-               (when (eq fdefn (code-header-ref code (+ fdefns-start i)))
-                 (return i)))))
-      (setq fixups (mapcar (lambda (fixup) ; = (offset . #<fdefn>)
-                             (cons (index-of (cdr fixup)) (car fixup)))
-                           fixups)))
-    (let ((insts (code-instructions code)))
-      ;; One final check: if any of the fixed-up instructions is "MOV EAX, #xNNNN"
-      ;; instead of a CALL or JMP, we can't fixup that particular fdefn for any
-      ;; of its call sites. (They should all use MOV if any one does).
-      ;; This happens when *COMPILE-TO-MEMORY-SPACE* is set to :AUTOMATIC.
-      ;; In that case we don't know that the code will be within an imm32 of
-      ;; the target address, because the code might have gone into dynamic space.
-      (dolist (fixup fixups)
-        (binding* ((fdefn-index (car fixup) :exit-if-null)
-                   (offset (cdr fixup)))
-          (when (and (aref replacements fdefn-index)
-                     (not (eql (logior (sap-ref-8 insts (1- offset)) 1) #xE9)))
-            (setf (aref replacements fdefn-index) nil))))
-      (let ((stored-locs (if any-ambiguous
-                             (make-array fdefns-count :initial-element nil))))
-        (with-system-mutex (*static-linker-lock*)
-          (dolist (fixup fixups)
-            (binding* ((fdefn-index (car fixup) :exit-if-null)
-                       (offset (cdr fixup))
-                       (fdefn (code-header-ref code (+ fdefns-start fdefn-index)))
-                       (fun (aref replacements fdefn-index)))
-              (when (and fun (/= (bit ambiguous fdefn-index) 1))
-                ;; Set the statically-linked flag
-                (set-fdefn-has-static-callers fdefn 1)
-                (when (= (bit ambiguous fdefn-index) 1)
-                  (push offset (aref stored-locs fdefn-index)))
-                ;; Change the machine instruction
-                ;; %CLOSURE-CALLEE reads the entry addresss word of any
-                ;; kind of function, but as if it were a tagged fixnum.
-                (let ((entry (descriptor-sap (%closure-callee fun))))
-                  (setf (signed-sap-ref-32 insts offset)
-                        (sap- entry (sap+ insts (+ offset 4))))))))
-          ;; Replace ambiguous elements of the code header while still holding the lock
-          #+statically-link-if-ambiguous ; never enabled
-          (dotimes (i fdefns-count)
-            (when (= (bit ambiguous i) 1)
-              (let ((wordindex (+ fdefns-start i))
-                    (locs (aref stored-locs i)))
-                (setf (code-header-ref code wordindex)
-                      (cons (code-header-ref code wordindex) locs)))))))))
-  code)
-
-(defmacro static-call-entrypoint-vector ()
-  '(- (get-lisp-obj-address sb-fasl::*asm-routine-vector*)
-      (ash (+ vector-data-offset (align-up (length +static-fdefns+) 2)) word-shift)))
-
-;;; Return either the address to jump to when calling NAME, or the address
-;;; containing the address, depending on FIXUP-KIND.
-;;; Use FDEFINITION because it strips encapsulations - whether that's
-;;; the right behavior for it or not is a separate concern.
-;;; If somebody tries (TRACE LENGTH) for example, it should not cause
-;;; compilations to fail on account of LENGTH becoming a closure.
-(defun function-raw-address (name fixup-kind &aux (fun (fdefinition name)))
-  (declare (type (member :abs32 :rel32) fixup-kind))
-  (cond ((not (immobile-space-obj-p fun))
-         (error "Can't statically link to ~S: code is movable" name))
-        ((neq (%fun-pointer-widetag fun) simple-fun-widetag)
-         (error "Can't statically link to ~S: non-simple function" name))
-        ((eq fixup-kind :rel32)
-         ;; if performing a relative fixup, return where the function really is,
-         ;; given that calling from anywhere in immobile space to immobile space
-         ;; needs only a signed imm32 operand.
-         (sap-ref-word (int-sap (get-lisp-obj-address fun))
-                       (- (ash simple-fun-self-slot word-shift) fun-pointer-lowtag)))
-        #+immobile-space
-        (t
-         ;; if calling from dynamic space, it is emitted as "call [abs]" where the
-         ;; absolute address is in static space. Return the address of the element
-         ;; in the entrypoint vector, not the address of the function.
-         (let ((vector-data (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
-                                  (- (ash (+ vector-data-offset
-                                             (align-up (length +static-fdefns+) 2))
-                                          word-shift))))
-               (index (the (not null) (position name +static-fdefns+))))
-           (the (signed-byte 32)
-                (sap-int (sap+ vector-data (ash index word-shift))))))))
-
-;; Return the address to which to jump when calling FDEFN,
-;; which is either an fdefn or the name of an fdefn.
-(defun fdefn-entry-address (fdefn)
-  (let ((fdefn (if (fdefn-p fdefn) fdefn (find-or-create-fdefn fdefn))))
-    (+ (get-lisp-obj-address fdefn)
-       (- 2 other-pointer-lowtag))))
-
 (defun validate-asm-routine-vector ()
   ;; If the jump table in static space does not match the jump table
   ;; in *assembler-routines*, fix the one one in static space.
@@ -466,17 +295,7 @@
     (dotimes (i n)
       (unless (= (aref external-table i) 0)
         (setf (aref external-table i)
-              (sap-ref-word insts (truly-the index (ash (1+ i) word-shift))))))
-    ;; Preceding the asm routine vector is the vector of addresses of static-fdefns [sic].
-    ;; These are functions deemed particularly important, so they can be called using 1 instruction
-    ;; from any address in dynamic space. The fdefns aren't actually in static space.
-    (let ((vector (truly-the (simple-array word (*))
-                             (%make-lisp-obj (static-call-entrypoint-vector)))))
-      (dotimes (i (length +static-fdefns+))
-        (setf (aref vector i)
-              (let ((fun (%symbol-function (truly-the symbol (aref +static-fdefns+ i)))))
-                (sap-ref-word (int-sap (get-lisp-obj-address fun))
-                              (- (ash simple-fun-self-slot word-shift) fun-pointer-lowtag))))))))
+              (sap-ref-word insts (truly-the index (ash (1+ i) word-shift))))))))
 
 (defconstant cf-bit 0)
 (defconstant sf-bit 7)

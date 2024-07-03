@@ -986,21 +986,7 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 
     WITH_GC_AT_SAFEPOINTS_ONLY() {
         block_blockable_signals(&ctx->sigmask);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        if (trap == trap_UndefinedFunction) {
-            lispobj* fdefn = (lispobj*)(OS_CONTEXT_PC(ctx) & ~LOWTAG_MASK);
-            if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
-                // Return to undefined-tramp
-                OS_CONTEXT_PC(ctx) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
-                // with RAX containing the FDEFN
-                *os_context_register_addr(ctx,reg_RAX) =
-                    make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
-            }
-        } else
-#endif
-        {
-            handle_trap(ctx, trap);
-        }
+        handle_trap(ctx, trap);
         thread_sigmask(SIG_SETMASK,&ctx->sigmask,NULL);
     }
 

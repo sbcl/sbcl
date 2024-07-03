@@ -1254,6 +1254,9 @@ collect_garbage(generation_index_t last_gen)
     // This could be done in the background somehow maybe.
     page_index_t max_nfp = initial_nfp > next_free_page ? initial_nfp : next_free_page;
     memset(gc_page_pins, 0, max_nfp);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    sweep_linkage_space();
+#endif
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -1753,6 +1756,9 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(s->value, &s->value);
         CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        CHECK(linkage_cell_taggedptr(symbol_linkage_index(s)), &s->fdefn);
+#endif
         CHECK(decode_symbol_name(s->name), &s->name);
         return 0;
     }
@@ -1760,7 +1766,11 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         struct fdefn* f = (void*)object;
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+        CHECK(linkage_cell_taggedptr(fdefn_linkage_index(f)), &f->fun);
+#else
         CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
+#endif
         return 0;
     }
     for (i=1; i<nwords; ++i) CHECK(object[i], object+i);

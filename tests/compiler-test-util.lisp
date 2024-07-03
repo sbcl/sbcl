@@ -110,13 +110,23 @@
                               calls))))))))))
     (values calls compiled-fun)))
 
+(when (member :linkage-space sb-impl:+internal-features+) ; for below
+  (pushnew :linkage-space *features*))
+
 (defun find-named-callees (fun &key (name nil namep))
-  (sb-int:binding* ((code (fun-code-header (%fun-fun fun)))
-                    ((start count) (sb-kernel:code-header-fdefn-range code)))
-    (loop for i from start repeat count
-          for c = (code-header-ref code i)
-          when (or (not namep) (equal name (sb-kernel:fdefn-name c)))
-          collect (sb-kernel:fdefn-name c))))
+  (let ((code (fun-code-header (%fun-fun fun))))
+    #+linkage-space
+    (loop for index in (sb-c:unpack-code-fixup-locs
+                        (sb-kernel:code-header-ref code sb-vm:code-linkage-elts-slot))
+          for this = (sb-vm::linkage-addr->name index :index)
+          when (or (not namep) (equal this name))
+          collect this)
+    #-linkage-space
+    (sb-int:binding* (((start count) (sb-kernel:code-header-fdefn-range code)))
+      (loop for i from start repeat count
+            for c = (code-header-ref code i)
+            when (or (not namep) (equal name (sb-kernel:fdefn-name c)))
+            collect (sb-kernel:fdefn-name c)))))
 
 (defun find-anonymous-callees (fun &key (type 'function))
   (let ((code (fun-code-header (%fun-fun fun))))
@@ -194,6 +204,8 @@
                  (write-line toplevel-forms f)
                  (dolist (form toplevel-forms)
                    (prin1 form f))))
+           ;; Preserve all referenced callees. This has no effect on semantics
+           (sb-int:encapsulate 'sb-int:permanent-fname-p 'test-shim #'sb-int:constantly-nil)
            (multiple-value-bind (fasl warn fail)
                (let ((*error-output* error-stream))
                  (compile-file lisp :print nil :verbose nil
@@ -204,6 +216,7 @@
                (let ((*error-output* error-stream))
                  (load fasl :print nil :verbose nil)))
              (values warn fail error-stream)))
+      (sb-int:unencapsulate 'sb-int:permanent-fname-p 'test-shim)
       (ignore-errors (delete-file lisp))
       (ignore-errors (delete-file fasl)))))
 

@@ -237,7 +237,7 @@
   (inst test :byte tmp tmp) ; if fdefn is nullptr, it has no lowtag
   (inst jmp :z UNDEFINED-TRAMP)
   (inst mov fun tmp) ; needed if the JMP invokes UNDEFINED-TRAMP
-  (inst jmp (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag) tmp))
+  (inst jmp (object-slot-ea tmp closure-fun-slot fun-pointer-lowtag))
   NOT-CALLABLE
   (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e UNDEFINED-TRAMP)

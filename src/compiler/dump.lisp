@@ -1034,7 +1034,7 @@
     :alien-code-linkage-index :alien-data-linkage-index
     :foreign :foreign-dataref
     :code-object
-    :layout :immobile-symbol :fdefn-call :static-call
+    :layout :immobile-symbol :linkage-cell
     :symbol-value
     :layout-id)
   #'equalp)

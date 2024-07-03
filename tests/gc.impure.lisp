@@ -168,10 +168,10 @@
     (assert (= (sb-kernel:generation-of (sb-int:find-fdefn '(setf car)))
                (sb-kernel:generation-of #'car)))))
 
-(with-test (:name :static-fdefn-space)
+(with-test (:name :static-fdefn-space :skipped-on :linkage-space)
   (sb-int:dovector (name sb-vm:+static-fdefns+)
     (assert (eq (sb-ext:heap-allocated-p (sb-int:find-fdefn name))
-                (or #+(and immobile-code x86-64) :immobile :static)))))
+                :static))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
 (with-test (:name :bug-529014)

@@ -454,10 +454,7 @@
                    (emit-store ea value val-temp))
                  `((inst mov :qword ea (encode-value-if-immediate value ,tagged)))))))))
 
-(defmacro pc-size (vop)
-  `(if (sb-c::code-immobile-p ,vop)
-       :dword
-       :qword))
+(defmacro pc-size (vop) (declare (ignore vop)) :qword)
 
 ;;; This is not "very" arch-specific apart from use of the EA macro
 (defmacro mutex-slot (base-reg slot-name)

@@ -6652,6 +6652,8 @@
 ;;; Add transforms in reverse of the order you want them tried
 ;;; (because of stupid semantics)
 (deftransform fboundp ((symbol) (symbol))
+  #+linkage-space `(sb-kernel:fdefn-fun symbol)
+  #-linkage-space
   `(let ((fdefn (sb-vm::%symbol-fdefn symbol)))
      (and (not (eq fdefn 0))
           ;; On 32-bit, where %SYMBOL-FDEFN of NIL returns NIL instead of 0,
@@ -6663,6 +6665,7 @@
 ;;; but this transform is neutral in terms of the sum of code and data size.
 ;;; So for the cost of an FDEFN that might never store a function, the code
 ;;; is smaller by about the size of an fdefn; and it's faster, so do it.
+#-linkage-space
 (deftransform fboundp ((name) ((constant-arg symbol)))
   `(fdefn-fun (load-time-value (find-or-create-fdefn ',(lvar-value name)) t)))
 

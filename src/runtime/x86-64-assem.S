@@ -253,16 +253,9 @@ GNAME(funcall_alien_callback):
         push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
         mov	%rsp,%rbp
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-#include "genesis/vector.h"
-        // An extra instruction is needed to load the fdefn.
-        mov	(STATIC_FDEFNS+VECTOR_DATA_OFFSET+8*ENTER_ALIEN_CALLBACK_fdefn),%rax
-        mov	FDEFN_FUN_OFFSET(%rax),%rax
-#else
-        mov     (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
-#endif
 	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
-	call	*CLOSURE_FUN_OFFSET(%rax)
+	LOAD_PIC_VAR(linkage_space, %rax)
+	call	*(8*ENTER_ALIEN_CALLBACK_fname_index)(%rax)
 
 /* Restore C regs */
 	pop	%r15

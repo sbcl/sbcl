@@ -100,11 +100,11 @@ distinct from the global value. Can also be SETF."
 ;;; Don't strip encapsulations.
 (declaim (inline %symbol-function))
 (defun %symbol-function (symbol)
+  #+linkage-space (%primitive sb-vm::fdefn-fun symbol)
+  #-linkage-space
   (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
     (if (eql fdefn 0) nil (fdefn-fun (truly-the fdefn fdefn)))))
-(defun (setf %symbol-function) (newval symbol) ; OK to use only if fdefn exists
-  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
-    (setf (fdefn-fun (truly-the fdefn fdefn)) newval)))
+(defun (setf %symbol-function) (newval symbol) (fset symbol newval))
 
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."
@@ -135,8 +135,7 @@ distinct from the global value. Can also be SETF."
     ;; e.g. what's up with *USER-HASH-TABLE-TESTS* being checked
     ;; in %SET-FDEFINITION but not here?
     (maybe-clobber-ftype symbol new-value)
-    (let ((fdefn (find-or-create-fdefn symbol)))
-      (setf (fdefn-fun fdefn) new-value))))
+    (fset symbol new-value)))
 
 ;;; Incredibly bogus kludge: the :CAS-TRANS option in objdef makes no indication
 ;;; that you can not use it on certain platforms, so then you do try to use it,

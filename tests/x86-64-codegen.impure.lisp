@@ -170,23 +170,6 @@
       (assert (search "; #<SB-KERNEL:LAYOUT " line))
       (assert (search " SB-ASSEM:LABEL" line)))))
 
-#+immobile-code ; uses SB-C::*COMPILE-TO-MEMORY-SPACE*
-(with-test (:name :static-link-compile-to-memory)
-  (let* ((string
-          (with-output-to-string (stream)
-            (disassemble
-             (let ((sb-c::*compile-to-memory-space* :immobile))
-               (compile nil '(lambda () (print (gensym)))))
-             :stream stream)))
-         (lines (split-string string #\newline)))
-    (flet ((find-line (mnemonic operand)
-             (find-if (lambda (line)
-                        (and (search mnemonic line)
-                             (search operand line)))
-                      lines)))
-    (assert (find-line "CALL" "#'GENSYM"))
-    (assert (find-line "JMP" "#'PRINT")))))
-
 (with-test (:name :c-call :skipped-on :win32)
   (let* ((lines (split-string
                  (with-output-to-string (s)
@@ -1073,14 +1056,6 @@
                (setf (submarine-x sub) a
                      (submarine-y sub) fooval)
                a))))
-
-#+immobile-code
-(with-test (:name :no-static-linkage-if-notinline)
-  ;; The normal state of the image has no "static" calls to FIND-PACKAGE
-  ;; but also has no globally proclaimed NOTINLINE, because that would
-  ;; suppress the optimization for CACHED-FIND-PACKAGE on a constant string.
-  (assert (not (sb-vm::fdefn-has-static-callers (sb-int:find-fdefn 'find-package))))
-  (assert (not (sb-int:info :function :inlinep 'find-package))))
 
 (sb-vm::define-vop (trythis)
   (:generator 1

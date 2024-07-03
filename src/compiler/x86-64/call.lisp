@@ -20,6 +20,13 @@
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))
 
+(defun compute-linkage-cell (node name res)
+  (cond ((sb-c::code-immobile-p node)
+         (inst lea res (rip-relative-ea (make-fixup name :linkage-cell))))
+        (t
+         (inst mov res (thread-slot-ea sb-vm::thread-linkage-table-slot))
+         (inst lea res (ea (make-fixup name :linkage-cell) res)))))
+
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
@@ -657,16 +664,11 @@
 ;;; have been set up in the current frame.
 (defmacro define-full-call (vop-name named return variable &optional args)
   (aver (not (and variable (eq return :tail))))
-  #+immobile-code (when named (setq named :direct))
   `(define-vop (,vop-name ,@(when (eq return :unknown) '(unknown-values-receiver)))
      (:args    ,@(unless (eq return :tail)
                    '((new-fp :scs (any-reg) :to (:argument 1))))
 
-               ;; If immobile-space is in use, then named call does not require
-               ;; a register unless the caller is NOT in immobile space,
-               ;; in which case the register is needed because there is no
-               ;; absolute addressing mode for jmp/call.
-               ,@(unless (eq named :direct)
+               ,@(unless named ; FUN is an info argument for named call
                    '((fun :scs (descriptor-reg control-stack)
                           :target rax :to (:argument 0))))
 
@@ -692,7 +694,7 @@
                ;; Intuitively you might want FUN to be the first codegen arg,
                ;; but that won't work, because EMIT-ARG-MOVES wants the
                ;; passing locs in (FIRST (vop-codegen-info vop)).
-               ,@(when (eq named :direct) '(fun))
+               ,@(when named '(fun))
                ,@(when (eq return :fixed) '(nvals))
                step-instrumenting
                ,@(unless named '(fun-type)))
@@ -701,15 +703,11 @@
                 ,@(unless variable '(args))
                 ,@(when (eq return :unboxed) '(values)))
 
-               ;; We pass either the fdefn object (for named call) or
-               ;; the actual function object (for unnamed call) in
-               ;; RAX. With named call, closure-tramp will replace it
-               ;; with the real function and invoke the real function
-               ;; for closures. Non-closures do not need this value,
-               ;; so don't care what shows up in it.
-     ,@(unless (eq named :direct)
-         '((:temporary (:sc descriptor-reg :offset rax-offset
-                        :from (:argument 0) :to :eval) rax)))
+     ;; For anonymous call, RAX is the function. For named call, RAX will be the linkage
+     ;; table base if not stepping, or the linkage cell itself if stepping.
+     ;; Calls from immobile-space without stepping avoid using RAX, and instead
+     ;; access the linkage table relative to RIP.
+     (:temporary (:sc descriptor-reg :offset rax-offset :from (:argument 0) :to :eval) rax)
 
      ;; We pass the number of arguments in RCX.
      (:temporary
@@ -750,7 +748,7 @@
                ;; This has to be done before the frame pointer is
                ;; changed! RAX stores the 'lexical environment' needed
                ;; for closures.
-       ,@(unless (eq named :direct) '((move rax fun)))
+       ,@(unless named '((move rax fun)))
 
        ,@(if variable
                      ;; For variable call, compute the number of
@@ -827,25 +825,16 @@
                    (storew rbp-tn new-fp (frame-word-offset ocfp-save-offset))
                    (move rbp-tn new-fp))))  ; NB - now on new stack frame.
 
-       (when (and step-instrumenting
-                  ,@(and (eq named :direct)
-                         `((not (and #+immobile-code
-                                     ;; handle-single-step-around-trap can't handle it
-                                     (static-fdefn-offset fun))))))
+       (when step-instrumenting
+         ,@(when named '((compute-linkage-cell node fun rax)))
          (emit-single-step-test)
          (inst jmp :eq DONE)
          (inst break single-step-around-trap))
        DONE
        (note-this-location vop :call-site)
-       ,(cond ((eq named :direct)
-                       #+immobile-code `(emit-direct-call fun ',(if (eq return :tail) 'jmp 'call)
-                                                          node step-instrumenting)
-                       #-immobile-code `(inst ,(if (eq return :tail) 'jmp 'call)
-                                              (ea (+ nil-value (static-fun-offset fun)))))
-              #-immobile-code
-              (named
-               `(inst ,(if (eq return :tail) 'jmp 'call)
-                      (object-slot-ea rax fdefn-raw-addr-slot other-pointer-lowtag)))
+       ,(cond (named
+               `(emit-direct-call fun ',(if (eq return :tail) 'jmp 'call)
+                                  node step-instrumenting))
               ((eq return :tail)
                `(tail-call-unnamed rax fun-type vop))
               (t
@@ -859,16 +848,10 @@
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
-#-immobile-code
-(define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
-#-immobile-code
-(define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
-#-immobile-code
-(define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
@@ -881,28 +864,15 @@
 ;;; Call NAME "directly" meaning in a single JMP or CALL instruction,
 ;;; if possible (without loading RAX)
 (defun emit-direct-call (name instruction node step-instrumenting)
-      ;; a :STATIC-CALL fixup is the address of the entry point of
-      ;; the function itself, and a :FDEFN-CALL fixup is the address
-      ;; of the JMP instruction embedded in the header for the named FDEFN.
-  (when (static-fdefn-offset name)
-    (let ((fixup (make-fixup name :static-call)))
-      (return-from emit-direct-call
-        (inst* instruction (if (sb-c::code-immobile-p node) fixup (ea fixup))))))
-  (let* ((fixup (make-fixup name :fdefn-call))
-         (target
-              (if (and (sb-c::code-immobile-p node)
-                       (not step-instrumenting))
-                  fixup
-                  (progn
-                    ;; RAX-TN was not declared as a temp var,
-                    ;; however it's sole purpose at this point is
-                    ;; for function call, so even if it was used
-                    ;; to compute a stack argument, it's free now.
-                    ;; If the call hits the undefined fun trap,
-                    ;; RAX will get loaded regardless.
-                    (inst mov rax-tn fixup)
-                    rax-tn))))
-    (inst* instruction target)))
+  (cond (step-instrumenting
+         ;; If step-instrumenting, then RAX points to the linkage table cell
+         (inst* instruction (ea rax-tn)))
+        ((sb-c::code-immobile-p node)
+         (inst* instruction (rip-relative-ea (make-fixup name :linkage-cell))))
+        (t
+         ;; get the linkage table base into RAX
+         (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
+         (inst* instruction (ea (make-fixup name :linkage-cell) rax-tn)))))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)

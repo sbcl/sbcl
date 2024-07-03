@@ -32,11 +32,6 @@
 (define-load-time-global *allocation-patch-points*
   (make-hash-table :test 'eq :weakness :key :synchronized t))
 
-#-x86-64
-(progn
-(defun sb-vm::statically-link-code-obj (code fixups)
-  (declare (ignore code fixups))))
-
 ;;; Point FUN's 'self' slot to FUN.
 ;;; FUN must be pinned when calling this.
 #-darwin-jit ; done entirely by C for #+darwin-jit
@@ -53,12 +48,9 @@
            #-(or x86 x86-64 arm64) fun))
      (setf (sb-vm::%simple-fun-self fun) self)))
 
-(flet ((fixup (code-obj offset name kind flavor-id preserved-lists statically-link-p
-               real-code-obj &aux (flavor (aref +fixup-flavors+ flavor-id)))
-         (declare (ignorable statically-link-p preserved-lists))
+(flet ((fixup (code-obj offset name kind flavor-id real-code-obj callees
+               &aux (flavor (aref +fixup-flavors+ flavor-id)))
          ;; NAME depends on the kind and flavor of fixup.
-         ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
-         ;; at which fixup must be re-applied after code movement.
          ;; CODE-OBJ must already be pinned in order to legally call this.
          ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
          ;; and the other is LOAD-CODE, both of which pin the code.
@@ -77,6 +69,7 @@
                    (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
                    (:foreign (foreign-symbol-address name))
                    (:foreign-dataref (foreign-symbol-address name t))
+                   #+linkage-space (:linkage-cell (ensure-linkage-index name))
                    (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
@@ -88,17 +81,20 @@
                    ;; value is known to be an immobile object
                    ;; (whose address we don't want to wire in).
                    (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
-                   #+(and immobile-code x86-64)
-                   (:fdefn-call
-                    (prog1 (sb-vm::fdefn-entry-address name) ; creates if didn't exist
-                      (when statically-link-p
-                        (push (cons offset (find-fdefn name)) (elt preserved-lists 0)))))
-                   #+(and immobile-code x86-64)
-                   (:static-call (sb-vm::function-raw-address name kind)))
-                 kind flavor))
-
-       (finish-fixups (code-obj preserved-lists)
-         (declare (ignorable code-obj))
+                   (t (bug "bad fixup flavor ~s" flavor)))
+                 kind flavor)
+         (if (eq flavor :linkage-cell)
+             (adjoin name callees :test 'equal)
+             callees))
+       (finish-fixups (code-obj callees)
+         (declare (ignorable code-obj callees))
+         #+linkage-space
+         (when callees
+           (aver (eql (code-header-ref code-obj sb-vm:code-linkage-elts-slot) 0))
+           (let ((indices (mapcar 'ensure-linkage-index
+                                  (remove-if #'permanent-fname-p callees))))
+             (setf (code-header-ref code-obj sb-vm:code-linkage-elts-slot)
+                   (pack-code-fixup-locs indices nil nil))))
          ;; Assign all SIMPLE-FUN-SELF slots unless #+darwin-jit in which case the simple-funs
          ;; are assigned by jit_memcpy_codeblob()
          #-darwin-jit
@@ -115,41 +111,40 @@
          ;; x86 doesn't need it, and darwin-jit doesn't do it because the
          ;; temporary object is not executable.
          #-(or x86 x86-64 darwin-jit) (sb-vm:sanctify-for-execution code-obj)
-         ;; Return fixups amenable to static linking
-         (aref preserved-lists 0)))
+         nil))
 
   (defun apply-fasl-fixups (code-obj fixups index count real-code-obj
                             &aux (end (1- (+ index count))))
-    (dx-let ((preserved (make-array 5 :initial-element nil)))
-      (let ((retained-fixups (svref fixups index)))
-        (incf index)
-        (unless (eql retained-fixups 0)
-          (setf (sb-vm::%code-fixups code-obj) retained-fixups)))
-      (awhen (svref fixups index)
-        (setf (gethash code-obj *allocation-patch-points*) it))
+    (let ((retained-fixups (svref fixups index)))
+      (incf index)
+      (unless (eql retained-fixups 0)
+        (setf (sb-vm::%code-fixups code-obj) retained-fixups)))
+    (awhen (svref fixups index)
+      (setf (gethash code-obj *allocation-patch-points*) it))
+    (let (callees)
       (loop
         (when (>= index end) (return))
         (binding* (((offset kind flavor-id data)
                     (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
                    (name (if (eql 0 data) (svref fixups (incf index)) data)))
-          (fixup code-obj offset name kind flavor-id preserved nil real-code-obj)))
-      (finish-fixups code-obj preserved)))
+          (setq callees (fixup code-obj offset name kind flavor-id real-code-obj callees))))
+      (finish-fixups code-obj callees)))
 
   (defun apply-core-fixups (code-obj fixup-notes retained-fixups real-code-obj)
     (declare (list fixup-notes))
     (unless (eql retained-fixups 0)
       (setf (sb-vm::%code-fixups code-obj) retained-fixups))
-    (dx-let ((preserved (make-array 5 :initial-element nil)))
+    (let (callees)
       (dolist (note fixup-notes)
         (let ((fixup (fixup-note-fixup note))
               (offset (fixup-note-position note)))
-          (fixup code-obj offset
-                 (fixup-name fixup)
-                 (fixup-note-kind note)
-                 (encoded-fixup-flavor (fixup-flavor fixup))
-                 preserved t
-                 real-code-obj)))
-      (finish-fixups code-obj preserved))))
+          (setq callees
+                (fixup code-obj offset
+                       (fixup-name fixup)
+                       (fixup-note-kind note)
+                       (encoded-fixup-flavor (fixup-flavor fixup))
+                       real-code-obj callees))))
+      (finish-fixups code-obj callees))))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
@@ -258,8 +253,6 @@
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
-    (when (and named-call-fixups (immobile-space-obj-p code-obj))
-      (sb-vm::statically-link-code-obj code-obj named-call-fixups))
     (sb-fasl::possibly-log-new-code code-obj "core")))
 
 ;;; Call the top level lambda function dumped for ENTRY, returning the
@@ -343,7 +336,7 @@
   ;; Serial# shares a word with the jump-table word count,
   ;; so we can't assign serial# until after all raw bytes are copied in.
   ;; Do we need unique IDs on the various strange kind of code blobs? These would
-  ;; include code from MAKE-SIMPLIFYING-TRAMPOLINE, ENCAPSULATE-FUNOBJ, MAKE-BPT-LRA.
+  ;; include code from MAKE-TRAMPOLINE, ENCAPSULATE-FUNOBJ, MAKE-BPT-LRA.
   (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
                         (atomic-incf *code-serialno*)))
          (insts (code-instructions code-obj))

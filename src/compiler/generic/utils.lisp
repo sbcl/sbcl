@@ -70,6 +70,8 @@
 ;;; Return the (byte) offset from NIL to the raw-addr slot of the
 ;;; fdefn object for the static function NAME.
 (defun static-fun-offset (name)
+  #+linkage-space (error "Can't compute static-fun-offset to ~S" name)
+  #-linkage-space
   (+ (static-fdefn-offset name)
      (- other-pointer-lowtag)
      (* fdefn-raw-addr-slot n-word-bytes)))

@@ -3964,20 +3964,11 @@ register."
   ;; Fetch the function / fdefn we're about to call from the
   ;; appropriate register.
   (let* ((callee
-           ;; FIXME: this could handle static calls, but needs some
-           ;; help from the backends
-          (make-lisp-obj
-           (cond #+(and immobile-space x86-64)
-                 ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
-                  ;; Construct a properly tagged FDEFN given the value
-                  ;; that machine code references it by for purposes
-                  ;; of the ensuing CALL instruction.
-                  ;; FIXME: this ought to go in {target}-vm.lisp as
-                  ;; something like GET-FDEFN-FOR-SINGLE-STEP
-                  (+ (sap-ref-32 (context-pc context) 1) -2 other-pointer-lowtag))
-                 (t
-                  (logior (context-register context callee-register-offset)
-                          #+untagged-fdefns other-pointer-lowtag)))))
+          #+linkage-space
+          (sb-vm::linkage-addr->name (context-register context callee-register-offset) :abs)
+          #-linkage-space
+          (make-lisp-obj (logior (context-register context callee-register-offset)
+                                 #+untagged-fdefns other-pointer-lowtag)))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
@@ -3987,7 +3978,7 @@ register."
                   (flet ((call ()
                            (apply (typecase callee
                                     (fdefn (fdefn-fun callee))
-                                    (function callee))
+                                    ((or function #+linkage-space symbol) callee))
                                   args)))
                     ;; Signal a step condition
                     (let* ((step-in
@@ -4017,6 +4008,8 @@ register."
                           (sb-impl::with-stepping-disabled
                             (call)))))))
            (new-callee (etypecase callee
+                         #+linkage-space ((or list symbol) (sb-vm::stepper-fun fun))
+                         #-linkage-space
                          (fdefn
                           (let ((fdefn (make-fdefn '(#:dummy))))
                             (setf (fdefn-fun fdefn) fun)
@@ -4029,15 +4022,13 @@ register."
         ;; won't keep NEW-CALLEE pinned down. Once it's inside
         ;; CONTEXT, which is registered in thread->interrupt_contexts,
         ;; it will properly point to NEW-CALLEE.
-        (cond
-         #+(and immobile-code x86-64)
-         ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
-          ;; Store into RAX the necessary value for issuing a CALL to the JMP
-          ;; opcode in the FDEFN header.
+        (typecase callee
+         #+linkage-space ((or list symbol)
+          ;; the new callee is a funcallable instance that jumps to FUN.
+          ;; Point the callee register to the address of the FIN's trampoline word
           (setf (context-register context callee-register-offset)
-                (sb-vm::fdefn-entry-address new-callee))
-          ;; And skip over the MOV EAX, imm instruction.
-          (sb-vm::incf-context-pc context 5))
+                (+ (get-lisp-obj-address new-callee)
+                   (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))))
          (t
           (setf (context-register context callee-register-offset)
                 #+untagged-fdefns

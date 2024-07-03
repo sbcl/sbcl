@@ -1,5 +1,6 @@
 :int3-breakpoints
 :64-bit
+:linkage-space
 :gencgc
 :use-cons-region
 :soft-card-marks

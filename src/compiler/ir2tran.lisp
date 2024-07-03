@@ -187,6 +187,8 @@
                     (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res))
                 #-untagged-fdefns
                 (if (or unsafe internal)
+                    #+linkage-space (vop fdefn-fun node block fdefn-tn res)
+                    #-linkage-space
                     (vop slot node block fdefn-tn 'fdefn-fun sb-vm:fdefn-fun-slot
                          sb-vm:other-pointer-lowtag res)
                     (vop safe-fdefn-fun node block fdefn-tn res)))))))))
@@ -1093,10 +1095,9 @@
            ;; Uncross so that we don't create a constant for SB-XC:GENSYM
            ;; and CL:GENSYM, in case a piece of code mentions both.
            (let ((name (uncross (lvar-fun-name lvar t))))
-             ;; Static fdefns never need a code header constant.
-             ;; Calls to immobile space fdefns won't use the constant,
-             ;; but it needs to exist for GC's pointer tracing.
-             (values (if (sb-vm::static-fdefn-offset name)
+             ;; Always pass name as a literal symbol or list if #+linkage-space,
+             ;; otherwise do so only if the fdefn is static.
+             (values (if (or #+linkage-space t (sb-vm::static-fdefn-offset name))
                          name
                          (make-load-time-constant-tn :fdefinition name))
                      name)))
@@ -1174,7 +1175,7 @@
                        nargs (emit-step-p node)
                        #+call-symbol
                        (fun-tn-type fun-lvar fun-tn)))
-                #-(and x86-64 immobile-code)
+                #-linkage-space
                 ((eq fun-tn named)
                  (vop* static-tail-call-named node block
                        (old-fp return-pc pass-refs) ; args
@@ -1183,14 +1184,14 @@
                 (fixed-args-p
                  (when-vop-existsp (:named sb-vm::fixed-tail-call-named)
                   (vop* sb-vm::fixed-tail-call-named node block
-                        (#-(and x86-64 immobile-code) fun-tn old-fp return-pc pass-refs) ; args
+                        (#-linkage-space fun-tn old-fp return-pc pass-refs) ; args
                         (nil)           ; results
-                        nargs #+(and x86-64 immobile-code) named (emit-step-p node))))
+                        nargs #+linkage-space named (emit-step-p node))))
                 (t
                  (vop* tail-call-named node block
-                       (#-(and x86-64 immobile-code) fun-tn old-fp return-pc pass-refs) ; args
+                       (#-linkage-space fun-tn old-fp return-pc pass-refs) ; args
                        (nil)            ; results
-                       nargs #+(and x86-64 immobile-code) named (emit-step-p node))))))) ; info
+                       nargs #+linkage-space named (emit-step-p node))))))) ; info
   (values))
 
 (defun fixed-args-state (node)
@@ -1267,21 +1268,21 @@
                (when-vop-existsp (:named sb-vm::unboxed-call-named)
                  (if fixed-args-p
                      (vop* sb-vm::fixed-unboxed-call-named node block
-                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (fp #-linkage-space fun-tn args) ; args
                            (loc-refs)
-                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           arg-locs nargs #+linkage-space named ; info
                            (emit-step-p node))
                      (vop* sb-vm::unboxed-call-named node block
-                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (fp #-linkage-space fun-tn args) ; args
                            (loc-refs)
-                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           arg-locs nargs #+linkage-space named ; info
                            (emit-step-p node)))))
               ((not named)
                (vop* call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs nvals (emit-step-p node)
                      #+call-symbol
                      (fun-tn-type fun-lvar fun-tn)))
-              #-(and x86-64 immobile-code)
+              #-linkage-space
               ((eq fun-tn named)
                (vop* static-call-named node block
                      (fp args)
@@ -1291,15 +1292,15 @@
               (fixed-args-p
                (when-vop-existsp (:named sb-vm::fixed-call-named)
                  (vop* sb-vm::fixed-call-named node block
-                       (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                       (fp #-linkage-space fun-tn args) ; args
                        (loc-refs)                       ; results
-                       arg-locs nargs #+(and x86-64 immobile-code) named nvals ; info
+                       arg-locs nargs #+linkage-space named nvals ; info
                        (emit-step-p node))))
               (t
                (vop* call-named node block
-                     (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                     (fp #-linkage-space fun-tn args) ; args
                      (loc-refs)                       ; results
-                     arg-locs nargs #+(and x86-64 immobile-code) named nvals ; info
+                     arg-locs nargs #+linkage-space named nvals ; info
                      (emit-step-p node))))
         (move-lvar-result node block locs lvar))))
   (values))
@@ -1324,7 +1325,7 @@
                            arg-locs nargs (emit-step-p node)
                            #+call-symbol
                            (fun-tn-type fun-lvar fun-tn)))
-                    #-(and x86-64 immobile-code)
+                    #-linkage-space
                     ((eq fun-tn named)
                      (vop* static-multiple-call-named node block
                            (fp args)
@@ -1333,9 +1334,9 @@
                            (emit-step-p node)))
                     (t
                      (vop* multiple-call-named node block
-                           (fp #-(and x86-64 immobile-code) fun-tn args) ; args
+                           (fp #-linkage-space fun-tn args) ; args
                            (loc-refs)   ; results
-                           arg-locs nargs #+(and x86-64 immobile-code) named ; info
+                           arg-locs nargs #+linkage-space named ; info
                            (emit-step-p node)))))))))
   (values))
 

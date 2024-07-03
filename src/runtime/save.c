@@ -296,6 +296,31 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     if (nwrote != (int)(sizeof (core_entry_elt_t) * string_words))
         perror(GENERAL_WRITE_FAILURE_MSG);
 
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    // Lisp linkage space precedes the general space directory
+    int i;
+    extern void illegal_linkage_space_call();
+    /* The C runtime is theoretically position-independent so don't write out the address
+     * of the unused entry sentinel. The affected elements needn't be restored on restart.
+     * (Maybe add a renumbering pass in Lisp to ensure the table is 100% dense) */
+    for (i=0; i<linkage_table_count; ++i)
+        if (linkage_space[i] == (uword_t)illegal_linkage_space_call)
+            linkage_space[i] = 0;
+    int nbytes = ALIGN_UP(linkage_table_count<<WORD_SHIFT, BACKEND_PAGE_BYTES);
+    if (!lisp_startup_options.noinform)
+        printf("writing %lu bytes from the %s space at %p\n",
+               (long unsigned)nbytes, "linkage", linkage_space);
+
+    write_lispobj(LISP_LINKAGE_SPACE_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(5, file); // number of words in this core header entry
+    write_lispobj(linkage_table_count, file);
+    sword_t data_page =
+        write_bytes(file, (char*)linkage_space,
+                    nbytes, core_start_pos, COMPRESSION_LEVEL_NONE);
+    write_lispobj(data_page, file);
+    write_lispobj(0, file); // address of ELF-based linkage entries
+#endif
+
     write_lispobj(DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     ftell_type spacecount_pos = FTELL(file);
     write_lispobj(0, file); // placeholder

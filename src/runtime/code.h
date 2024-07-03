@@ -157,21 +157,6 @@ base_pointer(lispobj ptr)
     return embedded_obj_p(widetag) ? (lispobj*)fun_code_header((struct simple_fun*)obj) : obj;
 }
 
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
-# define FUN_SELF_FIXNUM_TAGGED 1
-# define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
-# define fun_self_from_taggedptr(funptr) \
-    funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
-# define fun_taggedptr_from_self(self) \
-    self - 2*N_WORD_BYTES + FUN_POINTER_LOWTAG
-#else
-# define FUN_SELF_FIXNUM_TAGGED 0
-# define fun_self_from_baseptr(simple_fun) \
-    make_lispobj(simple_fun,FUN_POINTER_LOWTAG)
-# define fun_self_from_taggedptr(funptr) funptr
-# define fun_taggedptr_from_self(self) self
-#endif
-
 #define simplefun_is_wrapped(fun) \
   fun->self != fun_self_from_baseptr(fun) && fun->self != 0
 #define CODE_IS_TRACED 0x01

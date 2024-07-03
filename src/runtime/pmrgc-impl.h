@@ -348,6 +348,7 @@ extern void gc_close_collector_regions(int);
 /* The various sorts of pointer swizzling in SBCL. */
 enum source {
   SOURCE_NORMAL,
+  SOURCE_LINKAGE_CELL,
   SOURCE_ZERO_TAG,              /* code, lflist */
   SOURCE_CLOSURE,
   SOURCE_SYMBOL_NAME,

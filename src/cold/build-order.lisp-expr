@@ -530,6 +530,7 @@
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
+ #+linkage-space ("src/code/linkage-space" :not-host)
  ("src/code/fdefinition"       :not-host)
  ("src/code/sort"  :not-host)
  ("src/code/target-lflist" :not-host)
@@ -615,8 +616,6 @@
 (("src/code/early-ntrace" ; lets PCL hook into tracing
   "src/code/room" ; for MAP-ALLOCATED-OBJECTS
   #+x86-64 "src/code/text-space" ; needs src/code/room
-  ;; Delay (re)defining WARN until after undo-static-linkage works.
-  ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
   ;; Redefine some functions that contributed to far too numerous
   ;; xperfecthash entries due to variation by build configuration.
