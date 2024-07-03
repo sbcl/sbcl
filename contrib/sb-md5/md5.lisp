@@ -484,7 +484,7 @@ in `regs'.  Returns a (simple-array (unsigned-byte 8) (16))."
 starting at `buffer-offset'."
   (declare (optimize (speed 3) (safety 0) (space 0) (debug 0)
                      #+lw-int32 (float 0) #+lw-int32 (hcl:fixnum-safety 0))
-           (type (unsigned-byte 29) from-offset)
+           (type sb-int:index from-offset)
            (type (integer 0 63) count buffer-offset)
            (type (simple-array * (*)) from)
            (type (simple-array (unsigned-byte 8) (64)) buffer))
@@ -561,7 +561,7 @@ external-format conversion routines beforehand."
         ((simple-array (unsigned-byte 8) (*))
            (locally
                (declare (type (simple-array (unsigned-byte 8) (*)) sequence))
-             (loop for offset of-type (unsigned-byte 29) from start below end by 64
+             (loop for offset of-type sb-int:index from start below end by 64
                    until (< (- end offset) 64)
                    do
                 (fill-block-ub8 block sequence offset)
@@ -574,7 +574,7 @@ external-format conversion routines beforehand."
         (simple-string
            (locally
                (declare (type simple-string sequence))
-             (loop for offset of-type (unsigned-byte 29) from start below end by 64
+             (loop for offset of-type sb-int:index from start below end by 64
                    until (< (- end offset) 64)
                    do
                 (fill-block-char block sequence offset)
