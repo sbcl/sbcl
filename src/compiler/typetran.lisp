@@ -1652,6 +1652,12 @@
            ;; that can undo that and see that it's really (IDENTITY X).
            (progn (delay-ir1-transform node :constraint)
                   `(coerce-to-fun x))))
+      ((multiple-value-bind (p really)
+           (csubtypep tspec
+                      (specifier-type '(or sequence character complex float function)))
+         (and really
+              (not p)))
+       `(the* (,tspec :context coerce-context) x))
       (t
        (give-up-ir1-transform
         "~@<open coding coercion to ~S not implemented.~:@>"

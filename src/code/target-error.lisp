@@ -853,23 +853,30 @@ with that condition (or with no condition) will be returned."
   (:report report-general-type-error))
 (defun report-general-type-error (condition stream)
   (let ((type (type-error-expected-type condition))
-        (context (type-error-context condition)))
-    (if (eq context :multiple-values)
-        (format stream  "~@<The values ~
+        (context (type-error-context condition))
+        (datum (type-error-datum condition)))
+    (case context
+      (:multiple-values
+       (format stream  "~@<The values ~
                          ~@:_~2@T~S ~
                          ~@:_are not of type ~
                          ~@:_~2@T~/sb-impl:print-type-specifier/~:@>"
-                   (type-error-datum condition)
-                   type)
-        (format stream  "~@<The value ~
+               datum
+               type))
+      (sb-c::coerce-context
+       (format stream "~S can't be converted to type ~
+                       ~/sb-impl:print-type-specifier/."
+               datum type))
+      (t
+       (format stream  "~@<The value ~
                          ~@:_~2@T~S ~
                          ~@:_is not of type ~
                          ~@:_~2@T~/sb-impl:print-type-specifier/~@[ ~
                          ~@:_~a~]~:@>"
-                (type-error-datum condition)
-                type
-                (decode-type-error-context (type-error-context condition)
-                                           type)))))
+               datum
+               type
+               (decode-type-error-context (type-error-context condition)
+                                          type))))))
 
 ;;; not specified by ANSI, but too useful not to have around.
 (define-condition simple-style-warning (simple-condition style-warning) ())
