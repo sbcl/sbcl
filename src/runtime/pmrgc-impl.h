@@ -146,25 +146,6 @@ struct page {
     generation_index_t gen;
 };
 extern struct page *page_table;
-extern page_index_t page_table_pages;
-
-/* Find the page index within the page_table for the given
- * address. Return -1 on failure. */
-static inline page_index_t find_page_index(void *addr)
-{
-    if (addr >= (void*)DYNAMIC_SPACE_START) {
-        page_index_t index = ((uintptr_t)addr -
-                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_PAGE_BYTES;
-        if (index < page_table_pages)
-            return (index);
-    }
-    return (-1);
-}
-/* Calculate the start address for the given page number. */
-static inline char *page_address(page_index_t page_num)
-{
-    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
-}
 
 /* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following
@@ -562,7 +543,6 @@ extern char * gc_logfile;
 extern void log_generation_stats(char *logfile, char *header);
 extern void print_generation_stats(void);
 extern double generation_average_age(generation_index_t);
-#define PAGE_INDEX_FMT PRIdPTR
 static inline os_vm_size_t npage_bytes(page_index_t npages)
 {
     gc_assert(npages>=0);
@@ -780,8 +760,6 @@ struct fixedobj_page { // 8 bytes per page
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
 #endif
-
-extern page_index_t next_free_page;
 
 extern uword_t
 walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),

@@ -1189,7 +1189,7 @@ int load_gc_crashdump(char* pathname)
         lose("Didn't map dynamic space where expected: %p vs %p",
              dynspace, (char*)preamble.dynspace_start);
     checked_read("dynamic", fd, (char*)DYNAMIC_SPACE_START, dynspace_nbytes);
-    fprintf(stderr, "snapshot: %"PRIdPTR" pages in use (%ld bytes)\n",
+    fprintf(stderr, "snapshot: %"PAGE_INDEX_FMT" pages in use (%ld bytes)\n",
             next_free_page, dynspace_nbytes);
     checked_read("PTE", fd, page_table, sizeof (struct page) * next_free_page);
     checked_read("cardmark", fd, gc_card_mark, 1+gc_card_table_mask);

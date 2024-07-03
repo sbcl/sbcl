@@ -122,12 +122,6 @@ static inline bool protect_page_p(page_index_t page, generation_index_t generati
 }
 #endif
 
-/* Calculate the start address for the given page number. */
-inline char *page_address(page_index_t page_num)
-{
-    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
-}
-
 /* Calculate the address where the allocation region associated with
  * the page starts. */
 static inline void *

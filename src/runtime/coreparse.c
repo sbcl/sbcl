@@ -1165,7 +1165,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
 {
     if (next_free_page != n_ptes)
         lose("n_PTEs=%"PAGE_INDEX_FMT" but expected %"PAGE_INDEX_FMT,
-             n_ptes, next_free_page);
+             (int)n_ptes, next_free_page);
 
     gc_card_table_nbits = card_table_nbits;
     bool patchp = gc_allocate_ptes();

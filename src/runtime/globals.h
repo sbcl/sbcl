@@ -31,7 +31,7 @@ extern struct lisp_startup_options lisp_startup_options;
 extern int pre_verify_gen_0; // set and read from Lisp tests
 extern int gencgc_verbose;
 
-extern sword_t next_free_page;
+extern int next_free_page;
 #define dynamic_space_highwatermark() (next_free_page*GENCGC_PAGE_BYTES+DYNAMIC_SPACE_START)
 
 #ifdef LISP_FEATURE_SB_THREAD
