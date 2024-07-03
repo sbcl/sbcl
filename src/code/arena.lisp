@@ -83,9 +83,16 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                            (alien-funcall (extern-alien "sbcl_new_arena" (function unsigned unsigned))
                                           size)))))
     (%set-instance-layout arena layout)
+    ;; Arena growth amount < 8MiB is failure-prone. The reason has to do with the test
+    ;; for whether an allocation is "oversized" - see the logic in claim_subrange where it checks
+    ;; "nbytes > (sword_t)(a->uw_growth_amount >> 9)" and the logic for adding a default
+    ;; amount of slack to any claim at "long total_request = nbytes + 8192".
+    ;; If the amount to grow by is too small, then a single cons cell plus the default slack
+    ;; can exceed the threshold for being oversized. But if a cons cell goes in a standalone
+    ;; (oversized) block, scavenging goes haywire, and I don't really want to change how it works.
     (setf (arena-size-limit (truly-the arena arena))
           (+ size (the fixnum (* max-extensions growth-amount)))
-          (arena-growth-amount arena) growth-amount
+          (arena-growth-amount arena) (max growth-amount (* 8 1024 1024))
           (arena-index arena) index
           (arena-hidden arena) nil
           (arena-token arena) 1
