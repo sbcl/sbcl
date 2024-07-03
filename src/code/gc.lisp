@@ -413,7 +413,7 @@ statistics are appended to it."
                (alien-funcall find-page-index address))))
 
 (defun pages-allocated ()
-  (loop for n below (extern-alien "next_free_page" signed)
+  (loop for n below (extern-alien "next_free_page" page-index-t)
         count (not (zerop (slot (deref sb-vm:page-table n) 'sb-vm::flags)))))
 
 #-mark-region-gc
