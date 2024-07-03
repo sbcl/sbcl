@@ -36,9 +36,8 @@
 (declaim (inline dynamic-space-free-pointer))
 (defun dynamic-space-free-pointer ()
   (sap+ (int-sap sb-vm:dynamic-space-start)
-        ;; not sure why next_free_page is 'sword_t' instead of 'uword_t' !
         (truly-the (signed-byte 64)
-                   (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
+                   (* (extern-alien "next_free_page" sb-kernel::page-index-t) sb-vm:gencgc-page-bytes))))
 
 (declaim (inline read-only-space-obj-p dynamic-space-obj-p))
 (defun read-only-space-obj-p (x)
