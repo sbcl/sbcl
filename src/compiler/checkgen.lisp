@@ -581,7 +581,7 @@
                (convert-type-check cast types)
                (setf generated t))
               (:hairy
-               (when (policy cast (>= safety inhibit-warnings))
+               (when (policy cast (> speed inhibit-warnings))
                  (let* ((*compiler-error-context* cast)
                         (type (cast-asserted-type cast))
                         (value-type (coerce-to-values type)))
@@ -605,4 +605,3 @@
                (convert-hairy-type-check cast types)
                (setf generated t)))))))
     generated))
-
