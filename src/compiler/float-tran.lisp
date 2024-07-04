@@ -421,9 +421,7 @@
                       (let ((r (maybe-exact-reciprocal n)))
                         (if r
                             `(* x ,r)
-                            (give-up-ir1-transform
-                             "~S does not have an exact reciprocal"
-                             n))))))))
+                            (give-up-ir1-transform))))))))
   (def single-float)
   (def double-float))
 
