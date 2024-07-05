@@ -1706,7 +1706,8 @@
 (defun split-core (input-pathname asm-pathname &rest args)
   (let ((tmp (format nil "/tmp/sbcl~D.tmpcore" (sb-unix:unix-getpid))))
     ;; input core could be readonly
-    (unwind-protect (progn (run-program "/bin/cp" `("--no-preserve=mode" ,input-pathname ,tmp))
+    (unwind-protect (progn (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
+                                        :search t)
                            (redirect-text-space-calls tmp)
                            (apply #'really-split-core tmp asm-pathname args))
       (delete-file tmp))))
