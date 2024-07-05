@@ -40,7 +40,11 @@
 #include <locale.h>
 #include <limits.h>
 
+#ifdef LISP_FEATURE_AVOID_CLOCK_GETTIME
+#include <sys/time.h>
+#else
 #include <time.h>
+#endif
 
 #ifndef LISP_FEATURE_WIN32
 #include <signal.h>
