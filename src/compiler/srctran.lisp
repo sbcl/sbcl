@@ -3556,7 +3556,8 @@
            (result-type (type-intersection type cast)))
       (when (eq result-type *empty-type*)
         (give-up-ir1-transform))
-      (multiple-value-bind (cast-low cast-high) (integer-type-numeric-bounds cast)
+      (multiple-value-bind (cast-low cast-high) (integer-type-numeric-bounds
+                                                 (type-intersection (specifier-type 'integer) cast))
         (unless (and (fixnump cast-low)
                      (fixnump cast-high))
           (give-up-ir1-transform))
