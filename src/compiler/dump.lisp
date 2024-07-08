@@ -1378,12 +1378,7 @@
     (let ((res-handle (dump-pop file)))
       (dolist (info-handle (fasl-output-debug-info file))
         (dump-push res-handle file)
-        (symbol-macrolet
-            ((debug-info-source-index
-               (let ((dd (find-defstruct-description 'debug-info)))
-                 (dsd-index (find 'source (dd-slots dd)
-                                  :key #'dsd-name :test 'string=)))))
-          (dump-fop 'fop-structset file info-handle debug-info-source-index)))))
+        (dump-fop 'fop-structset file info-handle (get-dsd-index debug-info source)))))
 
   (setf (fasl-output-debug-info file) nil)
   (values))
