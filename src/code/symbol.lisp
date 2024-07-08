@@ -613,6 +613,43 @@ distinct from the global value. Can also be SETF."
             (intern (%symbol-nameify prefix (incf *gentemp-counter*)) package)
           (unless accessibility (return sym))))))
 
+(defmacro frob-symbol-progv-optimize (sym bit)
+  (sb-c::if-vop-existsp (:translate reset-header-bits)
+    (ecase bit
+      (1 `(logior-header-bits ,sym sb-vm::+symbol-fast-bindable+))
+      (0 `(reset-header-bits ,sym sb-vm::+symbol-fast-bindable+)))
+
+    ;; This way avoids a race with a thread assigning the TLS index
+    ;; when the required vops don't exist, which matters if and only
+    ;; if #+(and sb-thread 64-bit).
+    ;; Consider two threads binding the same symbol using PROGV:
+    ;;  thread A                    Thread B
+    ;;  --------                    --------
+    ;;  SET BIT:                    SET BIT:
+    ;;    x := load header word        x := load header word
+    ;;    logior x, bit                logior x, bit
+    ;;    store header word            ...
+    ;;                                 ... (descheduled by kernel)
+    ;;  DYNBIND:                       ...
+    ;;    ensure-tls-index             ...
+    ;;                                 store header word ; BUG: clobbers TLS index
+    ;;                              DYNBIND:
+    ;;                                 ensure-tls-index ; BUG: picks a new TLS index
+    ;;
+    `(with-pinned-objects (,sym)
+       (let ((sap (int-sap (get-lisp-obj-address ,sym)))
+             (offset (+ (- sb-vm:other-pointer-lowtag)
+                        #+big-endian (- sb-vm:n-word-bytes 2)
+                        #+little-endian 1)))
+         ;; ASSUMPTION: byte stores are atomic and do not affect adjacent bytes
+         (setf (sap-ref-8 sap offset)
+               (,(ecase bit (1 'logior) (0 'logandc2)) (sap-ref-8 sap offset)
+                 sb-vm::+symbol-fast-bindable+))))))
+
+(defun unset-symbol-progv-optimize (symbol)
+  (frob-symbol-progv-optimize symbol 0)
+  symbol)
+
 (macrolet ((signal-type-error (action-description)
              `(let ((spec (type-specifier type)))
                 (cerror "Proceed anyway"
@@ -674,7 +711,7 @@ distinct from the global value. Can also be SETF."
                (when (eq action 'progv)
                  (let ((package (symbol-package symbol)))
                    (if (or (not package) (not (package-locked-p package)))
-                       (logior-header-bits symbol sb-vm::+symbol-fast-bindable+)))))
+                       (frob-symbol-progv-optimize symbol 1)))))
               (continuable
                (cerror "Modify the constant." complaint (describe-action) symbol))
               (t

@@ -176,10 +176,9 @@
 (defknown logior-header-bits (t (unsigned-byte 24)) (values)
     (#+x86-64 always-translatable))
 ;;; ASSIGN-VECTOR-FLAGSS assign all and only the flags byte.
-;;; RESET- performs LOGANDC2 and returns no value.
-(defknown (assign-vector-flags reset-header-bits)
-  (t (unsigned-byte 16)) (values)
-  (#+x86-64 always-translatable))
+(defknown assign-vector-flags (t (unsigned-byte 16)) (values) (#+x86-64 always-translatable))
+;;; RESET- performs LOGANDC2
+(defknown reset-header-bits (t (unsigned-byte 24)) (values) (#+x86-64 always-translatable))
 ;;; test bits of "HeaderData" which start 8 bits over from the lsb
 (defknown (test-header-data-bit)
   (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (boolean)

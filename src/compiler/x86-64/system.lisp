@@ -168,8 +168,10 @@
   (:generator 1
     (cond ((sc-is bits immediate)
            (multiple-value-bind (imm8 shift) (header-byte-imm8 (tn-value bits))
-             (inst or :byte (ea (- (1+ shift) other-pointer-lowtag) x) imm8)))
+             (inst or :lock :byte (ea (- (1+ shift) other-pointer-lowtag) x) imm8)))
           ((csubtypep (tn-ref-type bits-ref) (specifier-type '(unsigned-byte 16)))
+           ;; don't need a :lock. Not sure where this case is needed,
+           ;; but it surely isn't for storing into symbol headers.
            (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))
           (t
            ;; This needs a temp to OR in the widetag and store only the low 4 header bytes.
@@ -189,11 +191,11 @@
   (:translate reset-header-bits)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:arg-types t (:constant (unsigned-byte 16)))
+  (:arg-types t (:constant (unsigned-byte 24)))
   (:info bits)
   (:generator 1
     (multiple-value-bind (imm8 shift) (header-byte-imm8 bits)
-      (inst and :byte (ea (- (1+ shift) other-pointer-lowtag) x) (logandc1 imm8 #xff)))))
+      (inst and :lock :byte (ea (- (1+ shift) other-pointer-lowtag) x) (logandc1 imm8 #xff)))))
 (define-vop (test-header-data-bit)
   (:translate test-header-data-bit)
   (:policy :fast-safe)

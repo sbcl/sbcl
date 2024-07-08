@@ -283,7 +283,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   ;; Deoptimize after changing it to :CONSTANT, and not before, though tbh
   ;; if your code cares about the timing of PROGV relative to DEFCONSTANT,
   ;; well, I can't even.
-  #-sb-xc-host (sb-c::unset-symbol-progv-optimize name)
+  #-sb-xc-host (unset-symbol-progv-optimize name)
   name)
 
 (sb-xc:defmacro defvar (var &optional (val nil valp) (doc nil docp))

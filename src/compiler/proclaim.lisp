@@ -322,11 +322,7 @@
     (if (eq kind 'always-bound)
         (setf (info :variable :always-bound name) info-value)
         (setf (info :variable :kind name) info-value)))
-  #-sb-xc-host (unset-symbol-progv-optimize name))
-
-#-sb-xc-host
-(defun unset-symbol-progv-optimize (symbol)
-  (reset-header-bits symbol sb-vm::+symbol-fast-bindable+))
+  #-sb-xc-host (sb-impl::unset-symbol-progv-optimize name))
 
 (defun proclaim-type (name type type-specifier where-from)
   (unless (symbolp name)

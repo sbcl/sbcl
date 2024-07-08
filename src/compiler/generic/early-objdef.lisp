@@ -440,15 +440,22 @@
 ;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
 (defconstant vector-weak-flag          #x01)
 
-;;; A symbol that is "unlocked" is neither constant, nor global,
+;;; There are 2 symbol flag bits. The placement restrictions on these stipulate:
+;;; - no conflict with the generation number (byte 3, low 4 bits)
+;;; - prefer that the uint32_t package ID be naturally aligned if it matters.
+;;; Given the above:
+;;; - for x864: byte indices 1 and 2 for the package, byte index 3 for flags so that
+;;;   the generation byte can stay where it is
+;;; - for others: byte indices 2 and 3 for package, byte index 1 for flags.
+
+;;; A symbol that is "fast bindable" is neither constant, nor global,
 ;;; nor a global symbol-macro, nor in a locked package. Such symbols can be
 ;;; bound by PROGV without calling ABOUT-TO-MODIFY-SYMBOL-VALUE, except in the
 ;;; case where PROGV invokes UNBIND.
-;;; This is a mask tested against GET-HEADER-DATA, so skip over the payload size byte.
-(defconstant +symbol-fast-bindable+ #x100)
-;;; bit index 30 peacefully co-exists with the immobile-space generation number
-;;; in the low 4 bits of the same byte.
-(defconstant +symbol-initial-core+ #x400000)
+(defconstant +symbol-fast-bindable+ #+x86-64 #x800000
+                                    #-x86-64 #x80)
+(defconstant +symbol-initial-core+  #+x86-64 #x400000
+                                    #-x86-64 #x40)
 
 ;;; Bit indices of the status bits in an INSTANCE header
 ;;; that implement lazily computed stable hash codes.

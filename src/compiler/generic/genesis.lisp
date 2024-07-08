@@ -1807,7 +1807,7 @@ core and return a descriptor to it."
     ;; but is meaningless. In practice, Lisp code can not utilize the fact that NIL
     ;; has a widetag; any use of NIL-as-symbol must pre-check for NIL. Consider:
     ;;   50100100: 0000000000000000 = 0
-    ;;   50100108: 000000000000052D      <- 5 words follow, widetag = #x2D
+    ;;   50100108: 000000000000002D      <- widetag = #x2D
     ;;   50100110: 0000000050100117
     ;;   50100118: 0000000050100117
     ;;   50100120: 0000001000000007 = (NIL . #<SB-INT:PACKED-INFO len=3 {1000002FF3}>)
@@ -1826,10 +1826,9 @@ core and return a descriptor to it."
 
     (when core-file-name
       (let ((name (string-literal-to-core "NIL")))
-        (write-wordindexed des 0 (make-fixnum-descriptor 0))
+        (write-wordindexed/raw des 0 0)
         ;; The header-word for NIL "as a symbol" contains a length + widetag.
-        (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
-                                                                  sb-vm:symbol-widetag))
+        (write-wordindexed/raw des 1 sb-vm:symbol-widetag)
         ;; Write the CAR and CDR of nil-as-cons
         (let* ((nil-cons-base-addr (- sb-vm:nil-value sb-vm:list-pointer-lowtag))
                (nil-cons-car-offs (- nil-cons-base-addr (gspace-byte-address *static*)))

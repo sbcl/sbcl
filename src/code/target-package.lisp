@@ -626,7 +626,7 @@ locked. Signals an error if PACKAGE is not a valid package designator"
              ;; What horrible fate befalls you for unsetting that.
              (when (and (typep x '(and symbol (not null)))
                         (test-header-data-bit x sb-vm::+symbol-fast-bindable+))
-               (sb-c::unset-symbol-progv-optimize x)))))
+               (unset-symbol-progv-optimize x)))))
     (let ((p (find-undeleted-package-or-lose package)))
       (setf (package-lock p) t)
       (unoptimize (package-internal-symbols p))
