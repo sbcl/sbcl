@@ -173,7 +173,7 @@
 ;;; Like SET-HEADER-DATA, but instead of writing the entire header,
 ;;; LOGIOR of the specified value into the "data" portion of the word.
 ;;; Returns the first argument, *not* the modified header data.
-(defknown logior-header-bits (t (unsigned-byte 16)) t
+(defknown logior-header-bits (t (unsigned-byte 16)) (values)
     (#+x86-64 always-translatable))
 ;;; ASSIGN-VECTOR-FLAGSS assign all and only the flags byte.
 ;;; RESET- performs LOGANDC2 and returns no value.

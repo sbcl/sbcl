@@ -152,7 +152,6 @@
   (:args (x :scs (descriptor-reg))
          (bits :scs (unsigned-reg immediate)))
   (:arg-types * positive-fixnum)
-  (:results (res :scs (descriptor-reg)))
   (:generator 1
     (if (sc-is bits immediate)
         (let ((bits (tn-value bits)))
@@ -162,8 +161,7 @@
                  (inst or :byte (ea (- 2 other-pointer-lowtag) x) (ash bits -8)))
                 (t
                  (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))))
-        (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))
-    (move res x)))
+        (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))))
 (define-vop ()
   (:translate assign-vector-flags)
   (:policy :fast-safe)
