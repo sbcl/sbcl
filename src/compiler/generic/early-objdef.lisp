@@ -446,7 +446,9 @@
 ;;; case where PROGV invokes UNBIND.
 ;;; This is a mask tested against GET-HEADER-DATA, so skip over the payload size byte.
 (defconstant +symbol-fast-bindable+ #x100)
-(defconstant +symbol-initial-core+ #x200)
+;;; bit index 30 peacefully co-exists with the immobile-space generation number
+;;; in the low 4 bits of the same byte.
+(defconstant +symbol-initial-core+ #x400000)
 
 ;;; Bit indices of the status bits in an INSTANCE header
 ;;; that implement lazily computed stable hash codes.

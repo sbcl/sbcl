@@ -146,22 +146,36 @@
     ;; merge in the widetag
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)))
+(flet ((header-byte-imm8 (bits)
+         ;; return an imm8 and a shift amount expressed in bytes
+         (cond ((typep bits '(unsigned-byte 8))
+                (values bits 0))
+               ((and (not (logtest bits #xff))
+                     (typep (ash bits -8) '(unsigned-byte 8)))
+                (values (ash bits -8) 1))
+               ((and (not (logtest bits #xffff))
+                     (typep (ash bits -16) '(unsigned-byte 8)))
+                (values (ash bits -16) 2))
+               (t
+                (bug "Can't construct mask from ~x" bits)))))
 (define-vop (logior-header-bits)
   (:translate logior-header-bits)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg))
          (bits :scs (unsigned-reg immediate)))
+  (:arg-refs dummy bits-ref)
   (:arg-types * positive-fixnum)
   (:generator 1
-    (if (sc-is bits immediate)
-        (let ((bits (tn-value bits)))
-          (cond ((typep bits '(unsigned-byte 8))
-                 (inst or :byte (ea (- 1 other-pointer-lowtag) x) bits))
-                ((not (logtest bits #xff))
-                 (inst or :byte (ea (- 2 other-pointer-lowtag) x) (ash bits -8)))
-                (t
-                 (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))))
-        (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))))
+    (cond ((sc-is bits immediate)
+           (multiple-value-bind (imm8 shift) (header-byte-imm8 (tn-value bits))
+             (inst or :byte (ea (- (1+ shift) other-pointer-lowtag) x) imm8)))
+          ((csubtypep (tn-ref-type bits-ref) (specifier-type '(unsigned-byte 16)))
+           (inst or :word (ea (- 1 other-pointer-lowtag) x) bits))
+          (t
+           ;; This needs a temp to OR in the widetag and store only the low 4 header bytes.
+           ;; We don't know whether BITS fits in 8,16, or 32 bits but a 4-byte unaligned store
+           ;; at byte offset 1 collides with symbol-TLS-index in the high 4 bytes.
+           (bug "Unhandled")))))
 (define-vop ()
   (:translate assign-vector-flags)
   (:policy :fast-safe)
@@ -178,11 +192,8 @@
   (:arg-types t (:constant (unsigned-byte 16)))
   (:info bits)
   (:generator 1
-    (let ((byte 1))
-      (when (> bits #xff)
-        (setf bits (ash bits -8))
-        (setf byte 2))
-      (inst and :byte (ea (- byte other-pointer-lowtag) x) (logandc1 bits #xff)))))
+    (multiple-value-bind (imm8 shift) (header-byte-imm8 bits)
+      (inst and :byte (ea (- (1+ shift) other-pointer-lowtag) x) (logandc1 imm8 #xff)))))
 (define-vop (test-header-data-bit)
   (:translate test-header-data-bit)
   (:policy :fast-safe)
@@ -191,11 +202,8 @@
   (:arg-types t (:constant t))
   (:conditional :ne)
   (:generator 1
-    (let ((byte 1))
-      (when (> mask #xff)
-        (setf mask (ash mask -8))
-        (setf byte 2))
-      (inst test :byte (ea (- byte other-pointer-lowtag) array) mask))))
+    (multiple-value-bind (imm8 shift) (header-byte-imm8 mask)
+      (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8)))))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)
