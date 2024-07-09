@@ -318,21 +318,18 @@ distinct from the global value. Can also be SETF."
   (let* ((new-id (cond ((not package) +package-id-none+)
                        ((package-id package))
                        (t +package-id-overflow+)))
-         (old-id (symbol-package-id symbol))
-         (name (symbol-name symbol)))
-    (with-pinned-objects (name)
-      (let ((name-bits (logior (ash new-id (- sb-vm:n-word-bits package-id-bits))
-                               (get-lisp-obj-address name))))
-        (declare (ignorable name-bits))
-        (when (= new-id +package-id-overflow+) ; put the package in the dbinfo
-          (setf (info :symbol :package symbol) package))
-        #-compact-symbol (set-symbol-package-id symbol new-id)
-        #+compact-symbol
-        (with-pinned-objects (symbol)
-          (setf (sap-ref-word (int-sap (get-lisp-obj-address symbol))
-                              (- (ash sb-vm:symbol-name-slot sb-vm:word-shift)
-                                 sb-vm:other-pointer-lowtag))
-                name-bits))))
+         (old-id (symbol-package-id symbol)))
+    (when (= new-id +package-id-overflow+) ; put the package in the dbinfo
+      (setf (info :symbol :package symbol) package))
+    #-compact-symbol (set-symbol-package-id symbol new-id)
+    #+compact-symbol
+    (let ((disp #+big-endian 4
+                #+x86-64 1
+                #+(and little-endian (not x86-64)) 2))
+      (with-pinned-objects (symbol)
+        (setf (sap-ref-16 (int-sap (get-lisp-obj-address symbol))
+                          (- disp sb-vm:other-pointer-lowtag))
+              new-id)))
     ;; CLEAR-INFO is inefficient, so try not to call it.
     (when (and (= old-id +package-id-overflow+) (/= new-id +package-id-overflow+))
       (clear-info :symbol :package symbol))

@@ -477,9 +477,6 @@ static void print_slots(char **slots, int count, lispobj *ptr)
             lispobj word = *ptr;
             char* slot_name = *slots;
             if (N_WORD_BYTES == 8 && !strcmp(slot_name, "boxed_size: ")) word = word & 0xFFFFFFFF;
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
-            else if (!strcmp(slot_name, "name: ")) word = decode_symbol_name(word);
-#endif
             print_obj(slot_name, word);
             slots++;
         } else {

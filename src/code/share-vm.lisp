@@ -238,12 +238,6 @@
                 (cond ((and (typep thing 'code-component)
                             (< 1 i (code-header-words thing)))
                        (values (code-header-ref thing i) t))
-                      #+compact-symbol
-                      ((and (typep thing '(and symbol (not null)))
-                            (= i symbol-name-slot))
-                       (values (list (symbol-package-id thing) (symbol-name thing))
-                               t
-                               "{~{~A,~S~}}"))
                       (decode
                        (cond #+system-tlabs ; fingers crossed, assume arena pointers are valid
                              ((and (is-lisp-pointer word) (find-containing-arena word))

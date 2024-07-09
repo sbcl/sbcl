@@ -1149,11 +1149,6 @@ core and return a descriptor to it."
 (defvar *cold-symbol-gspace* (or #+permgen '*permgen*
                                  #+immobile-space '*immobile-fixedobj*
                                  '*dynamic*))
-(defun encode-symbol-name (package-id name)
-  (declare (ignorable package-id))
-  (logior #+compact-symbol (ash package-id sb-impl::symbol-name-bits)
-          (descriptor-bits name)))
-
 (defun assign-symbol-hash (descriptor wordindex name)
   ;; "why not just call sb-c::symbol-name-hash?" you ask? because: no symbol.
   (let ((name-hash (sb-c::calc-symbol-name-hash name (length name))))
@@ -1168,6 +1163,15 @@ core and return a descriptor to it."
            (name-hash-pos (+ (byte-size prng-byte) (byte-position prng-byte)))
            (hash (logior (ash name-hash name-hash-pos) (mask-field prng-byte salt))))
       (write-wordindexed/raw descriptor wordindex hash))))
+
+(defun set-symbol-pkgid (symbol pkg &optional (nil-slots-magic 0))
+  (let ((wordindex (+ #-64-bit sb-vm:symbol-package-id-slot nil-slots-magic)))
+    (write-wordindexed/raw
+     symbol wordindex
+     #+64-bit (logior (read-bits-wordindexed symbol wordindex)
+                      (ash pkg #+x86-64  8   ; unaligned uint16_t
+                               #-x86-64 16)) ; naturally-aligned uint16_t
+     #-64-bit (ash pkg sb-vm:n-fixnum-tag-bits))))
 
 ;;; Allocate (and initialize) a symbol.
 ;;; Even though all symbols are the same size now, I still envision the possibility
@@ -1184,10 +1188,8 @@ core and return a descriptor to it."
         (assign-symbol-hash symbol sb-vm:symbol-hash-slot name)
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
-        (write-wordindexed/raw symbol sb-vm:symbol-name-slot
-                               (encode-symbol-name pkg-id cold-name))
-        #-compact-symbol (write-wordindexed symbol sb-vm:symbol-package-id-slot
-                                            (make-fixnum-descriptor pkg-id))))
+        (set-symbol-pkgid symbol pkg-id)
+        (write-wordindexed symbol sb-vm:symbol-name-slot cold-name)))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1839,8 +1841,8 @@ core and return a descriptor to it."
         #+(or relocatable-static-space (not 64-bit))
         (assign-symbol-hash des (+ 1 sb-vm:symbol-hash-slot) "NIL")
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-        (write-wordindexed/raw des (+ 1 sb-vm:symbol-name-slot)
-                               (encode-symbol-name sb-impl::+package-id-lisp+ name))))
+        (set-symbol-pkgid des sb-impl::+package-id-lisp+ 1)
+        (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
     nil))
 
 ;;; Since the initial symbols must be allocated before we can intern
@@ -3121,8 +3123,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    sb-impl::+package-id-keyword+
                    sb-impl::+package-id-lisp+
                    sb-impl::+package-id-user+
-                   sb-impl::+package-id-kernel+
-                   sb-impl::symbol-name-bits))
+                   sb-impl::+package-id-kernel+))
         (record (c-symbol-name c) 3/2 #| arb |# c ""))
       ;; Other constants that aren't necessarily grouped into families.
       (dolist (c '(sb-bignum:maximum-bignum-length
@@ -3337,30 +3338,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (format stream "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-type-name operator-name c-type-name lowtag)
   (case operator-name
-    (symbol ; FIXME: this is not a great place to inject all these extra accessors
-     (format stream "
-#include \"~A/vector.h\"
-struct vector *symbol_name(struct symbol*);~%
-lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
-     (multiple-value-bind (package-id-getter name-bits-extractor name-assigner)
-         #-compact-symbol
-         (values (format nil "s->package_id >> ~D" sb-vm:n-fixnum-tag-bits)
-                 "ptr" ; no decoder
-                 "name") ; no encoder
-         #+compact-symbol ; NAME slot is PACKAGE-ID [16 bits] | STRING [48 bits]
-         (values (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
-                 (format nil "(ptr & (uword_t)0x~X)"
-                         (mask-field (byte sb-impl::symbol-name-bits 0) -1))
-                 (format nil "(s->name & (uword_t)0x~X) | name"
-                         (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits)
-                                     -1)))
-       (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
-               package-id-getter)
-       (format stream "#define decode_symbol_name(ptr) ~A~%" name-bits-extractor)
-       (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
-  s->name = ~A;~%}~%#include ~S~%"
-               name-assigner
-               (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h))))))))
+    (symbol
+     (format stream "#include ~S~%"
+             (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h)))))))
 
 (defun write-genesis-thread-h-requisites ()
   (write-structure-type (layout-info (find-layout 'sb-thread::thread))

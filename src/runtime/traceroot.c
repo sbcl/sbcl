@@ -673,13 +673,6 @@ static lispobj trace1(lispobj object,
         if (next.wordindex == 0 && (instancep(ptr) || functionp(ptr))) {
             target = instance_layout(native_pointer(ptr));
         }
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
-        else if (next.wordindex == slot_index_of(symbol,name) &&
-                 lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
-                 widetag_of(&SYMBOL(ptr)->header) == SYMBOL_WIDETAG) {
-            target = decode_symbol_name(target);
-        }
-#endif
 #if FUN_SELF_FIXNUM_TAGGED
         else if (next.wordindex == 1 && functionp(ptr)
                  && widetag_of(native_pointer(ptr)) == CLOSURE_WIDETAG) {

@@ -332,7 +332,6 @@ enum source {
   SOURCE_LINKAGE_CELL,
   SOURCE_ZERO_TAG,              /* code, lflist */
   SOURCE_CLOSURE,
-  SOURCE_SYMBOL_NAME,
   SOURCE_FDEFN_RAW
 };
 

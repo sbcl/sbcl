@@ -220,20 +220,7 @@
   (:translate symbol-package-id)
   (:policy :fast-safe)
   (:generator 1 ; ASSUMPTION: symbol-package-bits = 16
-   (inst lhu result symbol (+ (ash symbol-name-slot word-shift)
-                              (- other-pointer-lowtag)
-                              6)))) ; little-endian
-(define-vop ()
-  (:policy :fast-safe)
-  (:translate symbol-name)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:generator 5
-    (pseudo-atomic (pa-flag)
-      (loadw result symbol symbol-name-slot other-pointer-lowtag)
-      (inst slli result result sb-impl::package-id-bits)
-      (inst srli result result sb-impl::package-id-bits))))
+   (inst lhu result symbol (- 2 other-pointer-lowtag)))) ; little-endian
 ) ; end PROGN
 
 ;;;; Fdefinition (fdefn) objects.

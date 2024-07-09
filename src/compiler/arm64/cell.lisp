@@ -247,18 +247,7 @@
   (:policy :fast-safe)
   (:generator 1
     #.(assert (= sb-impl::package-id-bits 16))
-    (inst ldrh result (@ symbol (+ (ash symbol-name-slot word-shift)
-                                  (- other-pointer-lowtag)
-                                  6))))) ; little-endian
-(define-vop ()
-  (:policy :fast-safe)
-  (:translate symbol-name)
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (result :scs (descriptor-reg)))
-  (:generator 5
-    (pseudo-atomic (tmp-tn :sync nil)
-      (loadw tmp-tn symbol symbol-name-slot other-pointer-lowtag)
-      (inst and result tmp-tn (1- (ash 1 sb-impl::symbol-name-bits))))))
+    (inst ldrh result (@ symbol (- 2 other-pointer-lowtag))))) ; little-endian
 
 ;; Is it worth eliding the GC store barrier for a thread-local CAS?
 ;; Not really, because why does such an operation even exists?

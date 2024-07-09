@@ -174,7 +174,7 @@ static void TRACE_NAME(lispobj* where)
     case SYMBOL_WIDETAG:
         {
         struct symbol* s = (void*)where;
-        ACTION(decode_symbol_name(s->name), &s->name, SOURCE_SYMBOL_NAME);
+        ORDINARY_SLOT(s->name);
         ORDINARY_SLOT(s->value);
         ORDINARY_SLOT(s->info);
         ORDINARY_SLOT(s->fdefn);

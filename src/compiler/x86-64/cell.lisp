@@ -459,23 +459,14 @@
               symbol))))
 
 (aver (= sb-impl::package-id-bits 16))
-(define-vop ()
+(define-vop (symbol-package-id)
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:translate symbol-package-id)
   (:policy :fast-safe)
   (:generator 2
-   (inst movzx '(:word :dword) result
-         (object-slot-ea symbol symbol-name-slot (- other-pointer-lowtag 6)))))
-(define-vop ()
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (result :scs (descriptor-reg) :from :load))
-  (:translate symbol-name)
-  (:policy :fast-safe)
-  (:generator 2
-   (inst mov result (1- (ash 1 sb-impl::symbol-name-bits)))
-   (inst and result (object-slot-ea symbol symbol-name-slot other-pointer-lowtag))))
+   (inst movzx '(:word :dword) result (ea (- 1 other-pointer-lowtag) symbol))))
 
 ;;;; fdefinition (FDEFN) objects
 

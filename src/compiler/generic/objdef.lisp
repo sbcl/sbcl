@@ -408,7 +408,7 @@ during backtrace.
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :init :arg))
+  (name :ref-trans symbol-name :init :arg))
 
 ;;; 64-bit relocatable-static is a little like 64-bit, a little like 32-bit.
 ;;; Refer to comments above for details on each slot.
@@ -421,7 +421,7 @@ during backtrace.
         :type (or instance list)
         :init :null)
   (hash :set-trans %set-symbol-hash)
-  (name :init :arg))
+  (name :ref-trans symbol-name :init :arg))
 
 #-64-bit
 (define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)

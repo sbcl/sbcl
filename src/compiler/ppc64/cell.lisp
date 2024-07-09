@@ -21,25 +21,24 @@
 ;;; to pre-check for NIL.
 
 (defun read-symbol-slot (slot symbol result)
-  (let ((null-label (gen-label))
-        (done-label (gen-label)))
+  (assemble ()
     (inst cmpld symbol null-tn)
     (inst beq null-label)
     (loadw result symbol slot other-pointer-lowtag)
     (inst b done-label)
-    (emit-label null-label)
+    NULL-LABEL
     ;; This is a very un-memorable bit of fudge factor magic
     ;; that I have to re-figure-out every time I need it.
     ;; Some sort of abstraction might be nice. Or not.
     (loadw result symbol (1- slot) list-pointer-lowtag)
-    (emit-label done-label)))
+    DONE-LABEL))
 
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (cond ((member name '(symbol-%info %symbol-fdefn))
+    (cond ((member name '(symbol-%info %symbol-fdefn symbol-name))
            (read-symbol-slot offset object result))
           (t
            (loadw result object offset lowtag)))))
@@ -55,22 +54,11 @@
    ;; This loads "random" bits if SYMBOL is NIL, but since RESULT is non-descriptor
    ;; there is no harm. We check for NULL and move a constant to the result if so.
    ;; ASSUMPTION: symbol-package-bits = 16
-   (inst lhz result symbol (+ (ash symbol-name-slot word-shift)
-                              (- other-pointer-lowtag)
-                              #+little-endian 6))
+   (inst lhz result symbol (- #+big-endian 4 #+little-endian 2
+                              other-pointer-lowtag))
    (inst bne done)
    (inst lr result 1) ; SB-IMPL::+PACKAGE-ID-LISP+
    DONE))
-(define-vop ()
-  (:args (symbol :scs (descriptor-reg)))
-  (:results (result :scs (descriptor-reg)))
-  (:translate symbol-name)
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
-  (:generator 2
-   (pseudo-atomic (pa-flag :sync nil)
-     (read-symbol-slot symbol-name-slot symbol result)
-     (inst rldicl result result 0 sb-impl::package-id-bits))))
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))

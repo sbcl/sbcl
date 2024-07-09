@@ -1,3 +1,22 @@
+#include "genesis/vector.h"
+struct vector *symbol_name(struct symbol*);
+lispobj symbol_package(struct symbol*);
+
+#define decode_symbol_name(x) x
+static inline void set_symbol_name(struct symbol*s, lispobj x) { s->name = x; }
+
+static inline uint16_t symbol_package_id(struct symbol* s) {
+#ifndef LISP_FEATURE_64_BIT
+  return s->package_id >> N_FIXNUM_TAG_BITS;
+#elif defined LISP_FEATURE_BIG_ENDIAN
+  return *(uint16_t*)(4+(char*)s);
+#elif defined LISP_FEATURE_X86_64
+  return UNALIGNED_LOAD16(1+(char*)s);
+# else
+  return *(uint16_t*)(2+(char*)s);
+#endif
+}
+
 #ifndef LISP_FEATURE_SB_THREAD
 /* no threads: every symbol's tls_index is statically zero */
 #  define tls_index_of(x) 0

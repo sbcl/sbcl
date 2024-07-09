@@ -241,13 +241,6 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
     closure->fun = fun_self_from_taggedptr(follow_fp(fun_taggedptr_from_self(closure->fun)));
     break;
   }
-  case SOURCE_SYMBOL_NAME: {
-    /* SOURCE_SYMBOL_NAME can only be the source type of the s->name
-     * slot. */
-    struct symbol *s = (struct symbol*)source;
-    set_symbol_name(s, follow_fp(decode_symbol_name(s->name)));
-    break;
-  }
 #ifdef LISP_FEATURE_LINKAGE_SPACE
   default: lose("Can't happen");
 #else
