@@ -158,7 +158,9 @@ GNAME(call_into_lisp):
 	ldr	reg_THREAD, [reg_THREAD,x0]
 #endif
 #else
-        ldr	x0, current_thread
+	adrp	x0, :got:current_thread
+	ldr	x0, [x0, :got_lo12:current_thread]
+	ldr	x0, [x0]
         bl      pthread_getspecific
         mov     reg_THREAD, x0
 #endif
