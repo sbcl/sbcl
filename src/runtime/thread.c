@@ -273,16 +273,6 @@ extern int arch_prctl(int code, unsigned long *addr);
 #define ASSOCIATE_OS_THREAD(thread) thread->os_thread = thread_self()
 #endif
 
-#ifndef LISP_FEATURE_SB_THREAD
-# define ASSIGN_CURRENT_THREAD(dummy)
-#elif defined LISP_FEATURE_GCC_TLS
-# define ASSIGN_CURRENT_THREAD(x) current_thread = x
-#elif !defined LISP_FEATURE_WIN32
-# define ASSIGN_CURRENT_THREAD(x) pthread_setspecific(current_thread, x)
-#else
-# define ASSIGN_CURRENT_THREAD(x) TlsSetValue(OUR_TLS_INDEX, x)
-#endif
-
 #ifdef LISP_FEATURE_WIN32
 // Need a function callable from assembly code, where the inline one won't do.
 void* read_current_thread() {

@@ -326,7 +326,7 @@ static int gc_and_save_cmd(char **ptr) {
         return 0;
     }
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
-    current_thread = all_threads;
+    ASSIGN_CURRENT_THREAD(all_threads);
 #endif
     extern void gc_and_save(char*,bool,bool,bool,bool,int,int);
     gc_and_save(name, 0, 0, 0, 0, 0, 0); // never returns
