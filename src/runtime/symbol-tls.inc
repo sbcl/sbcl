@@ -1,3 +1,4 @@
+#include "align.h"
 #include "genesis/vector.h"
 struct vector *symbol_name(struct symbol*);
 lispobj symbol_package(struct symbol*);
