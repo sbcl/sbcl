@@ -77,7 +77,7 @@
 ;;; The sequence of actions in this test creates a situation in which
 ;;; the list of interactive threads of the current session contains a
 ;;; single thread.
-(with-test (:name (sb-thread:get-foreground :inifite-loop :bug-1682671))
+(with-test (:name (sb-thread:get-foreground :infinite-loop :bug-1682671))
   (let ((state nil)
         (lock (sb-thread:make-mutex :name "get-foreground test lock"))
         (variable (sb-thread:make-waitqueue :name "get-foreground test waitqueue")))
