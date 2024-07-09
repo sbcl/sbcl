@@ -332,7 +332,7 @@ void mr_update_closed_region(struct alloc_region *region, generation_index_t gen
   /* alloc_regions never span multiple pages. */
   page_index_t the_page = find_page_index(region->start_addr);
   if (!(page_table[the_page].type & OPEN_REGION_PAGE_FLAG))
-    lose("Page %lu wasn't open", the_page);
+    lose("Page %d wasn't open", the_page);
 
   /* Mark the lines as allocated. */
   unsigned char *lines = line_bytemap;
@@ -838,7 +838,7 @@ static void sweep_lines() {
         } else if (page_table[p].gen != PSEUDO_STATIC_GENERATION) {
           page_bytes_t decrement = count_dead_bytes(p);
           if (page_bytes_used(p) < decrement)
-            lose("Decrement of %d on page #%ld, with only %d bytes to spare.",
+            lose("Decrement of %d on page #%d, with only %d bytes to spare.",
                  decrement, p, page_bytes_used(p));
           total_decrement += decrement;
           set_page_bytes_used(p, page_bytes_used(p) - decrement);
@@ -1398,7 +1398,7 @@ void count_line_values(char *why) {
 void check_weird_pages() {
   for (page_index_t p = 0; p < page_table_pages; p++)
     if (page_words_used(p) > GENCGC_PAGE_WORDS)
-      fprintf(stderr, "Page #%ld has %d words used\n", p, page_words_used(p));
+      fprintf(stderr, "Page #%d has %d words used\n", p, page_words_used(p));
   bool fail = 0;
   for (page_index_t p = 0; p < page_table_pages; p++)
     if (!page_single_obj_p(p)) {
@@ -1410,7 +1410,7 @@ void check_weird_pages() {
       }
       if (size != page_bytes_used(p)) {
         fail = 1;
-        fprintf(stderr, "Page #%lu (%x %d) has %d bytes, not %d\n",
+        fprintf(stderr, "Page #%d (%x %d) has %d bytes, not %d\n",
                 p, page_table[p].type, page_table[p].gen, size, page_bytes_used(p));
       }
       if (fail) lose("Errors checking line/page usage, as above.");

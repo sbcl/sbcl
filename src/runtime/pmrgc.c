@@ -1936,7 +1936,7 @@ static void check_free_pages()
         if (page_free_p(p))
             for_lines_in_page(l, p)
                 if (allocs[l])
-                    lose("You call page #%ld free, despite the fact it's obviously got allocation bits.", p);
+                    lose("You call page #%d free, despite the fact it's obviously got allocation bits.", p);
 }
 
 /* Return the number of verification errors found.
