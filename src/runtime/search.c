@@ -61,9 +61,15 @@ lispobj *search_codeblob_offsets(void* pointer) {
     if ((uword_t)pointer < TEXT_SPACE_START ||
         (uword_t)pointer >= (uword_t)text_space_highwatermark) return 0;
     struct vector* v = (void*)TEXT_SPACE_START;
+#ifdef LISP_FEATURE_64_BIT
     uint32_t* data = (void*)v->data;
     int index = bsearch_lesseql_uint32((char*)pointer - (char*)TEXT_SPACE_START,
                                        data, vector_len(v));
+#else
+    uword_t* data = v->data;
+    int index = bsearch_lesseql_uword((char*)pointer - (char*)TEXT_SPACE_START,
+                                      data, vector_len(v));
+#endif
     if (index >= 0) {
         lispobj* base = (lispobj*)(TEXT_SPACE_START + data[index]);
         gc_assert(widetag_of(base) == CODE_HEADER_WIDETAG);
@@ -374,14 +380,6 @@ int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements)
     BSEARCH_ALGORITHM_IMPL
     if (low < nelements) return low;
     return -1;
-}
-#else
-// these passthru stubs could probably just be linker symbol aliases
-int bsearch_lesseql_uint32(uint32_t item, uint32_t* array, int nelements) {
-    return bsearch_lesseql_uword(item, array, nelements);
-}
-int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements) {
-    return bsearch_greatereql_uword(item, array, nelements);
 }
 #endif
 
