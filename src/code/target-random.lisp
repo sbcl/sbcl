@@ -334,7 +334,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
         while (#+x86 eql ;; Can't use = due to 80-bit precision
                #-x86 =
                candidate arg)
-        finally (return candidate)))
+        finally (return (truly-the (single-float 0.0) candidate))))
 (declaim (ftype (function ((double-float (0d0)) random-state)
                           (double-float 0d0))
                 %random-double-float))
@@ -353,7 +353,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                  (random-chunk state))
                 1d0))
         while (= candidate arg)
-        finally (return candidate)))
+        finally (return (truly-the (double-float 0d0) candidate))))
 
 ;;; using a faster inline VOP
 #+x86
@@ -373,7 +373,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                   1d0))
           ;; Can't use = due to 80-bit precision
           while (eql candidate arg)
-          finally (return candidate))))
+          finally (return (truly-the (double-float 0d0) candidate)))))
 
 
 ;;;; random fixnums
