@@ -428,8 +428,7 @@ statistics are appended to it."
              (when (simple-fun-p object)
                (setq addr (get-lisp-obj-address (fun-code-header object))))
              (let ((sap (int-sap (logandc2 addr sb-vm:lowtag-mask))))
-               (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
-                       #xF)))))))
+               (logand (sap-ref-8 sap 3) #xF)))))))
 
 #+mark-region-gc
 (defun generation-of (object)
