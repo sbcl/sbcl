@@ -317,7 +317,8 @@
               (setf two-arg typed-two-arg))
             (change-full-call combination two-arg))))
       (let ((lvar (node-lvar combination)))
-        (when (lvar-single-value-p lvar)
+        (when (or (lvar-single-value-p lvar)
+                  (mv-bind-unused-p lvar 1))
           (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
                                           floor sb-kernel::floor1
                                           ceiling sb-kernel::ceiling1)

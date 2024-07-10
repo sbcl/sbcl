@@ -1768,7 +1768,9 @@
   (def double-float))
 
 (deftransform unary-truncate ((x) * * :result result :node node)
-  (unless (lvar-single-value-p result)
+  (delay-ir1-transform node :constraint)
+  (unless (or (lvar-single-value-p result)
+              (mv-bind-unused-p result 1))
     (give-up-ir1-transform))
   (let ((rem-type (second (values-type-required (node-derived-type node)))))
     `(values (%unary-truncate x)
