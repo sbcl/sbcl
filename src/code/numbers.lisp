@@ -315,10 +315,13 @@
 
 ;;;; TRUNCATE and friends
 
+(declaim (maybe-inline truncate floor ceiling))
+
 (defun truncate (number &optional (divisor 1))
   "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (maybe-inline truncate))
   (macrolet ((truncate-float (rtype)
                `(truncate (coerce number ',rtype)
                           (coerce divisor ',rtype)))
@@ -379,7 +382,8 @@
 (defun floor (number &optional (divisor 1))
   "Return the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (maybe-inline floor))
   (macrolet ((truncate-float (rtype)
                `(floor (coerce number ',rtype) (coerce divisor ',rtype)))
              (single-digit-bignum-p (x)
@@ -442,7 +446,8 @@
 (defun ceiling (number &optional (divisor 1))
   "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (maybe-inline ceiling))
   (macrolet ((truncate-float (rtype)
                `(ceiling (coerce number ',rtype) (coerce divisor ',rtype)))
              (single-digit-bignum-p (x)
@@ -502,6 +507,27 @@
       (((foreach fixnum bignum ratio)
         (foreach single-float double-float #+long-float long-float))
         (truncate-float (dispatch-type divisor))))))
+
+(defun truncate1 (number divisor)
+  (declare (explicit-check)
+           (inline truncate))
+  (values (truncate number divisor)))
+
+(defun floor1 (number divisor)
+  (declare (explicit-check)
+           (inline floor))
+  (values (floor number divisor)))
+
+(defun ceiling1 (number divisor)
+  (declare (explicit-check)
+           (inline ceiling))
+  (values (ceiling number divisor)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(truncate floor ceiling))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))
 
 (defun rem (number divisor)
   "Return second result of TRUNCATE."

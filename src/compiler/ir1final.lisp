@@ -304,19 +304,36 @@
 (defun rewrite-full-call (combination)
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (let ((two-arg (assoc combination-name *two-arg-functions*)))
-      (when (and two-arg
-                 (= (length args) 2)
-                 (not (fun-lexically-notinline-p combination-name
-                                                 (node-lexenv combination))))
-        (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
-          (declare (ignore name))
-          (when (and types
-                     (loop for arg in args
-                           for type in types
-                           always (csubtypep (lvar-type arg) type)))
-            (setf two-arg typed-two-arg))
-          (change-full-call combination two-arg))))))
+    (when (eq (combination-kind combination) :known)
+      (let ((two-arg (assoc combination-name *two-arg-functions*)))
+        (when (and two-arg
+                   (= (length args) 2))
+          (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
+            (declare (ignore name))
+            (when (and types
+                       (loop for arg in args
+                             for type in types
+                             always (csubtypep (lvar-type arg) type)))
+              (setf two-arg typed-two-arg))
+            (change-full-call combination two-arg))))
+      (let ((lvar (node-lvar combination)))
+        (when (lvar-single-value-p lvar)
+          (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
+                                          floor sb-kernel::floor1
+                                          ceiling sb-kernel::ceiling1)
+                                        combination-name)))
+            (when single-value-fun
+              (unless (cdr args)
+                (let* ((leaf (find-constant 1))
+                       (ref (make-ref leaf))
+                       (lvar (make-lvar combination)))
+                  (use-lvar ref lvar)
+                  (push ref (leaf-refs leaf))
+                  (insert-ref-before ref combination-name)
+                  (setf (cdr args) (list lvar))))
+              (change-full-call combination single-value-fun)
+              (setf (node-derived-type combination)
+                    (make-single-value-type (single-value-type (node-derived-type combination)))))))))))
 
 ;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
 ;;; checks for other-pointer into a single widetag load.

@@ -358,6 +358,9 @@
   (real &optional real) (values integer real)
   (movable foldable flushable recursive))
 
+(defknown (sb-kernel::truncate1 sb-kernel::floor1 sb-kernel::ceiling1) (real real) integer
+  (movable foldable flushable recursive no-verify-arg-count))
+
 (defknown unary-truncate (real) (values integer real)
   (movable foldable flushable no-verify-arg-count))
 
