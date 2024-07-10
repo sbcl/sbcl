@@ -74,7 +74,7 @@ provide bindings for printer control variables.")
   "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
-  (sb-thread::get-foreground)
+  (sb-thread:get-foreground)
   (format stream
           "~%~W~:[~;[~W~]] "
           (sb-di:frame-number *current-frame*)

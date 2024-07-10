@@ -756,7 +756,7 @@
         (frame-number (when (and (plusp *break-level*)
                                  sb-debug::*current-frame*)
                         (sb-di::frame-number sb-debug::*current-frame*))))
-    (sb-thread::get-foreground)
+    (sb-thread:get-foreground)
     (fresh-line stream)
     (if (functionp *prompt*)
         (write-string (funcall *prompt*

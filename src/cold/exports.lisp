@@ -3391,6 +3391,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            ;; Sessions
 
            "MAKE-LISTENER-THREAD"
+           "GET-FOREGROUND"
            "RELEASE-FOREGROUND"
            "WITH-NEW-SESSION"
            ;; Semaphores

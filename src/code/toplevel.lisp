@@ -703,7 +703,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
    (unwind-protect
         (progn
           (scrub-control-stack)
-          (sb-thread::get-foreground)
+          (sb-thread:get-foreground)
           (unless noprint
             (flush-standard-output-streams)
             (funcall *repl-prompt-fun* *standard-output*)

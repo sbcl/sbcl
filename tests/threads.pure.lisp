@@ -46,7 +46,7 @@
                   :skipped-on (not :sb-thread)
                   :broken-on :win32)
  (let ((thread (make-thread (lambda ()
-                              (sb-thread::get-foreground)))))
+                              (sb-thread:get-foreground)))))
    (sleep 1)
    (assert (thread-alive-p thread))
    (terminate-thread thread)
