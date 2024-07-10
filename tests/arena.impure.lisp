@@ -16,6 +16,32 @@
 (defun f (x y z)
   (with-arena (*arena*) (list x y z)))
 
+;;; The main use-case for inhibiting all arena allocations despite that objects
+;;; should go to arenas is for debugging an application under Slime.
+;;; Users don't understand all the things they have to avoid doing in Slime to avoid
+;;; violating the heap->arena pointer restriction, both in their code and as a side-effect
+;;; of using Slime to interact with SBCL. Supposing it were possible to alter parts of
+;;; slime to guard its own memory use (by injecting SB-VM:WITHOUT-ARENA all over the place)
+;;; - which frankly doesn't seem like it would be a welcome change - there's no assurance
+;;; that Slime customizations and contributed modules adhere to the required contract.
+;;; Thus it seems pretty impossible, and even if it were possible, users debugging at
+;;; a REPL have no idea how to avoid causing further harm due to Slime's background
+;;; threads holding on to objects users have made.  So we offer a toggle switch to
+;;; disable arenas; I think it's our the best shot. And obviously don't debug your
+;;; arena-related bugs using Slime: debug only your non-arena-related bugs.
+(test-util:with-test (:name :arena-inhibit)
+  (let ((arena *arena*))
+    (sb-vm:with-arena (arena)
+      (write (make-array 100) :stream (make-broadcast-stream)))
+    (assert (plusp (sb-vm:arena-bytes-used arena)))
+    (rewind-arena arena)
+    (unwind-protect
+         (progn (setf (extern-alien "inhibit_arena_use" int) 1)
+                (sb-vm:with-arena (arena)
+                  (write (make-array 100) :stream (make-broadcast-stream))))
+      (setf (extern-alien "inhibit_arena_use" int) 0))
+    (assert (zerop (sb-vm:arena-bytes-used arena)))))
+
 (test-util:with-test (:name :arena-huge-object)
   ;; This arena can grow to 10 MiB.
   (let ((a (new-arena 1048576 1048576 9)))

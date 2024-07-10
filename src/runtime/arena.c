@@ -170,8 +170,10 @@ static page_index_t close_heap_region(struct alloc_region* r, int page_type) {
     return result;
 }
 
+int inhibit_arena_use = 0;
 void switch_to_arena(lispobj arena_taggedptr)
 {
+    if (inhibit_arena_use) return;
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
     struct thread* th = get_sb_vm_thread();
     struct extra_thread_data *extra_data = thread_extra_data(th);
