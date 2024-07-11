@@ -1052,7 +1052,6 @@ collect_garbage(generation_index_t last_gen)
      *   in a unithread build.
      * So we need to close them for those two cases.
      */
-    extern void remset_union(lispobj);
     struct thread *th;
     for_each_thread(th) {
         gc_close_thread_regions(th, 0);
@@ -1063,7 +1062,6 @@ collect_garbage(generation_index_t last_gen)
 #endif
     }
 #ifdef LISP_FEATURE_PERMGEN
-    extern lispobj remset_transfer_list;
     // transfer the remsets from threads that exited
     remset_union(remset_transfer_list);
     remset_transfer_list = 0;

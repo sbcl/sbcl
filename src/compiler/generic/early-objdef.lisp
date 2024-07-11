@@ -442,6 +442,7 @@
 
 ;;; There are 2 symbol flag bits. The placement restrictions on these stipulate:
 ;;; - no conflict with the generation number (byte 3, low 4 bits)
+;;; - avoid #+permgen use of byte bit 7 as the "remembered" bit
 ;;; - prefer that the uint32_t package ID be naturally aligned if it matters.
 ;;; Given the above:
 ;;; - for x864: byte indices 1 and 2 for the package, byte index 3 for flags so that
@@ -452,7 +453,7 @@
 ;;; nor a global symbol-macro, nor in a locked package. Such symbols can be
 ;;; bound by PROGV without calling ABOUT-TO-MODIFY-SYMBOL-VALUE, except in the
 ;;; case where PROGV invokes UNBIND.
-(defconstant +symbol-fast-bindable+ #+x86-64 #x800000
+(defconstant +symbol-fast-bindable+ #+x86-64 #x200000
                                     #-x86-64 #x80)
 (defconstant +symbol-initial-core+  #+x86-64 #x400000
                                     #-x86-64 #x40)

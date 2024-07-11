@@ -471,15 +471,25 @@
 ;;;; fdefinition (FDEFN) objects
 
 #+sb-xc-host ; not needed post-build
-(progn
+(macrolet ((gcbar ()
+             `(assemble ()
+                #+permgen
+                (progn
+                  (inst cmp :byte (object-slot-ea object 0 other-pointer-lowtag) fdefn-widetag)
+                  (inst jmp :e SKIP)
+                  (inst push object)
+                  (invoke-asm-routine 'call 'gc-remember-symbol vop))
+                SKIP
+                (emit-gengc-barrier object nil temp))))
 (define-vop (set-fname-linkage-index)
   (:args (object :scs (descriptor-reg))
          (index :scs (unsigned-reg))
          (linkage-cell :scs (sap-reg))
-         (linkage-val :scs (sap-reg)))
+         (linkage-val :scs (unsigned-reg)))
   (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
   (:generator 1
-    (emit-gengc-barrier object nil temp)
+    (gcbar)
     (inst cmp :byte (ea (- other-pointer-lowtag) object) fdefn-widetag)
     (inst jmp :ne SYMBOL)
     (inst mov :dword (ea (- 2 other-pointer-lowtag) object) index)
@@ -492,12 +502,14 @@
   (:args (object :scs (descriptor-reg))
          (function :scs (descriptor-reg))
          (linkage-cell :scs (sap-reg))
-         (linkage-val :scs (sap-reg)))
+         (linkage-val :scs (unsigned-reg immediate)))
   (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
   (:generator 1
-    (emit-gengc-barrier object nil temp)
+    (gcbar)
     (storew function object fdefn-fun-slot other-pointer-lowtag)
-    (inst mov (ea linkage-cell) linkage-val))))
+    (unless (and (sc-is linkage-val immediate) (zerop (tn-value linkage-val)))
+      (inst mov (ea linkage-cell) linkage-val)))))
 
 (define-vop (fdefn-fun) ; This vop works on symbols and fdefns
   (:args (fdefn :scs (descriptor-reg)))

@@ -636,11 +636,11 @@ static void prepare_dynamic_space_for_final_gc(struct thread* thread)
 #endif
         }
     }
-#ifdef LISP_FEATURE_MARK_REGION_GC
 #ifdef LISP_FEATURE_PERMGEN
     extern void remember_all_permgen();
     remember_all_permgen();
 #endif
+#ifdef LISP_FEATURE_MARK_REGION_GC
     for (generation_index_t g = 1; g <= PSEUDO_STATIC_GENERATION; g++) {
       generations[0].bytes_allocated += generations[g].bytes_allocated;
       generations[g].bytes_allocated = 0;

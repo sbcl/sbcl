@@ -3533,6 +3533,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
     }
 
     if (!compacting_p()) {
+#ifdef LISP_FEATURE_PERMGEN
+        remember_all_permgen();
+#endif
         extern void execute_full_mark_phase();
         extern void execute_full_sweep_phase();
         execute_full_mark_phase();
@@ -3543,7 +3546,15 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (GC_LOGGING) fprintf(gc_activitylog(), "begin scavenge static roots\n");
     heap_scavenge((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
-    heap_scavenge((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
+#ifdef LISP_FEATURE_PERMGEN
+    // Remembered objects below the core permgen end, and all objects above it, are roots.
+    heap_scavenge((lispobj*)permgen_bounds[1], permgen_space_free_pointer);
+    int i, n = permgen_remset_count;
+    for (i=0; i<n; ++i) {
+        lispobj* o = native_pointer(permgen_remset[i]);
+        heap_scavenge(o, object_size(o)+o);
+    }
+#endif
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     extern void scavenge_elf_linkage_space();
     scavenge_elf_linkage_space();
@@ -3818,7 +3829,20 @@ collect_garbage(generation_index_t last_gen)
      * So we need to close them for those two cases.
      */
     struct thread *th;
-    for_each_thread(th) gc_close_thread_regions(th, 0);
+    for_each_thread(th) {
+        gc_close_thread_regions(th, 0);
+#ifdef LISP_FEATURE_PERMGEN
+        // transfer the thread-local remset to the global remset
+        remset_union(th->remset);
+        th->remset = 0;
+#endif
+    }
+#ifdef LISP_FEATURE_PERMGEN
+    // transfer the remsets from threads that exited
+    remset_union(remset_transfer_list);
+    remset_transfer_list = 0;
+#endif
+
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_lisp_gcs, last_gen);
 
@@ -4938,6 +4962,8 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     // Just don't worry about NIL, it's seldom the problem
     // if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
     if (verify(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &state, 0)) goto out;
+    if (verbose)
+        fprintf(stderr, " [permgen]");
     if (verify(PERMGEN_SPACE_START, permgen_space_free_pointer, &state,0)) goto out;
     if (verbose)
         fprintf(stderr, " [dynamic]");

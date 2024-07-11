@@ -183,4 +183,10 @@ extern _Atomic(char) *page_execp;
 static inline void set_page_executable(page_index_t i, bool val) { page_execp[i] = val; }
 #endif
 
+extern void remset_union(lispobj);
+extern lispobj remset_transfer_list;
+void remember_all_permgen();
+extern int permgen_remset_count;
+extern lispobj permgen_remset[];
+
 #endif /* _GC_H_ */
