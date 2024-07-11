@@ -4020,6 +4020,9 @@ collect_garbage(generation_index_t last_gen)
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     sweep_linkage_space();
 #endif
+    // It's confusing to see 'from_space=5' and such in the next *pre* GC verification
+    from_space = -1;
+    new_space = 0;
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -4918,6 +4921,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     state.object_addr = 0;
     state.object_gen = 0;
     for_each_thread(th) {
+        if (th->state_word.state == STATE_DEAD) continue;
         if (verify((lispobj)th->binding_stack_start,
                    (lispobj*)get_binding_stack_pointer(th), &state,
                    VERIFYING_UNFORMATTED)) goto out;
