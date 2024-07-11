@@ -24,3 +24,13 @@
                    `(lambda (x y)
                       (when (typep y '(or fixnum null))
                         (rplaca x y)))))
+
+(with-test (:name :rplaca-union-types)
+  (assert-barriers 1 0
+                   `(lambda (a b)
+                      (declare (fixnum a))
+                      (setf (car b) (1+ a))))
+  (assert-barriers 1 0
+                   `(lambda (a b)
+                      (declare (fixnum a))
+                      (setf (car b) (- a)))))

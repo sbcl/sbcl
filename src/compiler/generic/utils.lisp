@@ -360,6 +360,13 @@
                                              (and (symbolp member)
                                                   (logtest +symbol-initial-core+ (get-header-data member)))))))))
                (return-from potential-heap-pointer-p nil)))
+           (let ((write (sb-c::tn-writes tn)))
+             (when (and write
+                        (not (tn-ref-next write))
+                        (tn-ref-vop write)
+                        (memq (vop-name (tn-ref-vop write)) '(move-from-fixnum+1
+                                                              move-from-fixnum-1)))
+               (return-from potential-heap-pointer-p nil)))
            t)
          (boxed-tn-p (value-tn)
            (let* ((prim-type (sb-c::tn-primitive-type value-tn))
