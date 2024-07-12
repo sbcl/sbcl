@@ -142,7 +142,6 @@
   (dstate (make-dstate nil) :read-only t)
   (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
                       :virtual-location 0) :read-only t)
-  (fixup-addrs nil)
   (call-inst nil :read-only t)
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
@@ -376,13 +375,6 @@
         (when (cdr symbols)
           (setf (gethash string ambiguous-symbols) t))))
     core))
-
-(defun code-fixup-locs (code spacemap)
-  (let ((locs (sb-vm::%code-fixups code)))
-    ;; Return only the absolute fixups
-    ;; Ensure that a bignum LOCS is translated before using it.
-    (values (sb-c::unpack-code-fixup-locs
-             (if (fixnump locs) locs (translate locs spacemap))))))
 
 (declaim (ftype function extract-object-from-core))
 (defun extract-fun-map (code core)

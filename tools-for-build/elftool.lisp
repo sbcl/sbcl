@@ -145,7 +145,6 @@
 ;;; At execution time the function will have virtual address LOAD-ADDR.
 #+x86-64
 (defun list-textual-instructions (sap length core load-addr emit-cfi)
-  (setf (core-fixup-addrs core) nil) ; don't need these
   (let ((insts (simple-collect-inst-model sap length load-addr))
         (alien-linkage-end
          (+ (bounds-low (core-linkage-bounds core)) alien-linkage-space-size))
@@ -232,9 +231,6 @@
 ;;; will show the backtrace as if two invocations of the caller are on stack.
 ;;; This is tricky to fix because while we can relativize the CFA to the
 ;;; known frame size, we can't do that based only on a disassembly.
-
-;;; Return the list of locations which must be added to code-fixups
-;;; in the event that heap relocation occurs on image restart.
 (defun emit-lisp-function (paddr vaddr count stream emit-cfi core &optional labels)
   (when emit-cfi
     (format stream " .cfi_startproc~%"))
@@ -245,7 +241,6 @@
          (merge 'list labels
                 (list-textual-instructions (int-sap paddr) count core vaddr emit-cfi)
                 #'< :key #'car))
-        (extra-fixup-locs)
         (ptr paddr))
     (symbol-macrolet ((cur-offset (- ptr paddr)))
       (loop
@@ -300,9 +295,6 @@
                                         (core-alien-linkage-entry-size core))))
                                (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1
                                      operand (aref (core-alien-linkage-symbols core) entry-index))))
-                           (when (and (integerp operand)
-                                      (in-bounds-p operand (core-fixedobj-bounds core)))
-                             (push (+ vaddr cur-offset) extra-fixup-locs))
                            (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
                                    opcode (stringp operand) operand
                                    #+x86-64
@@ -368,7 +360,7 @@
           (when (= cur-offset count) (return)))))
     (when emit-cfi
       (format stream " .cfi_endproc~%"))
-    extra-fixup-locs))
+    nil))
 
 (defun c-symbol-quote (name)
   (concatenate 'string '(#\") name '(#\")))
@@ -470,17 +462,13 @@
         ;; Pass the current physical address at which to disassemble,
         ;; the notional core address (which changes after linker relocation),
         ;; and the length.
-        (let ((new-relative-fixups
-               (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
-                                   output emit-cfi core)))
-          (aver (null new-relative-fixups)))
+        (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
+                            output emit-cfi core)
         (cond ((not ranges) (return))
               ((eq (caar ranges) :pad)
                (format output " .byte ~{0x~x~^,~}~%"
                        (loop for i from 0 below (cdr (pop ranges))
                              collect (sap-ref-8 text-sap (+ end i))))))))
-    ;; All fixups should have been consumed by writing out the text.
-    (aver (null (core-fixup-addrs core)))
     ;; Emit bytes from the maximum function end to the object end.
     ;; We can't just round up %CODE-CODE-SIZE to a double-lispword
     ;; because the boxed header could end at an odd word, requiring that
@@ -711,10 +699,6 @@
                 (unless (string= namestring prev-namestring)
                   (format output " .file \"~a\"~%" namestring)
                   (setq prev-namestring namestring)))
-              (setf (core-fixup-addrs core)
-                    (mapcar (lambda (x)
-                              (+ code-addr (ash (code-header-words code) word-shift) x))
-                            (code-fixup-locs code spacemap)))
               (let ((code-physaddr (logandc2 (get-lisp-obj-address code) lowtag-mask)))
                 (format output "#x~x:~%" code-addr)
                 ;; Emit symbols before the code header data, because the symbols
