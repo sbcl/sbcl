@@ -48,7 +48,7 @@
 
 #+compact-instance-header
 (progn
-;; ~17 instructions vs. 35
+;; ~16 instructions vs. 35
 (define-vop ()
     (:policy :fast-safe)
     (:translate layout-of)
@@ -76,18 +76,26 @@
       (inst movzx '(:byte :dword) rax (ea rax))
       (inst jmp  load-from-vector)
       IMM-OR-LIST
+;;; There is a way to reduce these next 4 instructions to 3, but the encodings are longer
+;;; and have an extra memory read. The trick is to cleverly use the header of NIL to CMOV
+;;; from a constant 1, since CMOV can't take an immediate operand. (There are in fact a
+;;; few places that a 1 is stashed at a known address in static space)
+;;;    (inst cmp object nil-value)
+;;;    (inst movzx '(:byte :dword) rax object)
+;;;    (inst cmov :dword :e rax (EA something))
+;;;  50000108: 000000000000012D = package-id #x0001 | symbol-widetag
+;;;  50000110: 0000000050000117 = NIL-VALUE
+;;;  50000118: 0000000050000117
       (inst cmp  object nil-value)
-      (inst jmp  :eq NULL)
-      (inst movzx '(:byte :dword) rax object)
+      (inst mov :byte rax sb-kernel::index-of-layout-for-NULL)
+      (inst cmov :dword :ne rax object)
+      (inst movzx '(:byte :dword) rax rax) ; same as "AND EAX,255" but shorter encoding
       LOAD-FROM-VECTOR
       (inst mov :dword result
             (ea (make-fixup '**primitive-object-layouts** :symbol-value
                            (- (ash vector-data-offset word-shift)
                               other-pointer-lowtag))
                 nil rax 8)) ; no base register
-      (inst jmp  done)
-      NULL
-      (inst mov  result (make-fixup 'null :layout))
       DONE))
 (define-vop ()
     (:policy :fast-safe)

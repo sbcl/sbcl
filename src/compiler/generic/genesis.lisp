@@ -1829,7 +1829,7 @@ core and return a descriptor to it."
     (when core-file-name
       (let ((name (string-literal-to-core "NIL")))
         (write-wordindexed/raw des 0 0)
-        ;; The header-word for NIL "as a symbol" contains a length + widetag.
+        ;; The header-word for NIL "as a symbol" contains a widetag.
         (write-wordindexed/raw des 1 sb-vm:symbol-widetag)
         ;; Write the CAR and CDR of nil-as-cons
         (let* ((nil-cons-base-addr (- sb-vm:nil-value sb-vm:list-pointer-lowtag))
@@ -1906,21 +1906,21 @@ core and return a descriptor to it."
                                      sb-vm:other-pointer-lowtag))
                             sb-vm:simple-vector-widetag 256)
             #+immobile-space
-            (let ((filler
-                   (make-random-descriptor
-                    (logior (gspace-byte-address *immobile-fixedobj*)
-                            sb-vm:other-pointer-lowtag)))
-                  (vector
-                   (make-random-descriptor
-                    (logior (+ (gspace-byte-address *immobile-fixedobj*)
-                               sb-vm:immobile-card-bytes
-                               (* (+ 2 256) (- sb-vm:n-word-bytes)))
-                            sb-vm:other-pointer-lowtag))))
-              (emplace-vector filler sb-vm:simple-array-fixnum-widetag
-                              (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
-                                 ;; subtract 2 object headers + 256 words
-                                 (+ 4 256)))
-              (emplace-vector vector sb-vm:simple-vector-widetag 256))))
+            (let* ((layouts-vector-total-nwords (+ sb-vm:vector-data-offset 256)) ; physical size
+                   (padding-vector-total-nwords (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
+                                                   layouts-vector-total-nwords))
+                   (padding-vector (make-random-descriptor
+                                    (logior (gspace-byte-address *immobile-fixedobj*)
+                                            sb-vm:other-pointer-lowtag)))
+                   (padding-vector-end (+ (gspace-byte-address *immobile-fixedobj*)
+                                          (ash padding-vector-total-nwords sb-vm:word-shift)))
+                   (layouts-vector (make-random-descriptor
+                                    (logior padding-vector-end sb-vm:other-pointer-lowtag))))
+              ;; The free word index of imobile-fixedobj space was initialized to 1 page above
+              ;; the space address so that we can retroactively place these vectors at the start.
+              (emplace-vector padding-vector sb-vm:simple-array-fixnum-widetag
+                              (- padding-vector-total-nwords sb-vm:vector-data-offset))
+              (emplace-vector layouts-vector sb-vm:simple-vector-widetag 256))))
 
   ;; Dynamic-space code can't use "call rel32" to reach the assembly code
   ;; in a single instruction if too far away. The solution is to have a static-space

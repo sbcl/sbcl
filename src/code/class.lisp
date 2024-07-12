@@ -596,6 +596,9 @@ between the ~A definition and the ~A definition"
         ((funcallable-instance-p x) (%fun-layout x))
         ;; Compiler can dump literal layouts, which handily sidesteps
         ;; the question of when cold-init runs L-T-V forms.
+        ;; TODO: if WIDETAG-OF-FOR-LAYOUT and WIDETAG-OF can be made to return
+        ;; INDEX-OF-LAYOUT-FOR-NULL when appropriate, that'll remove this case,
+        ;; entailing 1 fewer constant to dump at each inlining.
         ((null x) #.(find-layout 'null))
         (t
          (svref (load-time-value **primitive-object-layouts** t)
