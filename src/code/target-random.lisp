@@ -411,10 +411,10 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
               (accept-reject-loop big-random-chunk))))))
 
 (defun random (arg &optional (state *random-state*))
+  (declare (explicit-check arg :result))
   (declare (inline %random-fixnum
                    %random-single-float %random-double-float
                    #+long-float %random-long-float))
-  (declare (explicit-check))
   (cond
     ((and (fixnump arg) (> arg 0))
      (%random-fixnum arg state))
@@ -428,8 +428,4 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
     ((and (bignump arg) (> arg 0))
      (%random-bignum arg state))
     (t
-     (error 'simple-type-error
-            :expected-type '(or (integer 1) (float (0))) :datum arg
-            :format-control "~@<Argument is neither a positive integer nor a ~
-                             positive float: ~2I~_~S~:>"
-            :format-arguments (list arg)))))
+     #.(sb-c::internal-type-error-call 'arg '(or (integer 1) (float (0)))))))
