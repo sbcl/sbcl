@@ -284,12 +284,6 @@
 (defun copy-code-object (code)
   ;; Must have one simple-fun
   (aver (= (code-n-entries code) 1))
-  ;; Disallow relative instruction operands.
-  ;; (This restriction could be removed by actually performing fixups)
-  ;; x86-64 absolute fixups are OK since they will only point to static objects.
-  #+x86-64
-  (aver (not (nth-value
-              1 (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))))
   (aver (zerop (nth-value 1 (code-header-fdefn-range code))))
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count

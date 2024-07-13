@@ -334,8 +334,7 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 #include "align.h"
 static void
 adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
-                 struct code __attribute__((unused)) *code,
-                 lispobj __attribute__((unused)) original_vaddr)
+                 struct code __attribute__((unused)) *code)
 {
 #if defined LISP_FEATURE_PERMGEN || defined LISP_FEATURE_IMMOBILE_SPACE
     // Dynamic space always gets relocated before immobile space does,
@@ -359,22 +358,6 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
             lose("Absolute fixup @ %p exceeds 32 bits", fixup_where);
         if (adjusted != ptr)
             FIXUP32(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
-    }
-    sword_t displacement = (lispobj)code - original_vaddr;
-    prev_loc = 0;
-    while (varint_unpack(&unpacker, &loc) && loc != 0) {
-        loc += prev_loc;
-        prev_loc = loc;
-        void* fixup_where = instructions + loc;
-        int32_t rel32operand = UNALIGNED_LOAD32(fixup_where);
-        int32_t abs_operand = (sword_t)fixup_where + 4 + rel32operand - displacement;
-        int32_t new_abs_operand = abs_operand + calc_adjustment(adj, abs_operand);
-        sword_t new_rel32operand = new_abs_operand - ((sword_t)fixup_where + 4);
-        // check for overflow before checking whether to write the new value
-        if (!(new_rel32operand >= INT32_MIN && new_rel32operand <= INT32_MAX))
-            lose("Relative fixup @ %p exceeds 32 bits", fixup_where);
-        if (new_rel32operand != rel32operand)
-            FIXUP_rel(UNALIGNED_STORE32(fixup_where, new_rel32operand), fixup_where);
     }
 #endif
 }
@@ -486,15 +469,11 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                 adjust_pointers(&f->self, 1, adj);
 #endif
             });
-            {
-              // Now that the packed integer comprising the list of fixup locations
-              // has been fixed-up (if necessary), apply them to the code.
-              lispobj original_vaddr = inverse_adjust(adj, (lispobj)code);
-              // code->fixups, if a bignum pointer, was fixed up as part of
-              // the constant pool.
-              gencgc_apply_code_fixups((struct code*)original_vaddr, code);
-              adjust_code_refs(adj, code, original_vaddr);
-            }
+            // Now that the packed integer comprising the list of fixup locations
+            // has been fixed-up (if necessary), apply them to the code.
+            gencgc_apply_code_fixups((struct code*)inverse_adjust(adj, (lispobj)code),
+                                     code);
+            adjust_code_refs(adj, code);
             continue;
         case CLOSURE_WIDETAG:
             fix_fun_header_layout(where, adj);
