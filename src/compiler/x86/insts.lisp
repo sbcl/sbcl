@@ -2435,6 +2435,10 @@
          (setf (sap-ref-32 sap offset) rel-val)))))
   nil)
 
+;;; There are 3 data streams in the FIXUPS slot:
+;;; 1. absolute fixups
+;;; 2. relative fixups
+;;; 3. card table mask fixups
 (defun sb-c::pack-fixups-for-reapplication (fixup-notes)
   (let (abs-fixups rel-fixups imm-fixups)
     (dolist (note fixup-notes)

@@ -1062,7 +1062,7 @@
 #-(or x86 x86-64) ; these two architectures provide an overriding definition
 (defun pack-fixups-for-reapplication (fixup-notes)
   (let (result)
-    (dolist (note fixup-notes (pack-code-fixup-locs nil nil result))
+    (dolist (note fixup-notes (pack-code-fixup-locs result))
       (let ((fixup (fixup-note-fixup note)))
         (when (eq (fixup-flavor fixup) :card-table-index-mask)
           (push (fixup-note-position note) result))))))

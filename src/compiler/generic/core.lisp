@@ -94,7 +94,7 @@
            (let ((indices (mapcar 'ensure-linkage-index
                                   (remove-if #'permanent-fname-p callees))))
              (setf (code-header-ref code-obj sb-vm:code-linkage-elts-slot)
-                   (pack-code-fixup-locs indices nil nil))))
+                   (pack-code-fixup-locs indices))))
          ;; Assign all SIMPLE-FUN-SELF slots unless #+darwin-jit in which case the simple-funs
          ;; are assigned by jit_memcpy_codeblob()
          #-darwin-jit

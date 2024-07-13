@@ -150,24 +150,13 @@
       (setf result (logior result (ash byte shift))
             shift (+ shift 8)))))
 
-;;; Pack two lists of fixup locations into a single varint.
-;;; * 32-bit x86 code tends to have more absolute fixups than relative fixups.
-;;;   An absolute fixup is necessary for each reference to a boxed constant
-;;;   due to lack of PC-relative addressing. A relative fixup is necessary for each
-;;;   call to an assembly routine.
-;;; * x86-64 can use 64-bit absolute fixups to encode jump tables within a movable
-;;;   or immobile object.  It uses 32-bit fixups only in immobile code.
-;;;   Therefore the GC is concerned only with 64-bit fixups, whereas core relocation
-;;;   and defragmentation makes use of all of them.
-;;;   However, there are no 64-bit fixups recorded in the packed fixup locs.
-;;;   This would need to change if we had any 64-bit fixups at locations within
-;;;   the code that could not be deduced by examining the object.
+;;; Pack one, two, or three lists of fixup locations into a single varint.
 ;;; It makes sense to store these externally to the object, as it would otherwise
 ;;; intrude on text pages. Also, some of the bignums are shareable this way.
-(defun pack-code-fixup-locs (abs-fixups rel-fixups more)
-  (dx-let ((bytes (make-array (min (* 2 (+ (length abs-fixups) ; guess at final length
-                                           (length rel-fixups)
-                                           (length more)))
+(defun pack-code-fixup-locs (list1 &optional list2 list3)
+  (dx-let ((bytes (make-array (min (* 2 (+ (length list1) ; guess at final length
+                                           (length list2)
+                                           (length list3)))
                                    1024) ; limit the stack usage
                               :fill-pointer 0 :adjustable t
                               :element-type '(unsigned-byte 8))))
@@ -178,13 +167,13 @@
                (aver (> x prev))
                (write-var-integer (- x prev) bytes)
                (setq prev x))))
-      (pack (sort abs-fixups #'<))
-      (when (or rel-fixups more)
+      (pack (sort list1 #'<))
+      (when (or list2 list3)
         (write-var-integer 0 bytes)
-        (pack (sort rel-fixups #'<)))
-      (when more
+        (pack (sort list2 #'<)))
+      (when list3
         (write-var-integer 0 bytes)
-        (pack (sort more #'<))))
+        (pack (sort list3 #'<))))
     ;; Stuff octets into an integer
     ;; It would be quite possible in the target to do something clever here
     ;; by creating a bignum directly from the ub8 vector.

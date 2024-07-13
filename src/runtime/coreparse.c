@@ -248,7 +248,8 @@ static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 
 // Given a post-relocation object 'x', compute the address at which
 // it was originally expected to have been placed as per the core file.
-static inline lispobj inverse_adjust(struct heap_adjust* adj, lispobj x)
+__attribute__((unused)) static inline lispobj
+inverse_adjust(struct heap_adjust* adj, lispobj x)
 {
     int j;
     for (j = adj->n_ranges - 1 ; j >= 0 ; --j)
@@ -344,6 +345,7 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
     char* instructions = code_text_start(code);
     struct varint_unpacker unpacker;
 
+    skip_data_stream(&unpacker); // first data stream is unused
     varint_unpacker_init(&unpacker, code->fixups);
     int prev_loc = 0, loc;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
@@ -1100,9 +1102,11 @@ static void gengcbarrier_patch_code_range(uword_t start, lispobj* limit)
         struct code* code = (void*)where;
         if (widetag_of(where) != CODE_HEADER_WIDETAG || !code->fixups) continue;
         varint_unpacker_init(&unpacker, code->fixups);
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
         // There are two other data streams preceding the one we want
         skip_data_stream(&unpacker);
         skip_data_stream(&unpacker);
+#endif
         char* instructions = code_text_start(code);
         int prev_loc = 0, loc;
         while (varint_unpack(&unpacker, &loc) && loc != 0) {

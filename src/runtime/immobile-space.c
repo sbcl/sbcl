@@ -2050,6 +2050,7 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
 {
     struct varint_unpacker unpacker;
     varint_unpacker_init(&unpacker, fixups);
+    skip_data_stream(&unpacker); // first data stream is unused
     char* instructions = code_text_start(code);
     int prev_loc = 0, loc;
     // The unpacker will produce successive values followed by a zero. There may
