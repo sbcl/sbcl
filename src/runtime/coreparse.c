@@ -345,8 +345,8 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
     char* instructions = code_text_start(code);
     struct varint_unpacker unpacker;
 
-    skip_data_stream(&unpacker); // first data stream is unused
     varint_unpacker_init(&unpacker, code->fixups);
+    skip_data_stream(&unpacker); // first data stream is unused
     int prev_loc = 0, loc;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,
