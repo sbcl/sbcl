@@ -83,18 +83,16 @@
                    (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
                    (t (bug "bad fixup flavor ~s" flavor)))
                  kind flavor)
-         (if (eq flavor :linkage-cell)
+         (if (and (eq flavor :linkage-cell) (not (permanent-fname-p name)))
              (adjoin name callees :test 'equal)
              callees))
-       (finish-fixups (code-obj callees)
+       (finish-fixups (code-obj callees retained-fixups)
          (declare (ignorable code-obj callees))
-         #+linkage-space
-         (when callees
-           (aver (eql (code-header-ref code-obj sb-vm:code-linkage-elts-slot) 0))
-           (let ((indices (mapcar 'ensure-linkage-index
-                                  (remove-if #'permanent-fname-p callees))))
-             (setf (code-header-ref code-obj sb-vm:code-linkage-elts-slot)
-                   (pack-code-fixup-locs indices))))
+         (setf (sb-vm::%code-fixups code-obj)
+               #-linkage-space retained-fixups
+               #+linkage-space
+               (let ((links (pack-code-fixup-locs (mapcar 'ensure-linkage-index callees))))
+                 (join-varint-streams links retained-fixups)))
          ;; Assign all SIMPLE-FUN-SELF slots unless #+darwin-jit in which case the simple-funs
          ;; are assigned by jit_memcpy_codeblob()
          #-darwin-jit
@@ -115,25 +113,21 @@
 
   (defun apply-fasl-fixups (code-obj fixups index count real-code-obj
                             &aux (end (1- (+ index count))))
-    (let ((retained-fixups (svref fixups index)))
+    (let ((retained-fixups (svref fixups index))
+          callees)
       (incf index)
-      (unless (eql retained-fixups 0)
-        (setf (sb-vm::%code-fixups code-obj) retained-fixups)))
-    (awhen (svref fixups index)
-      (setf (gethash code-obj *allocation-patch-points*) it))
-    (let (callees)
+      (awhen (svref fixups index)
+        (setf (gethash code-obj *allocation-patch-points*) it))
       (loop
         (when (>= index end) (return))
         (binding* (((offset kind flavor-id data)
                     (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
                    (name (if (eql 0 data) (svref fixups (incf index)) data)))
           (setq callees (fixup code-obj offset name kind flavor-id real-code-obj callees))))
-      (finish-fixups code-obj callees)))
+      (finish-fixups code-obj callees retained-fixups)))
 
   (defun apply-core-fixups (code-obj fixup-notes retained-fixups real-code-obj)
     (declare (list fixup-notes))
-    (unless (eql retained-fixups 0)
-      (setf (sb-vm::%code-fixups code-obj) retained-fixups))
     (let (callees)
       (dolist (note fixup-notes)
         (let ((fixup (fixup-note-fixup note))
@@ -144,7 +138,7 @@
                        (fixup-note-kind note)
                        (encoded-fixup-flavor (fixup-flavor fixup))
                        real-code-obj callees))))
-      (finish-fixups code-obj callees))))
+      (finish-fixups code-obj callees retained-fixups))))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.

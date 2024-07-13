@@ -214,9 +214,6 @@ during backtrace.
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info)
-  ;; A packed integer representing a set of 32-bit integers sorted, delta-encoded,
-  ;; and varint-encoded. The set describes the linkage cells needed by this object.
-  (linkage-elts)
   (constants :rest-p t))
 
 #-linkage-space

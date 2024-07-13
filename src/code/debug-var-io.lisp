@@ -179,6 +179,10 @@
     ;; by creating a bignum directly from the ub8 vector.
     (integer-from-octets bytes)))
 
+(defun join-varint-streams (first second)
+  (let ((length-in-bits (integer-length first)))
+    (logior first (ash second (+ (align-up length-in-bits 8) 8)))))
+
 (defmacro do-packed-varints ((loc locs &optional (bytepos nil bytepos-sup-p))
                              &body body)
   (with-unique-names (integer byte shift acc prev)

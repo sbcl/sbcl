@@ -142,12 +142,13 @@ static void TRACE_NAME(lispobj* where)
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         const unsigned int smallvec_elts =
             (GENCGC_PAGE_BYTES - offsetof(struct vector,data)) / N_WORD_BYTES;
-        if (code->linkage_elts) {
+        lispobj linkage_indices = code->fixups;
+        if (linkage_indices) {
             lispobj name_map = SYMBOL(LINKAGE_NAME_MAP)->value;
             gc_assert(simple_vector_p(name_map));
             struct vector* outer_vector = VECTOR(name_map);
             struct varint_unpacker unpacker;
-            varint_unpacker_init(&unpacker, code->linkage_elts);
+            varint_unpacker_init(&unpacker, linkage_indices);
             int prev_index = 0, index;
             while (varint_unpack(&unpacker, &index) && index != 0) {
                 index += prev_index;

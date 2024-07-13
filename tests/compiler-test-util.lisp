@@ -116,8 +116,7 @@
 (defun find-named-callees (fun &key (name nil namep))
   (let ((code (fun-code-header (%fun-fun fun))))
     #+linkage-space
-    (loop for index in (sb-c:unpack-code-fixup-locs
-                        (sb-kernel:code-header-ref code sb-vm:code-linkage-elts-slot))
+    (loop for index in (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code))
           for this = (sb-vm::linkage-addr->name index :index)
           when (or (not namep) (equal this name))
           collect this)

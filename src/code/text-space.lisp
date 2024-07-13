@@ -122,7 +122,7 @@
              (when (= loc index)
                (return-from index-used-p t)))))
     (do-text-space-code (code)
-      (when (or all (index-used-p (code-header-ref code code-linkage-elts-slot)))
+      (when (or all (index-used-p (sb-vm::%code-fixups code)))
         (do-functions (fun addr)
           (map-segment-instructions
            (lambda (chunk inst)

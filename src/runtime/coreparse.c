@@ -346,7 +346,7 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
     struct varint_unpacker unpacker;
 
     varint_unpacker_init(&unpacker, code->fixups);
-    skip_data_stream(&unpacker); // first data stream is unused
+    skip_data_stream(&unpacker); // first data stream comprises the linkage indices
     int prev_loc = 0, loc;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,

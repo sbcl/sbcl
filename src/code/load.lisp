@@ -1229,8 +1229,7 @@
               (incf header-index)
               (incf stack-index)))
         #+linkage-space ; Scan packed linkage index list for deprecated names
-        (dolist (index (sb-c:unpack-code-fixup-locs
-                        (code-header-ref code sb-vm:code-linkage-elts-slot)))
+        (dolist (index (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))
           (check-deprecated-thing 'function (sb-vm::linkage-addr->name index :index)))
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))

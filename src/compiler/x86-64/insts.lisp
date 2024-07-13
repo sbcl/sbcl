@@ -3421,13 +3421,14 @@
   nil))
 
 ;;; There are 3 data streams in the FIXUPS slot:
-;;; 1. (unused)
+;;; 1. linkage table indices
 ;;; 2. absolute fixups
 ;;; 3. card table mask fixups
+;;; This fuction returns only the latter 2 streams. The first is prepended later.
 (defun sb-c::pack-fixups-for-reapplication (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
-  (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil abs32-fixups imm-fixups))
+  (dolist (note fixup-notes (sb-c:pack-code-fixup-locs abs32-fixups imm-fixups))
     (let* ((fixup (fixup-note-fixup note))
            (offset (fixup-note-position note))
            (flavor (fixup-flavor fixup)))

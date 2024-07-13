@@ -2915,11 +2915,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (code-obj fixups index count
-                     &aux (end (1- (+ index count))) callees)
+                     &aux (end (1- (+ index count)))
+                          (retained-fixups (svref fixups index))
+                          callees)
   (declare (ignorable callees))
-  (let ((retained-fixups (svref fixups index)))
-    (write-wordindexed code-obj sb-vm::code-fixups-slot retained-fixups)
-    (incf index))
+  (incf index)
   (binding* ((alloc-points (svref fixups index) :exit-if-null))
     (cold-set 'sb-c::*!cold-allocation-patch-point*
               (cold-cons (cold-cons code-obj alloc-points)
@@ -2962,9 +2962,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (descriptor-bits (if (symbolp name) (cold-intern name) name)))
              (:symbol-value (descriptor-bits (cold-symbol-value name))))
            kind flavor)))
-  #+linkage-space
-  (write-wordindexed code-obj sb-vm:code-linkage-elts-slot
-                     (number-to-core (sb-c:pack-code-fixup-locs callees nil nil)))
+  (write-wordindexed code-obj sb-vm::code-fixups-slot
+                     #+linkage-space
+                     (number-to-core
+                      (sb-c::join-varint-streams (sb-c:pack-code-fixup-locs callees)
+                                                 (host-object-from-core retained-fixups)))
+                     #-linkage-space retained-fixups)
   code-obj)
 
 ;;;; sanity checking space layouts

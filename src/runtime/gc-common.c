@@ -827,7 +827,7 @@ void scav_code_linkage_cells(__attribute__((unused)) struct code* c)
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     const unsigned int smallvec_elts =
         (GENCGC_PAGE_BYTES - offsetof(struct vector,data)) / N_WORD_BYTES;
-    lispobj integer = barrier_load(&c->linkage_elts);
+    lispobj integer = barrier_load(&c->fixups);
     if (!integer) return; // do no work for leaf codeblobs
     lispobj name_map = barrier_load(&SYMBOL(LINKAGE_NAME_MAP)->value);
     gc_assert(simple_vector_p(name_map));
