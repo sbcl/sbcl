@@ -53,6 +53,17 @@
   (def double-float sb-vm:signed-word)
   (def double-float word))
 
+(macrolet ((def (type from-type inline-type)
+             `(deftransform ,(symbolicate "%" type) ((n) (,from-type) * :important nil)
+                (when (or (csubtypep (lvar-type n) (specifier-type ',inline-type))
+                          (not (types-equal-or-intersect (lvar-type n) (specifier-type ',inline-type))))
+                  (give-up-ir1-transform))
+                '(if (typep n ',inline-type)
+                  (,(symbolicate "%" type) (truly-the ,inline-type n))
+                  (,(symbolicate "%" type) (truly-the (not ,inline-type) n))))))
+  (def single-float integer fixnum)
+  (def double-float integer fixnum))
+
 ;;; RANDOM
 (macrolet ((frob (fun type)
              `(deftransform random ((num &optional state)
