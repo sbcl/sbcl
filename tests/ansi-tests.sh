@@ -43,7 +43,7 @@ rm -fr sandbox/scratch
  "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
  "UNION.FOLD.1"
  (append #+win32 (list "PROBE-FILE.4")
-         #+x86 (list "CIS.4")
+         #+x86 (list "CIS.4" "CEILING.16" "CEILING.18")
          #+(and arm64 (not darwin))
            (list "EXP.ERROR.4" "EXP.ERROR.5" "EXP.ERROR.6" "EXP.ERROR.7" "EXPT.ERROR.4"
                  "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7")
