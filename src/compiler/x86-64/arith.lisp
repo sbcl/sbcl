@@ -1535,7 +1535,8 @@
 (define-vop (overflow+t)
   (:translate overflow+)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg)))
+         (y :scs (any-reg (immediate
+                           (typep (tn-value tn) 'sc-offset)))))
   (:arg-types (:or t tagged-num) tagged-num)
   (:arg-refs x-ref)
   (:info type)
@@ -1551,13 +1552,17 @@
         (generate-fixnum-test x)
         (inst jmp :nz error))
       (move r x)
-      (inst add r y)
+      (inst add r (sc-case y
+                    (any-reg y)
+                    (t
+                     (fixnumize (tn-value y)))))
       (inst jmp :o error))))
 
 (define-vop (overflow-t)
   (:translate overflow-)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg)))
+         (y :scs (any-reg (immediate
+                           (typep (tn-value tn) 'sc-offset)))))
   (:arg-types (:or t tagged-num) tagged-num)
   (:arg-refs x-ref)
   (:info type)
@@ -1573,7 +1578,10 @@
         (generate-fixnum-test x)
         (inst jmp :nz error))
       (move r x)
-      (inst sub r y)
+      (inst sub r (sc-case y
+                    (any-reg y)
+                    (t
+                     (fixnumize (tn-value y)))))
       (inst jmp :o error))))
 
 (define-vop (overflow-t-y)

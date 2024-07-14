@@ -2800,7 +2800,10 @@
 (define-vop (overflow+t)
   (:translate overflow+)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg signed-reg)))
+         (y :scs (any-reg signed-reg
+                          (immediate
+                           (typep (tn-value tn) '(and sc-offset
+                                                  (satisfies fixnum-add-sub-immediate-p)))))))
   (:arg-types (:or t tagged-num) tagged-num)
   (:arg-refs x-ref)
   (:info type)
@@ -2814,15 +2817,21 @@
            (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
         (inst tbnz* x 0 error))
-      (inst adds r x (if (sc-is y any-reg)
-                         y
-                         (lsl y n-fixnum-tag-bits)))
+      (inst adds r x (sc-case y
+                       (any-reg y)
+                       (immediate
+                        (fixnumize (tn-value y)))
+                       (t
+                        (lsl y n-fixnum-tag-bits))))
       (inst b :vs error))))
 
 (define-vop (overflow-t)
   (:translate overflow-)
   (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg signed-reg)))
+         (y :scs (any-reg signed-reg
+                          (immediate
+                           (typep (tn-value tn) '(and sc-offset
+                                                  (satisfies fixnum-add-sub-immediate-p)))))))
   (:arg-types (:or t tagged-num) tagged-num)
   (:arg-refs x-ref)
   (:info type)
@@ -2836,9 +2845,12 @@
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
       (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
         (inst tbnz* x 0 error))
-      (inst subs r x (if (sc-is y any-reg)
-                         y
-                         (lsl y n-fixnum-tag-bits)))
+      (inst subs r x (sc-case y
+                       (any-reg y)
+                       (immediate
+                        (fixnumize (tn-value y)))
+                       (t
+                        (lsl y n-fixnum-tag-bits))))
       (inst b :vs error))))
 
 (define-vop (overflow-t-y)
