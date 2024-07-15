@@ -310,6 +310,7 @@
 ;;;; DEBUG-INFO structures
 
 (def!struct (debug-info
+             (:constructor nil)
              (:copier nil))
   ;; Some string describing something about the code in this component.
   (name (missing-arg) :type t :read-only t)
@@ -319,6 +320,8 @@
 
 (def!struct (compiled-debug-info
              (:include debug-info)
+             (:constructor !make-compiled-debug-info
+                           (name package fun-map contexts rest))
              (:copier nil)
              (:pure t))
   ;; The package that DEBUG-FUN-VARS were dumped relative
@@ -337,7 +340,8 @@
                                    (simple-array (signed-byte 8) (*))) :read-only t)
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
-  (contexts nil :type t :read-only t))
+  (contexts nil :type t :read-only t)
+  (rest))
 
 ;;;; file reading
 ;;;;

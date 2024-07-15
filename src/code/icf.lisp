@@ -171,8 +171,7 @@
          ;; Compare boxed constants. Ignore debug-info, fixups, and all
          ;; the simple-fun metadata (name, args, type, info) which will be compared
          ;; later based on how similar we require them to be.
-         (loop for i from (+ code-constants-offset
-                             (* code-slots-per-simple-fun (code-n-entries code1)))
+         (loop for i from code-constants-offset
                below (code-header-words code1)
                always (eq (code-header-ref code1 i) (code-header-ref code2 i)))
          ;; jump table word contains serial# which is arbitrary; don't compare it
@@ -237,8 +236,7 @@
                        (%simple-fun-text-len (%code-entry-point code i) i))))
              ;; Ignore the debug-info, fixups, and simple-fun metadata.
              ;; (Same things that are ignored by the CODE-EQUIVALENT-P predicate)
-             (loop for i from (+ code-constants-offset
-                                 (* code-slots-per-simple-fun (code-n-entries code)))
+             (loop for i from code-constants-offset
                      below (code-header-words code)
                      collect (constant-to-moniker (code-header-ref code i)))))))
 

@@ -1715,7 +1715,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         state->min_pointee_gen = ARTIFICIALLY_HIGH_GEN;
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         {
-        lispobj* pfdefn = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
+        lispobj* pfdefn = code->constants;
         lispobj* end = pfdefn + code_n_named_calls(code);
         for ( ; pfdefn < end ; ++pfdefn)
             if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pfdefn);

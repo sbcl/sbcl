@@ -1537,7 +1537,11 @@
 
 (defglobal *ignored-instance-type-ids*
   `(,(layout-id (find-layout 'sb-c::core-debug-source))))
-(defglobal *package-type-id* (layout-id (find-layout 'package)))
+(defglobal *package-layout-id* (layout-id (find-layout 'package)))
+(defglobal cdi-fixed-len ; Pretend the REST slot does not exist
+  (1- (sb-kernel:dd-length (sb-kernel:find-defstruct-description 'sb-c::compiled-debug-info))))
+(defglobal *cdi-layout-id*
+  (sb-kernel:layout-id (sb-kernel:find-layout 'sb-c::compiled-debug-info)))
 
 ;;; SB-KERNEL:LAYOUT-ID would perform a type-check (that may crash
 ;;; on the target core). This is cribbed from that function.
@@ -1592,7 +1596,10 @@
                              (allowed (position id *allowed-instance-type-ids*)))
                         (cond
                           (allowed
-                           (let* ((nslots (%instance-length (translated-obj)))
+                           ;; Take only the fixed portion of COMPILED-DEBUG-INFO
+                           (let* ((nslots (if (= id *cdi-layout-id*)
+                                              cdi-fixed-len
+                                              (%instance-length (translated-obj))))
                                   (new (memoize (%make-instance nslots)))
                                   (exclude-slot-mask
                                    (logior
@@ -1605,7 +1612,7 @@
                                (unless (logbitp i exclude-slot-mask)
                                  (setf (%instance-ref new i)
                                        (recurse (word (+ instance-slots-offset i))))))))
-                          ((= id *package-type-id*)
+                          ((= id *package-layout-id*)
                            ;; oh dear, this is completely wrong
                            (let* ((pkg (truly-the package (translated-obj)))
                                   (name (translate (sb-impl::package-%name pkg) spacemap)))

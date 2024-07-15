@@ -46,6 +46,7 @@
 #include "genesis/hash-table.h"
 #include "genesis/split-ordered-list.h"
 #include "genesis/static-symbols.h"
+#include "genesis/compiled-debug-info.h"
 #include "var-io.h"
 #include "search.h"
 #include "murmur_hash.h"
@@ -2014,7 +2015,9 @@ lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
         struct simple_fun* fun = (void*)(insts + offsets[-i]);
         if ((char*)fun < pc) {
             if (pfun) *pfun = (lispobj*)fun;
-            return code->constants[i*CODE_SLOTS_PER_SIMPLE_FUN];
+            struct compiled_debug_info* cdi = (void*)native_pointer(code->debug_info);
+            lispobj* fundata = &cdi->rest;
+            return fundata[i*CODE_SLOTS_PER_SIMPLE_FUN];
         }
     }
     return 0; // oops, how did this happen?

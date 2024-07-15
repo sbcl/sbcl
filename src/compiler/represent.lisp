@@ -895,10 +895,8 @@
          (renumbering)) ; alist of (old . new) indices into constant vector
     (setf (fill-pointer sorted) 0)
     ;; add in fixed overhead
-    (let ((n-entries (length (ir2-component-entries 2comp))))
-      (dotimes (i (+ (* sb-vm:code-slots-per-simple-fun n-entries)
-                     sb-vm:code-constants-offset))
-        (vector-push-extend nil sorted)))
+    (dotimes (i sb-vm:code-constants-offset)
+      (vector-push-extend nil sorted))
     (flet ((scan (pass &aux (old-offset 0))
              (dovector (constant unsorted)
                (incf old-offset)

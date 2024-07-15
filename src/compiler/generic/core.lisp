@@ -157,9 +157,7 @@
         ;; <header, boxed_size, debug_info, fixups> are absent from the simple-vector
         (or #+darwin-jit
             (make-array (- n-boxed-words sb-vm:code-constants-offset) :initial-element 0)))
-       (const-patch-start-index
-        (+ sb-vm:code-constants-offset (* (length (ir2-component-entries 2comp))
-                                          sb-vm:code-slots-per-simple-fun)))
+       (const-patch-start-index sb-vm:code-constants-offset)
        ;; Pre-scan for all fdefinitions to ensure their existence, which guarantees that
        ;; storing them into the boxed words can't can't create an old->young pointer.
        ;; This is essential since gencgc will miss them when scanning the code header
@@ -214,14 +212,8 @@
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
         (dolist (entry-info entries)
-          (let ((fun (%code-entry-point code-obj (decf fun-index)))
-                (w (+ sb-vm:code-constants-offset
-                      (* sb-vm:code-slots-per-simple-fun fun-index))))
+          (let ((fun (%code-entry-point code-obj (decf fun-index))))
             (aver (functionp fun)) ; in case %CODE-ENTRY-POINT returns NIL
-            (set-boxed-word (+ w sb-vm:simple-fun-name-slot) (entry-info-name entry-info))
-            (set-boxed-word (+ w sb-vm:simple-fun-arglist-slot) (entry-info-arguments entry-info))
-            (set-boxed-word (+ w sb-vm:simple-fun-source-slot) (entry-info-form/doc entry-info))
-            (set-boxed-word (+ w sb-vm:simple-fun-info-slot) (entry-info-type/xref entry-info))
             (setf (gethash entry-info (core-object-entry-table object)) fun))))
 
       (do ((index const-patch-start-index (1+ index)))

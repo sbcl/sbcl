@@ -931,8 +931,7 @@ line break."
             (let ((symbols)
                   (ppd-v)
                   (code (fun-code-header hashtable)))
-              (loop for i from (+ sb-vm:code-constants-offset
-                                  sb-vm:code-slots-per-simple-fun)
+              (loop for i from sb-vm:code-constants-offset
                     below (code-header-words code)
                     do (let ((const (code-header-ref code i)))
                          (when (simple-vector-p const)

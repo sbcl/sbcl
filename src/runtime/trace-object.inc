@@ -164,7 +164,7 @@ static void TRACE_NAME(lispobj* where)
         }
 #endif
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        lispobj* where = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
+        lispobj* where = code->constants;
         lispobj* limit = where + code_n_named_calls(code);
         for ( ; where < limit ; ++where )
             ACTION(*where | OTHER_POINTER_LOWTAG, where, SOURCE_ZERO_TAG);

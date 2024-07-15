@@ -287,12 +287,13 @@ static void __attribute__((unused))
 print_entry_points (struct code *code, FILE *f)
 {
     int n_funs = code_n_funs(code);
+    struct compiled_debug_info* cdi = (void*)native_pointer(barrier_load(&code->debug_info));
     for_each_simple_fun(index, fun, code, 0, {
         if (widetag_of(&fun->header) != SIMPLE_FUN_WIDETAG) {
             fprintf(f, "%p: bogus function entry", fun);
             return;
         }
-        print_entry_name(barrier_load(&code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index]),
+        print_entry_name(barrier_load(CODE_SLOTS_PER_SIMPLE_FUN*index + &cdi->rest),
                          f);
         if ((index + 1) < n_funs) fprintf(f, ", ");
     });

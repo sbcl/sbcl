@@ -357,7 +357,8 @@
                   ;; Rather than hit MAKE-DEFSTRUCT-DESCRIPTION's type-check
                   ;; on the NAME slot, we can be a little more clear.
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
-         (flagbits (logior #+sb-xc-host (if (eq name 'layout) +dd-varylen+ 0)
+         (flagbits (logior #+sb-xc-host
+                           (if (member name '(sb-c::compiled-debug-info layout)) +dd-varylen+ 0)
                            (if null-env-p +dd-nullenv+ 0)))
          (dd (make-defstruct-description name flagbits))
          (*dsd-source-form* nil)
@@ -2320,22 +2321,6 @@ or they must be declared locally notinline at each call site.~@:>"
     (when (typep ctor '(cons t (eql :default)))
       (car ctor))))
 
-#+sb-xc-host
-(defun %instance-ref (instance index)
-  (let* ((layout (%instance-layout instance))
-         (map (layout-index->accessor-map layout)))
-    (when (zerop (length map)) ; construct it on demand
-      (let ((slots (dd-slots (layout-%info layout))))
-        (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
-                              :initial-element nil)
-              (layout-index->accessor-map layout) map)
-        (dolist (dsd slots)
-          (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
-    (funcall (aref map index) instance)))
-
-#+sb-xc-host
-(defun %raw-instance-ref/word (instance index) (%instance-ref instance index))
-
 ;;; It is possible to produce instances of structure-object which violate
 ;;; the assumption throughout the compiler that slot readers are safe
 ;;; unless dictated otherwise by the SAFE-P flag in the DSD.
@@ -2384,6 +2369,7 @@ or they must be declared locally notinline at each call site.~@:>"
             sb-vm:instance-pointer-lowtag)))
 
 #+sb-xc-host
+(progn
 (defun write-structure-definitions-as-text (pathname)
   (with-open-file (output pathname :direction :output :if-exists :supersede)
     (dolist (root '(structure-object function))
@@ -2422,5 +2408,33 @@ or they must be declared locally notinline at each call site.~@:>"
             (t
              (error "Missing DD for ~S" pair))))))
     (format output ";; EOF~%")))
+
+(locally
+(declare (notinline sb-c::compiled-debug-info-p sb-c::compiled-debug-info-rest))
+;; Emulate variable-length structures for COMPILED-DEBUG-INFO.
+(defun %instance-length (instance)
+  (declare (notinline layout-length))
+  (let ((basic (layout-length (%instance-layout instance))))
+    (if (sb-c::compiled-debug-info-p instance)
+        (+ (1- basic)
+           (length (the simple-vector (sb-c::compiled-debug-info-rest instance))))
+        basic)))
+(defun %instance-ref (instance index)
+  (let* ((layout (%instance-layout instance))
+         (map (layout-index->accessor-map layout)))
+    (when (zerop (length map)) ; construct it on demand
+      (let ((slots (dd-slots (layout-%info layout))))
+        (setf map (make-array (1+ (reduce #'max slots :key #'dsd-index))
+                              :initial-element nil)
+              (layout-index->accessor-map layout) map)
+        (dolist (dsd slots)
+          (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
+    (if (and (sb-c::compiled-debug-info-p instance)
+             (>= index (1- (length map))))
+        (aref (sb-c::compiled-debug-info-rest instance) (- index (1- (length map))))
+        (funcall (aref map index) instance)))))
+
+(defun %raw-instance-ref/word (instance index) (%instance-ref instance index))
+) ; end PROGN
 
 (/show0 "code/defstruct.lisp end of file")

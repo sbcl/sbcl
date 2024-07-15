@@ -2811,11 +2811,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                  (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
                                     (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
           #-(or x86 x86-64 arm64) ; store a pointer back to the function itself in 'self'
-          (write-wordindexed fn sb-vm:simple-fun-self-slot fn))
-        (dotimes (i sb-vm:code-slots-per-simple-fun)
-          (write-wordindexed des header-index (svref stack stack-index))
-          (incf header-index)
-          (incf stack-index)))
+          (write-wordindexed fn sb-vm:simple-fun-self-slot fn)))
       (dotimes (i n-fdefns)
         (store-named-call-fdefn des header-index (svref stack stack-index))
         (incf header-index)

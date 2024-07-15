@@ -804,14 +804,14 @@ functions when called with no arguments."
                                    ;; The code constants will be overwritten in the copy.
                                    ;; These are just placeholders essentially.
                                    (apply ,#'trace-call ,(make-trace-info) #() args))))))
-                 (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+                 (index sb-vm:code-constants-offset))
              ;; First three args to APPLY must be at the expected offets
              (aver (typep (code-header-ref c (+ index 0)) 'function))
              (aver (typep (code-header-ref c (+ index 1)) 'trace-info))
              (aver (typep (code-header-ref c (+ index 2)) 'simple-vector))
              c)
            t)))
-        (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+        (index sb-vm:code-constants-offset))
     (setf (code-header-ref code (+ index 0)) (symbol-function wrapper)
           (code-header-ref code (+ index 1)) info
           (code-header-ref code (+ index 2)) actual-fun)

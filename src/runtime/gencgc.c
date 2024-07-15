@@ -4467,8 +4467,7 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         // Process each untagged fdefn pointer.
         // TODO: assert that the generation of any fdefn is older than that of 'code'.
-        lispobj* fdefns = code->constants +
-          code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
+        lispobj* fdefns = code->constants;
         int n_fdefns = code_n_named_calls(code);
         int i;
         for (i=0; i<n_fdefns; ++i) {
@@ -4729,7 +4728,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         state->min_pointee_gen = ARTIFICIALLY_HIGH_GEN;
 #ifdef LISP_FEATURE_UNTAGGED_FDEFNS
         {
-        lispobj* pfdefn = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
+        lispobj* pfdefn = code->constants;
         lispobj* end = pfdefn + code_n_named_calls(code);
         for ( ; pfdefn < end ; ++pfdefn)
             if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pfdefn);

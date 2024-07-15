@@ -1182,7 +1182,7 @@
     (with-fop-stack ((stack (operand-stack)) ptr stack-elts-consumed)
       ;; We've already ensured that all FDEFNs the code uses exist.
       ;; This happened by virtue of calling fop-fdefn for each.
-      (loop for stack-index from (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))
+      (loop for stack-index from ptr
             repeat n-fdefns
             do (aver (typep (svref stack stack-index) '(or fdefn #+linkage-space symbol))))
       (binding* (((code total-nwords)
@@ -1199,15 +1199,14 @@
         ;; Don't need the code pinned from here on
         (setf (sb-c::debug-info-source (%code-debug-info code))
               (%fasl-input-partial-source-info (fasl-input)))
-        (let ((stack-index (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))))
-          ;; This is the moral equivalent of a warning from /usr/bin/ld
-          ;; that "gets() is dangerous." You're informed by both the compiler and linker.
-          (dotimes (i n-fdefns)
-            (let* ((thing (svref stack (+ stack-index i)))
-                   (name (if (fdefn-p thing) (fdefn-name thing))))
-              (when (deprecated-thing-p 'function name)
-                (format *error-output* "~&; While loading ~S:" (sb-c::debug-info-name debug-info))
-                (check-deprecated-thing 'function name)))))
+        ;; This is the moral equivalent of a warning from /usr/bin/ld
+        ;; that "gets() is dangerous." You're informed by both the compiler and linker.
+        (dotimes (i n-fdefns)
+          (let* ((thing (svref stack (+ ptr i)))
+                 (name (if (fdefn-p thing) (fdefn-name thing))))
+            (when (deprecated-thing-p 'function name)
+              (format *error-output* "~&; While loading ~S:" (sb-c::debug-info-name debug-info))
+              (check-deprecated-thing 'function name))))
         ;; Boxed constants can be assigned only after figuring out where the range
         ;; of implicitly tagged words is, which requires knowing how many functions
         ;; are in the code component, which requires reading the code trailer.
@@ -1216,10 +1215,6 @@
         (let* ((header-index sb-vm:code-constants-offset)
                (stack-index ptr))
             (declare (type index header-index stack-index))
-            (dotimes (n (* n-simple-funs sb-vm:code-slots-per-simple-fun))
-              (setf (code-header-ref code header-index) (svref stack stack-index))
-              (incf header-index)
-              (incf stack-index))
             (dotimes (i n-fdefns)
               (sb-c::set-code-fdefn code header-index (svref stack stack-index))
               (incf header-index)

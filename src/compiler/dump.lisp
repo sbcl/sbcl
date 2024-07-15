@@ -1170,8 +1170,6 @@
              (dump-fop 'fop-misc-trap fasl-output))
             (list
              (ecase kind
-               (:constant ; anything that has not been wrapped in a #<CONSTANT>
-                (dump-object payload fasl-output))
                (:entry
                 (let* ((info (leaf-info payload))
                        (handle (gethash info
@@ -1287,25 +1285,8 @@
          (entries (ir2-component-entries 2comp))
          (nfuns (length entries))
          (code-handle
-           ;; fill in the placeholder elements of constants
-           ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
-           (let ((constants (ir2-component-constants 2comp))
-                 (wordindex (+ sb-vm:code-constants-offset
-                               (* sb-vm:code-slots-per-simple-fun nfuns))))
-             (dolist (entry entries)
-               ;; Process in reverse order of ENTRIES.
-               ;; See also MAKE-CORE-COMPONENT which does the same thing.
-               (decf wordindex sb-vm:code-slots-per-simple-fun)
-               (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
-                     `(:constant ,(entry-info-name entry))
-                     (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
-                     `(:constant ,(entry-info-arguments entry))
-                     (aref constants (+ wordindex sb-vm:simple-fun-source-slot))
-                     `(:constant ,(entry-info-form/doc entry))
-                     (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
-                     `(:constant ,(entry-info-type/xref entry))))
              (dump-code-object component code-segment code-length fixups
-                               alloc-points file)))
+                               alloc-points file))
          (fun-index nfuns))
 
     (dolist (entry entries)

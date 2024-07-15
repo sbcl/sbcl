@@ -969,6 +969,19 @@
 (defun debug-info-for-component (component)
   (declare (type component component))
   (let* ((dfuns nil)
+         (simple-fun-headers
+          ;; Compute all simple-fun metadata and store into a simple-vector
+          (let* ((entries (ir2-component-entries (component-info component)))
+                 (nfuns (length entries))
+                 (i (* sb-vm:code-slots-per-simple-fun nfuns))
+                 (v (make-array i)))
+            (dolist (e entries v)
+              ;; Process in reverse order of ENTRIES.
+              (decf i sb-vm:code-slots-per-simple-fun)
+              (setf (svref v (+ i sb-vm:simple-fun-name-slot)) (entry-info-name e)
+                    (svref v (+ i sb-vm:simple-fun-arglist-slot)) (entry-info-arguments e)
+                    (svref v (+ i sb-vm:simple-fun-source-slot)) (entry-info-form/doc e)
+                    (svref v (+ i sb-vm:simple-fun-info-slot)) (entry-info-type/xref e)))))
          (var-locs (make-hash-table :test 'eq))
          (*byte-buffer* (make-array 10
                                     :element-type '(unsigned-byte 8)
@@ -994,11 +1007,24 @@
         (push (cons (label-position (block-label (lambda-block lambda)))
                     (compute-1-debug-fun lambda var-locs))
               dfuns)))
-    (make-compiled-debug-info
-     :name name
-     :package *package*
-     :fun-map (compute-packed-debug-funs (nreverse dfuns))
-     :contexts (compact-vector *contexts*))))
+    (let ((map (compute-packed-debug-funs (nreverse dfuns)))
+          (contexts (compact-vector *contexts*)))
+      #+sb-xc-host
+      (!make-compiled-debug-info name *package* map contexts simple-fun-headers)
+      #-sb-xc-host
+      (let ((di (%make-instance (+ (sb-kernel::type-dd-length compiled-debug-info)
+                                   (length simple-fun-headers)))))
+        (setf (%instance-layout di) #.(find-layout 'compiled-debug-info)
+              ;; The fixed slots except for SOURCE are declared readonly
+              (%instance-ref di (get-dsd-index compiled-debug-info name)) name
+              (%instance-ref di (get-dsd-index compiled-debug-info source)) nil
+              (%instance-ref di (get-dsd-index compiled-debug-info package)) *package*
+              (%instance-ref di (get-dsd-index compiled-debug-info fun-map)) map
+              (%instance-ref di (get-dsd-index compiled-debug-info contexts)) contexts)
+        (let ((i (get-dsd-index compiled-debug-info rest)))
+          (dovector (x simple-fun-headers di)
+            (setf (%instance-ref di i) x)
+            (incf i)))))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.
