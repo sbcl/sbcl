@@ -563,7 +563,8 @@
   (let* ((inst (current-instruction dstate))
          (float (ldb-test (byte 1 26) inst)))
     (unless float
-      (let ((value (find-value-from-previous-inst value dstate)))
+      (let ((value (and (seg-code (sb-disassem:dstate-segment dstate))
+                        (find-value-from-previous-inst value dstate))))
         (when value
           (annotate-ldr-str (ldb (byte 5 5) inst) value dstate))))))
 
