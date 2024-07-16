@@ -1149,8 +1149,8 @@
      &key (:key (function-designator ((nth-arg 1 :sequence t)))))
     list (foldable flushable call))
 
-(defknown (memq assq) (t proper-list) list (foldable flushable))
-(defknown (delq delq1) (t (modifying list)) list (flushable))
+(defknown (memq assq) (t proper-list) list (foldable flushable no-verify-arg-count))
+(defknown (delq delq1) (t (modifying list)) list (flushable no-verify-arg-count))
 
 ;;;; from the "Hash Tables" chapter:
 
