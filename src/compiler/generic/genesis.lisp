@@ -1340,7 +1340,9 @@ core and return a descriptor to it."
 (defvar *vacuous-slot-table*)
 (defun cold-layout-gspace ()
   (cond ((boundp '*permgen*) *permgen*)
-        ((boundp '*immobile-fixedobj*) *immobile-fixedobj*)
+        ;; arm64 with immobile space uses immobile symbols (though doesn't really benefit),
+        ;; however it does NOT use immobile layouts or compact headers.
+        #+compact-instance-header ((boundp '*immobile-fixedobj*) *immobile-fixedobj*)
         (t *dynamic*)))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
                           descriptor)
