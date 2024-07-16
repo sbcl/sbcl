@@ -248,21 +248,6 @@
 
 (defun stepper-fun (closure) (ensure-simplistic closure nil))
 
-;;; Find an immobile FUNCTION given an interior pointer to it.
-#+immobile-space
-(defun find-called-object (address)
-  (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
-                                          (function unsigned unsigned))
-                            address)))
-    (unless (eql obj 0)
-      (case (sap-ref-8 (int-sap obj) 0)
-        (#.code-header-widetag
-         (%simple-fun-from-entrypoint
-          (make-lisp-obj (logior obj other-pointer-lowtag))
-          address))
-        (#.funcallable-instance-widetag ; FIXME: do we use this case?
-         (make-lisp-obj (logior obj fun-pointer-lowtag)))))))
-
 ;;; Undo the effects of XEP-ALLOCATE-FRAME
 ;;; and point PC to FUNCTION
 (defun context-call-function (context function &optional arg-count)

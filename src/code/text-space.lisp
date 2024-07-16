@@ -11,38 +11,6 @@
 
 (in-package "SB-X86-64-ASM")
 
-(eval-when (:compile-toplevel) ; not needed outside this file
-(defmacro do-text-space-code ((code-var) &body body)
-  ;; Loop over all code objects
-  `(let* ((call (find-inst #xE8 (get-inst-space)))
-          (jmp  (find-inst #xE9 (get-inst-space)))
-          (dstate (make-dstate nil))
-          (code-sap (int-sap 0))
-          (seg (sb-disassem::%make-segment :sap-maker (lambda () code-sap))))
-     (declare (ignorable mov-ea mov-imm-acc))
-     (macrolet ((do-functions ((fun-var addr-var) &body body)
-                  ;; Loop over all embedded functions
-                  `(dotimes (fun-index (code-n-entries ,',code-var))
-                     (let* ((,fun-var (%code-entry-point ,',code-var fun-index))
-                            (,addr-var (+ (get-lisp-obj-address ,fun-var)
-                                          (- fun-pointer-lowtag)
-                                          (ash simple-fun-insts-offset word-shift))))
-                       (with-pinned-objects (code-sap) ; Mutate SAP to point to fun
-                         (setf (sap-ref-word (int-sap (get-lisp-obj-address code-sap))
-                                             (- n-word-bytes other-pointer-lowtag))
-                               ,addr-var))
-                       (setf (seg-virtual-location seg) ,addr-var
-                             (seg-length seg) (%simple-fun-text-len ,fun-var fun-index))
-                       ,@body))))
-       (sb-vm::map-objects-in-range
-        (lambda (,code-var obj-type obj-size)
-          (declare (ignore obj-size))
-          (when (= obj-type code-header-widetag) ,@body))
-        ;; Slowness here is bothersome, especially for UNDO-STATIC-LINKAGE,
-        ;; so skip right over all fixedobj pages.
-        (ash text-space-start (- n-fixnum-tag-bits))
-        (%make-lisp-obj (sap-int *text-space-free-pointer*)))))))
-
 #+immobile-code
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components (make-array 20000 :element-type 'word :fill-pointer 0 :adjustable t))
@@ -55,15 +23,16 @@
              ;; lambda to compute the instruction offset relative to the code base.
              ;; Defrag has already stuffed in forwarding pointers when it reads
              ;; this data, which makes code_header_words() inconvenient to use.
-             (sb-x86-64-asm::scan-relative-operands
+             (scan-relative-operands
               code (sap-int sap) length dstate seg
               (lambda (offset operand inst)
                 (declare (ignore inst))
-                (let ((lispobj (if (immobile-space-addr-p operand)
-                                   nil
-                                   0)))
+                ;; We used to have movable objects pointing to other movable objects,
+                ;; and during defrag, either or both could move.  This no longer occurs,
+                ;; so pass 0 as the pointed-to object.
+                (let ()
                   (vector-push-extend (+ offset extra-offset) relocs)
-                  (vector-push-extend (get-lisp-obj-address lispobj) relocs)))
+                  (vector-push-extend 0 relocs)))
                predicate))
            (finish-component (code start-relocs-index)
              (when (> (fill-pointer relocs) start-relocs-index)
@@ -94,8 +63,7 @@
          (when (and (= type code-header-widetag) (plusp (code-n-entries code)))
            (let ((relocs-index (fill-pointer relocs)))
              (dotimes (i (code-n-entries code))
-               ;; simple-funs must be individually scanned so that the
-               ;; embedded boxed words are properly skipped over.
+               ;; simple-funs must be individually scanned to skip over header words
                (let* ((fun (%code-entry-point code i))
                       (sap (simple-fun-entry-sap fun)))
                  (scan-function code sap
@@ -112,6 +80,33 @@
     (vector-push-extend (fill-pointer relocs) code-components)
     (values code-components relocs)))
 
+(macrolet
+    ((do-text-space-code ((code-var) &body body)
+       `(let* ((call (find-inst #xE8 (get-inst-space)))
+               (jmp  (find-inst #xE9 (get-inst-space)))
+               (dstate (make-dstate nil))
+               (code-sap (int-sap 0))
+               (seg (sb-disassem::%make-segment :sap-maker (lambda () code-sap))))
+          (macrolet ((do-functions ((fun-var addr-var) &body body)
+                       ;; Loop over all embedded functions
+                       `(dotimes (fun-index (code-n-entries ,',code-var))
+                          (let* ((,fun-var (%code-entry-point ,',code-var fun-index))
+                                 (,addr-var (+ (get-lisp-obj-address ,fun-var)
+                                               (- fun-pointer-lowtag)
+                                               (ash simple-fun-insts-offset word-shift))))
+                            (with-pinned-objects (code-sap) ; Mutate SAP to point to fun
+                              (setf (sap-ref-word (int-sap (get-lisp-obj-address code-sap))
+                                                  (- n-word-bytes other-pointer-lowtag))
+                                    ,addr-var))
+                            (setf (seg-virtual-location seg) ,addr-var
+                                  (seg-length seg) (%simple-fun-text-len ,fun-var fun-index))
+                            ,@body))))
+            (sb-vm::map-objects-in-range
+             (lambda (,code-var obj-type obj-size)
+               (declare (ignore obj-size))
+               (when (= obj-type code-header-widetag) ,@body))
+             (ash text-space-start (- n-fixnum-tag-bits))
+             (%make-lisp-obj (sap-int *text-space-free-pointer*)))))))
 ;;; Ensure that any caller of FNAME jumps via the linkage table
 ;;; and not directly to the current functional binding.
 (defun sb-vm::unbypass-linkage (fname fun-entry index &aux (all (permanent-fname-p fname)))
@@ -154,4 +149,4 @@
                             (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
                             (setf (sap-ref-16 sap -1) #x90ff   ; CALL [RAX+n]
                                   (signed-sap-ref-32 sap 1) (ash index word-shift)))))))))
-           seg dstate))))))
+           seg dstate)))))))
