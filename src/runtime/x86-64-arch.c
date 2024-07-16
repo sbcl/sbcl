@@ -164,33 +164,34 @@ void visit_context_registers(void (*proc)(os_context_register_t, void*),
 }
 #endif
 
-os_context_register_t *
-os_context_flags_addr(os_context_t *context)
-{
 #if defined __linux__
     /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
      * <sys/ucontext.h> file to define symbolic names for offsets into
      * gregs[], but it's conditional on __USE_GNU and not defined, so
      * we need to do this nasty absolute index magic number thing
      * instead. */
-    return (os_context_register_t*)&context->uc_mcontext.gregs[17];
+#   define CONTEXT_FLAGS(c) c->uc_mcontext.gregs[17]
 #elif defined LISP_FEATURE_SUNOS
-    return &context->uc_mcontext.gregs[REG_RFL];
+#   define CONTEXT_FLAGS(c) c->uc_mcontext.gregs[REG_RFL]
 #elif defined LISP_FEATURE_FREEBSD || defined(__DragonFly__)
-    return &context->uc_mcontext.mc_rflags;
+#   define CONTEXT_FLAGS(c) c->uc_mcontext.mc_rflags
 #elif defined __HAIKU__
-    return &context->uc_mcontext.rflags;
+#   define CONTEXT_FLAGS(c) c->uc_mcontext.rflags
 #elif defined LISP_FEATURE_DARWIN
-    return CONTEXT_ADDR_FROM_STEM(rflags);
+#   define CONTEXT_FLAGS(c) CONTEXT_SLOT(c,rflags)
 #elif defined __OpenBSD__
-    return &context->sc_rflags;
+#   define CONTEXT_FLAGS(c) c->sc_rflags
 #elif defined __NetBSD__
-    return CONTEXT_ADDR_FROM_STEM(RFLAGS);
+#   define CONTEXT_FLAGS(c) CONTEXT_SLOT(c,RFLAGS)
 #elif defined _WIN64
-    return (os_context_register_t*)&context->win32_context->EFlags;
+#   define CONTEXT_FLAGS(c) c->win32_context->EFlags
 #else
 #error unsupported OS
 #endif
+
+os_context_register_t *os_context_flags_addr(os_context_t *context)
+{
+    return (os_context_register_t*)&(CONTEXT_FLAGS(context));
 }
 
 void arch_skip_instruction(os_context_t *context)
@@ -307,7 +308,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     *(pc-2) = 0x00240c81;
     *(pc-1) = 0x9d000001;
 #else
-    *os_context_flags_addr(context) |= 0x100;
+    CONTEXT_FLAGS(context) |= 0x100;
 #endif
 
     single_stepping = pc;
@@ -350,7 +351,7 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *(single_stepping-2) = single_step_save2;
     *(single_stepping-1) = single_step_save3;
 #else
-    *os_context_flags_addr(context) &= ~0x100;
+    CONTEXT_FLAGS(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
     if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&

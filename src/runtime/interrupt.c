@@ -1516,7 +1516,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  */
 
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-extern int *os_context_flags_addr(os_context_t *context);
+extern os_context_register_t *os_context_flags_addr(os_context_t *context);
 #endif
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
