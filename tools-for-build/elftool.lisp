@@ -1558,6 +1558,7 @@
   (multiple-value-bind (hi lo) (floor index smallvec-elts)
     (let ((inner (translate (svref *name-map* hi) spacemap)))
       (translate (weak-vector-ref inner lo) spacemap))))
+#+x86-64
 (defun use-indirection-p (index spacemap)
   (let ((name (linkage-index-to-name index spacemap)))
     (if (symbolp name)
@@ -1571,6 +1572,7 @@
              (member str '(sb-vm::simd-reverse32 sb-vm::simd-reverse8
                            sb-vm::simd-nreverse32 sb-vm::simd-nreverse8)
                      :test 'string=)))))))
+#+x86-64
 (defun bypass-indirection-cells
     (code vaddr core
      &optional print
@@ -1650,6 +1652,7 @@
                             (signed-sap-ref-32 sap 1) (1+ disp)
                             (sap-ref-8 sap 5) #x90))))))))))) ; followed by NOP
 
+#+x86-64
 (defun redirect-text-space-calls (pathname)
   (with-open-file (stream pathname :element-type '(unsigned-byte 8)
                          :direction :io :if-exists :overwrite)
@@ -1692,7 +1695,7 @@
     ;; input core could be readonly
     (unwind-protect (progn (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
                                         :search t)
-                           (redirect-text-space-calls tmp)
+                           #+x86-64 (redirect-text-space-calls tmp)
                            (apply #'really-split-core tmp asm-pathname args))
       (delete-file tmp))))
 

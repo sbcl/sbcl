@@ -45,7 +45,7 @@ run_sbcl <<EOF
 EOF
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
-(sb-vm::%alloc-immobile-symbol "junk") ; crashed 'cause I forgot to use rip-relative-EA
+#+x86-64 (sb-vm::%alloc-immobile-symbol "junk") ; crashed 'cause I forgot to use rip-relative-EA
 
 ;; Test that the link step did not use --export-dynamic
 (assert (gethash '("TEXT_SPACE_START") (car sb-sys:*linkage-info*))) ; C symbol exists

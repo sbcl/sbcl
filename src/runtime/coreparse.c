@@ -691,6 +691,9 @@ __attribute__((unused)) static void check_dynamic_space_addr_ok(uword_t start, u
 #define LISP_LINKAGE_SPACE_SIZE (1<<(N_LINKAGE_INDEX_BITS+WORD_SHIFT))
 #endif
 
+#if defined LISP_FEATURE_IMMOBILE_SPACE && defined LISP_FEATURE_ARM64
+#define LISP_LINKAGE_SPACE_SIZE 0
+#endif
 static os_vm_address_t reserve_space(int space_id, int attr,
                                      os_vm_address_t addr, os_vm_size_t size)
 {
@@ -856,7 +859,10 @@ process_directory(int count, struct ndir_entry *entry,
                 break;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
+                // arm64 does not care where this space is placed - it's not used
+#ifdef LISP_FEATURE_X86_64
                 if (addr + request > 0x80000000) lose("Won't map immobile space above 2GB");
+#endif
                 FIXEDOBJ_SPACE_START = addr;
                 break;
 #endif

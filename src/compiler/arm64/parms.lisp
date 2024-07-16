@@ -74,6 +74,7 @@
                      #+darwin #x300000000
                      #-darwin :read-only-space-size #-darwin 0
                      :fixedobj-space-size #.(* 65536 1024)
+                     :text-space-start #x0A00000000
                      :text-space-size #.(* 2 65536 1024)
                      :dynamic-space-start
                      #-darwin #x1000000000
@@ -81,6 +82,11 @@
 
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
+  ;; text space:
+  ;;   | ALIEN LINKAGE | CODE OBJECTS ...
+  ;;   |<------------->|
+#+(and sb-xc-host immobile-space)
+(defparameter alien-linkage-space-start (- text-space-start alien-linkage-space-size))
 
 ;;;; other miscellaneous constants
 

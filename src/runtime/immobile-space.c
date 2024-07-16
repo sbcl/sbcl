@@ -838,8 +838,10 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     if (younger_p(sym->value, gen, keep_gen, new_gen)) return 1;
     if (younger_p(sym->info, gen, keep_gen, new_gen)) return 1;
     if (younger_p(sym->fdefn, gen, keep_gen, new_gen)) return 1;
+#ifdef LISP_FEATURE_LINKAGE_SPACE
     if (younger_p(linkage_cell_taggedptr(symbol_linkage_index(sym)),
                   gen, keep_gen, new_gen)) return 1;
+#endif
     }
     return 0;
   case INSTANCE_WIDETAG:
@@ -1537,7 +1539,7 @@ static struct layout* fix_object_layout(lispobj* obj)
 
 static void apply_absolute_fixups(lispobj, struct code*);
 
-static void adjust_linkage_cell(int linkage_index)
+static void __attribute__((unused)) adjust_linkage_cell(int linkage_index)
 {
     if (!linkage_index) return;
     char* entrypoint = (char*)linkage_space[linkage_index];
@@ -1601,7 +1603,9 @@ static void fixup_space(lispobj* where, size_t n_words)
           struct fdefn *fdefn = (void*)where;
           adjust_words(&fdefn->name, 1); // name can be a symbol
           adjust_words(&fdefn->fun, 1);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
           adjust_linkage_cell(fdefn_linkage_index(fdefn));
+#endif
           break;
         }
         case SYMBOL_WIDETAG: {
@@ -1609,7 +1613,9 @@ static void fixup_space(lispobj* where, size_t n_words)
           struct symbol* s = (struct symbol*)where;
           adjust_words(&s->value, 1);
           adjust_words(&s->fdefn, 1);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
           adjust_linkage_cell(symbol_linkage_index(s));
+#endif
           break;
         }
         // Special case because we might need to mark hashtables

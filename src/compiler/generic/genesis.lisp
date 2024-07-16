@@ -1146,9 +1146,11 @@ core and return a descriptor to it."
           (cold-assign-tls-index cold-sym tls-index)))
       tls-index)))
 
-(defvar *cold-symbol-gspace* (or #+permgen '*permgen*
-                                 #+immobile-space '*immobile-fixedobj*
-                                 '*dynamic*))
+(defvar *cold-symbol-gspace*
+  (or #+permgen '*permgen*
+      ;; arm64 can't use immobile symbols
+      #+(and immobile-space x86-64) '*immobile-fixedobj*
+      '*dynamic*))
 (defun assign-symbol-hash (descriptor wordindex name)
   ;; "why not just call sb-c::symbol-name-hash?" you ask? because: no symbol.
   (let ((name-hash (sb-c::calc-symbol-name-hash name (length name))))

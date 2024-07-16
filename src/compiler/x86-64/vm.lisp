@@ -608,3 +608,28 @@
 #+nil
 (define-cond-sc 32-bit-immediate immediate
   (typep (tn-value tn) '(signed-byte 32)))
+
+(defmacro sb-impl::symbol-allocator-macro (kind name)
+  (declare (ignorable kind))
+  #+permgen
+  `(truly-the symbol (if (eql ,kind 0) ; uninterned
+                         (sb-vm::%alloc-symbol ,name)
+                         (allocate-permgen-symbol ,name)))
+  #-permgen
+  `(truly-the symbol
+          ;; If no immobile-space, easy: all symbols go in dynamic-space
+          #-immobile-space (sb-vm::%alloc-symbol ,name)
+          ;; If #+immobile-symbols, then uninterned symbols go in dynamic space, but
+          ;; interned symbols go in immobile space. Good luck IMPORTing an uninterned symbol-
+          ;; it'll work at least superficially, but if used as a code constant, the symbol's
+          ;; address may violate the assumption that it's an imm32 operand.
+          #+immobile-symbols
+          (if (eql ,kind 0) (sb-vm::%alloc-symbol ,name) (sb-vm::%alloc-immobile-symbol ,name))
+          #+(and immobile-space (not immobile-symbols))
+          (if (or (eql ,kind 1) ; keyword
+                  (and (eql ,kind 2) ; random interned symbol
+                       (plusp (length ,name))
+                       (char= (char ,name 0) #\*)
+                       (char= (char ,name (1- (length ,name))) #\*)))
+              (sb-vm::%alloc-immobile-symbol ,name)
+              (sb-vm::%alloc-symbol ,name))))
