@@ -289,7 +289,7 @@
 
 #+permgen
 (progn
-(defun sb-impl::allocate-permgen-symbol (name)
+(defun allocate-permgen-symbol (name)
   (with-system-mutex (*allocator-mutex* :without-gcing t)
     (let ((freeptr *permgen-space-free-pointer*))
       (setf *permgen-space-free-pointer*
