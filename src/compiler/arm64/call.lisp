@@ -653,15 +653,15 @@
     (move result null-tn)
     (inst cbz count DONE)
 
-    (let ((dx-p (node-stack-allocate-p node))
-          (leave-pa (gen-label)))
-      (pseudo-atomic (lr :sync nil :elide-if dx-p)
+    (pseudo-atomic (lr :sync nil :elide-if (node-stack-allocate-p node))
+      (assemble ()
         ;; Allocate a cons (2 words) for each item.
-        (let ((size (cond (dx-p
-                           (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
-                          (t
-                           (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
-                           temp))))
+        (let* ((dx-p (node-stack-allocate-p node))
+               (size (cond (dx-p
+                            (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
+                           (t
+                            (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
+                            temp))))
           (allocation 'list size list-pointer-lowtag dst
                       :flag-tn lr
                       :stack-allocate-p dx-p
@@ -671,7 +671,7 @@
                         (inst mov tmp-tn context)
                         (invoke-asm-routine (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest) lr)
                         (inst mov result tmp-tn)
-                        (inst b leave-pa))))
+                        (inst b ALLOC-DONE))))
         (move result dst)
 
         (inst b ENTER)
@@ -693,7 +693,7 @@
 
         ;; NIL out the last cons.
         (storew null-tn dst 1 list-pointer-lowtag)
-        (emit-label LEAVE-PA)))
+        ALLOC-DONE))
     DONE))
 
 ;;; Return the location and size of the more arg glob created by

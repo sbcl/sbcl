@@ -66,8 +66,6 @@
     ;; This code has to pathological cases: NO-TLS-VALUE-MARKER
     ;; or UNBOUND-MARKER as NEW: in either case we would end up
     ;; doing possible damage with CMPXCHG -- so don't do that!
-    (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol))
-          (check (gen-label)))
       (move eax old)
       #+sb-thread
       (progn
@@ -82,10 +80,10 @@
                              :disp (- (* symbol-value-slot n-word-bytes)
                                       other-pointer-lowtag))
             new :lock)
-      (emit-label check)
+      CHECK
       (move result eax)
       (inst cmp result unbound-marker-widetag)
-      (inst jmp :e unbound))))
+      (inst jmp :e (generate-error-code vop 'unbound-symbol-error symbol))))
 
 (define-vop (%set-symbol-global-value cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
@@ -115,17 +113,15 @@
            (value :scs (descriptor-reg any-reg)))
     (:temporary (:sc descriptor-reg) tls)
     (:generator 4
-      (let ((global-val (gen-label))
-            (done (gen-label)))
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base tls :base-already-live-p t)
           (inst cmp EA no-tls-value-marker :maybe-fs)
           (inst jmp :z global-val)
           (inst mov EA value :maybe-fs))
         (inst jmp done)
-        (emit-label global-val)
+        GLOBAL-VAL
         (storew value symbol symbol-value-slot other-pointer-lowtag)
-        (emit-label done))))
+        DONE))
 
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
@@ -136,19 +132,15 @@
     (:vop-var vop)
     (:save-p :compute-only)
     (:generator 9
-      (let* ((check-unbound-label (gen-label))
-             (err-lab (generate-error-code vop 'unbound-symbol-error object))
-             (ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base value :base-already-live-p t)
           (inst mov value EA :maybe-fs))
         (inst cmp value no-tls-value-marker)
         (inst jmp :ne check-unbound-label)
         (loadw value object symbol-value-slot other-pointer-lowtag)
-        (emit-label check-unbound-label)
+        CHECK-UNBOUND-LABEL
         (inst cmp value unbound-marker-widetag)
-        (inst jmp :e err-lab)
-        (emit-label ret-lab))))
+        (inst jmp :e (generate-error-code vop 'unbound-symbol-error object))))
 
   (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
@@ -159,14 +151,13 @@
     (:policy :fast)
     (:translate symbol-value)
     (:generator 8
-      (let ((ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
         (with-tls-ea (EA :base value :base-already-live-p t)
           (inst mov value EA :maybe-fs))
         (inst cmp value no-tls-value-marker)
-        (inst jmp :ne ret-lab)
+        (inst jmp :ne done)
         (loadw value object symbol-value-slot other-pointer-lowtag)
-        (emit-label ret-lab)))))
+        DONE)))
 
 #-sb-thread
 (progn
@@ -184,15 +175,14 @@
   (:conditional :ne)
   (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
   (:generator 9
-    (let ((check-unbound-label (gen-label)))
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (with-tls-ea (EA :base value :base-already-live-p t)
         (inst mov value EA :maybe-fs))
       (inst cmp value no-tls-value-marker)
       (inst jmp :ne check-unbound-label)
       (loadw value object symbol-value-slot other-pointer-lowtag)
-      (emit-label check-unbound-label)
-      (inst cmp value unbound-marker-widetag))))
+      CHECK-UNBOUND-LABEL
+      (inst cmp value unbound-marker-widetag)))
 
 #-sb-thread
 (define-vop (boundp)

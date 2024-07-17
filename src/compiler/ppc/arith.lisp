@@ -1088,12 +1088,11 @@
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (let ((done (gen-label)))
       (inst cmpwi digit 0)
       (move result null-tn)
       (inst blt done)
       (load-symbol result t)
-      (emit-label done))))
+      DONE))
 
 (define-vop (add-w/carry)
   (:translate sb-bignum:%add-with-carry)

@@ -305,20 +305,18 @@
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
   (:generator 30
-    (let ((loop (gen-label))
-          (test (gen-label)))
       (move shift arg)
       (inst bgez shift test)
       (zeroize res)
       (inst b test)
       (inst nor shift shift)
 
-      (emit-label loop)
+      LOOP
       (inst addu res (fixnumize 1))
 
-      (emit-label test)
+      TEST
       (inst bne shift loop)
-      (inst srl shift 1))))
+      (inst srl shift 1)))
 
 (define-vop (unsigned-byte-32-count)
   (:translate logcount)
@@ -739,22 +737,20 @@
   (:result-types unsigned-num positive-fixnum)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 5
-    (let ((carry-in (gen-label))
-          (done (gen-label)))
       (inst bne c carry-in)
       (inst addu res a b)
 
       (inst b done)
       (inst sltu carry res b)
 
-      (emit-label carry-in)
+      CARRY-IN
       (inst addu res 1)
       (inst nor temp a zero-tn)
       (inst sltu carry b temp)
       (inst xor carry 1)
 
-      (emit-label done)
-      (move result res))))
+      DONE
+      (move result res)))
 
 (define-vop (sub-w/borrow)
   (:translate sb-bignum:%subtract-with-borrow)
@@ -768,9 +764,6 @@
             (borrow :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
-    (let ((no-borrow-in (gen-label))
-          (done (gen-label)))
-
       (inst bne c no-borrow-in)
       (inst subu res a b)
 
@@ -778,12 +771,12 @@
       (inst b done)
       (inst sltu borrow b a)
 
-      (emit-label no-borrow-in)
+      NO-BORROW-IN
       (inst sltu borrow a b)
       (inst xor borrow 1)
 
-      (emit-label done)
-      (move result res))))
+      DONE
+      (move result res)))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)

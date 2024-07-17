@@ -25,13 +25,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 50
-    (let ((done (gen-label))
-          (loop (gen-label))
-          (not-list (gen-label)))
       (move ptr object)
       (inst eor count count count)
 
-      (emit-label loop)
+      LOOP
 
       (inst cmp ptr null-tn)
       (inst b :eq done)
@@ -42,9 +39,9 @@
       (inst add count count (fixnumize 1))
       (test-type ptr temp loop nil (list-pointer-lowtag))
 
-      (emit-label not-list)
+      NOT-LIST
 
       (error-call vop 'object-not-list-error ptr)
 
-      (emit-label done)
-      (move result count))))
+      DONE
+      (move result count)))

@@ -1324,7 +1324,7 @@
                           'call (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest)
                           node)
                          (inst pop result)
-                         (inst jmp leave-pa))))
+                         (inst jmp alloc-done))))
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
@@ -1346,7 +1346,7 @@
        (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
        (inst inc rcx) ; :QWORD because it's a signed number
        (inst jmp :nz loop)
-       LEAVE-PA)
+       ALLOC-DONE)
     DONE))
 
 ;;; Return the location and size of the &MORE arg glob created by

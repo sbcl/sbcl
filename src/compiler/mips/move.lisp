@@ -145,13 +145,12 @@
   (:note "integer to untagged word coercion")
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 3
-    (let ((done (gen-label)))
-      (inst and temp x fixnum-tag-mask)
-      (inst beq temp done)
-      (inst sra y x n-fixnum-tag-bits)
+    (inst and temp x fixnum-tag-mask)
+    (inst beq temp done)
+    (inst sra y x n-fixnum-tag-bits)
 
-      (loadw y x bignum-digits-offset other-pointer-lowtag)
-      (emit-label done))))
+    (loadw y x bignum-digits-offset other-pointer-lowtag)
+    DONE))
 ;;;
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))

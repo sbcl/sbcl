@@ -897,10 +897,7 @@
     (:temporary (:sc descriptor-reg) tail next limit)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:generator 20
-      (let ((size (calc-size-in-bytes length tail))
-            (entry (gen-label))
-            (loop (gen-label))
-            (leave-pa (gen-label)))
+      (let ((size (calc-size-in-bytes length tail)))
         (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
          (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
@@ -912,13 +909,13 @@
                        (invoke-asm-routine
                         'call (if (system-tlab-p 0 node) 'sys-make-list 'make-list) node)
                        (inst pop result)
-                       (inst jmp leave-pa)))
+                       (inst jmp alloc-done)))
          (compute-end)
          (inst mov next result)
          (inst jmp entry)
-         (emit-label LOOP)
+         LOOP
          (storew next tail cons-cdr-slot list-pointer-lowtag)
-         (emit-label ENTRY)
+         ENTRY
          (inst mov tail next)
          (inst add next (* 2 n-word-bytes))
          (storew element tail cons-car-slot list-pointer-lowtag)
@@ -926,7 +923,7 @@
          (inst jmp :ne loop)
          ;; still pseudo-atomic
          (storew nil-value tail cons-cdr-slot list-pointer-lowtag)
-         (emit-label leave-pa)))
+         ALLOC-DONE))
       done))) ; label needed by calc-size-in-bytes
 
 (define-vop (make-fdefn)

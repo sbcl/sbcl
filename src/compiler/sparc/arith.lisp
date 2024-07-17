@@ -365,7 +365,6 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 5
-    (let ((done (gen-label)))
       (inst cmp amount)
       (inst b :ge done)
       ;; The result-type assures us that this shift will not
@@ -381,7 +380,7 @@
             (inst b :le done)
             (inst sra result number ndesc)
             (inst sra result number 31)))
-      (emit-label done))))
+      DONE))
 
 (define-vop (fast-ash-c/signed=>signed)
   (:note "inline constant ASH")
@@ -409,7 +408,6 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 5
-    (let ((done (gen-label)))
       (inst cmp amount)
       (inst b :ge done)
       ;; The result-type assures us that this shift will not
@@ -425,7 +423,7 @@
             (inst b :lt done)
             (inst srl result number ndesc)
             (move result zero-tn)))
-      (emit-label done))))
+      DONE))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
   (:note "inline constant ASH")
@@ -513,21 +511,19 @@
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
   (:generator 30
-    (let ((loop (gen-label))
-          (test (gen-label)))
       (inst addcc shift zero-tn arg)
       (inst b :ge test)
       (move res zero-tn)
       (inst b test)
       (inst not shift)
 
-      (emit-label loop)
+      LOOP
       (inst add res (fixnumize 1))
 
-      (emit-label test)
+      TEST
       (inst cmp shift)
       (inst b :ne loop)
-      (inst srl shift 1))))
+      (inst srl shift 1)))
 
 (define-vop (unsigned-byte-32-count)
   (:translate logcount)
@@ -851,12 +847,11 @@
   (:results (result :scs (descriptor-reg)))
   (:guard (not (member :sparc-v9 *backend-subfeatures*)))
   (:generator 3
-    (let ((done (gen-label)))
       (inst cmp digit)
       (inst b :lt done)
       (move result null-tn)
       (load-symbol result t)
-      (emit-label done))))
+      DONE))
 
 (define-vop (v9-digit-0-or-plus-cmove)
   (:translate sb-bignum:%digit-0-or-plusp)

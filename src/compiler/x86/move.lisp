@@ -200,19 +200,18 @@
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
      (aver (not (location= x y)))
-     (let ((done (gen-label)))
-       (inst imul y x (ash 1 n-fixnum-tag-bits))
-       (inst jmp :no done)
-       (inst mov y x)
-       (inst call (make-fixup (ecase (tn-offset y)
-                                (#.eax-offset 'alloc-signed-bignum-in-eax)
-                                (#.ebx-offset 'alloc-signed-bignum-in-ebx)
-                                (#.ecx-offset 'alloc-signed-bignum-in-ecx)
-                                (#.edx-offset 'alloc-signed-bignum-in-edx)
-                                (#.esi-offset 'alloc-signed-bignum-in-esi)
-                                (#.edi-offset 'alloc-signed-bignum-in-edi))
-                              :assembly-routine))
-       (emit-label done))))
+     (inst imul y x (ash 1 n-fixnum-tag-bits))
+     (inst jmp :no done)
+     (inst mov y x)
+     (inst call (make-fixup (ecase (tn-offset y)
+                              (#.eax-offset 'alloc-signed-bignum-in-eax)
+                              (#.ebx-offset 'alloc-signed-bignum-in-ebx)
+                              (#.ecx-offset 'alloc-signed-bignum-in-ecx)
+                              (#.edx-offset 'alloc-signed-bignum-in-edx)
+                              (#.esi-offset 'alloc-signed-bignum-in-esi)
+                              (#.edi-offset 'alloc-signed-bignum-in-edi))
+                            :assembly-routine))
+     DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
@@ -242,25 +241,24 @@
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
     (aver (not (location= x y)))
-    (let ((done (gen-label)))
-      ;; The assembly routines test the sign flag from this one, so if
-      ;; you change stuff here, make sure the sign flag doesn't get
-      ;; overwritten before the CALL!
-      (inst test x #.(ash lowtag-mask n-positive-fixnum-bits))
-      ;; Faster but bigger then SHL Y 2. The cost of doing this speculatively
-      ;; is noise compared to bignum consing if that is needed.
-      (inst lea y (make-ea :dword :index x :scale (ash 1 n-fixnum-tag-bits)))
-      (inst jmp :z done)
-      (inst mov y x)
-      (inst call (make-fixup (ecase (tn-offset y)
-                               (#.eax-offset 'alloc-unsigned-bignum-in-eax)
-                               (#.ebx-offset 'alloc-unsigned-bignum-in-ebx)
-                               (#.ecx-offset 'alloc-unsigned-bignum-in-ecx)
-                               (#.edx-offset 'alloc-unsigned-bignum-in-edx)
-                               (#.edi-offset 'alloc-unsigned-bignum-in-edi)
-                               (#.esi-offset 'alloc-unsigned-bignum-in-esi))
-                             :assembly-routine))
-      (emit-label done))))
+    ;; The assembly routines test the sign flag from this one, so if
+    ;; you change stuff here, make sure the sign flag doesn't get
+    ;; overwritten before the CALL!
+    (inst test x #.(ash lowtag-mask n-positive-fixnum-bits))
+    ;; Faster but bigger then SHL Y 2. The cost of doing this speculatively
+    ;; is noise compared to bignum consing if that is needed.
+    (inst lea y (make-ea :dword :index x :scale (ash 1 n-fixnum-tag-bits)))
+    (inst jmp :z done)
+    (inst mov y x)
+    (inst call (make-fixup (ecase (tn-offset y)
+                             (#.eax-offset 'alloc-unsigned-bignum-in-eax)
+                             (#.ebx-offset 'alloc-unsigned-bignum-in-ebx)
+                             (#.ecx-offset 'alloc-unsigned-bignum-in-ecx)
+                             (#.edx-offset 'alloc-unsigned-bignum-in-edx)
+                             (#.edi-offset 'alloc-unsigned-bignum-in-edi)
+                             (#.esi-offset 'alloc-unsigned-bignum-in-esi))
+                           :assembly-routine))
+    DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
