@@ -394,6 +394,19 @@ void create_main_lisp_thread(lispobj function) {
     ASSIGN_CURRENT_THREAD(NULL);
 }
 
+void sb_posix_after_fork() { // for use by sb-posix:fork
+    struct thread* th = get_sb_vm_thread();
+    th->os_kernel_tid = get_nonzero_tid();
+#ifdef LISP_FEATURE_DARWIN
+    extern void darwin_reinit();
+    darwin_reinit();
+#endif
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    extern void thread_pool_init();
+    thread_pool_init();
+#endif
+}
+
 #ifdef LISP_FEATURE_SB_THREAD
 
 void free_thread_struct(struct thread *th)
@@ -804,19 +817,6 @@ static void detach_os_thread(init_thread_data *scribble)
     put_recyclebin_item(th);
 #ifndef LISP_FEATURE_WIN32 // native threads have no signal mask
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
-#endif
-}
-
-void sb_posix_after_fork() { // for use by sb-posix:fork
-    struct thread* th = get_sb_vm_thread();
-    th->os_kernel_tid = get_nonzero_tid();
-#ifdef LISP_FEATURE_DARWIN
-    extern void darwin_reinit();
-    darwin_reinit();
-#endif
-#ifdef LISP_FEATURE_MARK_REGION_GC
-    extern void thread_pool_init();
-    thread_pool_init();
 #endif
 }
 
