@@ -1297,11 +1297,17 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
+#|
+    ;; TODO: if instrumenting, just revert to the older way of precomputing
+    ;; a size rather than scaling by 8 in ALLOCATION so that we don't have
+    ;; to scale and unscale.
     ;; Compute the number of bytes to allocate
     (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
       (if (location= count rcx)
           (inst shl :dword rcx shift)
           (inst lea :dword rcx (ea nil count (ash 1 shift)))))
+|#
+    (move rcx count :dword)
     ;; Setup for the CDR of the last cons (or the entire result) being NIL.
     (inst mov result nil-value)
     (cond ((not (member :allocation-size-histogram sb-xc:*features*))
@@ -1309,13 +1315,22 @@
           (t ; jumps too far for JRCXZ sometimes
            (inst test rcx rcx)
            (inst jmp :z done)))
-    (unless (node-stack-allocate-p node)
-      (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
+    (when (and (not (node-stack-allocate-p node)) (instrument-alloc-policy-p node))
+      (inst shl :dword rcx word-shift) ; compute byte count
+      (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn)
+      (inst shr :dword rcx word-shift)) ; undo the computation
     (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
-       (if (node-stack-allocate-p node)
-           (stack-allocation rcx 0 dst)
-           (allocation +cons-primtype+ rcx 0 dst node value thread-tn
+      (let ((scale
+             (cond ((node-stack-allocate-p node)
+                    ;; LEA on RSP would be ok but we'd need to negate RCX first, then un-negate
+                    ;; to compute the final cons, then negate again. So use SHL and SUB instead.
+                    (inst shl :dword rcx word-shift)
+                    (stack-allocation rcx 0 dst)
+                    1)
+                   (t
+                    (allocation +cons-primtype+ rcx 0 dst node value thread-tn
+                       :scale 8
                        :overflow
                        (lambda ()
                          (inst push rcx)
@@ -1324,13 +1339,16 @@
                           'call (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest)
                           node)
                          (inst pop result)
-                         (inst jmp alloc-done))))
+                         (inst jmp alloc-done)))
+                    8))))
        ;; Recalculate DST as a tagged pointer to the last cons
-       (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
-       (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells
+       (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx scale))
+       ;; scale=8 implies RCX counts ncells (as a fixnum) therefore just untag it.
+       ;; scale=1 implies RCX counts nbytes therefore ncells = RCX/16
+       (inst shr :dword rcx (if (= scale 8) n-fixnum-tag-bits (1+ word-shift))))
        ;; The rightmost arguments are at lower addresses.
        ;; Start by indexing the last argument
-       (inst neg rcx) ; :QWORD because it's a signed number
+       (inst neg rcx) ; :QWORD because it's negative
        LOOP
        ;; Grab one value and store into this cons. Use RCX as an index into the
        ;; vector of values in CONTEXT, but add 8 because CONTEXT points exactly at
@@ -1344,7 +1362,7 @@
        (storew value dst cons-car-slot list-pointer-lowtag)
        (inst mov result dst) ; preserve the value to put in the CDR of the preceding cons
        (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
-       (inst inc rcx) ; :QWORD because it's a signed number
+       (inst inc rcx) ; :QWORD because it's negative
        (inst jmp :nz loop)
        ALLOC-DONE)
     DONE))

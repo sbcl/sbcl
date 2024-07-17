@@ -52,6 +52,9 @@
   (aver (= thread-tot-bytes-alloc-unboxed-slot
            (1+ thread-tot-bytes-alloc-boxed-slot))))
 
+(defun instrument-alloc-policy-p (node)
+  (policy node (> sb-c::instrument-consing 1)))
+
 ;;; Emit counter increments for SB-APROF. SCRATCH-REGISTERS is either a TN
 ;;; or list of TNs that can be used to store into the profiling data.
 ;;; We pick one of the available TNs to use for addressing the data buffer.
@@ -134,7 +137,7 @@
                      size)
                (inst inc :qword (thread-slot-ea (+ thread-allocator-histogram-slot
                                                    n-histogram-bins-small index))))))))
-  (when (policy node (> sb-c::instrument-consing 1))
+  (when (instrument-alloc-policy-p node)
     (when (tn-p size)
       (aver (not (location= size temp))))
     ;; CAUTION: the logic for RAX-SAVE is entirely untested
@@ -199,7 +202,7 @@
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
 (defun allocation (type size lowtag alloc-tn node temp thread-temp
-                   &key overflow
+                   &key scale overflow
                         (systemp (system-tlab-p type node)))
   (declare (ignorable thread-temp))
   (flet ((fallback (size)
@@ -261,7 +264,7 @@
              (inst mov alloc-tn free-pointer)
              (cond (temp
                     (when (tn-p size) (aver (not (location= size temp))))
-                    (inst lea temp (ea size alloc-tn))
+                    (inst lea temp (if scale (ea alloc-tn size scale) (ea size alloc-tn)))
                     (inst cmp temp end-addr)
                     (inst jmp :a NOT-INLINE)
                     (inst mov free-pointer temp)
@@ -836,6 +839,11 @@
                            (ea nil ,length
                                (ash 1 (1+ (- word-shift n-fixnum-tag-bits)))))
                      ,answer)))
+           (test-for-empty-list (length)
+             `(progn (inst mov result nil-value)
+                     (inst test ,length ,length)
+                     (inst jmp :z done)
+                     ,length))
            (compute-end ()
              `(let ((size (cond ((typep size '(or (signed-byte 32) tn))
                                  size)
@@ -897,20 +905,27 @@
     (:temporary (:sc descriptor-reg) tail next limit)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:generator 20
-      (let ((size (calc-size-in-bytes length tail)))
+      (multiple-value-bind (size scale)
+          ;; Multiply by 8 in ALLOCATION, not here, if possible.
+          (if (and (sc-is length any-reg) (not (instrument-alloc-policy-p node)))
+              (values (test-for-empty-list length) 8)
+              (values (calc-size-in-bytes length tail) nil))
         (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
          (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
+                     :scale scale
                      :overflow
                      (lambda ()
                        ;; Push C call args right-to-left
-                       (inst push (if (integerp size) (constantize size) size))
+                       (inst push (if (integerp size)
+                                      (constantize (fixnumize (tn-value length)))
+                                      length))
                        (inst push (if (sc-is element immediate) (tn-value element) element))
                        (invoke-asm-routine
                         'call (if (system-tlab-p 0 node) 'sys-make-list 'make-list) node)
                        (inst pop result)
                        (inst jmp alloc-done)))
-         (compute-end)
+         (if scale (inst lea limit (ea result length 8)) (compute-end))
          (inst mov next result)
          (inst jmp entry)
          LOOP
