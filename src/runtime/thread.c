@@ -807,6 +807,19 @@ static void detach_os_thread(init_thread_data *scribble)
 #endif
 }
 
+void sb_posix_after_fork() { // for use by sb-posix:fork
+    struct thread* th = get_sb_vm_thread();
+    th->os_kernel_tid = get_nonzero_tid();
+#ifdef LISP_FEATURE_DARWIN
+    extern void darwin_reinit();
+    darwin_reinit();
+#endif
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    extern void thread_pool_init();
+    thread_pool_init();
+#endif
+}
+
 #if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
 extern void funcall_alien_callback(lispobj arg1, lispobj arg2, lispobj arg0,
                                    struct thread* thread)

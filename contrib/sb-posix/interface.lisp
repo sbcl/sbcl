@@ -356,8 +356,6 @@
 
   ;; FIXME this is a lie, of course this can fail, but there's no
   ;; error handling here yet!
-  #+darwin
-  (define-call "darwin_reinit" void never-fails)
   (define-call ("posix_fork" :c-name "fork") pid-t minusp)
   (defun fork ()
     "Forks the current process, returning 0 in the new process and the PID of
@@ -391,8 +389,7 @@ not supported."
       (error "Cannot fork with multiple threads running."))
     (let ((pid (posix-fork)))
       (when (= pid 0) ; child
-        #+darwin (darwin-reinit)
-        #+mark-region-gc (alien-funcall (extern-alien "thread_pool_init" (function void))))
+        (alien-funcall (extern-alien "sb_posix_after_fork" (function void))))
       #+sb-thread (sb-impl::finalizer-thread-start)
       pid))
   (export 'fork :sb-posix)
