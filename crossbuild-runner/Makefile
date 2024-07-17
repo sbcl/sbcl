@@ -24,10 +24,10 @@ obj/xbuild/arm64-reloc/xc.core: $(DEPS1)
 obj/xbuild/arm64-reloc.core: obj/xbuild/arm64-reloc/xc.core
 	$(SBCL) $(ARGS) arm64-reloc < $(SCRIPT2)
 
-obj/xbuild/arm64-immobile/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) arm64-immobile arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :IMMOBILE-SPACE)" < $(SCRIPT1)
-obj/xbuild/arm64-immobile.core: obj/xbuild/arm64-immobile/xc.core
-	$(SBCL) $(ARGS) arm64-immobile < $(SCRIPT2)
+obj/xbuild/arm64-immobile-space/xc.core: $(DEPS1)
+	$(SBCL) $(ARGS) arm64-immobile-space arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :IMMOBILE-SPACE)" < $(SCRIPT1)
+obj/xbuild/arm64-immobile-space.core: obj/xbuild/arm64-immobile-space/xc.core
+	$(SBCL) $(ARGS) arm64-immobile-space < $(SCRIPT2)
 
 obj/xbuild/mips/xc.core: $(DEPS1)
 	$(SBCL) $(ARGS) mips mips "(:UNIX :LINUX :ELF :LARGEFILE :LITTLE-ENDIAN)" < $(SCRIPT1)
