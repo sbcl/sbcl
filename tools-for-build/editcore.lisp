@@ -141,10 +141,7 @@
   (enable-pie nil)
   (dstate (make-dstate nil) :read-only t)
   (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
-                      :virtual-location 0) :read-only t)
-  (call-inst nil :read-only t)
-  (jmp-inst nil :read-only t)
-  (pop-inst nil :read-only t))
+                      :virtual-location 0) :read-only t))
 
 (defglobal *editcore-ppd*
   ;; copy no entries for macros/special-operators (flet, etc)
