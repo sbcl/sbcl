@@ -1166,8 +1166,8 @@
                                  (aref *numeric-aspects-v*
                                        (!compute-numtype-aspect-id :real 'integer nil)))))
                    (return-from csubtypep
-                     (values (and (>= (truly-the fixnum l1) (truly-the fixnum l2))
-                                  (<= (truly-the fixnum h1) (truly-the fixnum h2)))
+                     (values (and (>= (truly-the sb-xc:fixnum l1) (truly-the sb-xc:fixnum l2))
+                                  (<= (truly-the sb-xc:fixnum h1) (truly-the sb-xc:fixnum h2)))
                              t)))))))
          (memoize
           (invoke-type-method :simple-subtypep :complex-subtypep-arg2
