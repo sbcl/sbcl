@@ -139,7 +139,7 @@
                (t
                 (inst addi ea index (- (ash vector-data-offset word-shift) other-pointer-lowtag))
                 (inst add ea object ea)))
-         (emit-gengc-barrier object ea (list t1) (vop-nth-arg 2 vop) value)
+         (emit-gengc-barrier object ea (list t1) (vop-nth-arg 2 vop))
          (inst std value ea 0)))
     `(define-vop (,(symbolicate "DATA-VECTOR-SET/" (string type))
                   ,(symbolicate (string variant) "-SET"))

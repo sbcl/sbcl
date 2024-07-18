@@ -30,7 +30,7 @@
   (:vop-var vop)
   (:generator 1
     (without-scheduling ()
-      (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value name)
+      (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) name)
       (storew value object offset lowtag))))
 
 ;;;; Symbol hacking VOPs:

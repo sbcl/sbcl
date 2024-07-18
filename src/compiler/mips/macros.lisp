@@ -295,7 +295,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:generator 2
          ,@(if (member name '(instance-index-set %closure-index-set))
                `((without-scheduling ()
-                   (emit-gengc-barrier object nil temp (vop-nth-arg 2 vop) value)
+                   (emit-gengc-barrier object nil temp (vop-nth-arg 2 vop))
                    (inst addu temp object index)
                    (storew value temp ,offset ,lowtag)))
                `((inst addu temp object index)
@@ -316,7 +316,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:generator 1
          ,@(if (member name '(instance-index-set %closure-index-set))
                `((without-scheduling ()
-                   (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value)
+                   (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop))
                    (storew value object (+ ,offset index) ,lowtag)))
                `((storew value object (+ ,offset index) ,lowtag)))))))
 

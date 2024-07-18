@@ -67,7 +67,7 @@
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:vop-var vop)
   (:generator 1
-    (emit-gengc-barrier object nil (list t1) (vop-nth-arg 1 vop) value name)
+    (emit-gengc-barrier object nil (list t1) (vop-nth-arg 1 vop) name)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -80,7 +80,7 @@
   (:results (result :scs (descriptor-reg) :from :load))
   (:vop-var vop)
   (:generator 5
-    (emit-gengc-barrier object nil (list temp) (vop-nth-arg 2 vop) new)
+    (emit-gengc-barrier object nil (list temp) (vop-nth-arg 2 vop))
     (inst sync)
     (inst li temp (- (* offset n-word-bytes) lowtag))
     LOOP
@@ -105,7 +105,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
-    (emit-gengc-barrier symbol nil (list temp) (vop-nth-arg 2 vop) new)
+    (emit-gengc-barrier symbol nil (list temp) (vop-nth-arg 2 vop))
     (inst sync)
     (load-tls-index temp symbol)
     ;; Thread-local area, no synchronization needed.
@@ -189,7 +189,7 @@
     (inst stdx value thread-base-tn tls-slot)
     (inst b DONE)
     GLOBAL-VALUE
-    (emit-gengc-barrier symbol nil (list tls-slot) (vop-nth-arg 1 vop) value)
+    (emit-gengc-barrier symbol nil (list tls-slot) (vop-nth-arg 1 vop))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     DONE))
 

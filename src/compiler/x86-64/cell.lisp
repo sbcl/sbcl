@@ -60,7 +60,7 @@
           (t
            (if (eq name '%set-symbol-global-value)
                (emit-symbol-write-barrier vop object val-temp (vop-nth-arg 1 vop) value)
-               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value name))
+               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) name))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
 (defun add-symbol-to-remset (vop symbol)
@@ -85,7 +85,7 @@
   (:generator 5
      (when (member name '(cas-symbol-fdefn sb-impl::cas-symbol-%info))
        (add-symbol-to-remset vop object))
-     (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop) new)
+     (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop))
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
      (move result rax)))
@@ -104,7 +104,7 @@
   ;; IMMEDIATE sc means that the symbol is static or immobile.
   ;; Static symbols are roots, and immobile symbols use page fault handling.
   (unless (sc-is symbol immediate)
-    (emit-gengc-barrier symbol nil temp newval-tn-ref newval)))
+    (emit-gengc-barrier symbol nil temp newval-tn-ref)))
 
 (define-vop (%set-symbol-global-value)
   (:args (symbol :scs (descriptor-reg immediate))
@@ -783,7 +783,7 @@
              (scs (and prim-type (sb-c::primitive-type-scs prim-type))))
         (when (and (not (singleton-p scs))
                    (member descriptor-reg-sc-number scs))
-          (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop) value))))
+          (emit-gengc-barrier object nil temp (vop-nth-arg 1 vop)))))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)

@@ -29,7 +29,7 @@
   (:results)
   (:vop-var vop)
   (:generator 1
-    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value name)
+    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) name)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -42,7 +42,7 @@
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   (:vop-var vop)
   (:generator 5
-    (emit-gengc-barrier object nil lip (vop-nth-arg 2 vop) new)
+    (emit-gengc-barrier object nil lip (vop-nth-arg 2 vop))
     (inst add-sub lip object (- (* offset n-word-bytes) lowtag))
     (cond ((member :arm-v8.1 *backend-subfeatures*)
            (move result old)
@@ -112,7 +112,7 @@
            (inst ldr (32-bit-reg tls-index) (tls-index-of object))
            (inst ldr tmp-tn (@ thread-tn tls-index))
            (no-tls-marker tmp-tn object nil LOCAL)
-           (emit-gengc-barrier object nil tls-index (vop-nth-arg 1 vop) value)
+           (emit-gengc-barrier object nil tls-index (vop-nth-arg 1 vop))
            (storew value object symbol-value-slot other-pointer-lowtag)
            (inst b DONE)
            LOCAL
@@ -264,7 +264,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
-    (emit-gengc-barrier symbol nil lip (vop-nth-arg 2 vop) new)
+    (emit-gengc-barrier symbol nil lip (vop-nth-arg 2 vop))
     (inst dsb)
     #+sb-thread
     (assemble ()
@@ -307,7 +307,7 @@
   (:vop-var vop)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
   (:generator 14
-    (emit-gengc-barrier symbol nil lip (vop-nth-arg 2 vop) new)
+    (emit-gengc-barrier symbol nil lip (vop-nth-arg 2 vop))
     #+sb-thread
     (assemble ()
       (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))

@@ -344,7 +344,7 @@
          (let ((ea (ea (- (* (+ ,offset addend) n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index))))
            ,@(when (eq type 'simple-vector)
-               '((emit-gengc-barrier object ea val-temp (vop-nth-arg 2 vop) value)))
+               '((emit-gengc-barrier object ea val-temp (vop-nth-arg 2 vop))))
            (emit-store ea value val-temp
                        ,(not (intersection '(signed-reg unsigned-reg) scs))))))
      (define-vop (,(symbolicate name "-C") dvset)
@@ -365,7 +365,7 @@
          ,@(unless (eq type 'simple-vector) '((unpoison-element object (+ index addend))))
          (let ((ea (ea (- (* (+ ,offset index addend) n-word-bytes) ,lowtag) object)))
            ,@(when (eq type 'simple-vector)
-               '((emit-gengc-barrier object ea val-temp (vop-nth-arg 1 vop) value)))
+               '((emit-gengc-barrier object ea val-temp (vop-nth-arg 1 vop))))
            (emit-store ea value val-temp
                        ,(not (intersection '(signed-reg unsigned-reg) scs)))))))))
 (defmacro def-full-data-vector-frobs (type element-type &rest scs)

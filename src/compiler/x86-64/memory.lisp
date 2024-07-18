@@ -33,15 +33,13 @@
 ;;;    be younger than the newly constructed thing.
 ;;; 2. hash-table k/v pair should mark once only.
 ;;;    (the vector elements are certainly on the same card)
-(defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref value-tn allocator)
-  #-soft-card-marks (declare (ignore object cell-address scratch-reg value-tn-ref value-tn allocator))
+(defun emit-gengc-barrier (object cell-address scratch-reg &optional value-tn-ref allocator)
+  #-soft-card-marks (declare (ignore object cell-address scratch-reg value-tn-ref allocator))
   #+soft-card-marks
   (progn
-  (when (sc-is object constant immediate)
-    (aver (symbolp (tn-value object))))
-  (multiple-value-bind (require #+debug-gc-barriers why-not)
-      (require-gengc-barrier-p object value-tn-ref value-tn allocator)
-    (cond (require
+    (when (sc-is object constant immediate)
+      (aver (symbolp (tn-value object))))
+    (cond ((require-gengc-barrier-p object value-tn-ref allocator)
            (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
                (inst lea scratch-reg cell-address)
                ;; OBJECT could be a symbol in immobile space
@@ -69,28 +67,16 @@
                          (if (integerp value)
                              (constantize value)
                              value))))))
-             (cond (value-tn
-                    (unless (and (sc-is value-tn immediate)
-                                 (typep (tn-value value-tn) '(or integer boolean)))
-                      (inst push (if (eq why-not :consecutive)
-                                     0
-                                     1))
-                      (inst push (encode object))
-                      (inst push (encode value-tn))
-
-                      (invoke-asm-routine 'call 'check-barrier sb-assem::*current-vop*)))
-                   (value-tn-ref
-                    (loop do
-                          (unless (and (sc-is (tn-ref-tn value-tn-ref) immediate)
-                                       (typep (tn-value (tn-ref-tn value-tn-ref)) '(or integer boolean)))
-                            (inst push (if (eq why-not :consecutive)
-                                           0
-                                           1))
-                            (inst push (encode object))
-                            (inst push (encode (tn-ref-tn value-tn-ref)))
-                            (invoke-asm-routine 'call 'check-barrier sb-assem::*current-vop*))
-                          (setf value-tn-ref (tn-ref-across value-tn-ref))
-                          while value-tn-ref)))))))))
+             (when value-tn-ref
+               (loop do
+                     (unless (and (sc-is (tn-ref-tn value-tn-ref) immediate)
+                                  (typep (tn-value (tn-ref-tn value-tn-ref)) '(or integer boolean)))
+                       (inst push 1)
+                       (inst push (encode object))
+                       (inst push (encode (tn-ref-tn value-tn-ref)))
+                       (invoke-asm-routine 'call 'check-barrier sb-assem::*current-vop*))
+                     (setf value-tn-ref (tn-ref-across value-tn-ref))
+                     while value-tn-ref)))))))
 
 #-soft-card-marks
 (defun emit-code-page-gengc-barrier (object scratch-reg)
@@ -129,7 +115,7 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
-    (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) value)
+    (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop))
     (let ((ea (object-slot-ea object offset lowtag)))
       (emit-store ea value val-temp))))
 

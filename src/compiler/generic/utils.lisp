@@ -326,7 +326,7 @@
 (define-load-time-global *store-barriers-potentially-emitted* 0)
 (define-load-time-global *store-barriers-emitted* 0)
 
-(defun require-gengc-barrier-p (object value-tn-ref value-tn &optional allocator)
+(defun require-gengc-barrier-p (object value-tn-ref &optional allocator)
   (incf *store-barriers-potentially-emitted*)
   ;; If OBJECT is stack-allocated, elide the barrier
   (when (stack-consed-p object)
@@ -349,7 +349,7 @@
            ;; And elide for things like (OR FIXNUM NULL)
            (let ((type (tn-ref-type tn-ref)))
              (when (or (csubtypep type #1=(specifier-type '(or character sb-xc:fixnum boolean
-                                                         #+64-bit single-float)))
+                                                            #+64-bit single-float)))
                        (let ((diff (type-difference type #1#)))
                          (and (member-type-p diff)
                               #-sb-xc-host
@@ -374,33 +374,23 @@
                             (sb-c::primitive-type-scs prim-type))))
              (or (singleton-p scs)
                  (not (member descriptor-reg-sc-number scs))))))
-    (cond (value-tn
-           (unless (eq (tn-ref-tn value-tn-ref) value-tn)
-             (aver (eq (tn-ref-load-tn value-tn-ref) value-tn)))
-           (unless (potential-heap-pointer-p value-tn value-tn-ref)
-             (return-from require-gengc-barrier-p nil)))
-          (value-tn-ref ; a list of refs linked through TN-REF-ACROSS
-           ;; (presumably from INSTANCE-SET-MULTIPLE)
-           (let ((any-pointer
-                  (do ((ref value-tn-ref (tn-ref-across ref)))
-                      ((null ref))
-                    (when (potential-heap-pointer-p (tn-ref-tn ref) ref)
-                      (return t)))))
-             (unless any-pointer
-               (return-from require-gengc-barrier-p nil)))))
-    (let (why)
-      (cond ((and value-tn
-                  value-tn-ref
-                  ;; Can this TN be boxed after the allocator?
-                  (boxed-tn-p value-tn)
-                  (or (eq allocator :allocator)
-                      (setf why
-                            (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop value-tn-ref))
-                                                  (vop-arg-position value-tn-ref (tn-ref-vop value-tn-ref))))))
-             (values nil why))
-            (t
-             (incf *store-barriers-emitted*)
-             t)))))
+    (when value-tn-ref
+      (let ((any-pointer
+              (do ((ref value-tn-ref (tn-ref-across ref)))
+                  ((null ref))
+                (let ((tn (tn-ref-tn ref)))
+                  (when (and (potential-heap-pointer-p tn ref)
+                             (not (and ;; Can this TN be boxed after the allocator?
+                                   (boxed-tn-p tn)
+                                   (or (eq allocator :allocator)
+                                       (and (neq (vop-name (tn-ref-vop ref)) 'instance-set-multiple)
+                                            (sb-c::set-slot-old-p (sb-c::vop-node (tn-ref-vop ref))
+                                                                  (vop-arg-position value-tn-ref (tn-ref-vop ref))))))))
+                    (return t))))))
+        (unless any-pointer
+          (return-from require-gengc-barrier-p nil))))
+    (incf *store-barriers-emitted*)
+    t))
 
 (defun vop-nth-arg (n vop)
   (let ((ref (vop-args vop)))

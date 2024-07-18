@@ -12,51 +12,39 @@
 
 (in-package "SB-VM")
 
-(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref value-tn allocator)
-  (multiple-value-bind (require #+debug-gc-barriers why-not)
-      (or (eq value-tn-ref t)
-          (require-gengc-barrier-p object value-tn-ref value-tn allocator))
-    (cond (require
-           (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
-           (inst strb zr-tn (@ cardtable-tn temp)))
-          #+debug-gc-barriers
-          (t
-           (labels ((encode (x)
-                      (cond ((integerp x)
-                             (inst mov temp (fixnumize x))
-                             temp)
-                            (t
-                             (sc-case x
-                               (constant
-                                (load-constant nil x temp)
-                                temp)
-                               (control-stack
-                                (load-stack-tn temp x)
-                                temp)
-                               (t
-                                x)))))
-                    (stack-push (x)
-                      x
-                      (inst str (encode x) (@ csp-tn n-word-bytes :post-index))))
-             (cond (value-tn
-                    (unless (sc-is value-tn immediate)
-                      (stack-push (if (eq why-not :consecutive)
-                                      zr-tn
-                                      55))
-                      (stack-push object)
-                      (stack-push value-tn)
-                      (invoke-asm-routine 'check-barrier temp)))
-                   (value-tn-ref
-                    (loop do
-                          (unless (sc-is (tn-ref-tn value-tn-ref) immediate)
-                            (stack-push (if (eq why-not :consecutive)
-                                            zr-tn
-                                            55))
-                            (stack-push object)
-                            (stack-push (tn-ref-tn value-tn-ref))
-                            (invoke-asm-routine 'check-barrier temp))
-                          (setf value-tn-ref (tn-ref-across value-tn-ref))
-                          while value-tn-ref))))))))
+(defun emit-gengc-barrier (object cell-address temp &optional value-tn-ref allocator)
+  (cond ((or (eq value-tn-ref t)
+             (require-gengc-barrier-p object value-tn-ref allocator))
+         (inst ubfm temp (or cell-address object) gencgc-card-shift (make-fixup nil :card-table-index-mask))
+         (inst strb zr-tn (@ cardtable-tn temp)))
+        #+debug-gc-barriers
+        (t
+         (labels ((encode (x)
+                    (cond ((integerp x)
+                           (inst mov temp (fixnumize x))
+                           temp)
+                          (t
+                           (sc-case x
+                             (constant
+                              (load-constant nil x temp)
+                              temp)
+                             (control-stack
+                              (load-stack-tn temp x)
+                              temp)
+                             (t
+                              x)))))
+                  (stack-push (x)
+                    x
+                    (inst str (encode x) (@ csp-tn n-word-bytes :post-index))))
+           (when value-tn-ref
+             (loop do
+                   (unless (sc-is (tn-ref-tn value-tn-ref) immediate)
+                     (stack-push 55)
+                     (stack-push object)
+                     (stack-push (tn-ref-tn value-tn-ref))
+                     (invoke-asm-routine 'check-barrier temp))
+                   (setf value-tn-ref (tn-ref-across value-tn-ref))
+                   while value-tn-ref))))))
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
@@ -76,7 +64,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 4
-    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) value)
+    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop))
     (storew value object offset lowtag)))
 
 ;;;
@@ -106,7 +94,7 @@
       ;; LOWTAG determines whether to mark the card containing the object header
       ;; (if instance-pointer-lowtag) versus element (if other-pointer-lowtag)
       (emit-gengc-barrier object (if (eq lowtag other-pointer-lowtag) lip nil)
-                          tmp-tn (vop-nth-arg 3 vop) new-value))
+                          tmp-tn (vop-nth-arg 3 vop)))
     (inst dsb)
     LOOP
     ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
@@ -143,7 +131,7 @@
     ;; just like above
     (when (sc-is new-value descriptor-reg)
       (emit-gengc-barrier object (if (eq lowtag other-pointer-lowtag) lip nil)
-                          tmp-tn (vop-nth-arg 3 vop) new-value))
+                          tmp-tn (vop-nth-arg 3 vop)))
     (move result old-value)
     (inst casal result new-value lip)))
 
