@@ -1238,10 +1238,6 @@
 (define-fop 19 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-#+arm64
-(define-fop 23 :not-host (fop-tls-index (name))
-  (ash (ensure-symbol-tls-index name) (- sb-vm:n-fixnum-tag-bits)))
-
 ;;; This FOP is only encountered in cross-compiled FASLs for cold load,
 ;;; and is a no-op except in cold load. A developer may want to load a
 ;;; cross-compiled FASL into a running system, and this FOP doesn't

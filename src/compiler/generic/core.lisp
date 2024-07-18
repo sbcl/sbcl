@@ -229,11 +229,7 @@
                          (the function (gethash (leaf-info payload)
                                                 (core-object-entry-table object))))
                         (:fdefinition (setq is-fdefn t) payload)
-                        (:known-fun (%coerce-name-to-fun payload))
-                        #+arm64
-                        (:tls-index
-                         (ash (ensure-symbol-tls-index payload)
-                              (- sb-vm:n-fixnum-tag-bits))))))))
+                        (:known-fun (%coerce-name-to-fun payload)))))))
           (declare (ignorable is-fdefn))
           (set-boxed-word index value is-fdefn)))
 

@@ -336,9 +336,7 @@
   ;;    to compute <handle>.
   ;;
   ;; as well as a few other forms of magic - see DUMP-CODE-OBJECT.
-  ;; (:constant )
   ;; (:coverage-marks )
-  ;; (:tls-index )
 
   ;; A null entry in this vector is a placeholder for implementation
   ;; overhead that is eventually stuffed in somehow.

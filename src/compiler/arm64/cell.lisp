@@ -406,16 +406,6 @@
                  n-word-bytes)))
       (inst str value (@ thread-tn tls-index))))
 
-  (defun load-time-tls-index (symbol)
-    (let ((component (component-info *component-being-compiled*)))
-      (ash (or (position-if (lambda (x)
-                              (and (typep x '(cons (eql :tls-index)))
-                                   (eq (cadr x) symbol)))
-                            (ir2-component-constants component))
-               (vector-push-extend (list :tls-index symbol)
-                                   (ir2-component-constants component)))
-           word-shift)))
-
   (defun bind (bsp symbol tls-index tls-value &optional bsp-loaded)
     (unless bsp-loaded
       (load-binding-stack-pointer bsp)
@@ -430,11 +420,13 @@
            (tls-index (if known-symbol-p
                           (make-fixup symbol :symbol-tls-index)
                           tls-index)))
-      (cond (known-symbol-p
-             (inst movz tls-index-reg tls-index))
-            (t
-             ;; TODO: a fixup could replace this with an immediate
-             (inst load-constant tls-index (load-time-tls-index symbol))))
+      (if known-symbol-p
+          (inst movz tls-index-reg tls-index) ; Definitely small-enough imm operand
+          ;; Otherwise indirect via the unboxed constant pool.
+          ;; register-inline-constant will point to the same word given
+          ;; repeated use of same symbol within a single code component.
+          (load-inline-constant tls-index `(:fixup ,symbol :symbol-tls-index)))
+
       (inst ldr tls-value (@ thread-tn tls-index))
       (inst stp tls-value tls-index-reg (if (and bsp-loaded
                                                  (neq bsp-loaded :last))

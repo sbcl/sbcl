@@ -1238,11 +1238,7 @@
                 (dump-specialized-vector (make-array (cdr entry)
                                                      :element-type '(unsigned-byte 8)
                                                      :initial-element #xFF)
-                                         fasl-output))
-               #+arm64
-               (:tls-index
-                (dump-object payload fasl-output)
-                (dump-fop 'fop-tls-index fasl-output)))))))
+                                         fasl-output)))))))
 
       ;; Dump the debug info.
       (let ((info (debug-info-for-component component)))
