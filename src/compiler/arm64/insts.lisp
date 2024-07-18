@@ -2660,7 +2660,10 @@
                                     1
                                     0)
                                 (ldb (byte 19 0)
-                                     (ash (compute-delta position) -2))
+                                ;; The cast asserts that the signed displacement
+                                ;; doesn't overflow the field.
+                                     (the (signed-byte 19)
+                                          (ash (compute-delta position) -2)))
                                 (reg-offset dest)))
             (multi-instruction-maybe-shrink (segment chooser posn magic-value)
               (declare (ignore chooser))
@@ -2707,7 +2710,8 @@
                                 #b01
                                 0
                                 (ldb (byte 19 0)
-                                     (ash (compute-delta position) -2))
+                                     (the (signed-byte 19)
+                                          (ash (compute-delta position) -2)))
                                 (reg-offset dest)))
             (multi-instruction-maybe-shrink (segment chooser posn magic-value)
               (declare (ignore chooser))
