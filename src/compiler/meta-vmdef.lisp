@@ -343,7 +343,8 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
-  (before-load :unspecified :type (or (member :unspecified) list)))
+  (before-load :unspecified :type (or (member :unspecified) list))
+  (gc-barrier nil))
 (declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
   name
@@ -371,7 +372,7 @@
 ;;; The list of slots in the structure, not including the OPERANDS slot.
 ;;; Order here is insignificant; it happens to be alphabetical.
 (defglobal vop-parse-slot-names
-    '(arg-types args before-load body conditional-p cost guard ignores info-args inherits
+    '(arg-types args before-load body conditional-p cost gc-barrier guard ignores info-args inherits
       ltn-policy more-args more-results move-args name node-var note optional-results result-types
       results save-p source-location temps translate variant variant-vars vop-var))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
@@ -1105,6 +1106,8 @@
          (setf (vop-parse-optional-results parse)
                (append (vop-parse-optional-results parse)
                        (rest spec))))
+        (:gc-barrier
+         (setf (vop-parse-gc-barrier parse) (rest spec)))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1528,7 +1531,10 @@
                     it
                     `(lambda (node) (declare (ignore node)) ,it)))
       :note ',(vop-parse-note parse)
-      :info-arg-count ,(length (vop-parse-info-args parse))
+      :info-arg-count ,(- (length (vop-parse-info-args parse))
+                          (if (vop-parse-gc-barrier parse)
+                              1
+                              0))
       :ltn-policy ',(vop-parse-ltn-policy parse)
       :save-p ',(vop-parse-save-p parse)
       :move-args ',(vop-parse-move-args parse)
@@ -1542,7 +1548,8 @@
       :variant (list ,@variant)
       :after-sc-selection
       ;; TODO: inherit it?
-      ,(make-after-sc-function parse))))
+      ,(make-after-sc-function parse)
+      :gc-barrier ',(vop-parse-gc-barrier parse))))
 
 ;;; Define the symbol NAME to be a Virtual OPeration in the compiler.
 ;;; If specified, INHERITS is the name of a VOP that we default
@@ -2058,7 +2065,10 @@
   (let* ((parse (vop-parse-or-lose name))
          (arg-count (length (vop-parse-args parse)))
          (result-count (length (vop-parse-results parse)))
-         (info-count (length (vop-parse-info-args parse)))
+         (info-count (- (length (vop-parse-info-args parse))
+                        (if (vop-parse-gc-barrier parse)
+                            1
+                            0)))
          (noperands (+ arg-count result-count info-count))
          (n-node (gensym))
          (n-block (gensym))

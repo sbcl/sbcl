@@ -39,7 +39,8 @@
   (progn
     (when (sc-is object constant immediate)
       (aver (symbolp (tn-value object))))
-    (cond ((require-gengc-barrier-p object value-tn-ref allocator)
+    (cond ((or (eq value-tn-ref t)
+               (require-gengc-barrier-p object value-tn-ref allocator))
            (if cell-address ; for SIMPLE-VECTOR, the page holding the specific element index gets marked
                (inst lea scratch-reg cell-address)
                ;; OBJECT could be a symbol in immobile space

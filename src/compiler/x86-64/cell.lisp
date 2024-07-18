@@ -35,10 +35,11 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
-  (:info name offset lowtag)
+  (:info name offset lowtag barrier)
   (:results)
   (:vop-var vop)
   (:temporary (:sc unsigned-reg) val-temp)
+  (:gc-barrier 0 1 0)
   (:generator 1
     (cond #+ubsan
           ((and (eql offset sb-vm:array-fill-pointer-slot) ; half-sized slot
@@ -58,9 +59,10 @@
              (emit-code-page-gengc-barrier object val-temp)
              (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
-           (if (eq name '%set-symbol-global-value)
-               (emit-symbol-write-barrier vop object val-temp (vop-nth-arg 1 vop) value)
-               (emit-gengc-barrier object nil val-temp (vop-nth-arg 1 vop) name))
+           (when barrier
+            (if (eq name '%set-symbol-global-value)
+                (emit-symbol-write-barrier vop object val-temp (vop-nth-arg 1 vop))
+                (emit-gengc-barrier object nil val-temp t)))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
 (defun add-symbol-to-remset (vop symbol)
@@ -98,8 +100,8 @@
   (:generator 1
     (inst mov result (unbound-marker-bits))))
 
-(defun emit-symbol-write-barrier (vop symbol temp newval-tn-ref newval)
-  (when (require-gengc-barrier-p symbol newval-tn-ref newval)
+(defun emit-symbol-write-barrier (vop symbol temp newval-tn-ref)
+  (when (require-gengc-barrier-p symbol newval-tn-ref)
     (add-symbol-to-remset vop symbol))
   ;; IMMEDIATE sc means that the symbol is static or immobile.
   ;; Static symbols are roots, and immobile symbols use page fault handling.
@@ -113,7 +115,7 @@
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
-    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop) value)
+    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop))
     (emit-store (if (sc-is symbol immediate)
                       (symbol-slot-ea (tn-value symbol) symbol-value-slot)
                       (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))
@@ -183,7 +185,7 @@
              (inst add cell thread-tn))))
     (inst cmp :qword (ea cell) no-tls-value-marker)
     (inst jmp :ne STORE)
-    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop) value)
+    (emit-symbol-write-barrier vop symbol val-temp (vop-nth-arg 1 vop))
     (get-symbol-value-slot-ea cell symbol)
     STORE
     (emit-store (ea cell) value val-temp)))
@@ -247,7 +249,7 @@
     (:policy :fast-safe)
     (:vop-var vop)
     (:generator 10
-      (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop) new)
+      (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop))
       (load-oldval)
       (inst cmpxchg :lock (if (sc-is symbol immediate)
                               (symbol-slot-ea (tn-value symbol) symbol-value-slot)
@@ -283,7 +285,7 @@
       (inst cmp :qword (ea cell) no-tls-value-marker)
       (inst jmp :ne CAS))
       ;; GLOBAL. All logic that follows is for both + and - sb-thread
-      (emit-symbol-write-barrier vop symbol cell (vop-nth-arg 2 vop) new)
+      (emit-symbol-write-barrier vop symbol cell (vop-nth-arg 2 vop))
       (get-symbol-value-slot-ea cell symbol)
       CAS
       (load-oldval)

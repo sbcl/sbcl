@@ -428,8 +428,12 @@
                (value :scs (,@scs zero)))
         (:arg-types ,type tagged-num ,el-type)
         (:vop-var vop)
+        ,@(if barrierp '((:gc-barrier 0 2)
+                         (:info barrier)))
         (:generator 2
-          ,@(if barrierp '((emit-gengc-barrier object nil tmp-tn (vop-nth-arg 2 vop))))
+          ,@(when barrierp
+              '((when barrier
+                  (emit-gengc-barrier object nil tmp-tn t))))
           (sc-case index
             (immediate
              (inst str value (@ object (load-store-offset

@@ -621,7 +621,10 @@
                      (template-more-results-type info) "results")
       (check-tn-refs (vop-temps vop) vop t 0 t "temps")
       (unless (or (= (length (vop-codegen-info vop))
-                     (template-info-arg-count info))
+                     (+ (template-info-arg-count info)
+                        (if (vop-info-gc-barrier info)
+                            1
+                            0)))
                   ;; Allow these 2 allocator vops to take an undeclared info arg
                   (member (vop-info-name info) '(sb-vm::fixed-alloc sb-vm::var-alloc))
                   ;; FIXME: The current representation for conditional

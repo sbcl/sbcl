@@ -120,6 +120,8 @@
              (type (integer 0 #.max-vop-tn-refs)
                    num-args num-results num-operands)
              (type (integer -1 #.(1- max-vop-tn-refs)) last-arg last-result))
+    (when (vop-info-gc-barrier template)
+      (setf info (append info (list (vop-info-gc-barrier template)))))
     (setf (vop-codegen-info vop) info)
 
     ;; Inputs

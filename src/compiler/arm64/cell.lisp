@@ -25,11 +25,14 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg zero)))
-  (:info name offset lowtag)
+  (:info name offset lowtag barrier)
   (:results)
   (:vop-var vop)
+  (:ignore name)
+  (:gc-barrier 0 1 0)
   (:generator 1
-    (emit-gengc-barrier object nil tmp-tn (vop-nth-arg 1 vop) name)
+    (when barrier
+      (emit-gengc-barrier object nil tmp-tn t))
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -620,36 +623,6 @@
 
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
-
-(define-vop (instance-set-multiple)
-  (:args (instance :scs (descriptor-reg))
-         (values :more t :scs (descriptor-reg any-reg)))
-  (:temporary (:sc descriptor-reg) val-temp)
-  (:info indices)
-  (:vop-var vop)
-  (:generator 1
-    (emit-gengc-barrier instance nil tmp-tn values)
-    (do ((tn-ref values (tn-ref-across tn-ref))
-         (indices indices (cdr indices)))
-        ((null tn-ref))
-      (let* ((value (tn-ref-tn tn-ref))
-             (source
-               (sc-case value
-                 (immediate
-                  (load-immediate vop value val-temp)
-                  val-temp)
-                 (constant
-                  (inst load-constant val-temp (tn-byte-offset value))
-                  val-temp)
-                 (control-stack
-                  (load-stack-tn val-temp value)
-                  val-temp)
-                 ((any-reg descriptor-reg)
-                  value))))
-        (inst str source
-              (@ instance (load-store-offset
-                           (- (ash (+ instance-slots-offset (car indices)) word-shift)
-                              instance-pointer-lowtag))))))))
 
 (define-vop (%instance-cas word-index-cas)
   (:policy :fast-safe)

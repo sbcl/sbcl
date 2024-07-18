@@ -1368,115 +1368,138 @@
     (do-ir2-blocks (block component)
       (fill loaded-constants nil)
       (setf aligned-stack nil)
-      (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+      (do ((2block-gc-barriers)
+           (vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
-        (labels ((register-p (tn)
-                   (and (tn-p tn)
-                        (not (eq (tn-kind tn) :unused))
-                        (eq (sc-sb (tn-sc tn)) register-sb)))
-                 (constant-eql-p (a b)
-                   (or (eq a b)
-                       (and (eq (sc-name (tn-sc a)) 'constant)
-                            (eq (tn-sc a) (tn-sc b))
-                            (eql (tn-offset a) (tn-offset b)))))
-                 (remove-constant (tn)
-                   (when (register-p tn)
-                     (setf (svref loaded-constants (tn-offset tn)) nil)))
-                 (remove-written-tns ()
-                   (cond ((memq (vop-info-save-p (vop-info vop))
-                                '(t :force-to-stack))
-                          (fill loaded-constants nil))
-                         (t
-                          (do ((ref (vop-results vop) (tn-ref-across ref)))
-                              ((null ref))
-                            (remove-constant (tn-ref-tn ref))
-                            (remove-constant (tn-ref-load-tn ref)))
-                          (do ((ref (vop-temps vop) (tn-ref-across ref)))
-                              ((null ref))
-                            (remove-constant (tn-ref-tn ref)))
-                          (do ((ref (vop-args vop) (tn-ref-across ref)))
-                              ((null ref))
-                            (remove-constant (tn-ref-load-tn ref))))))
-                 (compatible-scs-p (a b)
-                   (or (eql a b)
-                       (and (eq (sc-name a) 'sb-vm::control-stack)
-                            (eq (sc-name b) 'sb-vm::descriptor-reg))
-                       (and (eq (sc-name b) 'sb-vm::control-stack)
-                            (eq (sc-name a) 'sb-vm::descriptor-reg))))
-                 (find-constant-tn (constant sc)
-                   (loop for (saved-constant . tn) across loaded-constants
-                         when (and saved-constant
-                                   (constant-eql-p saved-constant constant)
-                                   (compatible-scs-p (tn-sc tn) sc))
-                         return tn)))
-          (case (vop-name vop)
-            ((move sb-vm::move-arg)
-             (let* ((args (vop-args vop))
-                    (results (vop-results vop))
-                    (x (tn-ref-tn args))
-                    (x-load-tn (tn-ref-load-tn args))
-                    (y (tn-ref-tn results))
-                    constant)
-               (cond ((or (eq (sc-name (tn-sc x)) 'null)
-                          (not (eq (tn-kind x) :constant)))
-                      (remove-written-tns))
-                     ((setf constant (find-constant-tn x (tn-sc y)))
-                      (when (register-p y)
+        (let ((info (vop-info vop)))
+          (labels ((register-p (tn)
+                     (and (tn-p tn)
+                          (not (eq (tn-kind tn) :unused))
+                          (eq (sc-sb (tn-sc tn)) register-sb)))
+                   (constant-eql-p (a b)
+                     (or (eq a b)
+                         (and (eq (sc-name (tn-sc a)) 'constant)
+                              (eq (tn-sc a) (tn-sc b))
+                              (eql (tn-offset a) (tn-offset b)))))
+                   (remove-constant (tn)
+                     (when (register-p tn)
+                       (setf (svref loaded-constants (tn-offset tn)) nil)))
+                   (remove-gc-barrier (tn)
+                     (when (register-p tn)
+                       (setf 2block-gc-barriers
+                             (delete (tn-offset tn) 2block-gc-barriers))))
+                   (remove-written-tns ()
+                     (cond ((memq (vop-info-save-p info)
+                                  '(t :force-to-stack))
+                            (setf 2block-gc-barriers nil)
+                            (fill loaded-constants nil))
+                           (t
+                            (do ((ref (vop-results vop) (tn-ref-across ref)))
+                                ((null ref))
+                              (remove-constant (tn-ref-tn ref))
+                              (remove-constant (tn-ref-load-tn ref))
+                              (remove-gc-barrier (tn-ref-tn ref))
+                              (remove-gc-barrier (tn-ref-load-tn ref)))
+                            (do ((ref (vop-temps vop) (tn-ref-across ref)))
+                                ((null ref))
+                              (remove-constant (tn-ref-tn ref)))
+                            (do ((ref (vop-args vop) (tn-ref-across ref)))
+                                ((null ref))
+                              (remove-constant (tn-ref-load-tn ref))))))
+                   (compatible-scs-p (a b)
+                     (or (eql a b)
+                         (and (eq (sc-name a) 'sb-vm::control-stack)
+                              (eq (sc-name b) 'sb-vm::descriptor-reg))
+                         (and (eq (sc-name b) 'sb-vm::control-stack)
+                              (eq (sc-name a) 'sb-vm::descriptor-reg))))
+                   (find-constant-tn (constant sc)
+                     (loop for (saved-constant . tn) across loaded-constants
+                           when (and saved-constant
+                                     (constant-eql-p saved-constant constant)
+                                     (compatible-scs-p (tn-sc tn) sc))
+                           return tn)))
+            (let ((barrier (vop-info-gc-barrier info)))
+              (when barrier
+                (destructuring-bind (object value &optional allocator) barrier
+                 (let* ((tn (tn-ref-tn (sb-vm::vop-nth-arg object vop)))
+                        (register (register-p tn)))
+                   (if (and (not (and register
+                                      (memq (tn-offset tn) 2block-gc-barriers)))
+                            (sb-vm::require-gengc-barrier-p tn
+                                                            (sb-vm::vop-nth-arg value vop)
+                                                            (and allocator
+                                                                 (nth allocator (vop-codegen-info vop)))))
+                       (when register
+                         (push (tn-offset tn) 2block-gc-barriers))
+                       (nsubst nil barrier (vop-codegen-info vop)))))))
+            (case (vop-name vop)
+              ((move sb-vm::move-arg)
+               (let* ((args (vop-args vop))
+                      (results (vop-results vop))
+                      (x (tn-ref-tn args))
+                      (x-load-tn (tn-ref-load-tn args))
+                      (y (tn-ref-tn results))
+                      constant)
+                 (cond ((or (eq (sc-name (tn-sc x)) 'null)
+                            (not (eq (tn-kind x) :constant)))
+                        (remove-written-tns))
+                       ((setf constant (find-constant-tn x (tn-sc y)))
+                        (when (register-p y)
+                          (setf (svref loaded-constants (tn-offset y))
+                                (cons x y)))
+                        ;; XOR is more compact on x86oids and many
+                        ;; RISCs have a zero register
+                        (unless (and (constant-p (tn-leaf x))
+                                     (eql (tn-value x) 0)
+                                     (register-p y))
+                          (change-tn-ref-tn args constant)
+                          (setf (tn-ref-load-tn args) nil)))
+                       ((register-p y)
                         (setf (svref loaded-constants (tn-offset y))
                               (cons x y)))
-                      ;; XOR is more compact on x86oids and many
-                      ;; RISCs have a zero register
-                      (unless (and (constant-p (tn-leaf x))
-                                   (eql (tn-value x) 0)
-                                   (register-p y))
-                        (change-tn-ref-tn args constant)
-                        (setf (tn-ref-load-tn args) nil)))
-                     ((register-p y)
-                      (setf (svref loaded-constants (tn-offset y))
-                            (cons x y)))
-                     ((and x-load-tn
-                           (or (not (tn-ref-load-tn results))
-                               (location= (tn-ref-load-tn results)
-                                          x-load-tn)))
-                      (setf (svref loaded-constants (tn-offset x-load-tn))
-                            (cons x x-load-tn)))
-                     (t
-                      (remove-written-tns)))))
-            (t
-             ;; Stack allocation alignes the stack and leaves it aligned,
-             ;; adjacent stack allocation doesn't need to realign it.
-             (let ((node (vop-node vop)))
-               (flet ((vop-dx-info ()
-                        (case (vop-name vop)
-                          (make-closure
-                           (nthcdr 2 (vop-codegen-info vop))))))
-                 (cond ((memq (vop-name vop)
-                              '(multiple-call multiple-call-local
-                                multiple-call-named
-                                static-multiple-call-named
-                                multiple-call-variable
-                                push-values values-list
-                                reverse-values-list %more-arg-values
-                                unaligned-dx-cons))
-                        (setf aligned-stack nil))
-                       ((memq (vop-name vop) '(move-operand))) ;; shares vop-node
-                       ((and aligned-stack
-                             (neq aligned-stack node))
-                        (let ((info (vop-dx-info)))
-                          (if info
-                              (when (car info)
-                                (setf (car info) :aligned-stack))
-                              (when (and (combination-p node)
-                                         (node-stack-allocate-p node))
-                                (setf (combination-info node) :aligned-stack)))))
+                       ((and x-load-tn
+                             (or (not (tn-ref-load-tn results))
+                                 (location= (tn-ref-load-tn results)
+                                            x-load-tn)))
+                        (setf (svref loaded-constants (tn-offset x-load-tn))
+                              (cons x x-load-tn)))
                        (t
-                        (let ((info (vop-dx-info)))
-                          (when (if info
-                                    (car info)
-                                    (and (valued-node-p node)
-                                         (node-stack-allocate-p node)))
-                            (setf aligned-stack node)))))))
-             (remove-written-tns))))))))
+                        (remove-written-tns)))))
+              (t
+               ;; Stack allocation aligns the stack and leaves it aligned,
+               ;; adjacent stack allocation doesn't need to realign it.
+               (let ((node (vop-node vop)))
+                 (flet ((vop-dx-info ()
+                          (case (vop-name vop)
+                            (make-closure
+                             (nthcdr 2 (vop-codegen-info vop))))))
+                   (cond ((memq (vop-name vop)
+                                '(multiple-call multiple-call-local
+                                  multiple-call-named
+                                  static-multiple-call-named
+                                  multiple-call-variable
+                                  push-values values-list
+                                  reverse-values-list %more-arg-values
+                                  unaligned-dx-cons))
+                          (setf aligned-stack nil))
+                         ((memq (vop-name vop) '(move-operand))) ;; shares vop-node
+                         ((and aligned-stack
+                               (neq aligned-stack node))
+                          (let ((info (vop-dx-info)))
+                            (if info
+                                (when (car info)
+                                  (setf (car info) :aligned-stack))
+                                (when (and (combination-p node)
+                                           (node-stack-allocate-p node))
+                                  (setf (combination-info node) :aligned-stack)))))
+                         (t
+                          (let ((info (vop-dx-info)))
+                            (when (if info
+                                      (car info)
+                                      (and (valued-node-p node)
+                                           (node-stack-allocate-p node)))
+                              (setf aligned-stack node)))))))
+               (remove-written-tns)))))))))
 
 (defun ir2-optimize (component &optional stage)
   (let ((*2block-info* (make-hash-table :test #'eq)))
