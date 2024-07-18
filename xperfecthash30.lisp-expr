@@ -528,6 +528,12 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 3) 29)))
     (^ a (aref tab b))))))")
+(#(1A6D13F 58EACE6 8C9AB8A D193D03 1B93DFC3 1BB8AC21 1C65D5BC 1DB3584D 1FA5A287)
+ "(:ALLOW-OTHER-KEYS :STYLE-WARNING-TRACKER :SUBFORMS :POSITIONS :FORMS :WRITE-DATE :PATHNAME :EXTERNAL-FORMAT :%TRUENAME)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 14 0 0 2 3 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> (<< val 3) 29)))
+    (^ a (aref tab b))))))")
 (#(1B0CCDE 2DCA563 904D08F A464254 13B6328E 15312028 1666B386 1B11FBF2 1B802DDD 1BB8AC21 1F3256DD)
  "(:ALLOW-OTHER-KEYS :DEBUG-FUN :HOOKS :INITIAL-OFFSET :CODE-CALLABLES :CODE :STORAGE-INFO :VIRTUAL-LOCATION :LENGTH :SAP-MAKER :OBJECT)"
  "((let ((tab #a((8) (unsigned-byte 8) 12 12 14 2 3 0 0 1)))
@@ -699,6 +705,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 3) 29)))
     (^ a (aref tab b))))))")
+(#(226BA13 1632420E 1DF82F79 1E77A9AA)
+ "(NIL :FAIL :DEFER :LISP)"
+ "(  (& (>> val 4) 3) )")
 (#(23C611E 26343D7 11823FAB 139FBD82 13D06AE3 167819CC 1BB8AC21)
  "(:ALLOW-OTHER-KEYS :SECTION-START-LINE :SUFFIX-LENGTH :PREFIX-LENGTH :PER-LINE-PREFIX-END :SECTION-COLUMN :START-COLUMN)"
  "(  (& (- (>> val 3) (>> val 18)) 7))")

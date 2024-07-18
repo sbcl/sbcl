@@ -363,7 +363,9 @@
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. In COMPILE-FILE, this gets filled lazily
   ;; after the file gets opened.
-  (truename nil :type (or pathname null (eql :lisp)))
+  ;; Can also be :DEFER if you want to lazily populate the slot,
+  ;; or :FAIL if you want to prevent use of truenames.
+  (%truename nil :type (or pathname null (member :lisp :defer :fail)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
@@ -391,6 +393,12 @@
   ;; And I doubt it changes anyone's mind about coding style anyway.
   ;; Typically this matters for DEFTYPE and DEFMACRO.
   (style-warning-tracker nil :type list))
+
+(defun file-info-truename (x)
+  (case (file-info-%truename x)
+    (:defer (setf (file-info-%truename x) (truename (file-info-pathname x))))
+    (:fail (error "Don't inquire FILE-INFO-TRUENAME"))
+    (t (file-info-%truename x))))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.

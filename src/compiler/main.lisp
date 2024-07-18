@@ -847,20 +847,10 @@ necessary, since type inference may take arbitrarily long to converge.")
                :subforms (if form-tracking-p (make-array 100 :fill-pointer 0 :adjustable t))
                :write-date (file-write-date file))))
 
-;; LOAD-AS-SOURCE uses this.
-(defun make-file-stream-source-info (file-stream)
-  (make-source-info
-   :file-info (make-file-info :truename (truename file-stream) ; FIXME: WHY USE TRUENAME???
-                              ;; This T-L-P has been around since at least 2011.
-                              ;; It's unclear why an LPN isn't good enough.
-                              :pathname (translate-logical-pathname file-stream)
-                              :external-format (stream-external-format file-stream)
-                              :write-date (file-write-date file-stream))))
-
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
 (defun make-lisp-source-info (form &key parent)
   (make-source-info
-   :file-info (make-file-info :truename :lisp
+   :file-info (make-file-info :%truename :lisp
                               :forms (vector form)
                               :positions '#(0))
    :parent parent))
@@ -909,7 +899,7 @@ necessary, since type inference may take arbitrarily long to converge.")
           ;; it seems to me that asking the stream for its name is expressly backwards]
           (setf *compile-file-pathname* (if *merge-pathnames* (pathname stream) pathname)
                 *compile-file-truename* (truename stream)
-                (file-info-truename file-info) *compile-file-truename*)
+                (file-info-%truename file-info) *compile-file-truename*)
           (when (file-info-subforms file-info)
             (setf (form-tracking-stream-observer stream)
                   (make-form-tracking-stream-observer file-info)))
