@@ -1083,6 +1083,59 @@
 
 ;;;; type method interfaces
 
+;;; The special-case for CSUBTYPEP on fixnum ranges improved a situation where the compiler
+;;; performed nearly 2 billion calls to CSUBTYPEP, all different. The flat profile said this
+;;; accounted for 21% of compilation time (which was 1:45 minutes:seconds on this one file)
+;;;            Self        Total        Cumul
+;;;   Nr  Count     %  Count     %  Count     %    Calls  Function
+;;; ------------------------------------------------------------------------
+;;;    1   5397  21.3   9064  35.7   5397  21.3        -  SB-KERNEL:CSUBTYPEP
+;;;    2   3419  13.5  24781  97.7   8816  34.8        -  SB-KERNEL::TYPE-UNION2
+;;;    3   2382   9.4   2382   9.4  11198  44.1        -  SB-KERNEL::NUMERIC-TYPES-ADJACENT
+;;;    4   2169   8.6   6870  27.1  13367  52.7        -  SB-KERNEL::NUMERIC-TYPES-INTERSECT
+;;;    5   1931   7.6   3193  12.6  15298  60.3        -  <=
+;;;    6   1883   7.4   2861  11.3  17181  67.7        -  >=
+;;;    7   1349   5.3  13004  51.3  18530  73.1        -  SB-KERNEL::NUMBER-SIMPLE-UNION2-TYPE-METHOD
+;;;    8   1287   5.1   1287   5.1  19817  78.1        -  SB-KERNEL::OK-TO-MEMOIZE-P
+;;;    9   1261   5.0   1261   5.0  21078  83.1        -  SB-KERNEL:TWO-ARG-<=
+;;;   10   1000   3.9   1000   3.9  22078  87.0        -  SB-KERNEL:TWO-ARG->=
+;;;   11    808   3.2   7084  27.9  22886  90.2        -  SB-KERNEL::%TYPE-UNION2
+;;;   12    740   2.9   1893   7.5  23626  93.1        -  SB-KERNEL::NUMBER-SIMPLE-SUBTYPEP-TYPE-METHOD
+;;;   13    379   1.5    712   2.8  24005  94.6        -  SB-IMPL::ALLOC-HASH-CACHE-LINE/4
+
+;;; After adding the special-case, total compilation time decreased to 1:12
+;;; and CSUBTYPEP dropped out of 1st-place for the worst function.
+;;;   Nr  Count     %  Count     %  Count     %    Calls  Function
+;;; ------------------------------------------------------------------------
+;;;    1   2649  14.6  17692  97.3   2649  14.6        -  SB-KERNEL::TYPE-UNION2
+;;;    2   2539  14.0   2642  14.5   5188  28.5        -  SB-KERNEL:CSUBTYPEP
+;;;    3   2422  13.3   2422  13.3   7610  41.9        -  SB-KERNEL::NUMERIC-TYPES-ADJACENT
+;;;    4   2240  12.3   6978  38.4   9850  54.2        -  SB-KERNEL::NUMERIC-TYPES-INTERSECT
+;;;    5   1605   8.8   2671  14.7  11455  63.0        -  <=
+;;;    6   1473   8.1  12776  70.3  12928  71.1        -  SB-KERNEL::NUMBER-SIMPLE-UNION2-TYPE-METHOD
+;;;    7   1446   8.0   2215  12.2  14374  79.1        -  >=
+;;;    8   1028   5.7   1028   5.7  15402  84.7        -  SB-KERNEL:TWO-ARG-<=
+;;;    9    806   4.4    806   4.4  16208  89.1        -  SB-KERNEL:TWO-ARG->=
+;;;   10    579   3.2   6623  36.4  16787  92.3        -  SB-KERNEL::%TYPE-UNION2
+;;;   11    372   2.0    372   2.0  17159  94.4        -  SB-KERNEL::OK-TO-MEMOIZE-P
+;;;   12    164   0.9    183   1.0  17323  95.3        -  SB-IMPL::ALLOC-HASH-CACHE-LINE/3
+;;;   13    135   0.7  17910  98.5  17458  96.0        -  SB-KERNEL::SIMPLIFY-UNIONS
+
+;;; It's unfortunate that we have to pick off the special case in the "generic dispatch"
+;;; of CSUBTYPEP, because it should go into the simple-subtypep path for numerics, but
+;;; aside from doing fixnum math, SB-IMPL::ALLOC-HASH-CACHE-LINE/4 (two args, two results)
+;;; showed up high in the profile but afterwards it is down to spot number 26.
+;;; So we definitely want the memoization NOT to occur, and there's no way to to that without
+;;; either delegating memoization to all impl methods, or else having the methods return
+;;; a flag saying whether to memoize. The generic piece could abide by the flag and strip
+;;; it out of its return values.
+
+(defmacro both-fixnum-p (a b)
+  #+(and (or arm64 x86-64) (not sb-xc-host)) ; One conditional branch is better than two
+  (return-from both-fixnum-p ; same as BOTH-FIXNUM-P in assembly/x86-64/arith
+    `(evenp (logior (get-lisp-obj-address ,a) (get-lisp-obj-address ,b))))
+  `(and (fixnump ,a) (fixnump ,b)))
+
 ;;; like SUBTYPEP, only works on CTYPE structures
 (defun-cached (csubtypep :hash-function #'hash-ctype-pair
                          :hash-bits 10
@@ -1098,6 +1151,24 @@
         ((eq type1 *universal-type*)
          (values nil t))
         (t
+         (when (and (= (type-class-id type1) #.(type-class-name->id 'number))
+                    (= (type-class-id type2) #.(type-class-name->id 'number))
+                    (eq (numeric-type-aspects (truly-the numeric-type type1))
+                        (numeric-type-aspects (truly-the numeric-type type2))))
+           (let ((l1 (numeric-type-low type1)) (h1 (numeric-type-high type1)))
+             (when (both-fixnum-p l1 h1)
+               (let ((l2 (numeric-type-low type2)) (h2 (numeric-type-high type2)))
+                 (when (and (both-fixnum-p l2 h2)
+                            ;; Is this final check tautologically true now?
+                            ;; (Complex can't have bounds, and real bounds would be floats.)
+                            (eq (numeric-type-aspects type1)
+                                (load-time-value
+                                 (aref *numeric-aspects-v*
+                                       (!compute-numtype-aspect-id :real 'integer nil)))))
+                   (return-from csubtypep
+                     (values (and (>= (truly-the fixnum l1) (truly-the fixnum l2))
+                                  (<= (truly-the fixnum h1) (truly-the fixnum h2)))
+                             t)))))))
          (memoize
           (invoke-type-method :simple-subtypep :complex-subtypep-arg2
                                type1 type2
