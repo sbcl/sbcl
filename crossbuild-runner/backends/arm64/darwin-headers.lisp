@@ -150,6 +150,9 @@
           (tv-sec (signed 64))
           (tv-nsec (signed 64))))
 
+(defconstant sizeof-timespec 16) ; #x10
+(defconstant sizeof-timeval 16) ; #x10
+
 ;;; sysctl(3) names
 (in-package "SB-IMPL")
 (defconstant ctl-kern 1) ; #x1
