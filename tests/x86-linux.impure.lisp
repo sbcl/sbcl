@@ -39,7 +39,8 @@
     f))
 
 ;;; Assert that loading via the FS: segment can see up to and including the last TLS cell
-(test-util:with-test (:name :tls-fencepost-positive-test)
+(test-util:with-test (:name :tls-fencepost-positive-test
+                      :skipped-on (not :sb-thread))
   (dotimes (i *tls-size-in-pages*)
     (let* ((begin (* os-page-size i))
            (end (+ begin os-page-size (- n-word-bytes)))
@@ -49,7 +50,8 @@
       (funcall f2))))
 ;;; ... and not one word beyond.
 ;;; This says the fault address is 0, I wonder if we can do better than that.
-(test-util:with-test (:name :tls-fencepost-negative-test)
+(test-util:with-test (:name :tls-fencepost-negative-test
+                      :skipped-on (not :sb-thread))
   (let ((f (make-tls-reader *tls-size-in-bytes*)))
     (setf (extern-alien "lose_on_corruption_p" int) 0)
     (catch 'success
