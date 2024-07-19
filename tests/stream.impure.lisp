@@ -123,11 +123,11 @@
   (assert-error (read-byte (make-string-input-stream "abc"))
                 type-error))
 
-(with-test (:name (:default :element-type read-byte error))
- (assert-error (with-open-file (s "/dev/zero")
-                 (read-byte s))
-               #-win32 type-error
-               #+win32 sb-int:simple-file-error))
+(with-test (:name (:default :element-type read-byte error
+                   :skipped-on :win32))
+  (assert-error (with-open-file (s "/dev/zero")
+                  (read-byte s))
+      type-error))
 
 ;;; bidirectional streams getting confused about their position
 (with-test (:name (:direction :io))
@@ -880,7 +880,8 @@
         (assert (listen cs))))
     (delete-file file)))
 
-(with-test (:name :read-sequence-end)
+(with-test (:name :read-sequence-end
+            :skipped-on :win32)
   (assert (=  (with-open-file (s "/dev/zero")
                 (read-sequence (make-string 4096) s :start 9))
               4096)))
