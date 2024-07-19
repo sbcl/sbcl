@@ -433,7 +433,9 @@
        (:arg-refs obj-ref ind-ref val-ref)
        (:vop-var vop)
        ,@(and barrier
-              `((:temporary (:sc unsigned-reg) val-temp)))
+              `((:gc-barrier 0 2)
+                (:info barrier)
+                (:temporary (:sc unsigned-reg) val-temp)))
        (:generator 4
          #+permgen
          ,@(when (string= name 'instance-index-set)
@@ -450,7 +452,8 @@
                        (ea (- (* ,offset n-word-bytes) ,lowtag)
                            object index (index-scale n-word-bytes index)))))
            ,@(if barrier
-                 `((emit-gengc-barrier object nil val-temp (vop-nth-arg 2 vop))
+                 `((when barrier
+                     (emit-gengc-barrier object nil val-temp t))
                    (emit-store ea value val-temp))
                  `((inst mov :qword ea (encode-value-if-immediate value ,tagged)))))))))
 
