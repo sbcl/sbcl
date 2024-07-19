@@ -1376,32 +1376,31 @@
 ;;; Note that this blocks in UNIX-READ. It is generally used where
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
-(defun fd-stream-read-n-bytes (stream buffer sbuffer start requested eof-error-p
-                               &aux (total-copied 0))
+(defun fd-stream-read-n-bytes (stream buffer sbuffer start end eof-error-p
+                               &aux (index start))
   (declare (type fd-stream stream))
-  (declare (type index start requested total-copied))
+  (declare (type index start end))
   (declare (ignore sbuffer))
   (aver (= (length (fd-stream-instead stream)) 0))
   (let* ((ibuf (fd-stream-ibuf stream))
          (sap (buffer-sap ibuf)))
     (cond #+soft-card-marks ; read(2) doesn't like write-protected buffers
           ((and (typep buffer '(simple-array (unsigned-byte 8) (*)))
-                (>= requested 256)
+                (>= (- end start) 256)
                 (eq (fd-stream-fd-type stream) :regular)
                 ;; TODO: handle non-empty initial buffers
                 (= (buffer-head ibuf) (buffer-tail ibuf)))
            (prog ((fd (fd-stream-fd stream))
-                  (offset start)
                   (errno 0)
                   (count 0))
-              (declare ((or null index) count offset))
+              (declare ((or null index) count))
               (go :read)
             :read-error
               (simple-stream-perror "couldn't read from ~S" stream errno)
             :eof
               (if eof-error-p
                   (error 'end-of-file :stream stream)
-                  (return total-copied))
+                  (return index))
             :read
               (without-interrupts
                 (tagbody
@@ -1411,7 +1410,7 @@
                        (declare (inline sb-unix:unix-read))
                        (setf (fd-stream-listen stream) nil)
                        (setf (values count errno)
-                             (sb-unix:unix-read fd (sap+ sap offset) (- requested total-copied)))
+                             (sb-unix:unix-read fd (sap+ sap index) (- end index)))
                        (cond ((null count)
                               (cond #-win32 ((eql errno sb-unix:eintr)
                                              (go :read))
@@ -1421,35 +1420,33 @@
                               (setf (fd-stream-listen stream) :eof)
                               (go :eof))
                              (t
-                              (setf offset (truly-the index (+ offset count)))
-                              (setf total-copied (truly-the index (+ total-copied count)))))
-                       (when (= requested total-copied)
-                         (return total-copied))
+                              (setf index (truly-the index (+ index count)))))
+                       (when (= index end)
+                         (return index))
                        (go :read)))))))
           (t
            (do ()
                (nil)
-             (let* ((remaining-request (- requested total-copied))
+             (let* ((remaining-request (- end index))
                     (head (buffer-head ibuf))
                     (tail (buffer-tail ibuf))
                     (available (- tail head))
-                    (n-this-copy (min remaining-request available))
-                    (this-start (+ start total-copied)))
+                    (n-this-copy (min remaining-request available)))
                (declare (type index remaining-request head tail available))
                (declare (type index n-this-copy))
                ;; Copy data from stream buffer into user's buffer.
-               (%byte-blt sap head buffer this-start n-this-copy)
+               (%byte-blt sap head buffer index n-this-copy)
                (incf (buffer-head ibuf) n-this-copy)
-               (incf total-copied n-this-copy)
+               (incf index n-this-copy)
                ;; Maybe we need to refill the stream buffer.
                (cond (;; If there were enough data in the stream buffer, we're done.
-                      (eql total-copied requested)
-                      (return total-copied))
+                      (= index end)
+                      (return index))
                      (;; If EOF, we're done in another way.
                       (null (catch 'eof-input-catcher (refill-input-buffer stream)))
                       (if eof-error-p
                           (error 'end-of-file :stream stream)
-                          (return total-copied)))
+                          (return index)))
                      ;; Otherwise we refilled the stream buffer, so fall
                      ;; through into another pass of the loop.
                      )))))))
@@ -1623,26 +1620,25 @@
                (tail (buffer-tail obuf)))
            ,out-expr))
        ,@(unless fd-stream-read-n-characters
-           `((defun ,in-function (stream buffer sbuffer start requested &aux (total-copied 0))
+           `((defun ,in-function (stream buffer sbuffer start end &aux (index start))
                (declare (type fd-stream stream)
-                        (type index start requested total-copied)
+                        (type index index start end)
                         (type ansi-stream-cin-buffer buffer)
                         (type ansi-stream-csize-buffer sbuffer)
                         (optimize (sb-c:verify-arg-count 0)))
                (when (fd-stream-eof-forced-p stream)
                  (setf (fd-stream-eof-forced-p stream) nil)
-                 (return-from ,in-function 0))
-               (do ((instead (fd-stream-instead stream))
-                    (index (+ start total-copied) (1+ index)))
+                 (return-from ,in-function index))
+               (do ((instead (fd-stream-instead stream)))
                    ((= (fill-pointer instead) 0)
                     (setf (fd-stream-listen stream) nil))
                  (setf (aref buffer index) (vector-pop instead))
                  (setf (aref sbuffer index) 0)
-                 (incf total-copied)
-                 (when (= requested total-copied)
+                 (incf index)
+                 (when (= index end)
                    (when (= (fill-pointer instead) 0)
                      (setf (fd-stream-listen stream) nil))
-                   (return-from ,in-function total-copied)))
+                   (return-from ,in-function index)))
                (do (;; external formats might wish for e.g. 2 octets
                     ;; to be available, but still be able to handle a
                     ;; single octet before end of file.  This flag
@@ -1680,7 +1676,8 @@
                    (declare (type index head tail))
                    ;; Copy data from stream buffer into user's buffer.
                    (do ((size nil nil))
-                       ((or (= tail head) (= requested total-copied)))
+                       ((or (= tail head)
+                            (= index end)))
                      (setf decode-break-reason
                            (block decode-break-reason
                              ,@(when (consp in-size-expr)
@@ -1697,10 +1694,9 @@
                                (setq size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr))
                                (when (> size (- tail head))
                                  (return))
-                               (let ((index (+ start total-copied)))
-                                 (setf (aref buffer index) ,in-expr)
-                                 (setf (aref sbuffer index) size))
-                               (incf total-copied)
+                               (setf (aref buffer index) ,in-expr)
+                               (setf (aref sbuffer index) size)
+                               (incf index)
                                (incf head size))
                              nil))
                      (setf (buffer-head ibuf) head)
@@ -1711,21 +1707,20 @@
                        ;; (where this check will be false). This allows establishing
                        ;; high-level handlers for decode errors (for example
                        ;; automatically resyncing in Lisp comments).
-                       (unless (plusp total-copied)
+                       (unless (> index start)
                          (stream-decoding-error-and-handle stream decode-break-reason unit))
                        ;; we might have been given stuff to use instead, so
-                       ;; we have to return (and trust our caller to know
-                       ;; what to do about TOTAL-COPIED being 0).
-                       (return-from ,in-function total-copied)))
+                       ;; we have to return
+                       (return-from ,in-function index)))
                    (setf (buffer-head ibuf) head)
                    ;; Maybe we need to refill the stream buffer.
                    (when (or
                           ;; If there was data in the stream buffer, we're done.
-                          (plusp total-copied)
+                          (> index start)
                           ;; If EOF, we're also done
                           (null (catch 'eof-input-catcher
                                   (refill-input-buffer stream))))
-                     (return total-copied))
+                     (return index))
                    ;; Otherwise we refilled the stream buffer, so fall
                    ;; through into another pass of the loop.
                    )))))

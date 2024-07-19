@@ -643,17 +643,17 @@
       DONE)))
 
 #+sb-unicode
-(defun simd-copy-utf8-to-character-string (requested total-copied start string ibuf)
-  (declare (type index start requested total-copied)
+(defun simd-copy-utf8-to-character-string (start end string ibuf)
+  (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
     (let* ((head (sb-impl::buffer-head ibuf))
            (tail (sb-impl::buffer-tail ibuf))
-           (left (- requested total-copied))
+           (left (- end start))
            (result-characters (logand left -16))
            (string-bytes (logand (- tail head) -16))
            (n (min result-characters string-bytes))
-           (string-start (truly-the fixnum (* (+ start total-copied) 4)))
+           (string-start (truly-the fixnum (* start 4)))
            (copied
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                           ((byte-array sap-reg t))
@@ -727,25 +727,24 @@
                (inst sub byte-array byte-array*)
                (move res byte-array))))
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
-      (incf total-copied copied))))
+      (+ start copied))))
 
 #+sb-unicode
-(defun simd-copy-utf8-to-base-string (requested total-copied start string ibuf)
-  (declare (type index start requested total-copied)
+(defun simd-copy-utf8-to-base-string (start end string ibuf)
+  (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (string)
     (let* ((head (sb-impl::buffer-head ibuf))
            (tail (sb-impl::buffer-tail ibuf))
-           (n (logand (min (- requested total-copied)
+           (n (logand (min (- end start)
                            (- tail head))
                       -16))
-           (string-start (truly-the fixnum (+ start total-copied)))
            (copied
              (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
                           ((byte-array sap-reg t))
                           ((32-bit-array sap-reg t) (vector-sap string))
                           ((bytes int-sse-reg))
-                          ((string-start unsigned-reg) string-start)
+                          ((string-start unsigned-reg) start)
                           ((end unsigned-reg))
                           ((head unsigned-reg) head)
                           ((n unsigned-reg) n))
@@ -774,18 +773,17 @@
                (inst sub byte-array byte-array*)
                (move res byte-array))))
       (setf (sb-impl::buffer-head ibuf) (+ head copied))
-      (incf total-copied copied))))
+      (+ start copied))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-to-base-string :ssse3+popcnt (requested total-copied start string ibuf)
-  (declare (type index start requested total-copied)
+(def-variant simd-copy-utf8-crlf-to-base-string :ssse3+popcnt (start end string ibuf)
+  (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
          (tail (sb-impl::buffer-tail ibuf))
-         (n (logand (min (- requested total-copied)
+         (n (logand (min (- end start)
                          (- (- tail head) 16)) ;; read one more chunk
                     (- 16)))
-         (string-start (+ start total-copied))
          (shuffle-table (load-time-value (let ((table (make-array (* 256 8) :element-type '(unsigned-byte 8))))
                                            (loop for row below 256
                                                  do (loop with indexes = (loop for i below 8
@@ -800,7 +798,7 @@
                                            table))))
 
     (if (<= n 0)
-        total-copied
+        start
         (with-pinned-objects (string)
           (multiple-value-bind (new-head copied)
               (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
@@ -812,7 +810,7 @@
                            ((next-bytes complex-double-reg))
                            ((shifted complex-double-reg))
                            ((temp complex-double-reg))
-                           ((string-start unsigned-reg) string-start)
+                           ((string-start unsigned-reg) start)
                            ((end unsigned-reg) n)
                            ((head unsigned-reg) head)
                            ((shuffle-table sap-reg) (vector-sap shuffle-table))
@@ -886,18 +884,18 @@
                 (inst mov new-head byte-array)
                 (inst sub new-head byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
-            (truly-the index (+ total-copied copied)))))))
+            (truly-the index (+ start copied)))))))
 
 #+sb-unicode
-(def-variant simd-copy-utf8-crlf-to-character-string :ssse3+popcnt (requested total-copied start string ibuf)
-  (declare (type index start requested total-copied)
+(def-variant simd-copy-utf8-crlf-to-character-string :ssse3+popcnt (start end string ibuf)
+  (declare (type index start end)
            (optimize speed (safety 0)))
   (let* ((head (sb-impl::buffer-head ibuf))
          (tail (sb-impl::buffer-tail ibuf))
-         (n (logand (min (- requested total-copied)
+         (n (logand (min (- end start)
                          (- (- tail head) 16)) ;; read one more chunk
                     (- 16)))
-         (string-start (* (+ start total-copied) 4))
+         (string-start (* start 4))
          (shuffle-table (load-time-value (let ((table (make-array (* 256 8) :element-type '(unsigned-byte 8))))
                                            (loop for row below 256
                                                  do (loop with indexes = (loop for i below 8
@@ -911,7 +909,7 @@
                                                                 index)))
                                            table))))
     (if (<= n 0)
-        total-copied
+        start
         (with-pinned-objects (string)
           (multiple-value-bind (new-head copied)
               (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap ibuf))
@@ -1024,4 +1022,4 @@
                 (inst mov new-head byte-array)
                 (inst sub new-head byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
-            (truly-the index (+ total-copied (truncate copied 4))))))))
+            (truly-the index (+ start (truncate copied 4))))))))

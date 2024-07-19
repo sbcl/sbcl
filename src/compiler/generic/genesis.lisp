@@ -4508,8 +4508,8 @@ static inline uword_t word_has_stickymark(uword_t word) {
            (#.sb-vm:bignum-widetag (bignum-from-core x))))))))
 
 ;;; This is for FOP-SPEC-VECTOR which always supplies 0 for the start
-(defun read-n-bytes (stream vector start nbytes)
+(defun read-n-bytes (stream vector start end)
   (aver (zerop start))
   (let ((start (+ (descriptor-byte-offset vector)
                   (ash sb-vm:vector-data-offset sb-vm:word-shift))))
-    (read-into-bigvec (descriptor-mem vector) stream start nbytes)))
+    (read-into-bigvec (descriptor-mem vector) stream start end)))

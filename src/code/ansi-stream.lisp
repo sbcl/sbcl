@@ -147,7 +147,8 @@
   ;; A character FD-STREAM uses this method to transfer octets from the
   ;; source buffer into characters of the destination buffer.
   (n-bin #'ill-bin :type                        ; n-byte input function
-   (sfunction (stream (simple-unboxed-array (*)) (or ansi-stream-csize-buffer null) index index
+   (sfunction (stream (or (simple-unboxed-array (*)) system-area-pointer)
+                      (or ansi-stream-csize-buffer null) index index
                       ;; EOF-ERROR-P, not used by character streams
                       &optional t)
               index))

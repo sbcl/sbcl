@@ -829,17 +829,17 @@
   (%make-mock-fd-stream
    (mapcar (lambda (x) (substitute #\Newline #\| x)) buffer-chain)))
 
-(defun mock-fd-stream-n-bin-fun (stream char-buf size-buf start count &optional eof-err-p)
+(defun mock-fd-stream-n-bin-fun (stream char-buf size-buf start end &optional eof-err-p)
   (cond ((mock-fd-stream-buffer-chain stream)
          (let* ((chars (pop (mock-fd-stream-buffer-chain stream)))
                 (n-chars (length chars)))
            ;; make sure the mock object is being used as expected.
-           (assert (>= count (length chars)))
+           (assert (>= end (length chars)))
            (replace char-buf chars :start1 start)
            (fill size-buf 1 :start start :end (+ start n-chars))
-           n-chars))
+           (+ start n-chars)))
         (t
-         (sb-impl::eof-or-lose stream eof-err-p 0))))
+         (sb-impl::eof-or-lose stream eof-err-p start))))
 
 (with-test (:name :read-chunk-from-frc-buffer)
   (let ((s (make-mock-fd-stream '("zabc" "d" "efgh" "foo|bar" "hi"))))
@@ -879,3 +879,8 @@
         (read-char-no-hang cs)
         (assert (listen cs))))
     (delete-file file)))
+
+(with-test (:name :read-sequence-end)
+  (assert (=  (with-open-file (s "/dev/zero")
+                (read-sequence (make-string 4096) s :start 9))
+              4096)))
