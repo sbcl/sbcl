@@ -860,3 +860,14 @@ way that the argument is passed.
 
 (defun alien-void-type-p (type)
   (and (alien-values-type-p type) (not (alien-values-type-values type))))
+
+;;; Assert that two important types aren't messed up
+(eval-when (:compile-toplevel)
+  (flet ((check-size (tag)
+           (let ((alien-type (parse-alien-type `(struct ,tag) nil)))
+             (unless (= (alien-type-bits alien-type)
+                        (* (symbol-value (package-symbolicate "SB-UNIX" "SIZEOF-" tag))
+                           sb-vm:n-byte-bits))
+               (error "(STRUCT ~S) has unexpected size" tag)))))
+    (check-size 'sb-unix::timespec)
+    (check-size 'sb-unix::timeval)))

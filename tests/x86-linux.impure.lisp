@@ -1,16 +1,5 @@
 #+(or (not x86) (not linux)) (invoke-restart 'run-tests::skip-file)
 
-;;; I'm not entirely satisfied with the solution to fixing the crash on Alpine linux
-;;; and while investigating that, I found also that we supplied too high a limit
-;;; to set_thread_area().
-
-;;; [As to the problem on Alpine: if it were the case that we don't pre-decrement the
-;;; alien-stack-pointer then we'd surely clobber th->no_tls_value_marker.
-;;; But it works everywhere else. Alpine uses musl libc, so perhaps that's the distinguishing
-;;; feature - something in libc takes an alien we allocated and writes past it by a word
-;;; because we still after all these years don't fully get the structure padding requirements
-;;; in the 32-bit ABI correct.]
-
 (in-package sb-vm)
 
 (defconstant os-page-size 4096)

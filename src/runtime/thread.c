@@ -1041,7 +1041,13 @@ alloc_thread_struct(void* spaces) {
     th->state_word.user_thread_p = 1;
 
     lispobj* alien_stack_end = (lispobj*)((char*)th->alien_stack_start + ALIEN_STACK_SIZE);
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    // Alien-stack-pointer is predecremented upon use
+    th->alien_stack_pointer = alien_stack_end;
+#else
+    // I do not know the convention for alien-stack-pointer
     th->alien_stack_pointer = alien_stack_end - 1;
+#endif
 
 #ifdef HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT
     memset(&th->pseudo_atomic_bits, 0, sizeof th->pseudo_atomic_bits);

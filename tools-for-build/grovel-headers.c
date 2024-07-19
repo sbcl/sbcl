@@ -380,9 +380,25 @@ main(int argc, char __attribute__((unused)) *argv[])
     DEFSTRUCT(timeval, struct timeval,
         DEFSLOT(tv-sec, tv_sec);
         DEFSLOT(tv-usec, tv_usec));
+    // There is no way to detect musl libc (https://wiki.musl-libc.org/faq)
+    // I'm really just guessing, but maybe 32-bit ARM has padding too
+#if defined LISP_FEATURE_LINUX && defined LISP_FEATURE_LITTLE_ENDIAN \
+  && (defined LISP_FEATURE_X86 || defined LISP_FEATURE_ARM)
+    struct timespec dummy_ts;
+    if (sizeof dummy_ts > sizeof dummy_ts.tv_sec + sizeof dummy_ts.tv_nsec) {
+        fprintf(stderr, "WARNING: Assuming physical layout of timespec\n");
+        printf("(define-alien-type nil\n\
+  (struct timespec\n\
+          (tv-sec (signed 64))\n\
+          (tv-nsec (signed 32))\n\
+          (padding (signed 32))))\n");
+    } else
+#endif
     DEFSTRUCT(timespec, struct timespec,
         DEFSLOT(tv-sec, tv_sec);
         DEFSLOT(tv-nsec, tv_nsec));
+    defconstant("sizeof-timespec", sizeof (struct timespec));
+    defconstant("sizeof-timeval", sizeof (struct timeval));
     printf("\n");
 
 #ifdef LISP_FEATURE_ANDROID
