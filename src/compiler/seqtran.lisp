@@ -1411,59 +1411,65 @@
   ;; This is a little circuitous - we transform REPLACE into BASH-COPY
   ;; and then possibly transform BASH-COPY into an unrolled loop.
   ;; There ought to be a way to see if the BASH-COPY transform applies.
-  `(let* ((len1 (length seq1))
-          (len2 (length seq2))
-          (end1 (or end1 len1))
-          (end2 (or end2 len2))
-          (replace-len (min (- end1 start1) (- end2 start2))))
-     ,@(when (policy node (/= insert-array-bounds-checks 0))
-         '((unless (<= 0 start1 end1 len1)
-             (sequence-bounding-indices-bad-error seq1 start1 end1))
-           (unless (<= 0 start2 end2 len2)
-             (sequence-bounding-indices-bad-error seq2 start2 end2))))
-     (,bash-function seq2 start2 seq1 start1 replace-len)
-     seq1))
+  `(if (and seq1 seq2)
+       (let* ((len1 (length seq1))
+              (len2 (length seq2))
+              (end1 (or end1 len1))
+              (end2 (or end2 len2))
+              (replace-len (min (- end1 start1) (- end2 start2))))
+         ,@(when (policy node (/= insert-array-bounds-checks 0))
+             '((unless (<= 0 start1 end1 len1)
+                 (sequence-bounding-indices-bad-error seq1 start1 end1))
+               (unless (<= 0 start2 end2 len2)
+                 (sequence-bounding-indices-bad-error seq2 start2 end2))))
+         (,bash-function seq2 start2 seq1 start1 replace-len)
+         seq1)
+       seq1))
 (defun transform-replace (same-types-p node)
-  `(let* ((len1 (length seq1))
-          (len2 (length seq2))
-          (end1 (or end1 len1))
-          (end2 (or end2 len2))
-          (replace-len (min (- end1 start1) (- end2 start2))))
-     ,@(when (policy node (/= insert-array-bounds-checks 0))
-         '((unless (<= 0 start1 end1 len1)
-             (sequence-bounding-indices-bad-error seq1 start1 end1))
-           (unless (<= 0 start2 end2 len2)
-             (sequence-bounding-indices-bad-error seq2 start2 end2))))
-     ,(flet ((down ()
-               '(do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1)) (1- i))
-                     (j (truly-the (or (eql -1) index) (+ start2 replace-len -1)) (1- j)))
-                 ((< j start2))
-                 (declare (optimize (insert-array-bounds-checks 0)))
-                 (setf (aref seq1 i) (data-vector-ref seq2 j))))
-             (up ()
-               '(do ((i start1 (1+ i))
-                     (j start2 (1+ j))
-                     (end (+ start1 replace-len)))
-                 ((>= i end))
-                 (declare (optimize (insert-array-bounds-checks 0)))
-                 (setf (aref seq1 i) (data-vector-ref seq2 j)))))
-        ;; "If sequence-1 and sequence-2 are the same object and the region being modified
-        ;;  overlaps the region being copied from, then it is as if the entire source region
-        ;;  were copied to another place and only then copied back into the target region.
-        ;;  However, if sequence-1 and sequence-2 are not the same, but the region being modified
-        ;;  overlaps the region being copied from (perhaps because of shared list structure or
-        ;;  displaced arrays), then after the replace operation the subsequence of sequence-1
-        ;;  being modified will have unpredictable contents."
-        (if same-types-p ; source and destination sequences could be EQ
-            `(if (and (eq seq1 seq2) (> start1 start2)) ,(down) ,(up))
-            (up)))
-     seq1))
+  `(if (and seq1 seq2)
+       (let* ((len1 (length seq1))
+              (len2 (length seq2))
+              (end1 (or end1 len1))
+              (end2 (or end2 len2))
+              (replace-len (min (- end1 start1) (- end2 start2))))
+         ,@(when (policy node (/= insert-array-bounds-checks 0))
+             '((unless (<= 0 start1 end1 len1)
+                 (sequence-bounding-indices-bad-error seq1 start1 end1))
+               (unless (<= 0 start2 end2 len2)
+                 (sequence-bounding-indices-bad-error seq2 start2 end2))))
+         ,(flet ((down ()
+                   '(do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1)) (1- i))
+                         (j (truly-the (or (eql -1) index) (+ start2 replace-len -1)) (1- j)))
+                     ((< j start2))
+                     (declare (optimize (insert-array-bounds-checks 0)))
+                     (setf (aref seq1 i) (data-vector-ref seq2 j))))
+                 (up ()
+                   '(do ((i start1 (1+ i))
+                         (j start2 (1+ j))
+                         (end (+ start1 replace-len)))
+                     ((>= i end))
+                     (declare (optimize (insert-array-bounds-checks 0)))
+                     (setf (aref seq1 i) (data-vector-ref seq2 j)))))
+            ;; "If sequence-1 and sequence-2 are the same object and the region being modified
+            ;;  overlaps the region being copied from, then it is as if the entire source region
+            ;;  were copied to another place and only then copied back into the target region.
+            ;;  However, if sequence-1 and sequence-2 are not the same, but the region being modified
+            ;;  overlaps the region being copied from (perhaps because of shared list structure or
+            ;;  displaced arrays), then after the replace operation the subsequence of sequence-1
+            ;;  being modified will have unpredictable contents."
+            (if same-types-p ; source and destination sequences could be EQ
+                `(if (and (eq seq1 seq2) (> start1 start2)) ,(down) ,(up))
+                (up)))
+         seq1)
+       seq1))
 
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                       ((simple-array * (*)) (simple-array * (*)) &rest t) (simple-array * (*))
+                       ((or null (simple-array * (*))) (or null (simple-array * (*))) &rest t) *
                        :node node)
-  (let ((et1 (ctype-array-specialized-element-types (lvar-type seq1)))
-        (et2 (ctype-array-specialized-element-types (lvar-type seq2))))
+  (let ((et1 (ctype-array-specialized-element-types (type-intersection (lvar-type seq1)
+                                                                       (specifier-type 'array))))
+        (et2 (ctype-array-specialized-element-types (type-intersection (lvar-type seq2)
+                                                                       (specifier-type 'array)))))
     (if (and (typep et1 '(cons * null))
              (typep et2 '(cons * null))
              (eq (car et1) (car et2)))
@@ -1478,11 +1484,11 @@
 #+sb-unicode
 (progn
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                       (simple-base-string simple-character-string &rest t) simple-base-string
+                       ((or null simple-base-string) (or null simple-character-string) &rest t) *
                        :node node)
   (transform-replace nil node))
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
-                       (simple-character-string simple-base-string &rest t) simple-character-string
+                       ((or null simple-character-string) (or null simple-base-string) &rest t) *
                        :node node)
   (transform-replace nil node)))
 
