@@ -123,8 +123,8 @@
   (assert-error (read-byte (make-string-input-stream "abc"))
                 type-error))
 
-(with-test (:name (:default :element-type read-byte error
-                   :skipped-on :win32))
+(with-test (:name (:default :element-type read-byte error)
+            :skipped-on :win32)
   (assert-error (with-open-file (s "/dev/zero")
                   (read-byte s))
       type-error))
