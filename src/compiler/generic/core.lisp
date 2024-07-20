@@ -203,11 +203,9 @@
                  #+darwin-jit
                  `(setf (svref boxed-data (- ,i ,sb-vm:code-constants-offset)) ,val)
                  #-darwin-jit
-                 (if (not fdefnp)       ; statically not an fdefn
-                     `(setf (code-header-ref code-obj ,i) ,val)
-                     `(if ,fdefnp    ; else choose which setter to use
-                          (set-code-fdefn code-obj ,i ,val)
-                          (setf (code-header-ref code-obj ,i) ,val)))))
+                 (if fdefnp
+                     `(set-code-fdefn code-obj ,i ,val)
+                     `(setf (code-header-ref code-obj ,i) ,val))))
 
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
@@ -218,9 +216,10 @@
 
       (do ((index const-patch-start-index (1+ index)))
           ((>= index n-boxed-words))
-        (let* ((const (aref constants index))
-               (is-fdefn)
-               (value
+        (let ((const (aref constants index)))
+          (if (typep const '(cons (eql :fdefinition)))
+              (set-boxed-word index (second const) t)
+              (set-boxed-word index
                 (if (constant-p const)
                     (constant-value const)
                     (destructuring-bind (kind payload) const
@@ -228,10 +227,7 @@
                         (:entry
                          (the function (gethash (leaf-info payload)
                                                 (core-object-entry-table object))))
-                        (:fdefinition (setq is-fdefn t) payload)
-                        (:known-fun (%coerce-name-to-fun payload)))))))
-          (declare (ignorable is-fdefn))
-          (set-boxed-word index value is-fdefn)))
+                        (:known-fun (%coerce-name-to-fun payload)))))))))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
