@@ -196,16 +196,16 @@
 
 ;;; structures
 (define-alien-type nil
-  (struct timeval
+  (struct timeval2
           (tv-sec (signed 32))
           (tv-usec (signed 32))))
 (define-alien-type nil
-  (struct timespec
+  (struct timespec2
           (tv-sec (signed 64))
           (tv-nsec (signed 32))))
 
 (defconstant sizeof-timespec 16) ; #x10
-(defconstant sizeof-timeval 16) ; #x10
+(defconstant sizeof-timeval 8) ; #x8
 
 (in-package "SB-KERNEL")
 
