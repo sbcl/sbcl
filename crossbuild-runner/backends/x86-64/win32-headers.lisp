@@ -196,11 +196,11 @@
 
 ;;; structures
 (define-alien-type nil
-  (struct timeval2
+  (struct timeval
           (tv-sec (signed 32))
           (tv-usec (signed 32))))
 (define-alien-type nil
-  (struct timespec2
+  (struct timespec
           (tv-sec (signed 64))
           (tv-nsec (signed 32))))
 
