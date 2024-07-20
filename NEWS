@@ -1,5 +1,40 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.6:
+  * minor incompatible change: the compiler will emit optimization notes
+    related to complex type checks only at high SPEED optimization settings.
+  * minor incompatible change: the GET-FOREGROUND symbol is now exported from
+    the SB-THREAD package.  (thanks to Philipp Marek)
+  * minor incompatible change: code objects are now printed with their ending
+    address as well as their start address.
+  * platform support:
+    ** address some crashing cases in arena support.  (reported by Andreas
+       Franke)
+    ** fix a hard-coded path to `cp`.  (thanks to Hraban Luyat)
+    ** address relocation issues on PIC-flavoured arm64.  (lp#2067153, thanks
+       to leafze)
+    ** fix a crash in the arm64-dissassembler if a code component is missing.
+    ** fix a crash on 32-bit musl libc systems.  (reported by Will Sinatra)
+    ** fix building with link-time optimization.  (lp#2072800, reported by Eli
+       Schwartz)
+    ** fix building with newer llvm.  (lp#2071545, reported by Yan)
+    ** mitigate the lack of gc-safety in SB-VM::REMOVE-STATIC-LINKS.
+       (lp#2045433)
+  * bug fix: COMPILE installs its second argument as the value of its non-null
+    NAME argument, even if the second argument was already compiled.
+    (lp#2071324, reported by Tim Bradshaw)
+  * bug fix: allow the hashing routines in sb-md5 to work on arrays with more
+    than 2^29 elements.
+  * bug fix: allow READ-SEQUENCE and WRITE-SEQUENCE to read and write files
+    bigger than 4GB.
+  * bug fix: READ-SEQUENCE returns the index of the first unmodified element
+    of its sequence.  (reported by Janis Dzerins)
+  * optimization: various improvements to floating point rounding routines.
+  * optimization: PHASE called on the result of COMPLEX now elides the
+    intermediate COMPLEX object.
+  * optimization: the compiler is more aware of the types of COMPLEX, ATAN,
+    APPEND and NCONC.
+
 changes in sbcl-2.4.6 relative to sbcl-2.4.5:
   * enhancement: name conflicts resulting from colliding symbols in IMPORT and
     USE-PACKAGE are resolved once for each name, rather than between pairwise
