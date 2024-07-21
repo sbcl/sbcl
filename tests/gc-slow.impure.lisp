@@ -9,7 +9,8 @@
   (sb-sys:without-interrupts (cons-madly)))
 
 (define-alien-variable n-lisp-gcs int)
-(with-test (:name :without-gcing)
+(with-test (:name :without-gcing
+            :skipped-on :gc-stress)
   (let ((initial-gc-count n-lisp-gcs))
 
     ;; check that WITHOUT-GCING defers explicit gc

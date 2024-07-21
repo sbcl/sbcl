@@ -269,7 +269,8 @@
 ;;; and one of cells that GC has marked as empty. Since we no longer inhibit GC
 ;;; during table operations, we need to give GC a list of its own to manipulate.
 (with-test (:name (hash-table :gc-smashed-cell-list)
-                  :broken-on :mark-region-gc)
+            :skipped-on :gc-stress
+            :broken-on :mark-region-gc)
   (flet ((f ()
            (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
            (setf (gethash (cons 1 2) *tbl*) 'foolz)
