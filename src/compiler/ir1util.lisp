@@ -435,6 +435,21 @@
                   (setf ctran start)
                   (go :next-ctran))))))))
 
+(defun skip-nodes-before-node-p (block before-node)
+  (do-nodes (node nil block)
+    (when (eq node before-node)
+      (return t))
+    (when (and (valued-node-p node)
+               (neq (node-dest node) before-node))
+      (return))
+    (typecase node
+      (ref)
+      (combination
+       (unless (flushable-combination-p node)
+         (return)))
+      (t
+       (return)))))
+
 ;;; Check that all the uses are almost immediately used and look through CASTs,
 ;;; as they can be freely deleted removing the immediateness
 (defun lvar-almost-immediately-used-p (lvar)
@@ -3475,3 +3490,16 @@ is :ANY, the function name is not checked."
                              path :from-end t)))
     (if first
         (nthcdr (+ first 2) path))))
+
+(defun combination-derive-type-for-arg-types (combination types)
+  (let* ((info (combination-fun-info combination))
+         (deriver (and info
+                       (fun-info-derive-type info))))
+    (when deriver
+      (let ((mock (copy-structure combination)))
+        (setf (combination-args mock)
+              (loop for type in types
+                    for lvar = (make-lvar)
+                    do (setf (lvar-%derived-type lvar) type)
+                    collect lvar))
+        (funcall deriver mock)))))

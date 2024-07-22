@@ -311,6 +311,11 @@
                    (prev (node-prev dest) :exit-if-null)
                    (block (ctran-block prev))
                    (component (block-component block)))
+          (when (valued-node-p dest)
+            (let ((dest (node-dest dest)))
+              (when (and (if-p dest)
+                         (node-prev dest))
+                (reoptimize-node dest))))
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))
         (loop for cast in (lvar-dependent-nodes lvar)
@@ -799,6 +804,41 @@
 
 (declaim (start-block ir1-optimize-if kill-if-branch-1))
 
+;;; Make the 0 branch go directly to 2
+;;; (if (> (if x (length x) 0) 10)
+;;;     1
+;;;     2)
+(defun bypass-if (if test block)
+  (let ((combination (lvar-uses test)))
+    (when (and (combination-p combination)
+               (eq (combination-kind combination) :known))
+      (let ((info (combination-fun-info combination)))
+        (when (and info
+                   (flushable-combination-p combination)
+                   (skip-nodes-before-node-p block combination))
+          (loop for arg in (combination-args combination)
+                for uses = (lvar-uses arg)
+                for type = (lvar-type arg)
+                when (consp uses)
+                do (loop named inner
+                         for use in uses
+                         for node-type = (node-derived-type use)
+                         when (and (eq (next-block use) block)
+                                   (type/= type node-type))
+                         do (let ((types (loop for arg2 in (combination-args combination)
+                                               collect (if (eq arg arg2)
+                                                           (single-value-type node-type)
+                                                           (lvar-type arg2)))))
+                              (let ((derived (combination-derive-type-for-arg-types combination types)))
+                                (cond ((not derived))
+                                      ((eq (setf derived (single-value-type derived))
+                                           (specifier-type 'null))
+                                       (delete-lvar-use use)
+                                       (change-block-successor (node-block use) block (if-alternative if)))
+                                      ((not (types-equal-or-intersect derived (specifier-type 'null)))
+                                       (delete-lvar-use use)
+                                       (change-block-successor (node-block use) block (if-consequent if)))))))))))))
+
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
 ;;; is the case.
@@ -809,7 +849,8 @@
 (defun ir1-optimize-if (node &optional fast)
   (declare (type cif node))
   (let* ((test (if-test node))
-         (block (node-block node))(type (lvar-type test))
+         (block (node-block node))
+         (type (lvar-type test))
          (consequent  (if-consequent  node))
          (alternative (if-alternative node))
          (victim
@@ -838,6 +879,7 @@
     (cond (victim
            (kill-if-branch-1 node test block victim))
           ((not fast)
+           (bypass-if node test block)
            (tension-if-if-1 node test block)
            (duplicate-if-if-1 node test block)))))
 

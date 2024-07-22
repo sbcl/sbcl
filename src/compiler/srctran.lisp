@@ -5032,47 +5032,52 @@
     "invert or open code"
     (maybe-invert node '< '> x y)))
 
+;;; Make sure any constant arg is second.
+(macrolet ((def (name inverse)
+             `(deftransform ,name ((x y))
+                (if (and (constant-lvar-p x)
+                         (not (constant-lvar-p y)))
+                    `(,',inverse y x)
+                    (give-up-ir1-transform)))))
+  (def = =)
+  (def < >)
+  (def > <)
+  (def <= >=)
+  (def >= <=))
+
 ;;; See whether we can statically determine (< X Y) using type
 ;;; information. If X's high bound is < Y's low, then X < Y.
 ;;; Similarly, if X's low is >= to Y's high, the X >= Y (so return
-;;; NIL). If not, at least make sure any constant arg is second.
-(macrolet ((def (name inverse reflexive-p surely-true surely-false)
-             `(deftransform ,name ((x y))
-                "optimize using intervals"
+;;; NIL).
+(macrolet ((def (name reflexive-p surely-true surely-false)
+             `(defoptimizer (,name derive-type) ((x y))
                 (if (and (same-leaf-ref-p x y)
                          ;; For non-reflexive functions we don't need
                          ;; to worry about NaNs: (non-ref-op NaN NaN) => false,
                          ;; but with reflexive ones we don't know...
                          ,@(when reflexive-p
-                                 '((and (not (maybe-float-lvar-p x))
-                                        (not (maybe-float-lvar-p y))))))
-                    ,reflexive-p
+                             '((and (not (maybe-float-lvar-p x))
+                                (not (maybe-float-lvar-p y))))))
+                    (specifier-type '(eql ,reflexive-p))
                     (multiple-value-bind (ix x-complex)
                         (type-approximate-interval (lvar-type x))
-                      (unless ix
-                        (give-up-ir1-transform))
-                      (multiple-value-bind (iy y-complex)
-                          (type-approximate-interval (lvar-type y))
-                        (unless iy
-                          (give-up-ir1-transform))
-                        (cond ((and (or (not x-complex)
-                                        (interval-contains-p 0 ix))
-                                    (or (not y-complex)
-                                        (interval-contains-p 0 iy))
-                                    ,surely-true)
-                               t)
-                              (,surely-false
-                               nil)
-                              ((and (constant-lvar-p x)
-                                    (not (constant-lvar-p y)))
-                               `(,',inverse y x))
-                              (t
-                               (give-up-ir1-transform)))))))))
-  (def = = t (interval-= ix iy) (interval-/= ix iy))
-  (def < > nil (interval-< ix iy) (interval->= ix iy))
-  (def > < nil (interval-< iy ix) (interval->= iy ix))
-  (def <= >= t (interval->= iy ix) (interval-< iy ix))
-  (def >= <= t (interval->= ix iy) (interval-< ix iy)))
+                      (when ix
+                        (multiple-value-bind (iy y-complex)
+                            (type-approximate-interval (lvar-type y))
+                          (when iy
+                            (cond ((and (or (not x-complex)
+                                            (interval-contains-p 0 ix))
+                                        (or (not y-complex)
+                                            (interval-contains-p 0 iy))
+                                        ,surely-true)
+                                   (specifier-type '(eql t)))
+                                  (,surely-false
+                                   (specifier-type '(eql nil))))))))))))
+  (def =  t (interval-= ix iy) (interval-/= ix iy))
+  (def <  nil (interval-< ix iy) (interval->= ix iy))
+  (def >  nil (interval-< iy ix) (interval->= iy ix))
+  (def <= t (interval->= iy ix) (interval-< iy ix))
+  (def >= t (interval->= ix iy) (interval-< ix iy)))
 
 (defun ir1-transform-char< (x y first second inverse)
   (cond

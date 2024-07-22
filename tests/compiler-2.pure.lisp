@@ -4505,3 +4505,13 @@
    `(lambda (m s)
       (declare (optimize speed))
       (the fixnum (or m (position 10 (the list s)))))))
+
+(with-test (:name :if-bypass)
+  (assert-type
+   (lambda (x)
+     (declare ((or null vector) x)
+              (optimize speed))
+     (if (> (length x) 10)
+         x
+         (error "m")))
+   vector))
