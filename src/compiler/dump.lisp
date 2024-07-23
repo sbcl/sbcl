@@ -166,7 +166,7 @@
       (symbol (sxhash x))
       (number (sb-impl::number-sxhash x))
       (pathname (sb-impl::pathname-sxhash x))
-      (instance
+      ((or instance simple-vector)
        (let ((idmap (fasl-output-instance-id-table *compile-object*)))
          (values (ensure-gethash x idmap
                                  (let ((c (1+ (hash-table-count idmap))))
