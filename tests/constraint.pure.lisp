@@ -1389,3 +1389,53 @@
          (values nil nil)))
    (values (or null (integer 0 0))
            (or null (integer -10 -2)) &optional)))
+
+(with-test (:name :length-back)
+  (assert-type
+   (lambda (x)
+     (if (= (length x) 0)
+         x
+         (error "")))
+   (and sequence (not cons)))
+  (assert-type
+   (lambda (x)
+     (if (= (length x) 0)
+         (error "")
+         x))
+   (and sequence (not null)))
+  (assert-type
+   (lambda (x)
+     (if (> (length x) 0)
+         x
+         (error "")))
+   (and sequence (not null)))
+  (assert-type
+   (lambda (x)
+     (if (> (length x) 0)
+         (error "")
+         x))
+   (and sequence (not cons)))
+  (assert-type
+   (lambda (x)
+     (if (< (length x) 1)
+         x
+         (error "")))
+   (and sequence (not cons)))
+  (assert-type
+   (lambda (x)
+     (if (< (length x) 1)
+         (error "")
+         x))
+   (and sequence (not null)))
+  (assert-type
+   (lambda (x)
+     (if (< (length x) 10)
+         x
+         (error "")))
+   sequence)
+  (assert-type
+   (lambda (x)
+     (if (< (length x) 10)
+         (error "")
+         x))
+   (and sequence (not null))))

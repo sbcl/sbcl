@@ -258,3 +258,38 @@
                       (let ((type (specifier-type `(character-set ((,low . ,high))))))
                         (conset-add-constraint-to-eql gen 'typep var type nil consequent)
                         (conset-add-constraint-to-eql gen 'typep var type t alternative))))))))))))))
+
+(defoptimizer (length constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value))
+  (case kind
+    (>
+     (when (csubtypep (lvar-type constraint) (specifier-type '(real 0)))
+       (let ((var (ok-lvar-lambda-var x gen)))
+         (when var
+           (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null))
+                                         nil consequent)
+           (when (csubtypep (lvar-type constraint) (specifier-type '(real 0 (1))))
+             (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not cons))
+                                           nil alternative))))))
+    (<
+     (when (csubtypep (lvar-type constraint) (specifier-type '(real (0))))
+       (let ((var (ok-lvar-lambda-var x gen)))
+         (when var
+           (when (csubtypep (lvar-type constraint) (specifier-type '(real 0 1)))
+             (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not cons))
+                                           nil consequent))
+           (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null))
+                                         nil alternative)))))
+    (eq
+     (cond ((not (types-equal-or-intersect (lvar-type constraint) (specifier-type '(eql 0))))
+            (let ((var (ok-lvar-lambda-var x gen)))
+              (when var
+                (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null))
+                                              nil consequent))))
+           ((eq (lvar-type constraint) (specifier-type '(eql 0)))
+            (let ((var (ok-lvar-lambda-var x gen)))
+              (when var
+                (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not cons))
+                                              nil consequent)
+                (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null))
+                                              nil alternative))))))))
