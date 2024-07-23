@@ -696,7 +696,11 @@
       (let ((notmutex (gen-label)))
         (inst cmp :dword symbol (make-fixup '*current-mutex* :symbol-tls-index))
         (inst jmp :ne notmutex)
-        (inst call (ea (make-fixup 'mutex-unlock :assembly-routine)))
+        ;; "Call [ea]" is generally fine except during genesis.
+        ;; (ASM-ROUTINE-INDIRECT-ADDRESS complains)
+        (if (or #+(and sb-xc-host immobile-code) t)
+            (inst call (make-fixup 'mutex-unlock :assembly-routine))
+            (inst call (ea (make-fixup 'mutex-unlock :assembly-routine))))
         (emit-label notmutex))
       (inst test :dword symbol symbol))
     #-sb-thread
