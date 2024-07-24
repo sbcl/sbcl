@@ -697,7 +697,8 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     if (!core && !(core = search_for_core())) {
       /* Try resolving symlinks */
       if (sbcl_runtime) {
-        free(sbcl_runtime_home);
+        if (sbcl_runtime_home != libpath)
+            free(sbcl_runtime_home);
         char* real = sb_realpath(sbcl_runtime);
         if (!real)
           goto lose;
