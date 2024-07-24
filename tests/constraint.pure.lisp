@@ -1439,3 +1439,24 @@
          (error "")
          x))
    (and sequence (not null))))
+
+(with-test (:name :find-item-type)
+  (assert-type
+   (lambda (x y)
+     (declare (string y))
+     (if (find x y)
+         x
+         (error "")))
+   character)
+  (assert-type
+   (lambda (x y)
+     (if (position x y :test #'=)
+         x
+         (error "")))
+   number)
+  (assert-type
+   (lambda (x y)
+     (if (position x y :key #'1+)
+         x
+         (error "")))
+   number))
