@@ -1181,6 +1181,18 @@ void thread_accrue_stw_time(struct thread* th,
 }
 #endif
 
+#ifndef LISP_FEATURE_WIN32
+/* pthread_kill is not guaranteed to be reentrant, prevent
+ * gc_stop_the_world from interrupting another pthread_kill */
+int sb_thread_kill (pthread_t thread, int sig) {
+    sigset_t old;
+    block_blockable_signals(&old);
+    int ret = pthread_kill(thread, sig);
+    thread_sigmask(SIG_SETMASK, &old, NULL);
+    return ret;
+}
+#endif
+
 /* stopping the world is a two-stage process.  From this thread we signal
  * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
  * the usual pseudo-atomic checks (we don't want to stop a thread while
@@ -1260,17 +1272,6 @@ void gc_stop_the_world()
     }
     event0("/gc_stop_the_world:end");
 }
-
-/* pthread_kill is not guaranteed to be reentrant, prevent
- * gc_stop_the_world from interrupting another pthread_kill */
-int sb_thread_kill (pthread_t thread, int sig) {
-    sigset_t old;
-    block_blockable_signals(&old);
-    int ret = pthread_kill(thread, sig);
-    thread_sigmask(SIG_SETMASK, &old, NULL);
-    return ret;
-}
-
 
 void gc_start_the_world()
 {
