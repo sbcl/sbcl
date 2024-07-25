@@ -1460,3 +1460,11 @@
          x
          (error "")))
    number))
+
+(with-test (:name :member-list-type)
+  (assert-type
+   (lambda (x y)
+     (if (member x y)
+         y
+         (error "")))
+   cons))

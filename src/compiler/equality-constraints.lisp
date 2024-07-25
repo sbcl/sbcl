@@ -924,3 +924,15 @@
   (let ((type (find-position-item-type sequence key test)))
     (when type
       (values item type nil nil t))))
+
+(defoptimizers constraint-propagate-if (%member %member-eq %member-if %member-if-not) ((x list))
+  (values list (specifier-type 'cons) nil nil t))
+
+(defoptimizers constraint-propagate-if
+    (%member-test %member-test-not %member-key %member-key-eq
+                  %member-if-key %member-if-not-key) ((x list test))
+  (values list (specifier-type 'cons) nil nil t))
+
+(defoptimizers constraint-propagate-if (%member-key-test %member-key-test-not) ((x list key test))
+  (values list (specifier-type 'cons) nil nil t))
+
