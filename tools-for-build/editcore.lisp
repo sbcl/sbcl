@@ -1589,7 +1589,12 @@
                       (let* ((layout
                               (truly-the layout
                                (translate (%instance-layout (translated-obj)) spacemap)))
-                             (id (%layout-id layout))
+                             (id
+                               (cond ((logtest +structure-layout-flag+
+                                               (layout-flags (truly-the layout layout)))
+                                      (%layout-id layout))
+                                     (t
+                                      (return-from recurse '%instance-too-hairy-to-extract%))))
                              (allowed (position id *allowed-instance-type-ids*)))
                         (cond
                           (allowed
