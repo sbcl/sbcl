@@ -4338,7 +4338,15 @@ unhandled_sigmemoryfault(void __attribute__((unused)) *addr)
 void zero_all_free_ranges() /* called only by gc_and_save() */
 {
     page_index_t i;
-    for (i = 0; i < next_free_page; i++) {
+    // gc_and_save() dumps at the granularity of "backend" pages, not GC pages
+    // so make sure that any extra GC pages are zeroed
+#if BACKEND_PAGE_BYTES > GENCGC_PAGE_BYTES
+    const int gc_pagecount_align = BACKEND_PAGE_BYTES/GENCGC_PAGE_BYTES;
+#else
+    const int gc_pagecount_align = 1;
+#endif
+    page_index_t limit = ALIGN_UP(next_free_page, gc_pagecount_align);
+    for (i = 0; i < limit; i++) {
         char* start = page_address(i);
         char* page_end = start + GENCGC_PAGE_BYTES;
         start += page_bytes_used(i);
