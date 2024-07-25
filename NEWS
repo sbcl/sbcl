@@ -8,6 +8,8 @@ changes relative to sbcl-2.4.6:
   * minor incompatible change: code objects are now printed with their ending
     address as well as their start address.
   * platform support:
+    ** fix occasional saved core corruption on Win32.  (reported by Luís
+       Borges de Oliveira)
     ** address some crashing cases in arena support.  (reported by Andreas
        Franke)
     ** fix a hard-coded path to `cp`.  (thanks to Hraban Luyat)
