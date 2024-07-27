@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.6:
+changes in sbcl-2.4.7 relative to sbcl-2.4.6:
   * minor incompatible change: the compiler will emit optimization notes
     related to complex type checks only at high SPEED optimization settings.
   * minor incompatible change: the GET-FOREGROUND symbol is now exported from
