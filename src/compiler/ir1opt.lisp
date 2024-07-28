@@ -820,24 +820,24 @@
                 for uses = (lvar-uses arg)
                 for type = (lvar-type arg)
                 when (consp uses)
-                do (loop named inner
-                         for use in uses
-                         for node-type = (node-derived-type use)
-                         when (and (eq (next-block use) block)
-                                   (type/= type node-type))
-                         do (let ((types (loop for arg2 in (combination-args combination)
-                                               collect (if (eq arg arg2)
-                                                           (single-value-type node-type)
-                                                           (lvar-type arg2)))))
-                              (let ((derived (combination-derive-type-for-arg-types combination types)))
-                                (cond ((not derived))
-                                      ((eq (setf derived (single-value-type derived))
-                                           (specifier-type 'null))
-                                       (change-block-successor (node-block use) block (if-alternative if))
-                                       (delete-lvar-use use))
-                                      ((not (types-equal-or-intersect derived (specifier-type 'null)))
-                                       (change-block-successor (node-block use) block (if-consequent if))
-                                       (delete-lvar-use use))))))))))))
+                do
+                (loop for use in uses
+                      when (eq (next-block use) block)
+                      do (let ((node-type (single-value-type (node-derived-type use))))
+                           (when (type/= type node-type)
+                             (let ((types (loop for arg2 in (combination-args combination)
+                                                collect (if (eq arg arg2)
+                                                            node-type
+                                                            (lvar-type arg2)))))
+                               (let ((derived (combination-derive-type-for-arg-types combination types)))
+                                 (cond ((not derived))
+                                       ((eq (setf derived (single-value-type derived))
+                                            (specifier-type 'null))
+                                        (change-block-successor (node-block use) block (if-alternative if))
+                                        (delete-lvar-use use))
+                                       ((not (types-equal-or-intersect derived (specifier-type 'null)))
+                                        (change-block-successor (node-block use) block (if-consequent if))
+                                        (delete-lvar-use use))))))))))))))
 
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
