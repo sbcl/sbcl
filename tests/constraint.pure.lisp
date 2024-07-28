@@ -1466,7 +1466,15 @@
      (if (find b v :test #'>)
          b
          (error "")))
-   real))
+   real)
+  (assert-type
+   (lambda (a v)
+     (declare (fixnum a)
+              ((vector (unsigned-byte 8)) v))
+     (if (find a v :test #'=)
+         a
+         (error "")))
+   (unsigned-byte 8)))
 
 (with-test (:name :member-list-type)
   (assert-type

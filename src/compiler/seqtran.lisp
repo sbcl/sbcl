@@ -2578,14 +2578,14 @@
           type))))
 
 (deftransform %find-position ((item sequence from-end start end key test))
-  (let* ((test (lvar-fun-is test '(eql equal equalp char-equal)))
+  (let* ((test (lvar-fun-is test '(eql equal equalp char-equal =)))
          (test-origin test))
     (when test
       (setf test (change-test-based-on-item test (lvar-type item)))
       (unless (eq test 'eq)
         (let ((elt (sequence-element-type sequence key)))
           (setf test (change-test-based-on-item test elt))
-          (when (and (eq test 'equalp)
+          (when (and (memq test '(equalp =))
                      (csubtypep (lvar-type item) (specifier-type 'integer))
                      (csubtypep elt (specifier-type 'integer)))
             (setf test (if (or (csubtypep (lvar-type item) (specifier-type 'fixnum))
