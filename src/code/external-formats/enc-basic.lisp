@@ -719,7 +719,7 @@
     (let* ((head (buffer-head ibuf))
            (tail (buffer-tail ibuf))
            (sap (buffer-sap ibuf))
-           (n (logand (min (- (- end start))
+           (n (logand (min (- end start)
                            (- tail head))
                       (- sb-vm:n-word-bytes)))
            (repeat (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
@@ -730,12 +730,12 @@
                          sb-c::preserve-constants))
       (loop for ibuf-offset from head below (+ head n) by sb-vm:n-word-bytes
             do
-            (incf string-offset sb-vm:n-word-bytes)
             (let ((word (sap-ref-word sap ibuf-offset)))
               (when (logtest word ascii-mask)
                 (setf head ibuf-offset)
                 (return))
               (setf (sap-ref-word string-sap string-offset) word))
+            (incf string-offset sb-vm:n-word-bytes)
             finally (incf head n))
       (setf (buffer-head ibuf) head)
       (truly-the index string-offset))))
