@@ -897,22 +897,12 @@
                    (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
                      (when arg
                        (setf type
-                             (type-intersection type arg))))))))
-           (fun-returns-type (fun-lvar)
-             (when fun-lvar
-               (let ((fun-type (lvar-fun-type fun-lvar t t)))
-                 (when (fun-type-p fun-type)
-                   (setf type
-                         (type-intersection type (single-value-type (fun-type-returns fun-type)))))))))
-      (cond ((or (not test)
-                 (lvar-fun-is test '(eq eql)))
-             (fun-returns-type key))
-            (t
-             (fun-accepts-type test 0))))
-    (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
-      (unless (eq upgraded-type *wild-type*)
+                             (type-intersection type arg)))))))))
+      (fun-accepts-type test 0)
+      (when (or (not test)
+                (lvar-fun-is test '(eq eql)))
         (setf type
-              (type-intersection type upgraded-type))))
+              (type-intersection type (sequence-element-type sequence key)))))
     type))
 
 (defoptimizer (%find-position constraint-propagate-if) ((item sequence from-end start end key test))

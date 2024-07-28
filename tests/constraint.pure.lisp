@@ -1459,7 +1459,14 @@
      (if (position x y :key #'1+)
          x
          (error "")))
-   number))
+   number)
+  (assert-type
+   (lambda (b v)
+     (declare ((vector (unsigned-byte 8)) v))
+     (if (find b v :test #'>)
+         b
+         (error "")))
+   real))
 
 (with-test (:name :member-list-type)
   (assert-type
