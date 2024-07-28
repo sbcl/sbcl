@@ -1691,7 +1691,15 @@
           (persist-to-file spacemap core-offset stream))))))
 
 (defun split-core (input-pathname asm-pathname &rest args)
-  (let ((tmp (format nil "/tmp/sbcl~D.tmpcore" (sb-unix:unix-getpid))))
+  (let ((tmp (flet ((try-directory (dir)
+                      (when (and dir (string/= "" dir) (sb-unix:unix-access dir sb-unix:w_ok))
+                        dir)))
+               (format nil "~a/sbcl~D.tmpcore"
+                       (or (try-directory (posix-getenv "TMPDIR"))
+                           (try-directory "/tmp")
+                           (try-directory (user-homedir-pathname))
+                           (error "Can't find a writeable directory for our split core."))
+                       (sb-unix:unix-getpid)))))
     ;; input core could be readonly
     (unwind-protect (progn (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
                                         :search t)
