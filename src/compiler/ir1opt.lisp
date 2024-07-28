@@ -833,11 +833,11 @@
                                 (cond ((not derived))
                                       ((eq (setf derived (single-value-type derived))
                                            (specifier-type 'null))
-                                       (delete-lvar-use use)
-                                       (change-block-successor (node-block use) block (if-alternative if)))
+                                       (change-block-successor (node-block use) block (if-alternative if))
+                                       (delete-lvar-use use))
                                       ((not (types-equal-or-intersect derived (specifier-type 'null)))
-                                       (delete-lvar-use use)
-                                       (change-block-successor (node-block use) block (if-consequent if)))))))))))))
+                                       (change-block-successor (node-block use) block (if-consequent if))
+                                       (delete-lvar-use use))))))))))))
 
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this

@@ -4514,4 +4514,10 @@
      (if (> (length x) 10)
          x
          (error "m")))
-   vector))
+   vector)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (evenp (if a 1 0)))
+   ((t) nil)
+   ((nil) t)))
