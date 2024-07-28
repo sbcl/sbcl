@@ -54,11 +54,11 @@ int minimal_perftest(void* ptr, int n_calls)
   return 0;
 }
 
+void*
 #ifdef _WIN32
-__stdcall unsigned int doThatThing(void* void_arg)
-#else
-void* doThatThing(void* void_arg)
+__stdcall
 #endif
+doThatThing(void* void_arg)
 {
     struct thread_arg* arg = void_arg;
     int thread_result = 0xC0FEFE;
@@ -96,7 +96,7 @@ int call_thing_from_threads(void* ptr, int n_threads, int n_calls)
         threads[i].arg.index = i + 1;
         threads[i].arg.n_calls = n_calls;
 #ifdef _WIN32
-        threads[i].handle = (HANDLE)_beginthreadex(NULL, 0, doThatThing, &threads[i].arg, 0, NULL);
+        threads[i].handle = (HANDLE)_beginthreadex(NULL, 0, (unsigned int (*)(void *))doThatThing, &threads[i].arg, 0, NULL);
 #else
         pthread_create(&threads[i].pthread_id, 0, doThatThing, &threads[i].arg);
 #endif
