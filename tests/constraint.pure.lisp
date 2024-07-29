@@ -1481,7 +1481,31 @@
      (if (find a v :test #'=)
          a
          (error "")))
-   (unsigned-byte 8)))
+   (unsigned-byte 8))
+  (assert-type
+   (lambda (x y)
+     (if (member x y :key #'1+)
+         (values x y)
+         (error "")))
+   (values number cons &optional))
+  (assert-type
+   (lambda (x y)
+     (if (member x y :test #'string=)
+         (values x y)
+         (error "")))
+   (values (or string symbol character) cons &optional))
+  (assert-type
+   (lambda (x y)
+     (if (position x y :key #'1+ :test-not #'eql)
+         x
+         (error "")))
+   t)
+  (assert-type
+   (lambda (x y)
+     (if (position x y :test-not #'=)
+         x
+         (error "")))
+   number))
 
 (with-test (:name :member-list-type)
   (assert-type

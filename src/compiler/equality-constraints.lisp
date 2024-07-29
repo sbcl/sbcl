@@ -888,7 +888,7 @@
     (values nil
             (list (list 1 '< y)))))
 
-(defun find-position-item-type (sequence key test)
+(defun find-position-item-type (sequence key test &optional test-not)
   (let ((type *universal-type*))
     (flet ((fun-accepts-type (fun-lvar argument)
              (when fun-lvar
@@ -899,30 +899,42 @@
                        (setf type
                              (type-intersection type arg)))))))))
       (fun-accepts-type test 0)
-      (when (or (not test)
-                (lvar-fun-is test '(eq eql)))
+      (fun-accepts-type test-not 0)
+      (when (and (or (not test)
+                     (lvar-fun-is test '(eq eql)))
+                 (not test-not))
         (setf type
               (type-intersection type (sequence-element-type sequence key)))))
     type))
 
 (defoptimizer (%find-position constraint-propagate-if) ((item sequence from-end start end key test))
-  (let ((type (find-position-item-type sequence key test)))
-    (when type
-      (values item type nil nil t))))
+  (values item (find-position-item-type sequence key test) nil nil t))
 
-(defoptimizers constraint-propagate-if (find position) ((item sequence &key key test &allow-other-keys))
-  (let ((type (find-position-item-type sequence key test)))
-    (when type
-      (values item type nil nil t))))
+(defoptimizers constraint-propagate-if (find position) ((item sequence &key key test test-not &allow-other-keys))
+  (values item (find-position-item-type sequence key test test-not) nil nil t))
 
 (defoptimizers constraint-propagate-if (%member %member-eq %member-if %member-if-not) ((x list))
   (values list (specifier-type 'cons) nil nil t))
 
 (defoptimizers constraint-propagate-if
-    (%member-test %member-test-not %member-key %member-key-eq
-                  %member-if-key %member-if-not-key) ((x list test))
+    (%member-key %member-key-eq) ((item list key))
+  (values nil nil (list (list 'typep list (specifier-type 'cons))
+                        (list 'typep item (find-position-item-type list key nil)))))
+
+(defoptimizers constraint-propagate-if
+    (%member-test %member-test-not) ((item list test))
+  (values nil nil (list (list 'typep list (specifier-type 'cons))
+                        (list 'typep item (find-position-item-type list nil test)))))
+
+(defoptimizers constraint-propagate-if
+    (%member-if-key %member-if-not-key) ((x list test))
   (values list (specifier-type 'cons) nil nil t))
 
-(defoptimizers constraint-propagate-if (%member-key-test %member-key-test-not) ((x list key test))
-  (values list (specifier-type 'cons) nil nil t))
+(defoptimizers constraint-propagate-if (%member-key-test-not) ((item list key test))
+  (values nil nil (list (list 'typep list (specifier-type 'cons))
+                        (list 'typep item (find-position-item-type list key nil test)))))
+
+(defoptimizers constraint-propagate-if (%member-key-test) ((item list key test))
+  (values nil nil (list (list 'typep list (specifier-type 'cons))
+                        (list 'typep item (find-position-item-type list key test)))))
 
