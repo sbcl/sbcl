@@ -1420,16 +1420,18 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
              (setf defined-fun (get-defined-fun name)))
            (when (boundp '*lexenv*)
              (aver (producing-fasl-file))
-             (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
-                 (warn 'duplicate-definition :name name)
-                 (push name (fun-names-in-this-file *compilation*))))
+             (let ((names (fun-names-in-this-file *compilation*)))
+               (if (hashset-find names name)
+                   (warn 'duplicate-definition :name name)
+                   (hashset-insert names name))))
            ;; I don't know why this is guarded by (WHEN compile-toplevel),
            ;; because regular old %DEFUN is going to call this anyway.
            (%set-inline-expansion name defined-fun inline-lambda extra-info)))
         ((boundp 'sb-fasl::*current-fasl-group*)
-         (if (member name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*) :test #'equal)
-             (warn 'duplicate-definition :name name)
-             (push name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*)))))
+         (let ((names (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*)))
+           (if (hashset-find names name)
+               (warn 'duplicate-definition :name name)
+               (hashset-insert names name)))))
 
   (become-defined-fun-name name)
 

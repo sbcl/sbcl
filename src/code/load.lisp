@@ -682,7 +682,7 @@
                       nil)))))))
 
 (defstruct fasl-group
-  (fun-names))
+  (fun-names (sb-c::make-fun-name-hashset)))
 
 (defvar *current-fasl-group*)
 ;;;

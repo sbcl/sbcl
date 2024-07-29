@@ -200,10 +200,19 @@
         ;; And who knows what the host considers "simple".
         #-sb-xc-host (not simple-array)))
 
+(defun make-fun-name-hashset ()
+  (make-hashset 32
+                (lambda (a b) (or (eq a b) (and (consp a) (consp b) (equal a b))))
+                ;; We don't emulate sb-xc:sxhash thoroughly enough to hash compound names
+                ;; (lists are rejected) but it doesn't actually matter what the hash is
+                ;; for duplicate name detection.
+                #+sb-xc-host #'cl:sxhash
+                #-sb-xc-host #'sxhash))
+
 (defstruct (compilation (:copier nil)
                         (:predicate nil)
                         (:conc-name ""))
-  (fun-names-in-this-file)
+  (fun-names-in-this-file (make-fun-name-hashset))
   ;; for constant coalescing across code components, and/or for situations
   ;; where SIMILARP does not do what you want.
   (constant-cache)

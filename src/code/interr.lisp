@@ -142,9 +142,9 @@
                            :name name
                            :not-yet-loaded
                            (cond ((and (boundp 'sb-c:*compilation*)
-                                       (member name (sb-c::fun-names-in-this-file
-                                                     sb-c:*compilation*)
-                                               :test #'equal))
+                                       (hashset-find (sb-c::fun-names-in-this-file
+                                                      sb-c:*compilation*)
+                                                     name))
                                   t)
                                  ((and (boundp 'sb-c:*lexenv*)
                                        (sb-c::fun-locally-defined-p

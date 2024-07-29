@@ -169,7 +169,7 @@
 (defun maybe-defined-here (name where)
   (if (and (eq :defined where)
            (boundp '*compilation*)
-           (member name (fun-names-in-this-file *compilation*) :test #'equal))
+           (hashset-find (fun-names-in-this-file *compilation*) name))
       :defined-here
       where))
 

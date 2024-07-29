@@ -102,9 +102,10 @@ only."
   (let ((name-key `(,kind ,name)))
     (when (boundp '*lexenv*)
       ;; a slight OAOO issue here wrt %COMPILER-DEFUN
-      (if (member name-key (fun-names-in-this-file *compilation*) :test #'equal)
-          (compiler-style-warn 'same-file-redefinition-warning :name name)
-          (push name-key (fun-names-in-this-file *compilation*))))))
+      (let ((c *compilation*))
+        (if (hashset-find (fun-names-in-this-file c) name-key)
+            (compiler-style-warn 'same-file-redefinition-warning :name name)
+            (hashset-insert (fun-names-in-this-file c) name-key))))))
 
 (defun %defmacro (name definition source-location)
   (declare (ignorable source-location)) ; xc-host doesn't use
