@@ -807,3 +807,10 @@
                                  (values #'1+ #'cdr))
                            (sort x f :key key)))
                       :allow-style-warnings t))))
+
+(with-test (:name :member-bad-test)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (m y)
+                         (member m y :test #'= :key #'symbol-name))
+                      :allow-warnings t))))

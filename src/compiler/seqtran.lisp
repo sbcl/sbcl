@@ -1305,6 +1305,13 @@
 (defoptimizer (vector-subseq* ir2-hook) ((vector start end) node)
   (check-sequence-ranges vector start end node))
 
+(defoptimizers ir2-hook (%member-key-test)
+    ((item list key test) node)
+  (check-sequence-test item list test key node))
+
+(defoptimizers ir2-hook (%member-key-eq %member-key) ((item list key) node)
+  (check-sequence-test item list nil key node))
+
 (defun string-cmp-deriver (string1 string2 start1 end1 start2 end2 &optional equality)
   (flet ((dims (string start end)
            (let* ((type (lvar-type string))
