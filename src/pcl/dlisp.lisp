@@ -256,8 +256,8 @@
                  `((let ((value ,read-form))
                      (return-from access (not (unbound-marker-p value))))))
                 (:makunbound
-                 `(progn (setf ,read-form +slot-unbound+)
-                         ,instance))
+                 `((progn (setf ,read-form +slot-unbound+)
+                          ,instance)))
                 (:writer
                  `((return-from access (setf ,read-form ,(car arglist)))))))
           (funcall miss-fn ,@arglist))))))
