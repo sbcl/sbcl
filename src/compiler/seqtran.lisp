@@ -3534,29 +3534,33 @@
         ;; with REDUCE and which benefit from improved type
         ;; derivation.
         (or
-         (when (and (eq name '+)
-                    element-type
+         (when (and element-type
                     (neq element-type *wild-type*)
                     (neq element-type *universal-type*))
            (let* ((non-empty (typep length '(integer 1)))
                   (identity-p (and (not initial-value)
                                    (not non-empty))))
-             (labels ((try (type)
-                        (let ((type (specifier-type type)))
-                          (when (csubtypep element-type type)
-                            (cond (identity-p
-                                   (type-union type
-                                               (specifier-type '(eql 0))))
-                                  (initial-value
-                                   (let ((contagion (numeric-contagion type initial-value-type
-                                                                       :rational nil
-                                                                       :unsigned t)))
-                                     (if non-empty
-                                         contagion
-                                         (type-union contagion initial-value-type))))
-                                  (t
-                                   type))))))
-               (some #'try '(double-float single-float float unsigned-byte integer rational real)))))
+             (case name
+               (+
+                (labels ((try (type)
+                           (let ((type (specifier-type type)))
+                             (when (csubtypep element-type type)
+                               (cond (identity-p
+                                      (type-union type
+                                                  (specifier-type '(eql 0))))
+                                     (initial-value
+                                      (let ((contagion (numeric-contagion type initial-value-type
+                                                                          :rational nil
+                                                                          :unsigned t)))
+                                        (if non-empty
+                                            contagion
+                                            (type-union contagion initial-value-type))))
+                                     (t
+                                      type))))))
+                  (some #'try '(double-float single-float float unsigned-byte integer rational real))))
+               (logior
+                (when (csubtypep element-type (specifier-type 'integer))
+                  element-type)))))
          (let ((fun-result (single-value-type (fun-type-returns fun-type))))
            (cond (initial-value-type
                   (type-union initial-value-type fun-result))

@@ -873,3 +873,10 @@
   (checked-compile `(lambda ()
                       (replace nil #()))
                    :allow-notes nil))
+
+(with-test (:name :reduce-type)
+  (assert-type
+   (lambda (v)
+     (declare ((vector (unsigned-byte 8)) v))
+     (reduce #'logior v))
+   (unsigned-byte 8)))
