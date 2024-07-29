@@ -667,7 +667,7 @@
 (defun add-combination-test-constraints (use constraints
                                          consequent-constraints
                                          alternative-constraints
-                                         quick-p)
+                                         quick-p &optional (nth-value 0))
   (flet ((add (fun lvar y &optional no-complement)
            (let ((x (ok-lvar-lambda-var lvar constraints)))
              (if no-complement
@@ -702,7 +702,7 @@
       (binding* ((info (combination-fun-info use) :exit-if-null)
                  (propagate (fun-info-constraint-propagate-if info) :exit-if-null))
         (multiple-value-bind (lvar type if else no-complement)
-            (funcall propagate use constraints)
+            (funcall propagate use constraints nth-value)
           (prop if consequent-constraints)
           (prop else alternative-constraints)
           (when (and lvar type)
@@ -741,9 +741,16 @@
                     (add 'typep (ok-lvar-lambda-var (ref-lvar node) constraints)
                          (specifier-type 'null) t)
                     (let ((use (principal-lvar-ref-use (ref-lvar use))))
-                      (when (and use
-                                 (not (ref-p use)))
-                        (process-node use))))
+                      (if use
+                          (unless (ref-p use)
+                            (process-node use))
+                          (multiple-value-bind (node nth-value) (mv-principal-lvar-ref-use (ref-lvar node))
+                            (when (combination-p node)
+                              (add-combination-test-constraints node constraints
+                                                                consequent-constraints
+                                                                alternative-constraints
+                                                                quick-p
+                                                                nth-value))))))
                    (combination
                     (unless (eq (combination-kind node) :error)
                       (let ((name (uncross

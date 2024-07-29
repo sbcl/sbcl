@@ -1450,6 +1450,13 @@
    character)
   (assert-type
    (lambda (x y)
+     (declare (string y))
+     (if (position x y)
+         x
+         (error "")))
+   character)
+  (assert-type
+   (lambda (x y)
      (if (position x y :test #'=)
          x
          (error "")))
