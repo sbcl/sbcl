@@ -333,32 +333,40 @@
 ;; expicitly ask us to load a file with a made-up name (e.g., the
 ;; defaulted filename might exceed filename length limits).
 (defun probe-load-defaults (pathname)
-  (destructuring-bind (defaulted-source-pathname
-                       defaulted-source-truename
-                       defaulted-fasl-pathname
-                       defaulted-fasl-truename)
-      (loop for type in (list *load-source-default-type*
-                              *fasl-file-type*)
-            as probe-pathname = (make-pathname :type type
-                                               :defaults pathname)
-            collect probe-pathname
-            collect (handler-case (probe-file probe-pathname)
-                      (file-error () nil)))
-    (cond ((and defaulted-fasl-truename
-                defaulted-source-truename
-                (> (file-write-date defaulted-source-truename)
-                   (file-write-date defaulted-fasl-truename)))
+  (multiple-value-bind (source-existsp defaulted-source-pathname
+                        fasl-existsp defaulted-fasl-pathname)
+      (flet ((probe (type &aux (candidate (make-pathname :type type
+                                                         :defaults pathname)))
+               ;; %query-file-system doesn't like LPNs. Maybe this should just
+               ;; always call (%query-file-system (translate-logical-pathname))
+               ;; since that works in either case. The right thing may be to translate
+               ;; before calling PROBE-LOAD-DEFAULTS but I'm not sure, because the
+               ;; translation of the name could differ by the type.
+               ;; In no case should this function ask for truename of a physical
+               ;; pathname on #+unix but maybe on #+win32 it has to, for reasons
+               ;; that I don't know. If so, we can just turn this test into
+               ;; (if (or #+win32 t (logical-pathname-p candidate)))
+               (values (if (logical-pathname-p candidate)
+                           (probe-file candidate)
+                           (sb-impl::%query-file-system candidate :existence nil))
+                       candidate)))
+        (multiple-value-call #'values
+          (probe *load-source-default-type*) (probe *fasl-file-type*)))
+    (cond ((and fasl-existsp
+                source-existsp
+                (> (file-write-date defaulted-source-pathname)
+                   (file-write-date defaulted-fasl-pathname)))
            (restart-case
                (error "The object file ~A is~@
                        older than the presumed source:~%  ~A."
-                      defaulted-fasl-truename
-                      defaulted-source-truename)
+                      defaulted-fasl-pathname
+                      defaulted-source-pathname)
              (source () :report "load source file"
                      defaulted-source-pathname)
              (object () :report "load object file"
                      defaulted-fasl-pathname)))
-          (defaulted-fasl-truename defaulted-fasl-pathname)
-          (defaulted-source-truename defaulted-source-pathname))))
+          (fasl-existsp defaulted-fasl-pathname)
+          (source-existsp defaulted-source-pathname))))
 
 ;;;; linkage fixups
 
