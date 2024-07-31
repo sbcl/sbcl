@@ -880,3 +880,17 @@
      (declare ((vector (unsigned-byte 8)) v))
      (reduce #'logior v))
    (unsigned-byte 8)))
+
+(with-test (:name :position-index-errors)
+  (assert (= (count 'sb-int:sequence-bounding-indices-bad-error
+                    (ctu:ir1-named-calls `(lambda (y)
+                                            (declare (optimize speed)
+                                                     (simple-string y))
+                                            (position #\a y :start 1))))
+             1))
+  (assert (= (count 'sb-int:sequence-bounding-indices-bad-error
+                    (ctu:ir1-named-calls `(lambda (y)
+                                            (declare (optimize speed)
+                                                     (string y))
+                                            (find #\a y :start 1))))
+             1)))

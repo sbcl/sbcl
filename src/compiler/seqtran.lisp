@@ -2633,7 +2633,9 @@
                                                             start
                                                             end-arg
                                                             element
-                                                            done-p-expr)
+                                                            done-p-expr
+                                                            &optional (with-array-data t)
+                                                                      offset-arg)
   (with-unique-names (offset block index n-sequence sequence end)
     (let ((maybe-return
             ;; WITH-ARRAY-DATA has already performed bounds
@@ -2646,28 +2648,32 @@
                    (values ,element
                            (- ,index ,offset)))))))
      `(let* ((,n-sequence ,sequence-arg))
-        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
-                          (,start ,start)
-                          (,end ,end-arg)
-                          :check-fill-pointer t)
-          (block ,block
-            (if ,from-end
-                (loop for ,index
-                      ;; (If we aren't fastidious about declaring that
-                      ;; INDEX might be -1, then (FIND 1 #() :FROM-END T)
-                      ;; can send us off into never-never land, since
-                      ;; INDEX is initialized to -1.)
-                      of-type index-or-minus-1
-                      from (1- ,end) downto ,start
-                      do
-                      ,maybe-return)
-                (loop for ,index of-type index from ,start below ,end
-                      do
-                      ,maybe-return))
-            (values nil nil)))))))
+        (,@ (if with-array-data
+                `(with-array-data ((,sequence ,n-sequence :offset-var ,offset)
+                                   (,start ,start)
+                                   (,end ,end-arg)
+                                   :check-fill-pointer t))
+                `(let ((,sequence ,n-sequence)
+                       (,end ,end-arg)
+                       (,offset ,offset-arg))))
+            (block ,block
+              (if ,from-end
+                  (loop for ,index
+                        ;; (If we aren't fastidious about declaring that
+                        ;; INDEX might be -1, then (FIND 1 #() :FROM-END T)
+                        ;; can send us off into never-never land, since
+                        ;; INDEX is initialized to -1.)
+                        of-type index-or-minus-1
+                        from (1- ,end) downto ,start
+                        do
+                        ,maybe-return)
+                  (loop for ,index of-type index from ,start below ,end
+                        do
+                        ,maybe-return))
+              (values nil nil)))))))
 
 (sb-xc:defmacro %find-position-vector-macro (item sequence
-                                             from-end start end key test)
+                                             from-end start end key test &optional (with-array-data t) offset)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
@@ -2678,7 +2684,9 @@
      ;; (See the LIST transform for a discussion of the correct
      ;; argument order, i.e. whether the searched-for ,ITEM goes before
      ;; or after the checked sequence element.)
-     `(funcall ,test ,item (funcall ,key ,element)))))
+     `(funcall ,test ,item (funcall ,key ,element))
+     with-array-data
+     offset)))
 
 (sb-xc:defmacro %find-position-if-vector-macro (predicate sequence
                                                      from-end start end key)
@@ -2803,21 +2811,14 @@
                               *
                               :policy (> speed space))
   (if (eq '* (upgraded-element-type-specifier sequence))
-      (let ((form
-             `(sb-impl::string-dispatch ((simple-array character (*))
-                                         (simple-array base-char (*)))
-                  sequence
-                (%find-position item sequence from-end start end key test))))
-        (if (csubtypep (lvar-type sequence) (specifier-type 'simple-string))
-            form
-            ;; Otherwise we'd get three instances of WITH-ARRAY-DATA from
-            ;; %FIND-POSITION.
-            `(with-array-data ((sequence sequence :offset-var offset)
-                               (start start)
-                               (end end)
-                               :check-fill-pointer t)
-               (multiple-value-bind (elt index) ,form
-                 (values elt (when (fixnump index) (- index offset)))))))
+      `(with-array-data ((sequence sequence :offset-var offset)
+                         (start start)
+                         (end end)
+                         :check-fill-pointer t)
+         (sb-impl::string-dispatch ((simple-array character (*))
+                                    (simple-array base-char (*)))
+                                   sequence
+           (%find-position-vector-macro item sequence from-end start end key test nil offset)))
       ;; The type is known exactly, other transforms will take care of it.
       (give-up-ir1-transform)))
 
