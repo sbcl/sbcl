@@ -467,7 +467,19 @@
                                        sb-unix:s-ifdir)))
             (:author (sb-unix:uid-username uid))
             (:write-date (+ unix-to-universal-time mtime)))
-          (resolve-problematic-symlink filename errno nil)))))
+          (if (and (not errorp) (eq query-for :existence))
+              ;; If stat() failed for whatever reason, then lstat() will similarly fail,
+              ;; barring race conditions - creating a file, changing mode bits, etc in
+              ;; between the two calls. So just return NIL. There are some edge cases:
+              ;; suppose "foo.txt" is a symlink to "/nosuchthing". The old behavior of ENOENT
+              ;; was to return #P"foo.txt" despite that the link's target does not exist.
+              ;; If such behavior was desirable in the case where RESOLVE- dubiously returned
+              ;; a pathname, then any callers which uses this as a near-equivalent of
+              ;; FILE-EXISTS-P can just use that instead. Unfortunately FILE-EXISTS-P would
+              ;; need to become aware of logical pathnames.
+              ;; I claim that test-driven design says this is working as it should.
+              nil
+              (resolve-problematic-symlink filename errno nil))))))
 
 (defun probe-file (pathspec)
   "Return the truename of PATHSPEC if the truename can be found,
@@ -647,7 +659,10 @@ exist or if is a file or a symbolic link."
                                       :as-directory directory))
            (probe (path)
              (let ((contrib (merge-pathnames "contrib/" path)))
-               (when (probe-file contrib)
+               ;; X_OK implies a searchable directory. Not defined on #+win32
+               (when #+unix (sb-unix:unix-access (namestring contrib)
+                                                 (logior sb-unix:r_ok sb-unix:x_ok))
+                     #-unix (probe-file contrib)
                  path)))
            (try-runtime-home (path)
              (or (probe path)

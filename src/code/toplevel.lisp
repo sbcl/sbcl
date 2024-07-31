@@ -16,9 +16,10 @@
 ;;;; default initfiles
 
 (defun sysinit-pathname ()
-  (or (let ((sbcl-homedir (sbcl-homedir-pathname)))
-        (when sbcl-homedir
-          (probe-file (merge-pathnames "sbclrc" sbcl-homedir))))
+  (or (binding* ((sbcl-homedir (sbcl-homedir-pathname) :exit-if-null)
+                 (merged (merge-pathnames "sbclrc" sbcl-homedir)))
+        (when (sb-unix:unix-access (namestring merged) sb-unix:r_ok)
+          merged))
       #+win32
       (merge-pathnames "sbcl\\sbclrc"
                        (sb-win32::get-folder-pathname
