@@ -1505,7 +1505,20 @@
      (if (position x y :test-not #'=)
          x
          (error "")))
-   number))
+   number)
+  (assert-type
+   (lambda (x y)
+     (if (find x y)
+         x
+         (error "")))
+   (not null))
+  (assert-type
+   (lambda (x y)
+     (declare (vector y))
+     (if (find x y)
+         x
+         (error "")))
+   (not null)))
 
 (with-test (:name :member-list-type)
   (assert-type
