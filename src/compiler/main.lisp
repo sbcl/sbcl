@@ -1691,21 +1691,23 @@ necessary, since type inference may take arbitrarily long to converge.")
        (values t t t)))))
 
 ;;; Return a pathname for the named file. The file must exist.
+(macrolet ((fast-probe-file (x)
+             #+sb-xc-host `(probe-file ,x)
+             #-sb-xc-host `(sb-impl::query-file-system ,x :existence nil)))
 (defun verify-source-file (pathname-designator)
   (let* ((pathname (pathname pathname-designator))
          (default-host (make-pathname :host (pathname-host pathname))))
-    (flet ((try-with-type (path type error-p)
+    (flet ((try-with-type (type)
              (let ((new (merge-pathnames
-                         path (make-pathname :type type
-                                             :defaults default-host))))
-               (if (probe-file new)
-                   new
-                   (and error-p (truename new))))))
-      (cond ((typep pathname 'logical-pathname)
-             (try-with-type pathname "LISP" t))
-            ((probe-file pathname) pathname)
-            ((try-with-type pathname "lisp"  nil))
-            ((try-with-type pathname "lisp"  t))))))
+                         pathname (make-pathname :type type :defaults default-host))))
+               ;; This is more efficient than always calling (TRUENAME NEW)
+               ;; because the truename isn't actually needed yet, if at all -
+               ;; the call merely forces a FILE-DOES-NOT-EXIST error.
+               (cond ((fast-probe-file new) new)
+                     (t (truename new))))))
+      (cond ((typep pathname 'logical-pathname) (try-with-type "LISP"))
+            ((fast-probe-file pathname) pathname)
+            ((try-with-type "lisp")))))))
 
 (defun elapsed-time-to-string (internal-time-delta)
   (multiple-value-bind (tsec remainder)
