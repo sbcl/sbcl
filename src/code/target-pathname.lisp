@@ -1300,7 +1300,7 @@ relative to DEFAULTS."
                   (:version (%pathname-version pathname))))))
       (if (not field-key)
           ;; SBCL does not allow :WILD in the host
-          (or (test :directory) (test :directory) (test :name) (test :type) (test :version))
+          (or (test :device) (test :directory) (test :name) (test :type) (test :version))
           (test field-key)))))
 
 (defun pathname-match-p (in-pathname in-wildname)
