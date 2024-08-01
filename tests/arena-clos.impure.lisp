@@ -1,4 +1,5 @@
-#+(or (not system-tlabs) interpreter) (invoke-restart 'run-tests::skip-file)
+#+(or gc-stress ;; c-find-heap->arena is not gc-safe
+      (not system-tlabs) interpreter) (invoke-restart 'run-tests::skip-file)
 
 (defmethod translate ((x (eql :a)) val) (* 1 val))
 (defmethod translate ((x (eql :b)) val) (* 2 val))

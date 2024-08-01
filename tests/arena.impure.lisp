@@ -1,4 +1,5 @@
-#+(or (not system-tlabs) interpreter) (invoke-restart 'run-tests::skip-file)
+#+(or gc-stress ;; c-find-heap->arena is not gc-safe
+      (not system-tlabs) interpreter) (invoke-restart 'run-tests::skip-file)
 
 (in-package sb-vm)
 
