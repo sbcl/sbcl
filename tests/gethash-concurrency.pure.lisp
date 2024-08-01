@@ -24,7 +24,7 @@
   (setf *errors* e)
   (format t "~&oops: ~A in ~S~%" e *current-thread*)
   (sb-debug:print-backtrace)
-  (catch 'done))
+  (throw 'done nil))
 
 (with-test (:name (hash-table :unsynchronized)
                   ;; FIXME: This test occasionally eats out craploads
@@ -222,3 +222,30 @@
           (unwind-protect (sleep 2.5)
             (mapc #'terminate-thread threads))
           (assert (not *errors*)))))))
+
+;;; Stress GROW-HASH-TABLE's optimization wherein no rehashing may be
+;;; done if the index vector is not growing.
+(with-test (:name (hash-table :not-growing-index-vector :parallel-gc)
+            :broken-on :win32)
+  (let ((*errors* nil))
+    (let ((threads
+            (list (make-kill-thread
+                   (lambda ()
+                     (handler-bind ((serious-condition 'oops))
+                       (loop (let ((h (make-hash-table))
+                                   (l (loop for i below (random 200)
+                                            collect (make-teststruct i))))
+                               (loop for x in l do (setf (gethash x h) x))
+                               (loop for x in l
+                                     do (assert (eq (gethash x h) x)))))))
+                   :name "worker")
+                  (make-kill-thread
+                   (lambda ()
+                     (handler-bind ((serious-condition 'oops))
+                       (loop
+                         (sb-ext:gc :full t)
+                         (sleep (random *sleep-delay-max*)))))
+                   :name "collector"))))
+      (unwind-protect (sleep 2.5)
+        (mapc #'terminate-thread threads))
+      (assert (not *errors*)))))
