@@ -6,7 +6,7 @@ use_test_subdirectory
 tmpcore=$TEST_FILESTEM.core
 set -e
 
-# This test asserts that preparing read-only space prior to savign a core file
+# This test asserts that preparing read-only space prior to saving a core file
 # does not attempt to rewrite pointers that appear to point to unknown memory.
 # So the test attempts to fabricate such pointers. However it's a bad idea
 # to store into the car of a cons the value
