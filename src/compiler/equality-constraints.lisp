@@ -1023,13 +1023,17 @@
 
 (defun sequence-min-length (sequence start end)
   (let* ((length (nth-value 1 (sequence-lvar-dimensions sequence)))
-         (start-int (type-approximate-interval (lvar-type start)))
-         (end-int (type-approximate-interval (lvar-type end)))
-         (start (and start-int
-                     (interval-high start-int)))
-         (end (if (eq (lvar-type end) (specifier-type 'null))
-                  (and (neq length '*)
-                       length)
+         (start-int (and start
+                         (type-approximate-interval (lvar-type start))))
+         (end-int (and end
+                       (type-approximate-interval (lvar-type end))))
+         (start (if start
+                    (and start-int
+                         (interval-high start-int))
+                    0))
+         (end (if (or (not end)
+                      (eq (lvar-type end) (specifier-type 'null)))
+                  length
                   (and end-int
                        (interval-low end-int)))))
     (when (and start end)
@@ -1046,3 +1050,16 @@
                (> min2 1))
       (push (list 'typep string2 (specifier-type '(not character))) constraints))
     (values nil nil constraints)))
+
+(defoptimizer (string-equal constraint-propagate-if) ((string1 string2 &key start1 end1 start2 end2))
+  (let ((min1 (sequence-min-length string1 start1 end1))
+        (min2 (sequence-min-length string2 start2 end2))
+        constraints)
+    (when (and min1
+               (> min1 1))
+      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (when (and min2
+               (> min2 1))
+      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (values nil nil constraints)))
+

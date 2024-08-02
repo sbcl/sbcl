@@ -1550,4 +1550,9 @@
    (lambda (x y)
      (when (string= x y :end1 2)
        y))
+   (or string symbol))
+  (assert-type
+   (lambda (y)
+     (when (string-equal "ab" y)
+       y))
    (or string symbol)))
