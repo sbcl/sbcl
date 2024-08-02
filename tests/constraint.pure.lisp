@@ -752,6 +752,13 @@
      (if (equalp x y)
          (eql x y)
          t))
+   boolean)
+  (assert-type
+   (lambda (y)
+     (let ((ht #1=#.(make-hash-table)))
+       (if (equalp (the (eql #1#) ht) y)
+           (eql y ht)
+           t)))
    boolean))
 
 (with-test (:name :bounds-check-constants)
