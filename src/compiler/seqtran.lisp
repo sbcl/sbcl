@@ -2095,6 +2095,31 @@
                             integer-range
                             `(or ,integer-range null)))))))
 
+(defun equal-type (type)
+  (let ((result type))
+    (macrolet ((intersect (type)
+                 `(when (types-equal-or-intersect type (specifier-type ',type))
+                    (setf result (type-union result (specifier-type ',type))))))
+      (intersect cons)
+      (intersect string)
+      (intersect bit-vector)
+      (intersect pathname))
+    result))
+
+(defun equalp-type (type)
+  (let ((result type))
+    (macrolet ((intersect (type)
+                 `(when (types-equal-or-intersect type (specifier-type ',type))
+                    (setf result (type-union result (specifier-type ',type))))))
+      (intersect cons)
+      (intersect array)
+      (intersect pathname)
+      (intersect number)
+      (intersect character) ;; ignore case
+      (intersect hash-table)
+      (intersect instance))
+    result))
+
 (defun find-derive-type (item sequence key test start end from-end)
   (declare (ignore start end from-end))
   (let ((type *universal-type*)
@@ -2110,12 +2135,16 @@
                        (setf type
                              (type-intersection type arg)))))))))
       (when (and item
-                 key-identity-p
-                 (or (not test)
-                     (lvar-fun-is test '(eq eql char= char-equal))
-                     (lvar-value-is test nil)))
-        ;; Maybe FIND returns ITEM itself (or an EQL number).
-        (setf type (lvar-type item)))
+                 key-identity-p)
+        ;; Maybe FIND returns ITEM itself or a comparable type
+        (cond ((or (not test)
+                   (lvar-fun-is test '(eq eql char= char-equal))
+                   (lvar-value-is test nil))
+               (setf type (lvar-type item)))
+              ((lvar-fun-is test '(equal))
+               (setf type (equal-type (lvar-type item))))
+              ((lvar-fun-is test '(equalp))
+               (setf type (equalp-type (lvar-type item))))))
       ;; Should return something the functions can accept
       (if key-identity-p
           (fun-accepts-type test (if item 1 0)) ;; the -if variants.

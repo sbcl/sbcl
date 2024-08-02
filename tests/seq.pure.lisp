@@ -894,3 +894,10 @@
                                                      (string y))
                                             (find #\a y :start 1))))
              1)))
+
+(with-test (:name :find-equalp-type)
+  (assert-type
+   (lambda (y j)
+     (declare ((or integer simple-string) j))
+     (find j y :test #'equalp))
+   (or array number null)))
