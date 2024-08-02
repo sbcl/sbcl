@@ -3347,8 +3347,10 @@
              ;; addition in to catch SNaNs.
              #+x86
              (progn
-               (assert (ctu:asm-search "FADD" fun1))
-               (assert (not (ctu:asm-search "FADD" fun2))))
+               (assert (or (ctu:asm-search "FADDD " fun1)
+                           (ctu:asm-search "FADD-STI " fun1)))
+               (assert (not (or (ctu:asm-search "FADDD " fun2)
+                                (ctu:asm-search "FADD-STI " fun2)))))
              #+x86-64
              (let ((inst (if (typep result 'double-float)
                              "ADDSD" "ADDSS")))
