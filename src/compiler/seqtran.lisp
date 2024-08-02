@@ -1372,7 +1372,7 @@
   (def string-lessp)
   (def string-not-equal t))
 
-(deftransform string ((x) ((or symbol string))) 
+(deftransform string ((x) ((or symbol string)))
   '(if (symbolp x) (symbol-name x) x))
 (deftransform string ((x) (symbol)) '(symbol-name x))
 (deftransform string ((x) (string)) '(progn x))
