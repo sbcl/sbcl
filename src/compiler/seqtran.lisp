@@ -1154,6 +1154,15 @@
                                (:end2 (constant-arg t))))
   (string-compare-transform string1 string2 start1 end1 start2 end2))
 
+(deftransform string-equal ((string1 string2 &key (start1 0) end1 (start2 0) end2)
+                            *)
+  (if (or (and (constant-lvar-p string1)
+               (notany #'both-case-p (string (lvar-value string1))))
+          (and (constant-lvar-p string2)
+               (notany #'both-case-p (string (lvar-value string2)))))
+      `(string=* string1 string2 start1 end1 start2 end2)
+      (give-up-ir1-transform)))
+
 (deftransform string/=* ((str1 str2 start1 end1 start2 end2) * * :node node
                          :important nil)
   ;; An IF node doesn't care about the mismatch index.
