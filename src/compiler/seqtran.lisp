@@ -3629,12 +3629,6 @@
                       (setf type (type-union (specifier-type 'null) type))))
             type)))
 
-(defoptimizer (car constraint-propagate-if) ((list))
-  (values list (specifier-type 'cons) nil nil t))
-
-(setf (fun-info-constraint-propagate-if (fun-info-or-lose 'cdr))
-      #'car-constraint-propagate-if-optimizer)
-
 (defoptimizer (read-sequence derive-type) ((sequence stream &key start end))
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end)

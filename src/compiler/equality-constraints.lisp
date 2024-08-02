@@ -888,6 +888,9 @@
     (values nil
             (list (list 1 '< y)))))
 
+(defoptimizers constraint-propagate-if (car cdr) ((list))
+  (values list (specifier-type 'cons) nil nil t))
+
 (defun find-position-item-type (sequence key test &optional test-not)
   (let ((type *universal-type*))
     (flet ((fun-accepts-type (fun-lvar argument)
@@ -1017,3 +1020,29 @@
     (multiple-value-bind (if2 then2)
         (char<-constraints char2 char1)
       (values nil nil (list if1 if2) (list then1 then2)))))
+
+(defun sequence-min-length (sequence start end)
+  (let* ((length (nth-value 1 (sequence-lvar-dimensions sequence)))
+         (start-int (type-approximate-interval (lvar-type start)))
+         (end-int (type-approximate-interval (lvar-type end)))
+         (start (and start-int
+                     (interval-high start-int)))
+         (end (if (eq (lvar-type end) (specifier-type 'null))
+                  (and (neq length '*)
+                       length)
+                  (and end-int
+                       (interval-low end-int)))))
+    (when (and start end)
+      (- end start))))
+
+(defoptimizer (string=* constraint-propagate-if) ((string1 string2 start1 end1 start2 end2))
+  (let ((min1 (sequence-min-length string1 start1 end1))
+        (min2 (sequence-min-length string2 start2 end2))
+        constraints)
+    (when (and min1
+               (> min1 1))
+      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (when (and min2
+               (> min2 1))
+      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (values nil nil constraints)))

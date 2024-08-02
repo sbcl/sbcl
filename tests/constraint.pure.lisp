@@ -1534,3 +1534,20 @@
          y
          (error "")))
    cons))
+
+(with-test (:name :string=)
+  (assert-type
+   (lambda (y end)
+     (when (string= "ab" y :end1 end)
+       y))
+   (or string symbol character))
+  (assert-type
+   (lambda (y)
+     (when (string= "ab" y)
+       y))
+   (or string symbol))
+  (assert-type
+   (lambda (x y)
+     (when (string= x y :end1 2)
+       y))
+   (or string symbol)))
