@@ -100,13 +100,7 @@
                       ;; so SYMBOL-HASH won't croak on it.
                       (funcall mapper slot-name))
                      ((simple-vector-p mapper)
-                      (let ((nsymbols (ash (length mapper) -1)))
-                        (dotimes (i nsymbols)
-                          (declare (index i))
-                          (when (eq (svref mapper i) slot-name)
-                            (return (svref mapper
-                                           (truly-the index (+ i nsymbols)))))))))))
-
+                      (search-struct-slot-name-vector mapper slot-name)))))
     (if bits
         (let ((raw-type (logand (truly-the fixnum bits) sb-vm:dsd-raw-type-mask))
               (index (truly-the index (ash bits (- sb-vm:dsd-index-shift)))))

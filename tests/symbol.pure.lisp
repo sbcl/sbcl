@@ -122,6 +122,9 @@
     (sb-int:add-to-xset #\A x)
     (assert (equal (sb-pcl::structure-slot-value x 'sb-kernel::data) '(#\A)))))
 
+;;; This test needs to be rewritten.
+;;; It no longer works to have a slot-mapper that is dissociated from a LAYOUT.
+#+nil
 (with-test (:name :fast-slot-name-mapper-big)
   (let ((collision-sets
          #+salted-symbol-hash

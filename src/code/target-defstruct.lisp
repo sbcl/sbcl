@@ -538,7 +538,7 @@
         (t
          't)))
 
-;;; Return a compiled function that maps keys to values based on SLOTS (an alist)
+;;; Return a lambda expression that maps keys to values based on SLOTS (an alist)
 ;;; where keys are symbols. Though structure slots are stringlike (dups by STRING=
 ;;; are disallowed), STANDARD-OBJECT has no such prohibition, so this employs SYMBOL-HASH
 ;;; rather than SYMBOL-NAME-HASH to better distinguish slots whose symbol-names match.
@@ -550,23 +550,10 @@
 ;;; for collision resolution is so infrequent that rather than resolving it by
 ;;; chosing different input bits, the lambda expression wrapped around the
 ;;; perfect hash should resolve collisions via another alist.
-(defun make-hash-based-slot-mapper (slots lambda-name)
+(defun hash-based-slot-mapper-lexpr (slots unique-hashes lambda-name)
   (flet ((hash (s) (ldb (byte 32 0) (symbol-hash s))))
-    (binding* ((symbols (map 'vector #'car slots))
-               (hashes (map '(simple-array (unsigned-byte 32) (*))
-                            #'hash symbols))
-               (unique-hashes (remove-duplicates hashes))
-               (nil
-                (when (< (length unique-hashes) 3)
-                  ;; Return a simple-vector, all symbols first, followed by all data
-                  (let* ((n (length symbols))
-                         (a (make-array (* n 2))))
-                    (loop for j from 0 for slot in slots
-                          do (setf (svref a j) (car slot)
-                                   (svref a (+ n j)) (cdr slot)))
-                    (return-from make-hash-based-slot-mapper a))))
-               ;; power-of-2 sizing generally results in fewer instructions
-               (lexpr (sb-c:make-perfect-hash-lambda unique-hashes nil))
+    ;; power-of-2 sizing generally results in fewer instructions
+    (binding* ((lexpr (sb-c:make-perfect-hash-lambda unique-hashes nil))
                (nbuckets (power-of-two-ceiling (length unique-hashes)))
                ((body decls) (parse-body (cddr lexpr) nil))
                (optimize-decl (pop decls)))
@@ -575,7 +562,7 @@
       (let* ((buckets (make-array nbuckets :initial-element nil))
              (phash-fun (sb-c::compile-perfect-hash lexpr unique-hashes))
              (resultform
-              (cond ((= (length unique-hashes) (length hashes))
+              (cond ((= (length unique-hashes) (length slots))
                      (let* ((et (choose-smallest-element-type slots :key #'cdr))
                             (data (make-array nbuckets :element-type et)))
                        (fill buckets 0)
@@ -592,25 +579,88 @@
                      `(dolist (choice (svref ,buckets h))
                         (when (eq (car choice) symbol)
                           (return (cdr choice))))))))
-        ;; Bypass COMPILE-PERFECT-HASH here, as it can elect not to actually
-        ;; call COMPILE, but instead make an interpreted function.
-        ;; We don't need the extra check for perfectness that it performs
-        ;; since the above bucketing already asserted that hashing worked.
-        (values (compile
-                 nil
-                 ;; this resembles the ASSOC transform
-                 `(named-lambda ,lambda-name (symbol)
-                    ,optimize-decl
-                    (let* ((sb-c::val (ldb (byte 32 0) (symbol-hash symbol)))
-                           (h (progn ,@body)))
-                      (if (< h ,nbuckets) ,resultform)))))))))
-;;; Return a compiled function which takes a symbol
-;;; and returns the DSD-BITS for the slot in DD of that name.
-(defun make-struct-slot-map (dd)
-  (make-hash-based-slot-mapper
-   (mapcar (lambda (dsd) (cons (dsd-name dsd) (dsd-bits dsd)))
-           (dd-slots dd))
-   ;; Prevent random junk like (lambda (symbol) in "very-long-name-why-why-why")
-   `(slot-mapper ,(dd-name dd))))
+        ;; this resembles the ASSOC transform
+        `(named-lambda ,lambda-name (symbol)
+           ,optimize-decl
+           (let* ((sb-c::val (ldb (byte 32 0) (symbol-hash symbol)))
+                  (h (progn ,@body)))
+             (if (< h ,nbuckets) ,resultform)))))))
+
+(declaim (inline sb-pcl::search-struct-slot-name-vector))
+(defun sb-pcl::search-struct-slot-name-vector (mapper slot-name)
+  ;; MAPPER is a vector of all slot name followed by all values of DSD-BITS
+  (let ((nsymbols (ash (length mapper) -1)))
+    (dotimes (i nsymbols)
+      (declare (index i))
+      (when (eq (svref mapper i) slot-name)
+        (return (svref mapper (truly-the index (+ i nsymbols))))))))
+
+(defun make-second-stage-slot-mapper (vector)
+  (lambda (symbol)
+    (sb-pcl::search-struct-slot-name-vector vector symbol)))
+
+(defun install-hash-based-slot-mapper (layout pairs unique-hashes fun-name)
+  (flet ((compile-it ()
+           (let* ((lexpr
+                   (hash-based-slot-mapper-lexpr pairs unique-hashes fun-name))
+                  (compiled-function
+                   ;; Bypass COMPILE-PERFECT-HASH here, as it can elect not to actually
+                   ;; call COMPILE, but instead make an interpreted function.
+                   ;; We don't need the extra check for perfectness that it performs
+                   ;; since the above bucketing already asserted that hashing worked.
+                   (compile nil lexpr)))
+             (setf (layout-slot-mapper layout) compiled-function))))
+    #+sb-thread (progn (atomic-push #'compile-it sb-c::*background-tasks*)
+                       (sb-impl::finalizer-thread-notify 0))
+    #-sb-thread (compile-it)))
+
+;;; Install a compiled function taking a symbol naming a slot in the DD
+;;; coresponding to LAYOUT and returning the DSD-BITS of the named slot.
+;;; There are 3 different "stages" the function operates in:
+;;; stage 1: when called, install stage 2 function, background compile
+;;;          the stage 3 function, then call the stage 2 function
+;;; stage 2: use linear search on the name -> dsd-bits mapping vector
+;;; stage 3: use a compiled perfect-hash-based function
+;;; This lazy compilation provided by staging is better than PROMISE-COMPILE in
+;;; the sb-concurrency contrib, because firstly it takes very little memory
+;;; until the function is called (which may never occur), and secondly the caller
+;;; is never delayed by waiting for the compiler.
+(defun install-struct-slot-mapper (layout)
+  (let* ((dd (layout-dd layout))
+         (slots (dd-slots dd))
+         (keys (map 'vector #'dsd-name slots))
+         (values (map 'vector #'dsd-bits slots))
+         (hashes
+          (flet ((hash (s) (ldb (byte 32 0) (symbol-hash s))))
+            (map '(simple-array (unsigned-byte 32) (*)) #'hash keys)))
+         (unique-hashes (remove-duplicates hashes))
+         (vector (let* ((n (length keys))
+                        (a (make-array (* n 2))))
+                   (dotimes (i n a)
+                     (setf (svref a i) (aref keys i)
+                           (svref a (+ i n)) (aref values i))))))
+    (when (<= (length unique-hashes) 4)
+      (return-from install-struct-slot-mapper
+        (setf (layout-slot-mapper layout) vector)))
+    (let ((me (sb-kernel:%make-funcallable-instance 1))
+          (pairs (map 'list #'cons keys values)))
+      (sb-kernel:%set-fun-layout me (sb-kernel:find-layout 'function))
+      (sb-vm::write-funinstance-prologue me)
+      (setf (sb-kernel:%funcallable-instance-fun me)
+            (lambda (symbol)
+              ;; Try to swap the slot-mapper to the second stage function.
+              ;; This state change acts only to indicate that compilation was started.
+              ;; (Several threads could invoke ME at the exact same time)
+              (let ((old (layout-slot-mapper layout)))
+                (if (neq old me) ; if it's not ME, then it's either the second stage mapper
+                    ;; or else a compiled perfect-hash-based mapper. Either way, punt.
+                    (funcall old symbol)
+                    (let* ((new (make-second-stage-slot-mapper vector))
+                           (actual-old (cas (layout-slot-mapper layout) me new)))
+                      (when (eq actual-old me)
+                        (install-hash-based-slot-mapper
+                         layout pairs unique-hashes `(slot-mapper ,(dd-name dd))))
+                      (funcall new symbol))))))
+      (setf (layout-slot-mapper layout) me))))
 
 (/show0 "target-defstruct.lisp end of file")

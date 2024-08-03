@@ -426,7 +426,7 @@ Examples:
 ;;; Concurrent invocations of this function in different threads are ok.
 ;;; Nested invocations (from a GC forced by a finalizer) are not ok.
 ;;; See the trace at the bottom of this file.
-(define-load-time-global *bg-compiler-function* nil)
+(define-load-time-global *bg-compiler-function* #'sb-c::default-compiler-worker)
 (defun run-pending-finalizers (&aux (system-finalizer-scratchpad (list 0)))
   (declare (dynamic-extent system-finalizer-scratchpad))
   (finalizers-rehash)
@@ -441,7 +441,7 @@ Examples:
        (sb-vm:without-arena (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))
        (atomic-decf *run-gc-hooks*)))
    (let ((ran-bg-compile ; Try to run a background compilation task
-          (when *bg-compiler-function* (funcall *bg-compiler-function*)))
+          (funcall *bg-compiler-function*))
          (ran-a-system-finalizer ; Try to run 1 system finalizer
           (sb-vm::immobile-code-dealloc-1 system-finalizer-scratchpad))
          (ran-a-user-finalizer ; Try to run 1 user finalizer
@@ -477,6 +477,9 @@ Examples:
             (lambda ()
               (setf *finalizer-thread* sb-thread:*current-thread*)
               (loop (run-pending-finalizers)
+                    ;; a slight race here- technically the finalizer thread should not
+                    ;; put itself to sleep unless it has ascertained that there is no
+                    ;; background work while it holds a mutex on the various queues.
                     (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))
                     (when (zerop finalizer-thread-runflag) (return)))
               (setq *finalizer-thread* nil))
