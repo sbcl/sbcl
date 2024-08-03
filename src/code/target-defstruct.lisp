@@ -614,6 +614,14 @@
                        (sb-impl::finalizer-thread-notify 0))
     #-sb-thread (compile-it)))
 
+(!defstruct-with-alternate-metaclass slot-mapper
+  :slot-names ()
+  :constructor %make-slot-mapper-fn
+  :superclass-name function
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
+  :dd-type funcallable-structure)
+
 ;;; Install a compiled function taking a symbol naming a slot in the DD
 ;;; coresponding to LAYOUT and returning the DSD-BITS of the named slot.
 ;;; There are 3 different "stages" the function operates in:
@@ -642,10 +650,8 @@
     (when (<= (length unique-hashes) 4)
       (return-from install-struct-slot-mapper
         (setf (layout-slot-mapper layout) vector)))
-    (let ((me (sb-kernel:%make-funcallable-instance 1))
+    (let ((me (%make-slot-mapper-fn))
           (pairs (map 'list #'cons keys values)))
-      (sb-kernel:%set-fun-layout me (sb-kernel:find-layout 'function))
-      (sb-vm::write-funinstance-prologue me)
       (setf (sb-kernel:%funcallable-instance-fun me)
             (lambda (symbol)
               ;; Try to swap the slot-mapper to the second stage function.
