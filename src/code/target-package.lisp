@@ -889,7 +889,9 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
      (do-pkg-table ((,package) *all-packages*) ,@body)))
 
 (defun package-%used-by-list (package &aux (wp (package-%used-by package)))
-  (or (and wp (weak-pointer-value wp))
+  (acond
+     ((and wp (weak-pointer-value wp)) (if (eq it :none) nil it))
+     (t
       ;; Ensure that the "uses" relation is fixed by acquiring the graph lock.
       ;; Additionally, DO-PACKAGES will acquire the name table lock.
       (with-package-graph ()
@@ -898,10 +900,8 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
           (do-packages (user)
             (when (find me (package-tables user))
               (push user list)))
-          ;; A minor deficiency: if the actual result is NIL, it will appear to
-          ;; always need recomputation. Honestly it's not worth caring about.
-          (setf (package-%used-by package) (if list (make-weak-pointer list)))
-          list))))
+         (setf (package-%used-by package) (make-weak-pointer (or list :none)))
+         list)))))
 
 (macrolet ((def (ext real)
              `(defun ,ext (package-designator)
