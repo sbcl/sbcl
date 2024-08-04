@@ -1610,3 +1610,12 @@
          (length x)
          (error "")))
    (eql 3)))
+
+(with-test (:name :search-length)
+  (assert-type
+   (lambda (x)
+     (declare (simple-string x))
+     (if (search "abc" x)
+         (length x)
+         (error "")))
+   (integer 3 (#.array-dimension-limit))))

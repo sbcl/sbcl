@@ -992,6 +992,25 @@
       (lvar-type y-var x))
     constraints))
 
+(defun equality-length-constraints (op x y gen)
+  (let ((x-var (ok-lvar-lambda-var x gen))
+        (y-var (ok-lvar-lambda-var y gen))
+        constraints)
+    (when (and x-var y-var)
+      (push (list 'equality 'op (make-vector-length-constraint x-var)
+                  (make-vector-length-constraint y-var))
+            constraints))
+    (flet ((lvar-type (op var lvar)
+             (when var
+               (let ((type (lvar-type lvar)))
+                 (when (csubtypep type (specifier-type 'vector))
+                   (let ((type (vector-length-type type)))
+                     (when type
+                       (push (list 'equality op (make-vector-length-constraint var) type) constraints))))))))
+      (lvar-type op x-var y)
+      (lvar-type (invert-operator op) y-var x))
+    constraints))
+
 (defoptimizer (equal constraint-propagate-if) ((x y) node gen)
   (let ((x-type (equal-type (lvar-type x)))
         (y-type (equal-type (lvar-type y))))
@@ -1109,5 +1128,13 @@
     (unless (or start1 start2 end1 end2)
       (setf constraints (nconc constraints
                                (equal-length-constraints string1 string2 gen))))
+    (values nil nil constraints)))
+
+(defoptimizer (search constraint-propagate-if) ((sub-sequence1 main-sequence2
+                                                               &key from-end test test-not key start1 start2 end1 end2)
+                                                node gen)
+  (let (constraints)
+    (unless (or start1 start2 end1 end2)
+      (setf constraints (equality-length-constraints '<= sub-sequence1 main-sequence2 gen)))
     (values nil nil constraints)))
 
