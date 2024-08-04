@@ -286,9 +286,9 @@
                       :original-form form
                       :format-args args
                       :context src-context
-                      :file-name (if (symbolp (file-info-truename file-info)) ; :LISP or :STREAM
+                      :file-name (if (member (file-info-%truename file-info) '(:lisp :stream))
                                      ;; (pathname will be NIL in those two cases)
-                                     (file-info-truename file-info)
+                                     (file-info-%truename file-info)
                                      (file-info-pathname file-info))
                       :file-position
                       (nth-value 1 (find-source-root tlf *source-info*))

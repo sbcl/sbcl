@@ -359,7 +359,8 @@
              (:copier nil)
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
-                                (princ (file-info-truename s) stream)))))
+                                (princ (or (file-info-pathname s) (file-info-%truename s))
+                                       stream)))))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. In COMPILE-FILE, this gets filled lazily
   ;; after the file gets opened.

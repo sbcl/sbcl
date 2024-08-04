@@ -864,7 +864,8 @@ necessary, since type inference may take arbitrarily long to converge.")
             (finfo (source-info-file-info sinfo)
                    (source-info-file-info sinfo)))
            ((or (not (source-info-p (source-info-parent sinfo)))
-                (pathnamep (file-info-truename finfo)))
+                ;; :DEFER is as if satifsying PATHNAMEP
+                (typep (file-info-%truename finfo) '(or (eql :defer) pathname)))
             finfo))))
 
 ;;; If STREAM is present, return it, otherwise open a stream to the

@@ -407,7 +407,7 @@
                         (file-info-positions file-info))
      (if function
          (values :form (let ((direct-file-info (source-info-file-info info)))
-                         (when (eq :lisp (file-info-truename direct-file-info))
+                         (when (eq :lisp (file-info-%truename direct-file-info))
                            (elt (file-info-forms direct-file-info) 0)))
                  :function function)
          (values)))))
