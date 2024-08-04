@@ -973,7 +973,26 @@
   (values nil nil (list (list 'typep list (specifier-type 'cons))
                         (list 'typep item (find-position-item-type list key test)))))
 
-(defoptimizer (equal constraint-propagate-if) ((x y))
+(defun equal-length-constraints (x y gen)
+  (let ((x-var (ok-lvar-lambda-var x gen))
+        (y-var (ok-lvar-lambda-var y gen))
+        constraints)
+    (when (and x-var y-var)
+      (push (list 'equality 'eq (make-vector-length-constraint x-var)
+             (make-vector-length-constraint y-var))
+            constraints))
+    (flet ((lvar-type (var lvar)
+             (when var
+               (let ((type (lvar-type lvar)))
+                 (when (csubtypep type (specifier-type 'vector))
+                   (let ((type (vector-length-type type)))
+                     (when type
+                       (push (list 'equality 'eq (make-vector-length-constraint var) type) constraints))))))))
+      (lvar-type x-var y)
+      (lvar-type y-var x))
+    constraints))
+
+(defoptimizer (equal constraint-propagate-if) ((x y) node gen)
   (let ((x-type (equal-type (lvar-type x)))
         (y-type (equal-type (lvar-type y))))
     (let ((intersection (type-intersection x-type y-type)))
@@ -982,9 +1001,11 @@
         (let ((constraints))
           (push (list 'typep x intersection) constraints)
           (push (list 'typep y intersection) constraints)
+          (setf constraints (nconc constraints
+                                   (equal-length-constraints x y gen)))
           (values nil nil constraints))))))
 
-(defoptimizer (equalp constraint-propagate-if) ((x y))
+(defoptimizer (equalp constraint-propagate-if) ((x y) node gen)
   (let ((x-type (equalp-type (lvar-type x)))
         (y-type (equalp-type (lvar-type y))))
     (let ((intersection (type-intersection x-type y-type)))
@@ -993,6 +1014,8 @@
         (let ((constraints))
           (push (list 'typep x intersection) constraints)
           (push (list 'typep y intersection) constraints)
+          (setf constraints (nconc constraints
+                                   (equal-length-constraints x y gen)))
           (values nil nil constraints))))))
 
 (defun character-set-range (lvar)
@@ -1055,7 +1078,7 @@
     (when (and start end)
       (- end start))))
 
-(defoptimizer (string=* constraint-propagate-if) ((string1 string2 start1 end1 start2 end2))
+(defoptimizer (string=* constraint-propagate-if) ((string1 string2 start1 end1 start2 end2) node gen)
   (let ((min1 (sequence-min-length string1 start1 end1))
         (min2 (sequence-min-length string2 start2 end2))
         constraints)
@@ -1065,9 +1088,15 @@
     (when (and min2
                (> min2 1))
       (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (when (and (eql (lvar-type start1) (specifier-type '(eql 0)))
+               (eql (lvar-type start2) (specifier-type '(eql 0)))
+               (eql (lvar-type end1) (specifier-type 'null))
+               (eql (lvar-type end2) (specifier-type 'null)))
+     (setf constraints (nconc constraints
+                              (equal-length-constraints string1 string2 gen))))
     (values nil nil constraints)))
 
-(defoptimizer (string-equal constraint-propagate-if) ((string1 string2 &key start1 end1 start2 end2))
+(defoptimizer (string-equal constraint-propagate-if) ((string1 string2 &key start1 end1 start2 end2) node gen)
   (let ((min1 (sequence-min-length string1 start1 end1))
         (min2 (sequence-min-length string2 start2 end2))
         constraints)
@@ -1077,5 +1106,8 @@
     (when (and min2
                (> min2 1))
       (push (list 'typep string2 (specifier-type '(not character))) constraints))
+    (unless (or start1 start2 end1 end2)
+      (setf constraints (nconc constraints
+                               (equal-length-constraints string1 string2 gen))))
     (values nil nil constraints)))
 

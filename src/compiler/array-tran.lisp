@@ -1687,35 +1687,36 @@
 
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
-(deftransform vector-length ((vector))
-  (let* ((vtype (lvar-type vector))
-         (dim (array-type-dimensions-or-give-up vtype)))
-    (when (or (not (typep dim '(cons integer)))
-              (conservative-array-type-complexp vtype))
-      (give-up-ir1-transform))
-    (first dim)))
+(defun vector-length-type (array-type)
+  (block nil
+    (catch 'give-up-ir1-transform
+      (return
+        (let ((dim (array-type-dimensions-or-give-up array-type)))
+          (if (and (typep dim '(cons integer))
+                   (not (conservative-array-type-complexp array-type)))
+              (specifier-type `(eql ,(first dim)))
+              (let (min-length
+                    max-length)
+                (when (and (union-type-p array-type)
+                           (loop for type in (union-type-types array-type)
+                                 for dim = (array-type-dimensions-or-give-up type)
+                                 always (typep dim '(cons integer null))
+                                 do (let ((length (car dim)))
+                                      (cond ((conservative-array-type-complexp type)
+                                             ;; fill-pointer can start from 0
+                                             (setf min-length 0))
+                                            ((or (not min-length)
+                                                 (< length min-length))
+                                             (setf min-length length)))
+                                      (when (or (not max-length)
+                                                (> length max-length))
+                                        (setf max-length length)))))
+                  (specifier-type `(integer ,(or min-length 0)
+                                            ,max-length))))))))
+    nil))
 
 (defoptimizer (vector-length derive-type) ((vector))
-  (let ((array-type (lvar-conservative-type vector))
-        min-length
-        max-length)
-    (when (and (union-type-p array-type)
-               (loop for type in (union-type-types array-type)
-                     for dim = (catch 'give-up-ir1-transform
-                                 (array-type-dimensions-or-give-up type))
-                     always (typep dim '(cons integer null))
-                     do (let ((length (car dim)))
-                          (cond ((conservative-array-type-complexp type)
-                                 ;; fill-pointer can start from 0
-                                 (setf min-length 0))
-                                ((or (not min-length)
-                                     (< length min-length))
-                                 (setf min-length length)))
-                          (when (or (not max-length)
-                                    (> length max-length))
-                            (setf max-length length)))))
-      (specifier-type `(integer ,(or min-length 0)
-                                ,max-length)))))
+  (vector-length-type (lvar-conservative-type vector)))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based

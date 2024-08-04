@@ -1570,3 +1570,43 @@
          y
          (error "x")))
    (and sequence (not null))))
+
+(with-test (:name :equal-length)
+  (assert-type
+   (lambda (y x)
+     (declare (simple-vector x y))
+     (if (equalp y x)
+         (= (length y) (length x))
+         t))
+   (eql t))
+  (assert-type
+   (lambda (x y)
+     (declare (simple-vector y x)
+              ((simple-vector 10) x))
+     (if (equalp x y)
+         (length y)
+         (error "")))
+   (eql 10))
+  (assert-type
+   (lambda (x y)
+     (declare (simple-vector y x))
+     (if (and (eql (length x) 9)
+              (equalp x y))
+         (length y)
+         (error "")))
+   (eql 9))
+  (assert-type
+   (lambda (x y)
+     (declare (simple-vector y x))
+     (if (and (> (length x) 5)
+              (equalp x y))
+         (length y)
+         (error "")))
+   (integer 6 (#.array-dimension-limit)))
+  (assert-type
+   (lambda (x)
+     (declare (simple-string x))
+     (if (string= x "abc")
+         (length x)
+         (error "")))
+   (eql 3)))
