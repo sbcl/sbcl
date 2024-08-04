@@ -1097,7 +1097,8 @@
     (when (and start end)
       (- end start))))
 
-(defoptimizer (string=* constraint-propagate-if) ((string1 string2 start1 end1 start2 end2) node gen)
+(defoptimizers constraint-propagate-if (string=* #+sb-unicode simple-character-string= simple-base-string=)
+    ((string1 string2 start1 end1 start2 end2) node gen)
   (let ((min1 (sequence-min-length string1 start1 end1))
         (min2 (sequence-min-length string2 start2 end2))
         constraints)
