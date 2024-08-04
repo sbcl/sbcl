@@ -105,12 +105,18 @@ copied_realpath(const char *pathname)
     }
 
     tidy = successful_malloc(PATH_MAX + 1);
+#ifdef LISP_FEATURE_ANSI_COMPLIANT_LOAD_TRUENAME
     if (realpath((messy ? messy : pathname), tidy) == NULL) {
         if (messy)
             free(messy);
         free(tidy);
         return NULL;
     }
+#else
+    // I don't know why avoiding realpath shouldn't be the default behavior
+    // but I'm sure some user would complain if it were.
+    strcpy(tidy, (messy ? messy : pathname));
+#endif
 
     if (messy)
         free(messy);
