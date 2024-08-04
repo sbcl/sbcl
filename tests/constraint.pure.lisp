@@ -1556,3 +1556,17 @@
      (when (string-equal "ab" y)
        y))
    (or string symbol)))
+
+(with-test (:name :find-sequence-type)
+  (assert-type
+   (lambda (y)
+     (declare (simple-string y))
+     (when (position #\a y)
+       (length y)))
+   (or null (integer 1 (#.array-dimension-limit))))
+  (assert-type
+   (lambda (y)
+     (if (find 1 y)
+         y
+         (error "x")))
+   (and sequence (not null))))

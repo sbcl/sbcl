@@ -686,17 +686,22 @@
                                            alternative-constraints)))
          (prop (triples target)
            (map nil (lambda (constraint)
-                      (destructuring-bind (kind x y &optional not-p)
-                          constraint
-                        (when (and kind x y)
-                          (let ((x (if (lvar-p x)
-                                       (ok-lvar-lambda-var x constraints)
-                                       x)))
-                            (when x
-                              (add-test-constraint quick-p
-                                                   kind x y
-                                                   not-p constraints
-                                                   target))))))
+                      (cond ((not constraint))
+                            ((eq (car constraint) 'equality)
+                             (destructuring-bind (op x y) (cdr constraint)
+                               (add-equality-constraint op x y constraints target nil)))
+                            (t
+                             (destructuring-bind (kind x y &optional not-p)
+                                 constraint
+                               (when (and kind x y)
+                                 (let ((x (if (lvar-p x)
+                                              (ok-lvar-lambda-var x constraints)
+                                              x)))
+                                   (when x
+                                     (add-test-constraint quick-p
+                                                          kind x y
+                                                          not-p constraints
+                                                          target))))))))
                 triples)))
     (when (eq (combination-kind use) :known)
       (binding* ((info (combination-fun-info use) :exit-if-null)

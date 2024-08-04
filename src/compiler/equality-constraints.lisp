@@ -207,7 +207,9 @@
                      ((ok-lvar-lambda-var/vector-length first constraints))
                      (t
                       first)))
-            (y (cond ((lambda-var/vector-length-p second)
+            (y (cond ((ctype-p second)
+                      second)
+                     ((lambda-var/vector-length-p second)
                       second)
                      ((ok-lvar-lambda-var/vector-length second constraints))
                      (t
@@ -219,7 +221,9 @@
             (y-type (etypecase second
                       (lvar (lvar-type second))
                       (lambda-var (lambda-var-type second))
-                      (vector-length-constraint (specifier-type 'index)))))
+                      (vector-length-constraint (specifier-type 'index))
+                      (ctype
+                       second))))
        (when (lvar-p first)
          (constraint-propagate-back first operator second
                                     constraints
@@ -912,25 +916,37 @@
 
 (defoptimizer (%find-position constraint-propagate-if) ((item sequence from-end start end key test) node gen nth-value)
   (let ((type (find-position-item-type sequence key test)))
-    (values item (if (and (= nth-value 0)
-                          (lvar-fun-is key '(identity))
-                          (lvar-fun-is test '(eq eql equal equalp)))
-                     (type-intersection type (specifier-type '(not null)))
-                     type)
-            nil nil t)))
+    (values nil nil
+            (list (list 'typep item (if (and (= nth-value 0)
+                                             (lvar-fun-is key '(identity))
+                                             (lvar-fun-is test '(eq eql equal equalp)))
+                                        (type-intersection type (specifier-type '(not null)))
+                                        type))
+                  (list 'typep sequence (specifier-type '(not null)))
+                  (let ((var (ok-lvar-lambda-var sequence gen)))
+                    (when var
+                      (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0)))))))))
 
-(defoptimizers constraint-propagate-if (position) ((item sequence &key key test test-not &allow-other-keys))
-  (values item (find-position-item-type sequence key test test-not) nil nil t))
+(defoptimizers constraint-propagate-if (position) ((item sequence &key key test test-not &allow-other-keys) node gen)
+  (values nil nil (list (list 'typep item (find-position-item-type sequence key test test-not))
+                        (list 'typep sequence (specifier-type '(not null)))
+                        (let ((var (ok-lvar-lambda-var sequence gen)))
+                          (when var
+                            (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0))))))))
 
-(defoptimizers constraint-propagate-if (find) ((item sequence &key key test test-not &allow-other-keys))
+(defoptimizers constraint-propagate-if (find) ((item sequence &key key test test-not &allow-other-keys) node gen)
   (let ((type (find-position-item-type sequence key test test-not)))
-    (values item (if (and (not key)
-                          (not test-not)
-                          (or (not test)
-                              (lvar-fun-is test '(eq eql equal equalp))))
-                     (type-intersection type (specifier-type '(not null)))
-                     type)
-            nil nil t)))
+    (values nil nil (list (list 'typep item
+                                (if (and (not key)
+                                         (not test-not)
+                                         (or (not test)
+                                             (lvar-fun-is test '(eq eql equal equalp))))
+                                    (type-intersection type (specifier-type '(not null)))
+                                    type))
+                          (list 'typep sequence (specifier-type '(not null)))
+                          (let ((var (ok-lvar-lambda-var sequence gen)))
+                            (when var
+                              (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0)))))))))
 
 (defoptimizers constraint-propagate-if (%member %member-eq %member-if %member-if-not) ((x list))
   (values list (specifier-type 'cons) nil nil t))
