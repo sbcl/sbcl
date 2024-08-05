@@ -205,7 +205,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defun standard-slot-value (object slot-name class)
   (declare (notinline standard-instance-access
                       funcallable-standard-instance-access))
-  (let ((location (gethash (cons class slot-name) *standard-slot-locations*)))
+  ;; I'm sure there's a super easy way to feed the mix of the CLASS and SLOT-NAME
+  ;; hashes into a perfect hash fun, but this function seems never to be called except
+  ;; by MOP some tests. Therefore I don't care to improve it beyond the avoidance
+  ;; of 1 cons operation.
+  (let* ((key (cons class slot-name))
+         (location (gethash key *standard-slot-locations*)))
+    (declare (dynamic-extent key))
     (if location
         (let ((value (if (funcallable-instance-p object)
                          (funcallable-standard-instance-access object location)
