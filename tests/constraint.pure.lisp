@@ -1619,3 +1619,31 @@
          (length x)
          (error "")))
    (integer 3 (#.array-dimension-limit))))
+
+(with-test (:name :subseq)
+  (assert-type
+   (lambda (y s e)
+     (declare (simple-vector y)
+              ((integer 1 2) s)
+              ((integer 7 8) e)
+              (optimize (debug 2)))
+     (let ((s (subseq y s e)))
+       (length s)))
+   (integer 5 7))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (y n)
+                        (declare (simple-vector y)
+                                 (integer n))
+                        (let ((s (subseq y 0 n)))
+                          (aref s (1- n))))
+                     nil))
+             0))
+  (assert-type
+   (lambda (y)
+     (declare (simple-vector y)
+              (optimize (debug 2)))
+     (when (< (length y) 6)
+       (let ((s (subseq y 1 nil)))
+         (length s))))
+   (or null (mod 5))))

@@ -654,7 +654,8 @@
               (values))
       (give-up-ir1-transform)))
 
-(defoptimizer (vector-length equality-constraint) ((vector) node gen)
+
+(defun vector-constraint-length (vector gen)
   (let (type
         (vector-var (ok-lvar-lambda-var vector gen)))
     (when (and vector-var
@@ -689,8 +690,12 @@
                    (when (ctype-p y)
                      (setf type
                            (type-after-comparison op not-p (or type (specifier-type 'index)) y))))))))
-      (when type
-        (derive-node-type node type))))
+      type)))
+
+(defoptimizer (vector-length equality-constraint) ((vector) node gen)
+  (let ((type (vector-constraint-length vector gen)))
+    (when type
+      (derive-node-type node type)))
   :give-up)
 
 (deftransform %in-bounds-constraint ((vector length) * * :node node)
@@ -779,7 +784,8 @@
   (let (gen)
     (loop for (operator second min-amount max-amount) in (lvar-result-constraints lvar constraints)
           do
-          (if (vector-length-constraint-p second)
+          (if (or (vector-length-constraint-p second)
+                  (ctype-p second))
               (conset-add-equality-constraint (or gen
                                                   (setf gen (make-conset)))
                                               operator var second nil min-amount)
@@ -881,6 +887,34 @@
 
 (defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
   (list (list 'vector-length length)))
+
+(defoptimizer (sb-kernel:vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
+  (let (c
+        (null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null))))
+    (when (and (not null-p)
+               (csubtypep (lvar-type start) (specifier-type '(eql 0))))
+      (push (list 'vector-length end) c))
+    (let* ((end (if null-p
+                    (type-union (type-intersection (or (vector-length-type (lvar-type sequence))
+                                                       *universal-type*)
+                                                   (or (vector-constraint-length sequence gen)
+                                                       *universal-type*))
+                                (type-intersection (lvar-type end) (specifier-type 'integer)))
+                    (lvar-type end)))
+           (int-s (type-approximate-interval (lvar-type start)))
+           (int-e (type-approximate-interval end)))
+      (when (and int-s int-e)
+        (let* ((length (interval-sub int-e int-s))
+               (l (interval-low length))
+               (h (interval-high length)))
+          (push (list 'vector-length (specifier-type
+                                      `(integer ,(if (typep l 'unsigned-byte)
+                                                     l
+                                                     0)
+                                                ,(or h
+                                                     '*))))
+                c))))
+    c))
 
 (defoptimizer (read-sequence constraint-propagate-result) ((seq stream &key start end) node gen)
   (let ((var (ok-lvar-lambda-var seq gen)))
