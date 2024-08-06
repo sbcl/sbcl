@@ -365,7 +365,7 @@
 ;;; Return a closure usable as a derive-type method for accessing the
 ;;; N'th argument. If arg is a list, result is a list. If arg is a
 ;;; vector, result is a vector with the same element type.
-(defun %sequence-result-nth-arg (n &key preserve-dimensions
+(defun sequence-result-nth-arg (n &key preserve-dimensions
                                        preserve-vector-type
                                        string-designator)
   (lambda (call)
@@ -375,11 +375,13 @@
         (let* ((type (lvar-type lvar))
                (result type))
           (unless string-designator
-            (setf result
-                  (type-union
-                   result
-                   (simplify-list-type (type-intersection type (specifier-type 'list))
-                                       :preserve-dimensions preserve-dimensions))))
+            (let ((list-type (type-intersection type (specifier-type 'list))))
+              (unless (eq list-type *empty-type*)
+                (setf result
+                      (type-union
+                       result
+                       (simplify-list-type list-type
+                                           :preserve-dimensions preserve-dimensions))))))
           (when string-designator
             (when (types-equal-or-intersect type (specifier-type 'character))
               (setf result
@@ -410,15 +412,6 @@
                                                 simplified)
                              simplified)))))))
           result)))))
-
-(defun sequence-result-nth-arg (n &key preserve-dimensions
-                                       preserve-vector-type
-                                       string-designator)
-  (lambda (call)
-    (funcall (%sequence-result-nth-arg n :preserve-dimensions preserve-dimensions
-                                         :preserve-vector-type preserve-vector-type
-                                         :string-designator string-designator)
-             call)))
 
 ;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)

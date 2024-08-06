@@ -917,4 +917,9 @@
    (lambda (x)
      (declare (cons x))
      (copy-seq x))
-   cons))
+   cons)
+  (assert-type
+   (lambda (x)
+     (declare ((simple-vector 10) x))
+     (remove 10 x))
+   simple-vector))
