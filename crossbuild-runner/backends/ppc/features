@@ -1,3 +1,2 @@
 :gencgc
 :compare-and-swap-vops :alien-callbacks
-:salted-symbol-hash

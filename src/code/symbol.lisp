@@ -392,8 +392,6 @@ distinct from the global value. Can also be SETF."
        (name-hash (calc-symbol-name-hash name (length name)))
        (symbol #+x86-64 (symbol-allocator-macro kind name)
                #-x86-64 (sb-vm::%alloc-symbol name)))
-    #-salted-symbol-hash (%set-symbol-hash symbol name-hash)
-    #+salted-symbol-hash
     (let ((salt (murmur-hash-word/fixnum
                  (word-mix name-hash (get-lisp-obj-address symbol)))))
       #+64-bit

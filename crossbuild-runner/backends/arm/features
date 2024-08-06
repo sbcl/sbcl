@@ -4,4 +4,3 @@
 ; hooks in for someone to add the support later.
 :arm-vfp :arm-vfpv2
 :fp-and-pc-standard-save
-:salted-symbol-hash

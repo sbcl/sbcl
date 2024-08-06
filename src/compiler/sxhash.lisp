@@ -167,9 +167,6 @@
 (deftransform hash-as-if-symbol-name ((object) (symbol) * :important nil)
   `(symbol-name-hash object))
 
-#-salted-symbol-hash
-(define-source-transform symbol-name-hash (s) `(ldb (byte 32 0) (symbol-hash ,s)))
-
 (intern "SCRAMBLE" "SB-C")
 (intern "TAB" "SB-C")
 

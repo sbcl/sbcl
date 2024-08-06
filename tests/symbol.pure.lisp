@@ -126,7 +126,7 @@
     (values (/ n-well-hashed-sets n-homograph-sets)
             result)))
 
-(with-test (:name :hashing-improvements :skipped-on (not :salted-symbol-hash))
+(with-test (:name :hashing-improvements)
   ;; Roughly: For each set of symbols colliding on SXHASH at all, what fraction
   ;; of those sets do NOT have any collisions on SYMBOL-HASH.
   (let ((expectation

@@ -319,12 +319,6 @@
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
           (push :compact-symbol sb-xc:*features*))
-        (when (target-featurep :64-bit)
-          ;; Considering that a single config file governs rv32 and rv64, I don't
-          ;; know how to make this properly configurable. In theory, 32-bit builds could
-          ;; have a salted hash (gaining 3 bits by making the hash slot raw), but
-          ;; they don't, so in light of things, this is a valid criterion.
-          (push :salted-symbol-hash sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or (:and :darwin (:not (:or :ppc :x86))) :openbsd)))
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
