@@ -11,6 +11,26 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;;; Start this test first, because the test at the end of this file
+;;; asserts that a state change occurred, and we need to give it ample time
+;;; to finish a background compile. There's no good way to synchronously wait,
+;;; but running a bunch of other tests in between gives it a fighting chance.
+(defvar *slot-mapper-initial-function* nil)
+(with-test (:name :fast-slot-name-mapper-initial-state)
+  (let ((l (sb-kernel:find-layout 'sb-impl::fd-stream)))
+    (let ((mapper (sb-kernel::layout-slot-mapper l)))
+      (setq *slot-mapper-initial-function* mapper)
+      (assert (or (sb-kernel:closurep mapper)
+                  (sb-kernel:funcallable-instance-p mapper))))
+    (let* ((ssv (compile nil '(lambda (x y) (slot-value (the structure-object x) y))))
+           (instance sb-sys:*stdin*)
+           (em (funcall ssv instance 'sb-impl::element-mode)))
+      ;; assert that slot-value optimized for structure-object works
+      (assert (eq em (sb-impl::stream-element-mode instance))))
+    (let ((mapper (sb-kernel::layout-slot-mapper l)))
+      ;; assert that the mapper is not the initial function
+      (assert (not (eq mapper *slot-mapper-initial-function*))))))
+
 ;;; Reported by Paul F. Dietz
 (with-test (:name (:symbol :non-simple-string-name))
   (let ((sym (make-symbol (make-array '(1) :element-type 'character
@@ -122,31 +142,17 @@
     (sb-int:add-to-xset #\A x)
     (assert (equal (sb-pcl::structure-slot-value x 'sb-kernel::data) '(#\A)))))
 
-;;; This test needs to be rewritten.
-;;; It no longer works to have a slot-mapper that is dissociated from a LAYOUT.
-#+nil
-(with-test (:name :fast-slot-name-mapper-big)
-  (let ((collision-sets
-         #+salted-symbol-hash
-          (nth-value 1 (summarize-colliding-hashes nil))
-         ;; Require at least 4 different sets of colliding symbols,
-         ;; Needless to say, this hashes horribly, with some sets
-         ;; having 20 element per bucket.
-         #-salted-symbol-hash (list (find-all-symbols "X")
-                                    (find-all-symbols "Y")
-                                    (find-all-symbols "RESULT") ; lots of these
-                                    (find-all-symbols "ARGS")))
-        (alist)
-        (arb-value 0))
-    (dolist (set collision-sets)
-      (dolist (symbol set)
-        (push (cons symbol (incf arb-value)) alist)))
-    ;; the mapper shouldn't be a simple-vector
-    (let ((function
-           (the function (sb-kernel::make-hash-based-slot-mapper
-                          alist "foo"))))
-      ;; now try it
-      (dolist (pair alist)
-        (let* ((key (car pair))
-               (computed (funcall function key)))
-          (assert (eql computed (cdr pair))))))))
+;;; This used to test an absurd number of symbols in the collision set, but I think it's enough
+;;; to assert that the slot mapper function upgrades itself on demand, changing from a closure
+;;; which searches a vector to a newly-compiled perfect-hash-based mapping.
+;;; If this fails - presumably due to slow background compilation due to lack of hardware
+;;; threads - we'll just have to disable it.
+(with-test (:name :fast-slot-name-mapper-final-state)
+  ;; Start by wasting some more time in this thread by compiling
+  (let* ((ssv (compile nil '(lambda (x y) (slot-value (the structure-object x) y))))
+         (instance sb-sys:*stdin*)
+         (em (funcall ssv instance 'sb-impl::element-mode)))
+    ;; assert that structure optimized slot-value works
+    (assert (eq em (sb-impl::stream-element-mode instance)))
+    (let ((l (sb-kernel:find-layout 'sb-impl::fd-stream)))
+      (assert (sb-kernel:simple-fun-p (sb-kernel::layout-slot-mapper l))))))
