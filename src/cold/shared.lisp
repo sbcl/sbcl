@@ -381,6 +381,7 @@
           ":SB-THREAD not supported on selected architecture")
          ("(and mark-region-gc (not (or x86-64 arm64)))"
           "mark-region is not supported on selected architecture")
+         ("(and mark-region-gc (not sb-thread))" "mark-region requires threads")
          ("(and (not sb-thread) (or arm64 ppc64))"
           "The selected architecture requires :SB-THREAD")
          ("(and gencgc cheneygc)"
