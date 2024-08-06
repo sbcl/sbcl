@@ -1618,7 +1618,14 @@
      (if (search "abc" x)
          (length x)
          (error "")))
-   (integer 3 (#.array-dimension-limit))))
+   (integer 3 (#.array-dimension-limit)))
+  (assert-type
+   (lambda (a b)
+     (declare (simple-array a b))
+     (when (and (> (length a) 3)
+                (search a b))
+       (length b)))
+   (or null (integer 4 (#.array-dimension-limit)))))
 
 (with-test (:name :subseq)
   (assert-type

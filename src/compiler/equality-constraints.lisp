@@ -182,13 +182,15 @@
          (case from
            ((> >=) '<=))
          (case from
-           ((< <= . #.+eq-ops+) '<=))))
+           (< '<)
+           ((<= . #.+eq-ops+) '<=))))
     (>=
      (if not-p
          (case from
            ((< <=) '>=))
          (case from
-           ((> >= . #.+eq-ops+) '>=))))))
+           ((>) '>)
+           ((>= . #.+eq-ops+) '>=))))))
 
 (defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints
                                 &optional (min-amount 0) max-amount)
@@ -1035,7 +1037,7 @@
         (y-var (ok-lvar-lambda-var y gen))
         constraints)
     (when (and x-var y-var)
-      (push (list 'equality 'op (make-vector-length-constraint x-var)
+      (push (list 'equality op (make-vector-length-constraint x-var)
                   (make-vector-length-constraint y-var))
             constraints))
     (flet ((lvar-type (op var lvar)
