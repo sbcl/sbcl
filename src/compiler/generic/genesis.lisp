@@ -2814,13 +2814,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (dotimes (fun-index (code-n-entries des))
         (let ((fn (%code-entry-point des fun-index)))
           (set-simple-fun-layout fn)
-          #+(or x86 x86-64 arm64) ; store a machine-native pointer to the function entry
-          ;; note that the bit pattern looks like fixnum due to alignment
           (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
-                                 (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
-                                    (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
-          #-(or x86 x86-64 arm64) ; store a pointer back to the function itself in 'self'
-          (write-wordindexed fn sb-vm:simple-fun-self-slot fn)))
+           (if (or #+(or x86 x86-64 arm64) t) ; Store a raw pointer to the function entry
+               (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
+                  (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
+               (descriptor-bits fn))))) ; Store a taagged pointer to the function
       (dotimes (i n-fdefns)
         (store-named-call-fdefn des header-index (svref stack stack-index))
         (incf header-index)
