@@ -577,6 +577,9 @@
 (defknown copy-seq (proper-sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
+(defknown list-copy-seq* (proper-list) list (flushable)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
+
 (defknown length (proper-sequence) index (foldable flushable dx-safe))
 
 (defknown reverse (proper-sequence) consed-sequence (flushable)

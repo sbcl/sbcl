@@ -901,3 +901,20 @@
      (declare ((or integer simple-string) j))
      (find j y :test #'equalp))
    (or array number null)))
+
+(with-test (:name :sequence-union-types)
+  (assert-type
+   (lambda (x)
+     (declare ((or cons (simple-vector 10)) x))
+     (copy-seq x))
+   (or cons (simple-vector 10)))
+  (assert-type
+   (lambda (x)
+     (declare ((or list (vector t 10)) x))
+     (reverse x))
+   (or list simple-vector))
+  (assert-type
+   (lambda (x)
+     (declare (cons x))
+     (copy-seq x))
+   cons))

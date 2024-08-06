@@ -365,34 +365,60 @@
 ;;; Return a closure usable as a derive-type method for accessing the
 ;;; N'th argument. If arg is a list, result is a list. If arg is a
 ;;; vector, result is a vector with the same element type.
-(defun sequence-result-nth-arg (n &key preserve-dimensions
+(defun %sequence-result-nth-arg (n &key preserve-dimensions
                                        preserve-vector-type
                                        string-designator)
   (lambda (call)
     (declare (type combination call))
     (let ((lvar (nth n (combination-args call))))
       (when lvar
-        (let ((type (lvar-type lvar)))
-          (cond ((and (not string-designator)
-                      (simplify-list-type type
-                                          :preserve-dimensions preserve-dimensions)))
-                ((not (csubtypep type (specifier-type 'vector)))
-                 (cond ((not string-designator) nil)
-                       ((csubtypep type (specifier-type 'character))
-                        (specifier-type `(simple-string 1)))
-                       ((and (constant-lvar-p lvar)
-                             (symbolp (lvar-value lvar)))
-                        (ctype-of (symbol-name (lvar-value lvar))))))
-                (preserve-vector-type
-                 type)
-                (t
-                 (let ((simplified (simplify-vector-type type)))
-                   (if (and preserve-dimensions
-                            (csubtypep simplified (specifier-type 'simple-array)))
-                       (type-intersection (specifier-type
-                                           `(simple-array * ,(ctype-array-dimensions type)))
-                                          simplified)
-                       simplified)))))))))
+        (let* ((type (lvar-type lvar))
+               (result type))
+          (unless string-designator
+            (setf result
+                  (type-union
+                   result
+                   (simplify-list-type (type-intersection type (specifier-type 'list))
+                                       :preserve-dimensions preserve-dimensions))))
+          (when string-designator
+            (when (types-equal-or-intersect type (specifier-type 'character))
+              (setf result
+                    (type-union
+                     (type-difference result (specifier-type 'character))
+                     (specifier-type '(simple-string 1)))))
+            (let ((symbol-type (type-intersection type (specifier-type 'symbol))))
+              (unless (eq symbol-type *empty-type*)
+                (setf result
+                      (type-union
+                       (type-difference result (specifier-type 'symbol))
+                       (if (member-type-p symbol-type)
+                           (sb-kernel::%type-union (mapcar-member-type-members
+                                                    (lambda (s) (ctype-of (symbol-name s)))
+                                                    symbol-type))
+                           (specifier-type 'simple-string)))))))
+          (unless preserve-vector-type
+            (let ((vector-type (type-intersection type (specifier-type 'vector))))
+              (unless (eq vector-type *empty-type*)
+                (let ((simplified (simplify-vector-type vector-type)))
+                  (setf result
+                        (type-union
+                         result
+                         (if (and preserve-dimensions
+                                  (csubtypep simplified (specifier-type 'simple-array)))
+                             (type-intersection (specifier-type
+                                                 `(simple-array * ,(ctype-array-dimensions vector-type)))
+                                                simplified)
+                             simplified)))))))
+          result)))))
+
+(defun sequence-result-nth-arg (n &key preserve-dimensions
+                                       preserve-vector-type
+                                       string-designator)
+  (lambda (call)
+    (funcall (%sequence-result-nth-arg n :preserve-dimensions preserve-dimensions
+                                         :preserve-vector-type preserve-vector-type
+                                         :string-designator string-designator)
+             call)))
 
 ;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)
