@@ -964,6 +964,16 @@
      (neq (ir2-block-environment 2block)
           (ir2-block-environment next)))))
 
+(defconstant sb-vm:code-slots-per-simple-fun 4)
+;;; These are word numbers beyond the fixed end of the code-debug-info, one group of
+;;; 4 slots per simple-fun. The mnemonic device here is that the first 3 slots
+;;; essentially comprise the function-lambda-expression,
+;;; and the last is a derived piece of information.
+(defconstant sb-vm:simple-fun-name-slot    0)
+(defconstant sb-vm:simple-fun-arglist-slot 1)
+(defconstant sb-vm:simple-fun-source-slot  2) ; form and/or docstring
+(defconstant sb-vm:simple-fun-info-slot    3) ; type and possibly xref
+
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)

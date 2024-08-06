@@ -254,16 +254,6 @@ during backtrace.
   ;; forward to the first instruction, i.e. what is now SIMPLE-FUN-INSTS-OFFSET.
   (insts :rest-p t :c-type "unsigned char"))
 
-(defconstant code-slots-per-simple-fun 4)
-;;; These are word numbers beyond the base of the simple-fun's metadata
-;;; in the code header. The mnemonic device here is that the first 3 slots
-;;; essentially comprise the function-lambda-expression,
-;;; and the last is a derived piece of information.
-(defconstant simple-fun-name-slot    0)
-(defconstant simple-fun-arglist-slot 1)
-(defconstant simple-fun-source-slot  2) ; form and/or docstring
-(defconstant simple-fun-info-slot    3) ; type and possibly xref
-
 #-(or x86 x86-64 arm64 riscv)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))

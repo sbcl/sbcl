@@ -4488,7 +4488,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
        (if strictp
            (error "Can't map cold-fun -> warm-fun")
            #+nil ; FIXME: not done, but only needed for debugging genesis
-           (let ((name (read-wordindexed x sb-vm:simple-fun-name-slot)))
+           (let ((name ...)) ; will have to look in code-debug-info if needed
              `(function ,(recurse name)))))
       (#.sb-vm:other-pointer-lowtag
        (let ((widetag (descriptor-widetag x)))
