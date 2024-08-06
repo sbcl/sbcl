@@ -1,2 +1,3 @@
 :gencgc :use-cons-region :soft-card-marks
 :alien-callbacks
+:salted-symbol-hash
