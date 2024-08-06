@@ -1646,4 +1646,11 @@
      (when (< (length y) 6)
        (let ((s (subseq y 1 nil)))
          (length s))))
-   (or null (mod 5))))
+   (or null (mod 5)))
+  (assert-type
+   (lambda (y)
+          (declare ((simple-array * (*)) y)
+                   (optimize (debug 2)))
+          (let ((copy (copy-seq y)))
+            (eq (length copy) (length y))))
+   (eql t)))

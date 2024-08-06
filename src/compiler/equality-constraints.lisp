@@ -891,9 +891,13 @@
 (defoptimizer (sb-kernel:vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
   (let (c
         (null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null))))
-    (when (and (not null-p)
-               (csubtypep (lvar-type start) (specifier-type '(eql 0))))
-      (push (list 'vector-length end) c))
+    (when (eql (lvar-type start) (specifier-type '(eql 0)))
+      (if null-p
+          (when (eql (lvar-type end) (specifier-type 'null))
+            (let ((seq-var (ok-lvar-lambda-var sequence gen)))
+              (when seq-var
+                (push (list 'vector-length (make-vector-length-constraint seq-var)) c))))
+          (push (list 'vector-length end) c)))
     (let* ((end (if null-p
                     (type-union (type-intersection (or (vector-length-type (lvar-type sequence))
                                                        *universal-type*)
