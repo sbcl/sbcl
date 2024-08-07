@@ -68,8 +68,7 @@
            ;; (this isn't a weak hashset, but still, don't try to store NIL because
            ;; it causes the set to size up on every alleged failure to find)
            (if slot-names
-               (or (hashset-find *slot-name-lists* slot-names)
-                   (hashset-insert *slot-name-lists* slot-names))))
+               (hashset-insert-if-absent *slot-name-lists* slot-names #'identity)))
          (%intern-pv-table (snl)
            (ensure-gethash
             snl *pv-tables*
@@ -135,9 +134,6 @@
             (unless (eq new-cache cache)
               (setf (pv-table-cache pv-table) new-cache))
             pv)))))
-
-(defun make-pv-type-declaration (var)
-  `(type simple-vector ,var))
 
 ;;; Sometimes we want to finalize if we can, but it's OK if
 ;;; we can't.
@@ -648,7 +644,7 @@
          ,@forms)
       `(let* ((.pv-table. ,pv-table-form)
               (.pv. (pv-table-lookup-pv-args .pv-table. ,@pv-parameters)))
-        (declare ,(make-pv-type-declaration '.pv.))
+        (declare (simple-vector .pv.))
         ,@forms)))
 
 (defun split-declarations (body args req-args cnm-p parameters-setqd)
