@@ -1661,3 +1661,20 @@
           (let ((copy (copy-seq y)))
             (eq (length copy) (length y))))
    (eql t)))
+
+(with-test (:name :remove)
+  (assert-type
+   (lambda (x)
+     (declare ((simple-vector 9) x)
+              (optimize (debug 2)))
+     (let ((j (delete 5 x)))
+       (length j)))
+   (mod 10))
+  (assert-type
+   (lambda (x)
+     (declare (simple-vector x)
+              (optimize (debug 2)))
+     (when (< (length x) 5)
+       (let ((j (remove-if #'evenp x)))
+         (length j))))
+   (or null (mod 5))))

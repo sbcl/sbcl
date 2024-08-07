@@ -195,13 +195,16 @@
 (defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints
                                 &optional (min-amount 0) max-amount)
   (case operator
-    (vector-length
+    ((vector-length vector-length<=)
      (let ((var (if (lambda-var-p first)
                     first
                     (lvar-dest-var first))))
        (when (and var
                   (lambda-var-constraints var))
-         (add-equality-constraint 'eq (make-vector-length-constraint var) second
+         (add-equality-constraint (case operator
+                                    (vector-length<= '<=)
+                                    (t 'eq))
+                                  (make-vector-length-constraint var) second
                                   constraints consequent-constraints alternative-constraints))))
     (t
      (let* ((x (cond ((lambda-var/vector-length-p first)
@@ -889,6 +892,18 @@
 
 (defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
   (list (list 'vector-length length)))
+
+(defoptimizers constraint-propagate-result (remove delete remove-if delete-if remove-if-not delete-if-not)
+    ((x sequence &rest args &key from-end test test-not start end count key) node gen)
+  (let (c)
+    (let ((var (ok-lvar-lambda-var sequence gen)))
+      (when var
+        (push (list 'vector-length<= (make-vector-length-constraint var)) c)))
+    (let ((length (vector-length-type (lvar-type sequence))))
+      (when length
+       (push (list 'vector-length<= length)
+             c)))
+    c))
 
 (defoptimizer (sb-kernel:vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
   (let (c
