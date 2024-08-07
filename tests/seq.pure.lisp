@@ -695,7 +695,8 @@
     (check (position x (the (simple-string 10) y)) (or (mod 10) null))
     (check (position x y :end 10) (or (mod 10) null))
     (check (position x (the cons y) :start 5 :end 10) (or (integer 5 9) null))
-    (check (position-if x y :end 10) (or (mod 10) null))))
+    (check (position-if x y :end 10) (or (mod 10) null))
+    (check (position x y :start (the (integer 10 20) x) :end x) (or (or (integer 10 19) null) null))))
 
 (with-test (:name :string-cmp)
   (macrolet

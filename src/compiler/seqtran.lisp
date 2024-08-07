@@ -2051,14 +2051,16 @@
                          null))))
 
 (defun index-into-sequence-derive-type (sequence start end &key (inclusive t))
-  (let* ((constant-start (and start
-                              (constant-lvar-p start)
-                              (lvar-value start)))
-         (constant-end (and end
-                            (constant-lvar-p end)
-                            (lvar-value end)))
-         (min-result (or constant-start 0))
-         (max-result (or constant-end (1- array-dimension-limit)))
+  (let* ((int-s (and start
+                     (type-approximate-interval (lvar-type start))))
+         (int-e (and end
+                     (type-approximate-interval (type-intersection (lvar-type end) (specifier-type 'integer)))))
+         (min-result (or (and int-s
+                              (interval-low int-s))
+                         0))
+         (max-result (or (and int-e
+                              (interval-high int-e))
+                         (1- array-dimension-limit)))
          (max (sequence-lvar-dimensions sequence))
          (max-result (if (integerp max)
                          (min max-result max)
