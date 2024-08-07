@@ -382,8 +382,7 @@
   (gf-info-fast-mf-p (slot-value gf 'arg-info)))
 
 (defun add-to-weak-hashset (key set)
-  (with-system-mutex ((hashset-mutex set))
-    (hashset-insert set key)))
+  (hashset-insert-if-absent set key #'identity)) ; implicitly locks
 (defun remove-from-weak-hashset (key set)
   (with-system-mutex ((hashset-mutex set))
     (hashset-remove set key)))
