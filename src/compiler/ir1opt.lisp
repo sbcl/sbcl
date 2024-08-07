@@ -1124,8 +1124,10 @@
       (cond (value
              ;; The number of consumed values is now known, reoptimize the users.
              ;; The VALUES transform in particular benefits from this.
-             (do-uses (use value)
-               (reoptimize-node use))
+             (let ((type (node-derived-type node)))
+               (do-uses (use value)
+                 (reoptimize-node use)
+                 (derive-node-type use type)))
              (delete-filter node (node-lvar node) value))
             (t
              (unlink-node node))))))

@@ -4521,3 +4521,18 @@
       (evenp (if a 1 0)))
    ((t) nil)
    ((nil) t)))
+
+(declaim (inline inline-losing-type))
+(defun inline-losing-type (array)
+  (block nil
+    (cond ((typep array '(simple-array * (*)))
+           (return array))
+          (t (error "x")))))
+
+(with-test (:name :inline-losing-type)
+  (checked-compile-and-assert
+      ()
+      `(lambda (array)
+         (declare (type (or null array) array))
+         (aref (inline-losing-type array) 0))
+    ((#(1)) 1)))
