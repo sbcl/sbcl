@@ -4536,3 +4536,6 @@
          (declare (type (or null array) array))
          (aref (inline-losing-type array) 0))
     ((#(1)) 1)))
+
+(with-test (:name :lvar-fun-type-specials)
+  (checked-compile `(lambda (y) (find t y :test *))))

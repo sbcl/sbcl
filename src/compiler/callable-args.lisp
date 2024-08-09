@@ -180,6 +180,7 @@
                              (node-source-form use)))))
          (asserted t)
          (defined-type (and (global-var-p leaf)
+                            (eq (global-var-kind leaf) :global-function)
                             (case (leaf-where-from leaf)
                               (:declared
                                (leaf-type leaf))
@@ -232,7 +233,8 @@
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf)
-                              (global-var-p leaf))
+                              (and (global-var-p leaf)
+                                   (eq (global-var-kind leaf) :global-function)))
                           (cond ((constant-p leaf)
                                  (let ((value (constant-value leaf)))
                                    (etypecase value
