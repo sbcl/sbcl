@@ -2133,42 +2133,43 @@
       (intersect instance))
     result))
 
-(defun find-derive-type (item sequence key test start end from-end)
+(defun find-derive-type (item sequence key test start end from-end &optional test-not)
   (declare (ignore start end from-end))
-  (let ((type *universal-type*)
-        (key-identity-p (or (not key)
-                            (lvar-value-is key nil)
-                            (lvar-fun-is key '(identity)))))
-    (flet ((fun-accepts-type (fun-lvar argument)
-             (when fun-lvar
-               (let ((fun-type (lvar-fun-type fun-lvar t t)))
-                 (when (fun-type-p fun-type)
-                   (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
-                     (when arg
-                       (setf type
-                             (type-intersection type arg)))))))))
-      (when (and item
-                 key-identity-p)
-        ;; Maybe FIND returns ITEM itself or a comparable type
-        (cond ((or (not test)
-                   (lvar-fun-is test '(eq eql char= char-equal))
-                   (lvar-value-is test nil))
-               (setf type (lvar-type item)))
-              ((lvar-fun-is test '(equal))
-               (setf type (equal-type (lvar-type item))))
-              ((lvar-fun-is test '(equalp))
-               (setf type (equalp-type (lvar-type item))))))
-      ;; Should return something the functions can accept
-      (if key-identity-p
-          (fun-accepts-type test (if item 1 0)) ;; the -if variants.
-          (fun-accepts-type key 0)))
-    (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
-      (unless (eq upgraded-type *wild-type*)
-        (setf type
-              (type-intersection type upgraded-type))))
-    (unless (eq type *empty-type*)
-      (type-union type
-                  (specifier-type 'null)))))
+  (unless test-not
+    (let ((type *universal-type*)
+          (key-identity-p (or (not key)
+                              (lvar-value-is key nil)
+                              (lvar-fun-is key '(identity)))))
+      (flet ((fun-accepts-type (fun-lvar argument)
+               (when fun-lvar
+                 (let ((fun-type (lvar-fun-type fun-lvar t t)))
+                   (when (fun-type-p fun-type)
+                     (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
+                       (when arg
+                         (setf type
+                               (type-intersection type arg)))))))))
+        (when (and item
+                   key-identity-p)
+          ;; Maybe FIND returns ITEM itself or a comparable type
+          (cond ((or (not test)
+                     (lvar-fun-is test '(eq eql char= char-equal))
+                     (lvar-value-is test nil))
+                 (setf type (lvar-type item)))
+                ((lvar-fun-is test '(equal))
+                 (setf type (equal-type (lvar-type item))))
+                ((lvar-fun-is test '(equalp))
+                 (setf type (equalp-type (lvar-type item))))))
+        ;; Should return something the functions can accept
+        (if key-identity-p
+            (fun-accepts-type test (if item 1 0)) ;; the -if variants.
+            (fun-accepts-type key 0)))
+      (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
+        (unless (eq upgraded-type *wild-type*)
+          (setf type
+                (type-intersection type upgraded-type))))
+      (unless (eq type *empty-type*)
+        (type-union type
+                    (specifier-type 'null))))))
 
 (defoptimizer (find derive-type) ((item sequence &key key test
                                         start end from-end))

@@ -969,6 +969,12 @@
               (type-intersection type (sequence-element-type sequence key)))))
     type))
 
+(defun sequence-type-from-item (item-type)
+  (if (and item-type
+           (types-equal-or-intersect item-type (specifier-type '(or number character))))
+      (specifier-type '(not null))
+      (specifier-type '(and (not null) (or (not array) (vector t))))))
+
 (defoptimizer (%find-position constraint-propagate-if) ((item sequence from-end start end key test) node gen nth-value)
   (let ((type (find-position-item-type sequence key test)))
     (values nil nil
@@ -977,14 +983,16 @@
                                              (lvar-fun-is test '(eq eql equal equalp)))
                                         (type-intersection type (specifier-type '(not null)))
                                         type))
-                  (list 'typep sequence (specifier-type '(not null)))
+                  (list 'typep sequence
+                        (sequence-type-from-item (single-value-type (node-derived-type node))))
                   (let ((var (ok-lvar-lambda-var sequence gen)))
                     (when var
                       (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0)))))))))
 
 (defoptimizers constraint-propagate-if (position) ((item sequence &key key test test-not &allow-other-keys) node gen)
   (values nil nil (list (list 'typep item (find-position-item-type sequence key test test-not))
-                        (list 'typep sequence (specifier-type '(not null)))
+                        (list 'typep sequence
+                              (sequence-type-from-item (find-derive-type item sequence key test nil nil nil test-not)))
                         (let ((var (ok-lvar-lambda-var sequence gen)))
                           (when var
                             (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0))))))))
@@ -998,7 +1006,8 @@
                                              (lvar-fun-is test '(eq eql equal equalp))))
                                     (type-intersection type (specifier-type '(not null)))
                                     type))
-                          (list 'typep sequence (specifier-type '(not null)))
+                          (list 'typep sequence
+                                (sequence-type-from-item (single-value-type (node-derived-type node))))
                           (let ((var (ok-lvar-lambda-var sequence gen)))
                             (when var
                               (list 'equality '> (make-vector-length-constraint var) (specifier-type '(eql 0)))))))))
@@ -1193,4 +1202,3 @@
     (unless (or start1 start2 end1 end2)
       (setf constraints (equality-length-constraints '<= sub-sequence1 main-sequence2 gen)))
     (values nil nil constraints)))
-

@@ -159,7 +159,7 @@
                               (not x-realp))
                          (add x (specifier-type 'real))))))))))))
 
-(defoptimizer (car constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+(defoptimizers constraint-propagate-back (car cdr) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
   (case kind
     (typep
@@ -167,8 +167,6 @@
        (let ((var (ok-lvar-lambda-var x gen)))
          (when var
            (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null)) nil consequent)))))))
-
-(setf (fun-info-constraint-propagate-back (fun-info-or-lose 'cdr)) #'car-constraint-propagate-back-optimizer)
 
 ;;; If the remainder is non-zero then X can't be zero.
 (defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)

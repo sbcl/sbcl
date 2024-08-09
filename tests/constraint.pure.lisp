@@ -1569,7 +1569,27 @@
      (if (find 1 y)
          y
          (error "x")))
-   (and sequence (not null))))
+   (and sequence (not null)))
+  (assert-type
+   (lambda (y)
+     (declare (array y))
+     (if (find t y)
+         y
+         (error "")))
+   (vector t))
+  (assert-type
+   (lambda (y)
+     (if (position t y)
+         y
+         (error "")))
+   (and sequence (not null) (or (not array) (vector t))))
+  (assert-type
+   (lambda (x y)
+     (declare (simple-array y))
+     (if (find x y :key #'car)
+         y
+         (error "")))
+   simple-vector))
 
 (with-test (:name :equal-length)
   (assert-type
