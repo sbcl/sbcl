@@ -163,11 +163,13 @@ static void walk_all_gc_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
 {
     walk_range((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, fun, arg);
     walk_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, fun, arg);
-    walk_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, fun, arg);
+    if (PERMGEN_SPACE_START)
+        walk_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, fun, arg);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     walk_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, fun, arg);
 #endif
-    walk_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, fun, arg);
+    if (TEXT_SPACE_START)
+        walk_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, fun, arg);
     struct pair pair = {fun, arg};
     walk_generation(walk_range_wrapper, -1, (uword_t)&pair);
 }
