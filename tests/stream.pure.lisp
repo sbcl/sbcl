@@ -535,3 +535,14 @@
       (assert-error (read-char syn))
       (close syn) ; no error
       (assert (eql (read-char *some-stream*) #\o)))))
+
+(with-test (:name :read-sequence-displaced-offset
+            :skipped-on :win32)
+  (let* ((d (make-array 3 :element-type '(unsigned-byte 8)
+                          :initial-element 1))
+         (x (make-array 1 :element-type '(unsigned-byte 8) :displaced-to d
+                          :displaced-index-offset 1)))
+    (with-open-file (s "/dev/zero" :element-type '(unsigned-byte 8))
+      (assert (= (read-sequence x s) 1))
+      (assert (equalp d #(1 0 1)))
+      (assert (equalp x #(0))))))
