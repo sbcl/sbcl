@@ -14,7 +14,7 @@
   `(progn
      (inst addi lexenv-tn null-tn (static-fdefn-offset ',name))
      (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-     (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)     
+     (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
      (inst li nargs (fixnumize 2))
      (inst mr ocfp cfp-tn)
      (inst mr cfp-tn csp-tn)

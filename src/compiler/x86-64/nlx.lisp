@@ -60,7 +60,7 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew rbp-tn block unwind-block-cfp-slot)
-    (inst lea (pc-size vop) temp (rip-relative-ea entry-label))
+    (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
     #+sb-thread
     (let ((bsp (info :variable :wired-tls '*binding-stack-pointer*)))
@@ -89,7 +89,7 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block catch-block-uwp-slot)
     (storew rbp-tn block catch-block-cfp-slot)
-    (inst lea (pc-size vop) temp (rip-relative-ea entry-label))
+    (inst lea temp (rip-relative-ea entry-label))
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     #+sb-thread
