@@ -15,6 +15,16 @@
           (inst andi. temp temp fixnum-tag-mask)
           (inst bne DO-STATIC-FUN)))
 
+(defmacro tail-call-fallback-fun (name)
+  `(progn
+     (inst addi lexenv-tn null-tn (static-fdefn-offset ',name))
+     (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+     (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)     
+     (inst li nargs (fixnumize 2))
+     (inst mr ocfp cfp-tn)
+     (inst mr cfp-tn csp-tn)
+     (inst j lip 0)))
+
 (define-assembly-routine
   (generic-+
    (:cost 10)
@@ -47,14 +57,7 @@
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-+))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg-+)
 
   DONE
   (move res temp))
@@ -92,14 +95,7 @@
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg--))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg--)
 
   DONE
   (move res temp))
@@ -157,14 +153,7 @@
     (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-*))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg-*)
 
   DONE
   (move res lo))
@@ -281,13 +270,7 @@
           (inst andi. nargs nargs fixnum-tag-mask)
           (inst beq FIXNUM)
 
-          (inst addi lexenv-tn null-tn (static-fdefn-offset ',static-fn))
-          (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-          (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-          (inst li nargs (fixnumize 2))
-          (inst mr ocfp cfp-tn)
-          (inst mr cfp-tn csp-tn)
-          (inst j lip 0)
+          (tail-call-fallback-fun ,static-fn)
 
           FIXNUM
           (inst cmpd x y) ; RES and X are the same register, so do this first
@@ -320,13 +303,7 @@
   (inst andi. nargs nargs fixnum-tag-mask)
   (inst beq FIXNUM)
 
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'eql))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  (tail-call-fallback-fun eql)
 
   FIXNUM
   (inst cmpd x y)

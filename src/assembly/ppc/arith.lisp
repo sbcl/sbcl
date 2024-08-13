@@ -10,6 +10,16 @@
 ;;; Note that there is only one use of static-fun-offset outside this
 ;;; file (in genesis.lisp)
 
+(defmacro tail-call-fallback-fun (name)
+  `(progn
+     (inst addi lexenv-tn null-tn (static-fdefn-offset ',name))
+     (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
+     (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)     
+     (inst li nargs (fixnumize 2))
+     (inst mr ocfp cfp-tn)
+     (inst mr cfp-tn csp-tn)
+     (inst j lip 0)))
+
 (define-assembly-routine
   (generic-+
    (:cost 10)
@@ -45,14 +55,7 @@
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-+))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg-+)
 
   DONE
   (move res temp))
@@ -95,14 +98,7 @@
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg--))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg--)
 
   DONE
   (move res temp))
@@ -174,14 +170,7 @@
   GO-HOME
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FUN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-*))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FUN (tail-call-fallback-fun two-arg-*)
 
   LOW-FITS-IN-FIXNUM
   (move res lo))
@@ -305,14 +294,7 @@
           (inst cmpw :cr1 x y)
           (inst beq DO-COMPARE)
 
-          DO-STATIC-FN
-          (inst addi lexenv-tn null-tn (static-fdefn-offset ',static-fn))
-          (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-          (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-          (inst li nargs (fixnumize 2))
-          (inst mr ocfp cfp-tn)
-          (inst mr cfp-tn csp-tn)
-          (inst j lip 0)
+          DO-STATIC-FN (tail-call-fallback-fun ,static-fn)
 
           DO-COMPARE
           (load-symbol res t)
@@ -352,14 +334,7 @@
   (inst mr res null-tn)
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'eql))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FN (tail-call-fallback-fun eql)
 
   RETURN-T
   (load-symbol res t))
@@ -390,14 +365,7 @@
   (inst mr res null-tn)
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-=))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
+  DO-STATIC-FN (tail-call-fallback-fun two-arg-=)
 
   RETURN-T
   (load-symbol res t))
@@ -427,14 +395,7 @@
   (load-symbol res t)
   (lisp-return lra lip :offset 2)
 
-  DO-STATIC-FN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-/=))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst j lip 0)
-  (inst mr cfp-tn csp-tn)
+  DO-STATIC-FN (tail-call-fallback-fun two-arg-/=)
 
   RETURN-NIL
   (inst mr res null-tn))
