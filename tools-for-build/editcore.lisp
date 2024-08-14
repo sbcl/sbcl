@@ -920,11 +920,12 @@
 (defmacro linkage-space-count (x) `(svref ,x 3))
 (defmacro linkage-space-cells (x) `(svref ,x 4))
 
-(defun read-linkage-cells (stream linkage-space-info)
+(defun read-linkage-cells (stream linkage-space-info core-offset)
   (let ((savepos (file-position stream))
         (words (linkage-space-cells linkage-space-info)))
-    (file-position stream (* (1+ (linkage-space-data-page linkage-space-info))
-                             +backend-page-bytes+))
+    (file-position stream (+ (* (1+ (linkage-space-data-page linkage-space-info))
+                                +backend-page-bytes+)
+                             core-offset))
     (with-pinned-objects (words)
       (sb-unix:unix-read (sb-sys:fd-stream-fd stream) (vector-sap words)
                          (ash (length words) word-shift)))
@@ -939,7 +940,7 @@
   initfun
   card-mask-nbits)
 
-(defun parse-core-header (input core-header)
+(defun parse-core-header (input core-header core-offset)
   (let ((space-list)
         (total-npages 0) ; excluding core header page
         (linkage-space-info)
@@ -961,7 +962,7 @@
              (setq linkage-space-info
                    (vector (+ ptr 2) data-page npages count
                            (make-array count :element-type 'word)))
-             (read-linkage-cells input linkage-space-info)
+             (read-linkage-cells input linkage-space-info core-offset)
              (incf total-npages npages))))
         (#.page-table-core-entry-type-code
          (aver (= len 4))
@@ -1133,7 +1134,7 @@
       #+gencgc (setq *bitmap-bits-per-page* 0 *bitmap-bytes-per-page* 0)
       (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header))
-             (parsed-header (parse-core-header input core-header))
+             (parsed-header (parse-core-header input core-header core-offset))
              (space-list (core-header-space-list parsed-header)))
         ;; Map the core file to memory
         (with-mapped-core (sap core-offset (core-header-total-npages parsed-header) input)
@@ -1992,7 +1993,7 @@
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
            (core-offset (read-core-header input core-header))
-           (parsed-header (parse-core-header input core-header))
+           (parsed-header (parse-core-header input core-header core-offset))
            (space-list (core-header-space-list parsed-header)))
       (with-mapped-core (sap core-offset (core-header-total-npages parsed-header) input)
         ;; FIXME: WITH-MAPPED-CORE should bind spacemap

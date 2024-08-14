@@ -1315,7 +1315,7 @@
       (let ((where (ash (linkage-space-header-ptr linkage-space-info) word-shift)))
         ;; LINKAGE_SPACE core entry gets a linker fixup to the second ELF symbol
         (vector-push-extend `#(,R_ABS64 ,where 2 0) relocs)
-        (read-linkage-cells input linkage-space-info))
+        (read-linkage-cells input linkage-space-info core-offset))
       ;; Map the original core file to memory
       (with-mapped-core (sap core-offset original-total-npages input)
         (let* ((data-spaces
@@ -1418,7 +1418,7 @@
       (let* ((core-header (make-array +backend-page-bytes+
                                       :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header nil))
-             (parsed-header (parse-core-header input core-header))
+             (parsed-header (parse-core-header input core-header core-offset))
              (space-list (core-header-space-list parsed-header)))
         ;; Map the core file to memory
         (with-mapped-core (sap core-offset (core-header-total-npages parsed-header) input)
@@ -1658,7 +1658,7 @@
                          :direction :io :if-exists :overwrite)
     (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
            (core-offset (read-core-header stream core-header))
-           (parsed-header (parse-core-header stream core-header))
+           (parsed-header (parse-core-header stream core-header core-offset))
            (space-list (core-header-space-list parsed-header)))
       (with-mapped-core (sap core-offset (core-header-total-npages parsed-header) stream)
         (let* ((spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
