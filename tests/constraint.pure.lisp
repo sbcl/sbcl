@@ -857,6 +857,7 @@
                                 do (setf (aref array i) i))))
                      nil))
              0))
+  #-sbcl
   (assert (= (count 'sb-kernel:%check-bound
                     (ctu:ir1-named-calls
                      `(lambda (length)

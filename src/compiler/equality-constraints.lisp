@@ -888,7 +888,8 @@
   (list (list 'vector-length length)))
 
 (defoptimizer (%make-array constraint-propagate-result) ((length &rest args) node)
-  (list (list 'vector-length length)))
+  (when (csubtypep (lvar-type length) (specifier-type 'integer))
+    (list (list 'vector-length length))))
 
 (defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
   (list (list 'vector-length length)))
