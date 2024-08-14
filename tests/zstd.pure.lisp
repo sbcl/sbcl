@@ -1,0 +1,8 @@
+(with-test (:name :compressed-debug-info-not-larger)
+  (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+    (let ((di (sb-kernel:%code-debug-info c)))
+      (when (typep di 'sb-c::compiled-debug-info)
+        (let ((v (sb-c::compiled-debug-info-fun-map di)))
+          (if (typep v '(simple-array (signed-byte 8) (*)))
+              (let ((uncompressed (sb-c::decompress v)))
+                (assert (> (length uncompressed) (length v))))))))))

@@ -113,31 +113,36 @@ void skip_data_stream(struct varint_unpacker* unpacker)
     while (varint_unpack(unpacker, &val) && val != 0) { }
 }
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-int compress_vector(lispobj vector, lispobj end) {
+static int __attribute__((unused)) mem_is_zeroed(char* from, char* to) {
+    for ( ; from < to ; ++from) if (*from) return 0;
+    return 1;
+}
+int compress_vector(lispobj vector, size_t used_length) {
     struct vector *v = VECTOR(vector);
-    size_t current_length = (size_t) vector_len(v);
+    gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG);
+    // Must be zero above the used_length (verified only if -DDEBUG)
+    gc_dcheck(mem_is_zeroed(used_length + (char*)&v->data,
+                            (size_t)vector_len(v) + (char*)&v->data));
 
-    size_t buf_size = ZSTD_compressBound(end);
+    size_t buf_size = ZSTD_compressBound(used_length);
     char* buf = successful_malloc(buf_size);
-    size_t new_length = ZSTD_compress(buf, buf_size, v->data, end, 22);
+    size_t new_length = ZSTD_compress(buf, buf_size, v->data, used_length, 22);
     if (ZSTD_isError(new_length)) {
         free(buf);
         return 0;
     }
 
-    if (new_length < current_length) {
+    int compressed = 0;
+    if (new_length < used_length) {
         assign_widetag(&v->header, SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG);
         memcpy(&v->data, buf, new_length);
-        memset(((char*)&v->data)+new_length, 0, current_length-new_length);
-        v->length_ = make_fixnum(new_length);
-        free(buf);
-        return 1;
+        memset(((char*)&v->data)+new_length, 0, used_length-new_length);
+        used_length = new_length;
+        compressed = 1;
     }
-    /* Shrink the data vector from an adjustable vector. */
-    memset(((char*)&v->data)+end, 0, current_length-end);
-    v->length_ = make_fixnum(end);
+    v->length_ = make_fixnum(used_length);
     free(buf);
-    return 0;
+    return compressed;
 }
 
 unsigned char* decompress_vector(lispobj vector, size_t *result_size) {
