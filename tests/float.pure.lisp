@@ -857,3 +857,10 @@
                         (= x 1d0))
                      nil))
              0)))
+
+(with-test (:name :tan-single-float-type-derivation)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (tan (the (single-float -1.5707964 1.5707964) x)))
+    ((1.5707964) -2.2877332e7)))

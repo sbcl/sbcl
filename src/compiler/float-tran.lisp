@@ -1611,8 +1611,10 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [-pi/2, pi/2].
      (trig-derive-type-aux arg
-                           (specifier-type `(float ,(sb-xc:- (sb-xc:/ pi 2))
-                                                   ,(sb-xc:/ pi 2)))
+                           (specifier-type `(or (double-float ,(sb-xc:- (sb-xc:/ pi 2))
+                                                              ,(sb-xc:/ pi 2))
+                                                ;; 1.5707964 coerced back to double-float is greater than (/ pi 2)
+                                                (single-float -1.5707963 1.5707963)))
                            #'tan
                            nil nil))
    #'tan))
