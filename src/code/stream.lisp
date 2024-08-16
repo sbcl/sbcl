@@ -2304,6 +2304,64 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     :native (ansi-stream-read-sequence seq stream start end)
     :gray (stream-read-sequence stream (the sequence seq) (the index start) (the sequence-end end))))
 
+
+(declaim (inline ansi-stream-read-string-from-frc-buffer))
+(defun ansi-stream-read-string-from-frc-buffer (seq stream start end)
+  (declare (type simple-string seq)
+           (type ansi-stream stream)
+           (type index start)
+           (type (or null index) end))
+  (let* ((end (or end (length seq)))
+         (needed (- end start))
+         (read 0))
+    (prepare-for-fast-read-char stream
+      (declare (ignore %frc-method%))
+      ;; Read directly into the string when possible
+      (or (and (= %frc-index% +ansi-stream-in-buffer-length+)
+               (>= needed (/ +ansi-stream-in-buffer-length+ 2))
+               (fd-stream-p stream)
+               (fd-stream-ibuf stream)
+               (cond #+sb-unicode
+                     ((typep seq 'simple-base-string)
+                      (cond
+                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
+                         (fd-stream-read-sequence/utf-8-to-base-string stream seq start end))
+                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
+                         (fd-stream-read-sequence/utf-8-crlf-to-base-string stream seq start end))))
+                     ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
+                      (fd-stream-read-sequence/utf-8-to-string stream seq start end))
+                     ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
+                      (fd-stream-read-sequence/utf-8-crlf-to-character-string stream seq start end))))
+          (labels ((refill-buffer ()
+                     (prog1 (fast-read-char-refill stream nil)
+                       (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
+                   (add-chunk ()
+                     (let* ((end (length %frc-buffer%))
+                            (len (min (- end %frc-index%)
+                                      (- needed read))))
+                       (declare (type index end len read needed))
+                       (string-dispatch (simple-base-string simple-character-string)
+                                        seq
+                         (replace seq %frc-buffer%
+                                  :start1 (+ start read)
+                                  :end1 (+ start read len)
+                                  :start2 %frc-index%
+                                  :end2 (+ %frc-index% len)))
+                       (incf read len)
+                       (incf %frc-index% len)
+                       (when (or (eql needed read) (not (refill-buffer)))
+                         (done-with-fast-read-char)
+                         (return-from ansi-stream-read-string-from-frc-buffer
+                           (+ start read))))))
+            (declare (inline refill-buffer))
+            (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
+                       (not (refill-buffer)))
+              ;; EOF had been reached before we read anything
+              ;; at all. But READ-SEQUENCE never signals an EOF error.
+              (done-with-fast-read-char)
+              (return-from ansi-stream-read-string-from-frc-buffer start))
+            (loop (add-chunk)))))))
+
 (declaim (maybe-inline read-sequence/read-function))
 (defun read-sequence/read-function (seq stream start %end
                                     stream-element-mode
@@ -2385,65 +2443,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (read-sequence/read-function
    seq stream start %end (stream-element-mode stream)
    #'ansi-stream-read-char #'ansi-stream-read-byte))
-
-(defun ansi-stream-read-string-from-frc-buffer (seq stream start end)
-  (declare (type simple-string seq)
-           (type ansi-stream stream)
-           (type index start)
-           (type (or null index) end))
-  (let* ((end (or end (length seq)))
-         (needed (- end start))
-         (read 0))
-    (prepare-for-fast-read-char stream
-      (declare (ignore %frc-method%))
-      (unless %frc-buffer%
-        (return-from ansi-stream-read-string-from-frc-buffer nil))
-      ;; Read directly into the string when possible
-      (or (and (= %frc-index% +ansi-stream-in-buffer-length+)
-               (>= needed (/ +ansi-stream-in-buffer-length+ 2))
-               (fd-stream-p stream)
-               (fd-stream-ibuf stream)
-               (cond #+sb-unicode
-                     ((typep seq 'simple-base-string)
-                      (cond
-                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
-                         (fd-stream-read-sequence/utf-8-to-base-string stream seq start end))
-                        ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
-                         (fd-stream-read-sequence/utf-8-crlf-to-base-string stream seq start end))))
-                     ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
-                      (fd-stream-read-sequence/utf-8-to-string stream seq start end))
-                     ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
-                      (fd-stream-read-sequence/utf-8-crlf-to-character-string stream seq start end))))
-          (labels ((refill-buffer ()
-                     (prog1 (fast-read-char-refill stream nil)
-                       (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
-                   (add-chunk ()
-                     (let* ((end (length %frc-buffer%))
-                            (len (min (- end %frc-index%)
-                                      (- needed read))))
-                       (declare (type index end len read needed))
-                       (string-dispatch (simple-base-string simple-character-string)
-                                        seq
-                         (replace seq %frc-buffer%
-                                  :start1 (+ start read)
-                                  :end1 (+ start read len)
-                                  :start2 %frc-index%
-                                  :end2 (+ %frc-index% len)))
-                       (incf read len)
-                       (incf %frc-index% len)
-                       (when (or (eql needed read) (not (refill-buffer)))
-                         (done-with-fast-read-char)
-                         (return-from ansi-stream-read-string-from-frc-buffer
-                           (+ start read))))))
-            (declare (inline refill-buffer))
-            (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
-                       (not (refill-buffer)))
-              ;; EOF had been reached before we read anything
-              ;; at all. But READ-SEQUENCE never signals an EOF error.
-              (done-with-fast-read-char)
-              (return-from ansi-stream-read-string-from-frc-buffer start))
-            (loop (add-chunk)))))))
-
 
 ;;;; WRITE-SEQUENCE
 
