@@ -855,11 +855,11 @@
   (let ((s (make-mock-fd-stream '("zabc" "d" "efgh" "foo*bar" "hi")))
         (string (make-string 100)))
     (let ((endpos
-           (sb-impl::ansi-stream-read-string-from-frc-buffer string s 10 nil)))
+           (read-sequence string s :start 10)))
       (assert (and (= endpos 28)
                    (string= (subseq string 10 endpos) "zabcdefghfoo*barhi"))))
     (let ((endpos
-           (sb-impl::ansi-stream-read-string-from-frc-buffer string s 0 nil)))
+           (read-sequence string s)))
       (assert (= endpos 0)))))
 
 (with-test (:name :named-pipe-wait-eof)
