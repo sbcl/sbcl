@@ -256,12 +256,14 @@
              `(progn
                 (defun (setf ,accessor) (newval fun)
                   (declare (simple-fun fun))
-                  (setf (%instance-ref (%code-debug-info (fun-code-header fun))
-                                       (index ,slot))
-                        newval))
+                  (let ((di (%code-debug-info (fun-code-header fun))))
+                    (aver (sb-c::compiled-debug-info-p di))
+                    (setf (%instance-ref di (index ,slot)) newval)))
                 (defun ,accessor (fun)
-                  (%instance-ref (%code-debug-info (fun-code-header fun))
-                                 (index ,slot))))))
+                  (let ((di (%code-debug-info (fun-code-header fun))))
+                    ;; metadataless functions return NIL for all these slots
+                    (when (sb-c::compiled-debug-info-p di)
+                      (%instance-ref di (index ,slot))))))))
   (def %simple-fun-name    sb-vm:simple-fun-name-slot)
   (def %simple-fun-arglist sb-vm:simple-fun-arglist-slot)
   (def %simple-fun-source  sb-vm:simple-fun-source-slot)
@@ -557,7 +559,7 @@
            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
            ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
              (error (if (eq kind :special) 'special-form-function 'undefined-function)
-                    :name  (second fun-name))))
+                    :name (second fun-name))))
           t
           fun-name)))
     (fset symbol closure)))
