@@ -576,12 +576,8 @@ default-value-8
      (:args
       ,@(unless (eq return :tail)
           '((new-fp :scs (any-reg) :to :eval)))
-      ,@(case named
-          ((nil)
+      ,@(unless named
            '((arg-fun :target lexenv)))
-          (:direct)
-          (t
-           '((name :target name-pass))))
 
       ,@(when (eq return :tail)
           '((old-fp :target old-fp-pass)
@@ -600,7 +596,7 @@ default-value-8
     (:vop-var vop)
     (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
            ,@(unless variable '(nargs))
-           ,@(when (eq named :direct) '(fun))
+           ,@(when named '(fun))
            ,@(when (eq return :fixed) '(nvals))
            step-instrumenting)
 
@@ -621,19 +617,13 @@ default-value-8
                   :to (:result 0))
                  return-pc-pass)
 
-     ,@(case named
-         ((t)
-          `((:temporary (:sc descriptor-reg :offset fdefn-offset
-                         :from (:argument ,(if (eq return :tail) 0 1))
-                         :to :eval)
-                        name-pass)))
-         ((nil)
+     ,@(unless named
           `((:temporary (:sc descriptor-reg :offset lexenv-offset
                          :from (:argument ,(if (eq return :tail) 0 1))
                          :to :eval)
-                        lexenv))))
+                        lexenv)))
 
-     ,@(unless (eq named :direct)
+     ,@(unless named
          '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
             function)))
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
@@ -662,12 +652,6 @@ default-value-8
                      (if (eq return :tail) 0 10)
                      15
                      (if (eq return :unknown) 25 0))
-
-       ,@(when (eq named t)
-           '((aver (sc-is name constant))
-             ;; It has to be an fdefinition constant, not a normal IR1 constant.
-             ;; This is the best we can assert without peeking into IR2-COMPONENT-CONSTANTS.
-             (aver (not (sb-c::tn-leaf name)))))
 
        (let* ((cur-nfp (current-nfp-tn vop))
               ,@(unless (eq return :tail)
@@ -757,7 +741,7 @@ default-value-8
                     (emit-label step-done-label))))
            (declare (ignorable #'insert-step-instrumenting))
            ,@(case named
-               ((t)
+               #+nil((t) ; I have NO Idea what these cases are trying to achieve
                 `((sc-case name
                     (descriptor-reg (move name-pass name))
                     (control-stack
@@ -800,12 +784,10 @@ default-value-8
                   (inst addi entry-point function
                         (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag))))
-               (:direct
-                ;; Load fdefn-raw-address using NIL as the base pointer.
-                ;; This has the usual problem that the displacement in
-                ;; the DS instruction form isn't a multiple of 4.
-                `((inst li temp-reg-tn (static-fun-offset fun))
-                  (inst ldx entry-point null-tn temp-reg-tn))))
+               (t
+                `((inst addis entry-point card-table-base-tn 0)
+                  (inst ld entry-point entry-point (make-fixup fun :linkage-cell))
+                  (do-next-filler)))) ; a little cargo-culting here
            (loop
              (if filler
                  (do-next-filler)
@@ -836,13 +818,10 @@ default-value-8
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
-(define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
-(define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
-(define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)

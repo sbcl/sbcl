@@ -738,6 +738,25 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 }
 
 #ifdef LISP_FEATURE_64_BIT
+#include "forwarding-ptr.inc"
+/* Return the tagged pointer for which 'entrypoint' is the starting address.
+ * This result must have SIMPLE_FUN_WIDETAG.
+ * If the thing has been forwarded, we do NOT return the newspace copy.
+ */
+lispobj entrypoint_taggedptr(uword_t entrypoint) {
+    if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
+    lispobj* phdr = (lispobj*)(entrypoint - 2*N_WORD_BYTES);
+    if (forwarding_pointer_p(phdr)) {
+        gc_assert(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
+        // We can't assert on the widetag if forwarded, because defragmentation
+        // puts the new logical object at some totally different physical address.
+        // This function doesn't know if defrag is occurring.
+    } else {
+        __attribute__((unused)) unsigned char widetag = widetag_of(phdr);
+        gc_assert(widetag == SIMPLE_FUN_WIDETAG);
+    }
+    return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+}
 void gcbarrier_patch_code(void* where, int nbits)
 {
     int m_operand = 64 - nbits;

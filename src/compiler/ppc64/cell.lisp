@@ -303,8 +303,62 @@
 
 ;;;; Fdefinition (fdefn) objects.
 
-(define-vop (untagged-fdefn-fun cell-ref) ; does not translate anything
-  (:variant fdefn-fun-slot 0))
+#+sb-xc-host ; not needed post-build
+(macrolet ((gcbar () '(emit-gengc-barrier object nil (list temp))))
+(define-vop (set-fname-linkage-index)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg))
+         (linkage-cell :scs (sap-reg))
+         (linkage-val :scs (unsigned-reg)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
+  (:generator 1
+    (gcbar)
+    (load-type temp object (- other-pointer-lowtag))
+    (inst cmpwi temp fdefn-widetag)
+    (inst beq FDEFN)
+    ;; SYMBOL
+    (loadw temp object symbol-hash-slot other-pointer-lowtag)
+    (inst or temp temp index)
+    (storew temp object symbol-hash-slot other-pointer-lowtag)
+    (inst b CELL-SET)
+    FDEFN
+    ;; Don't want to deal with endianness, and can't store unaligned,
+    ;; so write the entire header. This could be unsafe if GC puts
+    ;; data in the header without synchronization.
+    ;; (Consider using upper 4 bytes of the header instead)
+    (inst sldi temp index 16)
+    (inst ori temp temp fdefn-widetag)
+    (storew temp object 0 other-pointer-lowtag)
+    CELL-SET
+    (inst std linkage-val linkage-cell 0)))
+(define-vop (set-fname-fun)
+  (:args (object :scs (descriptor-reg))
+         (function :scs (descriptor-reg))
+         (linkage-cell :scs (sap-reg))
+         (linkage-val :scs (unsigned-reg immediate)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
+  (:generator 1
+    (gcbar)
+    (storew function object fdefn-fun-slot other-pointer-lowtag)
+    (unless (and (sc-is linkage-val immediate) (zerop (tn-value linkage-val)))
+      (inst std linkage-val linkage-cell 0)))))
+
+(define-vop (fdefn-fun) ; This vop works on symbols and fdefns
+  (:args (fdefn :scs (descriptor-reg)))
+  (:results (result :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:translate fdefn-fun)
+  (:generator 2
+    (inst cmpd fdefn null-tn)
+    (inst beq NOPE)
+    (loadw result fdefn fdefn-fun-slot other-pointer-lowtag)
+    (inst cmpdi result 0)
+    (inst bne done)
+    NOPE
+    (move result null-tn)
+    DONE))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
@@ -317,63 +371,9 @@
   (:generator 10
     (move obj-temp object)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
-    (inst cmpd value null-tn)
+    (inst cmpdi value 0)
     (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
       (inst beq err-lab))))
-;;; We need the ordinary safe-fdefn-fun *and* the untagged one. The tagged vop
-;;; translates calls which store and pass fdefns as objects:
-;;;  - a readtable can map a character to an fdefn (or a function)
-;;;  - handler clusters can bind a condition to an fdefn (or function)
-;;;  - maybe more
-;;; Those uses want the lazy lookup aspect while being faster than symbol-function.
-;;; References within code never manipulate the fdefn as an object.
-;;; Luckily there is no ambiguity in the undefined-fun trap when it receives
-;;; an integer in a descriptor register: it's a "stealth mode" fdefn.
-(define-vop (safe-untagged-fdefn-fun) ; does not translate anything
-  (:policy :fast-safe)
-  ;; I've given up on the idea that untagged fdefns shall only be loaded into fdefn-tn.
-  ;; Because of error handling, the GC has to allow them to be seen anywhere,
-  ;; conservatively not touching the bits.
-  (:args (object :scs (descriptor-reg) :target obj-temp))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
-  (:generator 10
-    (move obj-temp object)
-    (loadw value obj-temp fdefn-fun-slot 0)
-    (inst cmpd value null-tn)
-    (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
-      (inst beq err-lab))))
-
-(define-vop (set-fdefn-fun)
-  (:policy :fast-safe)
-  (:args (function :scs (descriptor-reg))
-         (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:scs (non-descriptor-reg)) type)
-  (:generator 38
-    (emit-gengc-barrier fdefn nil (list type))
-    (load-type type function (- fun-pointer-lowtag))
-    (inst cmpdi type simple-fun-widetag)
-    ;;(inst mr lip function)
-    (inst addi lip function
-          (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
-    (inst beq SIMPLE)
-    (inst addi lip null-tn (make-fixup 'closure-tramp :assembly-routine))
-    SIMPLE
-    (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
-    (storew function fdefn fdefn-fun-slot other-pointer-lowtag)))
-
-(define-vop (fdefn-makunbound)
-  (:policy :fast-safe)
-  (:translate fdefn-makunbound)
-  (:args (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 38
-    (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst addi temp null-tn (make-fixup 'undefined-tramp :assembly-routine))
-    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; Binding and Unbinding.
 
@@ -521,31 +521,10 @@
 
 ;;;; Code object frobbing.
 
-(define-vop (code-header-ref+tag)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types * tagged-num)
-  (:info implied-lowtag)
-  ;; conservative_root_p() in gencgc treats untagged pointers to fdefns
-  ;; as implicitly pinned. It has to be in a boxed register.
-  (:results (value :scs (descriptor-reg)))
+(define-vop (code-header-ref word-index-ref)
+  (:translate code-header-ref)
   (:policy :fast-safe)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 2
-    ;; ASSUMPTION: N-FIXNUM-TAG-BITS = 3
-    (inst addi temp index (- other-pointer-lowtag))
-    (inst ldx value object temp)
-    (unless (zerop implied-lowtag)
-      (inst ori value value implied-lowtag))))
-
-#-sb-xc-host
-(defun code-header-ref (code index)
-  (declare (index index))
-  (binding* (((start count) (code-header-fdefn-range code))
-             (end (+ start count)))
-    (values (if (and (>= index start) (< index end))
-                (%primitive code-header-ref+tag code index other-pointer-lowtag)
-                (%primitive code-header-ref+tag code index 0)))))
+  (:variant 0 other-pointer-lowtag))
 
 (define-vop (code-header-set)
   (:translate code-header-set)

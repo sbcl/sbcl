@@ -1,5 +1,5 @@
 ; threads are required because differing versions of the vops for BOUNDP
 ; and [fast-]symbol-[global-]value and CAS create extra maintenance burden.
-:64-bit :untagged-fdefns :sb-thread :soft-card-marks
+:64-bit :linkage-space :sb-thread :soft-card-marks
 :gencgc
 :compare-and-swap-vops :alien-callbacks

@@ -1279,6 +1279,7 @@ register."
                                                       sb-vm::undefined-alien-tramp))
                                       "undefined function")
                                      (routine)))))
+      #+ppc64 (function (make-bogus-debug-fun "trampoline"))
       ((eql :bpt-lra)
        (make-bogus-debug-fun "function end breakpoint")))))
 

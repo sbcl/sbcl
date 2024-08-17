@@ -646,6 +646,10 @@
                 (label-position si))
              subop))))
         (t
+         (when (fixup-p si) ; assume the fixup will be valid
+           (aver (eq (fixup-flavor si) :linkage-cell))
+           (note-fixup segment :addis+ld si)
+           (setq si 0))
          (if (= (mod si 4) 0)
              (emit-ds-form-inst segment opcode rt ra (ash si -2) subop)
              (error "Displacement should be a multiple of 4")))))
@@ -676,7 +680,7 @@
                   (patchable-emit-d-form segment ,op (reg-tn-encoding rt) (reg-or-0 ra) si)))))
            (define-ds-instruction (name op subop)
              `(define-instruction ,name (segment rt ra si)
-                (:declare (type (or (signed-byte 16) label) si))
+                (:declare (type (or (signed-byte 16) label fixup) si))
                 (:printer ds ((op ,op) (subop ,subop)))
                 (:emitter
                  (patchable-emit-ds-form segment ,op (reg-tn-encoding rt)
@@ -2410,6 +2414,16 @@
       (:rldic-m ; This is the M (mask) immediate operand to RLDIC{L,R} which
        ;; appears in (byte 6 5) of the instruction. See EMIT-MD-FORM-INST.
        (setf (ldb (byte 6 5) (sap-ref-32 sap offset)) (encode-mask6 (- 64 value))))
+      (:addis+ld
+       ;; load from linkage table
+       (binding* (((q r) (floor (ash value word-shift) 65536))
+                  (table-bias (- (ash (ash 1 (+ 19 3)) -16))))
+         (when (>= r 32768) ; LD instruction sign-extends, so this is actually negative
+           (incf q))
+         (setf (sap-ref-32 sap (- offset 4)) ; addis instruction
+               (logior (sap-ref-32 sap (- offset 4)) (ldb (byte 16 0) (+ table-bias q)))
+               (sap-ref-32 sap offset) ; ld instruction
+               (logior (sap-ref-32 sap offset) r))))
       (:b
        (error "Can't deal with CALL fixups, yet."))
       (:ba

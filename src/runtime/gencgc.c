@@ -4463,7 +4463,8 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
         // This assertion fails, but things work nonetheless.
         // gc_assert(!card_protected_p(object));
 
-        if (save_lisp_gc_iteration == 2) {
+        if (save_lisp_gc_iteration == 2 &&
+            lowtag_of(code->debug_info) == INSTANCE_POINTER_LOWTAG) {
             // Attempt to place debug-info at end of the heap by not scavenging now
             scavenge(object + 4, nboxed - 4);
             delay_code_metadata_scavenge(code);

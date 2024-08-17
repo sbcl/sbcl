@@ -47,9 +47,13 @@
     (fdefn (ash (get-header-data fname) -8))))
 
 (macrolet ((entry-addr (index f)
-             `(values (sap-ref-word (int-sap (get-lisp-obj-address ,f))
-                                    (- (ash closure-fun-slot word-shift)
-                                       fun-pointer-lowtag))
+             `(values #+ppc64 (truly-the word
+                                         (+ (get-lisp-obj-address ,f)
+                                            (- (ash simple-fun-insts-offset word-shift)
+                                               fun-pointer-lowtag)))
+                      #+x86-64 (sap-ref-word (int-sap (get-lisp-obj-address ,f))
+                                             (- (ash closure-fun-slot word-shift)
+                                                fun-pointer-lowtag))
                       (sap+ *linkage-table* (ash ,index word-shift)))))
 
 ;;; Give DESIGNATOR (a symbol, list, or fdefn) a linkage index.
@@ -158,6 +162,7 @@
 
 (defvar *!initial-linkage-table*)
 (defun !initialize-lisp-linkage-table ()
+  (setq sb-vm::*code-alloc-count* 0)
   (let* ((map (make-array (ceiling (ash 1 n-linkage-index-bits) linkage-smallvec-elts)))
          (i 0))
     (setf *linkage-name-map* map
@@ -170,4 +175,9 @@
                   (svref map hi) inner))
           (setf (weak-vector-ref inner lo) fname)))
       (unless (fdefn-fun fname) ; accepts symbol or fdefn
-        (fset fname 0)))))
+        (fset fname 0))))
+  #+ppc64
+  (let ((from (fname-linkage-index '%coerce-callable-to-fun))
+        (into (fname-linkage-index '%coerce-callable-for-call)))
+    (setf (sap-ref-word *linkage-table* (ash into word-shift))
+          (sap-ref-word *linkage-table* (ash from word-shift)))))

@@ -9,9 +9,11 @@
     (xundefined-tramp (:return-style :none)
                       (:align n-lowtag-bits)
                       (:export undefined-tramp
-                               (undefined-tramp-tagged
+                               (undefined-tramp-tagged ; can this junk go away?
                                 (+ xundefined-tramp
                                    fun-pointer-lowtag))))
+    ;; I very much suspect this doesn't have to be wired to fdefn-tn any more.
+    ;; (Same goes for funcallable-instance-tramp)
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
   (inst dword simple-fun-widetag) ;; header
   (inst dword (make-fixup 'undefined-tramp-tagged :assembly-routine)) ;; self
@@ -19,6 +21,10 @@
     (inst dword nil-value))
 
   UNDEFINED-TRAMP
+  ;; I see no purpose to computing CODE-TN here. Normally we need it in order
+  ;; to load header constants since there is no PC-relative load form,
+  ;; but there are no constants, and this routine can't be GC'ed so it's
+  ;; not for that either.
   (inst addi code-tn lip-tn (- fun-pointer-lowtag
                                (ash simple-fun-insts-offset word-shift)))
 
@@ -33,30 +39,13 @@
   (storew lra-tn cfp-tn 1)
   (error-call nil 'undefined-fun-error fdefn-tn))
 
-(define-assembly-routine
-    (closure-tramp (:return-style :none)
-                   (:align n-lowtag-bits))
-    ((:temp fdefn-tn descriptor-reg fdefn-offset))
-  ;; More complicated code allows an fdefn to be either tagged or untagged
-  ;; when referenced from a code header.
-  ;;  (inst andi. temp-reg-tn fdefn-tn 15)
-  ;;  (inst beq untagged)
-  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
-  ;;  (inst b continue)
-  ;;  untagged
-  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot 0)
-  ;;  continue
-  (loadw lexenv-tn fdefn-tn fdefn-fun-slot (+ #-untagged-fdefns other-pointer-lowtag))
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst addi lip-tn code-tn (- (ash simple-fun-insts-offset word-shift)
-                               fun-pointer-lowtag))
-  (inst mtctr lip-tn)
-  (inst bctr))
-
+;;; The -TRAMP entry point is for APPLY/FUNCALL, whereas the -SHIM entry point
+;;; is the tail piece of the simplifying wrapper on a globally named funinstance.
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
                       (:align n-lowtag-bits)
-                      (:export (funcallable-instance-tramp
+                      (:export funinstance-shim
+                               (funcallable-instance-tramp
                                 (+ xfuncallable-instance-tramp
                                    fun-pointer-lowtag))))
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
@@ -65,6 +54,7 @@
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
+  FUNINSTANCE-SHIM
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw fdefn-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   (inst addi lip-tn fdefn-tn (- (ash simple-fun-insts-offset word-shift)

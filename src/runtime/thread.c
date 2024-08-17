@@ -961,7 +961,7 @@ alloc_thread_struct(void* spaces) {
 #ifdef THREAD_T_NIL_CONSTANTS_SLOT
     tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | LISP_T;
 #endif
-#ifdef LISP_FEATURE_LINKAGE_SPACE
+#if defined LISP_FEATURE_LINKAGE_SPACE && defined LISP_FEATURE_X86_64
     tls[THREAD_LINKAGE_TABLE_SLOT] = (lispobj)linkage_space;
     tls[THREAD_ALIEN_LINKAGE_TABLE_BASE_SLOT] = (lispobj)ALIEN_LINKAGE_SPACE_START;
 #endif

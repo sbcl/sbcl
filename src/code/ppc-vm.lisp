@@ -95,3 +95,67 @@
                          '(#.arg-count-sc)))))
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
+
+;;; To support linkage-space as efficiently as on x86-64, these
+;;; things have to happen:
+;;; * funcallable-instances must become directly callable objects
+;;; * simple-fun-self, closure-fun, fin-fun must be raw addresses
+;;; * LRAs should be removed
+;;; For now, I'm using a hand-assembled simple-fun as simplifying wrapper
+;;; since executable funinstances are not supported.
+#+64-bit
+(defun ensure-simplistic (function name)
+  (when (simple-fun-p function)
+    (return-from ensure-simplistic function))
+  (binding*
+      ((nraw (* 8 n-word-bytes))
+       (code (sb-c:allocate-code-object nil 4 nraw))
+       ;; FIXME: why does an undef FUNCTION come in as either/or? Can I settle on just one?
+       (undef (or (eql function 0) (null function)))
+       ;; It's nice if these blobs of code are all the same size but the funinstance case
+       ;; doesn't fit entirely within NRAW bytes, so it calls an ASM routine.
+       ((insts helper)
+        (cond (undef
+               (values
+                #(#xE95FFFD8     ; LD $FDEFN,-40($LIP)     ; [debug-info] = the function name
+                  #x3BF20000     ; ADDI $LIP,$NULL,x       ; UNDEFINED-TRAMP
+                  #x7FE903A6     ; MTCTR $LIP
+                  #x4E800420     ; BCTR
+                  0 0)
+                'undefined-tramp))
+              ((funcallable-instance-p function)
+               (values
+                #(#xEABFFFD8     ; LD $LEXENV,-40($LIP)    ; [debug-info] = the funinstance
+                  #x3BF20000     ; ADDI $LIP,$NULL,x       ; FUNCALLABLE-INSTANCE-SHIM
+                  #x7FE903A6     ; MTCTR $LIP
+                  #x4E800420     ; BCTR
+                  0 0)
+                'funinstance-shim))
+              (t ; closure
+               #(#xEABFFFD8      ; LD $LEXENV,-40($LIP)    ; [debug-info] = the closure
+                 #x38000002      ; ADDI $ZERO,$ZERO,2
+                 #x7E75002A      ; LDX $CODE,$LEXENV,$ZERO ; get closure's simple-fun
+                 #x3BF3000A      ; ADDI $LIP,$CODE,10      ; simple-fun entrypoint
+                 #x7FE903A6      ; MTCTR $LIP
+                 #x4E800420))))) ; BCTR
+    (with-pinned-objects (code)
+      (let ((self (sap+ (code-instructions code) 16)))
+        (setf (sap-ref-word self (ash -2 word-shift)) 1 ; jump table word count
+              (sap-ref-word self (ash -1 word-shift)) 0 ; unused
+              (sap-ref-word self 0) (logior #x600 simple-fun-widetag)
+              (sap-ref-sap self 8) (sap+ self fun-pointer-lowtag))
+        (let ((start (sap+ self 16)))
+          (dotimes (i (length insts))
+            (setf (sap-ref-32 start (ash i 2)) (aref insts i)))
+          (when helper
+            (let ((imm (- (sb-fasl:get-asm-routine helper) nil-value)))
+              (setf (sap-ref-32 start 4) (logior (sap-ref-32 start 4) imm)))))
+        ;; Store trailing data
+        (let ((end (sap+ self (- nraw 16)))) ; undo 16 added above
+          (setf (sap-ref-32 end -8) #x10 ; code-instructions to fun-base offset
+                (sap-ref-16 end -4) (ash 1 5) ; simple-fun count
+                (sap-ref-16 end -2) 8)))) ; trailer len in bytes
+    (code-header-set code code-debug-info-slot (if undef name function))
+    (%code-entry-point code 0)))
+
+(defun stepper-fun (closure) (ensure-simplistic closure nil))

@@ -1053,6 +1053,14 @@ bool gc_allocate_ptes()
     void* result = os_alloc_gc_space(0, MOVABLE, 0,
                                      ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
     gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
+#elif defined LISP_FEATURE_PPC64
+    unsigned char* mem = successful_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
+    gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
+    /* Copy linkage entries from where they were allocated to where they're accessible
+     * off the GC card table register using negative indices. */
+    memcpy(mem, linkage_space, LISP_LINKAGE_SPACE_SIZE);
+    os_deallocate((void*)linkage_space, LISP_LINKAGE_SPACE_SIZE);
+    linkage_space = (lispobj*)mem;
 #else
     gc_card_mark = successful_malloc(num_gc_cards);
 #endif
