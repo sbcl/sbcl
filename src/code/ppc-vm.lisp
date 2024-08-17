@@ -104,6 +104,7 @@
 ;;; For now, I'm using a hand-assembled simple-fun as simplifying wrapper
 ;;; since executable funinstances are not supported.
 #+64-bit
+(progn
 (defun ensure-simplistic (function name)
   (when (simple-fun-p function)
     (return-from ensure-simplistic function))
@@ -159,3 +160,4 @@
     (%code-entry-point code 0)))
 
 (defun stepper-fun (closure) (ensure-simplistic closure nil))
+) ; end PROGN
