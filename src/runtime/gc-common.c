@@ -817,7 +817,7 @@ static void scav_linkage_cell(int linkage_index)
     if (!linkage_index) return;
     lispobj entrypoint = linkage_space[linkage_index];
     if (!entrypoint) return;
-    lispobj taggedptr = fun_taggedptr_from_self(entrypoint);
+    lispobj taggedptr = linkage_val_to_fun_ptr(entrypoint);
     lispobj new = taggedptr;
     scav1(&new, new);
     if (new != taggedptr) linkage_space[linkage_index] = new + (entrypoint - taggedptr);
@@ -1041,16 +1041,20 @@ static lispobj trans_bignum(lispobj object)
                                       unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
-#ifndef LISP_FEATURE_X86_64
+// Return the lisp object that fdefn jumps to.
 lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    extern lispobj entrypoint_taggedptr(uword_t);
+    return entrypoint_taggedptr(linkage_space[fdefn_linkage_index(fdefn)]);
+#else
     lispobj raw_addr = (lispobj)fdefn->raw_addr;
     if (!raw_addr || points_to_asm_code_p(raw_addr))
         // technically this should return the address of the code object
         // containing asm routines, but it's fine to return 0.
         return 0;
     return raw_addr - FUN_RAW_ADDR_OFFSET;
-}
 #endif
+}
 
 static sword_t
 scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)

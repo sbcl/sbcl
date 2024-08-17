@@ -181,7 +181,7 @@ static void TRACE_NAME(lispobj* where)
         ORDINARY_SLOT(s->fdefn);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         int i = symbol_linkage_index(s);
-        ACTION(linkage_cell_taggedptr(i), linkage_space+i, SOURCE_LINKAGE_CELL);
+        ACTION(linkage_cell_function(i), linkage_space+i, SOURCE_LINKAGE_CELL);
 #endif
         }
         return;
@@ -191,7 +191,7 @@ static void TRACE_NAME(lispobj* where)
         ORDINARY_SLOT(fdefn->fun);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         int i = fdefn_linkage_index(fdefn);
-        ACTION(linkage_cell_taggedptr(i), linkage_space+i, SOURCE_LINKAGE_CELL);
+        ACTION(linkage_cell_function(i), linkage_space+i, SOURCE_LINKAGE_CELL);
 #else
         ACTION(decode_fdefn_rawfun(fdefn), (lispobj*)&fdefn->raw_addr, SOURCE_FDEFN_RAW);
 #endif

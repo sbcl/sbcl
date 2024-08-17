@@ -1758,7 +1758,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-        CHECK(linkage_cell_taggedptr(symbol_linkage_index(s)), &s->fdefn);
+        CHECK(linkage_cell_function(symbol_linkage_index(s)), &s->fdefn);
 #endif
         CHECK(decode_symbol_name(s->name), &s->name);
         return 0;
@@ -1768,7 +1768,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-        CHECK(linkage_cell_taggedptr(fdefn_linkage_index(f)), &f->fun);
+        CHECK(linkage_cell_function(fdefn_linkage_index(f)), &f->fun);
 #else
         CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
 #endif

@@ -2215,13 +2215,13 @@ static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         else if (widetag == SYMBOL_WIDETAG) {
             struct symbol* s = (void*)where;
-            if (!ptr_ok_to_writeprotect(linkage_cell_taggedptr(symbol_linkage_index(s)), gen))
+            if (!ptr_ok_to_writeprotect(linkage_cell_function(symbol_linkage_index(s)), gen))
                 return where;
             // Process the value and info slots normally, and the bit-packed package ID + name
             // can't be younger, so that slot's contents are irrelevant
         } else if (widetag == FDEFN_WIDETAG) {
             struct fdefn* f = (void*)where;
-            if (!ptr_ok_to_writeprotect(linkage_cell_taggedptr(fdefn_linkage_index(f)), gen))
+            if (!ptr_ok_to_writeprotect(linkage_cell_function(fdefn_linkage_index(f)), gen))
                 return where;
         }
 #endif
@@ -4686,6 +4686,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
     return 0;
 }
 #define CHECK(pointer, where) if (verify_pointer(pointer, where, state)) return 1
+#define CHECK_LINKAGE_CELL(index, where) CHECK(linkage_cell_function(index), where)
 
 /* Return 0 if good, 1 if bad.
  * Take extra pains to process weak SOLIST nodes - Finalizer list nodes weakly point
@@ -4779,7 +4780,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-        CHECK(linkage_cell_taggedptr(symbol_linkage_index(s)), &s->fdefn);
+        CHECK_LINKAGE_CELL(symbol_linkage_index(s), &s->fdefn);
 #endif
         CHECK(decode_symbol_name(s->name), &s->name);
         return 0;
@@ -4789,7 +4790,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-        CHECK(linkage_cell_taggedptr(fdefn_linkage_index(f)), &f->fun);
+        CHECK_LINKAGE_CELL(fdefn_linkage_index(f), &f->fun);
 #else
         CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
 #endif

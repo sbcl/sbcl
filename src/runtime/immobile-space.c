@@ -839,7 +839,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     if (younger_p(sym->info, gen, keep_gen, new_gen)) return 1;
     if (younger_p(sym->fdefn, gen, keep_gen, new_gen)) return 1;
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-    if (younger_p(linkage_cell_taggedptr(symbol_linkage_index(sym)),
+    if (younger_p(linkage_cell_function(symbol_linkage_index(sym)),
                   gen, keep_gen, new_gen)) return 1;
 #endif
     }

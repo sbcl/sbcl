@@ -583,11 +583,6 @@ lispobj entrypoint_taggedptr(uword_t entrypoint) {
     return make_lispobj(phdr, FUN_POINTER_LOWTAG);
 }
 
-// Return the lisp object that fdefn jumps to.
-lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
-    return entrypoint_taggedptr(linkage_space[fdefn_linkage_index(fdefn)]);
-}
-
 #ifdef LISP_FEATURE_SB_THREAD
 #include "genesis/vector.h"
 #define LOCK_PREFIX 0xF0
