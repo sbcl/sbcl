@@ -3968,8 +3968,7 @@ register."
           #+linkage-space
           (sb-vm::linkage-addr->name (context-register context callee-register-offset) :abs)
           #-linkage-space
-          (make-lisp-obj (logior (context-register context callee-register-offset)
-                                 #+untagged-fdefns other-pointer-lowtag)))
+          (make-lisp-obj (context-register context callee-register-offset)))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
@@ -4032,9 +4031,6 @@ register."
                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))))
          (t
           (setf (context-register context callee-register-offset)
-                #+untagged-fdefns
-                (logandc2 (get-lisp-obj-address new-callee) lowtag-mask)
-                #-untagged-fdefns
                 (get-lisp-obj-address new-callee))))))))
 
 ;;; Given a signal context, fetch the step-info that's been stored in

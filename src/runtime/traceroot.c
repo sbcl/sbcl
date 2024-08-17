@@ -214,11 +214,8 @@ static lispobj* valid_ambiguous_pointer_p(lispobj ptr, int registerp)
     // exact pointer is always a winner
     if (compute_lispobj(start) == ptr) return start;
     unsigned char widetag = widetag_of(start);
-    // allow untagged and/or interior pointer to code, fdefn, funcallable-instance
-    // FIXME: could add a few more rejection filters
-    //        such as untagged ptr to 2nd word of fdefn
+    // allow untagged and/or interior pointer to code, funcallable-instance
     if (widetag == CODE_HEADER_WIDETAG ||
-        widetag == FDEFN_WIDETAG ||
         widetag == FUNCALLABLE_INSTANCE_WIDETAG)
         return start;
     // allow in-register untagged pointer to lockfree list node

@@ -1318,11 +1318,7 @@ int lowtag_ok_for_page_type(__attribute__((unused)) lispobj ptr,
  *
  * 3. PPC64: interior code pointers from the stack are ambiguous roots,
  *    and pin their referent if there is one.
- *    FDEFN pointers may be untagged, and are therefore ambiguous.
- *    They pin their referent if there is one, but only if the reference
- *    is from a register in an interrupt context, not the control stack.
- *    (codegen will never spill an untagged fdefn to the stack)
- *    All other non-code object pointers are unambiguous, and do NOT pin
+ *    Non-code pointers are unambiguous, and do NOT pin
  *    their referent from the stack.
  *    Interrupt context registers are unambiguous and DO pin their referent.
  *    The entire control stack is scanned for code pointers, thus avoiding
@@ -1435,7 +1431,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     return 0;
 }
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
-/* Consider interior pointers to code as roots, and untagged fdefn pointers.
+/* Consider interior pointers to code as roots.
  * But most other pointers are *unambiguous* conservative roots.
  * This is not "less conservative" per se, than the non-precise code,
  * because it's actually up to the user of this predicate to decide whehther
@@ -1465,9 +1461,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     lispobj* object_start = search_dynamic_space((void*)addr);
     if (!object_start) return 0;
 
-    // Untagged fdefn pointer or code pointer: ok
-    if ((widetag_of(object_start) == FDEFN_WIDETAG && addr == (uword_t)object_start)
-        || is_code(page->type))
+    if (is_code(page->type))
         return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
 
     /* Take special care not to return fillers. A real-world example:
@@ -4473,24 +4467,6 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
             scavenge(object + 2, nboxed - 2);
         }
 
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        // Process each untagged fdefn pointer.
-        // TODO: assert that the generation of any fdefn is older than that of 'code'.
-        lispobj* fdefns = code->constants;
-        int n_fdefns = code_n_named_calls(code);
-        int i;
-        for (i=0; i<n_fdefns; ++i) {
-            lispobj word = fdefns[i];
-            if (word) {
-                gc_assert(!(word & LOWTAG_MASK)); // must not have OTHER_POINTER_LOWTAG
-                lispobj tagged_word = word | OTHER_POINTER_LOWTAG;
-                scavenge(&tagged_word, 1);
-                if (tagged_word - OTHER_POINTER_LOWTAG != word) {
-                    fdefns[i] = tagged_word - OTHER_POINTER_LOWTAG;
-                }
-            }
-        }
-#endif
         extern void scav_code_linkage_cells(struct code*);
         scav_code_linkage_cells(code);
 
@@ -4736,14 +4712,6 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         sword_t nheader_words = code_header_words(code);
         /* Verify the boxed section of the code data block */
         state->min_pointee_gen = ARTIFICIALLY_HIGH_GEN;
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        {
-        lispobj* pfdefn = code->constants;
-        lispobj* end = pfdefn + code_n_named_calls(code);
-        for ( ; pfdefn < end ; ++pfdefn)
-            if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pfdefn);
-        }
-#endif
         for (i=2; i <nheader_words; ++i) CHECK(object[i], object+i);
 #ifndef NDEBUG // avoid "unused" warnings on auto vars of for_each_simple_fun()
         // Check the SIMPLE-FUN headers

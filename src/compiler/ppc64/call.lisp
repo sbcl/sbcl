@@ -761,7 +761,7 @@ default-value-8
                   ;; pointer) that the function itself be in a
                   ;; register before the raw-addr is loaded.
                   (sb-assem:without-scheduling ()
-                    (let ((tag (+ #-untagged-fdefns other-pointer-lowtag)))
+                    (let ((tag other-pointer-lowtag))
                       (loadw function name-pass fdefn-fun-slot tag)
                       (loadw entry-point name-pass fdefn-raw-addr-slot tag)))
                   (do-next-filler)))

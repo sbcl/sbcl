@@ -163,13 +163,6 @@ static void TRACE_NAME(lispobj* where)
             }
         }
 #endif
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        lispobj* where = code->constants;
-        lispobj* limit = where + code_n_named_calls(code);
-        for ( ; where < limit ; ++where )
-            ACTION(*where | OTHER_POINTER_LOWTAG, where, SOURCE_ZERO_TAG);
-        // Fall into general case. Untagged fdefns will be ignored as fixnums.
-#endif
         break;
     }
     case SYMBOL_WIDETAG:

@@ -97,7 +97,7 @@
   (def sb-c::vector-length)
   (def make-array-header (type rank))
   (def code-instructions)
-  #-untagged-fdefns (def code-header-ref (code-obj index))
+  (def code-header-ref (code-obj index))
   (def %vector-raw-bits (object offset))
   (def %set-vector-raw-bits (object offset value))
   #-weak-vector-readbarrier (def weak-vector-len)

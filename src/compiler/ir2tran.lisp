@@ -181,11 +181,6 @@
                ;; when referenced as #' - if it lacked such then you'd likely have just
                ;; as bad a time with or without safety. One way or another you're landing
                ;; in the ldb monitor if it occurs during cold-init.
-                #+untagged-fdefns
-                (if (or unsafe internal)
-                    (vop sb-vm::untagged-fdefn-fun node block fdefn-tn res)
-                    (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res))
-                #-untagged-fdefns
                 (if (or unsafe internal)
                     #+linkage-space (vop fdefn-fun node block fdefn-tn res)
                     #-linkage-space

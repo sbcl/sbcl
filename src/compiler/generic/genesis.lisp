@@ -2756,12 +2756,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
-(defun store-named-call-fdefn (code index fdefn)
-  #+untagged-fdefns
-  (write-wordindexed/raw code index (- (descriptor-bits fdefn)
-                                       sb-vm:other-pointer-lowtag))
-  #-untagged-fdefns (write-wordindexed code index fdefn))
-
 (define-cold-fop (fop-load-code (header n-code-bytes n-fixup-elts))
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
@@ -2820,7 +2814,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
                (descriptor-bits fn))))) ; Store a taagged pointer to the function
       (dotimes (i n-fdefns)
-        (store-named-call-fdefn des header-index (svref stack stack-index))
+        (write-wordindexed des header-index (svref stack stack-index))
         (incf header-index)
         (incf stack-index))
       (do () ((>= header-index n-boxed-words))

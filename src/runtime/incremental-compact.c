@@ -229,9 +229,7 @@ static void fix_slot(lispobj *slot, lispobj *source, enum source source_type) {
     break;
   case SOURCE_ZERO_TAG:
     /* I'm only guessing that this line is right. It's hard to test because compaction
-     * is unlikely to occur when there are lockfree lists containing logically-deleted nodes.
-     * The only other use of zero tag is for #+UNTAGGED-FDEFNS on ppc64, but soft marking
-     * and hence mark-region are not supported on that architecture */
+     * is unlikely to occur when there are lockfree lists containing logically-deleted nodes. */
     *slot = (lispobj)native_pointer(follow_fp(*slot));
     break;
   case SOURCE_CLOSURE: {

@@ -446,13 +446,6 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-            // Process each untagged fdefn pointer.
-            lispobj* fdefns_start = code->constants;
-            int i;
-            for (i=code_n_named_calls(code)-1; i>=0; --i)
-                adjust_word_at(fdefns_start+i, adj);
-#endif
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || \
     defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64
             // Fixup absolute jump table

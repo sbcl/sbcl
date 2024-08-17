@@ -1713,14 +1713,6 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         sword_t nheader_words = code_header_words(code);
         /* Verify the boxed section of the code data block */
         state->min_pointee_gen = ARTIFICIALLY_HIGH_GEN;
-#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
-        {
-        lispobj* pfdefn = code->constants;
-        lispobj* end = pfdefn + code_n_named_calls(code);
-        for ( ; pfdefn < end ; ++pfdefn)
-            if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pfdefn);
-        }
-#endif
         for (i=2; i <nheader_words; ++i) CHECK(object[i], object+i);
 #ifndef NDEBUG // avoid "unused" warnings on auto vars of for_each_simple_fun()
         // Check the SIMPLE-FUN headers

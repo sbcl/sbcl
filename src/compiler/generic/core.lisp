@@ -197,15 +197,11 @@
 
     ;; Don't need code pinned now
     ;; (It will implicitly be pinned on the conservatively scavenged backends)
-    (macrolet ((set-boxed-word (i val &optional fdefnp)
-                 (declare (ignorable fdefnp))
-                 ;; Thankfully we don't mix untagged fdefns with darwin-jit
+    (macrolet ((set-boxed-word (i val)
                  #+darwin-jit
                  `(setf (svref boxed-data (- ,i ,sb-vm:code-constants-offset)) ,val)
                  #-darwin-jit
-                 (if fdefnp
-                     `(set-code-fdefn code-obj ,i ,val)
-                     `(setf (code-header-ref code-obj ,i) ,val))))
+                 `(setf (code-header-ref code-obj ,i) ,val)))
 
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
@@ -217,17 +213,16 @@
       (do ((index const-patch-start-index (1+ index)))
           ((>= index n-boxed-words))
         (let ((const (aref constants index)))
-          (if (typep const '(cons (eql :fdefinition)))
-              (set-boxed-word index (second const) t)
-              (set-boxed-word index
+          (set-boxed-word index
                 (if (constant-p const)
                     (constant-value const)
                     (destructuring-bind (kind payload) const
                       (ecase kind
+                        (:fdefinition payload)
                         (:entry
                          (the function (gethash (leaf-info payload)
                                                 (core-object-entry-table object))))
-                        (:known-fun (%coerce-name-to-fun payload)))))))))
+                        (:known-fun (%coerce-name-to-fun payload))))))))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
@@ -356,12 +351,3 @@
           (list* code data (nconc (coerce data 'list) sb-vm::*pinned-objects*))))
     (sb-vm::jit-copy-code-constants (get-lisp-obj-address code)
                                     (get-lisp-obj-address data))))
-
-(defun set-code-fdefn (code index fdefn)
-  #+untagged-fdefns
-  (with-pinned-objects (fdefn)
-    (setf (code-header-ref code index)
-          (%make-lisp-obj (logandc2 (get-lisp-obj-address fdefn)
-                                    sb-vm:lowtag-mask))))
-  #-untagged-fdefns
-  (setf (code-header-ref code index) fdefn))
