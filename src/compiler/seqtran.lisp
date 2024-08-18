@@ -3645,3 +3645,14 @@
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end)
     (specifier-type `(integer ,min ,max))))
+
+(defoptimizers constants
+    (hairy-data-vector-ref hairy-data-vector-ref/check-bounds
+     data-vector-ref data-vector-ref-with-offset)
+    ((array index &optional offset))
+  array)
+
+(defoptimizer (nth constants) ((index list))
+  list)
+(defoptimizers constants (car cdr) ((cons))
+  cons)

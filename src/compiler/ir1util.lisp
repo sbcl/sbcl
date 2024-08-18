@@ -3180,7 +3180,7 @@ is :ANY, the function name is not checked."
                                                           source-path)))))
                     collect annotation)))))))
 
-(defun lvar-constants (lvar)
+(defun lvar-constants (lvar &optional walk-functions)
   (named-let recurse ((lvar lvar) (seen nil))
     (let* ((uses (lvar-uses lvar))
            (lvar (or (and (ref-p uses)
@@ -3214,7 +3214,19 @@ is :ANY, the function name is not checked."
                              (setf constants (nconc values constants)))))))
                     leaf)
                    (when constants
-                     (values :calls constants))))))))))
+                     (values :calls constants))))))
+            ((and walk-functions
+                  (combination-p uses)
+                  (eq (combination-kind uses) :known))
+             (let ((fun-info (fun-info-constants (combination-fun-info uses))))
+               (when fun-info
+                 (let ((constants (funcall fun-info uses)))
+                   (when constants
+                     (multiple-value-bind (kind constants)
+                         (lvar-constants constants t)
+                       (declare (ignore kind))
+                       (when constants
+                         (values :values constants))))))))))))
 
 (defun lambda-var-original-name (leaf)
   (let ((home (lambda-var-home leaf)))
@@ -3238,7 +3250,7 @@ is :ANY, the function name is not checked."
                      :fun-name (lvar-modified-annotation-caller annotation)
                      :variable (lambda-var-original-name lambda-var))
                (return-from process-lvar-modified-annotation))))
-  (multiple-value-bind (type values) (lvar-constants lvar)
+  (multiple-value-bind (type values) (lvar-constants lvar t)
     (labels ((modifiable-p (value)
                (or (consp value)
                    (and (arrayp value)
