@@ -821,3 +821,10 @@
                       '(lambda (n)
                         (setf (car (aref #((1) (2)) n)) 10))
                       :allow-warnings t))))
+
+(with-test (:name :constant-modification-nil)
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (n)
+                        (incf (car (assoc n '((1 . 2) (3 . 4))))))
+                      :allow-warnings t))))

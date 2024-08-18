@@ -3257,10 +3257,12 @@ is :ANY, the function name is not checked."
                         (not (typep value '(vector * 0))))
                    (hash-table-p value)))
              (report (values)
-               (when (every #'modifiable-p values)
-                 (warn 'constant-modified
-                       :fun-name (lvar-modified-annotation-caller annotation)
-                       :values values))))
+               (let ((sans-nil (remove nil values)))
+                (when (and sans-nil
+                           (every #'modifiable-p sans-nil))
+                  (warn 'constant-modified
+                        :fun-name (lvar-modified-annotation-caller annotation)
+                        :values sans-nil)))))
      (case type
        (:values
         (report values)
