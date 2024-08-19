@@ -44,7 +44,7 @@
             (#+big-endian sap-ref-word #+little-endian sap-ref-32
              (int-sap (get-lisp-obj-address fname))
              (- (ash symbol-hash-slot word-shift) other-pointer-lowtag)))))
-    (fdefn (ash (get-header-data fname) -8))))
+    (fdefn (ash (get-header-data fname) -24))))
 
 (macrolet ((entry-addr (index f)
              `(values #+ppc64 (truly-the word

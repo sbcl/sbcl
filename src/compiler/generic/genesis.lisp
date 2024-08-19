@@ -1226,7 +1226,8 @@ core and return a descriptor to it."
   (let ((des (coerce-to-cold-fname fname)))
     (cond ((cold-null des) 0)
           ((= (descriptor-widetag des) sb-vm:fdefn-widetag)
-           (ldb (byte sb-vm:n-linkage-index-bits 16) (read-bits-wordindexed des 0)))
+           ;; upper 32 bits of object header
+           (ldb (byte sb-vm:n-linkage-index-bits 32) (read-bits-wordindexed des 0)))
           (t
            (ldb (byte sb-vm:n-linkage-index-bits 0)
                 (read-bits-wordindexed des sb-vm:symbol-hash-slot))))))
@@ -1238,7 +1239,7 @@ core and return a descriptor to it."
       (setq index (vector-push-extend des *fname-table*))
       (if (= (descriptor-widetag des) sb-vm:fdefn-widetag)
           (let ((header (read-bits-wordindexed des 0))) ; store to fdefn header
-            (write-wordindexed/raw des 0 (logior (ash index 16) header)))
+            (write-wordindexed/raw des 0 (logior (ash index 32) header)))
           (let ((hash (read-bits-wordindexed des sb-vm:symbol-hash-slot)))
             (write-wordindexed/raw des sb-vm:symbol-hash-slot (logior hash index))))
       (assert (= (fname-linkage-index fname) index)))

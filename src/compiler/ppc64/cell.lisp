@@ -323,13 +323,7 @@
     (storew temp object symbol-hash-slot other-pointer-lowtag)
     (inst b CELL-SET)
     FDEFN
-    ;; Don't want to deal with endianness, and can't store unaligned,
-    ;; so write the entire header. This could be unsafe if GC puts
-    ;; data in the header without synchronization.
-    ;; (Consider using upper 4 bytes of the header instead)
-    (inst sldi temp index 16)
-    (inst ori temp temp fdefn-widetag)
-    (storew temp object 0 other-pointer-lowtag)
+    (inst stw index object (- #+little-endian 4 other-pointer-lowtag))
     CELL-SET
     (inst std linkage-val linkage-cell 0)))
 (define-vop (set-fname-fun)

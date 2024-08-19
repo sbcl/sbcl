@@ -97,16 +97,17 @@ extern void unbind_to_here(lispobj *bsp,void *thread);
 #endif
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
-
-#define LINKAGE_INDEX_MASK ((1<<N_LINKAGE_INDEX_BITS)-1)
-
 static inline unsigned int fdefn_linkage_index(struct fdefn* f) {
-    return (f->header >> 16) & LINKAGE_INDEX_MASK;
+#ifdef LISP_FEATURE_BIG_ENDIAN
+    return ((unsigned int*)f)[0]; // upper 4 bytes of header
+#else
+    return ((unsigned int*)f)[1]; // same
+#endif
 }
 static inline unsigned int symbol_linkage_index(struct symbol* s) {
     // never look at NIL's hash slot's low bits
     if ((uword_t)s == (STATIC_SPACE_START + NIL_SYMBOL_SLOTS_OFFSET)) return 0;
-    return s->hash & LINKAGE_INDEX_MASK;
+    return s->hash & ((1<<N_LINKAGE_INDEX_BITS)-1);
 }
 
 static lispobj __attribute__((unused)) symbol_function(struct symbol* s) {

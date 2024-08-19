@@ -494,7 +494,7 @@
     (gcbar)
     (inst cmp :byte (ea (- other-pointer-lowtag) object) fdefn-widetag)
     (inst jmp :ne SYMBOL)
-    (inst mov :dword (ea (- 2 other-pointer-lowtag) object) index)
+    (inst mov :dword (ea (- 4 other-pointer-lowtag) object) index)
     (inst jmp CELL-SET)
     SYMBOL
     (inst or :dword (object-slot-ea object symbol-hash-slot other-pointer-lowtag) index)
