@@ -3223,7 +3223,7 @@ is :ANY, the function name is not checked."
                  (let ((constants (funcall fun-info uses)))
                    (when constants
                      (multiple-value-bind (kind constants)
-                         (lvar-constants constants t)
+                         (recurse constants seen)
                        (declare (ignore kind))
                        (when constants
                          (values :values constants))))))))))))
