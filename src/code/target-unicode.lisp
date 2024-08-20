@@ -840,6 +840,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
   (if (has-case-p char)
       #-sb-unicode
       (list (char-downcase char))
+      #+sb-unicode
       (let ((cp (char-case-info char)))
         (if (consp cp)
             (let ((cp (cdr cp)))
