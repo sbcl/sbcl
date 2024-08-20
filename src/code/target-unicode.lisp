@@ -824,6 +824,9 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun char-uppercase (char)
   (if (has-case-p char)
+      #-sb-unicode
+      (list (char-upcase char))
+      #+sb-unicode
       (let ((cp (char-case-info char)))
         (if (consp cp)
             (let ((cp (car cp)))
@@ -835,6 +838,8 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun char-lowercase (char)
   (if (has-case-p char)
+      #-sb-unicode
+      (list (char-downcase char))
       (let ((cp (char-case-info char)))
         (if (consp cp)
             (let ((cp (cdr cp)))
