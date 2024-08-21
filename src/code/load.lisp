@@ -1203,8 +1203,7 @@
                  ;; that "gets() is dangerous." You're informed by both the compiler and linker.
                  (when (deprecated-thing-p 'function name)
                    (format *error-output* "~&; While loading ~S:"
-                           (format *error-output* "~&; While loading ~S:"
-                                   (sb-c::debug-info-name debug-info)))
+                           (sb-c::debug-info-name debug-info))
                    (check-deprecated-thing 'function name))))
           #+linkage-space ; Scan packed linkage index list for deprecated names
           (dolist (index (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))
