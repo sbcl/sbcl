@@ -2128,7 +2128,18 @@
       (intersect array)
       (intersect pathname)
       (intersect number)
-      (intersect character) ;; ignore case
+      ;; Ignore char case
+      (let ((char-type (type-intersection type (specifier-type 'character))))
+        (unless (eq char-type *empty-type*)
+          (setf result
+                (type-union
+                 result
+                 (cond ((csubtypep char-type (specifier-type 'standard-char))
+                        (specifier-type 'standard-char))
+                       ((csubtypep char-type (specifier-type 'base-char))
+                        (specifier-type 'base-char))
+                       (t
+                        (specifier-type 'character)))))))
       (intersect hash-table)
       (intersect instance))
     result))
@@ -2152,12 +2163,12 @@
                    key-identity-p)
           ;; Maybe FIND returns ITEM itself or a comparable type
           (cond ((or (not test)
-                     (lvar-fun-is test '(eq eql char= char-equal))
+                     (lvar-fun-is test '(eq eql char=))
                      (lvar-value-is test nil))
                  (setf type (lvar-type item)))
                 ((lvar-fun-is test '(equal))
                  (setf type (equal-type (lvar-type item))))
-                ((lvar-fun-is test '(equalp))
+                ((lvar-fun-is test '(equalp char-equal))
                  (setf type (equalp-type (lvar-type item))))))
         ;; Should return something the functions can accept
         (if key-identity-p
