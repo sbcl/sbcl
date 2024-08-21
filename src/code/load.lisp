@@ -1078,12 +1078,8 @@
 ;;; on any architecture where fixup application cares what the address of the code actually is.
 ;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
 (defmacro with-writable-code-instructions ((code-var total-nwords debug-info-var
-                                            n-fdefns n-funs)
+                                            n-funs)
                                            &key copy fixup)
-  (declare (ignorable n-fdefns))
-  ;; N-FDEFNS is important for PPC64, slightly important for X86-64, not important for
-  ;; any others, and doesn't even have a place to store it if lispwords are 32 bits.
-  ;; The :DEDUPLICATED-FDEFNS test in compiler-2.pure asserts that the value is valid
   (let ((body
          ;; The following operations need the code pinned:
          ;; 1. copying into code-instructions (a SAP)
@@ -1094,10 +1090,9 @@
          ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
          ;; interrupted in between the store of any individual byte, this code
          ;; is GC-safe because we no longer need to know where simple-funs are embedded
-         ;; within the object to trace pointers. We *do* need to know where the funs
-         ;; are when transporting the object, but it's pinned within the body forms.
+         ;; within the object to trace pointers.
          `(,copy
-           (sb-c::code-header/trailer-adjust ,code-var ,total-nwords ,n-fdefns)
+           (sb-c::code-header/trailer-adjust ,code-var ,total-nwords)
            ;; Check that the code trailer matches our expectation on number of embedded simple-funs
            (aver (= (code-n-entries ,code-var) ,n-funs))
            ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
@@ -1173,16 +1168,10 @@
   ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
   ;;     | <--------- n-constants ---------> |            | <-- n-fixup-elts -> ||
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
-         (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
          (n-constants (- n-boxed-words sb-vm:code-constants-offset))
          (stack-elts-consumed (+ n-constants 1 n-fixup-elts)))
     (with-fop-stack ((stack (operand-stack)) ptr stack-elts-consumed)
-      ;; We've already ensured that all FDEFNs the code uses exist.
-      ;; This happened by virtue of calling fop-fdefn for each.
-      (loop for stack-index from ptr
-            repeat n-fdefns
-            do (aver (typep (svref stack stack-index) '(or fdefn #+linkage-space symbol))))
       (binding* (((code total-nwords)
                   (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
@@ -1191,20 +1180,12 @@
                  (real-code code)
                  (debug-info (svref stack (+ ptr n-constants))))
         (with-writable-code-instructions
-            (code total-nwords debug-info n-fdefns n-simple-funs)
+            (code total-nwords debug-info n-simple-funs)
           :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts real-code))
         ;; Don't need the code pinned from here on
         (setf (sb-c::debug-info-source (%code-debug-info code))
               (%fasl-input-partial-source-info (fasl-input)))
-        ;; This is the moral equivalent of a warning from /usr/bin/ld
-        ;; that "gets() is dangerous." You're informed by both the compiler and linker.
-        (dotimes (i n-fdefns)
-          (let* ((thing (svref stack (+ ptr i)))
-                 (name (if (fdefn-p thing) (fdefn-name thing))))
-            (when (deprecated-thing-p 'function name)
-              (format *error-output* "~&; While loading ~S:" (sb-c::debug-info-name debug-info))
-              (check-deprecated-thing 'function name))))
         ;; Boxed constants can be assigned only after figuring out where the range
         ;; of implicitly tagged words is, which requires knowing how many functions
         ;; are in the code component, which requires reading the code trailer.
@@ -1217,9 +1198,22 @@
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
               (incf stack-index)))
-        #+linkage-space ; Scan packed linkage index list for deprecated names
-        (dolist (index (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))
-          (check-deprecated-thing 'function (sb-vm::linkage-addr->name index :index)))
+        (flet ((check-one-name (name)
+                 ;; This is the moral equivalent of a warning from /usr/bin/ld
+                 ;; that "gets() is dangerous." You're informed by both the compiler and linker.
+                 (when (deprecated-thing-p 'function name)
+                   (format *error-output* "~&; While loading ~S:"
+                           (format *error-output* "~&; While loading ~S:"
+                                   (sb-c::debug-info-name debug-info)))
+                   (check-deprecated-thing 'function name))))
+          #+linkage-space ; Scan packed linkage index list for deprecated names
+          (dolist (index (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))
+            (check-one-name (sb-vm::linkage-addr->name index :index)))
+          #-linkage-space
+          (loop for i from sb-vm:code-constants-offset below (code-header-words code)
+                do (let ((thing (code-header-ref code i)))
+                     (when (fdefn-p thing)
+                       (check-one-name (fdefn-name thing))))))
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.

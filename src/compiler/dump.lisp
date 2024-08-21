@@ -1190,8 +1190,7 @@
            (type fasl-output fasl-output))
   (let* ((2comp (component-info component))
          (constants (ir2-component-constants 2comp))
-         (header-length (length constants))
-         (n-fdefns 0))
+         (header-length (length constants)))
     (collect ((patches)
               (named-constants))
       ;; Dump the constants, noting any :ENTRY constants that have to
@@ -1223,11 +1222,9 @@
                (:load-time-value
                 (dump-push payload fasl-output))
                (:fdefinition
-                ;; It's possible for other fdefns to be found in the header, but they can't
-                ;; have resulted from IR2 conversion. They would have had to come from
-                ;; something like (load-time-value (find-or-create-fdefn ...))
-                ;; which is fine, but they don't count for this purpose.
-                (incf n-fdefns)
+                ;; It's possible for other fdefns to be found in the header not resulting
+                ;; from IR2-CONVERT-GLOBAL-VAR, for example (L-T-V (find-or-create-fdefn ...)).
+                ;; Those fdefns would not use FOP-FDEFN.
                 (dump-object payload fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
@@ -1256,9 +1253,6 @@
       ;; Fasl dumper/loader convention allows at most 3 integer args.
       ;; Others have to be written with explicit calls.
       (dump-integer-as-n-bytes (length (ir2-component-entries 2comp))
-                               4 ; output 4 bytes
-                               fasl-output)
-      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-fdefns)
                                4 ; output 4 bytes
                                fasl-output)
       (dump-segment code-segment code-length fasl-output)

@@ -2574,7 +2574,7 @@
                             (push name names)))))
              (assert (not dup-fdefns)))))
     (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
-      (sb-int:binding* (((start count) (sb-kernel:code-header-fdefn-range c))
+      (sb-int:binding* (((start count) (ctu:code-header-fdefn-range c))
                         (end (+ start count)))
         ;; Within each subset of FDEFNs there should be no duplicates
         ;; by name. But there could be an fdefn that is in the union of the two sets.

@@ -158,17 +158,13 @@
         (or #+darwin-jit
             (make-array (- n-boxed-words sb-vm:code-constants-offset) :initial-element 0)))
        (const-patch-start-index sb-vm:code-constants-offset)
-       ;; Pre-scan for all fdefinitions to ensure their existence, which guarantees that
-       ;; storing them into the boxed words can't can't create an old->young pointer.
-       ;; This is essential since gencgc will miss them when scanning the code header
-       ;; for such tagged pointers.
-       (n-fdefns
-        (do ((count 0)
-             (index const-patch-start-index (1+ index)))
-            ((>= index n-boxed-words) count)
+       ;; Ensure existence of FDEFNs before allocating code. This potentially reduces
+       ;; the number of old->young pointers when assigning boxed words.
+       (nil
+        (do ((index const-patch-start-index (1+ index)))
+            ((>= index n-boxed-words))
           (let ((const (aref constants index)))
             (when (typep const '(cons (eql :fdefinition)))
-              (incf count)
               (setf (second const) (find-or-create-fdefn (second const)))))))
        (retained-fixups (sb-c::pack-fixups-for-reapplication fixup-notes))
        ((code-obj total-nwords)
@@ -182,7 +178,7 @@
        (real-code-obj code-obj))
     (declare (ignorable boxed-data))
     (sb-fasl::with-writable-code-instructions
-        (code-obj total-nwords debug-info n-fdefns n-simple-funs)
+        (code-obj total-nwords debug-info n-simple-funs)
         :copy (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
         :fixup (setq named-call-fixups
                      (apply-core-fixups code-obj fixup-notes retained-fixups real-code-obj)))
@@ -257,7 +253,6 @@
 (defun copy-code-object (code)
   ;; Must have one simple-fun
   (aver (= (code-n-entries code) 1))
-  (aver (zerop (nth-value 1 (code-header-fdefn-range code))))
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count
          (unboxed (- nbytes (ash boxed sb-vm:word-shift))) ; byte count
@@ -298,8 +293,8 @@
 ;;; are 0, so the jump table count is 0.
 ;;; Similar considerations pertain to x86[-64] fixups within the machine code.
 
-(defun code-header/trailer-adjust (code-obj expected-nwords n-fdefns)
-  (declare (ignorable expected-nwords n-fdefns))
+(defun code-header/trailer-adjust (code-obj expected-nwords)
+  (declare (ignorable expected-nwords))
   ;; Serial# shares a word with the jump-table word count,
   ;; so we can't assign serial# until after all raw bytes are copied in.
   ;; Do we need unique IDs on the various strange kind of code blobs? These would
@@ -316,9 +311,6 @@
   (let ((base (sap+ (int-sap (get-lisp-obj-address code-obj)) (- sb-vm:other-pointer-lowtag)))
         (physical-nwords ; upper 4 bytes of the header word
          (ash (get-header-data code-obj) -24)))
-    (setf (sap-ref-32 base (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift)
-                              #+little-endian 4))
-          n-fdefns)
     (when (/= physical-nwords expected-nwords)
       ;; Oversized allocation must be exactly 2 words more than requested
       (aver (= (- physical-nwords 2) expected-nwords))

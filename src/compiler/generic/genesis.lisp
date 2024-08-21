@@ -743,15 +743,12 @@
                   0)))
     (write-wordindexed/raw des 0 (logior (ash gen 24) header-word))))
 
-(defun write-code-header-words (descriptor boxed unboxed n-fdefns)
-  (declare (ignorable n-fdefns))
+(defun write-code-header-words (descriptor boxed unboxed)
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
                        (logior (ash total-words sb-vm:code-header-size-shift)
                                sb-vm:code-header-widetag)))
-  (write-wordindexed/raw
-   descriptor 1
-   (logior #+64-bit (ash n-fdefns 32) (* boxed sb-vm:n-word-bytes))))
+  (write-wordindexed/raw descriptor sb-vm:code-boxed-size-slot (* boxed sb-vm:n-word-bytes)))
 
 (defun write-header-data+tag (des header-data widetag)
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
@@ -2759,7 +2756,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-load-code (header n-code-bytes n-fixup-elts))
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
-         (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
          (n-constants (- n-boxed-words sb-vm:code-constants-offset))
          (stack-elts-consumed (+ n-constants 1 n-fixup-elts))
@@ -2775,7 +2771,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes)
                   sb-vm:other-pointer-lowtag :code)))
     (declare (ignorable immobile))
-    (write-code-header-words des aligned-n-boxed-words n-code-bytes n-fdefns)
+    (write-code-header-words des aligned-n-boxed-words n-code-bytes)
     (write-wordindexed des sb-vm:code-debug-info-slot
                        (svref stack (+ stack-index n-constants)))
 
@@ -2814,10 +2810,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
                   (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
                (descriptor-bits fn))))) ; Store a taagged pointer to the function
-      (dotimes (i n-fdefns)
-        (write-wordindexed des header-index (svref stack stack-index))
-        (incf header-index)
-        (incf stack-index))
       (do () ((>= header-index n-boxed-words))
        (let ((constant (svref stack stack-index)))
          (cond ((and (consp constant) (eq (car constant) :known-fun))
@@ -2862,7 +2854,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (+ (ash header-n-words sb-vm:word-shift) rounded-length)
                   sb-vm:other-pointer-lowtag)))
     (setf *assembler-routines* asm-code)
-    (write-code-header-words asm-code header-n-words rounded-length 0)
+    (write-code-header-words asm-code header-n-words rounded-length)
     (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb-vm:word-shift))))
       (read-into-bigvec (descriptor-mem asm-code) (fasl-input-stream) start length))

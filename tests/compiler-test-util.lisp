@@ -18,6 +18,7 @@
   (:export #:asm-search
            #:assert-consing
            #:assert-no-consing
+           #:code-header-fdefn-range
            #:compiler-derived-type
            #:count-full-calls
            #:find-code-constants
@@ -113,6 +114,19 @@
 (when (member :linkage-space sb-impl:+internal-features+) ; for below
   (pushnew :linkage-space *features*))
 
+;;; Start and count of fdefns used in #'F synax or normal named call
+;;; (i.e. at the head of an expression).
+;;; SORT-BOXED-CONSTANTS ensures that FDEFNs precede other constants.
+;;; This does not have to be particularly efficient. It's only for tests.
+(defun code-header-fdefn-range (code-obj)
+  (let ((start sb-vm:code-constants-offset)
+        (count 0))
+    (do ((i start (1+ i))
+         (limit (code-header-words code-obj)))
+        ((= i limit))
+      (if (fdefn-p (code-header-ref code-obj i)) (incf count) (return)))
+    (values start count)))
+
 (defun find-named-callees (fun &key (name nil namep))
   (let ((code (fun-code-header (%fun-fun fun))))
     #+linkage-space
@@ -121,7 +135,7 @@
           when (or (not namep) (equal this name))
           collect this)
     #-linkage-space
-    (sb-int:binding* (((start count) (sb-kernel:code-header-fdefn-range code)))
+    (sb-int:binding* (((start count) (code-header-fdefn-range code)))
       (loop for i from start repeat count
             for c = (code-header-ref code i)
             when (or (not namep) (equal name (sb-kernel:fdefn-name c)))

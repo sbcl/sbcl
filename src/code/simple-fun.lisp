@@ -404,22 +404,6 @@
   (declare (type code-component code-obj))
   (ash (code-fun-table-count code-obj) -5))
 
-;;; Start and count of fdefns used in #'F synax or normal named call
-;;; (i.e. at the head of an expression)
-(defun code-header-fdefn-range (code-obj)
-  #-64-bit ; inefficient
-  (let ((start sb-vm:code-constants-offset)
-        (count 0))
-    (do ((i start (1+ i))
-         (limit (code-header-words code-obj)))
-        ((= i limit))
-      (if (fdefn-p (code-header-ref code-obj i)) (incf count) (return)))
-    (values start count))
-  #+64-bit
-  (values sb-vm:code-constants-offset
-          (ash (sb-vm::%code-boxed-size code-obj)
-               (+ -32 sb-vm:n-fixnum-tag-bits))))
-
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
 (declaim (inline %code-fun-offset))

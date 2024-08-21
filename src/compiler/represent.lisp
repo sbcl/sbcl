@@ -881,14 +881,9 @@
 
 ;;; Arrange boxed constants so that all :NAMED-CALL constants are first,
 ;;; then constant leaves, and finally LOAD-TIME-VALUE constants.
-;;; There exist a few reasons for placing all the FDEFNs first:
-;;;  * FDEFNs which are referenced for call (versus for value as in #'FUN)
-;;;    may be stored in the code header as untagged pointers. This benefits PPC64
-;;;    because lowtag subtraction can't be had "for free" due to the architectural
-;;;    requirement that lispword-aligned loads need a displacement that is
-;;;    a multiple of 4, which OTHER-POINTER-LOWTAG does not satisfy.
-;;;  * It is often useful to scan a blob of code to find just its referenced
-;;;    callees without having to sift through all constants.
+;;; It is often useful to scan a blob of code to find just its referenced
+;;; callees without having to sift through all constants. Historically there
+;;; were other uses for the sorting.
 (defun sort-boxed-constants (2comp)
   (let* ((sorted (ir2-component-constants 2comp))
          (unsorted (subseq sorted 1))
