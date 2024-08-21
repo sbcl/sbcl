@@ -33,8 +33,8 @@
     (let ((name (uncross name)))
       (setq *undefined-warnings*
             (delete-if (lambda (x)
-                         (and (equal (undefined-warning-name x) name)
-                              (eq (undefined-warning-kind x) kind)))
+                         (and (eq (undefined-warning-kind x) kind)
+                              (equal (undefined-warning-name x) name)))
                        *undefined-warnings*))))
   (values))
 
