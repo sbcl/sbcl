@@ -1658,8 +1658,8 @@ possible.")
        (current-defmethod
         (destructuring-bind (name qualifiers specializers lambda-list)
             (cdr spec)
-          (let* ((gfs (or *methods-in-compilation-unit*
-                          (setf *methods-in-compilation-unit*
+          (let* ((gfs (or (cu-methods *compilation-unit*)
+                          (setf (cu-methods *compilation-unit*)
                                 (make-hash-table :test #'equal))))
                  (methods (or (gethash name gfs)
                               (setf (gethash name gfs)

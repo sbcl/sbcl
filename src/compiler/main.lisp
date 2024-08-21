@@ -50,14 +50,6 @@
 ;;; identifiable compilation.
 (defvar *source-info* nil)
 
-;;; This is true if we are within a WITH-COMPILATION-UNIT form (which
-;;; normally causes nested uses to be no-ops).
-(defvar *in-compilation-unit* nil)
-
-;;; Count of the number of compilation units dynamically enclosed by
-;;; the current active WITH-COMPILATION-UNIT that were unwound out of.
-(defvar *aborted-compilation-unit-count*)
-
 ;;; Mumble conditional on *COMPILE-PROGRESS*.
 (defun maybe-mumble (&rest foo)
   (when *compile-progress*
@@ -171,22 +163,22 @@ Examples:
                  (*source-namestring*
                   (awhen (or source-namestring *source-namestring*)
                     (possibly-base-stringize it))))
-             (if (and *in-compilation-unit* (not override))
+             (if (and *compilation-unit* (not override))
                  ;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
                  ;; ordinarily (unless OVERRIDE) basically a no-op.
                  (unwind-protect
                       (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
                    (unless succeeded-p
-                     (incf *aborted-compilation-unit-count*)))
-                 (let ((*aborted-compilation-unit-count* 0)
-                       (*compiler-error-count* 0)
-                       (*compiler-warning-count* 0)
-                       (*compiler-style-warning-count* 0)
-                       (*compiler-note-count* 0)
-                       (*undefined-warnings* nil)
-                       *argument-mismatch-warnings*
-                       *methods-in-compilation-unit*
-                       (*in-compilation-unit* t))
+                     (incf (cu-aborted-count *compilation-unit*))))
+                 ;; (Were it not for UIOP+ASDF touching *undefined-warnings*, it should be an alist
+                 ;; of hash-tables, the alist keys denoting the KINDs of warnings and the
+                 ;; hash-table keys being the NAMEs that have been warned about of each KIND.
+                 ;; Currently NOTE-NAME-DEFINED takes time proportional to the number of warnings
+                 ;; issued, which may number in the hundredsd. Perhaps some trick with a SETF
+                 ;; function will work to convert between pretend and actual representation)
+                 (let ((*undefined-warnings* nil) ; UIOP both reads and writes this
+                       *argument-mismatch-warnings* ; bound in SIMPLE-EVAL-LOCALLY also
+                       (*compilation-unit* (make-compilation-unit)))
                    (handler-bind ((parse-unknown-type
                                     (lambda (c)
                                       (note-undefined-reference
@@ -195,7 +187,7 @@ Examples:
                      (unwind-protect
                           (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
                        (unless succeeded-p
-                         (incf *aborted-compilation-unit-count*))
+                         (incf (cu-aborted-count *compilation-unit*)))
                        (summarize-compilation-unit (not succeeded-p)))))))))
     (if policy
         (let ((*policy* (process-optimize-decl policy (unless override *policy*)))
@@ -226,7 +218,7 @@ Examples:
 ;;; aborted by throwing out. ABORT-COUNT is the number of dynamically
 ;;; enclosed nested compilation units that were aborted.
 (defun summarize-compilation-unit (abort-p)
-  (let (summary)
+  (let ((cu *compilation-unit*) summary)
     (unless abort-p
       (let ((undefs (sort *undefined-warnings* #'string<
                           :key (lambda (x)
@@ -287,11 +279,11 @@ Examples:
                          more kind name))))))))))
 
     (unless (and (not abort-p)
-                 (zerop *aborted-compilation-unit-count*)
-                 (zerop *compiler-error-count*)
-                 (zerop *compiler-warning-count*)
-                 (zerop *compiler-style-warning-count*)
-                 (zerop *compiler-note-count*))
+                 (zerop (cu-aborted-count cu))
+                 (zerop (cu-error-count cu))
+                 (zerop (cu-warning-count cu))
+                 (zerop (cu-style-warning-count cu))
+                 (zerop (cu-note-count cu)))
       (fresh-line *error-output*)
       (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
         (format *error-output* "~&compilation unit ~:[finished~;aborted~]"
@@ -307,11 +299,11 @@ Examples:
                                 ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
                                 ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
                                 ~[~:;~:*~&  printed ~W note~:P~]"
-                *aborted-compilation-unit-count*
-                *compiler-error-count*
-                *compiler-warning-count*
-                *compiler-style-warning-count*
-                *compiler-note-count*))
+                (cu-aborted-count cu)
+                (cu-error-count cu)
+                (cu-warning-count cu)
+                (cu-style-warning-count cu)
+                (cu-note-count cu)))
       (terpri *error-output*)
       (force-output *error-output*))))
 

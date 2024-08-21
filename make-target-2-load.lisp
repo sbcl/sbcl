@@ -537,6 +537,23 @@ Please check that all strings which were not recognizable to the compiler
 
 (scan-format-control-strings)
 
+(macrolet ((def-backward-compatible-sb-c-specials (pairs) ; for UIOP + ASDF
+             `(progn
+                ,@(mapcar (lambda (pair)
+                            `(define-symbol-macro ,(car pair)
+                                 (,(sb-int:package-symbolicate "SB-C" "CU-" (cdr pair) "-COUNT")
+                                   sb-c::*compilation-unit*)))
+                          pairs))))
+  ;; coece to a strict boolean
+  (define-symbol-macro sb-c::*in-compilation-unit* (not (null sb-c::*compilation-unit*)))
+  ;; the "specials" are all SETFable when and only when *IN-COMPILATION-UNIT* is T
+  (def-backward-compatible-sb-c-specials
+      sb-c::((*aborted-compilation-unit-count* . "ABORTED")
+             (*compiler-error-count* . "ERROR")
+             (*compiler-warning-count*  . "WARNING")
+             (*compiler-style-warning-count* . "STYLE-WARNING")
+             (*compiler-note-count* . "NOTE"))))
+
 #+sb-devel
 (rename-package "COMMON-LISP" "COMMON-LISP" '("SB-XC" "CL"))
 

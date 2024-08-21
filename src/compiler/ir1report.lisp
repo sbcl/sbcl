@@ -517,13 +517,23 @@ has written, having proved that it is unreachable."))
 
 ;;;; condition system interface
 
-;;; Keep track of how many times each kind of condition happens.
-(defvar *compiler-error-count*)
-(defvar *compiler-warning-count*)
-(defvar *compiler-style-warning-count*)
-(defvar *compiler-note-count*)
-
-(defvar *methods-in-compilation-unit*)
+(defstruct (compilation-unit (:conc-name cu-) (:predicate nil) (:copier nil)
+                             (:constructor make-compilation-unit ()))
+  ;; Count of the number of compilation units dynamically enclosed by
+  ;; the current active WITH-COMPILATION-UNIT that were unwound out of.
+  (aborted-count 0 :type fixnum)
+  ;; Keep track of how many times each kind of condition happens.
+  (error-count 0 :type fixnum)
+  (warning-count 0 :type fixnum)
+  (style-warning-count 0 :type fixnum)
+  (note-count 0 :type fixnum)
+  ;; hash-table of hash-tables:
+  ;;  outer: GF-Name -> hash-table
+  ;;  inner: (qualifiers . specializers) -> lambda-list
+  (methods nil :type (or null hash-table)))
+;;; This is a CUNIT if we are within a WITH-COMPILATION-UNIT form (which
+;;; normally causes nested uses to be no-ops).
+(defvar *compilation-unit* nil)
 
 ;;; Keep track of whether any surrounding COMPILE or COMPILE-FILE call
 ;;; should return WARNINGS-P or FAILURE-P.
@@ -535,21 +545,21 @@ has written, having proved that it is unreachable."))
 ;;; counter and print the error message.
 (defun compiler-error-handler (condition)
   (signal condition)
-  (incf *compiler-error-count*)
+  (incf (cu-error-count *compilation-unit*))
   (setf *warnings-p* t
         *failure-p* t)
   (print-compiler-condition condition)
   (continue condition))
 (defun compiler-warning-handler (condition)
   (signal condition)
-  (incf *compiler-warning-count*)
+  (incf (cu-warning-count *compilation-unit*))
   (setf *warnings-p* t
         *failure-p* t)
   (print-compiler-condition condition)
   (muffle-warning condition))
 (defun compiler-style-warning-handler (condition)
   (signal condition)
-  (incf *compiler-style-warning-count*)
+  (incf (cu-style-warning-count *compilation-unit*))
   (setf *warnings-p* t)
   (print-compiler-condition condition)
   (muffle-warning condition))
@@ -576,7 +586,7 @@ has written, having proved that it is unreachable."))
                     (= inhibit-warnings 3))
                 (policy *lexenv* (= inhibit-warnings 3)))
       (with-condition (condition datum args)
-        (incf *compiler-note-count*)
+        (incf (cu-note-count *compilation-unit*))
         (print-compiler-message
          *error-output*
          (format nil "note: ~~A")

@@ -496,9 +496,9 @@
 
 (defun compute-gf-ftype (name)
   (let ((gf (and (fboundp name) (fdefinition name)))
-        (methods-in-compilation-unit (and (boundp 'sb-c::*methods-in-compilation-unit*)
-                                          sb-c::*methods-in-compilation-unit*
-                                          (gethash name sb-c::*methods-in-compilation-unit*))))
+        (methods-in-compilation-unit (binding* ((cu sb-c::*compilation-unit* :exit-if-null)
+                                                (methods (sb-c::cu-methods cu) :exit-if-null))
+                                       (gethash name methods))))
     (cond ((generic-function-p gf)
            (let* ((ll (generic-function-lambda-list gf))
                   ;; If the GF has &REST without &KEY then we don't augment
