@@ -155,9 +155,7 @@
   ;; this to be initialized, so we initialize it right away.
   (show-and-call !random-cold-init)
 
-  ;; We can't do such much as a simple PROCLAIM without this global
-  ;; hash-table (because of WARN-IF-INLINE-FAILED/PROCLAIM)
-  (setf sb-c::*emitted-full-calls* (make-hash-table :test 'equal :synchronized t))
+  (setq sb-c::*compilation-unit* nil) ; its DEFVAR is not processed yet
 
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")

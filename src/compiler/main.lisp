@@ -1658,9 +1658,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                       #-sb-xc-host
                       (core-object (fix-core-source-info info object))
                       (null)))))
-              ;; FIXME: dump/restore "linkage" information, produce deferred warnings
-              ;; (sb-fasl::dump-emitted-full-calls (emitted-full-calls *compilation*)
-              ;;                                  *compile-object*)
               (let ((code-coverage-records
                       (code-coverage-records (coverage-metadata *compilation*))))
                 (unless (zerop (hash-table-count code-coverage-records))

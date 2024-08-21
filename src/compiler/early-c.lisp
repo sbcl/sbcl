@@ -223,13 +223,6 @@
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)
-  ;; Map of function name -> something about how many calls were converted
-  ;; as ordinary calls not in the scope of a local or global notinline declaration.
-  ;; Useful for finding functions that were supposed to have been converted
-  ;; through some kind of transformation but were not.
-  ;; FIXME: this should be scoped to a compile/load but there are
-  ;; apparently some difficulties in doing so.
-  ; (emitted-full-calls (make-hash-table :test 'equal))
   ;; if emitting a cfasl, the fasl stream to that
   (compile-toplevel-object nil :read-only t)
   ;; The current block compilation state.  These are initialized to
@@ -275,15 +268,31 @@
 #+linux ; shadow space differs by OS
 (defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)
 
-(define-load-time-global *emitted-full-calls*
-    (make-hash-table :test 'equal #-sb-xc-host :synchronized #-sb-xc-host t))
+(defstruct (compilation-unit (:conc-name cu-) (:predicate nil) (:copier nil)
+                             (:constructor make-compilation-unit ()))
+  ;; Count of the number of compilation units dynamically enclosed by
+  ;; the current active WITH-COMPILATION-UNIT that were unwound out of.
+  (aborted-count 0 :type fixnum)
+  ;; Keep track of how many times each kind of condition happens.
+  (error-count 0 :type fixnum)
+  (warning-count 0 :type fixnum)
+  (style-warning-count 0 :type fixnum)
+  (note-count 0 :type fixnum)
+  ;; Map of function name -> something about how many calls were converted
+  ;; as ordinary calls not in the scope of a local or global notinline declaration.
+  ;; Useful for finding functions that were supposed to have been converted
+  ;; through some kind of transformation but were not.
+  (emitted-full-calls (make-hash-table :test 'equal))
+  ;; hash-table of hash-tables:
+  ;;  outer: GF-Name -> hash-table
+  ;;  inner: (qualifiers . specializers) -> lambda-list
+  (methods nil :type (or null hash-table)))
+;;; This is a COMPILATION-UNIT if we are within a WITH-COMPILATION-UNIT form (which
+;;; normally causes nested uses to be no-ops).
+(defvar *compilation-unit* nil)
 
 (defmacro get-emitted-full-calls (name)
-;; Todo: probably remove the wrapping cons. It was for globaldb
-;; which is particularly inefficient at updates (because it can only
-;; use an R/C/U paradigm, and so conses on every insert,
-;; unlike a hash-table which can just update the cell)
-  `(gethash ,name *emitted-full-calls*))
+  `(awhen *compilation-unit* (gethash ,name (cu-emitted-full-calls it))))
 
 ;; Return the number of calls to NAME that IR2 emitted as full calls,
 ;; not counting calls via #'F that went untracked.
@@ -301,11 +310,16 @@
          (= (logand status 3) #b01)
          (ash status -2)))) ; the call count as tracked by IR2
 
+;;; FIXME: the math here is very suspicious-looking. If the flag bits are #b11
+;;; then they can rollover into the counts. And we're ORing counts. Wtf is this doing???
+;;; Well, it doesn't matter really. This is used only in FOP-NOTE-FULL-CALLS which is called
+;;; only if DUMP-EMITTED-FULL-CALLS emits that fop. But that function is never invoked.
 (defun accumulate-full-calls (data)
   (loop for (name status) in data
         do
-        (let ((existing (gethash name *emitted-full-calls* 0)))
-          (setf (gethash name *emitted-full-calls*)
+        (let* ((table (cu-emitted-full-calls *compilation-unit*))
+               (existing (gethash name table 0)))
+          (setf (gethash name table)
                 (logior (+ (logand existing #b11) ; old flag bits
                            (logand status #b11))  ; new flag bits
                         (logand existing -4)      ; old count

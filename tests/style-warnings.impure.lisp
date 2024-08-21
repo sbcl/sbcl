@@ -19,6 +19,16 @@
 ;; These tests don't work unless compiling
 #+interpreter (invoke-restart 'run-tests::skip-file)
 
+(defun compile-from-string (string) ; probably should be in CTU: for everyone to use
+  (with-scratch-file (lisp "lisp")
+    (with-open-file (f lisp :direction :output) (write-string string f))
+    (multiple-value-bind (result warn fail) (compile-file lisp :verbose nil)
+      (delete-file result)
+      (values result warn fail))))
+
+(test-util:with-test (:name :compiler-macro-order-bug)
+  (with-compilation-unit ()
+    (compile-from-string "
 (defun f-with-macro (arg) (list arg))
 (defun f2-with-macro (a b) (list a b))
 (defun map-f-with-macro (l) (mapcar #'f-with-macro l))
@@ -37,50 +47,52 @@
 
 (declaim (notinline h-with-macro))
 (defun h-with-macro (arg) (list arg))
-(defun map-h-with-macro (l) (mapcar #'h-with-macro l))
+(defun map-h-with-macro (l) (mapcar #'h-with-macro l))")
 
-(test-util:with-test (:name :compiler-macro-order-bug)
-  ;; There is one explicit NOTINLINE, but we still get a warning.
-  (assert-signal
-   (define-compiler-macro f-with-macro (arg) `(list ,arg))
-   sb-c:compiler-macro-application-missed-warning)
-  ;; To exercise both cases of the ~:P directive in the warning message.
-  (assert-signal
-   (define-compiler-macro f2-with-macro (a b) `(list ,a ,b))
-   sb-c:compiler-macro-application-missed-warning)
+    ;; There is one explicit NOTINLINE, but we still get a warning.
+    (assert-signal
+     (define-compiler-macro f-with-macro (arg) `(list ,arg))
+     sb-c:compiler-macro-application-missed-warning)
+    ;; To exercise both cases of the ~:P directive in the warning message.
+    (assert-signal
+     (define-compiler-macro f2-with-macro (a b) `(list ,a ,b))
+     sb-c:compiler-macro-application-missed-warning)
 
-  ;; There is a local notinline decl, so no warning about a compiler-macro.
-  (assert-no-signal
-    (define-compiler-macro g-with-macro (arg) `(list ,arg)))
-  ;; There is a global notinline proclamation.
-  (assert-no-signal
-    (define-compiler-macro h-with-macro (arg) `(list ,arg))))
+    ;; There is a local notinline decl, so no warning about a compiler-macro.
+    (assert-no-signal
+      (define-compiler-macro g-with-macro (arg) `(list ,arg)))
+    ;; There is a global notinline proclamation.
+    (assert-no-signal
+      (define-compiler-macro h-with-macro (arg) `(list ,arg)))))
 
+(with-test (:name :inline-failure-1)
+  (with-compilation-unit ()
+    (compile-from-string "
 (defun g (x) (1- x))
 (defun h (x) (1+ x))
 (defun use-g (x) (g x))
-(defun use-h (x) (list (h x) (h x)))
-(with-test (:name :inline-failure-1)
-  (assert-signal (declaim (inline g h))
-                 sb-c:inlining-dependency-failure 2))
+(defun use-h (x) (list (h x) (h x)))")
+    (assert-signal (declaim (inline g h))
+                   sb-c:inlining-dependency-failure 2)))
 
-(declaim (inline fast-guy))
+(declaim (inline fast-guy)) ; function does not exist
 (with-test (:name :inline-failure-2a)
   (assert-signal (compile nil '(lambda (x) (fast-guy x)))
                  sb-c:inlining-dependency-failure))
 
-(defun zippy (y) y)
+(defun zippy (y) y) ; didn't save source for this function
 (with-test (:name :inline-failure-2b)
   (assert-signal
    (eval '(defun baz (arg) (declare (inline zippy)) (zippy arg)))
    sb-c:inlining-dependency-failure))
 
-(locally (declare (muffle-conditions style-warning))
-  (defun foofy1 (x) (and (somestruct-p x) 'hi)))
-
 (test-util:with-test (:name :structure-pred-inline-failure)
- (assert-signal (defstruct somestruct a b)
-                sb-c:inlining-dependency-failure))
+  (with-compilation-unit ()
+    (compile-from-string "
+(locally (declare (muffle-conditions style-warning))
+  (defun foofy1 (x) (and (somestruct-p x) 'hi)))")
+    (assert-signal (defstruct somestruct a b)
+                   sb-c:inlining-dependency-failure)))
 
 (test-util:with-test (:name :redef-macro-same-file)
   (let* ((lisp (scratch-file-name "lisp"))

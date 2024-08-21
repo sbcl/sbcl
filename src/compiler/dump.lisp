@@ -1489,6 +1489,8 @@
   (dump-object cc file)
   (dump-fop 'fop-record-code-coverage file))
 
+;;; NOTE: this is unused at present and may never have been necessary-
+;;; full-calls can be inferred at load-time by tracking :LINKAGE-CELL fixups or FOP-FDEFN.
 (defun dump-emitted-full-calls (hash-table fasl)
   (let ((list (%hash-table-alist hash-table)))
     #+sb-xc-host ; enforce host-insensitive reproducible ordering

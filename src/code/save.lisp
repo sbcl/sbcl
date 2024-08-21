@@ -343,7 +343,6 @@ sufficiently motivated to do lengthy fixes."
   (sb-kernel::rebuild-ctype-hashsets)
   (drop-all-hash-caches)
   (os-deinit)
-  (clrhash sb-c::*emitted-full-calls*) ; Don't immortalize compiler's scratchpad
   (finalizers-deinit)
   ;; Try to shrink the pathname cache. It might be largely nulls
   (rebuild-pathname-cache)

@@ -30,6 +30,7 @@
 ;;; Run the cross-compiler to produce cold fasl files.
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 (setq sb-c::*static-vop-usage-counts* (make-hash-table))
+(defvar *emitted-full-calls*)
 (let (fail
       variables
       functions
@@ -48,6 +49,8 @@
                      (setq warnp 'warning))))
     (sb-xc:with-compilation-unit ()
       (load "src/cold/compile-cold-sbcl.lisp")
+      (setf *emitted-full-calls*
+            (sb-c::cu-emitted-full-calls sb-c::*compilation-unit*))
       (let ((cache (math-journal-pathname :output)))
         (when (probe-file cache)
           (copy-file-from-file "output/xfloat-math.lisp-expr" cache)
@@ -87,6 +90,48 @@
             (if (string= (cl:package-name (cl:symbol-package name)) "SB-XC")
                 (find-symbol (string name) "COMMON-LISP")
                 name))))
+
+(when sb-c::*track-full-called-fnames*
+  (let (possibly-suspicious likely-suspicious)
+    (sb-int:dohash ((name cell) *emitted-full-calls*)
+       (let* ((inlinep (eq (sb-int:info :function :inlinep name) 'inline))
+              (source-xform (sb-int:info :function :source-transform name))
+              (info (sb-int:info :function :info name)))
+         (when (and cell
+                    (or inlinep
+                        source-xform
+                        (and info (sb-c::fun-info-templates info))
+                        (sb-int:info :function :compiler-macro-function name)))
+             (cond (inlinep
+                    ;; A full call to an inline function almost always indicates
+                    ;; an out-of-order definition. If not an inline function,
+                    ;; the call could be due to an inapplicable transformation.
+                    (push (list name cell) likely-suspicious))
+                   ;; structure constructors aren't inlined by default,
+                   ;; though we have a source-xform.
+                   ((and (listp source-xform) (eq :constructor (cdr source-xform))))
+                   (t
+                    (push (list name cell) possibly-suspicious))))))
+    (flet ((show (label list)
+             (when list
+               (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
+                       label
+                       (mapcar (lambda (x) (list* (ash (cadr x) -2) (car x) (cddr x)))
+                               (sort list #'> :key #'cadr))))))
+      ;; Called inlines not in the presence of a declaration to the contrary
+      ;; indicate that perhaps the function definition appeared too late.
+      (show "Likely" likely-suspicious) ; "quite likely" an error
+      ;; Failed transforms are considered not quite as suspicious
+      ;; because it could either be too late, or that the transform failed.
+      (show "Possibly" possibly-suspicious)) ; _potentially_ an error
+    ;; As each platform's build becomes warning-free,
+    ;; it should be added to the list here to prevent regresssions.
+    ;; But oops! apparently this check started failing a long time ago
+    ;; but because it was done in the wrong place, the check failed to fail.
+    #+nil
+    (when (and likely-suspicious
+               (target-featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
+      (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.

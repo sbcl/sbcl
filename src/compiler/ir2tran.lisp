@@ -1379,14 +1379,15 @@
       (let* ((inlineable-p (not (let ((*lexenv* (node-lexenv node)))
                                   (fun-lexically-notinline-p fname))))
              (inlineable-bit (if inlineable-p 1 0))
-             (cell (get-emitted-full-calls fname)))
+             (table (cu-emitted-full-calls *compilation-unit*))
+             (cell (gethash fname table)))
         (if (not cell)
             ;; The low bit indicates whether any not-NOTINLINE call was seen.
             ;; The next-lowest bit is magic. Refer to %COMPILER-DEFMACRO
             ;; and WARN-IF-INLINE-FAILED/CALL for the pertinent logic.
             (setf cell (logior 4 inlineable-bit))
             (incf cell (+ 4 (if (oddp cell) 0 inlineable-bit))))
-        (setf (get-emitted-full-calls fname) cell)
+        (setf (gethash fname table) cell)
         ;; If the full call was wanted, don't record anything.
         ;; (This was originally for debugging SBCL self-compilation)
         (when inlineable-p

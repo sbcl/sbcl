@@ -517,24 +517,6 @@ has written, having proved that it is unreachable."))
 
 ;;;; condition system interface
 
-(defstruct (compilation-unit (:conc-name cu-) (:predicate nil) (:copier nil)
-                             (:constructor make-compilation-unit ()))
-  ;; Count of the number of compilation units dynamically enclosed by
-  ;; the current active WITH-COMPILATION-UNIT that were unwound out of.
-  (aborted-count 0 :type fixnum)
-  ;; Keep track of how many times each kind of condition happens.
-  (error-count 0 :type fixnum)
-  (warning-count 0 :type fixnum)
-  (style-warning-count 0 :type fixnum)
-  (note-count 0 :type fixnum)
-  ;; hash-table of hash-tables:
-  ;;  outer: GF-Name -> hash-table
-  ;;  inner: (qualifiers . specializers) -> lambda-list
-  (methods nil :type (or null hash-table)))
-;;; This is a CUNIT if we are within a WITH-COMPILATION-UNIT form (which
-;;; normally causes nested uses to be no-ops).
-(defvar *compilation-unit* nil)
-
 ;;; Keep track of whether any surrounding COMPILE or COMPILE-FILE call
 ;;; should return WARNINGS-P or FAILURE-P.
 (defvar *failure-p*)
@@ -810,7 +792,7 @@ and defining the function before its first potential use.~@:>"
       ;; Set a bit saying that a warning about the call was generated,
       ;; which suppresses the warning about either a later
       ;; call or a later proclamation.
-      (setf (gethash name *emitted-full-calls*) (logior count 2))
+      (setf (gethash name (cu-emitted-full-calls *compilation-unit*)) (logior count 2))
       ;; While there could be a different style-warning for
       ;;   "You should put the DEFUN after the DECLAIM"
       ;; if they appeared reversed, it's not ideal to warn as soon as that.
