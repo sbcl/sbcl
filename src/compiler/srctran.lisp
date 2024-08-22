@@ -4350,8 +4350,9 @@
 ;;;; character operations
 
 (deftransform char-equal ((a b) (base-char base-char) *
-                          :policy (>= speed space))
+                          :policy (>= speed space) :node node)
   "open code"
+  (delay-ir1-transform node :constraint)
   '(let* ((ac (char-code a))
           (bc (char-code b))
           (sum (logxor ac bc)))
@@ -4366,8 +4367,9 @@
 
 #+sb-unicode
 (deftransform char-equal ((a b) (base-char character) *
-                          :policy (>= speed space))
+                          :policy (>= speed space) :node node)
   "open code"
+  (delay-ir1-transform node :constraint)
   '(let* ((ac (char-code a))
           (bc (char-code b))
           (sum (logxor ac bc)))
@@ -4378,8 +4380,9 @@
 
 #+sb-unicode
 (deftransform char-equal ((a b) (character base-char) *
-                          :policy (>= speed space))
+                          :policy (>= speed space) :node node)
   "open code"
+  (delay-ir1-transform node :constraint)
   '(let* ((ac (char-code a))
           (bc (char-code b))
           (sum (logxor ac bc)))
@@ -4401,6 +4404,23 @@
 (deftransform char-equal ((a b) (t (constant-arg character)) *
                           :node node)
   (transform-constant-char-equal 'a b))
+
+(defun no-case-character-type-p (type)
+  (and (typep type 'character-set-type)
+       (loop for (start . end) in (character-set-type-pairs type)
+             always (loop for c from start to end
+                          always (not (and #+sb-xc-host
+                                           (or (< 31 c 127)
+                                               (= c 10))
+                                           (both-case-p (code-char c))))))))
+
+(deftransform char-equal ((a b))
+  (cond ((same-leaf-ref-p a b) t)
+        ((or (no-case-character-type-p (lvar-type a))
+             (no-case-character-type-p (lvar-type b)))
+         `(char= a b))
+        (t
+         (give-up-ir1-transform))))
 
 (deftransform char-upcase ((x) (base-char))
   "open code"
@@ -4529,12 +4549,6 @@
        `(lambda (obj i val) (%instance-ref-eq obj i val)))
       ((transform-eq-on-words 'eq x y))
       (t (give-up-ir1-transform)))))
-
-;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
-(deftransform char-equal ((x y) * *)
-  (cond
-    ((same-leaf-ref-p x y) t)
-    (t (give-up-ir1-transform))))
 
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:

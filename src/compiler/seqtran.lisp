@@ -632,7 +632,9 @@
                                                         pathname))))
              (change-test-based-on-item 'eql item)))
           (equalp
-           (cond ((csubtypep item (specifier-type '(not (or number
+           (cond ((no-case-character-type-p item)
+                  'eq)
+                 ((csubtypep item (specifier-type '(not (or number
                                                          character
                                                          cons
                                                          array
@@ -646,11 +648,8 @@
                                (not (both-case-p value)))
                       (change-test-based-on-item 'eq item))))))
           (char-equal
-           (multiple-value-bind (p value) (type-singleton-p item)
-             (when (and p
-                        (characterp value)
-                        (not (both-case-p value)))
-               'char=)))))
+           (when (no-case-character-type-p item)
+             'char=))))
    test))
 
 (defun change-test-lvar-based-on-item (test item)
