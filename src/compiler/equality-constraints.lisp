@@ -1076,7 +1076,7 @@
       (lvar-type (invert-operator op) y-var x))
     constraints))
 
-(defoptimizer (equal constraint-propagate-if) ((x y) node gen)
+(defoptimizers constraint-propagate-if (equal char=) ((x y) node gen)
   (let ((x-type (equal-type (lvar-type x)))
         (y-type (equal-type (lvar-type y))))
     (let ((intersection (type-intersection x-type y-type)))

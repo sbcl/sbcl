@@ -1369,7 +1369,11 @@
            ((eql c #\b) 1)
            ((eql c #\a) 2)
            (t 1)))
-   (eql 1)))
+   (eql 1))
+  (assert-type
+   (lambda (x)
+     (and (char= x #\a) x))
+   (or (eql #\a) null)))
 
 (with-test (:name :multiply-by-one)
   (assert-type
