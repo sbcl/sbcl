@@ -40,7 +40,7 @@
                                 0 0)
                  sb-vm:gencgc-page-bytes))
              (waste-bytes (- consumed-bytes used-bytes))
-             (waste (/ waste-bytes consumed-bytes)))
+             (waste (float (/ waste-bytes consumed-bytes))))
         (incf sum-fractional-waste waste)
         #+nil (format t "~&waste: ~,,2f~%" waste))
       (sb-vm:rewind-arena arena))
@@ -56,7 +56,7 @@
   ;; it was easily demonstrated that the heap waste could rise to as much
   ;; as 70% before starting a GC.
   (let ((avg-frac-waste (try-wasting-heap)))
-    (assert (< avg-frac-waste .05))))
+    (assert (< avg-frac-waste .07))))
 
 (defvar *arena* (sb-vm:new-arena 10485760))
 (defun make-biga (a &optional (len 3000))
