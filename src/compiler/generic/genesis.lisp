@@ -3159,6 +3159,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (dolist (const constants)
         (destructuring-bind (name priority value suffix) const
           (unless (= prev-priority priority)
+            (when (= prev-priority 1)
+  (format t "#ifdef RETURN_PC_WIDETAG
+#define embedded_obj_p(tag) (tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG)
+#else
+#define embedded_obj_p(tag) (tag==SIMPLE_FUN_WIDETAG)
+#endif~%"))
             (terpri)
             (setf prev-priority priority))
           (when (minusp value)

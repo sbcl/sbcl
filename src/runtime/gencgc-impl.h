@@ -311,6 +311,66 @@ gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
 lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 
+#define compacting_p() (from_space>=0)
+
+#define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
+
+extern unsigned char* gc_page_pins;
+#ifdef RETURN_PC_WIDETAG
+#include "code.h" // for fun_code_header
+#endif
+static inline bool pinned_p(lispobj obj, page_index_t page)
+{
+    extern struct hopscotch_table pinned_objects;
+    // Single-object pages can be pinned, but the object doesn't go
+    // in the hashtable. pinned_p can be queried on those pages,
+    // but the answer is always 'No', because if pinned, the page would
+    // already have had its generation changed to newspace.
+    if (page_single_obj_p(page)) return 0;
+
+#ifdef RETURN_PC_WIDETAG
+    // Yet another complication from the despised LRA objects- with the
+    // refinement of 8 pin bits per page, we either must set all possible bits
+    // for a simple-fun, or map LRAs to the code base address.
+    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
+        // The hash-table stores tagged pointers.
+        obj = make_lispobj(fun_code_header((struct simple_fun*)native_pointer(obj)),
+                           OTHER_POINTER_LOWTAG);
+        page = find_page_index((void*)obj);
+    }
+#endif
+
+    unsigned char pins = gc_page_pins[page];
+    if (!pins) return 0;
+    unsigned addr_lowpart = obj & (GENCGC_PAGE_BYTES-1);
+    // Divide the page into 8 parts, see whether that part is pinned.
+    unsigned subpage = addr_lowpart / (GENCGC_PAGE_BYTES/8);
+    return (pins & (1<<subpage)) && hopscotch_containsp(&pinned_objects, obj);
+}
+
+extern generation_index_t from_space, new_space;
+// Return true only if 'obj' must be *physically* transported to survive gc.
+// Return false if obj is in the immobile space regardless of its generation.
+// Pretend pinned objects are not in oldspace so that they don't get moved.
+static bool __attribute__((unused))
+from_space_p(lispobj obj)
+{
+    gc_dcheck(compacting_p());
+    page_index_t page_index = find_page_index((void*)obj);
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == from_space && !pinned_p(obj, page_index);
+}
+
+static bool __attribute__((unused)) new_space_p(lispobj obj)
+{
+    gc_dcheck(compacting_p());
+    page_index_t page_index = find_page_index((void*)obj);
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == new_space;
+}
+
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
     gc_dcheck(is_lisp_pointer(object)); \
     gc_dcheck(from_space_p(object)); \
@@ -727,66 +787,6 @@ static inline void ensure_region_closed(struct alloc_region *alloc_region,
 {
     if (alloc_region->start_addr)
         gc_close_region(alloc_region, page_type);
-}
-
-#define compacting_p() (from_space>=0)
-
-#define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
-
-extern unsigned char* gc_page_pins;
-#ifdef RETURN_PC_WIDETAG
-#include "code.h" // for fun_code_header
-#endif
-static inline bool pinned_p(lispobj obj, page_index_t page)
-{
-    extern struct hopscotch_table pinned_objects;
-    // Single-object pages can be pinned, but the object doesn't go
-    // in the hashtable. pinned_p can be queried on those pages,
-    // but the answer is always 'No', because if pinned, the page would
-    // already have had its generation changed to newspace.
-    if (page_single_obj_p(page)) return 0;
-
-#ifdef RETURN_PC_WIDETAG
-    // Yet another complication from the despised LRA objects- with the
-    // refinement of 8 pin bits per page, we either must set all possible bits
-    // for a simple-fun, or map LRAs to the code base address.
-    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
-        // The hash-table stores tagged pointers.
-        obj = make_lispobj(fun_code_header((struct simple_fun*)native_pointer(obj)),
-                           OTHER_POINTER_LOWTAG);
-        page = find_page_index((void*)obj);
-    }
-#endif
-
-    unsigned char pins = gc_page_pins[page];
-    if (!pins) return 0;
-    unsigned addr_lowpart = obj & (GENCGC_PAGE_BYTES-1);
-    // Divide the page into 8 parts, see whether that part is pinned.
-    unsigned subpage = addr_lowpart / (GENCGC_PAGE_BYTES/8);
-    return (pins & (1<<subpage)) && hopscotch_containsp(&pinned_objects, obj);
-}
-
-extern generation_index_t from_space, new_space;
-// Return true only if 'obj' must be *physically* transported to survive gc.
-// Return false if obj is in the immobile space regardless of its generation.
-// Pretend pinned objects are not in oldspace so that they don't get moved.
-static bool __attribute__((unused))
-from_space_p(lispobj obj)
-{
-    gc_dcheck(compacting_p());
-    page_index_t page_index = find_page_index((void*)obj);
-    // NOTE: It is legal to access page_table at index -1,
-    // and the 'gen' of page -1 is an otherwise unused value.
-    return page_table[page_index].gen == from_space && !pinned_p(obj, page_index);
-}
-
-static bool __attribute__((unused)) new_space_p(lispobj obj)
-{
-    gc_dcheck(compacting_p());
-    page_index_t page_index = find_page_index((void*)obj);
-    // NOTE: It is legal to access page_table at index -1,
-    // and the 'gen' of page -1 is an otherwise unused value.
-    return page_table[page_index].gen == new_space;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

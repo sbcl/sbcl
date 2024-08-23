@@ -363,6 +363,38 @@ gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
 lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 
+#define compacting_p() (from_space>=0)
+
+#define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
+
+extern unsigned char* gc_page_pins;
+#define pinned_p(dummy1,dummy2) 0
+
+extern generation_index_t from_space, new_space;
+generation_index_t gc_gen_of(lispobj obj, int defaultval);
+static bool __attribute__((unused))
+from_space_p(lispobj obj)
+{
+    /* There'd be a cyclic dependency between pmrgc-impl.h and
+     * incremental-compact.h would we try to #include the latter. */
+    extern unsigned char *target_pages;
+    page_index_t page_index = find_page_index((void*)obj);
+    if (page_index == -1) return 0;
+    /* We can only move objects in or younger than the current
+     * generation, as we can't build a complete remset for older
+     * objects in a younger GC. */
+    return target_pages[page_index] && gc_gen_of(obj, 0) <= new_space;
+}
+
+static bool __attribute__((unused)) new_space_p(lispobj obj)
+{
+    gc_dcheck(compacting_p());
+    page_index_t page_index = find_page_index((void*)obj);
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == new_space;
+}
+
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
     gc_dcheck(is_lisp_pointer(object)); \
     gc_dcheck(from_space_p(object)); \
@@ -708,38 +740,6 @@ static inline void ensure_region_closed(struct alloc_region *alloc_region,
 {
     if (alloc_region->start_addr)
         gc_close_region(alloc_region, page_type);
-}
-
-#define compacting_p() (from_space>=0)
-
-#define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
-
-extern unsigned char* gc_page_pins;
-#define pinned_p(dummy1,dummy2) 0
-
-extern generation_index_t from_space, new_space;
-generation_index_t gc_gen_of(lispobj obj, int defaultval);
-static bool __attribute__((unused))
-from_space_p(lispobj obj)
-{
-    /* There'd be a cyclic dependency between pmrgc-impl.h and
-     * incremental-compact.h would we try to #include the latter. */
-    extern unsigned char *target_pages;
-    page_index_t page_index = find_page_index((void*)obj);
-    if (page_index == -1) return 0;
-    /* We can only move objects in or younger than the current
-     * generation, as we can't build a complete remset for older
-     * objects in a younger GC. */
-    return target_pages[page_index] && gc_gen_of(obj, 0) <= new_space;
-}
-
-static bool __attribute__((unused)) new_space_p(lispobj obj)
-{
-    gc_dcheck(compacting_p());
-    page_index_t page_index = find_page_index((void*)obj);
-    // NOTE: It is legal to access page_table at index -1,
-    // and the 'gen' of page -1 is an otherwise unused value.
-    return page_table[page_index].gen == new_space;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

@@ -142,11 +142,6 @@ static inline lispobj fun_code_tagged(void* fun) {
     return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
 }
 
-#ifdef RETURN_PC_WIDETAG
-#define embedded_obj_p(tag) (tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG)
-#else
-#define embedded_obj_p(tag) (tag==SIMPLE_FUN_WIDETAG)
-#endif
 /* Convert from a lispobj with lowtag bits to the starting address
  * of the heap object. */
 static inline lispobj *

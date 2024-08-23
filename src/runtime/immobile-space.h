@@ -120,6 +120,7 @@ static inline int immobile_obj_gen_bits(lispobj* obj) // native pointer
 // Turn a grey node black.
 static inline void set_visited(lispobj* obj)
 {
+    extern generation_index_t new_space;
     gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
     gc_dcheck(immobile_obj_gen_bits(obj) == new_space);
     ((generation_index_t*)obj)[3] |= IMMOBILE_OBJ_VISITED_FLAG;

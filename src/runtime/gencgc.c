@@ -641,14 +641,6 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     char *page_base = page_address(first_page);
     char *free_pointer = alloc_region->free_pointer;
 
-#if defined LISP_FEATURE_SYSTEM_TLABS && defined DEBUG
-    if (alloc_region == &get_sb_vm_thread()->sys_mixed_tlab ||
-        alloc_region == &get_sb_vm_thread()->sys_cons_tlab) {
-        char msg[] = "NOTE: closing a system allocation region\n";
-        write(2, msg, sizeof msg-1); // signal-safe
-    }
-#endif
-
     // page_bytes_used() can be done without holding a lock. Nothing else
     // affects the usage on the first page of a region owned by this thread.
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
@@ -2179,7 +2171,7 @@ static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t
             continue;
         }
         int widetag = widetag_of(where);
-        gc_dcheck(widetag !== CODE_HEADER_WIDETAG); // This can't be called on a code page
+        gc_dcheck(widetag != CODE_HEADER_WIDETAG); // This can't be called on a code page
         nwords = sizetab[widetag](where);
         if (leaf_obj_widetag_p(widetag)) continue; // Do nothing
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
