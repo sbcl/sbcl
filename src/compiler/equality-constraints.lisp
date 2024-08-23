@@ -1172,7 +1172,7 @@
       (push (list 'typep string2 (specifier-type '(not character))) constraints))
     (when (and min2
                (> min2 1))
-      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+      (push (list 'typep string1 (specifier-type '(not character))) constraints))
     (when (and (eql (lvar-type start1) (specifier-type '(eql 0)))
                (eql (lvar-type start2) (specifier-type '(eql 0)))
                (eql (lvar-type end1) (specifier-type 'null))
@@ -1190,7 +1190,7 @@
       (push (list 'typep string2 (specifier-type '(not character))) constraints))
     (when (and min2
                (> min2 1))
-      (push (list 'typep string2 (specifier-type '(not character))) constraints))
+      (push (list 'typep string1 (specifier-type '(not character))) constraints))
     (unless (or start1 start2 end1 end2)
       (setf constraints (nconc constraints
                                (equal-length-constraints string1 string2 gen))))

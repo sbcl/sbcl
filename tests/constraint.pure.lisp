@@ -1560,6 +1560,11 @@
    (lambda (y)
      (when (string-equal "ab" y)
        y))
+   (or string symbol))
+  (assert-type
+   (lambda (y)
+     (when (string-equal y "ab")
+       y))
    (or string symbol)))
 
 (with-test (:name :find-sequence-type)
