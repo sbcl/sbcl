@@ -4769,6 +4769,14 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
         return 0;
     }
+#if FUN_SELF_FIXNUM_TAGGED
+    if (widetag == CLOSURE_WIDETAG) {
+        struct simple_fun* sf = (void*)(object[1] - 2*N_WORD_BYTES);
+        gc_assert(header_widetag(sf->header) == SIMPLE_FUN_WIDETAG);
+        struct code* code = fun_code_header(sf);
+        gc_assert(header_widetag(code->header) == CODE_HEADER_WIDETAG);
+    }
+#endif
     if (widetag == SYMBOL_WIDETAG) {
         struct symbol* s = (void*)object;
         CHECK(s->value, &s->value);

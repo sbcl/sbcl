@@ -126,7 +126,7 @@ static void TRACE_NAME(lispobj* where)
             return;
         }
         break;
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined (LISP_FEATURE_ARM64)
+#if FUN_SELF_FIXNUM_TAGGED
     /* on x86[-64], closure->fun is a fixnum-qua-pointer. Convert it to a lisp
      * pointer to mark it, but not on platforms where it's already a descriptor */
     case CLOSURE_WIDETAG: {

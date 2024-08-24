@@ -506,9 +506,9 @@ trans_return_pc_header(lispobj object)
 }
 #endif /* RETURN_PC_WIDETAG */
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
+#if FUN_SELF_FIXNUM_TAGGED
 /* Closures hold a pointer to the raw simple-fun entry address instead of the
- * tagged object so that CALL [RAX+const] can be used to invoke it. */
+ * tagged object so that a native call instruction can be used more easily */
 static sword_t
 scav_closure(lispobj *where, lispobj header)
 {
