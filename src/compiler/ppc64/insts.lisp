@@ -1062,7 +1062,10 @@
                                   (emit-d-form-inst
                                    segment ,op (reg-tn-encoding rt)
                                    ,(if allow-r0 '(reg-tn-encoding ra) '(reg-or-0 ra))
-                                   offset-from-code-tn))))))))
+                                   offset-from-code-tn))))))
+                          (when (and (typep si 'fixup) (eq (fixup-flavor si) :linkage-cell))
+                            (note-fixup segment :addis+ld si)
+                            (setq si 0))))
                     (when (typep si 'fixup)
                       (ecase ,fixup
                         ((:ha :l) (note-fixup segment ,fixup si)))

@@ -740,32 +740,16 @@ default-value-8
                                              8)))
                     (emit-label step-done-label))))
            (declare (ignorable #'insert-step-instrumenting))
-           ,@(case named
-               #+nil((t) ; I have NO Idea what these cases are trying to achieve
-                `((sc-case name
-                    (descriptor-reg (move name-pass name))
-                    (control-stack
-                     (loadw name-pass cfp-tn (tn-offset name))
-                     (do-next-filler))
-                    (constant
-                     (loadw name-pass code-tn (tn-offset name) code-tn-lowtag)
-                     (do-next-filler)))
-                  ;; The step instrumenting must be done after
-                  ;; FUNCTION is loaded, but before ENTRY-POINT is
-                  ;; calculated.
-                  (insert-step-instrumenting name-pass)
-                  ;; The raw-addr (ENTRY-POINT) will be one of:
-                  ;; closure-tramp, undefined-tramp, or somewhere
-                  ;; within a simple-fun object.  If the latter, then
-                  ;; it is essential (due to it being an interior
-                  ;; pointer) that the function itself be in a
-                  ;; register before the raw-addr is loaded.
-                  (sb-assem:without-scheduling ()
-                    (let ((tag other-pointer-lowtag))
-                      (loadw function name-pass fdefn-fun-slot tag)
-                      (loadw entry-point name-pass fdefn-raw-addr-slot tag)))
-                  (do-next-filler)))
-               ((nil)
+           ,@(if named
+                `((inst addis entry-point card-table-base-tn 0)
+                  (cond (step-instrumenting
+                         (inst addi entry-point entry-point (make-fixup fun :linkage-cell))
+                         (do-next-filler) ; cargo-cultism for the win
+                         (insert-step-instrumenting entry-point)
+                         (inst ld entry-point entry-point 0))
+                        (t
+                         (inst ld entry-point entry-point (make-fixup fun :linkage-cell))
+                         (do-next-filler)))) ; more cargo-cultism
                 `((sc-case arg-fun
                     (descriptor-reg (move lexenv arg-fun))
                     (control-stack
@@ -781,10 +765,6 @@ default-value-8
                   ;; is calculated.
                   (insert-step-instrumenting function)
                   (inst addi entry-point function 0)))
-               (t
-                `((inst addis entry-point card-table-base-tn 0)
-                  (inst ld entry-point entry-point (make-fixup fun :linkage-cell))
-                  (do-next-filler)))) ; a little cargo-culting here
            (loop
              (if filler
                  (do-next-filler)
