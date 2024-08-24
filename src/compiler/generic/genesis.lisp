@@ -2806,7 +2806,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (let ((fn (%code-entry-point des fun-index)))
           (set-simple-fun-layout fn)
           (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
-           (if (or #+(or x86 x86-64 arm64) t) ; Store a raw pointer to the function entry
+           (if (or #+(or arm64 ppc64 x86 x86-64) t) ; Store a raw pointer to the function entry
                (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
                   (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
                (descriptor-bits fn))))) ; Store a taagged pointer to the function
@@ -3910,10 +3910,6 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                     (fun (read-wordindexed fname sb-vm:fdefn-fun-slot)))
                (unless (zerop (descriptor-bits fun))
                  (setf (bvref-word data offset)
-                       #+ppc64
-                       (+ (descriptor-bits fun)
-                          (- (* 2 sb-vm:n-word-bytes) sb-vm:fun-pointer-lowtag))
-                       #+x86-64
                        (read-bits-wordindexed fun sb-vm:simple-fun-self-slot)))))
     (force-output core-file) ; not sure if this does anything
     (let ((posn (file-position core-file)))

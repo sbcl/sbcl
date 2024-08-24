@@ -134,9 +134,8 @@
 
   DONE
   ;; We are done.  Do the jump.
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp lip))
-
+  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag) ; RAW ADDR
+  (inst mtctr lip) (inst bctr))
 
 
 ;;;; Non-local exit noise.

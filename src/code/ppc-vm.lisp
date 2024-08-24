@@ -121,22 +121,19 @@
                 #(#xE95FFFD8     ; LD $FDEFN,-40($LIP)     ; [debug-info] = the function name
                   #x3BF20000     ; ADDI $LIP,$NULL,x       ; UNDEFINED-TRAMP
                   #x7FE903A6     ; MTCTR $LIP
-                  #x4E800420     ; BCTR
-                  0 0)
+                  #x4E800420)    ; BCTR
                 'undefined-tramp))
               ((funcallable-instance-p function)
                (values
                 #(#xEABFFFD8     ; LD $LEXENV,-40($LIP)    ; [debug-info] = the funinstance
-                  #x3BF20000     ; ADDI $LIP,$NULL,x       ; FUNCALLABLE-INSTANCE-SHIM
+                  #x3BF20000     ; ADDI $LIP,$NULL,x       ; FUNCALLABLE-INSTANCE-TRAMP
                   #x7FE903A6     ; MTCTR $LIP
-                  #x4E800420     ; BCTR
-                  0 0)
-                'funinstance-shim))
+                  #x4E800420)    ; BCTR
+                'funcallable-instance-tramp))
               (t ; closure
                #(#xEABFFFD8      ; LD $LEXENV,-40($LIP)    ; [debug-info] = the closure
                  #x38000002      ; ADDI $ZERO,$ZERO,2
-                 #x7E75002A      ; LDX $CODE,$LEXENV,$ZERO ; get closure's simple-fun
-                 #x3BF3000A      ; ADDI $LIP,$CODE,10      ; simple-fun entrypoint
+                 #x7FF5002A      ; LDX $LIP,$LEXENV,$ZERO  ; get closure's simple-fun entrypoint
                  #x7FE903A6      ; MTCTR $LIP
                  #x4E800420))))) ; BCTR
     (with-pinned-objects (code)
@@ -144,7 +141,7 @@
         (setf (sap-ref-word self (ash -2 word-shift)) 1 ; jump table word count
               (sap-ref-word self (ash -1 word-shift)) 0 ; unused
               (sap-ref-word self 0) (logior #x600 simple-fun-widetag)
-              (sap-ref-sap self 8) (sap+ self fun-pointer-lowtag))
+              (sap-ref-sap self 8) (sap+ self 16))
         (let ((start (sap+ self 16)))
           (dotimes (i (length insts))
             (setf (sap-ref-32 start (ash i 2)) (aref insts i)))

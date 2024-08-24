@@ -57,7 +57,7 @@
     ;; The closure scavenge function needs to know if the "self" slot
     ;; has pointer nature though it be fixnum tagged, as on x86.
     ;; The sizer is short_boxed.
-    (closure ,(or #+(or x86 x86-64 arm64) "closure" "short_boxed") "lose" "short_boxed")
+    (closure ,(or #+(or arm64 ppc64 x86 x86-64) "closure" "short_boxed") "lose" "short_boxed")
     ;; Like closure, but these can also have a layout pointer in the high header bytes.
     (funcallable-instance "funinstance" "lose" "short_boxed")
     ;; These have a scav and trans function, but no size function.

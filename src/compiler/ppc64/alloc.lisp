@@ -185,7 +185,8 @@
                           :temp-tn temp :flag-tn pa-flag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag))))
         (storew temp result 0 fun-pointer-lowtag)
-        (storew function result closure-fun-slot fun-pointer-lowtag)))))
+        (inst addi temp function (- 16 fun-pointer-lowtag)) ; untag
+        (storew temp result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;

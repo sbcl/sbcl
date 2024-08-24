@@ -774,16 +774,13 @@ default-value-8
                     (constant
                      (loadw lexenv code-tn (tn-offset arg-fun) code-tn-lowtag)
                      (do-next-filler)))
-                  (loadw function lexenv closure-fun-slot
-                      fun-pointer-lowtag)
+                  (loadw function lexenv closure-fun-slot fun-pointer-lowtag)
                   (do-next-filler)
                   ;; The step instrumenting must be done before
                   ;; after FUNCTION is loaded, but before ENTRY-POINT
                   ;; is calculated.
                   (insert-step-instrumenting function)
-                  (inst addi entry-point function
-                        (- (ash simple-fun-insts-offset word-shift)
-                           fun-pointer-lowtag))))
+                  (inst addi entry-point function 0)))
                (t
                 `((inst addis entry-point card-table-base-tn 0)
                   (inst ld entry-point entry-point (make-fixup fun :linkage-cell))

@@ -39,26 +39,19 @@
   (storew lra-tn cfp-tn 1)
   (error-call nil 'undefined-fun-error fdefn-tn))
 
-;;; The -TRAMP entry point is for APPLY/FUNCALL, whereas the -SHIM entry point
-;;; is the tail piece of the simplifying wrapper on a globally named funinstance.
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
                       (:align n-lowtag-bits)
-                      (:export funinstance-shim
-                               (funcallable-instance-tramp
-                                (+ xfuncallable-instance-tramp
-                                   fun-pointer-lowtag))))
-    ((:temp fdefn-tn descriptor-reg fdefn-offset))
+                      (:export funcallable-instance-tramp))
+    ()
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
-  FUNINSTANCE-SHIM
+  FUNCALLABLE-INSTANCE-TRAMP
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (loadw fdefn-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst addi lip-tn fdefn-tn (- (ash simple-fun-insts-offset word-shift)
-                                fun-pointer-lowtag))
+  (loadw lip-tn lexenv-tn closure-fun-slot fun-pointer-lowtag) ; RAW ADDR
   (inst mtctr lip-tn)
   (inst bctr))
 

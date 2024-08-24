@@ -39,13 +39,13 @@
   `(let* ((fun ,fun)
           (self
            ;; a few architectures store the untagged address of the entrypoint in 'self'
-           #+(or x86 x86-64 arm64)
+           #+(or arm64 ppc64 x86 x86-64)
            (%make-lisp-obj
             (truly-the word (+ (get-lisp-obj-address fun)
                                (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
                                (- sb-vm:fun-pointer-lowtag))))
            ;; all others store the function itself (what else?) in 'self'
-           #-(or x86 x86-64 arm64) fun))
+           #-(or arm64 ppc64 x86 x86-64) fun))
      (setf (sb-vm::%simple-fun-self fun) self)))
 
 (flet ((fixup (code-obj offset name kind flavor-id real-code-obj callees

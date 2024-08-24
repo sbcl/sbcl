@@ -84,7 +84,8 @@ extern void bind_variable(lispobj symbol, lispobj value,void *thread);
 extern void unbind(void *thread);
 extern void unbind_to_here(lispobj *bsp,void *thread);
 
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
+#if defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_PPC64 || \
+    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
 # define FUN_SELF_FIXNUM_TAGGED 1
 # define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
 # define fun_self_from_taggedptr(funptr) funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
