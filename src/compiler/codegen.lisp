@@ -344,8 +344,7 @@
           (assemble-sections
            asmstream
            (ir2-component-entries ir2-component)
-           (make-segment :header-skew skew
-                         :run-scheduler (default-segment-run-scheduler)))
+           (make-segment (default-segment-run-scheduler) skew))
         (values segment text-length fun-table
                 (asmstream-elsewhere-label asmstream) fixup-notes
                 (sb-assem::get-allocation-points asmstream))))))

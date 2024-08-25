@@ -53,7 +53,9 @@
 ;;;; the SEGMENT structure
 
 ;;; This structure holds the state of the assembler.
-(defstruct (segment (:copier nil))
+(defstruct (segment (:constructor make-segment
+                        (&optional run-scheduler (header-skew 0)))
+                    (:copier nil))
   ;; This is a vector where instructions are written.
   ;; It used to be an adjustable array, but we now do the array size
   ;; management manually for performance reasons (as of 2006-05-13 hairy
@@ -306,7 +308,8 @@
 (defun section-start (section) (car section))
 (defmacro section-tail (section) `(cdr ,section))
 
-(defstruct asmstream
+(defstruct (asmstream (:constructor make-asmstream ())
+                      (:copier nil))
   (data-section (make-section) :read-only t)
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)

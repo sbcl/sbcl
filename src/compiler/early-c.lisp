@@ -209,7 +209,10 @@
                 #+sb-xc-host #'cl:sxhash
                 #-sb-xc-host #'sxhash))
 
-(defstruct (compilation (:copier nil)
+(defstruct (compilation (:constructor make-compilation
+                                      (&key coverage-metadata msan-unpoison
+                                       block-compile entry-points compile-toplevel-object))
+                        (:copier nil)
                         (:predicate nil)
                         (:conc-name ""))
   (fun-names-in-this-file (make-fun-name-hashset))

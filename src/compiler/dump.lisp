@@ -17,6 +17,7 @@
 ;;; know about dumping to a fasl file. (We need to objectify the
 ;;; state because the fasdumper must be reentrant.)
 (defstruct (fasl-output
+            (:constructor make-fasl-output (stream))
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t)
                                (prin1 (namestring (fasl-output-stream x))
@@ -381,7 +382,7 @@
                          :direction :output
                          :if-exists :supersede
                          :element-type 'sb-assem:assembly-unit))
-           (res (make-fasl-output :stream stream)))
+           (res (make-fasl-output stream)))
       ;; Before the actual FASL header, write a shebang line using the current
       ;; runtime path, so our fasls can be executed directly from the shell.
       #-sb-xc-host ; cross-compiled fasls are not directly executable

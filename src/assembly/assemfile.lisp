@@ -67,7 +67,7 @@
                 `(.align ,sb-vm:n-lowtag-bits))
           (let ((segment (assemble-sections
                           asmstream nil
-                          (make-segment :run-scheduler nil))))
+                          (make-segment nil))))
             (unless (= (length (remove-duplicates (mapcar 'car *entry-points*)))
                        (length *entry-points*))
               (error "Duplicate asm routine: ~S"
