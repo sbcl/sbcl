@@ -117,23 +117,6 @@ static inline int immobile_obj_gen_bits(lispobj* obj) // native pointer
     gc_dcheck(!embedded_obj_p(widetag_of(obj)));
     return ((generation_index_t*)obj)[3] & 0x1F;
 }
-// Turn a grey node black.
-static inline void set_visited(lispobj* obj)
-{
-    extern generation_index_t new_space;
-    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
-    gc_dcheck(immobile_obj_gen_bits(obj) == new_space);
-    ((generation_index_t*)obj)[3] |= IMMOBILE_OBJ_VISITED_FLAG;
-}
-static inline void assign_generation(lispobj* obj, generation_index_t gen)
-{
-    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
-    generation_index_t* ptr = (generation_index_t*)obj + 3;
-    // Clear the VISITED flag, assign a new generation, preserving the three
-    // high bits which include the OBJ_WRITTEN flag as well as two
-    // opaque flag bits for use by Lisp.
-    *ptr = (*ptr & 0xE0) | gen;
-}
 #else
 #error "Need to define immobile_obj_gen_bits() for big-endian"
 #endif /* little-endian */

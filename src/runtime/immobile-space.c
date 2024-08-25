@@ -431,6 +431,16 @@ Threads A, and B, and C each want to claim index 6.
 #define calc_max_used_fixedobj_page() find_fixedobj_page_index(fixedobj_free_pointer-1)
 #define calc_max_used_text_page() find_text_page_index(text_space_highwatermark-1)
 
+static inline void assign_generation(lispobj* obj, generation_index_t gen)
+{
+    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
+    generation_index_t* ptr = (generation_index_t*)obj + 3;
+    // Clear the VISITED flag, assign a new generation, preserving the three
+    // high bits which include the OBJ_WRITTEN flag as well as two
+    // opaque flag bits for use by Lisp.
+    *ptr = (*ptr & 0xE0) | gen;
+}
+
 /* Turn a white object grey. Also enqueue the object for re-scan if required */
 void
 enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
@@ -565,6 +575,14 @@ bool immobile_space_preserve_pointer(void* addr)
         return 1;
     }
     return 0;
+}
+
+// Turn a grey node black.
+static inline void set_visited(lispobj* obj)
+{
+    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
+    gc_dcheck(immobile_obj_gen_bits(obj) == new_space);
+    ((generation_index_t*)obj)[3] |= IMMOBILE_OBJ_VISITED_FLAG;
 }
 
 // Loop over the newly-live objects, scavenging them for pointers.
