@@ -41,6 +41,7 @@
                       (= (ldb (byte 5 16) prev) 0)
                       (= (ldb (byte 5 21) prev) ra))
              (note-code-constant (ldb (byte 16 0) prev) dstate)))))
+      #+ppc64
       (addis
        ;; look for the intruction pair denoting a linkage table ref:
        ;;   ADDIS $LIP,$GC-CARD-TABLE,imm  / LD $LIP,$LIP,imm
