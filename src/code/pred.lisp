@@ -409,6 +409,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                       for y-i fixnum from start-y
                       always (= (aref x x-i) (aref y y-i))))))
 (defun array-equalp (a b)
+  (declare (explicit-check))
   (flet
       ((data-vector-compare (x y start-x end-x start-y)
          (declare (index start-x end-x start-y)

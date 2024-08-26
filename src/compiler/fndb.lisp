@@ -1310,6 +1310,9 @@
 (defknown bit-vector-= (bit-vector bit-vector) boolean
   (movable foldable flushable no-verify-arg-count))
 
+(defknown sb-impl::array-equalp (array array) boolean
+  (movable foldable flushable no-verify-arg-count))
+
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
 (defknown fill-pointer (complex-vector) index

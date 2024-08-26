@@ -1089,7 +1089,7 @@
                                    (equal-length-constraints x y gen)))
           (values nil nil constraints))))))
 
-(defoptimizer (equalp constraint-propagate-if) ((x y) node gen)
+(defoptimizers constraint-propagate-if (equalp bit-vector-= sb-impl::array-equalp) ((x y) node gen)
   (let ((x-type (equalp-type (lvar-type x)))
         (y-type (equalp-type (lvar-type y))))
     (let ((intersection (type-intersection x-type y-type)))
