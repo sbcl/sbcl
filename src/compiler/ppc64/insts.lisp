@@ -680,7 +680,7 @@
                   (patchable-emit-d-form segment ,op (reg-tn-encoding rt) (reg-or-0 ra) si)))))
            (define-ds-instruction (name op subop)
              `(define-instruction ,name (segment rt ra si)
-                (:declare (type (or (signed-byte 16) label fixup) si))
+                (:declare (type (or (signed-byte 16) label) si))
                 (:printer ds ((op ,op) (subop ,subop)))
                 (:emitter
                  (patchable-emit-ds-form segment ,op (reg-tn-encoding rt)
@@ -811,7 +811,12 @@
   (define-x-instruction      lwax  31 341)
   (define-x-instruction      lwaux 31 373 :other-dependencies ((writes ra)))
   ;; Doubleword
-  (define-ds-instruction     ld    58 #b00)
+  ;;(define-ds-instruction     ld    58 #b00)
+  (define-instruction ld (segment rt ra si)
+    (:declare (type (or (signed-byte 16) label fixup) si))
+    (:printer ds ((op 58) (subop 0)))
+    (:emitter
+     (patchable-emit-ds-form segment 58 (reg-tn-encoding rt) (reg-or-0 ra) si 0)))
   (define-ds-instruction     ldu   58 #b01)
   (define-x-instruction      ldx   31 21)
   (define-x-instruction      ldux  31 53)

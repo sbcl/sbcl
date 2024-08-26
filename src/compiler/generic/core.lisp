@@ -249,7 +249,7 @@
 ;;; so that it jumps to a tracing routine and then back again.
 ;;; The code that gets copied is just the tracing wrapper.
 ;;; See the example at COMPILE-FUNOBJ-ENCAPSULATION in ntrace
-#+(or x86 x86-64)
+#+(or ppc64 x86 x86-64)
 (defun copy-code-object (code)
   ;; Must have one simple-fun
   (aver (= (code-n-entries code) 1))

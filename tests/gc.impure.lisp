@@ -311,6 +311,9 @@
      (lambda (obj type size)
        (declare (ignore size))
        (when (and (= type sb-vm:code-header-widetag)
+                  ;; ppc64 allocates unusual-looking code when binding a
+                  ;; closure or funinstance to a global function name.
+                  #+ppc64 (sb-kernel:%instancep (sb-kernel:%code-debug-info obj))
                   (plusp (sb-kernel:code-n-entries obj)))
          (let ((serial (sb-kernel:%code-serialno obj)))
            (assert (zerop (aref a serial)))
