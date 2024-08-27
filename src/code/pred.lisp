@@ -407,9 +407,10 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
              (compare-loop (typespec)
                `(let ((x (truly-the (simple-array ,typespec 1) x))
                       (y (truly-the (simple-array ,typespec 1) y)))
-                  (loop for x-i fixnum from start-x below end-x
-                        for y-i fixnum from start-y
-                        always (= (aref x x-i) (aref y y-i)))))
+                  (loop for x-i from start-x below end-x
+                        for y-i from start-y
+                        always (= (aref x x-i)
+                                  (aref y (truly-the index y-i))))))
              (numeric-cases (&body rest)
                `(case (if (= xtag ytag) (ash xtag -2) 0)
                   ,@(loop for s across sb-vm:*specialized-array-element-type-properties*
@@ -420,8 +421,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   ,@rest)))
     (flet
         ((data-vector-compare (x y start-x end-x start-y)
-           (declare (index start-x end-x start-y)
-                    (optimize (sb-c:insert-array-bounds-checks 0)))
+           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
            (let ((xtag (%other-pointer-widetag (truly-the (simple-array * 1) x)))
                  (ytag (%other-pointer-widetag (truly-the (simple-array * 1) y))))
              (declare (optimize (sb-c:jump-table 3)))
@@ -429,25 +429,30 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
               (#.(ash sb-vm:simple-vector-widetag -2)
                  (let ((x (truly-the simple-vector x))
                        (y (truly-the simple-vector y)))
-                   (loop for x-i fixnum from start-x below end-x
-                         for y-i fixnum from start-y
-                         always (let ((a (svref x x-i)) (b (svref y y-i)))
-                                  (or (eq a b) (equalp a b))))))
+                   (loop for x-i from start-x below end-x
+                         for y-i from start-y
+                         always (let ((a (svref x x-i))
+                                      (b (svref y (truly-the index y-i))))
+                                  (or (eq a b)
+                                      (equalp a b))))))
               (t
                (let* ((reffers %%data-vector-reffers%%)
-                      (getter-x (truly-the function (svref reffers xtag)))
-                      (getter-y (truly-the function (svref reffers ytag))))
+                      (getter-x (locally (declare (optimize (safety 0))) ;; don't check for a function
+                                  (svref reffers xtag)))
+                      (getter-y (locally (declare (optimize (safety 0)))
+                                  (svref reffers ytag))))
                  ;; The arrays won't both be strings, because EQUALP has a case for that.
                  ;; If they're both numeric, use = as the test.
                  (if (and (numericp x) (numericp y))
                      (loop for x-i fixnum from start-x below end-x
-                           for y-i fixnum from start-y
-                           always (= (funcall getter-x x x-i) (funcall getter-y y y-i)))
+                           for y-i = start-y then (truly-the fixnum (1+ y-i))
+                           always (= (funcall getter-x x (truly-the fixnum x-i))
+                                     (funcall getter-y y (truly-the fixnum y-i))))
                      ;; Everything else
                      (loop for x-i fixnum from start-x below end-x
-                           for y-i fixnum from start-y
-                           for x-el = (funcall getter-x x x-i)
-                           for y-el = (funcall getter-y y y-i)
+                           for y-i = start-y then (truly-the fixnum (1+ y-i))
+                           for x-el = (funcall getter-x x (truly-the fixnum x-i))
+                           for y-el = (funcall getter-y y (truly-the fixnum y-i))
                            always (or (eq x-el y-el)
                                       (equalp x-el y-el))))))))))
       (or (eq a b)
