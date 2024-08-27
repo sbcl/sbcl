@@ -698,24 +698,35 @@
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
                              test-ref () node t)))
 
-(defun prepare-jump-table-targets (index targets)
+(defun prepare-jump-table-targets (index node)
   (let* ((int (type-approximate-interval (lvar-type index)))
+         (targets (jump-table-targets node))
          (otherwise (assoc 'otherwise targets))
          (targets (sort (remove otherwise targets) #'< :key #'car))
          (min (caar targets))
          (max (caar (last targets)))
-         ;; If there's only one item not in range avoid checking for
-         ;; the OTHERWISE case.
-         (min (if (and int
-                       (eql (interval-high int) max)
-                       (eql (interval-low int) (1- min)))
-                  (1- min)
-                  min))
-         (max (if (and int
-                       (eql (interval-low int) min)
-                       (eql (interval-high int) (1+ max)))
-                  (1+ max)
-                  max))
+         (sparse (and (policy node (= jump-table 3))
+                      int
+                      (>= (interval-low int) 0)
+                      (interval-high int)))
+         (min (cond (sparse
+                     0)
+                    ((and int
+                          (eql (interval-high int) max)
+                          (eql (interval-low int) (1- min)))
+                     ;; If there's only one item not in range avoid checking for
+                     ;; the OTHERWISE case.
+
+                     (1- min))
+                    (t
+                     min)))
+         (max (cond (sparse)
+                    ((and int
+                          (eql (interval-low int) min)
+                          (eql (interval-high int) (1+ max)))
+                     (1+ max))
+                    (t
+                     max)))
          (otherwise (and otherwise
                          (block-label (cdr otherwise))))
          (vector (make-array (1+ (- max min)) :initial-element (or otherwise 0))))
@@ -733,7 +744,7 @@
   (let ((index (jump-table-index node)))
     (emit-template node block (template-or-lose 'jump-table)
                    (reference-tn (lvar-tn node block index) nil)
-                   nil (prepare-jump-table-targets index (jump-table-targets node)))))
+                   nil (prepare-jump-table-targets index node))))
 
 ;;; Return a list of types that we can pass to LVAR-RESULT-TNS
 ;;; describing the result types we want for a template call. We are really
