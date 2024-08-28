@@ -415,7 +415,9 @@
      (typep (- d) '(integer -47727025476642942 -2593702250735)))
    null))
 
-(with-test (:name :signed-byte-8-p-unsigned)
+(with-test (:name :signed-byte-8-p-unsigned
+                  ;; these lack the necessary RANGE<= vop
+                  :fails-on (:or :mips :ppc :ppc64 :sparc :riscv))
   (checked-compile
    `(lambda (a)
       (declare (type (simple-array sb-vm:word (*)) a)
