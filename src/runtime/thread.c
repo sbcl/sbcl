@@ -563,14 +563,6 @@ void* new_thread_trampoline(void* arg)
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->_ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
 
-#ifdef ATOMIC_LOGGING
-      char* string = strdup((char*)VECTOR(name)->data); // FIXME: no such var as 'name'
-      int index = __sync_fetch_and_add(&thread_name_map_count, 1);
-      gc_assert(index < THREAD_NAME_MAP_MAX);
-      thread_name_map[index].thread = pthread_self();
-      thread_name_map[index].name = string;
-#endif
-
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
     lispobj startfun = startup_info->data[0]; // 'startup_info' is pinned
@@ -641,6 +633,13 @@ void sb_set_os_thread_name(char* name)
 #endif
 #if defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_AVOID_PTHREAD_SETNAME_NP
     if (vector_len(v) < 64) pthread_setname_np(name);
+#endif
+#ifdef ATOMIC_LOGGING
+      char* string = strdup(name);
+      int index = __sync_fetch_and_add(&thread_name_map_count, 1);
+      gc_assert(index < THREAD_NAME_MAP_MAX);
+      thread_name_map[index].thread = pthread_self();
+      thread_name_map[index].name = string;
 #endif
 }
 
