@@ -47,7 +47,7 @@
                           (declare (ignore c))
                           (setq warnp 'warning))))
          (with-compilation-unit () ,@forms))
-       (when (and (string>= (cl:lisp-implementation-version) "2")
+       (when (and (string>= (cl:lisp-implementation-version) "2.1")
                   (or warnp style-warnp) *fail-on-warnings*)
          (cerror "Proceed anyway"
                  "make-host-1 stopped due to unexpected ~A." (or warnp style-warnp))))
