@@ -1,5 +1,37 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.7:
+  * bug fix: the elftool utility finds a writeable directory in more
+    situations.  (thanks to Shinmera)
+  * bug fix: SLOT-MAKUNBOUND does not attempt to dereference a PROGN variable
+    in the interpreter.
+  * bug fix: READ-SEQUENCE into displaced arrays with a non-zero offset now
+    writes to the right memory location.
+  * bug fix: fix some erroneous file position calculations in the editcore
+    utility (exposed by a change in the libzstd compression implementation).
+  * bug fix: do not break the build on STYLE-WARNINGs for earlier SBCL build
+    hosts.  (lp#2064671, reported by Patrick Poitras)
+  * bug fix: various bug fixes for ppc64le (lp#2074275, reported by Claude R. C.)
+  * bug fix: address a rounding error in the TAN type deriver which led to a
+    miscompile in cl-pdf.  (lp#2077100, reported by Gian Pierro Carrubba)
+  * bug fix: overoptimization of FIND with a :TEST of CHAR-EQUAL.  (lp#2077539)
+  * optimization: detection of duplicate names in loaded code now scales
+    subquadratically.
+  * optimization: switch from Floyd's to Brent's cycle detection for lists.
+  * optimization: EQUAL on lists should be faster.
+  * optimization: fewer filesystem operations are performed when working out
+    what to LOAD.
+  * optimization: various microoptimizations on hash tables and
+    associated operations.
+  * optimization: strings are now hashed using FNV-1A, replacing Bob Jenkins'
+    one-at-a-time hash.
+  * optimization: fewer redundant validations of the sequence bounding indices
+    in POSITION on strings.
+  * optimization: many improvements to type derivation on the arguments to and
+    results of standard functions
+  * optimization: adding many (hundreds) methods to a generic function can be
+    done faster.
+
 changes in sbcl-2.4.7 relative to sbcl-2.4.6:
   * minor incompatible change: the compiler will emit optimization notes
     related to complex type checks only at high SPEED optimization settings.
