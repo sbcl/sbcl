@@ -434,7 +434,7 @@
 
 (with-test (:name (run-program :malloc-deadlock)
             :broken-on :sb-safepoint
-            :skipped-on (or :ubsan (not :sb-thread) :win32))
+            :skipped-on (or :ubsan (not :sb-thread) :win32 :android))
   (let* (stop
          (delay-between-gc
           (or #+freebsd
