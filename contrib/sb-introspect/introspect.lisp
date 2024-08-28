@@ -348,14 +348,16 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c:fun-info-optimizer . sb-c:optimizer)
                             (sb-c:fun-info-ir2-convert . sb-c:ir2-convert)
                             (sb-c::fun-info-ir2-hook . sb-c::ir2-hook)
-                            (sb-c::fun-info-stack-allocate-result
-                             . sb-c::stack-allocate-result)
-                            (sb-c::fun-info-constraint-propagate
-                             . sb-c::constraint-propagate)
-                            (sb-c::fun-info-constraint-propagate-if
-                             . sb-c::constraint-propagate-if)
-                            (sb-c::fun-info-call-type-deriver
-                             . sb-c::call-type-deriver))))
+                            (sb-c::fun-info-stack-allocate-result . sb-c::stack-allocate-result)
+                            (sb-c::fun-info-constraint-propagate . sb-c::constraint-propagate)
+                            (sb-c::fun-info-constraint-propagate-if . sb-c::constraint-propagate-if)
+                            (sb-c::fun-info-constraint-propagate-back . sb-c::constraint-propagate-back)
+                            (sb-c::fun-info-constraint-propagate-result . sb-c::constraint-propagate-result)
+                            (sb-c::fun-info-equality-constraint . sb-c::equality-constraint)
+                            (sb-c::fun-info-folder . sb-c::folder)
+                            (sb-c::fun-info-externally-checkable-type . sb-c::externally-checkable-type)
+                            (sb-c::fun-info-constants . sb-c::constants)
+                            (sb-c::fun-info-call-type-deriver . sb-c::call-type-deriver))))
               (loop for (reader . name) in otypes
                     for fn = (funcall reader fun-info)
                     when fn collect
