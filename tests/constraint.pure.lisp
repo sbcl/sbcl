@@ -1708,3 +1708,13 @@
        (let ((j (remove-if #'evenp x)))
          (length j))))
    (or null (mod 5))))
+
+(with-test (:name :zero-length-check-bound)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (simple-string x))
+                        (unless (string= x "")
+                          (aref x 0)))
+                     nil))
+             0)))

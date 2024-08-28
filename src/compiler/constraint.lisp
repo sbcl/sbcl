@@ -1108,24 +1108,38 @@
 (defun type-after-comparison (operator not-p current-type type)
   (case operator
     ((= eq)
-     (unless not-p
-       (multiple-value-bind (lo hi)
-           (if (numeric-type-p type)
-               (values (numeric-type-low type)
-                       (numeric-type-high type))
-               ;; Doesn't handle infinities
-               (let ((int (type-approximate-interval type)))
-                 (and int
-                      (values
-                       (interval-low int)
-                       (interval-high int)))))
-         (when (or lo hi)
-           (type-intersection current-type
-                              (type-union (make-numeric-type :low lo
-                                                             :high hi)
-                                          (make-numeric-type :complexp :complex
-                                                             :low lo
-                                                             :high hi)))))))
+     (multiple-value-bind (lo hi)
+         (if (numeric-type-p type)
+             (values (numeric-type-low type)
+                     (numeric-type-high type))
+             ;; Doesn't handle infinities
+             (let ((int (type-approximate-interval type)))
+               (and int
+                    (values
+                     (interval-low int)
+                     (interval-high int)))))
+       (if not-p
+           (when (and (csubtypep current-type (specifier-type 'integer))
+                      (integerp hi)
+                      (eql lo hi))
+             ;; Cut off an adjacent bound if it's not EQ
+             (multiple-value-bind (c-lo)
+                 (let ((int (type-approximate-interval current-type)))
+                   (and int
+                        (values
+                         (interval-low int)
+                         (interval-high int))))
+               (when (and c-lo
+                          (= hi c-lo))
+                 (type-intersection current-type
+                                    (make-numeric-type :low (1+ lo))))))
+           (when (or lo hi)
+             (type-intersection current-type
+                                (type-union (make-numeric-type :low lo
+                                                               :high hi)
+                                            (make-numeric-type :complexp :complex
+                                                               :low lo
+                                                               :high hi)))))))
     (t
      (multiple-value-bind (greater equal)
          (if not-p
