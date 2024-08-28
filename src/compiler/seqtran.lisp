@@ -1070,14 +1070,26 @@
                                 (constant-arg null)
                                 (constant-arg (eql 0))
                                 (constant-arg null)))
-  (cond ((and (constant-lvar-p string1)
-              (equal (lvar-value string1) ""))
-         `(zerop (length string2)))
-        ((and (constant-lvar-p string2)
-              (equal (lvar-value string2) ""))
-         `(zerop (length string1)))
-        (t
-         (give-up-ir1-transform))))
+  (flet ((literal (s1 s2 string2)
+           (when (constant-lvar-p s1)
+             (let ((str (lvar-value s1)))
+               (cond ((equal str "")
+                      `(zerop (length ,string2)))
+                     ((< (length str)
+                         (cond ((or (csubtypep (lvar-type s2) (specifier-type 'simple-base-string))
+                                    (csubtypep (lvar-type s2) (specifier-type '(simple-array character (*)))))
+                                5)
+                               ((csubtypep (lvar-type s2) (specifier-type 'simple-string))
+                                2)
+                               (t
+                                0)))
+                      `(and (= (length ,string2) ,(length str))
+                            ,@(loop for char across str
+                                    for i from 0
+                                    collect `(eq (char ,string2 ,i) ,char)))))))))
+    (or (literal string1 string2 'string2)
+        (literal string2 string1 'string1)
+        (give-up-ir1-transform))))
 
 (deftransform string/=* ((string1 string2 start1 end1 start2 end2)
                          (string string
