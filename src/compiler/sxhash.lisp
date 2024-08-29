@@ -182,6 +182,69 @@
 ;;; another cache-like layer (the journal files)
 (defglobal *phash-lambda-cache* nil)
 
+;;; There is a quick min perfect hash if there is a perfect hash into
+;;; 2^nbits values and all the 1 bits are consecutive, considering the
+;;; lsb and msb as adjacent. In that case we can perform subtraction
+;;; modulo N to coerce the output into the range 0..N-1.
+;;; If the table is exactly a power-of-2, it's even easier - all the
+;;; hashes must be distinct, and we're done.
+;;; For the non-power-of-2 size, I use a stupid algorithm for detecting
+;;; contiguous bits. A better algorithm would use bit scan.
+;;; There are really only 2 cases to consider:
+;;;   case A: some number of internal 1s bits bordered by zero or more 0 bits
+;;;           on the left and right: 00001111....1111000
+;;;   case B: 1 bits on the left and right, and some internal 0 bits
+;;;           11100...000011
+;;; But in fact it's only one case because LOGNOT can reduce case B
+;;; into case A.  However, since Lisp lacks bit-scan functions, and the
+;;; obvious algorithm for bit scanning is to just loop anyway, what's the
+;;; difference between a stupid algorithm and good algorithm? Not a lot.
+(defun quick-minperfect-hash (inputs &aux (n (length inputs))
+                                          (mph-mask (ldb (byte n 0) -1)))
+  (declare (type (simple-array (unsigned-byte 32) (*)) inputs))
+  (labels ((rshift (arg amt) (if (= amt 0) arg `(>> ,arg ,amt)))
+           (add (arg amt) (if (= amt 0) arg `(u32+ ,arg ,amt)))
+           (exhaustive-search (field-width)
+             (let ((n-pos (- 33 field-width)) ; number of positions to try
+                   ;; Compute the number of values of K to try in (h+K) mod N
+                   ;; where h is the extracted field. This is the same as the
+                   ;; number of ways to try rotating the output of VALUES-MASK
+                   ;; to put all the 1s into the lowest bits.
+                   (n-rot (ash 1 field-width)))
+               (dotimes (pos n-pos)
+                 (let ((mask (values-mask field-width pos)))
+                   (unless (= mask -1)
+                     (dotimes (i n-rot)
+                       (when (= mask mph-mask)
+                         (return-from exhaustive-search
+                           `(& ,(add (rshift 'val pos) (- n-rot i))
+                               ,(1- n-rot))))
+                       ;; rotate the mask right by 1 bit
+                       (setq mask
+                             (logior (ash (logand mask 1) (1- n-rot)) ; low goes to high
+                                     (ash mask -1)))))))))
+           (easy-exhaustive-search (field-width)
+             (let ((n-pos (- 33 field-width)))
+               (dotimes (pos n-pos)
+                 (unless (eql (values-mask field-width pos) -1)
+                   (return `(& ,(rshift 'val pos) ,(1- (ash 1 field-width))))))))
+           (values-mask (size pos &aux (res 0))
+             ;; Compute a mask of all values produced by a candidate hash function
+             ;; (f x) = (LDB (BYTE size pos) x). Return -1 if any collisions.
+             (dovector (input inputs (the (unsigned-byte 16) res))
+               (let ((bit (ash 1 (ldb (byte size pos) input))))
+                 (if (logtest bit res) (return -1))
+                 (setf res (logior bit res))))))
+    (case n
+      (4  (easy-exhaustive-search 2))
+      (8  (easy-exhaustive-search 3))
+      ((5 6 7) (exhaustive-search 3))
+      ;; Unsurprisingly this never wins for >8 keys. Either collisions occur, or
+      ;; there are disconnected runs of 0 bits. It's not even worth doing a search.
+      ;; (16 (simple-exhaustive-search 4))
+      ;; ((9 10 11 12 13 14 15) (exhaustive-search 4))
+      )))
+
 ;;; MINIMAL (the default) returns a a function that returns an output
 ;;; in the range 0..N-1 for N possible symbols. If non-minimal, the output
 ;;; range is the power-of-2-ceiling of N.
@@ -204,6 +267,14 @@
   (unless (ub32-collection-uniquep array)
     (return-from make-perfect-hash-lambda))
   ;; no dups present
+  (awhen (quick-minperfect-hash array) ; only for input size <= 8
+    (return-from make-perfect-hash-lambda
+      (values
+       `(lambda (val)
+          (declare (optimize (safety 0) (speed 3) (debug 0) (store-source-form 0)))
+          (declare (type (unsigned-byte 32) val))
+          (the (mod ,(length array)) (uint32-modularly val ,it)))
+       nil)))
   (let* ((cache *phash-lambda-cache*)
          ;; LOGXOR is commutative and associative, which matters to
          ;; EMULATE-GENERATE-PERFECT-HASH-SEXPR. Cross-compiling sorts the key array
