@@ -329,7 +329,11 @@ extern void gc_close_collector_regions(int);
 /* The various sorts of pointer swizzling in SBCL. */
 enum source {
   SOURCE_NORMAL,
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+  // avoid a warning from some C compilers that LINKAGE_CELL is not handled
+  // in "switch (source_type)"
   SOURCE_LINKAGE_CELL,
+#endif
   SOURCE_ZERO_TAG,              /* code, lflist */
   SOURCE_CLOSURE,
   SOURCE_FDEFN_RAW
