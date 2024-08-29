@@ -167,7 +167,7 @@
 
 (defun update-dynamic-space-code-tree (obj)
   (with-pinned-objects (obj)
-    (let ((addr (logandc2 (get-lisp-obj-address obj) other-pointer-lowtag))
+    (let ((addr (logandc2 (get-lisp-obj-address obj) lowtag-mask))
           (tree *dynspace-codeblob-tree*))
       (loop (let ((newtree (sb-brothertree:insert addr tree)))
               ;; check that it hasn't been promoted from gen0 -> gen1 already
