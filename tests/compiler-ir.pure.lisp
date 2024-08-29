@@ -457,3 +457,12 @@
              (ir2-vops '(lambda (y)
                          (make-array (1+ y)))))
       1)))
+
+(with-test (:name :other-pointer-p)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (x)
+                         (when (and (stringp (truly-the (or simple-string (member #\a)) x))
+                                    (zerop (length x)))
+                           x)))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))

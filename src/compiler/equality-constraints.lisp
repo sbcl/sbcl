@@ -1203,3 +1203,6 @@
     (unless (or start1 start2 end1 end2)
       (setf constraints (equality-length-constraints '<= sub-sequence1 main-sequence2 gen)))
     (values nil nil constraints)))
+
+(defoptimizer (%other-pointer-p constraint-propagate-if) ((x))
+  (values x (specifier-type 'other-pointer)))
