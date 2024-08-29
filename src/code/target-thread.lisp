@@ -1838,9 +1838,7 @@ session."
 ;;; It might work to just set *JOINABLE-THREADS* to NIL in the child, but it's better to prune
 ;;; the *ALL-THREADS* tree as well. Must be called with the *MAKE-THREAD-LOCK* held
 ;;; or interrupts inhibited or both.
-;;; Heuristic decides when to stop trying to free. Passing in #'IDENTITY means that
-;;; all joinables should be processed. Passing in #'CDR or #'CDDR returns early if there
-;;; are not at least 1 or 2 threads respectively that could be joined.
+;;; We try to keep up to RETAIN blocks of memory for reuse by later calls to MAKE-THREAD.
 (export '%dispose-thread-structs)
 (defun %dispose-thread-structs (&key (retain 0))
   (loop (unless (nthcdr retain *joinable-threads*) (return))
@@ -1858,7 +1856,7 @@ session."
 ;;; But there's no "atomic pthread_join + cancel-finalization", short of blocking
 ;;; signals around the join perhaps.
 ;;; One more thing- it's illegal to pthread_join() a thread more than once,
-;;; but we allow JOIN-THREAD more than one. I think that's a bug.
+;;; but we allow JOIN-THREAD more than once. I think that's a bug.
 ;;; Ours has the meaning of "get result if done, otherwise wait"
 ;;; which is not the same as deallocation of the thread's OS resources.
 (defun allocate-thread-memory ()
