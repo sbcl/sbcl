@@ -2061,6 +2061,11 @@
 (defknown vector-hairy-data-vector-ref/check-bounds (vector index) t (foldable no-verify-arg-count))
 (defknown vector-hairy-data-vector-set/check-bounds (vector index t) t (no-verify-arg-count))
 
+(defknown string-hairy-data-vector-ref (string index) t (foldable flushable no-verify-arg-count))
+(defknown string-hairy-data-vector-set (string index t) t (no-verify-arg-count))
+(defknown string-hairy-data-vector-ref/check-bounds (string index) t (foldable no-verify-arg-count))
+(defknown string-hairy-data-vector-set/check-bounds (string index t) t (no-verify-arg-count))
+
 (defknown %caller-frame () t (flushable))
 (defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))

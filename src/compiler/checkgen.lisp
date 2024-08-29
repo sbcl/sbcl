@@ -230,14 +230,22 @@
                                              hairy-data-vector-ref
                                              hairy-data-vector-set))
                               (eq (car (basic-combination-args dest)) lvar)
-                              (type= (specifier-type 'vector)
-                                     (single-value-type (cast-type-to-check cast))))
-                         (change-full-call dest
-                                           (getf '(hairy-data-vector-set/check-bounds vector-hairy-data-vector-set/check-bounds
-                                                   hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
-                                                   hairy-data-vector-ref vector-hairy-data-vector-ref
-                                                   hairy-data-vector-set vector-hairy-data-vector-set)
-                                                 (lvar-fun-name (basic-combination-fun dest) t))))
+                              (let ((type (single-value-type (cast-type-to-check cast)))
+                                    (fun-name (lvar-fun-name (basic-combination-fun dest) t)))
+                                (cond ((type= (specifier-type 'vector) type)
+                                       (change-full-call dest
+                                                         (getf '(hairy-data-vector-set/check-bounds vector-hairy-data-vector-set/check-bounds
+                                                                 hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
+                                                                 hairy-data-vector-ref vector-hairy-data-vector-ref
+                                                                 hairy-data-vector-set vector-hairy-data-vector-set)
+                                                               fun-name)))
+                                      ((type= (specifier-type 'string) type)
+                                       (change-full-call dest
+                                                         (getf '(hairy-data-vector-set/check-bounds string-hairy-data-vector-set/check-bounds
+                                                                 hairy-data-vector-ref/check-bounds string-hairy-data-vector-ref/check-bounds
+                                                                 hairy-data-vector-ref string-hairy-data-vector-ref
+                                                                 hairy-data-vector-set string-hairy-data-vector-set)
+                                                               fun-name)))))))
                         #+(or arm64 x86-64)
                         ((lvar-fun-is (basic-combination-fun dest) '(values-list)))
                         ;; Not great
