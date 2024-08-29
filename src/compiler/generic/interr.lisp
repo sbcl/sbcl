@@ -244,7 +244,8 @@
   ((or index list) object-not-index-or-list)
   condition
   sb-pcl::fast-method-call
-  ((or symbol string) object-not-or-symbol-string)
+  ((or symbol string) object-not-symbol-or-string)
+  ((or symbol string character) object-not-string-designator)
   ((and unsigned-byte fixnum) object-not-unsigned-fixnum)
   bit-index))
 
