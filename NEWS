@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.7:
+changes in sbcl-2.4.8 relative to sbcl-2.4.7:
   * bug fix: the elftool utility finds a writeable directory in more
     situations.  (thanks to Shinmera)
   * bug fix: SLOT-MAKUNBOUND does not attempt to dereference a PROGN variable
