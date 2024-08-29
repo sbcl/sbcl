@@ -1659,9 +1659,18 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;     read-only space. For others it is a fixnum.
 ;;;     In either case the GC need not observe the value.
 (defconstant funinstance-layout-bitmap
-  #-executable-funinstances                                     -6
-  #+(and executable-funinstances (not compact-instance-header)) -24
-  #+(and executable-funinstances compact-instance-header)       -8)
+  (macrolet ((untagged-slot-mask ()
+               (let ((objdef (find 'funcallable-instance sb-vm::*primitive-objects*
+                                   :key 'sb-vm::primitive-object-name))
+                     (mask 0))
+                 (dovector (slot (sb-vm::primitive-object-slots objdef) mask)
+                   (destructuring-bind (index name . rest) slot
+                     (declare (ignore rest))
+                     (when (or (string= name "TRAMPOLINE")
+                               (eql (string/= name "INSTWORD") 8)
+                               (string= name "LAYOUT"))
+                       (setf mask (logior mask (ash 1 (1- index))))))))))
+    (lognot (untagged-slot-mask))))
 
 ;;;
 ;;; Ordinary instance with only tagged slots:
