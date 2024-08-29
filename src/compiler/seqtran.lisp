@@ -1065,28 +1065,46 @@
   (def string>=* (< diff 0) nil))
 
 (deftransform string=* ((string1 string2 start1 end1 start2 end2)
-                        (string string
-                                (constant-arg (eql 0))
-                                (constant-arg null)
-                                (constant-arg (eql 0))
-                                (constant-arg null)))
+                        (t t
+                           (constant-arg (eql 0))
+                           (constant-arg null)
+                           (constant-arg (eql 0))
+                           (constant-arg null)))
   (flet ((literal (s1 s2 string2)
            (when (constant-lvar-p s1)
-             (let ((str (lvar-value s1)))
-               (cond ((equal str "")
-                      `(zerop (length ,string2)))
-                     ((< (length str)
-                         (cond ((or (csubtypep (lvar-type s2) (specifier-type 'simple-base-string))
-                                    (csubtypep (lvar-type s2) (specifier-type '(simple-array character (*)))))
-                                5)
-                               ((csubtypep (lvar-type s2) (specifier-type 'simple-string))
-                                2)
-                               (t
-                                0)))
-                      `(and (= (length ,string2) ,(length str))
-                            ,@(loop for char across str
-                                    for i from 0
-                                    collect `(eq (char ,string2 ,i) ,char)))))))))
+             (let* ((str (string (lvar-value s1)))
+                    (check (cond ((equal str "")
+                                  `(zerop (length ,string2)))
+                                 ((< (length str)
+                                     (cond ((or (csubtypep (lvar-type s2) (specifier-type 'simple-base-string))
+                                                (csubtypep (lvar-type s2) (specifier-type '(simple-array character (*)))))
+                                            5)
+                                           ((csubtypep (lvar-type s2) (specifier-type 'simple-string))
+                                            2)
+                                           (t
+                                            0)))
+                                  `(and (= (length ,string2) ,(length str))
+                                        ,@(loop for char across str
+                                                for i from 0
+                                                collect `(eq (char ,string2 ,i) ,char)))))))
+               (when check
+                 (if (csubtypep (lvar-type s2) (specifier-type 'string))
+                     check
+                     (let ((length (length str)))
+                       ;; Are the non-string parts of unequel length?
+                       (when (and (or (not (types-equal-or-intersect (lvar-type s2) (specifier-type 'character)))
+                                      (/= length 1))
+                                  (let ((symbol (type-intersection (lvar-type s2) (specifier-type 'symbol))))
+                                    (or (eq symbol *empty-type*)
+                                        (and (member-type-p symbol)
+                                             (block nil
+                                               (mapc-member-type-members (lambda (x)
+                                                                           (when (= (length (string x)) length)
+                                                                             (return nil)))
+                                                                         symbol)
+                                               t)))))
+                         `(and (stringp ,string2)
+                               ,check)))))))))
     (or (literal string1 string2 'string2)
         (literal string2 string1 'string1)
         (give-up-ir1-transform))))
