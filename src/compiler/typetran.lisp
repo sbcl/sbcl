@@ -121,6 +121,11 @@
                  ;; If it's a lisp-rep-type, the CTYPE should be one already.
                  (aver (not (compute-lisp-rep-type alien-type)))
                  `(sb-alien::alien-value-typep object ',alien-type)))
+              ((and (neq current-predicate 'arrayp)
+                    (csubtypep intersect (specifier-type 'array))
+                    (not (types-equal-or-intersect (type-difference otype type)
+                                                   (specifier-type 'array))))
+               `(arrayp object))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
               ((let ((new-predicate
@@ -149,6 +154,7 @@
                             (not (and (eq current-predicate 'functionp)
                                       (eq new-predicate 'compiled-function-p)))
                             (not (eq current-predicate 'characterp))
+                            (not (eq current-predicate 'arrayp))
                             (not (and (eq current-predicate 'non-null-symbol-p)
                                       (eq new-predicate 'keywordp)))
                             (not (eq new-predicate #+64-bit 'signed-byte-64-p
