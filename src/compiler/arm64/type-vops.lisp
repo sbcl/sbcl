@@ -190,6 +190,12 @@
                       (inst b (if not-p :ne :eq) target)
                       (return))
                      ((and last
+                           value-tn-ref
+                           (csubtypep (tn-ref-type value-tn-ref) (specifier-type 'array))
+                           (= start simple-array-widetag))
+                      (inst cmp widetag end)
+                      (inst b (if not-p :gt :le) target))
+                     ((and last
                            (/= start bignum-widetag)
                            (/= end complex-array-widetag))
                       (inst sub temp widetag start)

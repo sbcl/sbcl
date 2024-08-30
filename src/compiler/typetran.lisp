@@ -126,6 +126,12 @@
                     (not (types-equal-or-intersect (type-difference otype type)
                                                    (specifier-type 'array))))
                `(arrayp object))
+              ((and (neq current-predicate 'simple-array-p)
+                    (neq current-predicate 'arrayp)
+                    (csubtypep intersect (specifier-type 'simple-array))
+                    (not (types-equal-or-intersect (type-difference otype type)
+                                                   (specifier-type 'simple-array))))
+               `(simple-array-p object))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
               ((let ((new-predicate
@@ -155,6 +161,7 @@
                                       (eq new-predicate 'compiled-function-p)))
                             (not (eq current-predicate 'characterp))
                             (not (eq current-predicate 'arrayp))
+                            (not (eq current-predicate 'simple-array-p))
                             (not (and (eq current-predicate 'non-null-symbol-p)
                                       (eq new-predicate 'keywordp)))
                             (not (eq new-predicate #+64-bit 'signed-byte-64-p
