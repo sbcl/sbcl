@@ -119,19 +119,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp :byte (ea rank-disp array) (encode-array-rank rank))))
-
-(define-vop (array-vectorp simple-type-predicate)
-  ;; SIMPLE-TYPE-PREDICATE says that it takes stack locations, but that's no good.
-  (:args (array :scs (any-reg descriptor-reg)))
-  (:translate vectorp)
-  (:conditional :z)
-  (:info)
-  (:guard (lambda (node)
-            (let ((arg (car (sb-c::combination-args node))))
-              (csubtypep (sb-c::lvar-type arg) (specifier-type 'array)))))
-  (:generator 1
-    (inst cmp :byte (ea rank-disp array) (encode-array-rank 1)))))
+    (inst cmp :byte (ea rank-disp array) (encode-array-rank rank)))))
 
 (define-vop (simple-array-header-of-rank-p type-predicate)
   (:translate sb-c::simple-array-header-of-rank-p)

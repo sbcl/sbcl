@@ -132,6 +132,10 @@
                     (not (types-equal-or-intersect (type-difference otype type)
                                                    (specifier-type 'simple-array))))
                `(simple-array-p object))
+              ((and (eq current-predicate 'vectorp)
+                    (vop-existsp :translate %array-rank=)
+                    (and (csubtypep otype (specifier-type 'array))))
+               `(%array-rank= object 1))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
               ((let ((new-predicate
