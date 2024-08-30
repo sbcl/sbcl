@@ -1748,3 +1748,11 @@
     (def 16)
     #+64-bit
     (def 32)))
+
+;;; source-transform-union-typep would generate the same thing but
+;;; it's too complicated to be optimized later, hence the delay.
+(deftransform string-designator-p ((x) * * :node node)
+  (delay-ir1-transform node :constraint)
+  `(or (%other-pointer-subtype-p x '(,sb-vm:symbol-widetag ,@sb-vm::+string-widetags+))
+       (null (truly-the (not (or (and symbol (not null)) string)) x))
+       (characterp (truly-the (not (or symbol string)) x))))

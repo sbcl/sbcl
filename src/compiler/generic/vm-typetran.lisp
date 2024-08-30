@@ -122,6 +122,7 @@
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)
 (define-type-predicate non-null-symbol-p (and symbol (not null)))
+(define-type-predicate string-designator-p string-designator)
 
 
 (defglobal *backend-type-predicates-grouped*
