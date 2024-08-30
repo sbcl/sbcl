@@ -1076,13 +1076,14 @@
                     (check (cond ((equal str "")
                                   `(zerop (length ,string2)))
                                  ((< (length str)
-                                     (cond ((or (csubtypep (lvar-type s2) (specifier-type 'simple-base-string))
-                                                (csubtypep (lvar-type s2) (specifier-type '(simple-array character (*)))))
-                                            5)
-                                           ((csubtypep (lvar-type s2) (specifier-type 'simple-string))
-                                            2)
-                                           (t
-                                            0)))
+                                     (let ((type (type-intersection (lvar-type s2) (specifier-type 'string))))
+                                       (cond ((or (csubtypep type (specifier-type 'simple-base-string))
+                                                  (csubtypep type (specifier-type '(simple-array character (*)))))
+                                              5)
+                                             ((csubtypep type (specifier-type 'simple-string))
+                                              2)
+                                             (t
+                                              0))))
                                   `(and (= (length ,string2) ,(length str))
                                         ,@(loop for char across str
                                                 for i from 0
