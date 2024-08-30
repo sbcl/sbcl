@@ -205,7 +205,10 @@
                                     `(%other-pointer-p object))
                                    ((and (type-other-pointer-p diff)
                                          (type-not-other-pointer-p type))
-                                    `(not (%other-pointer-p object)))))))))
+                                    `(not (%other-pointer-p object)))
+                                   ((and (csubtypep diff (specifier-type 'instance))
+                                         (not (types-equal-or-intersect type (specifier-type 'instance))))
+                                    `(not (%instancep object)))))))))
               (t
                (give-up-ir1-transform)))))))
 
