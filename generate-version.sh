@@ -18,6 +18,18 @@ then
     exit 0
 elif [ -z "$AVAILABLE" ]
 then
+    if grep -q "sbcl-" .git-archive-version > /dev/null 2>&1
+    then
+        cat >version.lisp-expr <<EOF
+;;; This file is auto-generated using generate-version.sh. Every time
+;;; you re-run make.sh, this file will be overwritten if you are
+;;; working from a Git checkout.
+EOF
+        VERSION=`cat .git-archive-version | sed -e 's/sbcl[_-]//' | sed -e 's/_/\./g'`
+        printf "\"%s\"\n" $VERSION >> version.lisp-expr
+        exit 0
+    fi
+    
     echo "Can't 'git describe' SBCL source and version.lisp-expr is missing." >&2
     echo "To fix this, either install git or create a fake version.lisp-expr file." >&2
     echo "You can create a fake version.lisp-expr file like this:" >&2
