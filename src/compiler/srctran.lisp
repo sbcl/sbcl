@@ -7012,7 +7012,7 @@
            (or (contiguous-sequence values)
                (bit-test-sequence values))))))
 
-(defun replace-chain (chain form)
+(defun replace-chain (chain form &optional kill-last)
   (let* ((node (second (first chain)))
          (lvar (first (combination-args node))))
     (flush-dest (second (combination-args node)))
@@ -7032,7 +7032,11 @@
                  (flush-dest a2)
                  (transform-call node
                                  form
-                                 'or-eq-transform))))))
+                                 'or-eq-transform)
+                 (when kill-last
+                   (kill-if-branch-1 if (if-test if)
+                                     (node-block if)
+                                     (if-consequent if))))))))
 
 (defun single-or-chain (chain)
   (let* ((node (second (first chain)))
@@ -7300,7 +7304,8 @@
                                                                                 key)
                                                                             target)))
 
-                                         (otherwise . ,otherwise))))
+                                         (otherwise . ,otherwise)))
+                          t)
            t)
           ((let ((diff (type-difference (lvar-type lvar)
                                         (specifier-type `(member ,@keys)))))
@@ -7323,10 +7328,10 @@
            (multiple-value-bind (code new-targets)
                (and (slow-findhash-allowed node)
                     (expand-hash-case-for-jump-table keys key-lists
-                                                (append targets
-                                                        (and otherwise
-                                                             (list (cons 'otherwise
-                                                                         otherwise))))))
+                                                     (append targets
+                                                             (and otherwise
+                                                                  (list (cons 'otherwise
+                                                                              otherwise))))))
              (when code
                (replace-chain (reduce #'append chains)
                               `(lambda (key b)
@@ -7336,7 +7341,8 @@
                                                    ,@new-targets
                                                    ,@(and otherwise
                                                           `((otherwise . ,otherwise))))
-                                      code))))
+                                      code))
+                              t))
              t)))))
 
 ;;; Do something when comparing the same value to multiple things.

@@ -160,3 +160,14 @@
    ((2 197) 2)
    ((3 97) 3)
    ((4 399) 4)))
+
+(with-test (:name :deletion-notes)
+  (checked-compile
+   `(lambda (key)
+      (declare (optimize sb-c:jump-table))
+      (when (or (eq key 'm)
+                (eq key 'c)
+                (eq key 'd)
+                (eq key 'ab))
+        key))
+   :allow-notes nil))
