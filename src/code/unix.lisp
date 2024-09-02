@@ -323,7 +323,10 @@ corresponds to NAME, or NIL if there is none."
            (type index len))
   (int-syscall (#-win32 "read" #+win32 "win32_unix_read"
                 ssize-t (* char) size-t)
-               fd buf len))
+               fd buf 
+               (min len
+                    #+(or darwin freebsd)
+                    (1- (expt 2 31)))))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
 ;;; length to write. It attempts to write len bytes to the device
