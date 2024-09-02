@@ -207,7 +207,7 @@
     DEFTYPE("time-t", time_t);
     DEFTYPE("off-t",  off_t);
     DEFTYPE("size-t", size_t);
-    DEFTYPE("ssize-t", size_t);
+    DEFTYPE("ssize-t", ssize_t);
     DEFTYPE("mode-t", mode_t);
 
     DEFTYPE("wst-dev-t", wst_dev_t);
