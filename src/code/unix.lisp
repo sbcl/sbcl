@@ -73,18 +73,21 @@
                  (subseq x 3)
                  x)))
 
-(defmacro syscall ((name &rest arg-types) success-form &rest args)
+(defmacro syscall-type ((name return-type &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
     (setf name
           (concatenate 'string #+win32 "_" (subseq name 3))))
   `(locally
-    (declare (optimize (sb-c::float-accuracy 0)))
-    (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
-                                               (function int ,@arg-types))
-                                ,@args)))
-      (if (minusp result)
-          (values nil (get-errno))
-          ,success-form))))
+       (declare (optimize (sb-c::float-accuracy 0)))
+     (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
+                                                (function ,return-type ,@arg-types))
+                                  ,@args)))
+       (if (minusp result)
+           (values nil (get-errno))
+           ,success-form))))
+
+(defmacro syscall ((name &rest arg-types) success-form &rest args)
+  `(syscall-type (,name int ,@arg-types) ,success-form ,@args))
 
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
@@ -101,6 +104,9 @@
 
 (defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,(libc-name-for name) ,@arg-types) (values result 0) ,@args))
+
+(defmacro type-syscall ((name return-type &rest arg-types) &rest args)
+  `(syscall-type (,(libc-name-for name) ,return-type ,@arg-types) (values result 0) ,@args))
 
 (defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
@@ -321,12 +327,13 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type index len))
-  (int-syscall (#-win32 "read" #+win32 "win32_unix_read"
-                ssize-t (* char) size-t)
-               fd buf 
-               (min len
-                    #+(or darwin freebsd)
-                    (1- (expt 2 31)))))
+  (type-syscall (#-win32 "read" #+win32 "win32_unix_read"
+                 ssize-t
+                 int (* char) size-t)
+                fd buf
+                (min len
+                     #+(or darwin freebsd)
+                     (1- (expt 2 31)))))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
 ;;; length to write. It attempts to write len bytes to the device
@@ -341,14 +348,14 @@ corresponds to NAME, or NIL if there is none."
            (type index offset len))
   (flet ((%write (sap)
            (declare (system-area-pointer sap))
-           (int-syscall (#-win32 "write" #+win32 "win32_unix_write"
-                         ssize-t (* char) size-t)
-                        fd
-                        (with-alien ((ptr (* char) sap))
-                          (addr (deref ptr offset)))
-                        (min len
-                             #+(or darwin freebsd)
-                             (1- (expt 2 31))))))
+           (type-syscall (#-win32 "write" #+win32 "win32_unix_write"
+                          ssize-t int (* char) size-t)
+                         fd
+                         (with-alien ((ptr (* char) sap))
+                           (addr (deref ptr offset)))
+                         (min len
+                              #+(or darwin freebsd)
+                              (1- (expt 2 31))))))
     (etypecase buf
       ((simple-array * (*))
        (with-pinned-objects (buf)
