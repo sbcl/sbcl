@@ -1735,9 +1735,10 @@ win32_write_console(HANDLE handle, void * buf, int count)
     }
 }
 
-int
-win32_unix_write(HANDLE handle, void * buf, int count)
+ssize_t
+win32_unix_write(HANDLE handle, void * buf, size_t requested_count)
 {
+    int count = requested_count > INT_MAX ? INT_MAX : requested_count;
     DWORD written_bytes;
     OVERLAPPED overlapped;
     struct thread * self = get_sb_vm_thread();
