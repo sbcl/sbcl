@@ -343,7 +343,9 @@ corresponds to NAME, or NIL if there is none."
                         fd
                         (with-alien ((ptr (* char) sap))
                           (addr (deref ptr offset)))
-                        len)))
+                        (min len
+                             #+(or darwin freebsd)
+                             (1- (expt 2 31))))))
     (etypecase buf
       ((simple-array * (*))
        (with-pinned-objects (buf)
