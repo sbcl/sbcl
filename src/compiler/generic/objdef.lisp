@@ -556,9 +556,9 @@ during backtrace.
   (binding-stack-pointer :c-type "lispobj *" :pointer t
                          :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
-  #+(or x86-64 (and (or riscv x86-64 arm64) sb-thread))
+  #+(or x86-64 (and (or riscv arm64) sb-thread))
   (current-catch-block :special *current-catch-block*)
-  #+(or x86-64 (and (or riscv x86-64 arm64) sb-thread))
+  #+(or x86-64 (and (or riscv arm64) sb-thread))
   (current-unwind-protect-block :special *current-unwind-protect-block*)
   #+(or sb-thread sparc ppc)
   (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*

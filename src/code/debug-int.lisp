@@ -1007,13 +1007,16 @@
     (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
                         (* os-context-t))))
 
-#+(or sb-thread x86-64)
+;;; The special var and descriptor-sap costs a few more instructions, which isn't a big deal
+;;; because nothing that uses these is performance-critical. However, x86-64 wants these
+;;; pointers accessed via the thread structure for +/- sb-thread to simplify the vops.
+#+(or x86-64 (and (or riscv arm64) sb-thread))
 (progn
   (defmacro current-uwp-block-sap ()
     '(sb-vm::current-thread-offset-sap sb-vm::thread-current-unwind-protect-block-slot))
   (defmacro current-catch-block-sap ()
     '(sb-vm::current-thread-offset-sap sb-vm::thread-current-catch-block-slot)))
-#-(or sb-thread x86-64)
+#-(or x86-64 (and (or riscv arm64) sb-thread))
 (progn
   (defmacro current-uwp-block-sap () '(descriptor-sap sb-vm::*current-unwind-protect-block*))
   (defmacro current-catch-block-sap () '(descriptor-sap *current-catch-block*)))
