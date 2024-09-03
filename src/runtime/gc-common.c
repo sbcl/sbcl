@@ -42,7 +42,6 @@
 #include "code.h"
 #include "align.h"
 #include "genesis/primitive-objects.h"
-#include "genesis/binding.h"
 #include "genesis/hash-table.h"
 #include "genesis/split-ordered-list.h"
 #include "genesis/static-symbols.h"

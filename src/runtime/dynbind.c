@@ -23,7 +23,6 @@
 #include "thread.h"
 #include "interr.h"
 #include "genesis/symbol.h"
-#include "genesis/binding.h"
 
 /* Specially bind SYMBOL to VALUE. In a multithreaded build, SYMBOL must already
    have been assigned a thread-local storage index. See *KNOWN-TLS-SYMBOLS* in

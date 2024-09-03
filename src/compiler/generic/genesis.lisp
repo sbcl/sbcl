@@ -3335,11 +3335,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defun write-cast-operator (operator-name c-type-name lowtag stream)
   (format stream "static inline struct ~A* ~A(lispobj obj) {
-  return (struct ~A*)(obj - ~D);~%}~%" c-type-name operator-name c-type-name lowtag)
-  (case operator-name
-    (symbol
-     (format stream "#include ~S~%"
-             (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h)))))))
+  return (struct ~A*)(obj - ~D);~%}~%" c-type-name operator-name c-type-name lowtag))
 
 (defun write-genesis-thread-h-requisites ()
   (write-structure-type (layout-info (find-layout 'sb-thread::thread))
@@ -3446,8 +3442,6 @@ do {                                                                \\
          (c-name (c-name (string-downcase name)))
          (slots (sb-vm:primitive-object-slots obj))
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
-    (when (eq name 'symbol)
-      (sub-write-primitive-object (get-primitive-obj 'fdefn) lang))
     (ecase lang
       (:c
              (when (eq name 'sb-vm::thread)
@@ -3511,6 +3505,12 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
              (format t "#define ~a ~d~%" (c-name (string s)) (symbol-value s))))
          (terpri))))
     (case name
+      ('symbol
+       (sub-write-primitive-object (get-primitive-obj 'fdefn) lang)
+       (sub-write-primitive-object (get-primitive-obj 'binding) lang)
+       (when (eq lang :c)
+         (format t "#include ~S~%"
+                 (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h))))))
       (sb-vm::unwind-block
        (sub-write-primitive-object (get-primitive-obj 'catch-block) lang))
       (sb-kernel:closure
@@ -4397,6 +4397,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
         (let* ((skip `(,(get-primitive-obj 'funcallable-instance)
+                       ,(get-primitive-obj 'binding)
                        ,(get-primitive-obj 'catch-block)
                        ,(get-primitive-obj 'code)
                        ,(get-primitive-obj 'simple-fun)
