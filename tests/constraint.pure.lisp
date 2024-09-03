@@ -1718,3 +1718,12 @@
                           (aref x 0)))
                      nil))
              0)))
+
+(with-test (:name :concatenate-length)
+  (assert-type
+   (lambda (x y)
+     (declare ((simple-vector 10) x)
+              (optimize (debug 2)))
+     (let ((x (concatenate 'vector x y)))
+       (length x)))
+   (integer 10 (#.array-dimension-limit))))

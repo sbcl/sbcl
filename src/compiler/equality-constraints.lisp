@@ -195,7 +195,7 @@
 (defun add-equality-constraint (operator first second constraints consequent-constraints alternative-constraints
                                 &optional (min-amount 0) max-amount)
   (case operator
-    ((vector-length vector-length<=)
+    ((vector-length vector-length<= vector-length>=)
      (let ((var (if (lambda-var-p first)
                     first
                     (lvar-dest-var first))))
@@ -203,6 +203,7 @@
                   (lambda-var-constraints var))
          (add-equality-constraint (case operator
                                     (vector-length<= '<=)
+                                    (vector-length>= '>=)
                                     (t 'eq))
                                   (make-vector-length-constraint var) second
                                   constraints consequent-constraints alternative-constraints))))
@@ -906,7 +907,7 @@
              c)))
     c))
 
-(defoptimizer (sb-kernel:vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
+(defoptimizer (vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
   (let (c
         (null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null))))
     (when (eql (lvar-type start) (specifier-type '(eql 0)))
@@ -937,6 +938,32 @@
                                                      '*))))
                 c))))
     c))
+
+(defun concatenate-constraints (seqs gen)
+  (let ((sum 0))
+    (flet ((min-length (type)
+             (let ((int (type-approximate-interval type)))
+               (or (and int
+                        (interval-low int))
+                   0))))
+      (loop for seq in seqs
+            do (incf sum
+                     (min-length (type-intersection (or (vector-length-type (lvar-type seq))
+                                                        *universal-type*)
+                                                    (or (vector-constraint-length seq gen)
+                                                        *universal-type*))))))
+    (when (plusp sum)
+      (list (list 'vector-length>= (specifier-type `(eql ,sum)))))))
+
+(defoptimizers constraint-propagate-result
+    (%concatenate-to-simple-vector %concatenate-to-string %concatenate-to-base-string)
+    ((&rest seqs) node gen)
+  (concatenate-constraints seqs gen))
+
+(defoptimizers constraint-propagate-result
+    (%concatenate-to-vector)
+    ((widetag &rest seqs) node gen)
+  (concatenate-constraints seqs gen))
 
 (defoptimizer (read-sequence constraint-propagate-result) ((seq stream &key start end) node gen)
   (let ((var (ok-lvar-lambda-var seq gen)))
