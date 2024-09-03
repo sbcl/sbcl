@@ -41,7 +41,15 @@
   `(svref #(:byte :word :dword :qword) (logand ,byte #b11)))
 (defun pick-operand-size (prefix operand1 &optional operand2)
   (acond ((logtest prefix #b100) (opsize-prefix-keyword prefix))
-         (operand2 (matching-operand-size operand1 operand2))
+         (operand2
+          (let ((dst-size (operand-size operand1))
+                (src-size (operand-size operand2)))
+            (cond ((not (or dst-size src-size))
+                   (error "can't tell the size of either ~S or ~S" operand1 operand2))
+                  ((and dst-size src-size)
+                   (aver (eq dst-size src-size))
+                   dst-size)
+                  (t (or dst-size src-size)))))
          (t (operand-size operand1))))
 (defun encode-size-prefix (prefix)
   (case prefix
@@ -1312,22 +1320,6 @@
        ((:foreign-dataref) :qword)))
     (t
      nil)))
-
-;;; FIXME: I'm fairly certain that this can be removed, as there should be
-;;; no way for operand sizes to differ.
-(defun matching-operand-size (dst src)
-  (let ((dst-size (operand-size dst))
-        (src-size (operand-size src)))
-    (if dst-size
-        (if src-size
-            (if (eq dst-size src-size)
-                dst-size
-                (error "size mismatch: ~S is a ~S and ~S is a ~S."
-                       dst dst-size src src-size))
-            dst-size)
-        (if src-size
-            src-size
-            (error "can't tell the size of either ~S or ~S" dst src)))))
 
 ;;; Except in a very few cases (MOV instructions A1, A3 and B8 - BF)
 ;;; we expect dword immediate operands even for 64 bit operations.
