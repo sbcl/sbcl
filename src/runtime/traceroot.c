@@ -292,18 +292,13 @@ deduce_thread(uword_t pointer, char** pc)
 }
 #endif
 
-static int non_nil_symbolp(lispobj x) {
-    return lowtag_of(x) == OTHER_POINTER_LOWTAG
-      && widetag_of((lispobj*)(x-OTHER_POINTER_LOWTAG)) == SYMBOL_WIDETAG;
-}
-
 static __attribute__((unused)) int tls_index_ok(lispobj tlsindex, struct vector* ignored_objects)
 {
     if (ignored_objects) {
         int i;
         for (i = vector_len(ignored_objects)-1; i >= 0; --i) {
             lispobj x = ignored_objects->data[i];
-            if (non_nil_symbolp(x) && tls_index_of(SYMBOL(x)) == tlsindex) return 0;
+            if (non_nil_symbol_p(x) && tls_index_of(SYMBOL(x)) == tlsindex) return 0;
         }
     }
     return 1; // is OK

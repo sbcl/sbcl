@@ -72,6 +72,10 @@ static inline int simple_vector_p(lispobj obj) {
     return other_pointer_p(obj) &&
            widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
+static inline int non_nil_symbol_p(lispobj x) {
+    return lowtag_of(x) == OTHER_POINTER_LOWTAG
+      && widetag_of((lispobj*)(x-OTHER_POINTER_LOWTAG)) == SYMBOL_WIDETAG;
+}
 
 /* Convert from a lispobj with type bits to a native (ordinary
  * C/assembly) pointer to the beginning of the object. */
