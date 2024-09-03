@@ -119,8 +119,7 @@
   (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
   (:generator 17
-    (inst mov block (catch-block-ea current-block
-                                    catch-block-previous-catch-slot))
+    (inst mov block (catch-block-ea current-block catch-block-previous-catch-slot))
     (store-tl-symbol-value block *current-catch-block*)))
 
 (define-vop (%unwind-protect-breakup)
@@ -128,8 +127,7 @@
   (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
   (:generator 17
-     (inst mov block (unwind-block-ea current-block
-                                      unwind-block-uwp-slot))
+     (inst mov block (unwind-block-ea current-block unwind-block-uwp-slot))
      (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs

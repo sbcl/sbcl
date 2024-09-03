@@ -1886,9 +1886,7 @@ forms that explicitly control this kind of evaluation.")
   ;; Walk the catch block chain looking for the first entry with an address
   ;; higher than the pointer for FRAME or a null pointer.
   (let* ((frame-pointer (sb-di::frame-pointer frame))
-         (current-block (int-sap (ldb (byte #.sb-vm:n-word-bits 0)
-                                      (ash sb-vm:*current-catch-block*
-                                           sb-vm:n-fixnum-tag-bits))))
+         (current-block (sb-di::current-catch-block-sap))
          (enclosing-block (loop for block = current-block
                                 then (sap-ref-sap block
                                                   (* sb-vm:catch-block-previous-catch-slot
@@ -1905,12 +1903,10 @@ forms that explicitly control this kind of evaluation.")
   ;; Walk the UWP chain looking for the first entry with an address
   ;; higher than the pointer for FRAME or a null pointer.
   (let* ((frame-pointer (sb-di::frame-pointer frame))
-         (current-uwp (int-sap (ldb (byte #.sb-vm:n-word-bits 0)
-                                    (ash sb-vm::*current-unwind-protect-block*
-                                         sb-vm:n-fixnum-tag-bits))))
+         (current-uwp (sb-di::current-uwp-block-sap))
          (enclosing-uwp (loop for uwp-block = current-uwp
                               then (sap-ref-sap uwp-block
-                                                sb-vm:unwind-block-uwp-slot)
+                                                (* sb-vm:unwind-block-uwp-slot sb-vm:n-word-bytes))
                               when (or (zerop (sap-int uwp-block))
                                        #+stack-grows-downward-not-upward
                                        (sap> uwp-block frame-pointer)
@@ -1994,8 +1990,8 @@ forms that explicitly control this kind of evaluation.")
   (declare (notinline format))
   (let ((sap (descriptor-sap sb-vm:*current-catch-block*)))
     (loop
-     (let ((tag (sap-ref-lispobj sap (ash sb-vm:catch-block-tag-slot 3)))
-           (link (sap-ref-sap sap (ash sb-vm:catch-block-previous-catch-slot 3))))
+     (let ((tag (sap-ref-lispobj sap (ash sb-vm:catch-block-tag-slot sb-vm:word-shift)))
+           (link (sap-ref-sap sap (ash sb-vm:catch-block-previous-catch-slot sb-vm:word-shift))))
        (format t "~S ~A~%" tag link)
        (setq sap link)
        (if (= (sap-int sap) 0) (return))))))

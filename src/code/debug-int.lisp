@@ -1007,12 +1007,23 @@
     (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
                         (* os-context-t))))
 
+#+sb-thread
+(progn
+  (defmacro current-uwp-block-sap ()
+    '(sb-vm::current-thread-offset-sap sb-vm::thread-current-unwind-protect-block-slot))
+  (defmacro current-catch-block-sap ()
+    '(sb-vm::current-thread-offset-sap sb-vm::thread-current-catch-block-slot)))
+#-sb-thread
+(progn
+  (defmacro current-uwp-block-sap () '(descriptor-sap sb-vm::*current-unwind-protect-block*))
+  (defmacro current-catch-block-sap () '(descriptor-sap *current-catch-block*)))
+
 (defun catch-runaway-unwind (block)
   (declare (ignorable block))
   #-(and win32 x86) ;; uses SEH
   (let ((target (sap-ref-sap (descriptor-sap block)
                              (* unwind-block-uwp-slot n-word-bytes))))
-    (loop for uwp = (descriptor-sap sb-vm::*current-unwind-protect-block*)
+    (loop for uwp = (current-uwp-block-sap)
           then (sap-ref-sap uwp (* unwind-block-uwp-slot n-word-bytes))
           until (zerop (sap-int uwp))
           thereis (sap= target uwp)
@@ -1305,7 +1316,7 @@ register."
 ;;; CODE-LOCATIONs at which execution would continue with frame as the
 ;;; top frame if someone threw to the corresponding tag.
 (defun frame-catches (frame)
-  (let ((catch (descriptor-sap *current-catch-block*))
+  (let ((catch (current-catch-block-sap))
         (reversed-result nil)
         (fp (frame-pointer frame)))
     (labels ((catch-ref (slot)
@@ -1351,7 +1362,7 @@ register."
 
 ;;; Modify the value of the OLD-TAG catches in FRAME to NEW-TAG
 (defun replace-frame-catch-tag (frame old-tag new-tag)
-  (let ((catch (descriptor-sap *current-catch-block*))
+  (let ((catch (current-catch-block-sap))
         (fp (frame-pointer frame)))
     (labels ((catch-ref (slot)
                (sap-ref-lispobj catch (* slot n-word-bytes)))
