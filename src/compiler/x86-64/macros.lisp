@@ -122,28 +122,11 @@
       (let (#+gs-seg (thread-tn nil))
         (ea thread-segment-reg (ash slot-index word-shift) thread-tn))))
 
-#+sb-thread
-(progn
-  ;; Return an EA for the TLS of SYMBOL, or die.
-  (defun symbol-known-tls-cell (symbol)
-    (let ((index (info :variable :wired-tls symbol)))
-      (aver (integerp index))
-      (thread-tls-ea index)))
+(defmacro load-tl-symbol-value (reg symbol)
+  `(inst mov ,reg (thread-slot-ea ,(symbol-thread-slot symbol))))
 
-  ;; LOAD/STORE-TL-SYMBOL-VALUE macros are ad-hoc (ugly) emulations
-  ;; of (INFO :VARIABLE :WIRED-TLS) = :ALWAYS-THREAD-LOCAL
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(inst mov ,reg (symbol-known-tls-cell ',symbol)))
-
-  (defmacro store-tl-symbol-value (reg symbol)
-    `(inst mov (symbol-known-tls-cell ',symbol) ,reg)))
-
-#-sb-thread
-(progn
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(inst mov ,reg (static-symbol-value-ea ',symbol)))
-  (defmacro store-tl-symbol-value (reg symbol)
-    `(inst mov (static-symbol-value-ea ',symbol) ,reg)))
+(defmacro store-tl-symbol-value (reg symbol)
+  `(inst mov (thread-slot-ea ,(symbol-thread-slot symbol)) ,reg))
 
 (defmacro load-binding-stack-pointer (reg)
   `(load-tl-symbol-value ,reg *binding-stack-pointer*))

@@ -1988,7 +1988,7 @@ forms that explicitly control this kind of evaluation.")
 #+(and sb-devel x86-64)
 (defun show-catch-tags ()
   (declare (notinline format))
-  (let ((sap (descriptor-sap sb-vm:*current-catch-block*)))
+  (let ((sap (sb-di::current-catch-block-sap)))
     (loop
      (let ((tag (sap-ref-lispobj sap (ash sb-vm:catch-block-tag-slot sb-vm:word-shift)))
            (link (sap-ref-sap sap (ash sb-vm:catch-block-previous-catch-slot sb-vm:word-shift))))

@@ -556,9 +556,9 @@ during backtrace.
   (binding-stack-pointer :c-type "lispobj *" :pointer t
                          :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
-  #+(and (or riscv x86-64 arm64) sb-thread)
+  #+(or x86-64 (and (or riscv x86-64 arm64) sb-thread))
   (current-catch-block :special *current-catch-block*)
-  #+(and (or riscv x86-64 arm64) sb-thread)
+  #+(or x86-64 (and (or riscv x86-64 arm64) sb-thread))
   (current-unwind-protect-block :special *current-unwind-protect-block*)
   #+(or sb-thread sparc ppc)
   (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*
@@ -629,7 +629,7 @@ during backtrace.
   ;; Same as above for the location of the current control stack
   ;; pointer.  This is also used on threaded x86oids to allow LDB to
   ;; print an approximation of the CSP as needed.
-  #+sb-thread
+  #+(or sb-thread x86-64)
   (control-stack-pointer :c-type "lispobj *")
   (card-table)
 

@@ -94,6 +94,11 @@
                         :key #'primitive-object-name :test #'eq)))
     name))
 
+(defun symbol-thread-slot (sym)
+  (dovector (slot (primitive-object-slots (primitive-object 'thread))
+                  (bug "~S is not a known slot of thread" sym))
+    (when (eq (slot-special slot) sym) (return (slot-offset slot)))))
+
 (defvar *!late-primitive-object-forms* nil)
 
 (defmacro define-primitive-object

@@ -125,7 +125,7 @@ extern int dynamic_values_bytes;
 
 /* These are for use during GC, on the current thread, or on prenatal
  * threads only. */
-#if defined(LISP_FEATURE_SB_THREAD)
+#if defined LISP_FEATURE_SB_THREAD || defined LISP_FEATURE_X86_64
 #define get_binding_stack_pointer(thread)       \
     ((thread)->binding_stack_pointer)
 #define set_binding_stack_pointer(thread,value) \

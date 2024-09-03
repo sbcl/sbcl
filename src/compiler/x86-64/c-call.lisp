@@ -446,7 +446,7 @@
     (move result rsp-tn)))
 
 (macrolet ((alien-stack-ptr ()
-             #+sb-thread '(symbol-known-tls-cell '*alien-stack-pointer*)
+             #+sb-thread `(thread-slot-ea ,(symbol-thread-slot '*alien-stack-pointer*))
              #-sb-thread '(static-symbol-value-ea '*alien-stack-pointer*)))
   (define-vop (alloc-alien-stack-space)
     (:info amount)

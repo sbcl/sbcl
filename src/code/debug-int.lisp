@@ -1007,13 +1007,13 @@
     (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
                         (* os-context-t))))
 
-#+sb-thread
+#+(or sb-thread x86-64)
 (progn
   (defmacro current-uwp-block-sap ()
     '(sb-vm::current-thread-offset-sap sb-vm::thread-current-unwind-protect-block-slot))
   (defmacro current-catch-block-sap ()
     '(sb-vm::current-thread-offset-sap sb-vm::thread-current-catch-block-slot)))
-#-sb-thread
+#-(or sb-thread x86-64)
 (progn
   (defmacro current-uwp-block-sap () '(descriptor-sap sb-vm::*current-unwind-protect-block*))
   (defmacro current-catch-block-sap () '(descriptor-sap *current-catch-block*)))
