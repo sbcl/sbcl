@@ -646,15 +646,21 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
       (note-dangerous-wait "poll(2)"))
     (let ((events (ecase direction
                     (:input (logior pollin pollpri))
-                    (:output pollout))))
+                    (:output pollout)))
+          (deadline (if (minusp to-msec)
+                        to-msec
+                        (+ (* (get-universal-time) 1000) to-msec))))
       (with-alien ((fds (struct pollfd)))
         (with-restarted-syscall (count errno)
-          (progn
+          (let ((timeout (if (minusp to-msec)
+                             -1
+                             (max 0 (- deadline (* 1000 (get-universal-time)))))))
+            (declare (fixnum timeout))
             (setf (slot fds 'fd) fd
                   (slot fds 'events) events
                   (slot fds 'revents) 0)
             (int-syscall ("poll" (* (struct pollfd)) int int)
-                         (addr fds) 1 to-msec))
+                         (addr fds) 1 timeout))
           (if (zerop errno)
               (let ((revents (slot fds 'revents)))
                 (or (and (eql 1 count) (logtest events revents))
@@ -726,29 +732,34 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 #-os-provides-poll
 (defun unix-simple-poll (fd direction to-msec)
-  (multiple-value-bind (to-sec to-usec)
-      (if (minusp to-msec)
-          (values nil nil)
-          (multiple-value-bind (to-sec to-msec2) (truncate to-msec 1000)
-            (values to-sec (* to-msec2 1000))))
-    (with-restarted-syscall (count errno)
-      (with-alien ((fds (struct fd-set)))
-        (fd-zero fds)
-        (fd-set fd fds)
-        (multiple-value-bind (read-fds write-fds)
-            (ecase direction
-              (:input
-               (values (addr fds) nil))
-              (:output
-               (values nil (addr fds))))
-          (unix-fast-select (1+ fd)
-                                    read-fds write-fds nil
-                                    to-sec to-usec)))
-      (case count
-        ((1) t)
-        ((0) nil)
-        (otherwise
-         (error "Syscall select(2) failed on fd ~D: ~A" fd (strerror)))))))
+  (flet ((msec-to-sec-usec (msec)
+           (multiple-value-bind (sec msec2) (truncate msec 1000)
+             (values sec (* msec2 1000)))))
+    (let ((deadline (if (minusp to-msec)
+                        to-msec
+                        (+ (* (get-universal-time) 1000) to-msec))))
+      (with-restarted-syscall (count errno)
+        (with-alien ((fds (struct fd-set)))
+          (fd-zero fds)
+          (fd-set fd fds)
+          (multiple-value-bind (to-sec to-usec)
+              (if (minusp to-msec)
+                  (values nil nil)
+                  (msec-to-sec-usec (max 0 (- deadline (* 1000 (get-universal-time))))))
+            (multiple-value-bind (read-fds write-fds)
+                (ecase direction
+                  (:input
+                   (values (addr fds) nil))
+                  (:output
+                   (values nil (addr fds))))
+              (unix-fast-select (1+ fd)
+                                read-fds write-fds nil
+                                to-sec to-usec))))
+        (case count
+          ((1) t)
+          ((0) nil)
+          (otherwise
+           (error "Syscall select(2) failed on fd ~D: ~A" fd (strerror))))))))
 
 ;;;; sys/stat.h
 
