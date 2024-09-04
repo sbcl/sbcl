@@ -227,12 +227,6 @@
     (pseudo-atomic ()
       #+immobile-space
       (progn
-        #-sb-thread
-        (let ((fixup (make-fixup "all_threads" :foreign-dataref)))
-          ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
-          ;; to stack, because we do do not give the register allocator access to it.
-          (inst mov thread-tn (rip-relative-ea fixup))
-          (inst mov thread-tn (ea thread-tn)))
         (inst mov rax object)
         (inst sub rax (thread-slot-ea thread-text-space-addr-slot))
         (inst shr rax (1- (integer-length immobile-card-bytes)))
