@@ -639,17 +639,19 @@ void
 gc_close_region(struct alloc_region *alloc_region, int page_type)
 {
     page_index_t first_page = find_page_index(alloc_region->start_addr);
-    page_index_t next_page = first_page+1;
+    int type = page_table[first_page].type;
+    gc_assert(type & OPEN_REGION_PAGE_FLAG);
     char *page_base = page_address(first_page);
-    char *free_pointer = alloc_region->free_pointer;
 
     // page_bytes_used() can be done without holding a lock. Nothing else
     // affects the usage on the first page of a region owned by this thread.
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
     gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
-
     // Mark the region as closed on its first page.
-    page_table[first_page].type &= ~(OPEN_REGION_PAGE_FLAG);
+    page_table[first_page].type = type ^ OPEN_REGION_PAGE_FLAG;
+
+    page_index_t next_page = first_page+1;
+    char *free_pointer = alloc_region->free_pointer;
 
     if (free_pointer != alloc_region->start_addr) {
         /* some bytes were allocated in the region */
