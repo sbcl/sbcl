@@ -1754,14 +1754,11 @@ session."
   (setf (sap-ref-sap thread-sap (ash sb-vm::thread-arena-slot sb-vm:word-shift))
         (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))
   #+win32
-  (/= 0 (alien-funcall (extern-alien "create_thread"
+  (/= 0 (alien-funcall (extern-alien "create_lisp_thread"
                                      (function unsigned system-area-pointer))
                        thread-sap))
   #-win32
-  (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t))
-        (c-tramp
-          (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
-                              #-os-thread-stack "new_thread_trampoline")))
+  (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t)))
     (and (= 0 #+os-thread-stack
               (alien-funcall (extern-alien "pthread_attr_setstacksize"
                                            (function int system-area-pointer unsigned))
@@ -1788,10 +1785,10 @@ session."
                 (alien-funcall setguard attr 0)))
          (with-pinned-objects (thread)
            (= 0 (alien-funcall
-                 (extern-alien "pthread_create"
-                               (function int system-area-pointer system-area-pointer
+                 (extern-alien "create_lisp_thread"
+                               (function int system-area-pointer
                                          system-area-pointer system-area-pointer))
-                 (struct-slot-sap thread thread os-thread) attr c-tramp thread-sap))))))
+                 (struct-slot-sap thread thread os-thread) attr thread-sap))))))
 
 (defmacro free-thread-struct (memory)
   `(alien-funcall (extern-alien "free_thread_struct" (function void system-area-pointer))

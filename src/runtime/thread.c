@@ -1124,7 +1124,7 @@ alloc_thread_struct(void* spaces) {
 }
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_WIN32
-uword_t create_thread(struct thread* th)
+uword_t create_lisp_thread(struct thread* th)
 {
     unsigned int tid;
     struct extra_thread_data *data = thread_extra_data(th);
@@ -1139,6 +1139,15 @@ uword_t create_thread(struct thread* th)
         ResumeThread((HANDLE)th->os_thread);
     }
     return success;
+}
+#else
+#ifdef LISP_FEATURE_OS_THREAD_STACK
+# define START_ROUTINE new_thread_trampoline_switch_stack
+#else
+# define START_ROUTINE new_thread_trampoline
+#endif
+int create_lisp_thread(pthread_t *th, pthread_attr_t *attr, void *arg) {
+    return pthread_create(th, attr, START_ROUTINE, arg);
 }
 #endif
 
