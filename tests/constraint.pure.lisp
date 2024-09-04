@@ -1726,4 +1726,10 @@
               (optimize (debug 2)))
      (let ((x (concatenate 'vector x y)))
        (length x)))
-   (integer 10 (#.array-dimension-limit))))
+   (integer 10 (#.array-dimension-limit)))
+  (assert-type
+   (lambda (x)
+     (declare (optimize (debug 2)))
+     (let ((x (concatenate 'vector '(1 2 3) (subseq x 1))))
+       (length x)))
+   (integer 3 (#.array-dimension-limit))))

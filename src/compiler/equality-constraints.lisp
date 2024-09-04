@@ -965,6 +965,39 @@
     ((widetag &rest seqs) node gen)
   (concatenate-constraints seqs gen))
 
+(defun concatenate-subseq-constraints (args gen)
+  (let ((sum 0))
+    (flet ((min-length (type)
+             (let ((int (type-approximate-interval type)))
+               (or (and int
+                        (interval-low int))
+                   0))))
+      (loop while args
+            do (let ((arg (pop args)))
+                 (cond ((and (constant-lvar-p arg)
+                             (eq (lvar-value arg) 'sb-impl::%subseq))
+                        (pop args)
+                        (pop args)
+                        (pop args))
+                       (t
+                        (incf sum
+                              (min-length (type-intersection (or (vector-length-type (lvar-type arg))
+                                                                 *universal-type*)
+                                                             (or (vector-constraint-length arg gen)
+                                                                 *universal-type*)))))))))
+    (when (plusp sum)
+      (list (list 'vector-length>= (specifier-type `(eql ,sum)))))))
+
+(defoptimizers constraint-propagate-result
+    (%concatenate-to-string-subseq %concatenate-to-base-string-subseq %concatenate-to-simple-vector-subseq)
+    ((&rest seqs) node gen)
+  (concatenate-subseq-constraints seqs gen))
+
+(defoptimizers constraint-propagate-result
+    (%concatenate-to-vector-subseq)
+    ((type &rest seqs) node gen)
+  (concatenate-subseq-constraints seqs gen))
+
 (defoptimizer (read-sequence constraint-propagate-result) ((seq stream &key start end) node gen)
   (let ((var (ok-lvar-lambda-var seq gen)))
     (when var
