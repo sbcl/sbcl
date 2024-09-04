@@ -58,9 +58,9 @@ jobs:
     - name: archive clisp-xc fasls
       run: tar --transform 's,^,clisp-host/,' -cf clisp-host-fasls.tgz obj/from-xc/
     - name: upload clisp-xc archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: xc-host-fasls
+        name: xc-host-fasls-clisp
         path: clisp-host-fasls.tgz
     
   ccl:
@@ -85,9 +85,9 @@ jobs:
     - name: archive ccl-xc fasls
       run: tar --transform 's,^,ccl-host/,' -cf ccl-host-fasls.tgz obj/from-xc/
     - name: upload ccl-xc archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: xc-host-fasls
+        name: xc-host-fasls-ccl
         path: ccl-host-fasls.tgz
 
   cmucl:
@@ -118,9 +118,9 @@ jobs:
     - name: archive cmucl-xc fasls
       run: tar --transform 's,^,cmucl-host/,' -cf cmucl-host-fasls.tgz obj/from-xc/
     - name: upload cmucl-xc archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: xc-host-fasls
+        name: xc-host-fasls-cmucl
         path: cmucl-host-fasls.tgz
 
   sbcl:
@@ -143,9 +143,9 @@ jobs:
     - name: archive sbcl-xc fasls
       run: tar --transform 's,^,sbcl-host/,' -cf sbcl-host-fasls.tgz obj/from-xc/
     - name: upload sbcl-xc archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: xc-host-fasls
+        name: xc-host-fasls-sbcl
         path: sbcl-host-fasls.tgz
 
   self:
@@ -171,9 +171,9 @@ jobs:
     - name: archive sbcl-xc fasls
       run: tar --transform 's,^,self-host/,' -cf self-host-fasls.tgz obj/from-xc/
     - name: upload self-xc archive
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: xc-host-fasls
+        name: xc-host-fasls-self
         path: self-host-fasls.tgz
 
   compare-xc-host-fasls:
@@ -191,9 +191,10 @@ jobs:
 
     steps:
     - name: download xc-host fasls
-      uses: actions/download-artifact@v4.1.7
+      uses: actions/download-artifact@v4
       with:
-        name: xc-host-fasls
+        pattern: xc-host-fasls-*
+        merge-multiple: true
     - name: extract xc-host fasls
       run: |
         tar xf sbcl-host-fasls.tgz
