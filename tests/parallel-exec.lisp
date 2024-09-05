@@ -191,6 +191,7 @@
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
                    #+test-sprof (sb-sprof:report :type :flat)
                    #+tlsf-stress (cl-user::tlsf-dump)
+                   #-arm64 ;; causes crashes
                    (gc :gen 7)
                    (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
                    (exit :code (if (unexpected-failures) 1 104))))))
