@@ -129,6 +129,10 @@ struct sigaction old_ll_sigactions[NSIG];
 #endif
 lispobj lisp_sig_handlers[NSIG];
 
+#ifndef LISP_FEATURE_SPARC
+# define arch_os_get_context(c) *c
+#endif
+
 /* Under Linux on some architectures, we appear to have to restore the
  * FPU control word from the context, as after the signal is delivered
  * we appear to have a null FPU control word. */

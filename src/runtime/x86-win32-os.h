@@ -10,8 +10,6 @@ typedef struct os_context_t {
 
 typedef long os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 static inline DWORD NT_GetLastError() {
     DWORD result;
     asm("movl %%fs:0x0D,%0":"=r"(result));

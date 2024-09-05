@@ -8,8 +8,6 @@ typedef struct os_context_t {
 
 typedef intptr_t os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 static inline DWORD NT_GetLastError() {
     return GetLastError();
 }

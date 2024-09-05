@@ -12,8 +12,6 @@
 
 typedef register_t os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 #define RESTORE_FP_CONTROL_FROM_CONTEXT
 void os_restore_fp_control(os_context_t *context);
 void set_thread_stack(void *);

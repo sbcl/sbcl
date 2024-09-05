@@ -81,7 +81,7 @@
              (inst addi base base max-short-imm)
              (decf adjusted-imm max-short-imm)
              (incf n-adjustments))))))
-    
+
 (macrolet ((def-coerce-op (name inst)
              `(defmacro ,name ((reg temp-reg) &body body)
                 `(progn

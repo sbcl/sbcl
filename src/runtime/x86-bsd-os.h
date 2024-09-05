@@ -8,8 +8,6 @@
 
 typedef int os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 /* The different BSD variants have diverged in exactly where they
  * store signal context information, but at least they tend to use the
  * same stems to name the structure fields, so by using this macro we

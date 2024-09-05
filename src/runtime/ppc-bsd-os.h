@@ -3,8 +3,6 @@
 
 typedef int os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 #ifdef LISP_FEATURE_NETBSD
 #  define OS_CONTEXT_PC(context) _UC_MACHINE_PC(context)
 #elif defined LISP_FEATURE_OPENBSD

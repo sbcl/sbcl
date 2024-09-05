@@ -8,8 +8,6 @@
 
 typedef int os_context_register_t;
 
-#include "arch-os-generic.inc"
-
 void set_data_desc_size(data_desc_t* desc, unsigned long size);
 void set_data_desc_addr(data_desc_t* desc, void* addr);
 
