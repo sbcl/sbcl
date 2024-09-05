@@ -404,7 +404,7 @@
            (declare (rational y))
            (assert (<= 1/2 y 1))
            ;; Use the Taylor series expansion for log((1-y)/(1+y)),
-           ;; which gives around 4m digits of precision for m terms
+           ;; which gives around 4*m bits of precision for m terms
            ;; when 1/2 <= y <= 1.
            (let* ((x (/ (- y 1) (+ y 1)))
                   (x^2 (* x x))
