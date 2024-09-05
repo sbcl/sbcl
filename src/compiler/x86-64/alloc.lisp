@@ -1159,12 +1159,8 @@
       (move c-arg-1 rax-tn))
     (move res c-arg-1)))
 
-#+immobile-space
-(macrolet ((c-fun (name)
-             `(let ((c-fun (make-fixup ,name :foreign)))
-                (cond ((sb-c::code-immobile-p node) c-fun)
-                                 (t (progn (inst mov rax c-fun) rax))))))
-(define-vop (!alloc-immobile-fixedobj)
+#+(and sb-xc-host immobile-space)
+(define-vop (alloc-immobile-fixedobj)
   (:args (size-class :scs (any-reg) :target c-arg1)
          (nwords :scs (any-reg) :target c-arg2)
          (header :scs (any-reg) :target c-arg3))
@@ -1176,7 +1172,6 @@
                :offset #.(third *c-call-register-arg-offsets*)) c-arg3)
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) rax)
   (:results (result :scs (descriptor-reg)))
-  (:node-var node)
   (:generator 50
    (inst mov c-arg1 size-class)
    (inst mov c-arg2 nwords)
@@ -1185,7 +1180,7 @@
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic ()
-     (call-c (c-fun "alloc_immobile_fixedobj"))
+     (call-c "alloc_immobile_fixedobj")
      (move result rax))))
 
 ;;; Timing test:
@@ -1255,5 +1250,3 @@
        FAIL
        (inst mov result nil-value)
        OUT)))
-
-) ; end MACROLET

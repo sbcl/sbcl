@@ -92,7 +92,7 @@
 ;;;  - Layouts have varying size-class
 (defun alloc-immobile-fixedobj (nwords header)
   (let* ((widetag (logand (truly-the fixnum header) widetag-mask))
-         (aligned-nwords (truly-the fixnum (align-up nwords 2)))
+         (aligned-nwords (truly-the fixnum (align-up (the fixnum nwords) 2)))
          (size-class
           ;; If you change this, then be sure to update tests/immobile-space.impure
           ;; which hardcodes a size class to not conflict with anything.
@@ -110,7 +110,7 @@
                    ((<= aligned-nwords 32) (setq aligned-nwords 32) 6)
                    ((<= aligned-nwords 48) (setq aligned-nwords 48) 7)
                    (t (error "Oversized layout")))))))
-    (values (%primitive !alloc-immobile-fixedobj size-class aligned-nwords header))))
+    (values (%primitive alloc-immobile-fixedobj size-class aligned-nwords header))))
 
 (defun %alloc-immobile-symbol (name)
   (let ((symbol (truly-the symbol

@@ -168,14 +168,10 @@
                     (inst pop ,frame-tn))))))))
 
 (defmacro call-c (fun &rest args)
-  (when (stringp fun)
-    (let ((operand-form
-           (if (member :sb-assembling sb-xc:*features*)
-               :rel32
-               (or #+immobile-space :rel32 :ea))))
-      (setq fun (ecase operand-form
-                  (:rel32 `(make-fixup ,fun :foreign))
-                  (:ea    `(ea (make-fixup ,fun :foreign 8)))))))
+  (aver (stringp fun))
+  (setq fun (if (or #+immobile-space t (member :sb-assembling sb-xc:*features*))
+                `(make-fixup ,fun :foreign)
+                `(ea (make-fixup ,fun :foreign 8))))
   `(progn
      #+win32 (inst sub rsp-tn 32)
      ,@(loop for arg in args

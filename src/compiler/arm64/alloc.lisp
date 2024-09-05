@@ -170,8 +170,8 @@
       (allocation nil bytes lowtag result :flag-tn lr)
       (storew header result 0 lowtag))))
 
-#+immobile-space
-(define-vop (!alloc-immobile-fixedobj)
+#+(and sb-xc-host immobile-space)
+(define-vop (alloc-immobile-fixedobj)
   (:args (size-class :scs (any-reg) :target c-arg1)
          (nwords :scs (any-reg) :target c-arg2)
          (header :scs (any-reg) :target c-arg3))
