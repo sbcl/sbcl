@@ -81,7 +81,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
-    (inst addi block cfp-tn (tn-byte-offset tn))
+    (add-imm block cfp-tn (tn-byte-offset tn) 'make-unwind-block temp)
     (load-current-unwind-protect-block temp)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)

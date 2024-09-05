@@ -20,12 +20,68 @@
     `(unless (location= ,n-dst ,n-src)
        (inst addi ,n-dst ,n-src 0))))
 
+;;; Add a possibly-too-large immediate value using TEMP. VOP-NAME is merely
+;;; to track where the temp is needed because I might have overdone use of it
+;;; and could potentially remove some uses of this. (Not sure)
+(defun add-imm (result source imm-operand vop-name tmp)
+  (declare (ignorable vop-name))
+  (cond ((typep imm-operand 'short-immediate)
+         (inst addi result source imm-operand))
+        (t
+         (inst li tmp imm-operand)
+         (inst add result source tmp))))
+
 (macrolet ((def-mem-op (op inst shift)
              `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
                 `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
   (def-mem-op loadw #-64-bit lw #+64-bit ld word-shift)
   (def-mem-op storew #-64-bit sw #+64-bit sd word-shift))
 
+(defun load-frame-word (object base wordindex vop-name tmp)
+  (declare (ignore vop-name))
+  (let ((imm (ash wordindex word-shift)))
+    (cond ((typep imm 'short-immediate)
+           (loadw object base wordindex))
+          (t
+           (unless tmp
+             ;; check that it's OK to temporarily mess up OBJECT
+             (aver (not (location= object base)))
+             (setq tmp object)) ; use OBJECT for pointer arithmetic
+           ;; TOOD: there's a way to do this using only 2 instructions if the
+           ;; immediate is only a little too large: first, "addi TEMP base k"
+           ;; where K gets us nearer to the desired address; then store based off
+           ;; TMP using a smaller immediate index.
+           ;; For now, 3 instructions it shall be.
+           (inst li tmp imm)
+           (inst add tmp base tmp)
+           (inst #-64-bit lw #+64-bit ld object tmp 0)))))
+(defun store-frame-word (object base wordindex vop-name tmp)
+  (declare (ignore vop-name))
+  (let ((imm (ash wordindex word-shift)))
+    (cond ((typep imm 'short-immediate)
+           (storew object base wordindex))
+          (tmp
+           (inst li tmp imm)
+           (inst add tmp base tmp)
+           (inst #-64-bit sw #+64-bit sd object tmp 0))
+          (t
+           ;; Lacking a scratch register, I don't know what else to do but modify
+           ;; the BASE register.
+           ;; FIXME: POSSIBLY DANGEROUS! if a stop-for-GC occurs and the frame-pointer is off
+           ;; from what it should be, the set of values below the frame-pointer omits many
+           ;; words. Maybe it's OK because the Lisp stack grows upward so we only care that
+           ;; the stack is bounded by the stack-pointer and not the frame-pointer?
+           (do ((max-short-imm #x7F0)
+                (adjusted-imm imm)
+                (n-adjustments 0))
+               ((typep adjusted-imm 'short-immediate)
+                (inst #-64-bit sw #+64-bit sd object base adjusted-imm)
+                (dotimes (i n-adjustments)
+                  (inst subi base base max-short-imm)))
+             (inst addi base base max-short-imm)
+             (decf adjusted-imm max-short-imm)
+             (incf n-adjustments))))))
+    
 (macrolet ((def-coerce-op (name inst)
              `(defmacro ,name ((reg temp-reg) &body body)
                 `(progn
@@ -559,7 +615,7 @@ and
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (loadw reg cfp-tn offset))))))
+          (load-frame-word reg cfp-tn offset 'load-stack-tn nil))))))
 
 (defmacro store-stack-tn (stack reg)
   `(let ((stack ,stack)
@@ -567,7 +623,7 @@ and
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (storew reg cfp-tn offset))))))
+          (store-frame-word reg cfp-tn offset 'store-stack-tn nil))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
@@ -579,7 +635,7 @@ and
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))
           ((control-stack)
-           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
+           (load-frame-word ,n-reg cfp-tn (tn-offset ,n-stack) 'maybe-load-stack-tn nil)))))))
 
 (defun align-csp (temp)
   (let ((aligned (gen-label)))

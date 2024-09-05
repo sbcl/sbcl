@@ -62,7 +62,7 @@
    (sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
-  (loadw y (current-nfp-tn vop) (tn-offset x)))
+  (load-frame-word y (current-nfp-tn vop) (tn-offset x) 'load-number-stack nil))
 
 (define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg zero) (control-stack))
@@ -73,7 +73,7 @@
    (sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
-  (storew x (current-nfp-tn vop) (tn-offset y)))
+  (store-frame-word x (current-nfp-tn vop) (tn-offset y) 'store-number-stack nil))
 
 
 ;;;; The Move VOP:
@@ -106,12 +106,13 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
+  (:temporary (:sc unsigned-reg) tmp) ; TODO- :unused-if based on frame size
   (:generator 0
     (sc-case y
       ((any-reg descriptor-reg)
        (move y x))
       (control-stack
-       (storew x fp (tn-offset y))))))
+       (store-frame-word x fp (tn-offset y) 'move-arg tmp)))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg zero)
