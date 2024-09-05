@@ -156,6 +156,7 @@
   (def-type-predicate-wrapper simple-rank-1-array-*-p)
   (def-type-predicate-wrapper simple-string-p)
   (def-type-predicate-wrapper stringp)
+  (def-type-predicate-wrapper sb-c::string-designator-p)
   (def-type-predicate-wrapper vectorp))
 
 (sb-c::when-vop-existsp (:translate car-eq-if-listp)
