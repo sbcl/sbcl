@@ -143,10 +143,12 @@
 (define-vop (allocate-full-call-frame)
   (:info nargs)
   (:results (res :scs (any-reg)))
+  (:temporary (:sc unsigned-reg
+               :unused-if (typep (* nargs n-word-bytes) 'short-immediate)) tmp)
   (:generator 2
     (when (> nargs register-arg-count)
       (move res csp-tn)
-      (inst addi csp-tn csp-tn (* nargs n-word-bytes)))))
+      (add-imm csp-tn csp-tn (* nargs n-word-bytes) 'allocate-full-call-frame tmp))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  VALUES is the head of the TN-REF
