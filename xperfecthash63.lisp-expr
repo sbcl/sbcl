@@ -784,6 +784,9 @@
   (let ((b (& (>> val 28) #x7)))
    (let ((a (>> (<< val 31) 29)))
     (^ a (aref tab b))))))")
+(#(BA316CC 5D714507 6A1FC394 8A31A1DB C95BECAA F36C4AC5)
+ "(:LAYOUT-ID :ALIEN-DATA-LINKAGE-INDEX :ALIEN-CODE-LINKAGE-INDEX :ASSEMBLY-ROUTINE :LINKAGE-CELL :CARD-TABLE-INDEX-MASK)"
+ "(  (& (- (>> val 2) (>> val 26)) 7))")
 (#(BCB074C 10599A53 5256235A 7CC5F551 9647F466 A49305EF)
  "(:UNKNOWN :ALIEN :GLOBAL :MACRO :CONSTANT :SPECIAL)"
  "(  (& (- (>> val 1) (>> val 4)) 7))")
