@@ -171,3 +171,24 @@
                 (eq key 'ab))
         key))
    :allow-notes nil))
+
+(with-test (:name :quick-minperfect-hash)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (declare (notinline boole))
+         (case (boole boole-xor 0 0)
+           ((-104) 0)
+           ((-28 -41 -38 -99 -110 -81) 0)
+           (t 1)))
+    (() 1))
+  (checked-compile
+   `(lambda (p1)
+      (declare (type character p1))
+      (the
+       (or
+        (member #:g3953324 #:g3953325 #:|baaaabbbbabaababbb|
+                #:|baaabbaabbbabbba|
+                ,(make-symbol (map 'string #'code-char '(18689 30023 3247 59527 37241 35427))))
+        standard-char)
+       p1))))
