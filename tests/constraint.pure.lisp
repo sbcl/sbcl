@@ -1732,4 +1732,17 @@
      (declare (optimize (debug 2)))
      (let ((x (concatenate 'vector '(1 2 3) (subseq x 1))))
        (length x)))
-   (integer 3 (#.array-dimension-limit))))
+   (integer 3 (#.array-dimension-limit)))
+  (assert-type
+   (lambda (x)
+     (declare ((simple-vector 3) x)
+              (optimize (debug 2)))
+     (let ((x (concatenate 'vector x (if * "abc" "abcd"))))
+       (length x)))
+   (integer 6 7))
+  (assert-type
+   (lambda (x)
+     (declare (optimize (debug 2)))
+     (let ((x (concatenate 'vector "00" (subseq x 0 2))))
+       (length x)))
+   (integer 4 4)))

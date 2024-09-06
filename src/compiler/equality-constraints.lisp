@@ -907,6 +907,27 @@
              c)))
     c))
 
+(defun subseq-bounds (sequence start end gen)
+  (let* ((null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null)))
+         (end (if null-p
+                  (type-union (type-intersection (or (vector-length-type (lvar-type sequence))
+                                                     *universal-type*)
+                                                 (or (vector-constraint-length sequence gen)
+                                                     *universal-type*))
+                              (type-intersection (lvar-type end) (specifier-type 'integer)))
+                  (lvar-type end)))
+         (int-s (type-approximate-interval (lvar-type start)))
+         (int-e (type-approximate-interval end)))
+    (if (and int-s int-e)
+        (let* ((length (interval-sub int-e int-s))
+               (l (interval-low length))
+               (h (interval-high length)))
+          (values (if (typep l 'unsigned-byte)
+                      l
+                      0)
+                  h))
+        (values 0 nil))))
+
 (defoptimizer (vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
   (let (c
         (null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null))))
@@ -917,43 +938,50 @@
               (when seq-var
                 (push (list 'vector-length (make-vector-length-constraint seq-var)) c))))
           (push (list 'vector-length end) c)))
-    (let* ((end (if null-p
-                    (type-union (type-intersection (or (vector-length-type (lvar-type sequence))
-                                                       *universal-type*)
-                                                   (or (vector-constraint-length sequence gen)
-                                                       *universal-type*))
-                                (type-intersection (lvar-type end) (specifier-type 'integer)))
-                    (lvar-type end)))
-           (int-s (type-approximate-interval (lvar-type start)))
-           (int-e (type-approximate-interval end)))
-      (when (and int-s int-e)
-        (let* ((length (interval-sub int-e int-s))
-               (l (interval-low length))
-               (h (interval-high length)))
-          (push (list 'vector-length (specifier-type
-                                      `(integer ,(if (typep l 'unsigned-byte)
-                                                     l
-                                                     0)
-                                                ,(or h
-                                                     '*))))
-                c))))
+    (multiple-value-bind (l h) (subseq-bounds sequence start end gen)
+      (when (or h
+                (> l 0))
+        (push (list 'vector-length (specifier-type `(integer ,l ,(or h '*))))
+              c)))
     c))
 
-(defun concatenate-constraints (seqs gen)
-  (let ((sum 0))
-    (flet ((min-length (type)
-             (let ((int (type-approximate-interval type)))
-               (or (and int
-                        (interval-low int))
-                   0))))
-      (loop for seq in seqs
-            do (incf sum
-                     (min-length (type-intersection (or (vector-length-type (lvar-type seq))
-                                                        *universal-type*)
-                                                    (or (vector-constraint-length seq gen)
-                                                        *universal-type*))))))
-    (when (plusp sum)
-      (list (list 'vector-length>= (specifier-type `(eql ,sum)))))))
+(defun concatenate-constraints (args gen &optional subseq)
+  (let ((min-sum 0)
+        (max t)
+        (max-sum 0)
+        r)
+    (loop while args
+          do (let ((arg (pop args)))
+               (cond ((and subseq
+                           (constant-lvar-p arg)
+                           (eq (lvar-value arg) 'sb-impl::%subseq))
+
+                      (multiple-value-bind (l h) (subseq-bounds (pop args) (pop args)
+                                                                (pop args) gen)
+                        (incf min-sum l)
+                        (if h
+                            (incf max-sum h)
+                            (setf max nil))))
+                     (t
+                      (let ((int (type-approximate-interval (type-intersection (or (vector-length-type (lvar-type arg))
+                                                                                   *universal-type*)
+                                                                               (or (vector-constraint-length arg gen)
+                                                                                   *universal-type*)))))
+                        (cond (int
+                               (incf min-sum (or (interval-low int) 0))
+                               (if (interval-high int)
+                                   (incf max-sum (interval-high int))
+                                   (setf max nil)))
+                              (t
+                               (setf max nil))))))))
+    (when (plusp min-sum)
+      (push (list 'vector-length>= (specifier-type `(eql ,min-sum)))
+            r))
+    (when (and max
+               (plusp max-sum))
+      (push (list 'vector-length<= (specifier-type `(eql ,max-sum)))
+            r))
+    r))
 
 (defoptimizers constraint-propagate-result
     (%concatenate-to-simple-vector %concatenate-to-string %concatenate-to-base-string)
@@ -965,38 +993,15 @@
     ((widetag &rest seqs) node gen)
   (concatenate-constraints seqs gen))
 
-(defun concatenate-subseq-constraints (args gen)
-  (let ((sum 0))
-    (flet ((min-length (type)
-             (let ((int (type-approximate-interval type)))
-               (or (and int
-                        (interval-low int))
-                   0))))
-      (loop while args
-            do (let ((arg (pop args)))
-                 (cond ((and (constant-lvar-p arg)
-                             (eq (lvar-value arg) 'sb-impl::%subseq))
-                        (pop args)
-                        (pop args)
-                        (pop args))
-                       (t
-                        (incf sum
-                              (min-length (type-intersection (or (vector-length-type (lvar-type arg))
-                                                                 *universal-type*)
-                                                             (or (vector-constraint-length arg gen)
-                                                                 *universal-type*)))))))))
-    (when (plusp sum)
-      (list (list 'vector-length>= (specifier-type `(eql ,sum)))))))
-
 (defoptimizers constraint-propagate-result
     (%concatenate-to-string-subseq %concatenate-to-base-string-subseq %concatenate-to-simple-vector-subseq)
     ((&rest seqs) node gen)
-  (concatenate-subseq-constraints seqs gen))
+  (concatenate-constraints seqs gen t))
 
 (defoptimizers constraint-propagate-result
     (%concatenate-to-vector-subseq)
     ((type &rest seqs) node gen)
-  (concatenate-subseq-constraints seqs gen))
+  (concatenate-constraints seqs gen t))
 
 (defoptimizer (read-sequence constraint-propagate-result) ((seq stream &key start end) node gen)
   (let ((var (ok-lvar-lambda-var seq gen)))
