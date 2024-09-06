@@ -85,13 +85,13 @@
                                (in-bounds-p target-addr (core-linkage-bounds core)))
                        (push (list (dstate-cur-offs dstate)
                                    4    ; length
-                                   "adrp-gotpcrel"
+                                   :adrp-gotpcrel
                                    target-addr
                                    (format nil "x~d" reg))
                              list)
                        (push (list (+ 4 (dstate-cur-offs dstate))
                                    4    ; length
-                                   "ldr-gotpcrel"
+                                   :ldr-gotpcrel
                                    target-addr
                                    (format nil "x~d" reg))
                              list))))
@@ -108,13 +108,13 @@
                                (in-bounds-p target-addr (core-linkage-bounds core)))
                        (push (list (dstate-cur-offs dstate)
                                    4    ; length
-                                   "adrp-gotpcrel"
+                                   :adrp-gotpcrel
                                    target-addr
                                    (format nil "x~d" reg))
                              list)
                        (push (list (+ 4 (dstate-cur-offs dstate))
                                    4    ; length
-                                   "ldr-gotpcrel"
+                                   :ldr-gotpcrel
                                    target-addr
                                    (format nil "x~d" reg))
                              list)))))))
@@ -128,7 +128,7 @@
                       (in-bounds-p target-addr (core-linkage-bounds core)))
               (push (list* (dstate-cur-offs dstate)
                            4            ; length
-                           (if (eq inst inst-bl) "bl" "b")
+                           (if (eq inst inst-bl) :bl :b)
                            target-addr)
                     list))))))
      seg
@@ -157,7 +157,7 @@
              (machine-ea-disp x)))
       (when (and emit-cfi
                  (equalp (car insts) '(0 pop (#s(machine-ea :disp 8 :base 5) . :qword))))
-        (push (list* 0 3 "pop" "8(%rbp)") result))
+        (push (list* 0 3 :pop "8(%rbp)") result))
       (do ((insts insts (cdr insts)))
           ((endp insts))
         (let* ((inst (car insts))
@@ -169,9 +169,7 @@
                    (aver (eq (cadr inst) 'sb-x86-64-asm::call))
                    (aver (< ea alien-linkage-end)) ; CALL via alien linkage
                    (aver (= inst-len 5))
-                   ;; Note: This defers to the ASM writer inference of which alien symbol
-                   ;; is referenced which in retrospect is a bad approach.
-                   (push (list* (car inst) 5 "call" ea) result))
+                   (push (list* (car inst) 5 :call ea) result))
                   ((pc-relative-ea-p ea)
                    (let* ((next-pc (+ load-addr (caadr insts)))
                           (ea (+ next-pc (ea-disp-of ea)))
@@ -180,16 +178,15 @@
                        (cond ((< ea alien-linkage-end) ; alien linkage
                               (aver (= inst-len 7))
                               (let ((op (ecase (cadr inst)
-                                          (sb-x86-64-asm::mov "mov-gotpcrel")
-                                          (sb-x86-64-asm::lea "lea")))
+                                          (sb-x86-64-asm::mov :mov-gotpcrel)
+                                          (sb-x86-64-asm::lea :lea)))
                                     (args (list ea (string-downcase (princ-to-string (third inst))))))
-                                ;; same Note as above pertains here
                                 (push (list* (car inst) 7 op args) result)))
                              ((eq (cadr inst) 'sb-x86-64-asm::lea)
                               ;; Get ADDRESS of lisp linkage cell in stepping-enabled code
                               (aver (eq (third inst) (get-gpr :qword 0))) ; %rax
                               (aver (= inst-len 7))
-                              (push (list* (car inst) 7 "lea" (format nil "(fntbl+~d)(%rip),%rax"
+                              (push (list* (car inst) 7 :lea (format nil "(fntbl+~d)(%rip),%rax"
                                                                       table-offset))
                                     result))
                              (t ; lisp CALL or JMP
@@ -198,8 +195,17 @@
                                      (format nil "~a *(fntbl+~d)(%rip)"
                                              (string-downcase (cadr inst))
                                              table-offset)))
-                                (push (list* (car inst) 6 "lispcall" new-inst) result))))))))))))
+                                (push (list* (car inst) 6 :lispcall new-inst) result))))))))))))
       (nreverse result)))
+
+(defun c-linkage-sym-from-addr (addr core)
+  (let ((entry-index (/ (- addr (bounds-low (core-linkage-bounds core)))
+                        (core-alien-linkage-entry-size core))))
+    (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1)
+    (let ((symbol (aref (core-alien-linkage-symbols core) entry-index)))
+      (if (listp symbol)
+          (values (car symbol) entry-index t) ; data linkage
+          (values symbol entry-index nil))))) ; code linkage
 
 ;;; Using assembler directives and/or real mnemonics, dump COUNT bytes
 ;;; of memory at PADDR (physical addr) to STREAM.
@@ -286,76 +292,47 @@
           ;; to see them where they belong in the instruction stream]
           (when (and instructions (= (caar instructions) cur-offset))
             (destructuring-bind (length opcode . operand) (cdr (pop instructions))
-              (when (cond ((member opcode #+arm64 '("bl" "b")
-                                          #+x86-64 '("jmp" "je" "call")
-                                          :test #'string=)
-                           (when (in-bounds-p operand (core-linkage-bounds core))
-                             (let ((entry-index
-                                     (/ (- operand (bounds-low (core-linkage-bounds core)))
-                                        (core-alien-linkage-entry-size core))))
-                               (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1
-                                     operand (aref (core-alien-linkage-symbols core) entry-index))))
-                           (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
+              (ecase opcode
+                (#+arm64 (:bl :b) #+x86-64 (:call)
+                 ;; XXX Should this AVER that it is in-bounds?
+                 (when (in-bounds-p operand (core-linkage-bounds core))
+                   (setq operand (c-linkage-sym-from-addr operand core)))
+                 (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
                                    opcode (stringp operand) operand
                                    #+x86-64
                                    (core-enable-pie core)
                                    #+arm64 nil ; arm64 doesn't need the extra @PLT
                                    ))
-                          ((or #+x86-64 (string= opcode "mov-gotpcrel")
-                               #+arm64 (string= opcode "ldr-gotpcrel")
-                               #+arm64 (string= opcode "adrp-gotpcrel"))
-                           (let* ((entry-index
-                                    (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
-                                       (core-alien-linkage-entry-size core)))
-                                  (c-symbol (let ((thing (aref (core-alien-linkage-symbols core)
-                                                               entry-index)))
-                                              (if (consp thing) (car thing) thing))))
-                             (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1)
-                             #+x86-64
-                             (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))
-                             #+arm64
-                             (cond ((string= opcode "adrp-gotpcrel")
-                                    (format stream " adrp ~A,:got:~A~%" (cadr operand) c-symbol))
-                                   ((string= opcode "ldr-gotpcrel")
-                                    (format stream " ldr ~A, [~A, #:got_lo12:~A]~%"
-                                            (cadr operand)
-                                            (cadr operand)
-                                            c-symbol))
-                                   (t (error "unreachable")))))
-                          #+x86-64
-                          ((string= opcode "lea")
-                           (if (stringp operand)
-                               (format stream " lea ~A~%" operand) ; the "operand" is the whole instructon
-                               (let* ((entry-index
-                                       (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
-                                          (core-alien-linkage-entry-size core)))
-                                      (c-symbol (aref (core-alien-linkage-symbols core) entry-index)))
-                                 (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1)
-                                 ;; lea becomes "mov" with gotpcrel as src, which will become lea
-                                 (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand)))))
-                          #+x86-64
-                          ((string= opcode "pop")
-                           (format stream " ~A ~A~%" opcode operand)
-                           (cond ((string= operand "8(%rbp)")
-                                  (format stream " .cfi_def_cfa 6, 16~% .cfi_offset 6, -16~%"))
-                                 ((string= operand "%rbp")
+                ((#+x86-64 :mov-gotpcrel) ; = get address of alien code linkage entry
+                 (let ((c-symbol (c-linkage-sym-from-addr (car operand) core)))
+                   (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))))
+                ((#+arm64 :adrp-gotpcrel)
+                 (let ((c-symbol (c-linkage-sym-from-addr (car operand) core)))
+                   (format stream " adrp ~A,:got:~A~%" (cadr operand) c-symbol)))
+                ((#+arm64 :ldr-gotpcrel)
+                 (let ((c-symbol (c-linkage-sym-from-addr (car operand) core)))
+                   (format stream " ldr ~A, [~A, #:got_lo12:~A]~%"
+                           (cadr operand) (cadr operand) c-symbol)))
+                ((#+x86-64 :lea)
+                 ;; The THEN case is to calculate a linkage-table cell address for stepping,
+                 ;; the ELSE case is FOREIGN-SYMBOL-SAP
+                 (if (stringp operand)
+                     (format stream " lea ~A~%" operand) ; the "operand" is the whole instructon
+                     (let ((c-symbol (c-linkage-sym-from-addr (car operand) core)))
+                       ;; lea becomes "mov" with gotpcrel as src, which will become lea
+                       (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand)))))
+                ((#+x86-64 :pop)
+                 (format stream " ~A ~A~%" opcode operand)
+                 (cond ((string= operand "8(%rbp)")
+                        (format stream " .cfi_def_cfa 6, 16~% .cfi_offset 6, -16~%"))
+                       ((string= operand "%rbp")
                                         ;(format stream " .cfi_def_cfa 7, 8~%")
-                                  nil)
-                                 (t)))
-                          #+x86-64
-                          ((or (string= opcode "mov") (string= opcode "lispcall"))
+                        nil)
+                       (t)))
+                ((#+x86-64 :lispcall)
                            ;; the so-called "operand" is the entire instruction
                            (write-string operand stream)
-                           (terpri stream))
-                          ((or (string= opcode "call *") (string= opcode "jmp *"))
-                           ;; Indirect call - since the code is in immobile space,
-                           ;; we could render this as a 2-byte NOP followed by a direct
-                           ;; call. For simplicity I'm leaving it exactly as it was.
-                           (format stream " ~A(CS+0x~x)~%"
-                                   opcode ; contains a "*" as needed for the syntax
-                                   (- operand (bounds-low (core-code-bounds core)))))
-                          (t))
-                (bug "Random annotated opcode ~S" opcode))
+                           (terpri stream)))
               (incf ptr length)))
           (when (= cur-offset count) (return)))))
     (when emit-cfi
