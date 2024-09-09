@@ -377,6 +377,12 @@
 (defoptimizer (%concatenate-to-vector-subseq externally-checkable-type) ((type &rest args) node lvar)
   (concatenate-subseq-type lvar args))
 
+(defoptimizer (%concatenate-to-list derive-type) ((&rest args))
+  (loop for arg in args
+        for min = (nth-value 1 (sequence-lvar-dimensions arg))
+        when (typep min '(integer 1))
+        return (specifier-type 'cons)))
+
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
   (once-only ((n-x x))

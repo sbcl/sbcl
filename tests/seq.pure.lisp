@@ -926,3 +926,9 @@
      (declare ((simple-vector 10) x))
      (remove 10 x))
    simple-vector))
+
+(with-test (:name :concatenate-list-type)
+  (assert-type
+   (lambda (x)
+     (concatenate 'list '(1 2 3) x))
+   cons))

@@ -955,7 +955,6 @@
                (cond ((and subseq
                            (constant-lvar-p arg)
                            (eq (lvar-value arg) 'sb-impl::%subseq))
-
                       (multiple-value-bind (l h) (subseq-bounds (pop args) (pop args)
                                                                 (pop args) gen)
                         (incf min-sum l)
