@@ -931,4 +931,9 @@
   (assert-type
    (lambda (x)
      (concatenate 'list '(1 2 3) x))
+   cons)
+  (assert-type
+   (lambda (x)
+     (declare (cons x))
+     (concatenate 'list x x))
    cons))
