@@ -698,7 +698,8 @@
     (check (position x y :end 10) (or (mod 10) null))
     (check (position x (the cons y) :start 5 :end 10) (or (integer 5 9) null))
     (check (position-if x y :end 10) (or (mod 10) null))
-    (check (position x y :start (the (integer 10 20) x) :end x) (or (or (integer 10 19) null) null))))
+    (check (position x y :start (the (integer 10 20) x) :end x) (or (or (integer 10 19) null) null))
+    (check (position x (the (or null (simple-vector 5)) y)) (or null (mod 5)))))
 
 (with-test (:name :string-cmp)
   (macrolet
@@ -935,5 +936,10 @@
   (assert-type
    (lambda (x)
      (declare (cons x))
+     (concatenate 'list x x))
+   cons)
+  (assert-type
+   (lambda (x)
+     (declare ((or cons (simple-vector 10)) x))
      (concatenate 'list x x))
    cons))

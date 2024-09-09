@@ -514,7 +514,14 @@
                           (array-type (if (array-type-complexp type)
                                           (return '*)
                                           (process-dim (array-type-dimensions type))))
-                          (t (return '*))))
+                          (t
+                           (cond ((csubtypep type (specifier-type 'cons))
+                                  (setf max array-total-size-limit
+                                        min (min min 1)))
+                                 ((csubtypep type (specifier-type 'null))
+                                  (setf min 0))
+                                 (t
+                                  (return '*))))))
                       (process-dim (dim)
                         (if (typep dim '(cons integer null))
                             (let ((length (car dim)))
