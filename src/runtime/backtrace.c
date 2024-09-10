@@ -617,19 +617,21 @@ static char* asm_routine_name(char* pc)
     struct code *c = (void*)asm_routines_start;
     int offset = pc - code_text_start(c);
     struct hash_table* ht = (void*)native_pointer(c->debug_info);
-    struct vector* v = (void*)native_pointer(ht->pairs);
-    int len = vector_len(v);
-    int i;
-    for (i = 2; i < len; i += 2) {
-        if (lowtag_of(v->data[i+1]) != LIST_POINTER_LOWTAG) continue;
-        struct cons* c = CONS(v->data[i+1]);
-        struct cons* cdr = CONS(c->cdr);
-        int from_byteindex = fixnum_value(c->car);
-        int to_byteindex = fixnum_value(cdr->car);
-        if (offset >= from_byteindex && offset <= to_byteindex) {
-            struct symbol* sym = SYMBOL(v->data[i]);
-            struct vector* string = VECTOR(decode_symbol_name(sym->name));
-            return (char*)string->data;
+    if (ht) { // cold-init will have no hash-table
+        struct vector* v = (void*)native_pointer(ht->pairs);
+        int len = vector_len(v);
+        int i;
+        for (i = 2; i < len; i += 2) {
+            if (lowtag_of(v->data[i+1]) != LIST_POINTER_LOWTAG) continue;
+            struct cons* c = CONS(v->data[i+1]);
+            struct cons* cdr = CONS(c->cdr);
+            int from_byteindex = fixnum_value(c->car);
+            int to_byteindex = fixnum_value(cdr->car);
+            if (offset >= from_byteindex && offset <= to_byteindex) {
+                struct symbol* sym = SYMBOL(v->data[i]);
+                struct vector* string = VECTOR(decode_symbol_name(sym->name));
+                return (char*)string->data;
+            }
         }
     }
     return "?";
