@@ -1732,21 +1732,28 @@
                                  total-bits assembly-unit-bits))
                         quo))
            (bytes (make-array num-bytes :initial-element nil))
-           (segment-arg (gensym "SEGMENT-")))
+           (segment-arg '#:segment))
       (dolist (byte-spec-expr byte-specs)
         (let* ((byte-spec (eval byte-spec-expr))
                (byte-size (byte-size byte-spec))
                (byte-posn (byte-position byte-spec))
-               (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
+               ;; if exactly one arg, then it is named literally #:integer
+               (arg (if (cdr byte-specs)
+                        (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))
+                        '#:integer)))
           (when (ldb-test (byte byte-size byte-posn) overall-mask)
             (error "The byte spec ~S either overlaps another byte spec, or ~
                     extends past the end."
                    byte-spec-expr))
           (setf (ldb byte-spec overall-mask) -1)
           (arg-names arg)
-          (arg-types `(type (integer ,(ash -1 (1- byte-size))
-                                     ,(1- (ash 1 byte-size)))
-                            ,arg))
+          (arg-types
+           ;; the two arms of the IF are equivalent,
+           ;; but literal integers get ugly beyond a certain point.
+           (let ((spec (if (<= byte-size 16)
+                           `(integer ,(ash -1 (1- byte-size)) ,(1- (ash 1 byte-size)))
+                           `(or (signed-byte ,byte-size) (unsigned-byte ,byte-size)))))
+             `(type ,spec ,arg)))
           (multiple-value-bind (start-byte offset)
               (floor byte-posn assembly-unit-bits)
             (let ((end-byte (floor (1- (+ byte-posn byte-size))
@@ -1789,6 +1796,10 @@
                           (svref bytes end-byte))))))))))
       (unless (= overall-mask -1)
         (error "There are holes."))
+      ;; Note: the way this would typically be done efficiently
+      ;; (at least in the target) for 2 or 4 bytes is to first ensure
+      ;; adequate buffer space followed by exactly 1 store.
+      ;; For portability we have to split octets apart by hand.
       (let ((forms nil))
         (dotimes (i num-bytes)
           (let ((pieces (svref bytes i)))
