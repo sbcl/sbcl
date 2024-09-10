@@ -2698,7 +2698,7 @@ many elements are copied."
                               (let ((p (%bit-position item sequence
                                                       from-end start end)))
                                 (if p
-                                    (values item p)
+                                    (values item (truly-the index (- p offset)))
                                     (values nil nil)))
                               (vector*-frob sequence)))))
                    (t
