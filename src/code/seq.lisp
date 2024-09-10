@@ -2682,31 +2682,27 @@ many elements are copied."
                                  (start start)
                                  (end end)
                                  :check-fill-pointer t)
-                 (multiple-value-bind (f p)
-                     (macrolet ((frob2 () `(if from-end
-                                               (frob sequence t)
-                                               (frob sequence nil))))
-                       (typecase sequence
-                         #+sb-unicode
-                         ((simple-array character (*)) (frob2))
-                         ((simple-array base-char (*)) (frob2))
-                         ,@(when bit-frob
-                             `((simple-bit-vector
-                                (if (and (typep item 'bit)
-                                         (eq #'identity key)
-                                         (or (eq #'eq test)
-                                             (eq #'eql test)
-                                             (eq #'equal test)))
-                                    (let ((p (%bit-position item sequence
-                                                            from-end start end)))
-                                      (if p
-                                          (values item p)
-                                          (values nil nil)))
-                                    (vector*-frob sequence)))))
-                         (t
-                          (vector*-frob sequence))))
-                   (declare (type (or index null) p))
-                   (values f (and p (the index (- p offset))))))
+                 (typecase sequence
+                   #+sb-unicode
+                   ((simple-array character (*))
+                    (vector*-frob sequence))
+                   ((simple-array base-char (*))
+                    (vector*-frob sequence))
+                   ,@(when bit-frob
+                       `((simple-bit-vector
+                          (if (and (typep item 'bit)
+                                   (eq #'identity key)
+                                   (or (eq #'eq test)
+                                       (eq #'eql test)
+                                       (eq #'equal test)))
+                              (let ((p (%bit-position item sequence
+                                                      from-end start end)))
+                                (if p
+                                    (values item p)
+                                    (values nil nil)))
+                              (vector*-frob sequence)))))
+                   (t
+                    (vector*-frob sequence))))
                ;; EXTENDED-SEQUENCE is not allowed.
                )))
   (defun %find-position (item sequence-arg from-end start end key test)
@@ -2717,7 +2713,7 @@ many elements are copied."
                                   ,from-end start end key test))
                (vector*-frob (sequence)
                  `(%find-position-vector-macro item ,sequence
-                                               from-end start end key test)))
+                                               from-end start end key test offset)))
       (frobs t)))
   (defun %find-position-if (predicate sequence-arg from-end start end key)
     (declare (explicit-check sequence-arg))
@@ -2727,7 +2723,7 @@ many elements are copied."
                                      ,from-end start end key))
                (vector*-frob (sequence)
                  `(%find-position-if-vector-macro predicate ,sequence
-                                                  from-end start end key)))
+                                                  from-end start end key offset)))
       (frobs)))
   (defun %find-position-if-not (predicate sequence-arg from-end start end key)
     (declare (explicit-check sequence-arg))
@@ -2737,7 +2733,7 @@ many elements are copied."
                                          ,from-end start end key))
                (vector*-frob (sequence)
                  `(%find-position-if-not-vector-macro predicate ,sequence
-                                                  from-end start end key)))
+                                                  from-end start end key offset)))
       (frobs))))
 
 (defun find

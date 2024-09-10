@@ -2722,8 +2722,7 @@
                                                             end-arg
                                                             element
                                                             done-p-expr
-                                                            &optional (with-array-data t)
-                                                                      offset-arg)
+                                                            &optional array-data-ofset)
   (with-unique-names (offset block index n-sequence sequence end)
     (let ((maybe-return
             ;; WITH-ARRAY-DATA has already performed bounds
@@ -2736,14 +2735,14 @@
                    (values ,element
                            (- ,index ,offset)))))))
      `(let* ((,n-sequence ,sequence-arg))
-        (,@ (if with-array-data
+        (,@ (if array-data-ofset
+                `(let ((,sequence ,n-sequence)
+                       (,end ,end-arg)
+                       (,offset ,array-data-ofset)))
                 `(with-array-data ((,sequence ,n-sequence :offset-var ,offset)
                                    (,start ,start)
                                    (,end ,end-arg)
-                                   :check-fill-pointer t))
-                `(let ((,sequence ,n-sequence)
-                       (,end ,end-arg)
-                       (,offset ,offset-arg))))
+                                   :check-fill-pointer t)))
             (block ,block
               (if ,from-end
                   (loop for ,index
@@ -2761,7 +2760,8 @@
               (values nil nil)))))))
 
 (sb-xc:defmacro %find-position-vector-macro (item sequence
-                                             from-end start end key test &optional (with-array-data t) offset)
+                                             from-end start end key test
+                                             &optional array-data-ofset)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
@@ -2773,11 +2773,11 @@
      ;; argument order, i.e. whether the searched-for ,ITEM goes before
      ;; or after the checked sequence element.)
      `(funcall ,test ,item (funcall ,key ,element))
-     with-array-data
-     offset)))
+     array-data-ofset)))
 
 (sb-xc:defmacro %find-position-if-vector-macro (predicate sequence
-                                                     from-end start end key)
+                                                from-end start end key
+                                                &optional array-data-ofset)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
@@ -2785,10 +2785,12 @@
      start
      end
      element
-     `(funcall ,predicate (funcall ,key ,element)))))
+     `(funcall ,predicate (funcall ,key ,element))
+     array-data-ofset)))
 
 (sb-xc:defmacro %find-position-if-not-vector-macro (predicate sequence
-                                                         from-end start end key)
+                                                    from-end start end key
+                                                    &optional array-data-ofset)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
      sequence
@@ -2796,7 +2798,8 @@
      start
      end
      element
-     `(not (funcall ,predicate (funcall ,key ,element))))))
+     `(not (funcall ,predicate (funcall ,key ,element)))
+     array-data-ofset)))
 
 ;;; %FIND-POSITION, %FIND-POSITION-IF and %FIND-POSITION-IF-NOT for
 ;;; VECTOR data
@@ -2906,7 +2909,7 @@
          (sb-impl::string-dispatch ((simple-array character (*))
                                     (simple-array base-char (*)))
                                    sequence
-           (%find-position-vector-macro item sequence from-end start end key test nil offset)))
+           (%find-position-vector-macro item sequence from-end start end key test offset)))
       ;; The type is known exactly, other transforms will take care of it.
       (give-up-ir1-transform)))
 
