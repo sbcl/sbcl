@@ -33,7 +33,7 @@ jobs:
         ./make-windows-installer.sh
         mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
     - name: save installer
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: sbcl-windows-installer
         path: sbcl-windows-installer

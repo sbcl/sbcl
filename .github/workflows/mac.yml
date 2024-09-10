@@ -36,7 +36,7 @@ jobs:
         mv $name sbcl
         mv $name-binary.tar.bz2 sbcl/sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
     - name: save binary
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
         path: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
