@@ -773,9 +773,9 @@
         do
         (add-equality-constraint operator var second constraints target nil min-amount max-amount))
   (when (lambda-var-p var)
-    (let ((vector-length (vector-length-var-p lvar constraints)))
+    (let ((vector-length (vector-length-var-p lvar constraints t)))
       (when vector-length
-        (conset-add-equality-constraint target 'eq var vector-length nil)))))
+        (add-equality-constraint 'eq var vector-length constraints target nil)))))
 
 (defun add-mv-let-result-constraints (call fun constraints &optional (target constraints))
   (let ((vars (lambda-vars fun))

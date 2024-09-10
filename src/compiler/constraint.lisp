@@ -1648,6 +1648,10 @@
     (dolist (block (find-and-propagate-constraints component))
       (unless (block-delete-p block)
         (use-result-constraints block)))
+    #+sb-devel
+    (when (and *compiler-trace-output*
+               (memq :constraints *compile-trace-targets*))
+      (print-constraints component))
     (loop for node in *blocks-to-terminate*
           do (maybe-terminate-block node nil)))
   (values))

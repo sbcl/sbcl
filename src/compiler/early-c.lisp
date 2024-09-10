@@ -89,7 +89,7 @@
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
 ;;; These are the default, but the list can also include
-;;; :pre-ir2-optimize, :symbolic-asm.
+;;; :pre-ir2-optimize, :constraints.
 (defvar *compile-trace-targets* '(:ir1 :ir2 :vop :symbolic-asm :disassemble))
 (defvar *current-path*)
 (defvar *current-component*)

@@ -1746,3 +1746,22 @@
      (let ((x (concatenate 'vector "00" (subseq x 0 2))))
        (length x)))
    (integer 4 4)))
+
+(with-test (:name :inherit-length-var)
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x y n)
+                   (declare (optimize (space 0))
+                            (fixnum n)
+                            (simple-base-string y))
+                   (when (< n (length y))
+                     (find x y :start n))))))
+  (assert-type
+   (lambda (x y)
+     (declare (simple-vector x))
+     (if (< y (length x))
+         (let ((m (length x)))
+           (if (< y m)
+               t
+               m))
+         t))
+   (eql t)))
