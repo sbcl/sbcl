@@ -823,15 +823,12 @@
 
 ;;;; primitive emitters
 
-(define-bitfield-emitter emit-word 16
-  (byte 16 0))
+(define-bitfield-emitter emit-word 16 (byte 16 0))
 
 (declaim (maybe-inline emit-dword))
-(define-bitfield-emitter emit-dword 32
-  (byte 32 0))
+(define-bitfield-emitter emit-dword 32 (byte 32 0))
 
-(define-bitfield-emitter emit-qword 64
-  (byte 64 0))
+(define-bitfield-emitter emit-qword 64 (byte 64 0))
 
 ;;; Most uses of dwords are as displacements or as immediate values in
 ;;; 64-bit operations. In these cases they are sign-extended to 64 bits.
@@ -844,11 +841,13 @@
   #-sb-xc-host (declare (inline emit-dword))
   (emit-dword segment value))
 
-(define-bitfield-emitter emit-mod-reg-r/m-byte 8
-  (byte 2 6) (byte 3 3) (byte 3 0))
-
-(define-bitfield-emitter emit-sib-byte 8
-  (byte 2 6) (byte 3 3) (byte 3 0))
+;; See https://gist.github.com/seanjensengrey/f971c20d05d4d0efc0781f2f3c0353da
+;; for some enlightening discussion of field packing on x86 intructions.
+(defun emit-mod-reg-r/m-byte (segment high middle low)
+  (declare (type (unsigned-byte 2) high)
+           (type (unsigned-byte 3) middle low))
+  (emit-byte segment (logior (ash (logior (ash high 3) middle) 3) low)))
+(defmacro emit-sib-byte (&rest args) `(emit-mod-reg-r/m-byte ,@args))
 
 
 ;;;; fixup emitters
