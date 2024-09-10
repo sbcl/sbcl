@@ -2171,15 +2171,12 @@
           (emit-byte segment #b11111111)
           (emit-ea segment where #b100))))))
 
-(define-instruction ret (segment &optional stack-delta)
+(define-instruction ret (segment &optional (stack-delta 0))
   (:printer byte ((op #xC3)))
   (:printer byte ((op #xC2) (imm nil :type 'imm-word-16)) '(:name :tab imm))
   (:emitter
-   (cond ((and stack-delta (not (zerop stack-delta)))
-          (emit-byte segment #xC2)
-          (emit-word segment stack-delta))
-         (t
-          (emit-byte segment #xC3)))))
+   (emit-byte segment (if (eql stack-delta 0) #xC3 #xC2))
+   (unless (eql stack-delta 0) (emit-word segment stack-delta))))
 
 (define-instruction jrcxz (segment target)
   (:printer short-jump ((op #b0011)))
