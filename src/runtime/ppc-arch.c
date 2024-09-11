@@ -379,8 +379,11 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
     }
     if (!handle_it) return 0;
 
-    struct thread *thread = get_sb_vm_thread();
-    set_pseudo_atomic_atomic(thread);
+#ifdef DEBUG
+    sigset_t curmask;
+    pthread_sigmask(SIG_BLOCK, 0, &curmask);
+    gc_assert(sigismember(&curmask, SIG_STOP_FOR_GC));
+#endif
 
     int symbol_reg = (prev_inst >> 16) & 31;
     struct symbol *specvar =
@@ -423,7 +426,6 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
     // This is actually always going to be 0 for 64-bit code
     int tlsindex_reg = (code >> 16) & 31; // the register we trapped on
     *os_context_register_addr(context, tlsindex_reg) = tls_index;
-    clear_pseudo_atomic_atomic(thread);
     return 1; // handled this signal
 }
 #endif
