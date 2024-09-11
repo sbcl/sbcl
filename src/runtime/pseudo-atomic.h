@@ -109,12 +109,6 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
  * I guess the reason it's allowed is GC can't ever see the bad value.
  * But it sure seems like it's asking for trouble */
 
-#ifdef LISP_FEATURE_X86_64
-# define LISPOBJ_ASM_SUFFIX "q"
-#else
-# define LISPOBJ_ASM_SUFFIX "l"
-#endif
-
 #if defined LISP_FEATURE_X86 && !defined LISP_FEATURE_SB_THREAD
 # define pa_bits SYMBOL(PSEUDO_ATOMIC_BITS)->value
 #else
@@ -130,12 +124,10 @@ get_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
     return (pa_bits & ~1) != 0;
 }
 
-// FIXME: all this seems unnecessary use of inline assembly
-
 static inline void
 clear_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
-    __asm__ volatile ("and" LISPOBJ_ASM_SUFFIX " $1, %0" : "+m" (pa_bits));
+    __sync_fetch_and_and(&(pa_bits), 1); // leave the "interrupted" bit intact
 }
 
 static inline int
@@ -149,7 +141,7 @@ set_pseudo_atomic_interrupted(struct thread *thread)
 {
     if (!get_pseudo_atomic_atomic(thread))
         lose("set_pseudo_atomic_interrupted not in pseudo atomic");
-    __asm__ volatile ("or" LISPOBJ_ASM_SUFFIX " $1, %0" : "+m" (pa_bits));
+    __sync_fetch_and_or(&(pa_bits), 1);
 }
 
 static inline void
@@ -157,10 +149,9 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 {
     if (get_pseudo_atomic_atomic(thread))
         lose("clear_pseudo_atomic_interrupted in pseudo atomic");
-    __asm__ volatile ("and" LISPOBJ_ASM_SUFFIX " $~1, %0" : "+m" (pa_bits));
+    __sync_fetch_and_and(&(pa_bits), ~(uword_t)1);
 }
 #undef pa_bits
-#undef LISPOBJ_ASM_SUFFIX
 
 #else
 
