@@ -30,7 +30,6 @@
  * These values can be anything - they just have to be compatible between C and Lisp.
  * Lisp uses NULL-TN to set pseudo-atomic and THREAD-TN to clear it. */
 # define get_pseudo_atomic_atomic(th) (th)->pseudo_atomic_bits[0] != 0
-# define set_pseudo_atomic_atomic(th) (th)->pseudo_atomic_bits[0] = 1
 # define clear_pseudo_atomic_atomic(th) (th)->pseudo_atomic_bits[0] = 0
 // A 2-byte field allows for 'lhz' followed by 'twi'
 # define get_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] != 0
@@ -52,8 +51,6 @@
 
 #define get_pseudo_atomic_atomic(thread) \
     ((thread)->pseudo_atomic_bits & flag_PseudoAtomic)
-#define set_pseudo_atomic_atomic(thread) \
-    ((thread)->pseudo_atomic_bits |= flag_PseudoAtomic)
 #define clear_pseudo_atomic_atomic(thread) \
     ((thread)->pseudo_atomic_bits &= ~flag_PseudoAtomic)
 #define get_pseudo_atomic_interrupted(thread) \
@@ -69,12 +66,6 @@ static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {
     return SymbolValue(PSEUDO_ATOMIC_ATOMIC, thread) != NIL;
-}
-
-static inline void
-set_pseudo_atomic_atomic(struct thread *thread)
-{
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, PSEUDO_ATOMIC_ATOMIC, thread);
 }
 
 static inline void
@@ -140,13 +131,6 @@ get_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 }
 
 // FIXME: all this seems unnecessary use of inline assembly
-
-static inline void
-set_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
-{
-    if (pa_bits) lose("set_pseudo_atomic_atomic: bits=%"OBJ_FMTX, pa_bits);
-    __asm__ volatile ("or" LISPOBJ_ASM_SUFFIX " $~1, %0" : "+m" (pa_bits));
-}
 
 static inline void
 clear_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
