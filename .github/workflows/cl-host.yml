@@ -34,7 +34,7 @@ jobs:
       working-directory: /tmp/ecl
 
     - name: build
-      env:  
+      env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: ./make.sh --xc-host='ecl'
 
@@ -50,7 +50,7 @@ jobs:
         sudo apt-get -qq update | true
         sudo apt-get -qq install clisp git-restore-mtime
     - name: build
-      env:  
+      env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: |
         git restore-mtime
@@ -62,7 +62,7 @@ jobs:
       with:
         name: xc-host-fasls-clisp
         path: clisp-host-fasls.tgz
-    
+
   ccl:
 
     runs-on: ubuntu-latest
@@ -77,7 +77,7 @@ jobs:
         sudo apt-get -qq update | true
         sudo apt-get -qq install git-restore-mtime
     - name: build
-      env:  
+      env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: |
         git restore-mtime
@@ -110,7 +110,7 @@ jobs:
         sudo apt-get -qq install git-restore-mtime
       working-directory: /tmp/
     - name: build
-      env:  
+      env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: |
         git restore-mtime
@@ -148,27 +148,16 @@ jobs:
         name: xc-host-fasls-sbcl
         path: sbcl-host-fasls.tgz
 
-  self:
-
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-    - uses: actions/checkout@v1
-    - name: install host sbcl
-      run: |
-        sudo apt-get -qq update | true
-        sudo apt-get -qq install sbcl libcapstone-dev git-restore-mtime
-    - name: build
+    - name: self build
       env:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: |
-        ./make.sh --xc-host='sbcl --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
         cp src/runtime/sbcl output/sbcl.core /tmp
         git reset --hard
         git restore-mtime
         ./make.sh --xc-host='/tmp/sbcl --core /tmp/sbcl.core --dynamic-space-size 600MB --lose-on-corruption --disable-ldb --disable-debugger'
-    - name: archive sbcl-xc fasls
+
+    - name: archive self-xc fasls
       run: tar --transform 's,^,self-host/,' -cf self-host-fasls.tgz obj/from-xc/
     - name: upload self-xc archive
       uses: actions/upload-artifact@v4
@@ -180,7 +169,7 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [ccl, sbcl, cmucl, clisp, self]
+    needs: [ccl, sbcl, cmucl, clisp]
 
     strategy:
       matrix:
