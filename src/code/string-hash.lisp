@@ -39,14 +39,8 @@
                `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
     (let ((result 2166136261))
       (declare (type word result))
-      ;; Avoid accessing elements of a (simple-array nil (*)).
-      ;; The expansion of STRING-DISPATCH involves ETYPECASE,
-      ;; so we can't simply omit one case. Therefore that macro
-      ;; is unusable here.
-      #-sb-xc-host (typecase string
-                     (simple-base-string (guts))
-                     ((simple-array character (*)) (guts)))
-
+      #-sb-xc-host (string-dispatch (simple-base-string (simple-array character (*))) string
+                     (guts))
       ;; just do it, don't care about loop unswitching or simple-ness of the string.
       #+sb-xc-host (guts)
 
