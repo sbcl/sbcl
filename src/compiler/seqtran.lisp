@@ -2733,8 +2733,8 @@
                (when ,done-p-expr
                  (return-from ,block
                    (values ,element
-                           (- ,index ,offset)))))))
-     `(let* ((,n-sequence ,sequence-arg))
+                           (truly-the index (- ,index ,offset))))))))
+     `(let ((,n-sequence ,sequence-arg))
         (,@ (if array-data-ofset
                 `(let ((,sequence ,n-sequence)
                        (,end ,end-arg)
