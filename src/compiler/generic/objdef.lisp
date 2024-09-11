@@ -560,9 +560,10 @@ during backtrace.
   (current-catch-block :special *current-catch-block*)
   #+(or x86-64 (and (or riscv arm64) sb-thread))
   (current-unwind-protect-block :special *current-unwind-protect-block*)
-  #+(or sb-thread sparc ppc)
-  (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*
-                      :c-type "pa_bits_t")
+  ;; BUG: fundamentally a pseudo-atomic code sequence does not use these bits
+  ;; with #+sb-safepoint so why does this slot need to be defined at all in that case?
+  #+(or sb-thread sparc ppc x86-64)
+  (pseudo-atomic-bits :c-type "pa_bits_t")
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   ;; Deterministic consing profile recording area.

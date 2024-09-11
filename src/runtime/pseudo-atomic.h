@@ -111,8 +111,8 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 
 /* x86 uses either a thread slot, or a single static symbol holding
  * the same value as the thread slot would hold.
- * The encoding of the values is strange - the entire word is onzero
- * whend pseudo-atomic, and the lowest bit should be 0.
+ * The encoding of the values is strange - the entire word is nonzero
+ * when pseudo-atomic, and the lowest bit should be 0.
  * If interrupted, the low bit becomes 1. This seems a little bogus because
  * symbol->value at that point can have "illegal" bits (non-descriptor).
  * I guess the reason it's allowed is GC can't ever see the bad value.
@@ -124,10 +124,10 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 # define LISPOBJ_ASM_SUFFIX "l"
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-# define pa_bits thread->pseudo_atomic_bits
-#else
+#if defined LISP_FEATURE_X86 && !defined LISP_FEATURE_SB_THREAD
 # define pa_bits SYMBOL(PSEUDO_ATOMIC_BITS)->value
+#else
+# define pa_bits thread->pseudo_atomic_bits
 #endif
 
 #include "interr.h" // for lose()

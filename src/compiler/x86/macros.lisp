@@ -203,10 +203,8 @@
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
-            #+sb-thread
-            (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
-            #-sb-thread
-            (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)))
+            #+sb-thread (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
+            #-sb-thread (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)))
        (unless ,elide-if
          (inst mov ,pa-bits-ea ebp-tn #+sb-thread :fs))
        ,@forms

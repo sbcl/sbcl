@@ -163,8 +163,6 @@
     ;; That being so, it has to use the #-sb-thread mechanism of placing the new value
     ;; in the symbol's value slot for compatibility with UNBIND and all else.
     #-sb-thread *alien-stack-pointer*    ; a thread slot if #+sb-thread
-     ;; interrupt handling
-    #-sb-thread *pseudo-atomic-bits*     ; ditto
     ;; Since the text space and alien linkage table might both get relocated on startup
     ;; under #+immobile-space, an alien callback wrapper can't wire in the address
     ;; of a word that holds the C function pointer to callback_wrapper_trampoline.

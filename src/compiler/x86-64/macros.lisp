@@ -188,10 +188,8 @@
   (inst test :byte rax-tn (ea -8 gc-card-table-reg-tn)))
 
 (macrolet ((pa-bits-ea ()
-             #+sb-thread `(thread-slot-ea
-                           thread-pseudo-atomic-bits-slot
-                           #+gs-seg ,@(if thread (list thread)))
-             #-sb-thread `(static-symbol-value-ea '*pseudo-atomic-bits*))
+             `(thread-slot-ea thread-pseudo-atomic-bits-slot
+                              #+gs-seg ,@(if thread (list thread))))
            (nonzero-bits ()
              ;; reg-mem move is allegedly faster than imm-mem according to
              ;; someone at some point. Whether that's true or not, it is what it is.
