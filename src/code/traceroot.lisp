@@ -12,7 +12,7 @@
 ;;; Not loaded until warm build. exports.lisp only affects symbols
 ;;; that are visible to genesis.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (export '(sb-ext::search-roots) 'sb-ext))
+  (export '(sb-ext::search-roots) "SB-EXT"))
 
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
