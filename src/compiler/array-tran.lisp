@@ -1979,7 +1979,7 @@
                     ,cumulative-offset))))))
 
 (defun transform-%with-array-data/mumble (array node check-fill-pointer)
-  (let ((element-type (upgraded-element-type-specifier-or-give-up array))
+  (let ((element-type (upgraded-element-type-specifier array))
         (type (lvar-type array))
         (check-bounds (policy node (plusp insert-array-bounds-checks))))
     (if (and (array-type-p type)

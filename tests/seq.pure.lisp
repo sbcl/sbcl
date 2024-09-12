@@ -897,7 +897,7 @@
                                             (declare (optimize speed)
                                                      (string y))
                                             (find #\a y :start 1))))
-             1)))
+             2)))
 
 (with-test (:name :find-equalp-type)
   (assert-type
