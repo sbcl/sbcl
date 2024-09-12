@@ -2096,11 +2096,13 @@ static void pin_exact_root(lispobj obj)
     // 2. If not moving, then pinning is irrelevant. 'obj' is a-priori live given
     //    the reference from *PINNED-OBJECTS*, and obviously it won't move.
     if (!compacting_p()) return;
-    // 3. If pointing off-heap, why are you pinning? Just ignore it.
-    // Would this need to do anything if immobile-space were ported
-    // to the precise GC platforms. FIXME?
+    // 3. If the pointer is in immobile space, preserve it.
     page_index_t page = find_page_index((void*)obj);
-    if (page < 0) return;
+    if (page < 0) {
+        if (immobile_space_p(obj))
+            immobile_space_preserve_pointer((void*)obj);
+        return;
+    }
     // 4. Ignore if not in the condemned set.
     if (immune_set_memberp(page)) return;
 
@@ -3457,21 +3459,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
             gc_assert(vector_len(VECTOR(info)) >= 1);
             lispobj fun = VECTOR(info)->data[0];
             gc_assert(functionp(fun));
-#ifdef LISP_FEATURE_X86_64
-                /* FIXME: re. the following remark that pin_exact_root() "does not
-                 * work", does it have to be that way? It seems the issue is that
-                 * pin_exact_root does absolutely nothing for objects in immobile space.
-                 * Are there other objects we call it on which could be in immobile-space
-                 * and should it be made to deal with them? */
-                // slight KLUDGE: 'fun' is a simple-fun in immobile-space,
-                // and pin_exact_root() doesn't work. In all probability 'fun'
-                // is pseudo-static, but let's use the right pinning function.
-                // (This line of code is so rarely executed that it doesn't
-                // impact performance to search for the object)
-            preserve_pointer(fun, 0);
-#else
             pin_exact_root(fun);
-#endif
             // pin_exact_root is more efficient than preserve_pointer()
             // because it does not search for the object.
             pin_exact_root(thing);
