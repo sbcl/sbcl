@@ -2013,14 +2013,14 @@
 ;; just haven't tried to understand the performance issues involved.
 ;; -- WHN, and also CSR 2002-05-26
 (deftransform %with-array-data ((array start end)
-                                ((or vector simple-array) index (or index null) t)
+                                ((or vector simple-array) index (or index null))
                                 *
                                 :node node
                                 :policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
   (transform-%with-array-data/mumble array node nil))
 (deftransform %with-array-data/fp ((array start end)
-                                ((or vector simple-array) index (or index null) t)
+                                ((or vector simple-array) index (or index null))
                                 *
                                 :node node
                                 :policy (> speed space))
