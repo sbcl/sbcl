@@ -1,0 +1,29 @@
+name: Linux qemu
+
+on: [push]
+
+jobs:
+  ppc64le:
+    runs-on: ubuntu-22.04
+    name: ppc64le
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v2
+        name: Run commands
+        id: runcmd
+        with:
+          arch: none
+          distro: none
+          base_image: ppc64le/debian:trixie
+
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get -qq update | true
+            apt-get -qq install sbcl libzstd-dev git build-essential
+          run: |
+            export SBCL_MAKE_TARGET_2_OPTIONS="--disable-ldb --disable-debugger"
+            echo "\"`git rev-parse HEAD`\"" > version.lisp-expr
+            ./make.sh --with-sb-core-compression --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger'
+            cd tests
+            #./run-tests.sh --slow
+            ./ansi-tests.sh
