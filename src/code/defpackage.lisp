@@ -798,7 +798,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 ;;;
 (defun tune-hashset-sizes-of-all-packages ()
   (flet ((tune-table-size (desired-lf table)
-           (resize-symbol-table table (%symtbl-count table) t desired-lf)
+           (resize-symbol-table table (%symtbl-count table) 'intern desired-lf)
            ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
            #-darwin-jit (setf (symtbl-modified table) nil)))
     (dolist (package (list-all-packages))

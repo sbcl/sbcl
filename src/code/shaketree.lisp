@@ -16,7 +16,7 @@
                        (push x result) ; keep a strong reference to this symbol
                        (push (cons (string x) (make-weak-pointer x)) result))))
                (fill cells 0)
-               (resize-symbol-table table 0 t)
+               (resize-symbol-table table 0 'intern)
                result)))
       (dolist (package (list-all-packages))
         ;; Never discard standard symbols
@@ -33,10 +33,10 @@
                (declare (ignore package))
                (dolist (item symbols)
                  (if (symbolp item)
-                     (add-symbol table item)
+                     (add-symbol table item 'intern)
                      (let ((symbol (weak-pointer-value (cdr item))))
                        (cond (symbol
-                              (add-symbol table symbol))
+                              (add-symbol table symbol 'intern))
                              (t
                               (when print
                                 (format t "  (~a)~A~%" access (car item)))

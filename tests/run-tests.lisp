@@ -236,6 +236,7 @@
       sb-impl::*user-hash-table-tests*
       sb-impl::*pn-dir-table*
       sb-impl::*pn-table*
+      sb-impl::*clear-resized-symbol-tables*
       sb-vm::*immobile-codeblob-tree*
       sb-vm::*dynspace-codeblob-tree*
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")

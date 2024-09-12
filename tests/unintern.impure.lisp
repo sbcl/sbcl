@@ -6,7 +6,7 @@
 (defun extern (name)
   (let ((s (make-symbol name))
         (p *package*))
-    (sb-impl::add-symbol (sb-impl::package-external-symbols *package*) s)
+    (sb-impl::add-symbol (sb-impl::package-external-symbols *package*) s 'intern)
     (sb-impl::%set-symbol-package s p)
     s))
 

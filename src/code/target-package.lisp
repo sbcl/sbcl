@@ -307,6 +307,7 @@
 
 ;;;; iteration macros
 
+(define-thread-local *clear-resized-symbol-tables* t)
 (defmacro with-package-iterator ((mname package-list &rest symbol-types) &body body)
   "Within the lexical scope of the body forms, MNAME is defined via macrolet
 such that successive invocations of (MNAME) will return the symbols, one by
@@ -325,7 +326,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
                           (if (member :external  symbol-types) 2 0)
                           (if (member :inherited symbol-types) 4 0))))
       `(multiple-value-bind ,state (package-iter-init ,select ,package-list)
-         (let (,symbol ,kind)
+         (let (*clear-resized-symbol-tables* ,symbol ,kind)
            (macrolet
                ((,mname ()
                    '(if (eql 0 (multiple-value-setq (,@state ,symbol ,kind)
@@ -533,7 +534,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; calls to ADD-SYMBOL make no attempt to preserve Robinhood's minimization
 ;;; of the maximum probe sequence length. We can do it now because the
 ;;; entire vector will be swapped, which is concurrent reader safe.
-(defun resize-symbol-table (table size splat &optional (load-factor 3/4))
+(defun resize-symbol-table (table size reason &optional (load-factor 3/4))
   (when (zerop size)
     (return-from resize-symbol-table
       ;; Don't need a barrier here. Suppose a reader finished probing with a miss.
@@ -597,14 +598,17 @@ of :INHERITED :EXTERNAL :INTERNAL."
           (setf (symtbl-size table) (symtbl-size temp-table)
                 (symtbl-free table) (symtbl-free temp-table)
                 (symtbl-deleted table) 0)
-          ;; Splat with 0 to reduce garbage tenuring. Readers who searched the old VEC
-          ;; may miss spuriously, but will retry because they can detect that %CELLS changed.
-          ;; Exception: UNINTERN must not splat the vector because it is permitted to
-          ;; UNINTERN while iterating over symbols. We never re-fetch the vector, as doing
-          ;; that would cause extreme complications in deciding what symbols to produce.
-          ;; As such, we simply avoid splatting if called by UNINTERN.
-          ;; (Also, the constant vector of an empty package hashtable.)
-          (when (and splat (not (read-only-space-obj-p old)))
+          ;; Try to splat with 0 to reduce garbage tenuring based on a pre-test:
+          ;; - If the current thread has bound *CLEAR-RESIZED-SYMBOL-TABLES* to NIL,
+          ;;   meaning that it is within the dynamic extent of WITH-PACKAGE-ITERATOR,
+          ;;   splat only if the package modification is NOT a permissible one.
+          ;; - If the currrent thread has NOT bound the special variable, always splat.
+          ;; Concurrent readers who searched the old VEC may miss spuriously, but will retry
+          ;; because they can detect that %CELLS changed. In this manner, FIND-SYMBOL
+          ;; remains lock-free while allowing resizing and splatting.
+          (when (and (or *clear-resized-symbol-tables*
+                         (not (memq reason '(unintern export unexport)))) ; permissible
+                     (not (read-only-space-obj-p old)))
             (fill old 0))
           new)))))
 
@@ -1104,7 +1108,7 @@ Experimental: interface subject to change."
 
 ;;; Add a symbol to a hashset. The symbol MUST NOT be present.
 ;;; This operation is under the WITH-PACKAGE-GRAPH lock if called by %INTERN.
-(defun add-symbol (table symbol)
+(defun add-symbol (table symbol reason)
   (setf (symtbl-modified table) t)
   (when (zerop (symtbl-free table))
     ;; The hashtable is full. Resize it to be able to hold twice the
@@ -1114,7 +1118,7 @@ Experimental: interface subject to change."
     ;; N.B.: Never pass 0 for the new size, as that will assign the
     ;; constant read-only vector #(0 0 0) into the cells.
     (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
-      (resize-symbol-table table new-size t)))
+      (resize-symbol-table table new-size reason)))
   (let* ((cells (symtbl-%cells table))
          (reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
@@ -1304,25 +1308,10 @@ Experimental: interface subject to change."
                     (probe)))))))))
 
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
-;;;
-;;; NOTE: It's possible that NUKE-SYMBOL should never 0-fill the old symbol-table if downsizing.
-;;; CLHS nowhere implies that altering accessability of a symbol already _present_ in a package
-;;; counts as INTERNing. Iterating over directly present symbols of a package permits UNINTERN on
-;;; the current symbol, which might rehash the storage vector, creating a new one. To allow it,
-;;; UNINTERN does not 0-fill the old vector, so any observers of that vector still see all symbols
-;;; beyond the cursor. But what if the operation is EXPORT or UNEXPORT? This moves the symbol from
-;;; one table to the other for that same package. EXPORT would remove from internals and move to
-;;; externals. If the internals can down-size and 0-fill (as we do), then symbols beyond the cursor
-;;; are missed. The argument in favaor of allowing EXPORT would seem to be that EXPORT is not
-;;; technically INTERNing in this case. But the argument _against_ allowing EXPORT or UNEXPORT
-;;; is that there is one and only one exception specifically called out as permissible, namely:
-;;;  "the current symbol may be uninterned from the package being traversed."
-;;; If it were _also_ intended to be permissible to EXPORT or UNEXPORT, would it not have said
-;;; that it is permissible to change accessibility ? I'm not sure.
-(defun nuke-symbol (table symbol splat)
+(defun nuke-symbol (table symbol reason)
   (let ((cells (symtbl-%cells table)))
     (when (functionp (car cells)) ; change table back to not-perfectly-hashed
-      (resize-symbol-table table (length (cdr cells)) splat)))
+      (resize-symbol-table table (length (cdr cells)) reason)))
   (let* ((string (symbol-name symbol))
          (length (length string))
          (hash (symbol-name-hash symbol)))
@@ -1339,7 +1328,7 @@ Experimental: interface subject to change."
   (let ((size (symtbl-size table))
         (used (%symtbl-count table)))
     (when (< used (truncate size 4))
-      (resize-symbol-table table (* used 2) splat))))
+      (resize-symbol-table table (* used 2) reason))))
 
 (defun list-all-packages ()
   "Return a list of all existing packages."
@@ -1425,10 +1414,10 @@ Experimental: interface subject to change."
                 ;; This matters in the case of concurrent INTERN.
                 (%set-symbol-package symbol package)
                 (if ignore-lock
-                    (add-symbol table symbol)
+                    (add-symbol table symbol 'intern)
                     (with-single-package-locked-error
                         (:package package "interning ~A" symbol-name)
-                      (add-symbol table symbol)))
+                      (add-symbol table symbol 'intern)))
                 (values symbol nil)))))))
 
 (macrolet ((find/intern (function package-lookup &rest more-args)
@@ -1664,7 +1653,7 @@ uninterned."
                                   (package-internal-symbols package)
                                   (package-external-symbols package))
                               symbol
-                              nil)
+                              'unintern)
                  (if (eq (sb-xc:symbol-package symbol) package)
                      (%set-symbol-package symbol nil))
                  t)
@@ -1742,8 +1731,8 @@ uninterned."
             ;; mean that some symbols in the original export list are
             ;; not exportable.
             (when (eql (find-symbol (symbol-name sym) package) sym)
-              (add-symbol external sym)
-              (nuke-symbol internal sym t)))))
+              (add-symbol external sym 'export)
+              (nuke-symbol internal sym 'export)))))
       t)))
 
 ;;; Check that all symbols are accessible, then move from external to internal.
@@ -1768,8 +1757,8 @@ uninterned."
         (let ((internal (package-internal-symbols package))
               (external (package-external-symbols package)))
           (dolist (sym syms)
-            (add-symbol internal sym)
-            (nuke-symbol external sym t))))
+            (add-symbol internal sym 'unexport)
+            (nuke-symbol external sym 'unexport))))
       t)))
 
 ;;; Check for name conflict caused by the import and let the user
@@ -1817,7 +1806,7 @@ the importation, then a correctable error is signalled."
         ;; Add the new symbols to the internal hashtable.
         (let ((internal (package-internal-symbols package)))
           (dolist (sym syms)
-            (add-symbol internal sym)))
+            (add-symbol internal sym 'import)))
         ;; If any of the symbols are uninterned, make them be owned by PACKAGE.
         (dolist (sym homeless)
           (%set-symbol-package sym package))
@@ -1848,7 +1837,7 @@ the importation, then a correctable error is signalled."
                 (setf (package-%shadowing-symbols package)
                       (remove s (the list (package-%shadowing-symbols package))))
                 (unintern s package))
-              (add-symbol internal sym))
+              (add-symbol internal sym 'shadowing-import))
             (pushnew sym (package-%shadowing-symbols package)))))))
   t)
 
@@ -1876,7 +1865,7 @@ it is not already present."
               (unless (present-p w)
                 (setq s (%make-symbol 2 name)) ; 2 = random interned symbol
                 (%set-symbol-package s package)
-                (add-symbol internal s))
+                (add-symbol internal s 'shadow))
               (pushnew s (package-%shadowing-symbols package))))))))
   t)
 
@@ -1996,7 +1985,7 @@ PACKAGE."
       (flet ((!make-table (input)
                (let ((table (make-symbol-table (length (the simple-vector input)))))
                  (dovector (symbol input table)
-                   (add-symbol table symbol)))))
+                   (add-symbol table symbol 'intern)))))
         (let ((externals (!make-table external-v)))
           (setf (package-external-symbols pkg) externals
                 (package-internal-symbols pkg) (!make-table internal-v)
