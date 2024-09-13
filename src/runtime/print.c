@@ -488,18 +488,20 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 
 static void print_fun_or_otherptr(lispobj obj)
 {
-    int index;
+    lispobj *ptr;
+    unsigned long header;
+    int count, type, index;
     char buffer[16];
 
-    lispobj *ptr = native_pointer(obj);
+    ptr = native_pointer(obj);
     if (ptr == NULL) {
         printf(" (NULL Pointer)");
         return;
     }
 
-    int count = object_size(ptr)-1;
-    uword_t header = *ptr++;
-    int type = header_widetag(header);
+    header = *ptr++;
+    count = HeaderValue(header);
+    type = header_widetag(header);
 
     print_obj("header: ", header);
     if (!other_immediate_lowtag_p(header)) {
@@ -549,7 +551,7 @@ static void print_fun_or_otherptr(lispobj obj)
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
         // print_obj doesn't understand raw words, so make it a fixnum
         int pkgid = symbol_package_id(sym) << N_FIXNUM_TAG_BITS;
-        print_obj("pkgid: ", pkgid);
+        print_obj("package_id: ", pkgid);
 #endif
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         int fname_index = symbol_linkage_index(sym);
