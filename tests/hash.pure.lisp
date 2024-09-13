@@ -582,9 +582,9 @@
   (let ((h (make-hash-table :test 'eq)))
     ;; Prevent SB-IMPL::GUESS-EQ-HASH-FUN from finding the shift
     ;; required to bring the informative bits into range.
-    (setf (gethash t h) t)
+    (setf (gethash 1 h) 1)
     (dotimes (i (1+ +flat-limit/eq+))
-      (setf (gethash (float i) h) (ash i 16)))
+      (setf (gethash (ash i 27) h) i))
     (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-safe+))))
 
 (with-test (:name :eq-hash-switch-to-mid)
