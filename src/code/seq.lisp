@@ -2923,7 +2923,7 @@ many elements are copied."
   (when (and test-p test-not-p)
     ;; Use the same wording as EFFECTIVE-FIND-POSITION-TEST
     (error "can't specify both :TEST and :TEST-NOT"))
-  (let ((test (or test-not test)))
+  (let ((test (%coerce-callable-to-fun (or test-not test))))
     (seq-dispatch-checking sequence
         (let ((end (or end length)))
           (declare (type index end))
