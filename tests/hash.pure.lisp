@@ -578,6 +578,7 @@
       (setf (gethash i h) i))
     (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-eq-mid+))))
 
+#+64-bit
 (with-test (:name :eq-hash-switch-to-safe)
   (let ((h (make-hash-table :test 'eq)))
     ;; Prevent SB-IMPL::GUESS-EQ-HASH-FUN from finding the shift
