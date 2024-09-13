@@ -86,7 +86,7 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
 
 (sb-c:defknown listen (&optional sb-kernel:stream-designator
                                  (or null (integer 1 10) (member character)))
-    boolean (sb-c::unsafely-flushable)
+    sb-kernel:generalized-boolean (sb-c::unsafely-flushable)
   :overwrite-fndb-silently t)
 
 (sb-c:defknown read-sequence (sequence stream &key (:start sb-int:index)

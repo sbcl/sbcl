@@ -1553,7 +1553,7 @@
 
 ;; N.B., sb-simple-streams clobbers this; if this changes, make sure
 ;; sb-simple-streams follows along, where necessary.
-(defknown listen (&optional stream-designator) boolean (flushable))
+(defknown listen (&optional stream-designator) generalized-boolean (flushable))
 
 ;; N.B., sb-simple-streams clobbers this; if this changes, make sure
 ;; sb-simple-streams follows along, where necessary.
