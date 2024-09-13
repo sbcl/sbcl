@@ -1237,6 +1237,9 @@ void immobile_space_coreparse(uword_t fixedobj_len,
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
     // The vector itself is either in R/O space, or pseudo-static in dynamic space
     // depending on :PURIFY
+    if ((uword_t)v < READ_ONLY_SPACE_START || (uword_t)v >= READ_ONLY_SPACE_END) {
+        gc_assert(CORE_PAGE_GENERATION == PSEUDO_STATIC_GENERATION);
+    }
     if(gencgc_verbose) fprintf(stderr, "pseudostatic codeblob vector is %p\n", v);
     loaded_codeblob_offsets = (void*)v->data;
     loaded_codeblob_offsets_len = vector_len(v);
