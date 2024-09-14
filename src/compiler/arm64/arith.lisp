@@ -1394,8 +1394,7 @@
   (:translate logand)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:arg-types t (:constant (member #.most-positive-word
-                                   #.(ash most-positive-word -1))))
+  (:arg-types t (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:info mask)
   (:result-types unsigned-num)
@@ -1407,8 +1406,11 @@
     (inst b DONE)
     BIGNUM
     (loadw r x bignum-digits-offset other-pointer-lowtag)
-    (unless (= mask most-positive-word)
-      (inst ubfm r r 0 (- n-word-bits 2)))
+    (cond ((= mask most-positive-word))
+          ((encode-logical-immediate mask)
+           (inst and r r mask))
+          (t
+           (inst and r r (load-immediate-word tmp-tn mask))))
     DONE))
 
 ;;;; Bignum stuff.
