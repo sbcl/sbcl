@@ -527,6 +527,9 @@
                           (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
                `(logbitp index (%bignum-ref integer 0))
                `(bignum-logbitp index integer)))
+          ((and (constant-lvar-p index)
+                (< (lvar-value index) sb-vm:n-word-bits))
+           `(logbitp index (logand integer ,most-positive-word)))
           (t
            (give-up-ir1-transform)))))
 

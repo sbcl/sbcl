@@ -584,3 +584,7 @@
               ((unsigned-byte 8) a))
      (floor a b))
    (values (integer -255 0) (integer -9 0) &optional)))
+
+(with-test (:name :logbitp-on-integers)
+  (assert (not (ctu:ir1-named-calls `(lambda (x)
+                                       (logbitp 20 x))))))
