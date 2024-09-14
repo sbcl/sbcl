@@ -75,7 +75,8 @@
 ;;; These tests disable GC because the private cons allocator
 ;;; assumes exclusive use of the page table, and moreover if GC
 ;;; were to occur, free_oldspace() could obliterate our test data.
-(with-test (:name :private-consing)
+(with-test (:name :private-consing
+            :skipped-on :interpreter)
   (sb-sys:without-gcing
    (test-private-consing)
    ;; Test pushback
