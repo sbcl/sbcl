@@ -3844,7 +3844,7 @@
 (define-vop (logand-word-mask)
   (:translate logand)
   (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
+  (:args (x :scs (descriptor-reg) :to :save))
   (:arg-types t (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:info mask)
@@ -3854,12 +3854,15 @@
                               (= mask (ash most-positive-word -1)))))
       (assemble ()
         (move r x)
-        (generate-fixnum-test r)
-        (inst jmp :nz BIGNUM)
+        (unless (= n-fixnum-tag-bits 1)
+          (generate-fixnum-test r)
+          (inst jmp :nz BIGNUM))
         (if fixnum-mask-p
             (inst shr r n-fixnum-tag-bits)
             (inst sar r n-fixnum-tag-bits))
-        (inst jmp DONE)
+        (if (= n-fixnum-tag-bits 1)
+            (inst jmp :nc DONE)
+            (inst jmp DONE))
         BIGNUM
         (loadw r x bignum-digits-offset other-pointer-lowtag)
         (when fixnum-mask-p

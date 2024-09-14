@@ -1399,13 +1399,10 @@
   (:info mask)
   (:result-types unsigned-num)
   (:generator 10
-    (inst tbnz x 0 BIGNUM)
-    (if (= mask most-positive-word)
-        (inst asr r x n-fixnum-tag-bits)
-        (inst lsr r x n-fixnum-tag-bits))
-    (inst b DONE)
-    BIGNUM
+    (inst asr r x n-fixnum-tag-bits)
+    (inst tbz x 0 AND)
     (loadw r x bignum-digits-offset other-pointer-lowtag)
+    AND
     (cond ((= mask most-positive-word))
           ((encode-logical-immediate mask)
            (inst and r r mask))
