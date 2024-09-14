@@ -242,6 +242,13 @@
                  (= (logcount (logandc1 y most-positive-word)) 1))
             (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
            (t
+            (inst and r (constantize y)))))
+    :c/signed=>signed
+    ((move r x)
+     (cond ((and (not (plausible-signed-imm32-operand-p y))
+                 (= (logcount (logandc1 y most-positive-word)) 1))
+            (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+           (t
             (inst and r (constantize y))))))
 
   (define-binop logior 2 or
