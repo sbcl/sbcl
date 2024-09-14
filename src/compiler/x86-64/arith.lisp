@@ -227,29 +227,50 @@
               ;; when Y = (ldb (byte 32 0) (fixnumize -1 n-fixnum-tag-bits))
               ;; Probably not very common, so not too important.
               (inst and :dword r y))
-           (t
-            (move r x)
-            (inst and r (constantize y))))))
+             (t
+              (move r x)
+              (inst and r (constantize y))))))
     :c/unsigned=>unsigned
     ;; Probably should give it the preceding treatment here too.
     ;; Also, if the constant is #xFFFFFFFF, then just a MOV is enough
     ;; if the destination is a register.
     ((move r x)
-     (let ((y (constantize y)))
-       ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
-       ;; the eflags state which we don't care about.
-       (unless (eql y -1) ; do nothing if this is true
-         (inst and r y)))))
+     ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
+     ;; the eflags state which we don't care about.
+     (cond ((eql y -1))
+           ((and (not (plausible-signed-imm32-operand-p y))
+                 (= (logcount (logandc1 y most-positive-word)) 1))
+            (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
+           (t
+            (inst and r (constantize y))))))
 
   (define-binop logior 2 or
-    :c/unsigned=>unsigned
-    ((let ((y (constantize y)))
-       (cond ((and (gpr-tn-p r) (eql y -1)) ; special-case "OR reg, all-ones"
-              ;; I have yet to elicit this case. Can it happen?
-              (inst mov r -1))
+    :c/fixnum=>fixnum
+    ((let ((y (fixnumize y)))
+       (move r x)
+       (cond ((and (not (plausible-signed-imm32-operand-p y))
+                   (= (logcount y) 1))
+              (inst bts r (1- (integer-length y))))
              (t
-              (move r x)
-              (inst or r y))))))
+              (inst or r (constantize y))))))
+    :c/unsigned=>unsigned
+    ((cond ((and (gpr-tn-p r) (eql y -1)) ; special-case "OR reg, all-ones"
+            ;; I have yet to elicit this case. Can it happen?
+            (inst mov r -1))
+           ((and (not (plausible-signed-imm32-operand-p y))
+                 (= (logcount y) 1))
+            (move r x)
+            (inst bts r (1- (integer-length y))))
+           (t
+            (move r x)
+            (inst or r (constantize y)))))
+    :c/signed=>signed
+    ((move r x)
+     (cond ((and (not (plausible-signed-imm32-operand-p y))
+                 (= (logcount y) 1))
+            (inst bts r (1- (integer-length y))))
+           (t
+            (inst or r (constantize y))))))
 
   (define-binop logxor 2 xor
     :c/unsigned=>unsigned
@@ -3870,8 +3891,11 @@
         DONE
         (unless (or fixnum-mask-p
                     (= mask most-positive-word))
-          (inst and r (or (plausible-signed-imm32-operand-p mask)
-                          (constantize mask))))))))
+          (if (and (not (plausible-signed-imm32-operand-p mask))
+                   (= (logcount (logandc1 mask most-positive-word)) 1))
+              (inst btr r (1- (integer-length (logandc1 mask most-positive-word))))
+              (inst and r (or (plausible-signed-imm32-operand-p mask)
+                              (constantize mask)))))))))
 
 (in-package "SB-C")
 
