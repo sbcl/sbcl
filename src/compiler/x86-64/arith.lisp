@@ -181,6 +181,7 @@
                    ,@(or fixnum=>fixnum `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
                              fast-fixnum-binop-c)
+                  (:arg-refs x-ref)
                   (:translate ,translate)
                   (:generator 1
                    ,@(or c/fixnum=>fixnum
@@ -227,6 +228,15 @@
               ;; when Y = (ldb (byte 32 0) (fixnumize -1 n-fixnum-tag-bits))
               ;; Probably not very common, so not too important.
               (inst and :dword r y))
+             ((and (not (plausible-signed-imm32-operand-p y))
+                   (let* ((int (sb-c::type-approximate-interval (tn-ref-type x-ref)))
+                          (mask (logandc1 (logior y fixnum-tag-mask)
+                                          (ldb (byte (+ (integer-length (sb-c::interval-high int)) n-fixnum-tag-bits) 0) -1))))
+                     (when (and (>= (sb-c::interval-low int) 0)
+                                (= (logcount mask) 1))
+                       (move r x)
+                       (inst btr r (1- (integer-length mask)))
+                       t))))
              (t
               (move r x)
               (inst and r (constantize y))))))
