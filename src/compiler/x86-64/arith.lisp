@@ -237,7 +237,7 @@
     ((move r x)
      ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
      ;; the eflags state which we don't care about.
-     (cond ((eql y -1))
+     (cond ((eql y most-positive-word))
            ((and (not (plausible-signed-imm32-operand-p y))
                  (= (logcount (logandc1 y most-positive-word)) 1))
             (inst btr r (1- (integer-length (logandc1 y most-positive-word)))))
