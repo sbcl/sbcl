@@ -2651,11 +2651,16 @@
          ;; the restricted case of 8 bits at (BYTE 8 8).
          (reducible-to-byte-p
           (and (eq size :word) (not (logtest #xFF y)))))
-    (cond ((not size)
-           ;; Ensure that both operands are acceptable
-           ;; by possibly loading one into TEMP
-           (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
-           (inst test :qword x y))
+    (cond  ((and (integerp y)
+                 (not (plausible-signed-imm32-operand-p y))
+                 (= (logcount y) 1))
+            (change-vop-flags sb-assem::*current-vop* '(:c))
+            (inst bt x (1- (integer-length y))))
+           ((not size)
+            ;; Ensure that both operands are acceptable
+            ;; by possibly loading one into TEMP
+            (multiple-value-setq (x y) (ensure-not-mem+mem x y temp))
+            (inst test :qword x y))
           ((sc-is x control-stack unsigned-stack signed-stack)
            ;; Otherwise, when using an immediate operand smaller
            ;; than 64 bits, narrow the reg/mem operand to match.
