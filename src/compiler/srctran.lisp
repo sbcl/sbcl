@@ -3049,39 +3049,23 @@
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word :node node)
   "convert to inline logical operations"
-  (let ((width (and (constant-lvar-p size)
-                    (constant-lvar-p posn)
-                    (+ (lvar-value size) (lvar-value posn))))
-        (size-max (nth-value 1 (integer-type-numeric-bounds (lvar-type size)))))
-    (cond ((and width
-                (<= width sb-vm:n-fixnum-bits))
-           (let ((size (lvar-value size))
-                 (posn (lvar-value posn)))
-             `(logand (ash (mask-signed-field ,sb-vm:n-fixnum-bits int) ,(- posn))
-                      ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
-          ((and width
-                (<= width sb-vm:n-word-bits))
-           (let ((size (lvar-value size))
-                 (posn (lvar-value posn)))
-             `(logand (ash (logand int ,most-positive-word) ,(- posn))
-                      ,(ash most-positive-word (- size sb-vm:n-word-bits)))))
-          ((let* ((posn-max (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
-                  (width (and size-max posn-max
-                              (+ size-max posn-max))))
-             (cond ((not width) nil)
-                   ((<= width sb-vm:n-fixnum-bits)
-                    `(logandc2 (ash (mask-signed-field sb-vm:n-fixnum-bits int) (- posn))
-                               (ash -1 size)))
-                   ((<= width sb-vm:n-word-bits)
-                    `(logandc2 (ash (logand int most-positive-word) (- posn))
-                               (ash -1 size))))))
-          ((not (or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
-                    (csubtypep (lvar-type int) (specifier-type 'word))))
-           (delay-ir1-transform node :ir1-phases)
-           (give-up-ir1-transform "not a word-sized integer"))
-          (t
-           `(logandc2 (ash int (- posn))
-                      (ash -1 size))))))
+  (let* ((size-max (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
+         (posn-max (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
+         (width (and size-max posn-max
+                     (+ size-max posn-max))))
+    (cond
+      ((or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
+           (csubtypep (lvar-type int) (specifier-type 'word)))
+       `(logandc2 (ash int (- posn))
+                  (ash -1 size)))
+      ((cond ((not width) nil)
+             ((<= width sb-vm:n-fixnum-bits)
+              `(%ldb size posn (mask-signed-field sb-vm:n-fixnum-bits int)))
+             ((<= width sb-vm:n-word-bits)
+              `(%ldb size posn (logand int most-positive-word)))))
+      (t
+       (delay-ir1-transform node :ir1-phases)
+       (give-up-ir1-transform "not a word-sized integer")))))
 
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
