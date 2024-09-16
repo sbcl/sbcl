@@ -293,6 +293,52 @@
   (:generator 3
     (inst orr r x y)))
 
+(define-vop (logior-signed-unsigned=>integer)
+  (:args (x :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-refs x-ref)
+  (:arg-types signed-num unsigned-num)
+  (:results (r :scs (descriptor-reg)))
+  (:translate logior)
+  (:temporary (:sc unsigned-reg) low)
+  (:temporary (:sc unsigned-reg) header)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:vop-var vop)
+  (:policy :fast-safe)
+  (:generator 10
+    (let ((fixnum (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))))
+      (assemble ()
+        (inst orr low x y)
+        (if fixnum
+            (inst add r low low)
+            (inst adds r low low))
+        (inst mov header (bignum-header-for-length 1))
+        (inst tbnz x 63 (if fixnum
+                            done
+                            negative))
+        (inst tst low (ash (1- (ash 1 (- n-word-bits
+                                         n-positive-fixnum-bits)))
+                           n-positive-fixnum-bits))
+        (inst b :eq done)
+        (inst tbz low 63 allocate)
+        (inst mov header (bignum-header-for-length 2))
+        (inst b allocate)
+        negative
+        (unless fixnum
+          (inst b :vc DONE))
+        allocate
+        (with-fixed-allocation
+            (r lr nil (+ 2 bignum-digits-offset))
+          (storew-pair header 0 low bignum-digits-offset tmp-tn)
+          (storew zr-tn tmp-tn 2))
+        DONE))))
+
+(define-vop (logior-unsigned-signed=>integer logior-signed-unsigned=>integer)
+  (:args (y :scs (unsigned-reg))
+         (x :scs (signed-reg)))
+  (:arg-refs nil x-ref)
+  (:arg-types unsigned-num signed-num))
+
 ;;; Multiplication
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
