@@ -588,3 +588,12 @@
 (with-test (:name :logbitp-on-integers)
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
+(with-test (:name :logtest-negative-bit)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+     (declare ((signed-byte 64) c))
+     (logtest c -2199023255553))
+   ((-2049990302793354782) t)
+   ((0) nil)
+   (((ash 1 41)) nil)))

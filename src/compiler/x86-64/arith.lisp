@@ -2653,9 +2653,9 @@
           (and (eq size :word) (not (logtest #xFF y)))))
     (cond  ((and (integerp y)
                  (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount y) 1))
+                 (= (logcount (ldb (byte n-word-bits 0) y)) 1))
             (change-vop-flags sb-assem::*current-vop* '(:c))
-            (inst bt x (1- (integer-length y))))
+            (inst bt x (1- (integer-length (ldb (byte n-word-bits 0) y)))))
            ((not size)
             ;; Ensure that both operands are acceptable
             ;; by possibly loading one into TEMP
