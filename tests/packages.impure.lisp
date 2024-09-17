@@ -871,7 +871,7 @@ if a restart was invoked."
           (assert (equal (length (intersection answer expect :test #'equal))
                          (length expect))))))))
 
-;; Assert that changes in size of a symbo-hashset's symbol vector
+;; Assert that changes in size of a symbol-hashset's symbol vector
 ;; do not cause WITH-PACKAGE-ITERATOR to crash. The vector shouldn't grow,
 ;; because it is not permitted to INTERN new symbols, but it can shrink
 ;; because it is expressly permitted to UNINTERN the current symbol.
@@ -1232,3 +1232,97 @@ if a restart was invoked."
     (delete-package "COMPILE-TWICE")
     (load fasl7)
     (delete-package "COMPILE-TWICE")))
+
+;;; It is legal to export or unexport a symbol in the process of
+;;; iteration, since that does not change the set of symbols interned
+;;; in any package.
+
+(with-test (:name (do-symbols export))
+  (when (find-package "SOM") (delete-package "SOM"))
+  (let* ((package (make-package "SOM" :use nil))
+         (mmm (intern "*MMM*" package))
+         (sym (intern "SYM" package)))
+    (let (result)
+      (do-symbols (s package)
+        (export s package)
+        (push s result))
+      (assert (member mmm result))
+      (assert (member sym result))
+      #+nil ; not yet
+      (assert (= (length result) 2))
+      (assert (= (length (delete-duplicates result)) 2)))))
+
+(with-test (:name (with-package-iterator :internal export))
+  (when (find-package "SOM") (delete-package "SOM"))
+  (let* ((package (make-package "SOM" :use nil))
+         (mmm (intern "*MMM*" package))
+         (sym (intern "SYM" package)))
+    (let (result)
+      (with-package-iterator (iter package :internal)
+        (loop
+         (multiple-value-bind (flag symbol accessibility package)
+             (iter)
+           (unless flag (return nil))
+           (assert (eql accessibility :internal))
+           (export symbol package)
+           (push symbol result))))
+      (assert (member mmm result))
+      (assert (member sym result))
+      (assert (= (length result) 2)))))
+
+(with-test (:name (with-package-iterator :internal :external export))
+  (when (find-package "SOM") (delete-package "SOM"))
+  (let* ((package (make-package "SOM" :use nil))
+         (mmm (intern "*MMM*" package))
+         (sym (intern "SYM" package)))
+    (let (result)
+      (with-package-iterator (iter package :internal :external)
+        (loop
+         (multiple-value-bind (flag symbol accessibility package)
+             (iter)
+           (unless flag (return nil))
+           #+nil ; not yet
+           (assert (eql accessibility :internal))
+           (assert (member accessibility '(:internal :external)))
+           (export symbol package)
+           (push symbol result))))
+      (assert (member mmm result))
+      (assert (member sym result))
+      #+nil ; not yet
+      (assert (= (length result) 2))
+      (assert (= (length (delete-duplicates result)) 2)))))
+
+(with-test (:name (do-symbols unexport))
+  (when (find-package "SOM") (delete-package "SOM"))
+  (let* ((package (make-package "SOM" :use nil))
+         (mmm (intern "*MMM*" package))
+         (sym (intern "SYM" package)))
+    (export mmm package)
+    (export sym package)
+    (let (result)
+      (do-symbols (s package)
+        (unexport s package)
+        (push s result))
+      (assert (member mmm result))
+      (assert (member sym result))
+      (assert (= (length result) 2)))))
+
+(with-test (:name (with-package-iterator :internal :external unexport))
+  (when (find-package "SOM") (delete-package "SOM"))
+  (let* ((package (make-package "SOM" :use nil))
+         (mmm (intern "*MMM*" package))
+         (sym (intern "SYM" package)))
+    (export mmm package)
+    (export sym package)
+    (let (result)
+      (with-package-iterator (iter package :internal :external)
+        (loop
+         (multiple-value-bind (flag symbol accessibility package)
+             (iter)
+           (unless flag (return nil))
+           (assert (eql accessibility :external))
+           (unexport symbol package)
+           (push symbol result))))
+      (assert (member mmm result))
+      (assert (member sym result))
+      (assert (= (length result) 2)))))
