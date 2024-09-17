@@ -715,14 +715,14 @@
         (inst lsl pa-flag pa-flag card)
 
         (cond ((member :arm-v8.1 *backend-subfeatures*)
-               (inst ldset pa-flag pa-flag temp))
+               (inst ldset pa-flag zr-tn temp))
               (t
                (let ((loop (gen-label)))
                  (emit-label LOOP)
                  (inst ldaxr card temp)
                  (inst orr card card pa-flag)
-                 (inst stlxr pa-flag card temp)
-                 (inst cbnz (32-bit-reg pa-flag) LOOP))))
+                 (inst stlxr tmp-tn card temp)
+                 (inst cbnz (32-bit-reg tmp-tn) LOOP))))
         (inst b store))
       TRY-DYNAMIC-SPACE
       (load-foreign-symbol temp "gc_card_table_mask" :dataref t)
