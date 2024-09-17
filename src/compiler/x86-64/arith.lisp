@@ -284,8 +284,8 @@
     :c/signed=>signed
     ((move r x)
      (cond ((and (not (plausible-signed-imm32-operand-p y))
-                 (= (logcount y) 1))
-            (inst bts r (1- (integer-length y))))
+                 (= (logcount (ldb (byte n-word-bits 0) y)) 1))
+            (inst bts r (1- (integer-length (ldb (byte n-word-bits 0) y)))))
            (t
             (inst or r (constantize y))))))
 
