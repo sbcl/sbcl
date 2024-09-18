@@ -24,7 +24,12 @@ jobs:
     - name: install host sbcl
       run: |
         sudo apt-get -qq update | true
-        sudo apt-get -qq install sbcl libcapstone-dev libzstd-dev
+        sudo apt-get -qq install libcapstone-dev libzstd-dev
+        cd /tmp/
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-2.4.8-x86-64-linux-binary.tar.bz2
+        tar xf sbcl-2.4.8-x86-64-linux-binary.tar.bz2
+        cd sbcl-2.4.8-x86-64-linux/
+        sudo ./install.sh
     - name: install host gcc-multilib
       if: matrix.arch == 'x86'
       run: |
