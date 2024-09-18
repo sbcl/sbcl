@@ -11,7 +11,7 @@
 
 include Config.arm64-bsd
 
-OS_LIBS = -lutil
+OS_LIBS += -lutil
 
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread -lrt
