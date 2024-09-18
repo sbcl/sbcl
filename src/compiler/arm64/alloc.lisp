@@ -193,7 +193,8 @@
      (move c-arg2 nwords)
      (move c-arg3 header)
      (load-foreign-symbol cfunc "alloc_immobile_fixedobj")
-     (invoke-foreign-routine "call_into_c" lr)
-     (when cur-nfp
-       (load-stack-tn cur-nfp nfp-save))
-     (move result nl0))))
+     (pseudo-atomic (lr)
+       (invoke-foreign-routine "call_into_c" lr)
+       (when cur-nfp
+         (load-stack-tn cur-nfp nfp-save))
+       (move result nl0)))))
