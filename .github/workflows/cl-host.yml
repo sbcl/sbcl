@@ -6,7 +6,7 @@ jobs:
 
   ecl:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -40,7 +40,7 @@ jobs:
 
   clisp:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -65,7 +65,7 @@ jobs:
 
   ccl:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -92,7 +92,7 @@ jobs:
 
   cmucl:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -125,7 +125,7 @@ jobs:
 
   sbcl:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
@@ -167,7 +167,7 @@ jobs:
 
   compare-xc-host-fasls:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: [ccl, sbcl, cmucl, clisp]
 
