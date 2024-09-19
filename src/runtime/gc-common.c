@@ -219,7 +219,9 @@ void heap_scavenge(lispobj *start, lispobj *end)
 // that must not contain any object headers.
 sword_t scavenge(lispobj *start, sword_t n_words)
 {
+#ifdef LISP_FEATURE_GENCGC
     gc_dcheck(compacting_p());
+#endif
     lispobj *end = start + n_words;
     lispobj *object_ptr;
     for (object_ptr = start; object_ptr < end; object_ptr++) {
