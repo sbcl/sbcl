@@ -256,6 +256,10 @@
           '(find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
     (test 'sb-kernel:bounding-indices-bad-error
           '(position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(find :foo '(1 2 3) :start 5))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(position :foo '(1 2 3) :start 5 :from-end t))
     (test 'type-error
           '(let ((list (list 1 2 3 :foo)))
              (find :bar (nconc list list)))

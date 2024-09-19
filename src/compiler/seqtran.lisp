@@ -2601,10 +2601,12 @@
              (bounds-error)
            (do ((slow sequence (cdr slow))
                 ,@(when safe '((fast (cdr sequence) (cddr fast))))
-                ,@(when indexed '((index 0 (+ index 1)))))
+                ,@(when indexed '((index 0 (truly-the index (+ index 1))))))
                ((cond ((null slow)
                        (,@(if indexed
-                              '(if (and end (> end index)) (bounds-error))
+                              '(if (or (> start index)
+                                    (and end (> end index)))
+                                (bounds-error))
                               '(progn))
                         (return (values find position))))
                       ,@(when indexed
