@@ -2592,52 +2592,56 @@
          (not (and (lvar-single-value-p (node-lvar node))
                    (constant-lvar-p start)
                    (eql (lvar-value start) 0)
-                   (lvar-value-is end nil)))))
+                   (lvar-value-is end nil))))
+        (check-bounds-p (policy node (plusp insert-array-bounds-checks))))
     `(let ((find nil)
            (position nil))
-       (flet ((bounds-error ()
-                (sequence-bounding-indices-bad-error sequence start end)))
-         (if (and end (> start end))
-             (bounds-error)
-           (do ((slow sequence (cdr slow))
-                ,@(when safe '((fast (cdr sequence) (cddr fast))))
-                ,@(when indexed '((index 0 (truly-the index (+ index 1))))))
-               ((cond ((null slow)
-                       (,@(if indexed
-                              '(if (or (> start index)
-                                    (and end (> end index)))
-                                (bounds-error))
-                              '(progn))
-                        (return (values find position))))
-                      ,@(when indexed
-                          '(((and end (>= index end))
-                             (return (values find position)))))
-                      ,@(when safe
-                          '(((eq slow fast)
-                             (circular-list-error sequence)))))
-                (sb-impl::unreachable))
-             (declare (list slow ,@(and safe '(fast)))
-                      ;; If you have as many as INDEX conses on a 32-bit build,
-                      ;; then you've either used up 4GB of memory (impossible)
-                      ;; or you're stuck in a circular list in unsafe code.
-                      ;; Correspondingly larger limit for 64-bit.
-                      ,@(and indexed '((index index))))
-             (,@(if indexed '(when (>= index start)) '(progn))
-               (let ((element (car slow)))
-                 ;; This hack of dealing with non-NIL FROM-END for list data
-                 ;; by iterating forward through the list and keeping track of
-                 ;; the last time we found a match might be more screwy than
-                 ;; what the user expects, but it seems to be allowed by the
-                 ;; ANSI standard. (And if the user is screwy enough to ask
-                 ;; for FROM-END behavior on list data, turnabout is fair play.)
-                 ;;
-                 ;; It's also not enormously efficient, calling PREDICATE
-                 ;; and KEY more often than necessary; but all the alternatives
-                 ;; seem to have their own efficiency problems.
-                 (,sense (funcall predicate (funcall key element))
-                   (if from-end
-                       (setf find element position ,(and indexed 'index))
-                       (return (values element ,(and indexed 'index)))))))))))))
+       (flet (,@(and check-bounds-p
+                  `((bounds-error ()
+                                  (sequence-bounding-indices-bad-error sequence start end)))))
+         ,@(when check-bounds-p
+             `((if (and end (> start end))
+                   (bounds-error))))
+         (do ((slow sequence (cdr slow))
+              ,@(when safe '((fast (cdr sequence) (cddr fast))))
+              ,@(when indexed '((index 0 (truly-the index (+ index 1))))))
+             ((cond ((null slow)
+                     (,@(if (and indexed
+                                 check-bounds-p)
+                            '(if (or (> start index)
+                                  (and end (> end index)))
+                              (bounds-error))
+                            '(progn))
+                      (return (values find position))))
+                    ,@(when indexed
+                        '(((and end (>= index end))
+                           (return (values find position)))))
+                    ,@(when safe
+                        '(((eq slow fast)
+                           (circular-list-error sequence)))))
+              (sb-impl::unreachable))
+           (declare (list slow ,@(and safe '(fast)))
+                    ;; If you have as many as INDEX conses on a 32-bit build,
+                    ;; then you've either used up 4GB of memory (impossible)
+                    ;; or you're stuck in a circular list in unsafe code.
+                    ;; Correspondingly larger limit for 64-bit.
+                    ,@(and indexed '((index index))))
+           (,@(if indexed '(when (>= index start)) '(progn))
+            (let ((element (car slow)))
+              ;; This hack of dealing with non-NIL FROM-END for list data
+              ;; by iterating forward through the list and keeping track of
+              ;; the last time we found a match might be more screwy than
+              ;; what the user expects, but it seems to be allowed by the
+              ;; ANSI standard. (And if the user is screwy enough to ask
+              ;; for FROM-END behavior on list data, turnabout is fair play.)
+              ;;
+              ;; It's also not enormously efficient, calling PREDICATE
+              ;; and KEY more often than necessary; but all the alternatives
+              ;; seem to have their own efficiency problems.
+              (,sense (funcall predicate (funcall key element))
+                      (if from-end
+                          (setf find element position ,(and indexed 'index))
+                          (return (values element ,(and indexed 'index))))))))))))
 
 (macrolet ((def (name condition)
              `(deftransform ,name ((predicate sequence from-end start end key)
