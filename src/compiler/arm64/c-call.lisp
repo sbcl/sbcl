@@ -254,12 +254,11 @@
                (inst blr cfunc)))
         ;; Blank all boxed registers that potentially contain Lisp
         ;; pointers, not just volatile ones, since GC could
-        ;; potentially observe stale pointers otherwise. FIXME: There
-        ;; is some suboptimality here; instead of blanking all boxed
-        ;; pointers, we can just blank the ones which are both qsaved
-        ;; and restored by C and known to not contain a Lisp pointer
-        ;; (i.e. can be moved).
-        (loop for reg in descriptor-regs
+        ;; potentially observe stale pointers otherwise.
+        (loop for reg in (set-difference descriptor-regs
+                                         ;; any-reg temporaries contain no pointers
+                                         (list #-immobile-space r9-offset ;; invoke-foreign-routine doesn't touch it
+                                               r10-offset lexenv-offset))
               do (inst mov
                        (make-random-tn
                         :kind :normal
