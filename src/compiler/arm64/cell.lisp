@@ -388,7 +388,7 @@
     (:args (value :scs (any-reg descriptor-reg zero) :to :save)
            (symbol :scs (descriptor-reg)
                    :target alloc-tls-symbol))
-    (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
+    (:temporary (:sc descriptor-reg :offset r10-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
     (:temporary (:sc non-descriptor-reg :offset nl1-offset) free-tls-index)
     (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)

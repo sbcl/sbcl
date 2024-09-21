@@ -306,7 +306,7 @@
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc any-reg :offset #+darwin r8-offset #-darwin r10-offset) temp)
+  (:temporary (:sc any-reg :offset r10-offset) temp)
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
   (:vop-var vop)
   (:generator 0

@@ -38,14 +38,12 @@
 #define reg_R6         REG(16)
 #define reg_R7         REG(17)
 
-#ifdef LISP_FEATURE_DARWIN
-#define reg_R8         REG(20)
-#else
+#ifndef LISP_FEATURE_DARWIN
 #define reg_R8         REG(18)
-#define reg_R10         REG(20)
 #endif
 
 #define reg_R9         REG(19)
+#define reg_R10        REG(20)
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define reg_THREAD      REG(21)

@@ -5,7 +5,7 @@
                           (:translate ensure-symbol-tls-index)
                           (:result-types positive-fixnum)
                           (:policy :fast-safe))
-    ((:arg symbol (descriptor-reg) r8-offset)
+    ((:arg symbol (descriptor-reg) r10-offset)
      (:temp free-tls-index (non-descriptor-reg) nl1-offset)
 
      (:res result (unsigned-reg) nl0-offset))

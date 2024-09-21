@@ -53,11 +53,8 @@
   (defreg #-darwin r8 #+darwin reserved 18)
   (defreg r9 19)
 
-  (defreg #+darwin r8 #-darwin r10 20)
-  #+sb-thread
-  (defreg thread 21)
-  #-sb-thread
-  (defreg r11 21)
+  (defreg r10 20)
+  (defreg #+sb-thread thread #-sb-thread r11 21)
 
   (defreg lexenv 22)
 
@@ -76,7 +73,7 @@
       null cfp nsp lr)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
+      r0 r1 r2 r3 r4 r5 r6 r7 #-darwin r8 r9 r10 #-sb-thread r11 lexenv)
 
   ;; nl9 can't be selected by PACK as it is a freely usable temp reg
   (defregset non-descriptor-regs
@@ -84,7 +81,7 @@
 
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
+      r7 #-darwin r8 r9 r10 #-sb-thread r11 lexenv)
 
   ;; registers used to pass arguments
   ;;
@@ -93,7 +90,7 @@
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2 r3)
   (defparameter *register-arg-names* '(r0 r1 r2 r3))
-  (defregset *descriptor-args* r0 r1 r2 r3 r4 r5 r6 r7 r8 r9)
+  (defregset *descriptor-args* r0 r1 r2 r3 r4 r5 r6 r7 #-darwin r8 r9 r10)
   (defregset *non-descriptor-args* nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8)
   (defglobal *float-regs* (loop for i below 32 collect i)))
 

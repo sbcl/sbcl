@@ -164,8 +164,6 @@ GNAME(call_into_lisp):
         bl      pthread_getspecific
         mov     reg_THREAD, x0
 #endif
-#else
-        mov     reg_R10, #0
 #endif
 	// Clear the boxed registers that don't already have something
 	// in them.
@@ -177,14 +175,13 @@ GNAME(call_into_lisp):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-        mov     reg_R8, #0
 #ifndef LISP_FEATURE_DARWIN
-        mov     reg_R10,#0
+        mov     reg_R8, #0
+#endif
+        mov     reg_R10, #0
 #ifndef LISP_FEATURE_SB_THREAD
-        mov     reg_R11,#0
+        mov     reg_R11, #0
 #endif
-#endif
-
 
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
@@ -296,19 +293,19 @@ GNAME(call_into_c):
         // Build a Lisp stack frame.
         // Can store two values above the stack pointer, interrupts ignore them.
         stp     reg_CFP, reg_LR, [reg_CSP]
-        add     reg_R8, reg_CSP, #2*8
+        add     reg_R10, reg_CSP, #2*8
         mov     reg_LEXENV, reg_LR
 
         // Save the lisp stack and frame pointers.
 
 #ifdef LISP_FEATURE_SB_THREAD
-        stp     reg_CSP, reg_R8, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
+        stp     reg_CSP, reg_R10, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
         ENTER_PA
 	ldr	reg_NFP, =GNAME(current_control_stack_pointer)
 	str	reg_CSP, [reg_NFP]
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
-	str	reg_R8, [reg_NFP]
+	str	reg_R10, [reg_NFP]
 
         // Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =GNAME(foreign_function_call_active)
@@ -330,9 +327,10 @@ GNAME(call_into_c):
         // to where Lisp expects it, and to re-establish the Lisp
         // environment.
 
-        // Blank the boxed registers. reg_LEXENV doesn't need to be
-        // blanked because its saved and restored by C and also known
-        // to not be a Lisp pointer here.
+        // Blank the boxed registers. R9, R10, LEXENV do not need to be
+        // blanked because its saved and restored by C and the above 
+        // code puts fixnums into it.
+
         mov     reg_R0, #0
         mov     reg_R1, #0
         mov     reg_R2, #0
@@ -341,13 +339,11 @@ GNAME(call_into_c):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-        mov     reg_R8, #0
-        mov     reg_R9, #0
 #ifndef LISP_FEATURE_DARWIN
-        mov     reg_R10,#0
+        mov     reg_R8,#0
+#endif
 #ifndef LISP_FEATURE_SB_THREAD
         mov     reg_R11,#0
-#endif
 #endif
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
