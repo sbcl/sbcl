@@ -1061,8 +1061,12 @@ unless :NAMED is also specified.")))
 
     (let* ((gc-ignorable
             (csubtypep ctype
-                       (specifier-type '(or fixnum boolean character
-                                            #+64-bit single-float))))
+                       ;; GC can only ignore booleans if their values
+                       ;; never change, even between images, so only
+                       ;; when static space is not relocatable.
+                       (specifier-type '(or fixnum character
+                                         #+64-bit single-float
+                                         #-relocatable-static-space boolean))))
            (dsd (make-dsd name type accessor-name
                           (pack-dsd-bits index read-only safe-p
                                          always-boundp gc-ignorable
