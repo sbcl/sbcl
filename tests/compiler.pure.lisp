@@ -3829,7 +3829,7 @@
       (assert (< d3 (* 10 short-avg))))))
 
 (with-test (:name :bug-384892)
-  (assert (equal
+  (assert (ctype=
            '(function (fixnum fixnum &key (:k1 boolean))
              (values (member t) &optional))
            (sb-kernel:%simple-fun-type
