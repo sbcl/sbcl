@@ -330,7 +330,9 @@ GNAME(call_into_c):
         // to where Lisp expects it, and to re-establish the Lisp
         // environment.
 
-        // Blank the boxed registers.
+        // Blank the boxed registers. reg_LEXENV doesn't need to be
+        // blanked because its saved and restored by C and also known
+        // to not be a Lisp pointer here.
         mov     reg_R0, #0
         mov     reg_R1, #0
         mov     reg_R2, #0
@@ -339,6 +341,8 @@ GNAME(call_into_c):
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
+        mov     reg_R8, #0
+        mov     reg_R9, #0
 #ifndef LISP_FEATURE_DARWIN
         mov     reg_R10,#0
 #ifndef LISP_FEATURE_SB_THREAD
