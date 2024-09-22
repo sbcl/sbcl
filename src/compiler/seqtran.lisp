@@ -2703,20 +2703,35 @@
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t list t t t t t)
                               *
-                              :policy (> speed space))
+                              :node node)
   "expand inline"
-  '(%find-position-if (let ((test-fun (%coerce-callable-to-fun test)))
-                        ;; The order of arguments for asymmetric tests
-                        ;; (e.g. #'<, as opposed to order-independent
-                        ;; tests like #'=) is specified in the spec
-                        ;; section 17.2.1 -- the O/Zi stuff there.
-                        (lambda (i)
-                          (funcall test-fun item i)))
-                      sequence
-                      from-end
-                      start
-                      end
-                      (%coerce-callable-to-fun key)))
+  (if (or (policy node (> speed space))
+          ;; Is it small anyway?
+          (and (or (not key)
+                   (lvar-fun-is key '(identity)))
+               (and (constant-lvar-p start)
+                    (eql (lvar-value start) 0))
+               (and (constant-lvar-p end)
+                    (null (lvar-value end)))
+               (and (constant-lvar-p from-end)
+                    (null (lvar-value from-end)))
+               (policy node (< safety 2))
+               (lvar-fun-is test '(eq))))
+      `(locally (declare (optimize (space 0)
+                                   (speed ,(max 1 (policy node speed)))))
+         (%find-position-if (let ((test-fun (%coerce-callable-to-fun test)))
+                              ;; The order of arguments for asymmetric tests
+                              ;; (e.g. #'<, as opposed to order-independent
+                              ;; tests like #'=) is specified in the spec
+                              ;; section 17.2.1 -- the O/Zi stuff there.
+                              (lambda (i)
+                                (funcall test-fun item i)))
+                            sequence
+                            from-end
+                            start
+                            end
+                            (%coerce-callable-to-fun key)))
+      (give-up-ir1-transform)))
 
 ;;; The inline expansions for the VECTOR case are saved as macros so
 ;;; that we can share them between the DEFTRANSFORMs and the default
