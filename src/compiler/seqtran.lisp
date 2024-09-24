@@ -2589,10 +2589,10 @@
         ;; This is limited in power, but good enough, for want of a proper
         ;; dead-code-elimination phase of the compiler.
         (indexed
-         (not (and (lvar-single-value-p (node-lvar node))
-                   (constant-lvar-p start)
-                   (eql (lvar-value start) 0)
-                   (lvar-value-is end nil))))
+          (not (and (lvar-single-value-p (node-lvar node))
+                    (constant-lvar-p start)
+                    (eql (lvar-value start) 0)
+                    (lvar-value-is end nil))))
         (check-bounds-p (policy node (plusp insert-array-bounds-checks))))
     `(let ((find nil)
            (position nil))
@@ -2612,10 +2612,12 @@
                                   (and end (> end index)))
                               (bounds-error))
                             '(progn))
-                      (return (values find position))))
+                      (return (values find (truly-the (or (mod #.(1- array-dimension-limit)) null)
+                                                      position)))))
                     ,@(when indexed
                         '(((and end (>= index end))
-                           (return (values find position)))))
+                           (return (values find (truly-the (or (mod #.(1- array-dimension-limit)) null)
+                                                           position))))))
                     ,@(when safe
                         '(((eq slow fast)
                            (circular-list-error sequence)))))
@@ -2640,8 +2642,11 @@
               ;; seem to have their own efficiency problems.
               (,sense (funcall predicate (funcall key element))
                       (if from-end
-                          (setf find element position ,(and indexed 'index))
-                          (return (values element ,(and indexed 'index))))))))))))
+                          (setf find element
+                                position ,(and indexed 'index))
+                          (return (values element
+                                          ,(and indexed
+                                                '(truly-the (mod #.(1- array-dimension-limit)) index)))))))))))))
 
 (macrolet ((def (name condition)
              `(deftransform ,name ((predicate sequence from-end start end key)
