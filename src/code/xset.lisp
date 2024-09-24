@@ -198,10 +198,23 @@
 (defmacro plus-mod-fixnum (a b)
   `(#+sb-xc-host sb-c::plus-mod-fixnum #-sb-xc-host  sb-vm::+-modfx ,a ,b))
 
+;;; Hash an element ELT of an XSET using EQL-HASH. If ELT is a symbol, we _assume_ it to
+;;; have a stable hash under EQL. With #+relocatable-static-space the assumption on EQL-HASH
+;;; is violated, so instead wire in an arbitrary value.
+;;; Note that EQL-HASH does not try to pick off NIL as symbol (and use its hash slot)
+;;; because that's just an extra unnecessary step. EQL hash-tables don't care whether NIL's
+;;; hash is address-based, because a rehash is forced only if some key actually moves.
+(defmacro xset-elt-hash (elt)
+  `(multiple-value-bind (hash bool)
+       (locally
+           #-sb-xc-host (declare (notinline sb-impl::eql-hash)) ; forward ref
+           #+relocatable-static-space (if ,elt (sb-impl::eql-hash ,elt) (values #xababababa nil))
+           #-relocatable-static-space (sb-impl::eql-hash ,elt))
+     (values (truly-the sb-xc:fixnum hash) bool)))
+
 ;;; Produce a hash that helps decide whether two xsets could be considered equivalent
 ;;; as order-insensitive sets comparing elements by EQL.
 (defun xset-elts-hash (xset)
-  #-sb-xc-host (declare (notinline sb-impl::eql-hash)) ; forward ref
   (let* ((c (xset-count xset))
          (h (mix c c)))
     (declare (sb-xc:fixnum h))
@@ -215,8 +228,7 @@
           ;; a restricted type of element, which we AVER below
           (map-xset (lambda (x)
                       (aver (typep x '(or symbol number character)))
-                      (setq h (plus-mod-fixnum (truly-the sb-xc:fixnum (sb-impl::eql-hash x))
-                                               h)))
+                      (setq h (plus-mod-fixnum (xset-elt-hash x) h)))
                     xset)))
     ;; Now mix the bits thoroughly and then mask to a positive fixnum.
     ;; I think this does not need to be compatible between host and target.
@@ -237,14 +249,23 @@
 (define-load-time-global *xset-stable-hashes* (make-hash-table :test 'eq))
 
 (defun xset-generate-stable-hashes (xset &aux (hashmap *xset-stable-hashes*))
-  #-sb-xc-host (declare (notinline sb-impl::eql-hash) ; forward ref
-                        (sb-c::tlab :system))
+  #-sb-xc-host (declare (sb-c::tlab :system))
+  ;; Regarding the (NULL X) in the first COND clause below - EQL-HASH pessimistically reports
+  ;; that NIL's hash _does_ depend on its address which is technically true but for purposes here
+  ;; is not true. This avoids assigning yet another arbitrary hash value to NIL for each MEMBER
+  ;; type in which it participates, if the members did not all have stable hashes already.
+  ;; Unusual (not-very-useful) MEMBER types with non-EQL-comparable values are quite common.
+  ;; Probably the most common case is the derived type of the iteration var in a DOLIST, e.g.
+  ;; in contrib/sb-grovel/def-to-lisp the type (MEMBER "char" "short" "long long" "long" "int")
+  ;; occurs, being the type of the iteration variable whose name incidentally is TYPE.
+  ;; Also the compiler always calls CTYPE-OF on all constants, and often computes unions of those
+  ;; types based on control flow, which can lead to similar MEMBER types as shown above.
   (let ((hashes (make-array (xset-count xset)))
         (index -1))
     (dx-flet ((assign-hash (x)
-                (multiple-value-bind (h address-based) (sb-impl::eql-hash x)
+                (multiple-value-bind (h address-based) (xset-elt-hash x)
                   (setf (aref hashes (incf index))
-                        (acond ((not address-based)
+                        (acond ((or (not address-based) (null x))
                                 ;; EQL-HASH does not hash fixnums well enough
                                 (murmur-hash-word/fixnum h))
                                ((gethash x hashmap)
