@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS += -m64 -g -Wall -std=gnu89 -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+CFLAGS += -m64 -g -Wall -std=gnu89 -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer -D_POSIX_PTHREAD_SEMANTICS
 LINKFLAGS = -m64 -g
 ASFLAGS = -m64 -Wall
 GREP = ggrep

@@ -10,7 +10,8 @@
 # files for more information.
 
 CC=gcc
-CFLAGS += -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+CFLAGS += -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer -D_POSIX_PTHREAD_SEMANTICS -m32
+LINKFLAGS += -m32
 GREP = ggrep
 
 ASSEM_SRC = x86-assem.S
