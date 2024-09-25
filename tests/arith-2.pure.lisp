@@ -603,3 +603,13 @@
       (declare (fixnum b))
       (logior b -4611686018427387905))
    ((-6) -1)))
+
+(with-test (:name :float-cmp)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare ((unsigned-byte 20) a)
+                  (float b))
+         (< a b))
+    ((6 4.0) nil)
+    ((1 1.1) t)))
