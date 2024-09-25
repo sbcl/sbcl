@@ -111,7 +111,7 @@
 ;;; In particular, ELF cores shrink the immobile code space down to just enough
 ;;; to contain all code, plus about 1/2 MiB of spare, which means that you can't
 ;;; subsequently compile a whole lot into immobile space.
-;;; The value is changed to :AUTO in make-target-2-load.lisp which supresses
+;;; The value is changed to :AUTO in make-target-2-load.lisp which suppresses
 ;;; codegen optimizations for immobile space, but nonetheless prefers to allocate
 ;;; the code there, falling back to dynamic space if there is no room left.
 ;;; These controls exist whether or not the immobile-space feature is present.
@@ -246,7 +246,7 @@
   ;; compiler to dump symbols in such a way that the loader can
   ;; reconstruct them in the correct package.
   (package-environment-changed nil :type boolean)
-  ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding
+  ;; Bidirectional map between IR1/IR2/assembler abstractions and a corresponding
   ;; small integer or string identifier. One direction could be done by adding
   ;; the ID as slot to each object, but we want both directions.
   ;; These could just as well be scoped by WITH-IR1-NAMESPACE, but
