@@ -1385,6 +1385,24 @@
                             (car high)))))
          (= (floor low) (floor high)))))
 
+(defun interval-float-p (interval)
+  (let ((low (interval-low interval))
+        (high (interval-high interval)))
+    (flet ((fraction-p (x)
+             (and (numberp x)
+                  (not (integerp x))
+                  (not (zerop (nth-value 1 (truncate x)))))))
+     (and (or (fraction-p low)
+              (if (consp low)
+                  (setf low (car low))))
+          (or (fraction-p high)
+              (and (consp high)
+                   (setf high
+                         (if (fraction-p (car high))
+                             (car high)
+                             (1- (car high))))))
+          (= (floor low) (floor high))))))
+
 (defun interval-constant-p (interval)
   (let ((low (interval-low interval))
         (high (interval-high interval)))
@@ -4893,41 +4911,68 @@
 ;;; and the same for both.
 (deftransform = ((x y) (number number) *)
   "open code"
-  (let ((x-type (lvar-type x))
-        (y-type (lvar-type y)))
-    (cond ((or (and (csubtypep x-type (specifier-type 'float))
-                    (csubtypep y-type (specifier-type 'float)))
-               (and (csubtypep x-type (specifier-type '(complex float)))
-                    (csubtypep y-type (specifier-type '(complex float))))
-               (and (vop-existsp :named sb-vm::=/complex-single-float)
-                    (csubtypep x-type (specifier-type '(or single-float (complex single-float))))
-                    (csubtypep y-type (specifier-type '(or single-float (complex single-float)))))
-               (and (vop-existsp :named sb-vm::=/complex-double-float)
-                    (csubtypep x-type (specifier-type '(or double-float (complex double-float))))
-                    (csubtypep y-type (specifier-type '(or double-float (complex double-float))))))
-           ;; They are both floats. Leave as = so that -0.0 is
-           ;; handled correctly.
-           (give-up-ir1-transform))
-          ((or (and (csubtypep x-type (specifier-type 'rational))
-                    (csubtypep y-type (specifier-type 'rational)))
-               (and (csubtypep x-type
-                               (specifier-type '(complex rational)))
-                    (csubtypep y-type
-                               (specifier-type '(complex rational)))))
-           ;; They are both rationals and complexp is the same.
-           ;; Convert to EQL.
-           '(eql x y))
-          ((or (and (csubtypep x-type (specifier-type 'real))
-                    (csubtypep y-type
-                               (specifier-type '(complex rational))))
-               (and (csubtypep y-type (specifier-type 'real))
-                    (csubtypep x-type
-                               (specifier-type '(complex rational)))))
-           ;; Can't be EQL since imagpart can't be 0.
-           nil)
-          (t
-           (give-up-ir1-transform
-            "The operands might not be the same type.")))))
+  (let* ((x-type (lvar-type x))
+         (y-type (lvar-type y)))
+    ;; Inline if the intersecting type is simple:
+    ;; (= (the (or single-float integer) x) 1.5)
+    ;; => (and (single-float-p x) (= x 1.5))
+    (labels ((transform (x-type y-type x y type test)
+               (when (and (csubtypep x-type type)
+                          (not (and (eq test 'fixnump)
+                                    (csubtypep y-type (specifier-type 'rational))))
+                          (not (csubtypep y-type type))
+                          (let ((excluded (type-difference y-type type)))
+                            (and (neq excluded *empty-type*)
+                                 (let ((x-int (type-approximate-interval x-type))
+                                       (y-int (type-approximate-interval excluded)))
+                                   (and x-int
+                                        (or (and y-int
+                                                 (interval-/= x-int y-int))
+                                            (and (interval-float-p x-int)
+                                                 (csubtypep excluded (specifier-type 'integer)))))))))
+                 `(and (,test ,y)
+                       (= ,x (truly-the ,(type-specifier type) ,y)))))
+             (intersecting (type test)
+               (or (transform x-type y-type 'x 'y type test)
+                   (transform y-type x-type 'y 'x type test))))
+      (cond ((intersecting (specifier-type 'single-float) 'single-float-p))
+            ((intersecting (specifier-type 'double-float) 'double-float-p))
+            ((intersecting (specifier-type 'fixnum) 'fixnump))
+            ;; Convert to EQL if both args are rational and complexp is specified
+            ;; and the same for both.
+            ((or (and (csubtypep x-type (specifier-type 'float))
+                      (csubtypep y-type (specifier-type 'float)))
+                 (and (csubtypep x-type (specifier-type '(complex float)))
+                      (csubtypep y-type (specifier-type '(complex float))))
+                 (and (vop-existsp :named sb-vm::=/complex-single-float)
+                      (csubtypep x-type (specifier-type '(or single-float (complex single-float))))
+                      (csubtypep y-type (specifier-type '(or single-float (complex single-float)))))
+                 (and (vop-existsp :named sb-vm::=/complex-double-float)
+                      (csubtypep x-type (specifier-type '(or double-float (complex double-float))))
+                      (csubtypep y-type (specifier-type '(or double-float (complex double-float))))))
+             ;; They are both floats. Leave as = so that -0.0 is
+             ;; handled correctly.
+             (give-up-ir1-transform))
+            ((or (and (csubtypep x-type (specifier-type 'rational))
+                      (csubtypep y-type (specifier-type 'rational)))
+                 (and (csubtypep x-type
+                                 (specifier-type '(complex rational)))
+                      (csubtypep y-type
+                                 (specifier-type '(complex rational)))))
+             ;; They are both rationals and complexp is the same.
+             ;; Convert to EQL.
+             '(eql x y))
+            ((or (and (csubtypep x-type (specifier-type 'real))
+                      (csubtypep y-type
+                                 (specifier-type '(complex rational))))
+                 (and (csubtypep y-type (specifier-type 'real))
+                      (csubtypep x-type
+                                 (specifier-type '(complex rational)))))
+             ;; Can't be EQL since imagpart can't be 0.
+             nil)
+            (t
+             (give-up-ir1-transform
+              "The operands might not be the same type."))))))
 
 (defun maybe-float-lvar-p (lvar)
   (neq *empty-type* (type-intersection (specifier-type 'float)
