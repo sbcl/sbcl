@@ -117,15 +117,15 @@
       (truly-the
        (values t &optional)
        (catch 'up-and-out
-         (let* ((string (etypecase string-or-fun
+         (let* ((string (typecase string-or-fun
                           (simple-string
                            string-or-fun)
                           (string
                            (coerce string-or-fun 'simple-string))
-                          ;; Not just more compact than testing for fmt-control
-                          ;; but also produces a better error message.
                           (function
-                           (fmt-control-string string-or-fun))))
+                           (fmt-control-string string-or-fun))
+                          (t
+                           #.(sb-c::internal-type-error-call 'string-or-fun '(or string function)))))
                 (*default-format-error-control-string* string)
                 (*logical-block-popper* nil)
                 (tokens
