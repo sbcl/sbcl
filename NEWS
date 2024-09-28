@@ -1,5 +1,23 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.8:
+  * platform support:
+    ** improve support for Solaris and variants on x86 and x86-64.  (thanks to
+       Masatoshi SANO)
+    ** fix a bug in handling timeouts and interrupted system calls in
+       SB-UNIX:UNIX-SIMPLE-POLL.  (lp#2078824, thanks to Michał phoe Herda)
+    ** fix a bug in the lisp understanding of ssize_t under Windows.
+    ** fix large constant encoding in RISC-V.  (lp#2077307, reported by
+       Guillaume LE VAILLANT)
+    ** more parsimonious low-level type tests on arm64.
+    ** building from the result of git-archive should complete without error.
+  * bug fix: exporting a symbol during package iteration no longer skips other
+    symbols.  (lp#2080387, reported by kbhit)
+  * optimization: improvements to EQ hash tables and associated hash functions.
+  * optimization: type checking of string and string-designator is more efficient.
+  * optimization: the compiler better understands the nature of the results of
+    CONCATENATE.
+
 changes in sbcl-2.4.8 relative to sbcl-2.4.7:
   * bug fix: the elftool utility finds a writeable directory in more
     situations.  (thanks to Shinmera)
