@@ -320,21 +320,18 @@ of :INHERITED :EXTERNAL :INTERNAL."
     (unless (member symbol '(:internal :external :inherited))
       (%program-error "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
                       symbol)))
-  (with-unique-names (bits index sym-vec pkglist symbol kind)
-    (let ((state (list bits index sym-vec pkglist))
-          (select (logior (if (member :internal  symbol-types) 1 0)
-                          (if (member :external  symbol-types) 2 0)
-                          (if (member :inherited symbol-types) 4 0))))
-      `(multiple-value-bind ,state (package-iter-init ,select ,package-list)
-         (let (*clear-resized-symbol-tables* ,symbol ,kind)
-           (macrolet
-               ((,mname ()
-                   '(if (eql 0 (multiple-value-setq (,@state ,symbol ,kind)
-                                 (package-iter-step ,@state)))
-                        nil
-                        (values t ,symbol ,kind
-                                (car (truly-the list ,pkglist))))))
-             ,@body))))))
+  (let ((enable (logior (if (member :external  symbol-types) 1 0)
+                        (if (member :internal  symbol-types) 2 0)
+                        (if (member :inherited symbol-types) 4 0)))
+        (iter '#:iter))
+    `(let ((,iter (pkg-iter (package-listify ,package-list) ,enable))
+           (*clear-resized-symbol-tables*))
+       (declare (dynamic-extent ,iter))
+       (macrolet ((,mname ()
+                    ;; "status" is the term used in the doc of FIND-SYMBOL for its 2nd value
+                    '(multiple-value-bind (status package symbol) (package-iter-step ,iter)
+                       (when status (values t symbol status package)))))
+         ,@body))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun expand-pkg-iterator (range var body result-form)
@@ -535,15 +532,15 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;; of the maximum probe sequence length. We can do it now because the
 ;;; entire vector will be swapped, which is concurrent reader safe.
 (defun resize-symbol-table (table size reason &optional (load-factor 3/4))
-  (when (zerop size)
+  (when (zerop size) ; Q: when do we resize to zero; everything gets uninterned?
     (return-from resize-symbol-table
       ;; Don't need a barrier here. Suppose a reader finished probing with a miss.
       ;; Whether it re-probes again or not, it will surely result in a miss.
-      (setf (symtbl-%cells table)
-            (load-time-value (cons (make-symtbl-magic 0 0 0) #(0 0 0)) t)
-            (symtbl-free table) 0
-            (symtbl-size table) 0
-            (symtbl-deleted table) 0)))
+      (let ((new (load-time-value (cons (make-symtbl-magic 0 0 0) #(0 0 0)) t)))
+        (setf (symtbl-free table) 0
+              (symtbl-deleted table) 0
+              (symtbl-size table) 0
+              (symtbl-%cells table) new))))
   (let* ((temp-table (make-symbol-table size load-factor))
          (cells (symtbl-%cells temp-table))
          (reciprocals (car cells))
@@ -1108,9 +1105,9 @@ Experimental: interface subject to change."
 
 ;;; Add a symbol to a hashset. The symbol MUST NOT be present.
 ;;; This operation is under the WITH-PACKAGE-GRAPH lock if called by %INTERN.
-(defun add-symbol (table symbol reason)
+(defun add-symbol (table symbol reason &aux (cells (symtbl-%cells table)))
   (setf (symtbl-modified table) t)
-  (when (zerop (symtbl-free table))
+  (when (or (zerop (symtbl-free table)) (/= 0 (symtbl-immutable (car cells))))
     ;; The hashtable is full. Resize it to be able to hold twice the
     ;; amount of symbols than it currently contains. The actual new size
     ;; can be smaller than twice the current size if the table contained
@@ -1118,9 +1115,8 @@ Experimental: interface subject to change."
     ;; N.B.: Never pass 0 for the new size, as that will assign the
     ;; constant read-only vector #(0 0 0) into the cells.
     (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
-      (resize-symbol-table table new-size reason)))
-  (let* ((cells (symtbl-%cells table))
-         (reciprocals (car cells))
+      (setq cells (resize-symbol-table table new-size reason))))
+  (let* ((reciprocals (car cells))
          (vec (truly-the simple-vector (cdr cells)))
          (len (length vec))
          (name-hash (symbol-name-hash symbol))
@@ -2020,87 +2016,93 @@ PACKAGE."
 
 ;;; support for WITH-PACKAGE-ITERATOR
 
-(defun package-iter-init (access-types pkg-designator-list)
-  (declare (type (integer 1 7) access-types)) ; a nonzero bitmask over types
-  (values (logior (ash access-types 3) #b11) 0 #()
-          (package-listify pkg-designator-list)))
-
-;; The STATE parameter is comprised of 4 packed fields
-;;  [0:1] = substate {0=internal,1=external,2=inherited,3=initial}
-;;  [2]   = package with inherited symbols has shadowing symbols
-;;  [3:5] = enabling bits for {internal,external,inherited}
-;;  [6:]  = index into 'package-tables'
-;;
-(defconstant +package-iter-check-shadows+  #b000100)
-
-(defun package-iter-step (start-state index sym-vec pkglist)
-  ;; the defknown isn't enough
-  (declare (type fixnum start-state) (type index index)
-           (type simple-vector sym-vec) (type list pkglist))
-  (declare (optimize speed) (muffle-conditions compiler-note))
+(defun package-iter-step (iter)
+  (declare (optimize speed))
+  ;; Keeping in mind that (DO-SYMBOLS (s p) (EXPORT s p)) is a prevalent idiom among users,
+  ;; the right thing for us is to produce external symbols before producing internals.
+  ;; We'll never double-visit an external. It does mean, however, that we must solve the
+  ;; double-visit problem for UNEXPORT of externals, as those symbols will appear in
+  ;; internals. The difficulties are symmetrical, but solving the problem that occurs
+  ;; hypothetically less often is better, as the solution involves consing.
   (labels
-      ((advance (state) ; STATE is the one just completed
-         (case (logand state #b11)
-           ;; Test :INHERITED first because the state repeats for a package
-           ;; as many times as there are packages it uses. There are enough
-           ;; bits to count up to 2^23 packages if fixnums are 30 bits.
-           (2
-            (when (desired-state-p 2)
-              (let* ((tables (package-tables (this-package)))
-                     (next-state (the fixnum (+ state (ash 1 6))))
-                     (table-idx (ash next-state -6)))
-              (when (< table-idx (length tables))
-                (return-from advance ; remain in state 2
-                  (start next-state (svref tables table-idx))))))
-            (pop pkglist)
-            (advance 3)) ; start on next package
-           (1 ; finished externals, switch to inherited if desired
-            (when (desired-state-p 2)
-              (let ((tables (package-tables (this-package))))
-                (when (plusp (length tables)) ; inherited symbols
-                  (return-from advance ; enter state 2
-                    (start (if (package-%shadowing-symbols (this-package))
-                               (logior 2 +package-iter-check-shadows+) 2)
-                           (svref tables 0))))))
-            (advance 2)) ; skip state 2
-           (0 ; finished internals, switch to externals if desired
-            (if (desired-state-p 1) ; enter state 1
-                (start 1 (package-external-symbols (this-package)))
-                (advance 1))) ; skip state 1
-           (t ; initial state
-            (cond ((endp pkglist) ; latch into returning NIL forever more
-                   (values 0 0 #() '() nil nil))
-                  ((desired-state-p 0) ; enter state 0
-                   (start 0 (package-internal-symbols (this-package))))
-                  (t (advance 0)))))) ; skip state 0
-       (desired-state-p (target-state)
-         (logtest start-state (ash 1 (+ target-state 3))))
-       (this-package ()
-         (truly-the package (car pkglist)))
-       (start (next-state new-table)
-         (let ((symbols (symtbl-cells new-table)))
-           (package-iter-step (logior (mask-field (byte 3 3) start-state)
-                                      next-state)
-                              ;; assert that physical length was nonzero
-                              (the index (length symbols))
-                              symbols pkglist))))
-    (declare (inline desired-state-p this-package))
-    (if (zerop index)
-        (advance start-state)
-        (macrolet ((scan (&optional (guard t))
-                   `(loop
-                     (let ((sym (aref sym-vec (decf index))))
-                       (when (and (pkg-symbol-valid-p sym) ,guard)
-                         (return (values start-state index sym-vec pkglist sym
-                                         (aref #(:internal :external :inherited)
-                                               (logand start-state 3))))))
-                     (when (zerop index)
-                       (return (advance start-state))))))
+      ((advance-from-state (bits &aux (cur-pkg
+                                       (truly-the package (car (pkg-iter-pkglist iter)))))
+         ;; For most platforms, this CASE should become a jump-table, therefore the order
+         ;; in which to test clauses is not as relevant as if may have once been.
+         (case (logand bits #b11)
+           (2 ; state 2 repeats as many times as there are packages used by cur-package
+            (let* ((tables (package-tables cur-pkg))
+                   (next-state (the fixnum (+ bits #b100)))
+                   (table-idx (ash next-state -2)))
+              (if (< table-idx (length tables)) ; remain in state 2
+                  (start next-state (symtbl-cells (svref tables table-idx)))
+                  (start-next-pkg))))
+           (1 ; finished internals, switch to inherited if desired
+            (let ((tables (package-tables cur-pkg)))
+              (setf (pkg-iter-exclude iter) (package-%shadowing-symbols cur-pkg))
+              (if (and (plusp (length tables)) (logbitp 2 (pkg-iter-enable iter)))
+                  (start 2 (symtbl-cells (svref tables 0)))
+                  (start-next-pkg)))) ; bypass state 2 entirely
+           (0 ; finished externals, switch to internals if desired
+            (if (logbitp 1 (pkg-iter-enable iter)) ; enter state 1
+                (let ((snapshot (shiftf (pkg-iter-snapshot iter) nil)))
+                  (start 1 (cond ((null snapshot)
+                                  (symtbl-cells (package-internal-symbols cur-pkg)))
+                                 (t (atomic-decf (symtbl-immutable (car snapshot)))
+                                    (cdr snapshot)))))
+                (advance-from-state 1))) ; skip the internals
+           (3 ; initial state
+            (let ((pkglist (pkg-iter-pkglist iter)))
+              (cond ((not pkglist)
+                     (setf (pkg-iter-bits iter) -1) ; ensure further -STEP calls drop to state 3
+                     (values nil *cl-package* nil)) ; type-correct 2nd value!
+                    ((not (logbitp 0 (pkg-iter-enable iter))) (advance-from-state 0))
+                    (t ; enter state 0 (externals)
+                     (let ((pkg (truly-the package (car pkglist))))
+                       (when (logbitp 1 (pkg-iter-enable iter)) ; will visit internals
+                         ;; - Capture the internal symbol vector as it exists now, not later.
+                         ;; - Bump the copy-on-write count and undo it after visiting externals.
+                         ;;   But in fact it's benign for the user to stop iteration early, even
+                         ;;   through non-local exit. If that occurs, the C-O-W status sticks,
+                         ;;   causing ADD-SYMBOL to copy the table as though immutable,
+                         ;    which has no effect other than extra consing.
+                         (let ((other (symtbl-%cells (package-internal-symbols pkg))))
+                           (atomic-incf (symtbl-immutable (car other)))
+                           (setf (pkg-iter-snapshot iter) other)))
+                       (start 0 (symtbl-cells (package-external-symbols pkg))))))))))
+       (start (state vec)
+         (setf (pkg-iter-symbols iter) vec
+               (pkg-iter-cur-index iter) (length vec)
+               (pkg-iter-bits iter) state)
+         (package-iter-step iter))
+       (start-next-pkg ()
+         (setf (pkg-iter-exclude iter) nil)
+         (pop (pkg-iter-pkglist iter))
+         (advance-from-state 3))
+       (symbol-name= (a b)
+         ;; Symbols won't be string= unless their name hashes are =
+         ;; so I think it's worth guarding the slower test with a quicker test.
+         (and (= (symbol-name-hash a) (symbol-name-hash b))
+              (string= a b))))
+    ;; INDEX is decremented before use, so if it's already zero upon entry,
+    ;; then the current symbol set is exhausted.
+    (let ((index (pkg-iter-cur-index iter)))
+      (unless (zerop index)
+        (let ((sym-vec (pkg-iter-symbols iter))
+              (exclude (pkg-iter-exclude iter)))
           (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-          (if (logtest start-state +package-iter-check-shadows+)
-              (let ((shadows (package-%shadowing-symbols (this-package))))
-                (scan (not (member sym shadows :test #'string=))))
-              (scan))))))
+          (loop
+            (let ((sym (aref sym-vec (decf index))))
+              (when (and (pkg-symbol-valid-p sym)
+                         (not (and exclude (member sym exclude :test #'symbol-name=))))
+                (setf (pkg-iter-cur-index iter) index)
+                (return-from package-iter-step
+                  (values (aref #(:external :internal :inherited)
+                                (logand (pkg-iter-bits iter) 3))
+                          (truly-the package (car (pkg-iter-pkglist iter)))
+                          sym))))
+            (when (zerop index) (return))))))
+    (advance-from-state (pkg-iter-bits iter))))
 
 (defun program-assert-symbol-home-package-unlocked (context symbol control)
   (handler-bind ((package-lock-violation

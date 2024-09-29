@@ -1248,9 +1248,7 @@ if a restart was invoked."
         (push s result))
       (assert (member mmm result))
       (assert (member sym result))
-      #+nil ; not yet
-      (assert (= (length result) 2))
-      (assert (= (length (delete-duplicates result)) 2)))))
+      (assert (= (length result) 2)))))
 
 (with-test (:name (with-package-iterator :internal export))
   (when (find-package "SOM") (delete-package "SOM"))
@@ -1281,16 +1279,12 @@ if a restart was invoked."
          (multiple-value-bind (flag symbol accessibility package)
              (iter)
            (unless flag (return nil))
-           #+nil ; not yet
            (assert (eql accessibility :internal))
-           (assert (member accessibility '(:internal :external)))
            (export symbol package)
            (push symbol result))))
       (assert (member mmm result))
       (assert (member sym result))
-      #+nil ; not yet
-      (assert (= (length result) 2))
-      (assert (= (length (delete-duplicates result)) 2)))))
+      (assert (= (length result) 2)))))
 
 (with-test (:name (do-symbols unexport))
   (when (find-package "SOM") (delete-package "SOM"))

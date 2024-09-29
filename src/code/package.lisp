@@ -54,6 +54,10 @@
   ;; because the secondary hash is not computed by taking a remainder. It's just a mask.
   (hash2-mask 0 :type (unsigned-byte 32))
   ;(hash2-c    0 :type (unsigned-byte 32))
+  ;; Every extant package iterator (in any thread) can vote to make a table immutable.
+  ;; This affects ADD-SYMBOL but not NUKE-SYMBOL, the latter being informed by
+  ;; *CLEAR-RESIZED-SYMBOL-TABLES* as to zero-filling or not.
+  (immutable 0 :type sb-vm:word) ; copy-on-write if immutable > 0
   )
 
 (sb-xc:defstruct (symbol-table
@@ -78,6 +82,18 @@
   (free (missing-arg) :type index)
   ;; The number of deleted entries.
   (deleted 0 :type index))
+
+(sb-xc:defstruct (pkg-iter (:constructor pkg-iter (pkglist enable)))
+  (symbols #() :type simple-vector)
+  (cur-index 0 :type index)
+  (snapshot nil :type list) ; immutable view of internals
+  (exclude nil :type list) ; shadowing symbols, when and only when in state 2
+  ;; The BITS slot is composed of 2 packed fields:
+  ;;  [0:1] = state {-1=initial,0=externals,1=internals,2=inherited}
+  ;;  [2:]  = index into 'package-tables'
+  (bits -1 :type fixnum)
+  (enable 0 :type (unsigned-byte 3) :read-only t) ; 1 bit per {external,internal,inherited}
+  (pkglist nil :type list))
 
 ;;;; the PACKAGE structure
 

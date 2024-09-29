@@ -234,8 +234,8 @@
   ((or list package-designator) &optional package-designator) (eql t))
 (defknown find-all-symbols (string-designator) list (flushable))
 ;; private
-(defknown package-iter-step (fixnum index simple-vector list)
-  (values fixnum index simple-vector list symbol symbol))
+(defknown package-iter-step (sb-impl::pkg-iter)
+  (values (member :internal :external :inherited nil) package symbol))
 
 ;;;; from the "Numbers" chapter:
 
