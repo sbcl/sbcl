@@ -244,6 +244,28 @@
     (typep
      (-constraint-propagate-back nil x (specifier-type '(eql 0)) (lvar-type x) kind constraint gen consequent))))
 
+(defoptimizer (abs constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
+  (case kind
+    (typep
+     (flet ((add (lvar type)
+              (let ((var (and lvar
+                              (ok-lvar-lambda-var lvar gen))))
+                (when var
+                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+       (cond ((csubtypep constraint (specifier-type 'integer))
+              (let ((int (type-approximate-interval constraint t)))
+                (add x (specifier-type (if (and int
+                                                (typep (interval-high int) 'unsigned-byte))
+                                           `(integer ,(- (interval-high int))
+                                                     ,(interval-high int))
+                                           'integer)))
+                t))
+             ((csubtypep constraint (specifier-type 'rational))
+              (add x (specifier-type 'rational)))
+             ((csubtypep constraint (specifier-type 'float))
+              (add x (specifier-type '(or complex float)))))))))
+
 (defoptimizer (char-code constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value))
   (case kind
