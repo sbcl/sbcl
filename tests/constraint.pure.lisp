@@ -983,7 +983,17 @@
    (lambda (x)
      (when (> (- 3 x) 10)
        x))
-   (or real null)))
+   (or real null))
+  (assert-type
+   (lambda (x)
+     (when (floatp (- x))
+       x))
+   (or float null))
+  (assert-type
+   (lambda (x)
+     (when (typep (- x) '(integer 1 2))
+       x))
+   (or (integer -2 -1) null)))
 
 (with-test (:name :*back)
   (assert-type
