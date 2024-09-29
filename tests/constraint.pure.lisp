@@ -943,7 +943,7 @@
    (lambda (x y)
      (when (integerp (+ x y))
        x))
-   (or number null))
+   (or rational (complex rational) null))
   (assert-type
    (lambda (x y)
      (declare (real y))
@@ -996,7 +996,7 @@
      (declare ((real 0 3) m))
      (when (typep (* x m) '(integer 0 10))
        x))
-   (or number null))
+   (or (or rational (complex rational) null) null))
   (assert-type
    (lambda (x)
      (when (> (* x 3) 10)

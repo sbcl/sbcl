@@ -17,6 +17,53 @@
                             :exit-if-null))
         (funcall propagate node nth-value kind constraint gen consequent alternative)))))
 
+(defun numeric-contagion-constraint-back (x y gen constraint consequent &optional complex-p)
+  (flet ((add (lvar type)
+           (let ((var (ok-lvar-lambda-var lvar gen)))
+             (when var
+               (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+    (let ((real-type (if complex-p ;; complex rationals multiplied by 0 will produce an integer 0.
+                         (specifier-type '(and real (not (eql 0))))
+                         (specifier-type 'real))))
+      (cond ((csubtypep constraint (specifier-type 'rational))
+             (cond ((or (csubtypep (lvar-type x) real-type)
+                        (csubtypep (lvar-type y) real-type))
+                    (add x (specifier-type 'rational))
+                    (add y (specifier-type 'rational)))
+                   (t
+                    (add x (specifier-type '(or rational (complex rational))))
+                    (add y (specifier-type '(or rational (complex rational)))))))
+            ((and (csubtypep constraint (specifier-type 'double-float))
+                  (let ((x-double (types-equal-or-intersect (lvar-type x) (specifier-type 'double-float)))
+                        (y-double (types-equal-or-intersect (lvar-type y) (specifier-type 'double-float))))
+                    (or (when (and x-double
+                                   (not y-double)
+                                   (not (csubtypep (lvar-type x) (specifier-type 'double-float))))
+                          (add x (specifier-type 'double-float))
+                          t)
+                        (when (and y-double
+                                   (not x-double)
+                                   (not (csubtypep (lvar-type y) (specifier-type 'double-float))))
+                          (add x (specifier-type 'double-float))
+                          t)))))
+            ((and (csubtypep constraint (specifier-type 'single-float))
+                  (let ((x-double (types-equal-or-intersect (lvar-type x) (specifier-type 'double-float)))
+                        (y-double (types-equal-or-intersect (lvar-type y) (specifier-type 'double-float))))
+                    (when x-double
+                      (add x (specifier-type '(not double-float))))
+                    (when y-double
+                      (add y (specifier-type '(not double-float))))
+                    nil)))
+            ((csubtypep constraint (specifier-type 'real))
+             (let ((x-realp (csubtypep (lvar-type x) (specifier-type 'real)))
+                   (y-realp (csubtypep (lvar-type y) (specifier-type 'real))))
+               (cond ((and x-realp
+                           (not y-realp))
+                      (add y (specifier-type 'real)))
+                     ((and y-realp
+                           (not x-realp))
+                      (add x (specifier-type 'real))))))))))
+
 (defoptimizer (+ constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
   (case kind
@@ -27,34 +74,24 @@
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
                   (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
-       (cond ((csubtypep constraint (specifier-type 'integer))
-              (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
-                    (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
-                (flet ((int (c-interval x y)
-                         (let* ((y-interval (type-approximate-interval (lvar-type y) t))
-                                (int (and c-interval y-interval
-                                          (interval-sub c-interval y-interval))))
-                           (add x (specifier-type (if int
-                                                      `(integer ,(or (interval-low int) '*)
-                                                                ,(or (interval-high int) '*))
-                                                      'integer))))))
-                 (cond ((or y-integerp x-integerp)
-                        (let ((interval (type-approximate-interval constraint t)))
-                          (int interval y x)
-                          (int interval x y)))
-                       ((or (csubtypep (lvar-type x) (specifier-type 'real))
-                            (csubtypep (lvar-type y) (specifier-type 'real)))
-                        (add x (specifier-type 'rational))
-                        (add y (specifier-type 'rational)))))))
-             ((csubtypep constraint (specifier-type 'real))
-              (let ((x-realp (csubtypep (lvar-type x) (specifier-type 'real)))
-                    (y-realp (csubtypep (lvar-type y) (specifier-type 'real))))
-                (cond ((and x-realp
-                            (not y-realp))
-                       (add y (specifier-type 'real)))
-                      ((and y-realp
-                            (not x-realp))
-                       (add x (specifier-type 'real)))))))))))
+       (cond ((and (csubtypep constraint (specifier-type 'integer))
+                   (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
+                         (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
+                     (flet ((int (c-interval x y)
+                              (let* ((y-interval (type-approximate-interval (lvar-type y) t))
+                                     (int (and c-interval y-interval
+                                               (interval-sub c-interval y-interval))))
+                                (add x (specifier-type (if int
+                                                           `(integer ,(or (interval-low int) '*)
+                                                                     ,(or (interval-high int) '*))
+                                                           'integer))))))
+                       (when (or y-integerp x-integerp)
+                         (let ((interval (type-approximate-interval constraint t)))
+                           (int interval y x)
+                           (int interval x y))
+                         t)))))
+             (t
+              (numeric-contagion-constraint-back x y gen constraint consequent)))))))
 
 (defoptimizer (- constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
@@ -64,10 +101,10 @@
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
                   (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
-       (cond ((csubtypep constraint (specifier-type 'integer))
-              (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
-                    (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
-                (cond ((or y-integerp x-integerp)
+       (cond ((and (csubtypep constraint (specifier-type 'integer))
+                   (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
+                         (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
+                     (when (or y-integerp x-integerp)
                        (let ((c-interval (type-approximate-interval constraint t)))
                          (let* ((y-interval (type-approximate-interval (lvar-type y) t))
                                 (int (and c-interval
@@ -84,20 +121,10 @@
                            (add y (specifier-type (if int
                                                       `(integer ,(or (interval-low int) '*)
                                                                 ,(or (interval-high int) '*))
-                                                      'integer))))))
-                      ((or (csubtypep (lvar-type x) (specifier-type 'real))
-                           (csubtypep (lvar-type y) (specifier-type 'real)))
-                       (add x (specifier-type 'rational))
-                       (add y (specifier-type 'rational))))))
-             ((csubtypep constraint (specifier-type 'real))
-              (let ((x-realp (csubtypep (lvar-type x) (specifier-type 'real)))
-                    (y-realp (csubtypep (lvar-type y) (specifier-type 'real))))
-                (cond ((and x-realp
-                            (not y-realp))
-                       (add y (specifier-type 'real)))
-                      ((and y-realp
-                            (not x-realp))
-                       (add x (specifier-type 'real)))))))))))
+                                                      'integer)))))
+                       t))))
+             (t
+              (numeric-contagion-constraint-back x y gen constraint consequent)))))))
 
 (defoptimizer (* constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
@@ -107,57 +134,52 @@
               (let ((var (ok-lvar-lambda-var lvar gen)))
                 (when var
                   (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
-       (let* ((complex-p (or (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))
-                             (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))))
-              ;; complex rationals multiplied by 0 will produce an integer 0.
-              (real-type (if complex-p
-                             (specifier-type '(and real (not (eql 0))))
-                             (specifier-type 'real))))
-         (cond ((csubtypep constraint (specifier-type 'integer))
-                (let* ((rational-type (if complex-p
-                                          (specifier-type '(and rational (not (eql 0))))
-                                          (specifier-type 'rational)))
-                       (x-rationalp (csubtypep (lvar-type x) rational-type))
-                       (y-rationalp (csubtypep (lvar-type y) rational-type)))
-                  (flet ((int (c-interval x y)
-                           (let* ((y-interval (type-approximate-interval (lvar-type y) t))
-                                  (int (and c-interval
-                                            y-interval
-                                            (interval-div c-interval y-interval))))
-                             (add x (specifier-type (if int
-                                                        `(rational ,(or (interval-low int) '*)
-                                                                   ,(or (interval-high int) '*))
-                                                        'rational))))))
-                    (cond ((or y-rationalp x-rationalp)
-                           (let ((interval (type-approximate-interval constraint t))
-                                 (x-zerop (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0))))
-                                 (y-zerop (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
-                             (cond ((not interval))
-                                   ((and (interval-contains-p 0 interval)
-                                         (or x-zerop y-zerop))
-                                    ;; If one is not zero the other must include a zero
-                                    (if x-zerop
-                                        (add y (specifier-type 'rational))
-                                        (int interval y x))
-                                    (if y-zerop
-                                        (add x (specifier-type 'rational))
-                                        (int interval x y)))
-                                   (t
-                                    (int interval y x)
-                                    (int interval x y)))))
-                          ((or (csubtypep (lvar-type x) real-type)
-                               (csubtypep (lvar-type y) real-type))
-                           (add x (specifier-type 'rational))
-                           (add y (specifier-type 'rational)))))))
-               ((csubtypep constraint (specifier-type 'real))
-                (let ((x-realp (csubtypep (lvar-type x) real-type))
-                      (y-realp (csubtypep (lvar-type y) real-type)))
-                  (cond ((and x-realp
-                              (not y-realp))
-                         (add y (specifier-type 'real)))
-                        ((and y-realp
-                              (not x-realp))
-                         (add x (specifier-type 'real))))))))))))
+       (let ((complex-p (or (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))
+                            (types-equal-or-intersect (lvar-type y) (specifier-type 'complex)))))
+         (cond ((and
+                 (csubtypep constraint (specifier-type 'integer))
+                 (let* ((rational-type (if complex-p
+                                           (specifier-type '(and rational (not (eql 0))))
+                                           (specifier-type 'rational)))
+                        (x-rationalp (csubtypep (lvar-type x) rational-type))
+                        (y-rationalp (csubtypep (lvar-type y) rational-type)))
+                   (flet ((int (c-interval x y)
+                            (let* ((y-interval (type-approximate-interval (lvar-type y) t))
+                                   (int (and c-interval
+                                             y-interval
+                                             (interval-div c-interval y-interval))))
+                              (add x (specifier-type (if int
+                                                         `(rational ,(or (interval-low int) '*)
+                                                                    ,(or (interval-high int) '*))
+                                                         'rational))))))
+                     (when (or y-rationalp x-rationalp)
+                       (let ((interval (type-approximate-interval constraint t))
+                             (x-zerop (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0))))
+                             (y-zerop (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
+                         (cond ((not interval)
+                                nil)
+                               ((and (interval-contains-p 0 interval)
+                                     (or x-zerop y-zerop))
+                                ;; If one is not zero the other must include a zero
+                                (if x-zerop
+                                    (add y (specifier-type 'rational))
+                                    (int interval y x))
+                                (if y-zerop
+                                    (add x (specifier-type 'rational))
+                                    (int interval x y))
+                                t)
+                               (t
+                                (int interval y x)
+                                (int interval x y)
+                                t))))))))
+               (t
+                (numeric-contagion-constraint-back x y gen constraint consequent complex-p))))))))
+
+(defoptimizer (/ constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
+  (case kind
+    (typep
+     (numeric-contagion-constraint-back x y gen constraint consequent))))
 
 (defoptimizers constraint-propagate-back (car cdr) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
