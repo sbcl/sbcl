@@ -3490,9 +3490,9 @@ used for a COMPLEX component.~:@>"
                    :complexp (cond ((and (eq complexp1 :real)
                                          (eq complexp2 :real))
                                     :real)
-                                   ((or (null complexp1) (null complexp2))
-                                    nil)
-                                   (t :complex))))
+                                   ((or (eq complexp1 :complex)
+                                        (eq complexp2 :complex))
+                                    :complex))))
                  ((eq class2 'float) (numeric-contagion type2 type1))
                  ((and (eq complexp1 :real) (eq complexp2 :real))
                   (if (or rational

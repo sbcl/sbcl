@@ -613,3 +613,13 @@
          (< a b))
     ((6 4.0) nil)
     ((1 1.1) t)))
+
+(with-test (:name :complex+non-complex-type)
+  (assert-type
+   (lambda (a)
+     (+ a #c(1.0 3.0)))
+   (or (complex single-float) (complex double-float)))
+  (assert-type
+   (lambda (a)
+     (* a #c(1d0 0d0)))
+    (complex double-float)))
