@@ -356,7 +356,7 @@
 
   ;; FIXME this is a lie, of course this can fail, but there's no
   ;; error handling here yet!
-  (define-call ("posix_fork" :c-name "fork") pid-t minusp)
+  (define-call-internally posix-fork "fork" pid-t minusp)
   (defun fork ()
     "Forks the current process, returning 0 in the new process and the PID of
 the child process in the parent. Forking while multiple threads are running is
