@@ -17,14 +17,18 @@
                             :exit-if-null))
         (funcall propagate node nth-value kind constraint gen consequent alternative)))))
 
+(defun add-back-constraint (gen kind x y target)
+  (when x
+    (let ((var (ok-lvar-lambda-var x gen)))
+      (if var
+          (conset-add-constraint-to-eql gen kind var y nil target)
+          (constraint-propagate-back x kind y gen target nil)))))
+
 (defun numeric-contagion-constraint-back (x y gen constraint consequent &optional complex-p
                                                                                   (x-type (lvar-type x))
                                                                                   (y-type (lvar-type y)))
   (flet ((add (lvar type)
-           (let ((var (and lvar
-                           (ok-lvar-lambda-var lvar gen))))
-             (when var
-               (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+           (add-back-constraint gen 'typep lvar type consequent)))
     (let ((real-type (if complex-p ;; complex rationals multiplied by 0 will produce an integer 0.
                          (specifier-type '(and real (not (eql 0))))
                          (specifier-type 'real))))
@@ -88,9 +92,7 @@
      ;; (integerp (+ integer y)) means Y is an integer too.
      ;; (integerp (+ y-real x-real)) means X and Y are rational.
      (flet ((add (lvar type)
-              (let ((var (ok-lvar-lambda-var lvar gen)))
-                (when var
-                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+              (add-back-constraint gen 'typep lvar type consequent)))
        (cond ((and (csubtypep constraint (specifier-type 'integer))
                    (let ((x-integerp (csubtypep (lvar-type x) (specifier-type 'integer)))
                          (y-integerp (csubtypep (lvar-type y) (specifier-type 'integer))))
@@ -114,10 +116,7 @@
   (case kind
     (typep
      (flet ((add (lvar type)
-              (let ((var (and lvar
-                              (ok-lvar-lambda-var lvar gen))))
-                (when var
-                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+              (add-back-constraint gen 'typep lvar type consequent)))
        (cond ((and (csubtypep constraint (specifier-type 'integer))
                    (let ((x-integerp (csubtypep x-type (specifier-type 'integer)))
                          (y-integerp (csubtypep y-type (specifier-type 'integer))))
@@ -152,9 +151,7 @@
   (case kind
     (typep
      (flet ((add (lvar type)
-              (let ((var (ok-lvar-lambda-var lvar gen)))
-                (when var
-                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+              (add-back-constraint gen 'typep lvar type consequent)))
        (let ((complex-p (or (types-equal-or-intersect (lvar-type x) (specifier-type 'complex))
                             (types-equal-or-intersect (lvar-type y) (specifier-type 'complex)))))
          (cond ((and
@@ -237,10 +234,7 @@
        (let ((range (type-approximate-interval (lvar-type constraint))))
          (when (and range
                     (numberp (interval-high range)))
-           (let ((var (ok-lvar-lambda-var x gen)))
-             (when var
-               (conset-add-constraint-to-eql gen 'typep var (specifier-type `(rational (,(- (interval-high range)))))
-                                             nil consequent)))))))
+           (add-back-constraint gen 'typep x (specifier-type `(rational (,(- (interval-high range))))) consequent)))))
     (typep
      (-constraint-propagate-back nil x (specifier-type '(eql 0)) (lvar-type x) kind constraint gen consequent))))
 
@@ -249,10 +243,7 @@
   (case kind
     (typep
      (flet ((add (lvar type)
-              (let ((var (and lvar
-                              (ok-lvar-lambda-var lvar gen))))
-                (when var
-                  (conset-add-constraint-to-eql gen 'typep var type nil consequent)))))
+              (add-back-constraint gen 'typep lvar type consequent)))
        (cond ((csubtypep constraint (specifier-type 'integer))
               (let ((int (type-approximate-interval constraint t)))
                 (add x (specifier-type (if (and int

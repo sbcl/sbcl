@@ -1775,3 +1775,10 @@
                m))
          t))
    (eql t)))
+
+(with-test (:name :multiple-back)
+  (assert-type
+   (lambda (m)
+     (the (integer 0 30) (+ (* m 2) 2))
+     m)
+   (rational -1 14)))
