@@ -122,7 +122,7 @@
                          (y-integerp (csubtypep y-type (specifier-type 'integer))))
                      (when (or y-integerp x-integerp)
                        (let ((c-interval (type-approximate-interval constraint t)))
-                         (let* ((y-interval (type-approximate-interval (lvar-type y) t))
+                         (let* ((y-interval (type-approximate-interval y-type t))
                                 (int (and c-interval
                                           y-interval
                                           (interval-add c-interval y-interval))))
@@ -211,19 +211,44 @@
 ;;; If the remainder is non-zero then X can't be zero.
 (defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
   (let ((var (ok-lvar-lambda-var x gen)))
-   (when (and var
-              (eql nth-value 1)
-              (csubtypep (lvar-type x) (specifier-type 'integer))
-              (csubtypep (lvar-type y) (specifier-type 'integer)))
-     (case kind
-       (eql
-        (when (and (constant-p constraint)
-                   (eql (constant-value constraint) 0)
-                   alternative)
-          (conset-add-constraint-to-eql gen 'typep var (specifier-type '(and integer (not (eql 0)))) nil alternative)))
-       (>
-        (when (csubtypep (lvar-type constraint) (specifier-type '(integer 0)))
-          (conset-add-constraint-to-eql gen 'typep var (specifier-type '(integer 1)) nil consequent)))))))
+    (cond
+      ((and var
+            (eql nth-value 1)
+            (csubtypep (lvar-type x) (specifier-type 'integer))
+            (csubtypep (lvar-type y) (specifier-type 'integer)))
+       (case kind
+         (eql
+          (when (and (constant-p constraint)
+                     (eql (constant-value constraint) 0)
+                     alternative)
+            (conset-add-constraint-to-eql gen 'typep var (specifier-type '(and integer (not (eql 0)))) nil alternative)))
+         (>
+          (when (csubtypep (lvar-type constraint) (specifier-type '(integer 0)))
+            (conset-add-constraint-to-eql gen 'typep var (specifier-type '(integer 1)) nil consequent)))))
+      ((and (eq kind 'typep)
+            (not nth-value))
+       (flet ((add (lvar type)
+                (add-back-constraint gen 'typep lvar type consequent)))
+         (cond ((and
+                 (csubtypep constraint (specifier-type 'integer))
+                 (csubtypep (lvar-type x) (specifier-type 'integer))
+                 (csubtypep (lvar-type y) (specifier-type 'integer)))
+                (let ((c-interval (type-approximate-interval constraint t))
+                      (y-interval (type-approximate-interval (lvar-type y) t)))
+                  (when (and c-interval y-interval)
+                    (let ((c-low (interval-low c-interval))
+                          (c-high (interval-high c-interval))
+                          (y-low (interval-low y-interval))
+                          (y-high (interval-high y-interval)))
+                      (when (and c-low c-high
+                                 y-low y-high
+                                 (>= y-low 0))
+                        (add x (specifier-type `(integer ,(if (<= c-low 0)
+                                                              (- (* c-low y-high) (1- y-high))
+                                                              (* c-low y-low))
+                                                         ,(if (< c-high 0)
+                                                              (* c-high y-low)
+                                                              (+ (* c-high y-high) (1- y-high)))))))))))))))))
 
 (defoptimizer (%negate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
