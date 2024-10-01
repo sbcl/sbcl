@@ -100,7 +100,15 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 44
-    (inst addi result cfp-tn (tn-byte-offset tn))
+    ;; ADD-IMM needs 3 instructions usually, but this way almost always needs
+    ;; at most 2 instructions in all likelihood.
+    (do ((src-operand cfp-tn)
+         (imm (tn-byte-offset tn)))
+        ((zerop imm))
+      (let ((short-imm (min imm 2040))) ; 2040 = maximum short immediate
+        (inst addi result src-operand short-imm)
+        (setq src-operand result)
+        (zerop (decf imm short-imm))))
     (load-current-unwind-protect-block temp)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
