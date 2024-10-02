@@ -33,7 +33,8 @@
                          (specifier-type '(and real (not (eql 0))))
                          (specifier-type 'real))))
       (cond ((csubtypep constraint (specifier-type 'rational))
-             (cond ((or (csubtypep x-type real-type)
+             (cond ((or (and x-type
+                             (csubtypep x-type real-type))
                         (csubtypep y-type real-type))
                     (add x (specifier-type 'rational))
                     (add y (specifier-type 'rational)))
@@ -249,6 +250,15 @@
                                                          ,(if (< c-high 0)
                                                               (* c-high y-low)
                                                               (+ (* c-high y-high) (1- y-high)))))))))))))))))
+
+(defoptimizer (unary-truncate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value alternative))
+  (case kind
+    (typep
+     (cond ((csubtypep constraint (specifier-type 'integer))
+            (add-back-constraint gen 'typep x (specifier-type 'integer) consequent))
+           (t
+            (numeric-contagion-constraint-back nil x gen constraint consequent nil nil (lvar-type x)))))))
 
 (defoptimizer (%negate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))

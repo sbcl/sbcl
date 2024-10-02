@@ -1818,4 +1818,9 @@
               ((integer 3 5) d))
      (if (typep (truncate m d) '(integer -5 -2))
          m))
-   (or (integer -29 -6) null)))
+   (or (integer -29 -6) null))
+  (assert-type
+   (lambda (m)
+     (if (typep (nth-value 1 (truncate m)) 'double-float)
+         m))
+   (or double-float null)))
