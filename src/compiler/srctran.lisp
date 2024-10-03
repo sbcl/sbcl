@@ -730,17 +730,17 @@
                                     ;; less than one can round to zero.
                                     `(or (not (fp-zero-p ,res))
                                          (cond ((and (consp ,x) (fp-zero-p ,xb))
-                                                (>= (abs ,yb) 1))
+                                                (sb-xc:>= (abs ,yb) 1))
                                                ((and (consp ,y) (fp-zero-p ,yb))
-                                                (>= (abs ,xb) 1)))))
+                                                (sb-xc:>= (abs ,xb) 1)))))
                                    (sb-xc:/
                                     ;; Dividing a greater-than-zero with
                                     ;; greater than one can round to zero.
                                     `(or (not (fp-zero-p ,res))
                                          (cond ((and (consp ,x) (fp-zero-p ,xb))
-                                                (<= (abs ,yb) 1))
+                                                (sb-xc:<= (abs ,yb) 1))
                                                ((and (consp ,y) (fp-zero-p ,yb))
-                                                (<= (abs ,xb) 1)))))
+                                                (sb-xc:<= (abs ,xb) 1)))))
                                    ((sb-xc:+ sb-xc:-)
                                     ;; Adding or subtracting greater-than-zero
                                     ;; can end up with identity.

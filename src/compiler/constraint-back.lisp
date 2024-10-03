@@ -210,13 +210,13 @@
            (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null)) nil consequent)))))))
 
 ;;; If the remainder is non-zero then X can't be zero.
-(defoptimizer (truncate constraint-propagate-back) ((x y) node nth-value kind constraint gen consequent alternative)
+(defoptimizer (truncate constraint-propagate-back) ((x d) node nth-value kind constraint gen consequent alternative)
   (let ((var (ok-lvar-lambda-var x gen)))
     (cond
       ((and var
             (eql nth-value 1)
             (csubtypep (lvar-type x) (specifier-type 'integer))
-            (csubtypep (lvar-type y) (specifier-type 'integer)))
+            (csubtypep (lvar-type d) (specifier-type 'integer)))
        (case kind
          (eql
           (when (and (constant-p constraint)
@@ -229,32 +229,83 @@
       ((eq kind 'typep)
        (if (eql nth-value 1)
            (cond ((and (csubtypep constraint (specifier-type 'integer))
-                       (csubtypep (lvar-type y) (specifier-type 'integer)))
+                       (csubtypep (lvar-type d) (specifier-type 'integer)))
                   (add-back-constraint gen 'typep x (specifier-type 'integer) consequent))
                  (t
-                  (numeric-contagion-constraint-back x y gen constraint consequent)))
-           (flet ((add (lvar type)
-                    (add-back-constraint gen 'typep lvar type consequent)))
-             (cond ((and
-                     (csubtypep constraint (specifier-type 'integer))
-                     (csubtypep (lvar-type x) (specifier-type 'integer))
-                     (csubtypep (lvar-type y) (specifier-type 'integer)))
+                  (numeric-contagion-constraint-back x d gen constraint consequent)))
+           (cond ((and
+                   (csubtypep constraint (specifier-type 'integer))
+                   (csubtypep (lvar-type x) (specifier-type 'integer))
+                   (csubtypep (lvar-type d) (specifier-type 'integer)))
+                  (flet ((add (lvar type)
+                           (add-back-constraint gen 'typep lvar type consequent)))
                     (let ((c-interval (type-approximate-interval constraint t))
-                          (y-interval (type-approximate-interval (lvar-type y) t)))
-                      (when (and c-interval y-interval)
+                          (d-interval (type-approximate-interval (lvar-type d) t)))
+                      (when (and c-interval d-interval)
                         (let ((c-low (interval-low c-interval))
                               (c-high (interval-high c-interval))
-                              (y-low (interval-low y-interval))
-                              (y-high (interval-high y-interval)))
+                              (d-low (interval-low d-interval))
+                              (d-high (interval-high d-interval)))
                           (when (and c-low c-high
-                                     y-low y-high
-                                     (>= y-low 0))
-                            (add x (specifier-type `(integer ,(if (<= c-low 0)
-                                                                  (- (* c-low y-high) (1- y-high))
-                                                                  (* c-low y-low))
-                                                             ,(if (< c-high 0)
-                                                                  (* c-high y-low)
-                                                                  (+ (* c-high y-high) (1- y-high))))))))))))))))))
+                                     d-low d-high)
+                            ;; No division by zero
+                            (cond ((= d-low 0)
+                                   (setf d-low 1))
+                                  ((= d-high 0)
+                                   (setf d-high -1)))
+                            (let* ((c-both (and (< c-low 0)
+                                                (>= c-high 0)))
+                                   (d-both (and (< d-low 0)
+                                                (> d-high 0)))
+                                   (l (cond ((and c-both
+                                                  d-both)
+                                             (min (- (* c-low d-high) (1- d-high))
+                                                  (+ (* d-low c-high) (1+ d-low))))
+                                            (c-both
+                                             (if (< d-high 0)
+                                                 (+ (* d-low c-high) (1+ d-low))
+                                                 (- (* c-low d-high) (1- d-high))))
+                                            (d-both
+                                             (if (< c-high 0)
+                                                 (- (* c-low d-high) (1- d-high))
+                                                 (+ (* d-low c-high) (1+ d-low))))
+                                            ((and (< c-high 0)
+                                                  (< d-high 0))
+                                             (* c-high d-high))
+                                            ((< c-high 0)
+                                             (- (* c-low d-high) (1- d-high)))
+                                            ((< d-high 0)
+                                             (+ (* d-low c-high) (1+ d-low)))
+                                            (t
+                                             (* c-low d-low))))
+                                   (h
+                                     (cond ((and c-both
+                                                 d-both)
+                                            (max (+ (* c-low d-low) (1- (- d-low)))
+                                                 (+ (* d-high c-high) (1- d-high))))
+                                           (c-both
+                                            (if (< d-high 0)
+                                                (+ (* c-low d-low) (1- (- d-low)))
+                                                (+ (* d-high c-high) (1- d-high))))
+                                           (d-both
+                                            (if (<= c-high 0)
+                                                (+ (* c-low d-low) (1- (- d-low)))
+                                                (+ (* d-high c-high) (1- d-high))))
+                                           ((and (< c-high 0)
+                                                 (< d-high 0))
+                                            (+ (* c-low d-low) (1- (- d-low))))
+                                           ((< c-high 0)
+                                            (* c-high d-low))
+                                           ((< d-high 0)
+                                            (* c-low d-high))
+                                           (t
+                                            (+ (* d-high c-high) (1- d-high))))))
+                              (when (interval-contains-p 0 c-interval)
+                                (let ((max (1- (max (abs d-low)
+                                                    (abs d-high)))))
+                                  (setf l (min l (- max))
+                                        h (max h max))))
+                              (add x (specifier-type `(integer ,l ,h))))))))))))))))
 
 (defoptimizer (unary-truncate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
   (declare (ignore nth-value alternative))
