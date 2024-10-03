@@ -966,7 +966,12 @@
               (fixnum x))
      (when (typep (+ m x) '(integer 2 4))
        x))
-   (or (integer -2 2) null)))
+   (or (integer -2 2) null))
+  (assert-type
+   (lambda (m)
+     (the (integer 0 30) (+ m m))
+     m)
+   rational))
 
 (with-test (:name :-back)
   (assert-type
@@ -993,7 +998,12 @@
    (lambda (x)
      (when (typep (- x) '(integer 1 2))
        x))
-   (or (integer -2 -1) null)))
+   (or (integer -2 -1) null))
+  (assert-type
+   (lambda (m)
+     (the real (+ m m))
+     m)
+   real))
 
 (with-test (:name :*back)
   (assert-type
@@ -1018,7 +1028,12 @@
               (integer m))
      (when (typep (* x m) 'integer)
        x))
-   (or rational null)))
+   (or rational null))
+  (assert-type
+   (lambda (m)
+     (the (integer 0 30) (* m m))
+     m)
+   integer))
 
 (with-test (:name :ignore-hairy-types)
   (checked-compile
