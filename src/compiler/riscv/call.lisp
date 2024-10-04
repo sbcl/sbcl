@@ -773,6 +773,7 @@
          (return-pc :scs (any-reg) :target ra)
          (value))
   (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
+  (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:ignore value)
   (:vop-var vop)
   (:generator 6
@@ -782,7 +783,7 @@
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (inst li nargs-tn -1) ; mark single value return
+    (inst li nargs -1) ; mark single value return
     (move ra return-pc)
     (inst jalr zero-tn ra 0)))
 
