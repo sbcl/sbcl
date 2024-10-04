@@ -1033,7 +1033,12 @@
    (lambda (m)
      (the (integer 0 30) (* m m))
      m)
-   integer))
+   integer)
+  (assert-type
+   (lambda (m)
+     (when (typep (+ m 1) 'float)
+       m))
+   (or null float)))
 
 (with-test (:name :ignore-hairy-types)
   (checked-compile

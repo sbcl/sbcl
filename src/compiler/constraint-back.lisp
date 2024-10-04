@@ -81,11 +81,18 @@
                            (when y-double
                              (add y (specifier-type '(not double-float))))
                            nil)))))
-            ((and (or (not x)
+            ((and (csubtypep constraint (specifier-type 'float))
+                  (cond
+                    ((or
+                      (not x)
                       (and same-leaf-not-complex
-                           (same-leaf-ref-p x y)))
-                  (csubtypep constraint (specifier-type 'float)))
-             (add y (specifier-type 'float)))
+                           (same-leaf-ref-p x y))
+                      (not (types-equal-or-intersect x-type (specifier-type 'float))))
+                     (add y (specifier-type 'float))
+                     t)
+                    ((not (types-equal-or-intersect y-type (specifier-type 'float)))
+                     (add x (specifier-type 'float))
+                     t))))
             ((and (not x)
                   (csubtypep constraint (specifier-type 'complex)))
              (add y (specifier-type 'complex)))
