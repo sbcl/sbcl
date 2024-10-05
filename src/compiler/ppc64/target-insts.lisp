@@ -17,6 +17,7 @@
                4
                (dstate-byte-order dstate)))
 
+#+ppc64
 (defun ds-annotate (value stream dstate)
   ;; If the preceding instruction is ADDIS $LIP,$GC-CARD-TABLE,imm
   ;; and this is LD $LIP,$LIP,imm then it's a linkage table ref.
