@@ -17,6 +17,23 @@
                4
                (dstate-byte-order dstate)))
 
+(defun ds-annotate (value stream dstate)
+  ;; If the preceding instruction is ADDIS $LIP,$GC-CARD-TABLE,imm
+  ;; and this is LD $LIP,$LIP,imm then it's a linkage table ref.
+  (princ value stream)
+  (let* ((sap (dstate-segment-sap dstate))
+         (prev-inst (sap-ref-32 sap (+ (dstate-cur-offs dstate) -4)))
+         (this-inst (sap-ref-32 sap (+ (dstate-cur-offs dstate)))))
+    (when (and (= (ash prev-inst -16) #x3FF1)
+               (= (ash this-inst -16) #xEBFF))
+      (let* ((si-hi (sign-extend (ldb (byte 16 0) prev-inst) 16))
+             (si-lo value)
+             ;; BIAS is what the arg to ADDIS would be to get index 0 into the linkage space
+             (bias (ash 1 (- (+ sb-vm:n-linkage-index-bits sb-vm:word-shift) 16)))
+             (index (+ (ash (+ si-hi bias) 16) si-lo))
+             (name (sb-vm::linkage-addr->name index :rel)))
+        (note (lambda (stream) (princ name stream)) dstate)))))
+
 (defun maybe-add-notes (regno dstate)
   (let ((inst (current-instruction dstate))
         (symbolic-inst (sb-disassem::dstate-inst dstate)))
@@ -41,22 +58,6 @@
                       (= (ldb (byte 5 16) prev) 0)
                       (= (ldb (byte 5 21) prev) ra))
              (note-code-constant (ldb (byte 16 0) prev) dstate)))))
-      #+ppc64
-      (addis
-       ;; look for the intruction pair denoting a linkage table ref:
-       ;;   ADDIS $LIP,$GC-CARD-TABLE,imm  / LD $LIP,$LIP,imm
-       ;; Only do this when reg = LIP since MAYBE-ADD-NOTES occurs once per register.
-       (let ((next (current-instruction dstate 4)))
-         (when (and (= regno sb-vm::lip-offset)
-                    (= (logand inst #xFFFF0000) #x3FF10000)
-                    (= (logand next #xFFFF0000) #xEBFF0000))
-         (let* ((si-high (sign-extend (ldb (byte 16 0) inst) 16))
-                (si-low  (sign-extend (ldb (byte 16 0) next) 16))
-                ;; BIAS is what the arg to ADDIS would be to get index 0 into the linkage space
-                (bias (ash 1 (- (+ sb-vm:n-linkage-index-bits sb-vm:word-shift) 16)))
-                (index (+ (ash (+ si-high bias) 16) si-low))
-                (name (sb-vm::linkage-addr->name index :rel)))
-           (note (lambda (stream) (princ name stream)) dstate)))))
       (addi
        (when (= regno null-offset)
          (maybe-note-nil-indexed-object (ldb (byte 16 0) inst) dstate))))))

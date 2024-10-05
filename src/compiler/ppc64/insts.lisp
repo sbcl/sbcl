@@ -415,7 +415,10 @@
 (def-ppc-iformat (d '(:name :tab rt "," d "(" ra ")"))
   rt ra d)
 
-(def-ppc-iformat (ds '(:name :tab rt "," ds "(" ra ")")) ; D scaled
+(def-ppc-iformat (ds '(:name :tab rt "," ; D scaled
+                       #+ppc64 (:using #'ds-annotate ds)
+                       #+ppc ds
+                       "(" ra ")"))
   rt ra ds (subop ds-form-subop))
 
 (def-ppc-iformat (d-si '(:name :tab rt "," ra "," si )) ; D with signed immediate
