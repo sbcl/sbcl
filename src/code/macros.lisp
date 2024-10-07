@@ -114,7 +114,7 @@ tree structure resulting from the evaluation of EXPRESSION."
               (not (member name entry-points :test #'equal))))))
 
 (defun specialized-xep-for-type-p (lambda-list type)
-  (and #+(or arm64 x86-64) t
+  (and #-(or arm64 x86-64) nil
        (fun-type-p type)
        (not (or (fun-type-optional type)
                 (fun-type-keyp type)
