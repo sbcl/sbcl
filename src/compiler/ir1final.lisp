@@ -294,8 +294,9 @@
 (defun change-full-call (combination new-fun-name)
   (let ((ref (lvar-uses (combination-fun combination))))
     (when (ref-p ref)
-      (setf (combination-fun-info combination)
-            (fun-info-or-lose new-fun-name))
+      (when (combination-fun-info combination)
+        (setf (combination-fun-info combination)
+              (fun-info-or-lose new-fun-name)))
       (change-ref-leaf
        ref
        (find-free-fun new-fun-name ""))
@@ -304,37 +305,41 @@
 (defun rewrite-full-call (combination)
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (when (eq (combination-kind combination) :known)
-      (let ((two-arg (assoc combination-name *two-arg-functions*)))
-        (when (and two-arg
-                   (= (length args) 2))
-          (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
-            (declare (ignore name))
-            (when (and types
-                       (loop for arg in args
-                             for type in types
-                             always (csubtypep (lvar-type arg) type)))
-              (setf two-arg typed-two-arg))
-            (change-full-call combination two-arg))))
-      (let ((lvar (node-lvar combination)))
-        (when (or (lvar-single-value-p lvar)
-                  (mv-bind-unused-p lvar 1))
-          (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
-                                          floor sb-kernel::floor1
-                                          ceiling sb-kernel::ceiling1)
-                                        combination-name)))
-            (when single-value-fun
-              (unless (cdr args)
-                (let* ((leaf (find-constant 1))
-                       (ref (make-ref leaf))
-                       (lvar (make-lvar combination)))
-                  (use-lvar ref lvar)
-                  (push ref (leaf-refs leaf))
-                  (insert-ref-before ref combination-name)
-                  (setf (cdr args) (list lvar))))
-              (change-full-call combination single-value-fun)
-              (setf (node-derived-type combination)
-                    (make-single-value-type (single-value-type (node-derived-type combination)))))))))))
+    (cond ((eq (combination-kind combination) :known)
+           (let ((two-arg (assoc combination-name *two-arg-functions*)))
+             (when (and two-arg
+                        (= (length args) 2))
+               (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
+                 (declare (ignore name))
+                 (when (and types
+                            (loop for arg in args
+                                  for type in types
+                                  always (csubtypep (lvar-type arg) type)))
+                   (setf two-arg typed-two-arg))
+                 (change-full-call combination two-arg))))
+           (let ((lvar (node-lvar combination)))
+             (when (or (lvar-single-value-p lvar)
+                       (mv-bind-unused-p lvar 1))
+               (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
+                                               floor sb-kernel::floor1
+                                               ceiling sb-kernel::ceiling1)
+                                             combination-name)))
+                 (when single-value-fun
+                   (unless (cdr args)
+                     (let* ((leaf (find-constant 1))
+                            (ref (make-ref leaf))
+                            (lvar (make-lvar combination)))
+                       (use-lvar ref lvar)
+                       (push ref (leaf-refs leaf))
+                       (insert-ref-before ref combination-name)
+                       (setf (cdr args) (list lvar))))
+                   (change-full-call combination single-value-fun)
+                   (setf (node-derived-type combination)
+                         (make-single-value-type (single-value-type (node-derived-type combination)))))))))
+          ((not (fun-lexically-notinline-p combination-name (node-lexenv combination)))
+           (let ((specialized (info :function :specialized-xep combination-name)))
+             (when specialized
+               (change-full-call combination `(sb-impl::specialized-xep ,combination-name ,@specialized))))))))
 
 ;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
 ;;; checks for other-pointer into a single widetag load.

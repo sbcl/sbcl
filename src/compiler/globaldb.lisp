@@ -399,6 +399,8 @@
 ;;;   (AND (SATISFIES UNINTERESTING-METHOD-REDEFINITION-P) RATIONAL)
 ;;; is *empty-type*, which in turn avoids type cache pollution.
 (define-info-type (:function :predicate-truth-constraint) :type-spec t)
+
+(define-info-type (:function :specialized-xep) :type-spec t)
 
 ;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 

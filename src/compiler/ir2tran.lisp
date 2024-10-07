@@ -1201,11 +1201,15 @@
   (values))
 
 (defun fixed-args-state (node)
-  (let ((info (combination-fun-info node)))
-    (when (and info
-               (ir1-attributep (fun-info-attributes info) fixed-args))
-      (values (sb-vm::make-fixed-call-args-state)
-              (fun-type-required (info :function :type (combination-fun-source-name node)))))))
+  (let ((info (combination-fun-info node))
+        (name (combination-fun-source-name node nil)))
+    (cond ((and info
+                (ir1-attributep (fun-info-attributes info) fixed-args))
+           (values (sb-vm::make-fixed-call-args-state)
+                   (fun-type-required (info :function :type name))))
+          ((typep name '(cons (eql sb-impl::specialized-xep)))
+           (values (sb-vm::make-fixed-call-args-state)
+                   (fun-type-required (info :function :type (second name))))))))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
 (defun ir2-convert-full-call-args (node block)
@@ -1315,8 +1319,10 @@
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (let ((info (combination-fun-info node)))
-    (if (and info
-             (ir1-attributep (fun-info-attributes info) unboxed-return fixed-args))
+    (if (or (and info
+                 (ir1-attributep (fun-info-attributes info) unboxed-return fixed-args))
+            (typep (lvar-fun-name (basic-combination-fun node))
+                   '(cons (eql sb-impl::specialized-xep))))
         (ir2-convert-fixed-full-call node block)
         (multiple-value-bind (fp args arg-locs nargs)
             (ir2-convert-full-call-args node block)
@@ -1535,15 +1541,18 @@
                (fixed-args
                  (and fun-info
                       (ir1-attributep (fun-info-attributes fun-info) fixed-args)))
-               (arg-types (and fixed-args
-                               (fun-type-required (info :function :type name))))
-               (fixed-arg-state (and fixed-args
+               (arg-types (or (and fixed-args
+                                   (fun-type-required (info :function :type name)))
+                              (and (typep name
+                                          '(cons (eql sb-impl::specialized-xep)))
+                                   (fun-type-required (specifier-type `(function ,@(cddr name)))))))
+               (fixed-arg-state (and arg-types
                                      (sb-vm::make-fixed-call-args-state))))
           (when (leaf-refs (first vars))
             (emit-move node block arg-count-tn (leaf-info (first vars))))
           (dolist (arg (rest vars))
             (when (leaf-refs arg)
-              (let ((pass (if fixed-args
+              (let ((pass (if fixed-arg-state
                               (sb-vm::fixed-call-arg-location (pop arg-types) fixed-arg-state)
                               (standard-arg-location n)))
                     (home (leaf-info arg)))

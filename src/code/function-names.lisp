@@ -54,6 +54,9 @@ use as a BLOCK name in the function in question."
           (cons (unless (member (car fun) '(cas setf))
                   (valid-function-name-p fun))))))))
 
+(define-function-name-syntax specialized-xep (name)
+  name)
+
 ;;; FBOUNDP wants to know what names are valid early on in COLD-INIT.
 (defun !function-names-init ()
   (setq *valid-fun-names-alist* nil)

@@ -172,6 +172,24 @@ the file system."
   (sb-c::note-name-defined name :function)
   name)
 
+(defun %defun-specialized-xep (name def specialized-xep specialized-type &optional extra-info)
+  (declare (type function def specialized-xep))
+  (aver (legal-fun-name-p name))
+  (when (and (fboundp name)
+             *type-system-initialized*)
+    (handler-bind (((satisfies sb-c::handle-condition-p)
+                     'sb-c::handle-condition-handler))
+      (warn 'redefinition-with-defun :name name :new-function def)))
+  (let ((xep-name (list* 'specialized-xep name specialized-type)))
+    (sb-c:%compiler-defun name nil nil extra-info)
+    (setf (fdefinition name) def
+          (fdefinition xep-name) specialized-xep)
+    (setf (info :function :type xep-name) (specifier-type `(function ,@specialized-type))
+          (info :function :where-from xep-name) :declared)
+    (sb-c::%set-inline-expansion name nil nil extra-info)
+    (sb-c::note-name-defined name :function))
+  name)
+
 (macrolet
     ((cast-it ()
        `(when s

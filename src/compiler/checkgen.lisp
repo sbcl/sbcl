@@ -199,6 +199,8 @@
                                         (>= debug speed)))))
              nil)
             ((and (basic-combination-p dest)
+                  (not (info :function :specialized-xep
+                             (lvar-fun-name (basic-combination-fun dest))))
                   (or (not (basic-combination-fun-info dest))
                       ;; fixed-args functions do not check their arguments.
                       (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))

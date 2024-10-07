@@ -174,12 +174,15 @@
      (let* ((n-supplied (gensym))
             (nargs (length (lambda-vars fun)))
             (temps (make-gensym-list nargs))
-            (info (info :function :info (functional-%source-name fun)))
-            (types (and info
-                        (ir1-attributep (fun-info-attributes info) fixed-args)
-                        (loop for var in (lambda-vars fun)
-                              for temp in temps
-                              collect `(type ,(type-specifier (lambda-var-type var)) ,temp)))))
+            (name (functional-%source-name fun))
+            (info (info :function :info name))
+            (types (or (and (or
+                             (and info
+                                  (ir1-attributep (fun-info-attributes info) fixed-args))
+                             (typep name '(cons (eql sb-impl::specialized-xep))))
+                            (loop for var in (lambda-vars fun)
+                                  for temp in temps
+                                  collect `(type ,(type-specifier (lambda-var-type var)) ,temp))))))
 
        `(lambda (,n-supplied ,@temps)
           (declare (type index ,n-supplied)

@@ -873,9 +873,12 @@
 
 (defun add-types-for-fixed-args (fun vars)
   (let ((fun-info (info :function :info fun)))
-    (when (and fun-info
-               (ir1-attributep (fun-info-attributes fun-info) fixed-args))
-      (loop for type in (fun-type-required (info :function :type fun))
+    (when (or (and fun-info
+                   (ir1-attributep (fun-info-attributes fun-info) fixed-args))
+              (typep fun '(cons (eql sb-impl::specialized-xep))))
+      (loop for type in (fun-type-required (if (typep fun '(cons (eql sb-impl::specialized-xep)))
+                                               (specifier-type `(function ,@(cddr fun)))
+                                               (info :function :type fun)))
             for var in vars
             do (setf (lambda-var-type var) type))))
   vars)
@@ -1412,7 +1415,7 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 ;;; * a possibly empty list of dynamic extent arguments.
 ;;; The inline lambda will be NIL for a structure accessor, predicate, or copier
 ;;; since those can always be reconstructed from a defstruct description.
-(defun %compiler-defun (name compile-toplevel inline-lambda extra-info)
+(defun %compiler-defun (name compile-toplevel inline-lambda extra-info &optional specialized-xep)
   (cond (compile-toplevel
          (let ((defined-fun nil))
            (with-single-package-locked-error
@@ -1434,5 +1437,7 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
                (hashset-insert names name)))))
 
   (become-defined-fun-name name)
+  (when specialized-xep
+    (setf (info :function :specialized-xep name) specialized-xep))
 
   (values))

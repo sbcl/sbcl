@@ -113,6 +113,22 @@ tree structure resulting from the evaluation of EXPRESSION."
               entry-points
               (not (member name entry-points :test #'equal))))))
 
+(defun specialized-xep-for-type-p (lambda-list type)
+  (and #+(or arm64 x86-64) t
+       (fun-type-p type)
+       (not (or (fun-type-optional type)
+                (fun-type-keyp type)
+                (fun-type-rest type)))
+       (multiple-value-bind (llks required) (parse-lambda-list lambda-list)
+         (and (zerop llks)
+              (= (length required)
+                 (length (fun-type-required type)))
+              ;; FIXME: The number of float regs.
+              (<= (length required) 16)))
+       (loop for arg in (fun-type-required type)
+             thereis (csubtypep arg (specifier-type 'double-float)))
+       (cdr (type-specifier type))))
+
 (flet ((defun-expander (env name lambda-list body snippet &optional source-form)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
@@ -138,7 +154,10 @@ tree structure resulting from the evaluation of EXPRESSION."
                            #-sb-xc-host sb-c:maybe-compiler-notify
                            "lexical environment too hairy, can't inline DEFUN ~S"
                            name)
-                          nil))))))
+                          nil)))))
+           (specialized-xep (and (not (or inline-thing
+                                          (info :function :info name)))
+                                 (specialized-xep-for-type-p lambda-list (info :function :type name)))))
       (when (and (eq snippet :constructor)
                  (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
         ;; constructor in null lexenv need not save the expansion
@@ -147,29 +166,58 @@ tree structure resulting from the evaluation of EXPRESSION."
         (setq inline-thing (list 'quote inline-thing)))
       (when (and extra-info (not (keywordp extra-info)))
         (setq extra-info (list 'quote extra-info)))
-      (let ((definition
-              (if (block-compilation-non-entry-point name)
-                  `(progn
-                     (sb-c::%refless-defun ,named-lambda)
-                     ',name)
-                  `(%defun ',name ,named-lambda
-                           ,@(when (or inline-thing extra-info) `(,inline-thing))
-                           ,@(when extra-info `(,extra-info))))))
-       `(progn
-          (eval-when (:compile-toplevel)
-            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
-          ,(if source-form
-               `(sb-c::with-source-form ,source-form ,definition)
-               definition)
-          ;; This warning, if produced, comes after the DEFUN happens.
-          ;; When compiling, there's no real difference, but when interpreting,
-          ;; if there is a handler for style-warning that nonlocally exits,
-          ;; it's wrong to have skipped the DEFUN itself, since if there is no
-          ;; function, then the warning ought not to have been issued at all.
-          ,@(when (typep name '(cons (eql setf)))
-              `((eval-when (:compile-toplevel :execute)
-                  (sb-c::warn-if-setf-macro ',name))
-                ',name))))))))
+      `(progn
+         ,@(let ((existing-specialized-xep (info :function :specialized-xep name)))
+             (if (and existing-specialized-xep
+                      (not (equal existing-specialized-xep specialized-xep)))
+                 (let ((xep-name `(specialized-xep ,name ,@existing-specialized-xep))
+                       (vars (loop for arg in (car existing-specialized-xep)
+                                   for i from 0
+                                   collect (make-symbol (format nil "A~a" i)))))
+                   `((progn
+                       (eval-when (:compile-toplevel)
+                         (setf (info :function :specialized-xep ',name) nil))
+                       (when (fdefinition ',xep-name)
+                         (setf (fdefinition ',xep-name)
+                               (named-lambda ,xep-name ,vars
+                                 (declare (notinline ,name)
+                                          (muffle-conditions warning))
+                                 (funcall ',name ,@vars)))))))))
+         ,@(if specialized-xep
+               (let ((xep-name `(specialized-xep ,name ,@specialized-xep)))
+                 `((eval-when (:compile-toplevel)
+                     (sb-c:%compiler-defun ',name t nil nil ',specialized-xep))
+                    (let ((xep (named-lambda ,xep-name ,@(cddr named-lambda))))
+                      (sb-impl::%defun-specialized-xep
+                       ',name
+                       (named-lambda ,name ,lambda-list
+                         ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
+                         ,@(when doc (list doc))
+                         (funcall xep ,@lambda-list))
+                       xep
+                       ',specialized-xep))))
+               (let ((definition
+                       (if (block-compilation-non-entry-point name)
+                           `(progn
+                              (sb-c::%refless-defun ,named-lambda)
+                              ',name)
+                           `(%defun ',name ,named-lambda
+                                    ,@(when (or inline-thing extra-info) `(,inline-thing))
+                                    ,@(when extra-info `(,extra-info))))))
+                 `((eval-when (:compile-toplevel)
+                     (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
+                   ,(if source-form
+                        `(sb-c::with-source-form ,source-form ,definition)
+                        definition)
+                   ;; This warning, if produced, comes after the DEFUN happens.
+                   ;; When compiling, there's no real difference, but when interpreting,
+                   ;; if there is a handler for style-warning that nonlocally exits,
+                   ;; it's wrong to have skipped the DEFUN itself, since if there is no
+                   ;; function, then the warning ought not to have been issued at all.
+                   ,@(when (typep name '(cons (eql setf)))
+                       `((eval-when (:compile-toplevel :execute)
+                           (sb-c::warn-if-setf-macro ',name))
+                         ',name))))))))))
 
 ;;; This is one of the major places where the semantics of block
 ;;; compilation is handled. Substitution for global names is totally

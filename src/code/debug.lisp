@@ -662,7 +662,8 @@ information."
 
 (defun clean-frame-call (frame argument-limit name method-frame-style info)
   (let ((args (frame-args-as-list frame argument-limit)))
-    (when (typep name '(cons (eql sb-pcl::gf-dispatch)))
+    (when (typep name '(cons (or (eql sb-pcl::gf-dispatch)
+                              (eql sb-impl::specialized-xep))))
       (setf name (cadr name)))
     (cond ((typep name '(cons (eql sb-pcl::fast-method)))
            (clean-fast-method name args method-frame-style info))
