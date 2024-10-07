@@ -1143,19 +1143,24 @@
          :symbol)))
 
 (defun pass-nargs-p (combination)
-  (let ((fun-info (combination-fun-info combination)))
-    (declare (ignorable fun-info))
+  (let ((fun-info (combination-fun-info combination))
+        (name (combination-fun-source-name combination nil)))
+    (declare (ignorable fun-info name))
     (and #+(or arm64 x86-64)
          (or (policy combination (= insert-step-conditions 3))
              (and
               (combination-pass-nargs combination)
-              (not (and (eq (combination-kind combination) :known)
-                        fun-info
-                        (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
-                        (let ((type (info :function :type (combination-fun-source-name combination))))
-                          (and (not (fun-type-keyp type))
-                               (not (fun-type-rest type))
-                               (not (fun-type-optional type)))))))))))
+              (not (and
+                    (or (and (eq (combination-kind combination) :known)
+                             fun-info
+                             (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
+                        (and (typep name
+                                    '(cons (eql sb-impl::specialized-xep)))
+                             (setf name (second name))))
+                    (let ((type (info :function :type name)))
+                      (and (not (fun-type-keyp type))
+                           (not (fun-type-rest type))
+                           (not (fun-type-optional type)))))))))))
 
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.
@@ -1472,10 +1477,13 @@
                       ((and optional
                             (not (optional-dispatch-more-entry ef)))
                        (optional-dispatch-max-args ef))))
-           (fun-info (info :function :info (functional-%source-name ef))))
+           (name (functional-%source-name ef))
+           (fun-info (info :function :info name)))
       (unless (or (and (eql min 0) (not max))
-                  (and fun-info
-                       (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)))
+                  (or
+                   (and fun-info
+                        (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
+                   (typep name '(cons (eql sb-impl::specialized-xep)))))
         (vop verify-arg-count node block
              arg-count-location
              min
