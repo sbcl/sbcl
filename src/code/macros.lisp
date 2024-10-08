@@ -142,7 +142,7 @@ tree structure resulting from the evaluation of EXPRESSION."
         (funcall ',name ,@vars))
      xep-name)))
 
-(flet ((defun-expander (env name lambda-list body snippet &optional source-form)
+(flet ((defun-expander (env name lambda-list body snippet &optional source-form always-store-source-form)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
     #+(and (not sb-doc) sb-xc-host) (setq doc nil)
@@ -195,7 +195,9 @@ tree structure resulting from the evaluation of EXPRESSION."
                (let ((xep-name `(specialized-xep ,name ,@specialized-xep)))
                  `((eval-when (:compile-toplevel)
                      (sb-c:%compiler-defun ',name t nil nil ',specialized-xep))
-                    (let ((xep (named-lambda ,xep-name ,@(cddr named-lambda))))
+                    (let ((xep (named-lambda ,xep-name ,(third named-lambda)
+                                 (declare (sb-c::source-form ,source-form))
+                                 ,@(cdddr named-lambda))))
                       (sb-impl::%defun-specialized-xep
                        ',name
                        (named-lambda ,name ,lambda-list
@@ -217,7 +219,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                                     ,@(when extra-info `(,extra-info))))))
                  `((eval-when (:compile-toplevel)
                      (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
-                   ,(if source-form
+                   ,(if (and source-form
+                             always-store-source-form)
                         `(sb-c::with-source-form ,source-form ,definition)
                         definition)
                    ;; This warning, if produced, comes after the DEFUN happens.
@@ -236,17 +239,17 @@ tree structure resulting from the evaluation of EXPRESSION."
 ;;; (block-compile *compilation*) is true and entry points are
 ;;; specified, then we don't install global definitions for non-entry
 ;;; functions (effectively turning them into local lexical functions.)
-  (sb-xc:defmacro defun (&environment env name lambda-list &body body)
+  (sb-xc:defmacro defun (&whole whole &environment env name lambda-list &body body)
     "Define a function at top level."
     (check-designator name 'defun #'legal-fun-name-p "function name")
     #+sb-xc-host
     (unless (cl:symbol-package (fun-name-block-name name))
       (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
-    (defun-expander env name lambda-list body nil))
+    (defun-expander env name lambda-list body nil whole))
 
   ;; extended defun as used by defstruct
   (sb-xc:defmacro sb-c:xdefun (&environment env name snippet source-form lambda-list &body body)
-    (defun-expander env name lambda-list body snippet source-form)))
+    (defun-expander env name lambda-list body snippet source-form t)))
 
 ;;;; DEFCONSTANT, DEFVAR and DEFPARAMETER
 
