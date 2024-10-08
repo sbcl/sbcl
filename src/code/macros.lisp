@@ -169,7 +169,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                            name)
                           nil)))))
            (specialized-xep (and (not (or inline-thing
-                                          (info :function :info name)))
+                                          (info :function :info name)
+                                          (eq (info :function :inlinep name) 'notinline)))
                                  (specialized-xep-for-type-p lambda-list (info :function :type name)))))
       (when (and (eq snippet :constructor)
                  (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
