@@ -172,11 +172,14 @@
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
     (or (loop for fun in funs
-              for fun-info = (info :function :info (functional-%source-name fun))
-              when
-              (and fun-info
-                   (ir1-attributep (fun-info-attributes fun-info) unboxed-return)
-                   (not (lambda-inline-expanded fun)))
+              for name = (functional-%source-name fun)
+              for fun-info = (info :function :info name)
+              for specialized = (unboxed-specialized-return-p name)
+              when specialized
+              do (return-from use-standard-returns (values :unboxed specialized))
+              when (and fun-info
+                        (ir1-attributep (fun-info-attributes fun-info) unboxed-return)
+                        (not (lambda-inline-expanded fun)))
               return :unboxed)
         (find-if #'xep-p funs)
         (some (lambda (fun) (policy fun (>= insert-debug-catch 2))) funs)
@@ -240,31 +243,33 @@
 (defun return-info-for-set (tails)
   (declare (type tail-set tails))
   (multiple-value-bind (types count) (values-types (tail-set-type tails))
-    (let ((ptypes (mapcar #'primitive-type types))
-          (use-standard (use-standard-returns tails)))
-      (when (and (eq count :unknown) (not use-standard)
-                 (not (eq (tail-set-type tails) *empty-type*)))
-        (return-value-efficiency-note tails))
-      (cond ((eq use-standard :unboxed)
-             (make-return-info :kind :unboxed
-                               :count count
-                               :primitive-types ptypes
-                               :types types
-                               :locations
-                               (let ((state (sb-vm::make-fixed-call-args-state)))
-                                 (loop for type in ptypes
-                                       collect (sb-vm::fixed-call-arg-location type state)))))
-            ((or (eq count :unknown) use-standard)
-             (make-return-info :kind :unknown
-                               :count count
-                               :primitive-types ptypes
-                               :types types))
-            (t
-             (make-return-info :kind :fixed
-                               :count count
-                               :primitive-types ptypes
-                               :types types
-                               :locations (mapcar #'make-normal-tn ptypes)))))))
+    (let ((ptypes (mapcar #'primitive-type types)))
+      (multiple-value-bind (use-standard specialized-xep-type) (use-standard-returns tails)
+        (when (and (eq count :unknown) (not use-standard)
+                   (not (eq (tail-set-type tails) *empty-type*)))
+          (return-value-efficiency-note tails))
+        (cond ((eq use-standard :unboxed)
+               (make-return-info :kind :unboxed
+                                 :count count
+                                 :primitive-types ptypes
+                                 :types types
+                                 :locations
+                                 (let ((state (sb-vm::make-fixed-call-args-state)))
+                                   (loop for type in (if specialized-xep-type
+                                                         (mapcar #'primitive-type (values-type-required specialized-xep-type))
+                                                         ptypes)
+                                         collect (sb-vm::fixed-call-arg-location type state)))))
+              ((or (eq count :unknown) use-standard)
+               (make-return-info :kind :unknown
+                                 :count count
+                                 :primitive-types ptypes
+                                 :types types))
+              (t
+               (make-return-info :kind :fixed
+                                 :count count
+                                 :primitive-types ptypes
+                                 :types types
+                                 :locations (mapcar #'make-normal-tn ptypes))))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
 (defun assign-return-locations (fun)

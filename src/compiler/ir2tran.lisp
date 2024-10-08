@@ -1073,7 +1073,7 @@
                         :unknown)
                (:unknown
                 (ir2-convert-local-unknown-call node block fun lvar start))
-               (:fixed
+               ((:fixed :unboxed)
                 (ir2-convert-local-known-call node block fun returns
                                               lvar start)))))))
   (values))
@@ -1252,9 +1252,11 @@
   (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
-           (unboxed-return (let ((info (combination-fun-info node)))
-                             (and info
-                                  (ir1-attributep (fun-info-attributes info) unboxed-return))))
+           (unboxed-return (or (let ((info (combination-fun-info node)))
+                                 (and info
+                                      (ir1-attributep (fun-info-attributes info) unboxed-return)))
+                               (unboxed-specialized-return-p
+                                (lvar-fun-name (basic-combination-fun node)))))
            (locs (and lvar
                       (if unboxed-return
                           (let ((state (sb-vm::make-fixed-call-args-state))

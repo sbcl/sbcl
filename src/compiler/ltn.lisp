@@ -185,6 +185,14 @@
           (t
            (ltn-default-call node)))))
 
+(defun unboxed-specialized-return-p (name)
+  (and (typep name '(cons (eql sb-impl::specialized-xep)))
+       (let ((type (fun-type-returns (specifier-type `(function ,@(cddr name))))))
+         (and (values-type-p type)
+              (not (or (values-type-optional type)
+                       (values-type-rest type)))
+              type))))
+
 ;;; If TAIL-P is true, then we check to see whether the call can
 ;;; really be a tail call by seeing if this function's return
 ;;; convention is :UNKNOWN. If so, we move the call block successor
@@ -195,9 +203,10 @@
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
                     (lambda-tail-set (node-home-lambda call))))
-        (unboxed-return (let ((info (basic-combination-fun-info call)))
-                          (and info
-                               (ir1-attributep (fun-info-attributes info) unboxed-return)))))
+        (unboxed-return (or (let ((info (basic-combination-fun-info call)))
+                              (and info
+                                   (ir1-attributep (fun-info-attributes info) unboxed-return)))
+                            (unboxed-specialized-return-p (lvar-fun-name (basic-combination-fun call))))))
     (cond ((not tails))
           ((eq (return-info-kind (tail-set-info tails))
                (if unboxed-return

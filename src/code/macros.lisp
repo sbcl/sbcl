@@ -200,7 +200,10 @@ tree structure resulting from the evaluation of EXPRESSION."
                        (named-lambda ,name ,lambda-list
                          ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
                          ,@(when doc (list doc))
-                         (funcall xep ,@lambda-list))
+                         (multiple-value-prog1
+                             (funcall xep ,@lambda-list)
+                           ;; Avoid tail calls for unboxed returns.
+                           (values)))
                        xep
                        ',specialized-xep))))
                (let ((definition
