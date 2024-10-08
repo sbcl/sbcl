@@ -159,6 +159,8 @@
 ;;; the default.
 (defun undefine-fun-name (name)
   (when name
+    #-sb-xc-host
+    (sb-impl::remove-specialized-xep name)
     (macrolet ((frob (&rest types)
                  `(clear-info-values
                    name ',(mapcar (lambda (x)

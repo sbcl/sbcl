@@ -129,6 +129,19 @@ tree structure resulting from the evaluation of EXPRESSION."
              thereis (csubtypep arg (specifier-type 'double-float)))
        (cdr (type-specifier type))))
 
+(defun make-specialized-xep-stub (name specialized
+                                  &optional (xep-name
+                                             `(specialized-xep ,name ,@specialized)))
+  (let ((vars (loop for arg in (car specialized)
+                    for i from 0
+                    collect (make-symbol (format nil "A~a" i)))))
+    (values
+     `(named-lambda ,xep-name ,vars
+        (declare (notinline ,name)
+                 (muffle-conditions warning))
+        (funcall ',name ,@vars))
+     xep-name)))
+
 (flet ((defun-expander (env name lambda-list body snippet &optional source-form)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
@@ -170,19 +183,13 @@ tree structure resulting from the evaluation of EXPRESSION."
          ,@(let ((existing-specialized-xep (info :function :specialized-xep name)))
              (if (and existing-specialized-xep
                       (not (equal existing-specialized-xep specialized-xep)))
-                 (let ((xep-name `(specialized-xep ,name ,@existing-specialized-xep))
-                       (vars (loop for arg in (car existing-specialized-xep)
-                                   for i from 0
-                                   collect (make-symbol (format nil "A~a" i)))))
+                 (multiple-value-bind (xep xep-name)
+                     (make-specialized-xep-stub name existing-specialized-xep)
                    `((progn
                        (eval-when (:compile-toplevel)
-                         (setf (info :function :specialized-xep ',name) nil))
+                         (clear-info :function :specialized-xep ',name))
                        (when (fdefinition ',xep-name)
-                         (setf (fdefinition ',xep-name)
-                               (named-lambda ,xep-name ,vars
-                                 (declare (notinline ,name)
-                                          (muffle-conditions warning))
-                                 (funcall ',name ,@vars)))))))))
+                         (setf (fdefinition ',xep-name) ,xep)))))))
          ,@(if specialized-xep
                (let ((xep-name `(specialized-xep ,name ,@specialized-xep)))
                  `((eval-when (:compile-toplevel)

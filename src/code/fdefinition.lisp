@@ -341,6 +341,18 @@
            :format-control "~S is not acceptable to ~S."
            :format-arguments (list object setter))))
 
+(defun remove-specialized-xep (name)
+  (let ((xep (info :function :specialized-xep name)))
+    (when xep
+      (let* ((xep-name
+               `(specialized-xep ,name ,@xep))
+             (fdefn (find-fdefn xep-name)))
+        (when fdefn
+          (fset fdefn
+                (compile nil (make-specialized-xep-stub name xep xep-name))))
+        (clear-info :function :specialized-xep name)
+        (undefine-fun-name xep-name)))))
+
 (defun (setf fdefinition) (new-value name)
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
@@ -366,6 +378,7 @@
       (dolist (f *setf-fdefinition-hook*)
         (declare (type function f))
         (funcall f name new-value))
+      (remove-specialized-xep name)
       ;; fdefn may be a symbol if #+linkage-space. fdefn-fun vop is fine with that
       (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
         (cond (encap-info

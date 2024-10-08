@@ -134,6 +134,7 @@ distinct from the global value. Can also be SETF."
     ;; I really think the code paths should be reconciled.
     ;; e.g. what's up with *USER-HASH-TABLE-TESTS* being checked
     ;; in %SET-FDEFINITION but not here?
+    (remove-specialized-xep symbol)
     (maybe-clobber-ftype symbol new-value)
     (fset symbol new-value)))
 
