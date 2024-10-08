@@ -73,6 +73,9 @@
   ;; on standard Unix filesystems)
   (version nil :type %pathname-version :read-only t))
 
+(declaim (inline %pathname-directory))
+(defun %pathname-directory (pathname) (car (%pathname-dir+hash pathname)))
+
 (let ((to (find-layout 'logical-pathname))
       (from (find-layout 'pathname)))
   (setf (layout-info to) (layout-info from)

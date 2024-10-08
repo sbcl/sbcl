@@ -76,9 +76,6 @@
     (aver (typep piece '(or string symbol (cons (eql :character-set) string)))))
   (%make-pattern (pathname-sxhash pieces) pieces))
 
-(declaim (inline %pathname-directory))
-(defun %pathname-directory (pathname) (car (%pathname-dir+hash pathname)))
-
 (declaim (inline pathname-component-present-p))
 (defun pathname-component-present-p (component)
   (not (typep component 'absent-pathname-component)))

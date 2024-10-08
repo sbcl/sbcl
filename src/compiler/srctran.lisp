@@ -7585,3 +7585,12 @@
                  if-does-not-exist
                  (not (types-equal-or-intersect (lvar-type direction) (specifier-type '(eql :probe))))))
     (specifier-type 'stream)))
+
+;; Absence of a second argument on the pathname accessor defaults to :LOCAL case
+;; which implies that MAYBE-DIDDLE-CASE has no effect.
+(deftransform pathname-host ((p) (pathname)) '(sb-impl::%pathname-host p))
+(deftransform pathname-device ((p) (pathname)) '(sb-impl::%pathname-device p))
+(deftransform pathname-directory ((p) (pathname)) '(sb-impl::%pathname-directory p))
+(deftransform pathname-name ((p) (pathname)) '(sb-impl::%pathname-name p))
+(deftransform pathname-type ((p) (pathname)) '(sb-impl::%pathname-type p))
+(deftransform pathname-version ((p) (pathname)) '(sb-impl::%pathname-version p))
