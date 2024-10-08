@@ -707,7 +707,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
        :read-only))
     (let ((result (make-hash-table :test 'eq))
           ;; darwin-jit will never take the purified branch. Readonly space exists,
-          ;; but contains no symbol names. TUNE-HASHTABLE-SIZES-OF-ALL-PACKAGES knows that
+          ;; but contains no symbol names. TUNE-HASHSET-SIZES-OF-ALL-PACKAGES knows that
           ;; and will never reset a table's MODIFIED flag. However, for all other platforms,
           ;; we need to detect if purification happened.
           (core-purified-p (sap> sb-vm:*read-only-space-free-pointer*
@@ -748,35 +748,10 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
     (briefly-describe-symbol symbol))
   (values))
 
-;;; TODO: I think the original idea was to place all symbols into a single
-;;; vector, with an bit-vector to record internal/external per symbol.
-(defun perfectly-hash-package (package)
-  (flet ((rehash (table &aux (cells (symtbl-%cells table)))
-           (when (functionp (car cells))
-             (return-from rehash)) ; already hashed
-           ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
-           #-darwin-jit (setf (symtbl-modified table) nil)
-           (let* ((cells (cdr cells))
-                  (hashes (map '(simple-array (unsigned-byte 32) (*))
-                               #'symbol-name-hash
-                               (remove-if-not #'symbolp cells)))
-                  (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
-             (unless hash-expr
-               (return-from rehash))
-             (let ((fun (compile nil hash-expr))
-                   (new-cells (make-array (length hashes) :initial-element 0)))
-               (dovector (s cells)
-                 (when (symbolp s)
-                   (let ((hash (funcall fun (symbol-name-hash s))))
-                     (aver (eq (svref new-cells hash) 0))
-                     (setf (svref new-cells hash) s))))
-               (setf (symtbl-%cells table) (cons fun new-cells)
-                     (symtbl-size table) (length hashes)
-                     (symtbl-free table) 0
-                     (symtbl-deleted table) 0)))))
-    (rehash (package-internal-symbols package))
-    (rehash (package-external-symbols package))))
-
+;;; NOTE: the comments below no longer hold. I can't remember what exactly was broken about
+;;; perfect hashing on most packages as long as we downgrade to a hashset on demand.
+;;; The FIXME below says it isn't thread-safe, but why not?
+;;;
 ;;; Reorganize both hashsets of all packages, called by SAVE-LISP-AND-DIE.
 ;;; With a few exceptions, tables are saved at 100% load factor and a perfect hash.
 ;;; The danger of attempting to achieve such high load using an open-addressing table
@@ -797,24 +772,51 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 ;;;   0.012 seconds of real time
 ;;;
 (defun tune-hashset-sizes-of-all-packages ()
-  (flet ((tune-table-size (desired-lf table)
-           (resize-symbol-table table (%symtbl-count table) 'intern desired-lf)
-           ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
-           #-darwin-jit (setf (symtbl-modified table) nil)))
+  (flet ((tune (desired-lf table)
+           (resize-symbol-table table (%symtbl-count table) 'intern desired-lf))
+         (perfect (table &aux (cells (symtbl-%cells table)))
+           (when (functionp (car cells))
+             (return-from perfect)) ; already perfectly hashed
+           (let* ((cells (cdr cells))
+                  (hashes (map '(simple-array (unsigned-byte 32) (*))
+                               #'symbol-name-hash
+                               (remove-if-not #'symbolp cells)))
+                  (hash-expr (sb-c:make-perfect-hash-lambda hashes)))
+             (unless hash-expr
+               ;; hmm, this seems like it should be a hard error
+               ;; since it's confined to the CL package.
+               (return-from perfect))
+             (let ((fun (compile nil hash-expr))
+                   (new-cells (make-array (length hashes) :initial-element 0)))
+               (dovector (s cells)
+                 (when (symbolp s)
+                   (let ((hash (funcall fun (symbol-name-hash s))))
+                     (aver (eq (svref new-cells hash) 0))
+                     (setf (svref new-cells hash) s))))
+               (setf (symtbl-%cells table) (cons fun new-cells)
+                     (symtbl-size table) (length hashes)
+                     (symtbl-free table) 0
+                     (symtbl-deleted table) 0)))))
     (dolist (package (list-all-packages))
       ;; Choose load factor based on whether INTERN is expected at runtime
       ;; FIXME: because changing a package from perfectly hashed back to
       ;; an open-addressing table is not thread-safe, _only_ the CL package can
       ;; become perfectly hashed.
       (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
-                      ((eq (package-id package) +package-id-user+) 8/10)
                       ((eq package *cl-package*) 1)
-                      (t 8/10))))
+                      (t 8/10)))
+            (internals (package-internal-symbols (truly-the package package)))
+            (externals (package-external-symbols package)))
         (cond ((= lf 1)
-               (perfectly-hash-package package))
+               ;; Should be no internals of CL, don't even bother tuning them
+               (perfect externals))
               (t
-               (tune-table-size lf (package-internal-symbols (truly-the package package)))
-               (tune-table-size lf (package-external-symbols package))))))))
+               (tune lf internals)
+               (tune lf externals)))
+        ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
+        #-darwin-jit
+        (setf (symtbl-modified externals) nil
+              (symtbl-modified internals) nil)))))
 
 ;;; This function is mainly of interest to developers, should we remove it
 ;;; from the image?

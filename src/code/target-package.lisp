@@ -2065,7 +2065,9 @@ PACKAGE."
                          ;;   But in fact it's benign for the user to stop iteration early, even
                          ;;   through non-local exit. If that occurs, the C-O-W status sticks,
                          ;;   causing ADD-SYMBOL to copy the table as though immutable,
-                         ;    which has no effect other than extra consing.
+                         ;;   which has no effect other than extra consing.
+                         ;; FIXME: %CELLS isn't an instance of SYMTBL-MAGIC if perfectly hashed
+                         ;;        though for the time being that can't happen.
                          (let ((other (symtbl-%cells (package-internal-symbols pkg))))
                            (atomic-incf (symtbl-immutable (car other)))
                            (setf (pkg-iter-snapshot iter) other)))
