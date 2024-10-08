@@ -365,6 +365,7 @@
         (when clear-info
           (clear-info :function :specialized-xep name)
           (undefine-fun-name xep-name))))))
+
 (defun setf-fdefinition (new-value name clear-specialized-xep)
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))

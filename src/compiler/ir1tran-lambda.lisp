@@ -1438,6 +1438,9 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 
   (become-defined-fun-name name)
   (when specialized-xep
-    (setf (info :function :specialized-xep name) specialized-xep))
+    (setf (info :function :specialized-xep name) specialized-xep)
+    (let ((xep-name (list* 'sb-impl::specialized-xep name specialized-xep)))
+      (setf (info :function :type xep-name) (specifier-type `(function ,@specialized-xep))
+            (info :function :where-from xep-name) :declared)))
 
   (values))
