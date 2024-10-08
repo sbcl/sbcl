@@ -128,9 +128,10 @@
              (inst add csp-tn csp-tn size)
              (storew cfp-tn res ocfp-save-offset))))
     (when (ir2-environment-number-stack-p callee)
-      (inst sub nfp nsp-tn (add-sub-immediate
-                            (bytes-needed-for-non-descriptor-stack-frame)))
-      (inst mov-sp nsp-tn nfp))))
+      (let ((size (bytes-needed-for-non-descriptor-stack-frame)))
+        (unless (zerop size)
+          (inst sub nfp nsp-tn (add-sub-immediate size))
+          (inst mov-sp nsp-tn nfp))))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
 ;;; is the number of arguments passed.  If no stack arguments are passed, then
