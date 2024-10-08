@@ -182,11 +182,9 @@ the file system."
       (warn 'redefinition-with-defun :name name :new-function def)))
   (let ((xep-name (list* 'specialized-xep name specialized-type)))
     (sb-c:%compiler-defun name nil nil extra-info)
-    (setf (info :function :specialized-xep name) nil ;; stop (setf fdefinition) from clearing it
-          (fdefinition name) def
-          (fdefinition xep-name) specialized-xep)
-    (setf (info :function :specialized-xep name) specialized-type
-          (info :function :type xep-name) (specifier-type `(function ,@specialized-type))
+    (setf (fdefinition xep-name) specialized-xep)
+    (setf-fdefinition def name nil)
+    (setf (info :function :type xep-name) (specifier-type `(function ,@specialized-type))
           (info :function :where-from xep-name) :declared)
     (sb-c::%set-inline-expansion name nil nil extra-info)
     (sb-c::note-name-defined name :function))
