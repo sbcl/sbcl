@@ -113,21 +113,23 @@ tree structure resulting from the evaluation of EXPRESSION."
               entry-points
               (not (member name entry-points :test #'equal))))))
 
-(defun specialized-xep-for-type-p (lambda-list type)
-  (and #-(or arm64 x86-64) nil
-       (fun-type-p type)
-       (not (or (fun-type-optional type)
-                (fun-type-keyp type)
-                (fun-type-rest type)))
-       (multiple-value-bind (llks required) (parse-lambda-list lambda-list)
-         (and (zerop llks)
-              (= (length required)
-                 (length (fun-type-required type)))
-              ;; FIXME: The number of float regs.
-              (<= (length required) 16)))
-       (loop for arg in (fun-type-required type)
-             thereis (csubtypep arg (specifier-type 'double-float)))
-       (cdr (type-specifier type))))
+(defun specialized-xep-for-type-p (lambda-list name)
+  (let ((type (info :function :type name)))
+    (and #-(or arm64 x86-64) nil
+         (fun-type-p type)
+         (eq (info :function :where-from name) :declared)
+         (not (or (fun-type-optional type)
+                  (fun-type-keyp type)
+                  (fun-type-rest type)))
+         (multiple-value-bind (llks required) (parse-lambda-list lambda-list)
+           (and (zerop llks)
+                (= (length required)
+                   (length (fun-type-required type)))
+                ;; FIXME: The number of float regs.
+                (<= (length required) 16)))
+         (loop for arg in (fun-type-required type)
+               thereis (csubtypep arg (specifier-type 'double-float)))
+         (cdr (type-specifier type)))))
 
 (defun make-specialized-xep-stub (name specialized
                                   &optional (xep-name
@@ -171,7 +173,7 @@ tree structure resulting from the evaluation of EXPRESSION."
            (specialized-xep (and (not (or inline-thing
                                           (info :function :info name)
                                           (eq (info :function :inlinep name) 'notinline)))
-                                 (specialized-xep-for-type-p lambda-list (info :function :type name)))))
+                                 (specialized-xep-for-type-p lambda-list name))))
       (when (and (eq snippet :constructor)
                  (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
         ;; constructor in null lexenv need not save the expansion
@@ -202,6 +204,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                        ',name
                        (named-lambda ,name ,lambda-list
                          ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
+                         (declare (muffle-conditions compiler-note))
                          ,@(when doc (list doc))
                          (multiple-value-prog1
                              (funcall xep ,@lambda-list)
