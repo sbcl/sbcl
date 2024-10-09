@@ -906,20 +906,19 @@ necessary, since type inference may take arbitrarily long to converge.")
             (print-compile-start-note info))
           stream))))
 
-;;; Close the stream in INFO if it is open.
-(defun close-source-info (info)
-  (declare (type source-info info))
-  (let ((stream (source-info-stream info)))
-    (when stream (close stream)))
-  (setf (source-info-stream info) nil)
-  (values))
-
 ;; Loop over forms read from INFO's stream, calling FUNCTION with each.
 ;; CONDITION-NAME is signaled if there is a reader error, and should be
 ;; a subtype of not-so-aptly-named INPUT-ERROR-IN-COMPILE-FILE.
 (defun %do-forms-from-info (function info condition-name)
   (declare (function function))
   (declare (dynamic-extent function))
+  (when (eq (file-info-%truename (source-info-file-info info)) :lisp)
+    ;; special case for COMPILE-FORM-TO-FILE
+    (return-from %do-forms-from-info
+      (let* ((forms (file-info-forms (source-info-file-info info)))
+             (form (shiftf (svref forms 0) nil)))
+        (when form
+          (funcall function form :current-index 0)))))
   (let* ((file-info (source-info-file-info info))
          (stream (get-source-stream info))
          (pos (file-position stream))
@@ -1760,6 +1759,14 @@ necessary, since type inference may take arbitrarily long to converge.")
                                   (%cas-symbol-global-value symbol old new)))
                 (return)))))))
 
+(flet ((open-trace-file (trace-file fasl-output)
+         (if (streamp trace-file)
+             trace-file
+             (open (merge-pathnames (if (eql trace-file t) "" trace-file)
+                                    (make-pathname :type "trace" :defaults
+                                                   (fasl-output-stream fasl-output)))
+                   :if-exists :supersede :direction :output))))
+
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
 ;;; that we don't overwrite it with known garbage.
@@ -1829,7 +1836,10 @@ returning its filename.
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
   (binding*
-        ((output-file-pathname nil)
+        ((output-file-pathname
+          ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
+          ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
+          (compile-file-pathname input-file (when output-file-p :output-file) output-file))
          (fasl-output nil)
          (cfasl-pathname nil)
          (cfasl-output nil)
@@ -1847,30 +1857,18 @@ returning its filename.
 
     (unwind-protect
         (progn
-          ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
-          ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
-          (setq output-file-pathname
-                (compile-file-pathname input-file (when output-file-p :output-file) output-file)
-                fasl-output (open-fasl-output output-file-pathname
-                                              (namestring input-pathname)))
+          (setq fasl-output (open-fasl-output output-file-pathname (namestring input-pathname)))
           (when emit-cfasl
             (setq cfasl-pathname (make-pathname :type "cfasl" :defaults output-file-pathname))
             (setq cfasl-output (open-fasl-output cfasl-pathname (namestring input-pathname))))
           (when trace-file
-            (setf *compiler-trace-output*
-                  (if (streamp trace-file)
-                      trace-file
-                      (open (merge-pathnames
-                             (if (eql trace-file t) "" trace-file)
-                             (make-pathname :type "trace" :defaults
-                                            (fasl-output-stream fasl-output)))
-                            :if-exists :supersede :direction :output))))
-
+            (setq *compiler-trace-output* (open-trace-file trace-file fasl-output)))
           (let ((*compile-object* fasl-output))
             (setf (values abort-p warnings-p failure-p)
                   (sub-compile-file source-info cfasl-output))))
 
-      (close-source-info source-info)
+      (awhen (source-info-stream source-info) (close it))
+      (setf (source-info-stream source-info) nil)
 
       (when fasl-output
         (close-fasl-output fasl-output abort-p)
@@ -1917,6 +1915,34 @@ returning its filename.
                   output-file-pathname))
             warnings-p
             failure-p)))
+
+;;; Produce a FASL named by OUTPUT-FILE from FORM.
+;;; The accepted keywords are a subset of those to COMPILE-FILE.
+;;; *COMPILE-VERBOSE* has no effect - this is silent in general.
+(defun compile-form-to-file
+    (form output-file &key ((:progress *compile-progress*) *compile-progress*)
+                           (trace-file nil))
+  (let* ((abort-p t)
+         (warnings-p nil)
+         (failure-p t)
+         (source-info (make-lisp-source-info form))
+         (*last-message-count* (list* 0 nil nil))
+         (*last-error-context* nil)
+         (pathname (compile-file-pathname "" :output-file output-file))
+         (fasl-output (open-fasl-output pathname "?"))
+         (*compiler-trace-output*
+          (when trace-file
+            (open-trace-file trace-file fasl-output))))
+    (unwind-protect
+         (let ((*block-compile-argument* nil)
+               (*entry-points-argument* nil)
+               (*compile-object* fasl-output))
+           (setf (values abort-p warnings-p failure-p) (sub-compile-file source-info nil)))
+      (when fasl-output
+        (close-fasl-output fasl-output abort-p))
+      (when (and trace-file (not (streamp trace-file)))
+        (close *compiler-trace-output*)))
+    (values (unless abort-p pathname) warnings-p failure-p))))
 
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
 ;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,

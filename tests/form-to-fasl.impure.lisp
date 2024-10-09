@@ -1,0 +1,27 @@
+(defvar *foo* 0)
+(defclass mything () ((a :initarg :a :reader a)
+                      (b :initform (incf *foo*))))
+(defmethod make-load-form ((self mything) &optional e)
+  (declare (ignore e))
+  (make-load-form-saving-slots self))
+
+(with-test (:name :is-unprintable)
+  (assert-error (write-to-string (make-instance 'mything :a "a") :readably t)))
+
+(defvar *form* `(setf (car *items*)
+                      ,(vector (make-instance 'mything :a "hello")
+                               (make-instance 'mything :a "world"))))
+(defun thingp (x str)
+  (and (typep x 'mything) (string= (a x) str)))
+
+(defvar *items* nil)
+
+(with-test (:name :compile-form-to-file)
+  (with-scratch-file (fasl "fasl")
+    (sb-c:compile-form-to-file *form* fasl)
+    (setf *items* (list nil))
+    (load fasl)
+    (let ((first (car *items*)))
+      (assert (and (simple-vector-p first)
+                   (thingp (elt first 0) "hello")
+                   (thingp (elt first 1) "world"))))))
