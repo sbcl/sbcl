@@ -185,9 +185,7 @@
                         (cond ((fun-type-keyp type)
                                (loop with keywords = (fun-type-keywords type)
                                      for (key value) on args by #'cddr
-                                     for info = (find (lvar-value key)
-                                                      (fun-type-keywords type)
-                                                      :key #'key-info-name)
+                                     for info = (find (lvar-value key) keywords :key #'key-info-name)
                                      always (and info
                                                  (check value
                                                         (key-info-type info)))))
