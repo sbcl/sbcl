@@ -1316,6 +1316,12 @@
 
 (macrolet ((with-print-restrictions (&rest body)
              `(let ((*print-pretty* t)
+                    ;; Truncating end-of-line notes is not very informative, certainly
+                    ;; now that so many FDEFNs have compound names like
+                    ;;  #<SB-KERNEL:FDEFN (SB-IMPL::SPECIALIZED-XEP
+                    ;;                     F ..))
+                    ;; hence the extremely generous overriding value for right-margin.
+                    (*print-right-margin* 200)
                     (*print-lines* 2)
                     (*print-length* 4)
                     (*print-level* 4))
