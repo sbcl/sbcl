@@ -181,8 +181,11 @@
                                   (ir1-attributep (fun-info-attributes info) fixed-args))
                              (typep name '(cons (eql sb-impl::specialized-xep))))
                             (loop for var in (lambda-vars fun)
+                                  for type in (fun-type-required (if (typep name '(cons (eql sb-impl::specialized-xep)))
+                                                                     (specifier-type `(function ,@(cddr name)))
+                                                                     (info :function :type name)))
                                   for temp in temps
-                                  collect `(type ,(type-specifier (lambda-var-type var)) ,temp))))))
+                                  collect `(type ,(type-specifier type) ,temp))))))
 
        `(lambda (,n-supplied ,@temps)
           (declare (type index ,n-supplied)

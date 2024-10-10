@@ -880,7 +880,9 @@
                                                (specifier-type `(function ,@(cddr fun)))
                                                (info :function :type fun)))
             for var in vars
-            do (setf (lambda-var-type var) type))))
+            for intersection = (type-intersection type (lambda-var-type var))
+            unless (eq intersection *empty-type*)
+            do (setf (lambda-var-type var) intersection))))
   vars)
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
