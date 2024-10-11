@@ -23,11 +23,11 @@
 (defconstant keyword-package-id (sb-impl::package-id (find-package 'keyword)))
 
 (defun convert-to-host-object (x spacemap)
-  (let ((nil-object (compute-nil-object spacemap)))
+  (let ()
     (labels ((recurse (x)
                (cond ((not (is-lisp-pointer (get-lisp-obj-address x)))
                       x)
-                     ((eq x nil-object) nil)
+                     ((core-null-p x) nil)
                      (t
                       (let ((x (translate x spacemap)))
                         (ecase (lowtag-of x)

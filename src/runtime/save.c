@@ -285,10 +285,21 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     int string_words = ALIGN_UP(stringlen, sizeof (core_entry_elt_t))
         / sizeof (core_entry_elt_t);
     int pad = string_words * sizeof (core_entry_elt_t) - stringlen;
-    /* Write 3 word entry header: a word for entry-type-code, a word for
-     * the total length in words, and a word for the string length */
+    /* Write 5 word entry header: a word for entry-type-code, the length in words,
+     * the GC enum, the address of NIL, and the string length */
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(3 + string_words, file);
+    write_lispobj(5 + string_words, file);
+#ifdef LISP_FEATURE_GENCGC
+    write_lispobj(1, file);
+#endif
+#ifdef LISP_FEATURE_MARK_REGION_GC
+    write_lispobj(2, file);
+#endif
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+    write_lispobj(0, file);
+#else
+    write_lispobj(NIL, file);
+#endif
     write_lispobj(stringlen, file);
     int nwrote = fwrite(build_id, 1, stringlen, file);
     /* Write padding bytes to align to core_entry_elt_t */

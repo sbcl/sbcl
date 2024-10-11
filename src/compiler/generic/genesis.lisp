@@ -4041,9 +4041,12 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                  ((nwords padding) (ceiling (length build-id) sb-vm:n-word-bytes)))
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,
-        ;; length of the string, then base string chars + maybe padding.
+        ;; the GC this was build for, the address of NIL, the length of the
+        ;; ID string, then base string chars + maybe padding.
         (write-words core-file build-id-core-entry-type-code
-                     (+ 3 nwords) ; 3 = fixed overhead including this word
+                     (+ 5 nwords) ; 5 = fixed overhead including this word
+                     (or #+gencgc 1 #+mark-region-gc 2 (error "Bad GC selection"))
+                     (or #-relocatable-static-space sb-vm:nil-value 0)
                      (length build-id))
         (dovector (char build-id) (write-byte (char-code char) core-file))
         (dotimes (j (- padding)) (write-byte #xff core-file)))

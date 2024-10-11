@@ -1405,10 +1405,12 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
         switch (val) {
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
-            stringlen = *ptr++;
-            --remaining_len;
+            // The first 2 data words are the GC selection and address of NIL,
+            // which are mainly of interest to 'editcore'. Here they are ignored.
+            stringlen = ptr[2];
+            ptr += 3; remaining_len -= 3;
             gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);
-            if (stringlen+1 != sizeof build_id || memcmp(ptr, build_id, stringlen))
+            if (stringlen != (sizeof build_id-1) || memcmp(ptr, build_id, stringlen))
                 lose("core was built for runtime \"%.*s\" but this is \"%s\"",
                      (int)stringlen, (char*)ptr, build_id);
             break;

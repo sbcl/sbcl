@@ -88,13 +88,8 @@
 ;;;
 (defun get-space (id spacemap)
   (find id (cdr spacemap) :key #'space-id))
-(defun compute-nil-addr (spacemap)
-  (let ((space (get-space static-core-space-id spacemap)))
-    ;; TODO: The core should store its address of NIL in the initial function entry
-    ;; so this kludge can be removed.
-    (logior (space-addr space) #x117))) ; SUPER KLUDGE
-(defun compute-nil-object (spacemap) ; terrible, don't use!
-  (%make-lisp-obj (compute-nil-addr spacemap)))
+(defglobal *nil-taggedptr* 0)
+(defun core-null-p (x) (= (get-lisp-obj-address x) *nil-taggedptr*))
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
 ;;; the range at which the core is now mapped during execution of this tool,
@@ -118,7 +113,6 @@
                  (:copier nil)
                  (:constructor %make-core))
   (spacemap)
-  (nil-object)
   ;; mapping from small integer ID to package
   (pkg-id->package)
   ;; mapping from string naming a package to list of symbol names (strings)
@@ -174,14 +168,13 @@
 
 (defun scan-symbol-table (function table core)
   (let* ((spacemap (core-spacemap core))
-         (nil-object (core-nil-object core))
          (cells (translate (symtbl-%cells (truly-the symbol-table
                                                      (translate table spacemap)))
                            spacemap)))
     (dovector (x (translate (cdr cells) spacemap))
       (unless (fixnump x)
         (funcall function
-                 (if (eq x nil-object) ; any random package can export NIL. wow.
+                 (if (core-null-p x) ; any random package can export NIL. wow.
                      "NIL"
                      (translate (symbol-name (translate x spacemap)) spacemap))
                  x)))))
@@ -323,12 +316,10 @@
            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
                                spacemap :physical)))
          (alien-linkage-symbols (compute-alien-linkage-symbols spacemap))
-         (nil-object (compute-nil-object spacemap))
          (ambiguous-symbols (make-hash-table :test 'equal))
          (core
           (%make-core
            :spacemap spacemap
-           :nil-object nil-object
            :nonunique-symbol-names ambiguous-symbols
            :code-bounds code-bounds
            :fixedobj-bounds fixedobj-bounds
@@ -359,7 +350,7 @@
                      (scan-symtbl (package-internal-symbols package))))))
         (dovector (x (translate package-table spacemap))
           (cond ((%instancep x) (scan-package x))
-                ((listp x) (loop (if (eq x nil-object) (return))
+                ((listp x) (loop (if (core-null-p x) (return))
                                  (setq x (translate x spacemap))
                                  (scan-package (car x))
                                  (setq x (cdr x)))))))
@@ -718,10 +709,9 @@
 ;;; 3) make a different entry type code for PTES_WITH_BITMAP
 (defun detect-target-features (spacemap &aux result)
   (flet ((scan (symbol)
-           (let ((list (symbol-global-value symbol))
-                 (target-nil (compute-nil-object spacemap)))
+           (let ((list (symbol-global-value symbol)))
              (loop
-               (when (eq list target-nil) (return))
+               (when (core-null-p list) (return))
                (setq list (translate list spacemap))
                (let ((feature (translate (car list) spacemap)))
                  (aver (symbolp feature))
@@ -976,10 +966,14 @@
            (let ((space (get-space dynamic-core-space-id (cons nil space-list))))
              (setf (space-page-table space) (read-page-table input n-ptes nbytes data-page)))))
         (#.build-id-core-entry-type-code
-         (let ((string (make-string (%vector-raw-bits core-header ptr)
-                                    :element-type 'base-char)))
-           (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
-           (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D~%" string len ptr (length string))))
+         (setf *nil-taggedptr* (%vector-raw-bits core-header (+ ptr 1)))
+         (let* ((strptr (+ ptr 2))
+                (string (make-string (%vector-raw-bits core-header strptr)
+                                     :element-type 'base-char)))
+           (%byte-blt core-header (* (1+ strptr) n-word-bytes) string 0 (length string))
+           (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D, gc=~D~%"
+                   string len ptr (length string)
+                   (%vector-raw-bits core-header ptr))))
         (#.runtime-options-magic) ; ignore
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
@@ -1559,7 +1553,6 @@
 
 (defun extract-object-from-core (sap core &optional proxy-symbols
                                  &aux (spacemap (core-spacemap core))
-                                      (targ-nil (compute-nil-addr spacemap))
                                       ;; address (an integer) -> host object
                                       (seen (make-hash-table)))
   (declare (ignorable proxy-symbols)) ; not done
@@ -1572,7 +1565,7 @@
                  (return-from recurse (%make-lisp-obj addr)))
                (awhen (gethash addr seen) ; NIL is not recorded
                  (return-from recurse it))
-               (when (eql addr targ-nil)
+               (when (eql addr *nil-taggedptr*)
                  (return-from recurse nil))
                (let ((sap (int-sap (translate-ptr (logandc2 addr lowtag-mask)
                                                   spacemap))))

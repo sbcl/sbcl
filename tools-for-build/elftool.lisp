@@ -670,7 +670,7 @@
                      (namestring
                       (sb-c::debug-source-namestring
                        (truly-the sb-c::debug-source (translate source spacemap)))))
-                (setq namestring (if (eq namestring (core-nil-object core))
+                (setq namestring (if (core-null-p namestring)
                                      "sbcl.core"
                                      (translate namestring spacemap)))
                 (unless (string= namestring prev-namestring)
@@ -1171,6 +1171,10 @@
   ;; Remove old files
   (ignore-errors (delete-file asm-pathname))
   (ignore-errors (delete-file elf-core-pathname))
+  ;; Crappy assumption: we already called redirect-text-space-calls which
+  ;; assigned a value to *nil-taggedptr*. Anyway, why doesn't this use
+  ;; PARSE-CORE-HEADER like it should?
+  (assert (/= *nil-taggedptr* 0))
   ;; Ensure that all files can be opened
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (asm-file asm-pathname :direction :output :if-exists :supersede)
@@ -1182,6 +1186,7 @@
           (case id
             (#.build-id-core-entry-type-code
              (when verbose
+               (incf ptr 2)
                (let ((string (make-string (%vector-raw-bits core-header ptr)
                                           :element-type 'base-char)))
                  (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
