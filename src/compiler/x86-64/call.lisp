@@ -711,7 +711,10 @@
 
      ;; We pass the number of arguments in RCX.
      (:temporary
-      (:sc unsigned-reg :offset rcx-offset :to ,(if (eq return :fixed) :save :eval))
+      (:sc unsigned-reg :offset rcx-offset
+           ,@(if (eq args :fixed)
+                 `(:from :eval :to :save)
+                 `(:to ,(if (eq return :fixed) :save :eval))))
       rcx)
 
      ,@(when (eq return :fixed)
