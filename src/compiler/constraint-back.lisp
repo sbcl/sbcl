@@ -96,7 +96,8 @@
             ((and (not x)
                   (csubtypep constraint (specifier-type 'complex)))
              (add y (specifier-type 'complex)))
-            ((csubtypep constraint (specifier-type 'real))
+            ((and x-type
+                  (csubtypep constraint (specifier-type 'real)))
              (let ((x-realp (csubtypep x-type (specifier-type 'real)))
                    (y-realp (csubtypep y-type (specifier-type 'real))))
                (cond ((and x-realp
