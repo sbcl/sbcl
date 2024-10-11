@@ -336,9 +336,12 @@
                    (change-full-call combination single-value-fun)
                    (setf (node-derived-type combination)
                          (make-single-value-type (single-value-type (node-derived-type combination)))))))))
-          ((not (fun-lexically-notinline-p combination-name (node-lexenv combination)))
+          ((and (eq (combination-kind combination) :full)
+                (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
            (let ((specialized (info :function :specialized-xep combination-name)))
-             (when specialized
+             (when (and specialized
+                        (= (length args)
+                           (length (first specialized))))
                (change-full-call combination `(sb-impl::specialized-xep ,combination-name ,@specialized))))))))
 
 ;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
