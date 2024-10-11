@@ -1857,3 +1857,11 @@
      (if (typep (nth-value 1 (truncate m 2.0)) 'double-float)
          m))
    (or double-float null)))
+
+(with-test (:name :ignore-delays)
+  (assert-type
+   (lambda (x)
+     (declare (optimize debug))
+     (when (typep (nth-value 1 (truncate x 1)) 'float)
+       x))
+   (or null real)))

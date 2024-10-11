@@ -1267,6 +1267,7 @@
          (maybe-add-eql-var-lvar-constraint node gen)
          (when preprocess-refs-p
            (constrain-ref-type node gen))))
+      (delay)
       (cast
        (let* ((lvar (cast-value node))
               (var (ok-lvar-lambda-var lvar gen))
