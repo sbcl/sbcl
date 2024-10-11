@@ -122,27 +122,35 @@
                        type
                        (primitive-type type)))
          (sc (find descriptor-reg-sc-number (sb-c::primitive-type-scs primtype) :test-not #'eql)))
-    (case (primitive-type-name primtype)
-      ((double-float single-float)
-       (make-wired-tn primtype
-                      sc
-                      (elt *float-regs* (incf (fixed-call-args-state-float state)))))
-      ((unsigned-byte-64 signed-byte-64)
-       (make-wired-tn primtype
-                      sc
-                      (elt #-c-stack-is-control-stack *non-descriptor-args*
-                           #+c-stack-is-control-stack *descriptor-args*
-                           (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
-                                  #+c-stack-is-control-stack fixed-call-args-state-descriptors
-                                  state)))))
-      (t
-       (let ((index (incf (fixed-call-args-state-descriptors state)))
-             (max-regs (length *descriptor-args*)))
-         (if (< index max-regs)
-             (make-wired-tn primtype
-                            descriptor-reg-sc-number
-                            (elt *descriptor-args* index))
-             (make-wired-tn primtype control-stack-sc-number (+ register-arg-count (- max-regs index)))))))))
+    (flet ((descriptor ()
+             (let ((index (incf (fixed-call-args-state-descriptors state)))
+                   (max-regs (length *descriptor-args*)))
+               (if (< index max-regs)
+                   (make-wired-tn primtype
+                                  descriptor-reg-sc-number
+                                  (elt *descriptor-args* index))
+                   (make-wired-tn primtype control-stack-sc-number (+ register-arg-count (- index max-regs)))))))
+      (case (primitive-type-name primtype)
+        ((double-float single-float)
+         (let ((n (incf (fixed-call-args-state-float state))))
+           (if (< n (length *float-regs*))
+               (make-wired-tn primtype
+                              sc
+                              (elt *float-regs* n))
+               (descriptor))))
+        ((unsigned-byte-64 signed-byte-64)
+         (let ((n (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
+                         #+c-stack-is-control-stack fixed-call-args-state-descriptors
+                         state)))
+               (regs #-c-stack-is-control-stack *non-descriptor-args*
+                     #+c-stack-is-control-stack *descriptor-args*))
+           (if (< n (length regs))
+               (make-wired-tn primtype
+                              sc
+                              (elt regs n))
+               (descriptor))))
+        (t
+         (descriptor))))))
 
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.

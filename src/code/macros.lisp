@@ -124,11 +124,15 @@ tree structure resulting from the evaluation of EXPRESSION."
          (multiple-value-bind (llks required) (parse-lambda-list lambda-list)
            (and (zerop llks)
                 (= (length required)
-                   (length (fun-type-required type)))
-                ;; FIXME: The number of float regs.
-                (<= (length required) 16)))
-         (loop for arg in (fun-type-required type)
-               thereis (csubtypep arg (specifier-type 'double-float)))
+                   (length (fun-type-required type)))))
+         (or (loop for arg in (fun-type-required type)
+                   thereis (csubtypep arg (specifier-type 'double-float)))
+             (let ((return (fun-type-returns type)))
+               (and (values-type-p return)
+                    (not (or (values-type-optional return)
+                             (values-type-rest return)))
+                    (loop for value in (values-type-required return)
+                          thereis (csubtypep value (specifier-type 'double-float))))))
          (cdr (type-specifier type)))))
 
 (defun make-specialized-xep-stub (name specialized
