@@ -136,9 +136,13 @@
                                   #+c-stack-is-control-stack fixed-call-args-state-descriptors
                                   state)))))
       (t
-       (make-wired-tn primtype
-                      descriptor-reg-sc-number
-                      (elt *descriptor-args* (incf (fixed-call-args-state-descriptors state))))))))
+       (let ((index (incf (fixed-call-args-state-descriptors state)))
+             (max-regs (length *descriptor-args*)))
+         (if (< index max-regs)
+             (make-wired-tn primtype
+                            descriptor-reg-sc-number
+                            (elt *descriptor-args* index))
+             (make-wired-tn primtype control-stack-sc-number (+ register-arg-count (- max-regs index)))))))))
 
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.
