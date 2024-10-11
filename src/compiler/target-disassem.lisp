@@ -1845,10 +1845,15 @@
                         (when first-block-seen-p
                           (return)))
                        ((eq kind nil)
-                        (when nil-block-seen-p
-                          (return))
-                        (when first-block-seen-p
-                          (setf nil-block-seen-p t))))
+                        (let ((name (sb-c::compiled-debug-fun-name fmap-entry)))
+                          (cond ((and (typep name '(cons (eql sb-impl::specialized-xep)))
+                                      (eq (%fun-name function)
+                                          (second name)))
+                                 (setf first-block-seen-p t))
+                                (nil-block-seen-p
+                                 (return))
+                                (first-block-seen-p
+                                 (setf nil-block-seen-p t))))))
                  (setf last-debug-fun
                        (sb-di::make-compiled-debug-fun fmap-entry code)))))))
         (let ((max-offset (%code-text-size code)))
