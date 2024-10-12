@@ -33,9 +33,7 @@ create_test_subdirectory
 temp=$TEST_DIRECTORY/$TEST_FILESTEM
 
 run_sbcl --load ../tools-for-build/elftool \
-  --eval '(sb-editcore:move-dynamic-code-to-text-space "../output/sbcl.core" "'${temp}'-patched.core")' \
-  --eval '(sb-editcore:redirect-text-space-calls "'${temp}'-patched.core")' \
-  --eval '(sb-editcore:split-core "'${temp}'-patched.core" "'${temp}'-src.s")' --quit
+  --eval '(sb-editcore:split-core "../output/sbcl.core" "'${temp}'-src.s")' --quit
 
 m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lzstd") #+x86 (princ " -m32"))' --quit`
 

@@ -88,6 +88,7 @@
 ;;;
 (defun get-space (id spacemap)
   (find id (cdr spacemap) :key #'space-id))
+(defglobal *heap-arrangement* nil)
 (defglobal *nil-taggedptr* 0)
 (defun core-null-p (x) (= (get-lisp-obj-address x) *nil-taggedptr*))
 
@@ -634,7 +635,8 @@
         (page-ranges)
         (first-page 0))
        ((>= first-page nptes) (nreverse page-ranges))
-    #+gencgc
+  (ecase *heap-arrangement*
+   (:gencgc
     (let* ((last-page (find-ending-page first-page ptes))
            (pte (aref (space-page-table space) first-page))
            (start-vaddr (page-addr first-page space))
@@ -664,7 +666,8 @@
             (setq vaddr (sap+ vaddr size)
                   paddr (sap+ paddr size)))))
       (setq first-page (1+ last-page)))
-    #+mark-region-gc
+    )
+   (:mark-region-gc
     (let* ((vaddr (int-sap (+ (space-addr space) (* first-page gencgc-page-bytes))))
            (paddr (int-sap (translate-ptr (sap-int vaddr) spacemap)))
            (pte (aref (space-page-table space) first-page))
@@ -697,7 +700,7 @@
                    (setq vaddr (sap+ vaddr size)
                          paddr (sap+ paddr size))
                    (incf object-offset-in-dualwords (ash size (- (1+ word-shift)))))))))
-      (incf first-page))))
+      (incf first-page))))))
 
 ;;; Unfortunately the idea of using target features to decide whether to
 ;;; read a bitmap from PAGE_TABLE_CORE_ENTRY_TYPE_CODE falls flat,
@@ -865,7 +868,8 @@
                    (page-type pte) 0
                    (page-scan-start pte) 0)))
       (let ((space (get-space dynamic-core-space-id spacemap)))
-        #+gencgc
+       (ecase *heap-arrangement*
+        (:gencgc
         (dolist (range page-ranges (aver (null codeblobs)))
           (destructuring-bind (in-use first last) range
             ;;(format t "~&Working on range ~D..~D~%" first last)
@@ -884,8 +888,8 @@
                                 (pop codeblobs))))))
             (unless in-use
               (loop for page-index from first to last
-                    do (reset-pte (svref (space-page-table space) page-index))))))
-        #+mark-region-gc
+                    do (reset-pte (svref (space-page-table space) page-index)))))))
+        (:mark-region-gc
         (dolist (code codeblobs)
           (destructuring-bind (vaddr . size) code
             (alien-funcall memset (translate-ptr (sap-int vaddr) spacemap) 0 size)
@@ -900,9 +904,9 @@
                                 (aver (not (find 1 (page-bitmap pte))))
                                 (reset-pte pte))))
                     ((not (find 1 (page-bitmap pte)))
-                     ;; is the #+gencgc logic above actually more efficient?
+                     ;; is the gencgc logic above actually more efficient?
                      ;;(format t "~&Code page ~D is now empty~%" page-index)
-                     (reset-pte pte))))))))))
+                     (reset-pte pte))))))))))))
 
 (defmacro linkage-space-header-ptr (x) `(svref ,x 0))
 (defmacro linkage-space-data-page (x) `(svref ,x 1))
@@ -966,14 +970,17 @@
            (let ((space (get-space dynamic-core-space-id (cons nil space-list))))
              (setf (space-page-table space) (read-page-table input n-ptes nbytes data-page)))))
         (#.build-id-core-entry-type-code
+         (setq *heap-arrangement*
+               (ecase (%vector-raw-bits core-header ptr)
+                 (1 :gencgc)
+                 (2 :mark-region-gc)))
          (setf *nil-taggedptr* (%vector-raw-bits core-header (+ ptr 1)))
          (let* ((strptr (+ ptr 2))
                 (string (make-string (%vector-raw-bits core-header strptr)
                                      :element-type 'base-char)))
            (%byte-blt core-header (* (1+ strptr) n-word-bytes) string 0 (length string))
-           (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D, gc=~D~%"
-                   string len ptr (length string)
-                   (%vector-raw-bits core-header ptr))))
+           (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D, gc=~A~%"
+                   string len ptr (length string) *heap-arrangement*)))
         (#.runtime-options-magic) ; ignore
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
@@ -1044,12 +1051,12 @@
                (wrote (sb-unix:unix-write fd paddr 0 nbytes)))
           (aver (= wrote nbytes)))))
     (aver (= (file-position output) (* +backend-page-bytes+ (1+ page-count))))
-    #+mark-region-gc ; write the bitmap
-    (dovector (pte (space-page-table dynamic-space))
-      (let ((bitmap (page-bitmap pte)))
-        (sb-sys:with-pinned-objects (bitmap)
-          ;; WRITE-SEQUENCE on a bit vector would write one octet per bit
-          (sb-unix:unix-write fd bitmap 0 (/ (length bitmap) 8)))))
+    (when (eq *heap-arrangement* :mark-region-gc)
+      (dovector (pte (space-page-table dynamic-space))
+        (let ((bitmap (page-bitmap pte)))
+          (sb-sys:with-pinned-objects (bitmap)
+            ;; WRITE-SEQUENCE on a bit vector would write one octet per bit
+            (sb-unix:unix-write fd bitmap 0 (/ (length bitmap) 8))))))
     ;; write the PTEs
     (let ((buffer (make-array 10 :element-type '(unsigned-byte 8))))
       (sb-sys:with-pinned-objects (buffer)
@@ -1124,8 +1131,8 @@
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (output output-pathname :direction :output
                                             :element-type '(unsigned-byte 8) :if-exists :supersede)
-      ;; KLUDGE: see comment above DETECT-TARGET-FEATURES
-      #+gencgc (setq *bitmap-bits-per-page* 0 *bitmap-bytes-per-page* 0)
+      (when (eq *heap-arrangement* :gencgc)
+        (setq *bitmap-bits-per-page* 0 *bitmap-bytes-per-page* 0))
       (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header))
              (parsed-header (parse-core-header input core-header core-offset))
@@ -1840,8 +1847,9 @@
          ;;; for large objects. With gencgc we'd have to compute the scan-start
          ;;; on subsequent pages, and put the end-of-page free space in a list.
          ;;; It's not worth the hassle.
-         (largep #+gencgc (>= size gencgc-page-bytes)
-                 #-gencgc (>= size large-object-size))
+         (largep (ecase *heap-arrangement*
+                   (:mark-region-gc (>= size large-object-size))
+                   (:gencgc (>= size gencgc-page-bytes))))
          (page-type (pick-page-type descriptor sap largep old-spacemap))
          (newspace (get-space dynamic-core-space-id new-spacemap))
          (new-nslots) ; only set if it's a resized instance

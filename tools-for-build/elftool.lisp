@@ -1682,11 +1682,21 @@
                            (try-directory (user-homedir-pathname))
                            (error "Can't find a writeable directory for our split core."))
                        (sb-unix:unix-getpid)))))
-    ;; input core could be readonly
-    (unwind-protect (progn (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
-                                        :search t)
-                           #+x86-64 (redirect-text-space-calls tmp)
-                           (apply #'really-split-core tmp asm-pathname args))
+    (with-open-file (stream input-pathname :element-type '(unsigned-byte 8))
+      (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
+             (core-offset (read-core-header stream core-header)))
+        (parse-core-header stream core-header core-offset)))
+    (unwind-protect
+         (progn
+           (ecase *heap-arrangement*
+             (:gencgc
+              ;; input core could be readonly
+              (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
+                           :search t))
+             (:mark-region-gc
+              (move-dynamic-code-to-text-space input-pathname tmp)))
+           #+x86-64 (redirect-text-space-calls tmp)
+           (apply #'really-split-core tmp asm-pathname args))
       (delete-file tmp))))
 
 (defun cl-user::elfinate (&optional (args (cdr *posix-argv*)))
