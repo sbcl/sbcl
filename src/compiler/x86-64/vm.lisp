@@ -168,7 +168,7 @@
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
   #+win32
   (defregset    *c-call-register-arg-offsets* rcx rdx r8 r9)
-  (defregset *descriptor-args* rdx rdi rsi rbx rcx r8 r9 r10 r14 r15))
+  (defregset *descriptor-args* rdx rdi rsi rbx rcx r8 r9 r10 r14))
 
 ;;;; SB definitions
 
