@@ -466,3 +466,12 @@
                                     (zerop (length x)))
                            x)))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :external-type-checks-across-functions)
+  (assert (not (find 'sb-c::%type-check-error/c
+                     (ir-calls
+                      `(lambda (a b)
+                         (declare (number a b)
+                                  (optimize speed))
+                         (+ a b)))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))

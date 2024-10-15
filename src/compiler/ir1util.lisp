@@ -424,7 +424,7 @@
                      (when (and flushable
                                 (flushable-combination-p node))
                        (go :next)))
-                    (enclose
+                    ((or enclose entry)
                      (go :next)))))
              (t
               ;; Loops shouldn't cause a problem, either it will
