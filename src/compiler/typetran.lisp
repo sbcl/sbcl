@@ -701,6 +701,16 @@
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
           ((source-transform-union-numeric-typep object types))
+          ;; Check for CONSP once.
+          ((> (count-if #'cons-type-p types) 1)
+           `(or (and (consp ,object)
+                     (or
+                      ,@(loop for type in types
+                              when (cons-type-p type)
+                              collect  `(typep ,object ',(type-specifier type)))))
+                ,@(loop for type in types
+                        unless (cons-type-p type)
+                        collect  `(typep ,object ',(type-specifier type)))))
           (t
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
