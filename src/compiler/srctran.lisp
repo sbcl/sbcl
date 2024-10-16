@@ -6975,7 +6975,13 @@
     (def range<= 0 0)
     (def range< 1 -1)
     (def range<<= 1 0)
-    (def range<=< 0 -1)))
+    (def range<=< 0 -1))
+
+  (defoptimizer (check-range<= constraint-propagate-if) ((l x h))
+    (let ((l-int (type-approximate-interval (lvar-type l)))
+          (h-int (type-approximate-interval (lvar-type h))))
+      (values x (specifier-type `(integer ,(interval-low l-int)
+                                          ,(interval-high h-int)))))))
 
 (defun find-or-chains (node op)
   (let ((chains (make-array 1 :adjustable t :fill-pointer 1 :initial-element nil)))
