@@ -573,6 +573,8 @@
 (defun check-fasl-header (stream)
   (maybe-skip-shebang-line stream)
   (let ((byte (read-byte stream nil))
+        (freeform-bytes
+         (make-array 256 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
         (results))
     (when byte
       ;; Read and validate constant string prefix in fasl header.
@@ -589,6 +591,7 @@
             ((= byte +fasl-header-string-stop-char-code+)
              t)
           (declare (fixnum byte count))
+          (vector-push-extend byte freeform-bytes)
           (when (and (< count fhsss-length)
                      (not (eql byte (char-code (schar fhsss count)))))
             (error 'invalid-fasl-header
@@ -639,9 +642,8 @@
             (error 'invalid-fasl-features
                    :stream stream
                    :expected expected
-                   :features faff-in-this-file)))
-        ;; success
-        (nreverse results)))))
+                   :features faff-in-this-file)))))
+    (values (nreverse results) freeform-bytes)))
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.
@@ -681,8 +683,9 @@
                       nil
                       nil)))))))
 
-(defstruct fasl-group
-  (fun-names (sb-c::make-fun-name-hashset)))
+(defstruct (fasl-group (:constructor !make-fasl-group (header-label)))
+  (header-label nil :read-only t)
+  (fun-names (sb-c::make-fun-name-hashset) :read-only t))
 
 (defvar *current-fasl-group*)
 ;;;
@@ -693,10 +696,30 @@
 ;;; Dispatch to the right function for each fop.
 (defun load-fasl-group (fasl-input)
   (let ((stream (%fasl-input-stream fasl-input))
+        (header-label)
         (trace *show-fops-p*))
-    (unless (check-fasl-header stream)
-      (return-from load-fasl-group))
-    (let ((*current-fasl-group* (make-fasl-group)))
+    (declare (inline !make-fasl-group))
+    (multiple-value-bind (results freeform-bytes) (check-fasl-header stream)
+      (unless results
+        (return-from load-fasl-group))
+      (let* ((signature
+              #.(sb-xc:make-array
+                 15
+                 :initial-contents
+                 ;; (see OPEN-FASL-OUTPUT in src/compiler/dump)
+                 (map 'list #'sb-xc:char-code "compiled from \"")))
+             (len 15) ; length of signature
+             (pos1 (search signature freeform-bytes))
+             (pos2 (and pos1 (position (char-code #\newline) freeform-bytes
+                                       :start (+ pos1 len)))))
+        (when (and pos1 pos2
+                   (= (aref freeform-bytes (1- pos2)) (char-code #\"))
+                   (loop for p from (+ pos1 len) below (1- pos2)
+                         always (standard-char-p (code-char (aref freeform-bytes p)))))
+          (setq header-label
+                (map 'string 'code-char
+                     (subseq freeform-bytes (+ pos1 len) (1- pos2)))))))
+    (let ((*current-fasl-group* (!make-fasl-group header-label)))
       (catch 'fasl-group-end
         (setf (svref (%fasl-input-table fasl-input) 0) 0)
         (loop

@@ -13,6 +13,13 @@
 
 (defvar *foo* '#:bar)
 
+(assert (boundp 'sb-fasl::*current-fasl-group*))
+(let* ((label
+        (sb-fasl::fasl-group-header-label sb-fasl::*current-fasl-group*))
+       (pn (pathname label)))
+  (assert (and (string= (pathname-name pn) "load.impure-cload")
+               (string= (pathname-type pn) "lisp"))))
+
 ;; INTERN always computes hashes, so the only thing we need to test
 ;; is whether uninterned symbols always have a hash.
 (with-test (:name :loader-computes-symbol-hash-always)
