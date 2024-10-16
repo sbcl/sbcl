@@ -223,11 +223,11 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 a simple-string (not necessarily unique) or NIL."
   (thread-%name thread))
 (defun (setf thread-name) (name thread)
-  (setq name (possibly-base-stringize name))
-  (setf (thread-%name thread) name) ; will fail if non-simple
-  ;; Not all native thread APIs can set the name of a random thread, so only try to do it
-  ;; if changing your own name.
-  (when (eq thread *current-thread*) (try-set-os-thread-name name))
+  (let ((name (possibly-base-stringize-to-heap name)))
+    (setf (thread-%name thread) name) ; will fail if non-simple
+    ;; Not all native thread APIs can set the name of a random thread, so only try to do it
+    ;; if changing your own name.
+    (when (eq thread *current-thread*) (try-set-os-thread-name name)))
   name)
 
 (defmethod print-object ((thread thread) stream)
