@@ -698,6 +698,15 @@
                        '(or ,@(mapcar #'type-specifier
                                (remove type-cons
                                 (remove type-symbol types)))))))
+          ;; Check for NULL before consp, then consp can be reduced to listp.
+          ((and mtype
+                (memq nil members)
+                (find-if #'cons-type-p types))
+           `(or (null ,object)
+                (typep ,object
+                       '(or ,@(mapcar #'type-specifier
+                               (remove mtype types))
+                         (member ,@(remove nil members))))))
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
           ((source-transform-union-numeric-typep object types))
