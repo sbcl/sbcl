@@ -710,16 +710,36 @@
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
           ((source-transform-union-numeric-typep object types))
-          ;; Check for CONSP once.
-          ((> (count-if #'cons-type-p types) 1)
-           `(or (and (consp ,object)
-                     (or
-                      ,@(loop for type in types
-                              when (cons-type-p type)
-                              collect  `(typep ,object ',(type-specifier type)))))
-                ,@(loop for type in types
-                        unless (cons-type-p type)
-                        collect  `(typep ,object ',(type-specifier type)))))
+          ;; Check for CONSP/SINGLE/DOUBLE-FLOAT-P once.
+          ((let* (single-floats
+                  double-floats
+                  conses)
+             (loop for type in types
+                   do
+                   (cond
+                     ((numeric-type-p type)
+                      (cond ((numtype-aspects-eq type (specifier-type 'double-float))
+                             (push type double-floats))
+                            ((numtype-aspects-eq type (specifier-type 'single-float))
+                             (push type single-floats))))
+                     ((cons-type-p type)
+                      (push type conses))))
+             (when (or (cdr single-floats)
+                       (cdr double-floats)
+                       (cdr conses))
+               (flet ((check (sub-types test)
+                        (when (cdr sub-types)
+                          `((and (,test ,object)
+                                 (or
+                                  ,@(loop for type in sub-types
+                                          do (setf types (remove type types :test #'eq :count 1))
+                                          collect `(typep ,object ',(type-specifier type)))))))))
+                 `(or
+                   ,@(check single-floats 'single-float-p)
+                   ,@(check double-floats 'double-float-p)
+                   ,@(check conses 'consp)
+                   ,@(loop for type in types
+                           collect `(typep ,object ',(type-specifier type))))))))
           (t
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
