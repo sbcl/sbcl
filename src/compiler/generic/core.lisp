@@ -69,7 +69,11 @@
                    (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
                    (:foreign (foreign-symbol-address name))
                    (:foreign-dataref (foreign-symbol-address name t))
-                   #+linkage-space (:linkage-cell (ensure-linkage-index name))
+                   #+linkage-space
+                   (:linkage-cell
+                    (let ((index (ensure-linkage-index name)))
+                      (unless (permanent-fname-p name) (setq callees (adjoin index callees)))
+                      index))
                    (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
@@ -83,16 +87,12 @@
                    (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
                    (t (bug "bad fixup flavor ~s" flavor)))
                  kind flavor)
-         (if (and (eq flavor :linkage-cell) (not (permanent-fname-p name)))
-             (adjoin name callees :test 'equal)
-             callees))
-       (finish-fixups (code-obj callees retained-fixups)
+         callees)
+       (finish-fixups (code-obj callees other-fixups)
          (declare (ignorable code-obj callees))
          (setf (sb-vm::%code-fixups code-obj)
-               #-linkage-space retained-fixups
-               #+linkage-space
-               (let ((links (pack-code-fixup-locs (mapcar 'ensure-linkage-index callees))))
-                 (join-varint-streams links retained-fixups)))
+               #+linkage-space (join-varint-streams (pack-code-fixup-locs callees) other-fixups)
+               #-linkage-space other-fixups)
          ;; Assign all SIMPLE-FUN-SELF slots unless #+darwin-jit in which case the simple-funs
          ;; are assigned by jit_memcpy_codeblob()
          #-darwin-jit
