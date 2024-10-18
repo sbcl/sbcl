@@ -1000,7 +1000,10 @@
                                  (let ((data ,obj))
                                    (and
                                     ,@(when (eq complexp t)
-                                        `((/= (%other-pointer-widetag data) ,typecode)))
+                                        `((/= (%other-pointer-widetag data)
+                                              ,@(unless headerp
+                                                  `(,typecode))
+                                              sb-vm:simple-array-widetag)))
                                     (loop
                                      (let ((widetag (%other-pointer-widetag data)))
                                        (if (eq widetag ,typecode)
