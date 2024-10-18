@@ -1071,12 +1071,13 @@
   (assert (<= (length +fixup-kinds+) 16))) ; fixup-kind fits in 4 bits
 
 (defconstant-eqx +fixup-flavors+
-  #(:assembly-routine
+ `#(:assembly-routine
     :card-table-index-mask :symbol-tls-index
     :alien-code-linkage-index :alien-data-linkage-index
     :foreign :foreign-dataref
     :code-object
-    :layout :immobile-symbol :linkage-cell
+    :layout :immobile-symbol
+    #+linkage-space ,@'(:linkage-cell)
     :symbol-value
     :layout-id)
   #'equalp)
