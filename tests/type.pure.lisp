@@ -948,3 +948,23 @@
    (lambda (j)
      (sb-kernel:%other-pointer-p (the (and sequence (not vector)) j)))
    null))
+
+(with-test (:name :non-simple-arrays)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x '(and (vector t) (not simple-array))))
+   ((#()) nil)
+   (((make-array 10 :adjustable t)) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x '(and (array t) (not simple-array))))
+   ((#()) nil)
+   (((make-array '(10 10) :adjustable t)) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x '(and (vector t 10) (not simple-array))))
+   ((#10(t)) nil)
+   (((make-array 10 :adjustable t)) t)))

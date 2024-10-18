@@ -973,8 +973,9 @@
   (let ((eltype (array-type-specialized-element-type type)))
     (unless (or (type= eltype (array-type-specialized-element-type stype))
                 (eq eltype *wild-type*))
-      (let* ((typecode (sb-vm:saetp-typecode (find-saetp-by-ctype eltype))))
-        (cond ((and headerp (not (array-type-complexp stype)))
+      (let* ((typecode (sb-vm:saetp-typecode (find-saetp-by-ctype eltype)))
+             (complexp (array-type-complexp type)))
+        (cond ((and headerp (not complexp))
                (let ((obj `(truly-the ,(type-specifier stype) ,obj)))
                  ;; If we know OBJ is an array header, and that the array is
                  ;; simple, we also know there is exactly one indirection to
@@ -983,7 +984,7 @@
                    (eq (%other-pointer-widetag (%array-data ,obj)) ,typecode)
                    #+x86-64
                    (widetag= (%array-data ,obj) ,typecode))))
-              ((not (array-type-complexp stype))
+              ((not complexp)
                (values
                 `((and (%other-pointer-p ,obj)
                        (let ((widetag (%other-pointer-widetag ,obj)))
@@ -997,40 +998,47 @@
                  (arrayp
                   (values `((and (%other-pointer-p ,obj)
                                  (let ((data ,obj))
-                                   (loop
-                                    (let ((widetag (%other-pointer-widetag data)))
-                                      (if (eq widetag ,typecode)
-                                          (return t)
-                                          (if (or (eq widetag sb-vm:simple-array-widetag)
-                                                  (>= widetag sb-vm:complex-base-string-widetag))
-                                              (setf data (%array-data data))
-                                              (return nil))))))))
+                                   (and
+                                    ,@(when (eq complexp t)
+                                        `((/= (%other-pointer-widetag data) ,typecode)))
+                                    (loop
+                                     (let ((widetag (%other-pointer-widetag data)))
+                                       (if (eq widetag ,typecode)
+                                           (return t)
+                                           (if (or (eq widetag sb-vm:simple-array-widetag)
+                                                   (>= widetag sb-vm:complex-base-string-widetag))
+                                               (setf data (%array-data data))
+                                               (return nil)))))))))
                           t))
                  (vectorp
                   (if length
                       (values `((and (%other-pointer-p ,obj)
                                      (let ((widetag (%other-pointer-widetag ,obj)))
-                                       (if (eq widetag ,typecode)
-                                           (= (vector-length (truly-the (simple-array * (*)) ,obj)) ,length)
-                                           (and (= widetag sb-vm:complex-vector-widetag)
-                                                (= (%array-dimension (truly-the (and (array * (*))
-                                                                                     (not simple-array)) ,obj) 0)
-                                                   ,length)
-                                                (let ((data ,obj))
-                                                  (loop
-                                                   (setf data (%array-data data))
-                                                   (let ((widetag (%other-pointer-widetag data)))
-                                                     (if (eq widetag ,typecode)
-                                                         (return t)
-                                                         (unless (or (eq widetag sb-vm:simple-array-widetag)
-                                                                     (>= widetag sb-vm:complex-vector-widetag))
-                                                           (return nil)))))))))))
+                                       (,@(if (eq complexp t)
+                                              '(progn)
+                                              `(if (eq widetag ,typecode)
+                                                   (= (vector-length (truly-the (simple-array * (*)) ,obj)) ,length)))
+                                        (and (= widetag sb-vm:complex-vector-widetag)
+                                             (= (%array-dimension (truly-the (and (array * (*))
+                                                                                  (not simple-array)) ,obj) 0)
+                                                ,length)
+                                             (let ((data ,obj))
+                                               (loop
+                                                (setf data (%array-data data))
+                                                (let ((widetag (%other-pointer-widetag data)))
+                                                  (if (eq widetag ,typecode)
+                                                      (return t)
+                                                      (unless (or (eq widetag sb-vm:simple-array-widetag)
+                                                                  (>= widetag sb-vm:complex-vector-widetag))
+                                                        (return nil)))))))))))
                               t
                               t)
                       (values `((and (%other-pointer-p ,obj)
                                      (let ((widetag (%other-pointer-widetag ,obj)))
-                                       (if (eq widetag ,typecode)
-                                           t
+                                       (,@(if (eq complexp t)
+                                              '(progn)
+                                              `(if (eq widetag ,typecode)
+                                                   t))
                                            (and (= widetag sb-vm:complex-vector-widetag)
                                                 (let ((data ,obj))
                                                   (loop
