@@ -2048,7 +2048,7 @@
   (foldable flushable always-translatable)
   ;; check bounds when folding.
   :folder (lambda (array index) (aref array index)))
-(defknown data-vector-ref-with-offset (simple-array fixnum fixnum) t
+(defknown data-vector-ref-with-offset (simple-array index fixnum) t
   (foldable flushable always-translatable)
   :folder (lambda (array index offset) (aref array (+ index offset))))
 (defknown data-nil-vector-ref (simple-array index) nil
@@ -2056,7 +2056,7 @@
 ;;; The lowest-level vector SET operators should not return a value.
 ;;; Functions built upon them may return the input value.
 (defknown data-vector-set (array index t) (values) (dx-safe always-translatable))
-(defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
+(defknown data-vector-set-with-offset (array index fixnum t) (values)
   (dx-safe always-translatable))
 (defknown hairy-data-vector-ref (array index) t (foldable flushable no-verify-arg-count)
   :folder (lambda (array index) (aref array index)))
