@@ -3221,68 +3221,72 @@
                                                     branch-label
                                                     (sb-c::next-vop-label branch)))))
                             (cond
-                                  ((> lo hi)
-                                   (inst cmp null-tn 0))
-                                  ((= lo hi)
-                                   (change-vop-flags vop '(:eq))
-                                   (inst cmp x (add-sub-immediate lo)))
-                                  ((= hi ,(fixnumize -1))
-                                   (change-vop-flags vop '(:hs))
-                                   (cond (tbz-label
-                                          (inst tbnz* x 0 tbz-label)
-                                          (inst cmn x (add-sub-immediate (- lo))))
-                                         (t
-                                          (inst tst x fixnum-tag-mask)
-                                          (inst ccmn x (ccmp-immediate (- lo)) :eq))))
-                                  ((eq lo ,(fixnumize most-positive-fixnum))
-                                   (change-vop-flags vop '(:le))
-                                   (cond (tbz-label
-                                          (inst tbnz* x 0 tbz-label)
-                                          (inst cmp x (add-sub-immediate hi)))
-                                         (t
-                                          (inst tst x fixnum-tag-mask)
-                                          (inst ccmp x (ccmp-immediate hi) :eq))))
-                                  ((= hi ,(fixnumize most-positive-fixnum))
-                                   (change-vop-flags vop '(:ge))
-                                   (cond (tbz-label
-                                          (inst tbnz* x 0 tbz-label)
-                                          (inst cmp x (add-sub-immediate lo)))
-                                         (t
-                                          (inst tst x fixnum-tag-mask)
-                                          (inst ccmp x (ccmp-immediate lo) :eq #b1000))))
-                                  ((and (> lo 0)
-                                        (= (logcount (+ hi (fixnumize 1))) 1))
-                                   (inst tst x (lognot hi))
-                                   (change-vop-flags vop '(:hs))
-                                   (inst ccmp x (ccmp-immediate lo) :eq))
-                                  (t
-                                   (if (zerop lo)
-                                       (setf temp x)
-                                       (if (plusp lo)
-                                           (inst sub temp x (add-sub-immediate lo))
-                                           (inst add temp x (add-sub-immediate (abs lo)))))
-                                   (let* ((diff (- hi lo))
-                                          (loaded diff))
-                                     (cond ((= (logcount (+ diff (fixnumize 1))) 1)
-                                            (change-vop-flags vop '(:eq))
-                                            (inst tst temp (lognot diff)))
-                                           (t
-                                            (unless (add-sub-immediate-p diff)
-                                              (if (load-immediate-word tmp-tn (+ diff (fixnumize 1)) t)
-                                                  (change-vop-flags vop '(:lo))
-                                                  (load-immediate-word tmp-tn diff))
-                                              (setf loaded tmp-tn))
-                                            (cond
-                                              ((< diff lowest-bignum-address)
-                                               (inst cmp temp loaded))
-                                              (tbz-label
-                                               (inst tbnz* x 0 (if branch-not
-                                                                   branch-label
-                                                                   (sb-c::next-vop-label branch)))
-                                               (inst cmp temp loaded))
-                                              (t
-                                               (inst tst x fixnum-tag-mask)
-                                               (inst ccmp temp (ccmp-immediate loaded) :eq #b10)))))))))))))
+                              ((and (= lo 0)
+                                    (= hi (fixnumize most-positive-fixnum)))
+                               (change-vop-flags vop '(:eq))
+                               (inst tst x (logior (ash 1 63) fixnum-tag-mask)))
+                              ((> lo hi)
+                               (inst cmp null-tn 0))
+                              ((= lo hi)
+                               (change-vop-flags vop '(:eq))
+                               (inst cmp x (add-sub-immediate lo)))
+                              ((= hi ,(fixnumize -1))
+                               (change-vop-flags vop '(:hs))
+                               (cond (tbz-label
+                                      (inst tbnz* x 0 tbz-label)
+                                      (inst cmn x (add-sub-immediate (- lo))))
+                                     (t
+                                      (inst tst x fixnum-tag-mask)
+                                      (inst ccmn x (ccmp-immediate (- lo)) :eq))))
+                              ((eq lo ,(fixnumize most-positive-fixnum))
+                               (change-vop-flags vop '(:le))
+                               (cond (tbz-label
+                                      (inst tbnz* x 0 tbz-label)
+                                      (inst cmp x (add-sub-immediate hi)))
+                                     (t
+                                      (inst tst x fixnum-tag-mask)
+                                      (inst ccmp x (ccmp-immediate hi) :eq))))
+                              ((= hi ,(fixnumize most-positive-fixnum))
+                               (change-vop-flags vop '(:ge))
+                               (cond (tbz-label
+                                      (inst tbnz* x 0 tbz-label)
+                                      (inst cmp x (add-sub-immediate lo)))
+                                     (t
+                                      (inst tst x fixnum-tag-mask)
+                                      (inst ccmp x (ccmp-immediate lo) :eq #b1000))))
+                              ((and (> lo 0)
+                                    (= (logcount (+ hi (fixnumize 1))) 1))
+                               (inst tst x (lognot hi))
+                               (change-vop-flags vop '(:hs))
+                               (inst ccmp x (ccmp-immediate lo) :eq))
+                              (t
+                               (if (zerop lo)
+                                   (setf temp x)
+                                   (if (plusp lo)
+                                       (inst sub temp x (add-sub-immediate lo))
+                                       (inst add temp x (add-sub-immediate (abs lo)))))
+                               (let* ((diff (- hi lo))
+                                      (loaded diff))
+                                 (cond ((= (logcount (+ diff (fixnumize 1))) 1)
+                                        (change-vop-flags vop '(:eq))
+                                        (inst tst temp (lognot diff)))
+                                       (t
+                                        (unless (add-sub-immediate-p diff)
+                                          (if (load-immediate-word tmp-tn (+ diff (fixnumize 1)) t)
+                                              (change-vop-flags vop '(:lo))
+                                              (load-immediate-word tmp-tn diff))
+                                          (setf loaded tmp-tn))
+                                        (cond
+                                          ((< diff lowest-bignum-address)
+                                           (inst cmp temp loaded))
+                                          (tbz-label
+                                           (inst tbnz* x 0 (if branch-not
+                                                               branch-label
+                                                               (sb-c::next-vop-label branch)))
+                                           (inst cmp temp loaded))
+                                          (t
+                                           (inst tst x fixnum-tag-mask)
+                                           (inst ccmp temp (ccmp-immediate loaded) :eq #b10)))))))))))))
 
                   (define-vop (,(symbolicate name '-integer))
                     (:translate ,name)
