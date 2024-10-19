@@ -89,7 +89,7 @@
 (gc-space-setup #x50000000
                      :read-only-space-size 0
                      :fixedobj-space-size #.(* 60 1024 1024)
-                     :text-space-size #.(* 130 1024 1024)
+                     :text-space-size #.(* 160 1024 1024)
                      :text-space-start #xB800000000
                      :dynamic-space-start #x1000000000)
 
