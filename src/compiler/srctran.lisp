@@ -5263,30 +5263,46 @@
   (def <= < ceiling)
   (def >= > floor))
 
-(macrolet ((def (name x y type-x type-y &optional non-fixnum)
-             `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node :important nil)
-                (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
-                           (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
-                       (give-up-ir1-transform))
-                      (t
-                       ;; Give the range-transform optimizers a chance to trigger.
-                       (delay-ir1-transform node :ir1-phases)
-                       `(if (fixnump i)
-                            (let ((i (truly-the fixnum i)))
-                              (,',name ,',x ,',y))
-                            ,,non-fixnum))))))
+;;; Do a check for fixnum and a fixnum comparison if the range is
+;;; already restricted to a fixnum on one side.
+(macrolet ((def (name x y type-x type-y check-range &optional non-fixnum)
+               `(deftransform ,name ((,x ,y) (,type-x ,type-y) * :node node :important nil)
+                  (cond ((or (csubtypep (lvar-type i) (specifier-type 'word))
+                             (csubtypep (lvar-type i) (specifier-type 'sb-vm:signed-word)))
+                         (give-up-ir1-transform))
+                        (t
+                         ;; Give the range-transform optimizers a chance to trigger.
+                         (delay-ir1-transform node :ir1-phases)
+                         ',(if (vop-existsp :translate check-range<<=)
+                               check-range
+                               `(if (fixnump i)
+                                    (let ((i (truly-the fixnum i)))
+                                      (,name ,x ,y))
+                                    ,non-fixnum)))))))
 
-  (def < i f (integer #.most-negative-fixnum) fixnum)
-  (def > f i fixnum (integer #.most-negative-fixnum))
+  (def < i f (integer #.most-negative-fixnum) fixnum
+       (check-range<=< most-negative-fixnum i f))
+  (def > f i fixnum (integer #.most-negative-fixnum)
+       (check-range<=< most-negative-fixnum i f))
 
-  (def > i f (integer * #.most-positive-fixnum) fixnum)
-  (def < f i fixnum (integer * #.most-positive-fixnum))
+  (def > i f (integer * #.most-positive-fixnum) fixnum
+       (check-range<<= f i most-positive-fixnum))
+  (def < f i fixnum (integer * #.most-positive-fixnum)
+       (check-range<<= f i most-positive-fixnum))
 
-  (def > i f (integer #.most-negative-fixnum) fixnum t)
-  (def < f i fixnum (integer #.most-negative-fixnum) t)
+  (def > i f (integer #.most-negative-fixnum) fixnum
+       (not (check-range<= most-negative-fixnum i f))
+       t)
+  (def < f i fixnum (integer #.most-negative-fixnum)
+       (not (check-range<= most-negative-fixnum i f))
+       t)
 
-  (def < i f (integer * #.most-positive-fixnum) fixnum t)
-  (def > f i fixnum (integer * #.most-positive-fixnum) t))
+  (def < i f (integer * #.most-positive-fixnum) fixnum
+       (not (check-range<= f i most-positive-fixnum))
+       t)
+  (def > f i fixnum (integer * #.most-positive-fixnum)
+       (not (check-range<= f i most-positive-fixnum))
+       t))
 
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))

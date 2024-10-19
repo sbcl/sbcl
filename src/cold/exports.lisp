@@ -2007,7 +2007,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "TWO-ARG-STRING/=" "TWO-ARG-STRING-LESSP" "TWO-ARG-STRING-GREATERP"
            "TWO-ARG-STRING-NOT-LESSP" "TWO-ARG-STRING-NOT-GREATERP" "TWO-ARG-STRING-NOT-EQUAL"
            "RANGE<" "RANGE<=" "RANGE<<=" "RANGE<=<"
-           "CHECK-RANGE<="
+           "CHECK-RANGE<=" "CHECK-RANGE<<=" "CHECK-RANGE<=<"
            "TYPE-*-TO-T"
            "TYPE-DIFFERENCE" "TYPE-INTERSECTION"
            "TYPE-INTERSECTION2" "TYPE-APPROX-INTERSECTION2"

@@ -3309,7 +3309,18 @@
                                      (inst ccmn x (ccmp-immediate (- c)) cond flags)
                                      (inst ccmp x (ccmp-immediate c) cond flags))))
                         (inst tst x fixnum-tag-mask)
-                        (cond ((and (sc-is lo immediate)
+                        (cond ,@(unless excl-high
+                                  `(((and (sc-is hi immediate)
+                                          (= (tn-value hi) most-positive-fixnum))
+                                     (change-vop-flags vop '(,(if excl-low
+                                                                  :gt
+                                                                  :ge)))
+                                     (ccmp (imm lo) :eq #b1))))
+                              ,@(unless excl-low
+                                  `(((and (sc-is lo immediate)
+                                          (= (tn-value lo) most-negative-fixnum))
+                                     (ccmp (imm hi) :eq #b10))))
+                              ((and (sc-is lo immediate)
                                     (csubtypep (tn-ref-type hi-ref)
                                                (specifier-type 'unsigned-byte))
                                     (eql (tn-value lo)
@@ -3329,7 +3340,9 @@
   (def range<<= t nil)
   (def range<=< nil t)
 
-  (def check-range<= nil nil t))
+  (def check-range<= nil nil t)
+  (def check-range<<= t nil t)
+  (def check-range<=< nil t t))
 
 
 (define-vop (signed-multiply-low-high)
