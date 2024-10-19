@@ -3221,10 +3221,6 @@
                                                     branch-label
                                                     (sb-c::next-vop-label branch)))))
                             (cond
-                              ((and (= lo 0)
-                                    (= hi (fixnumize most-positive-fixnum)))
-                               (change-vop-flags vop '(:eq))
-                               (inst tst x (logior (ash 1 63) fixnum-tag-mask)))
                               ((> lo hi)
                                (inst cmp null-tn 0))
                               ((= lo hi)
@@ -3246,7 +3242,8 @@
                                      (t
                                       (inst tst x fixnum-tag-mask)
                                       (inst ccmp x (ccmp-immediate hi) :eq))))
-                              ((= hi ,(fixnumize most-positive-fixnum))
+                              ((and (/= lo 0)
+                                    (= hi ,(fixnumize most-positive-fixnum)))
                                (change-vop-flags vop '(:ge))
                                (cond (tbz-label
                                       (inst tbnz* x 0 tbz-label)
