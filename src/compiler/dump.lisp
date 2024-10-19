@@ -1077,7 +1077,7 @@
     :foreign :foreign-dataref
     :code-object
     :layout :immobile-symbol
-    #+linkage-space ,@'(:linkage-cell)
+    #+linkage-space ,@'(:linkage-cell :linkage-cell-ud)
     :symbol-value
     :layout-id)
   #'equalp)

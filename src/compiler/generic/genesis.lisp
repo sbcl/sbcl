@@ -2929,7 +2929,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
            code-obj offset
            (ecase flavor
              #+linkage-space
-             (:linkage-cell
+             ((:linkage-cell :linkage-cell-ud)
+              (setq flavor :linkage-cell) ; -ud variant is irrelevant
               (let ((i (ensure-linkage-index name)))
                 (unless (permanent-fname-p (warm-fun-name name))
                   (pushnew i callees))

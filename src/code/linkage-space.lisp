@@ -58,9 +58,16 @@
 
 ;;; Give DESIGNATOR (a symbol, list, or fdefn) a linkage index.
 (defun ensure-linkage-index (designator
+                             &optional quiet
                              &aux (fname (if (typep designator '(or symbol fdefn))
                                              designator
                                              (find-or-create-fdefn designator))))
+  ;; The QUIET arg is for an extension to the FASLoader that discriminates between looking
+  ;; up a linkage index where the compiler did/did-not emit an "undefined" warning.
+  ;; In certain cases where a linkage-cell is referenced, the compiler will never warn,
+  ;; so neither should the loader, for example in (WHEN (FBOUNDP 'F) (FUNCALL 'F)).
+  ;; Observing the QUIET argument requires placing an encapsulation on this function.
+  (declare (ignore quiet))
   (aver designator) ; can not assign a linkage index to NIL
   ;; Optimistically assume FNAME has an index already but don't return it if the linkage cell
   ;; isn't also set, which avoids a subtle data race. Consider: Thread A sets the index in the name,

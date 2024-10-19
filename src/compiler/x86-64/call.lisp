@@ -20,12 +20,42 @@
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))
 
+(defun linkage-cell-fixup (name node)
+  ;; The distinction between the two linkage-cell fixups is that :linkage-cell
+  ;; never warns about undefined linkage but the "-ud" one may, after resolving
+  ;; separately-compiled fasls much the same as a standard linker, thereby liberating
+  ;; SBCL from the restriction that WITH-COMPILATION-UNIT is the only way to avoid
+  ;; style-warnings about defined-elsewhere functions. Needless to say, we must avoid
+  ;; emitting any such warnings at compile-time. Two tests are done to decide whether
+  ;; to emit the load-time warning:
+  ;; - did the compiler style-warn?  If not then don't. This covers the case
+  ;;   of (FUNCALL 'name)
+  ;; - was it lexically notinline? Even if the compiler style-warned, there should
+  ;;   not be a load-time warning if the user wanted an out-of-line call.
+  (let* ((explicit-notinline
+          (sb-c::fun-lexically-notinline-p name (sb-c::node-lexenv node)))
+         (lt-warn ; (possible) load-time warning for unresolved linkage
+          (and (not explicit-notinline)
+               ;; Optimize the predicate to FIND-IF. We can usually
+               ;; compare names by EQ except when NAME is a list.
+               (find-if (if (symbolp name)
+                            (lambda (x)
+                              (and (eq (sb-c::undefined-warning-kind x) :function)
+                                   (eq (sb-c::undefined-warning-name x) name)))
+                            (lambda (x)
+                              (and (eq (sb-c::undefined-warning-kind x) :function)
+                                   (equal (sb-c::undefined-warning-name x) name))))
+                        sb-c::*undefined-warnings*))))
+    (make-fixup name (if lt-warn
+                         :linkage-cell-ud  ; was undefined at compile-time
+                         :linkage-cell))))
+
 (defun compute-linkage-cell (node name res)
   (cond ((sb-c::code-immobile-p node)
-         (inst lea res (rip-relative-ea (make-fixup name :linkage-cell))))
+         (inst lea res (rip-relative-ea (linkage-cell-fixup name node))))
         (t
          (inst mov res (thread-slot-ea sb-vm::thread-linkage-table-slot))
-         (inst lea res (ea (make-fixup name :linkage-cell) res)))))
+         (inst lea res (ea (linkage-cell-fixup name node) res)))))
 
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
@@ -871,11 +901,11 @@
          ;; If step-instrumenting, then RAX points to the linkage table cell
          (inst* instruction (ea rax-tn)))
         ((sb-c::code-immobile-p node)
-         (inst* instruction (rip-relative-ea (make-fixup name :linkage-cell))))
+         (inst* instruction (rip-relative-ea (linkage-cell-fixup name node))))
         (t
          ;; get the linkage table base into RAX
          (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
-         (inst* instruction (ea (make-fixup name :linkage-cell) rax-tn)))))
+         (inst* instruction (ea (linkage-cell-fixup name node) rax-tn)))))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)

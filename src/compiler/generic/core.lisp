@@ -70,9 +70,12 @@
                    (:foreign (foreign-symbol-address name))
                    (:foreign-dataref (foreign-symbol-address name t))
                    #+linkage-space
-                   (:linkage-cell
-                    (let ((index (ensure-linkage-index name)))
+                   ((:linkage-cell :linkage-cell-ud)
+                    (let* ((quiet (eq flavor :linkage-cell))
+                           (index (ensure-linkage-index name quiet)))
                       (unless (permanent-fname-p name) (setq callees (adjoin index callees)))
+                      ;; machine-dependent fixup doesn't want to know which flavor was used
+                      (setq flavor :linkage-cell)
                       index))
                    (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
