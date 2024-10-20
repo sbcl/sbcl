@@ -802,7 +802,10 @@
                                setf-svuc-slots sbuc-slots)
     (let ((wrapper (class-wrapper (ctor-class ctor))))
       (values
-       `(lambda ,(make-ctor-parameter-list ctor)
+       `(,@(if (ctor-safe-p ctor)
+               `(named-lambda (make-instance ,(ctor-class-or-name ctor)))
+               `(lambda))
+            ,(make-ctor-parameter-list ctor)
          (declare #.*optimize-speed*)
          (block nil
            (when (layout-invalid ,wrapper)
@@ -946,13 +949,15 @@
         finally
           (return (values around before (first primary) (reverse after)))))
 
-(defmacro with-type-checked ((type safe-p) &body body)
+(defmacro with-type-checked ((type slot-name safe-p) &body body)
   (if safe-p
       ;; To handle FUNCTION types reasonable, we use SAFETY 3 and
       ;; THE instead of e.g. CHECK-TYPE.
       `(locally
            (declare (optimize (safety 3)))
-         (the ,type (progn ,@body)))
+         (the* (,type :context (slot ,slot-name)
+                :silent-conflict t)
+               (progn ,@body)))
       `(progn ,@body)))
 
 ;;; Return as multiple values bindings for default initialization arguments,
@@ -1057,7 +1062,7 @@
                                            ,class .instance. ,slotd)
                                           ,value-form)
                                    `(setf (clos-slots-ref .slots. ,i)
-                                          (with-type-checked (,type ,safe-p)
+                                          (with-type-checked (,type ,(slot-definition-name slotd) ,safe-p)
                                             ,value-form))))
                              (not-boundp-form ()
                                (if (member slotd sbuc-slots :test #'eq)
@@ -1109,7 +1114,7 @@
                        (push name names)
                        (push location locations)
                        `(setf (cdr ,name)
-                              (with-type-checked (,type ,safe-p)
+                              (with-type-checked (,type ,(slot-definition-name slotd) ,safe-p)
                                 ,init-form)))
                   into class-init-forms
                   finally (return (values (nreverse names)
