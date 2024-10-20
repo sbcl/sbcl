@@ -802,16 +802,15 @@
                                setf-svuc-slots sbuc-slots)
     (let ((wrapper (class-wrapper (ctor-class ctor))))
       (values
-       `(,@(if (ctor-safe-p ctor)
-               `(named-lambda (make-instance ,(ctor-class-or-name ctor)))
-               `(lambda))
+       `(named-lambda
+            (make-instance ,(ctor-class-or-name ctor))
             ,(make-ctor-parameter-list ctor)
-         (declare #.*optimize-speed*)
-         (block nil
-           (when (layout-invalid ,wrapper)
-             (install-initial-constructor ,ctor t)
-             (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
-           ,(wrap-in-allocate-forms ctor body early-unbound-markers-p)))
+          (declare #.*optimize-speed*)
+          (block nil
+            (when (layout-invalid ,wrapper)
+              (install-initial-constructor ,ctor t)
+              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
+            ,(wrap-in-allocate-forms ctor body early-unbound-markers-p)))
        locations
        names
        t))))
