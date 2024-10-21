@@ -955,7 +955,8 @@
       `(locally
            (declare (optimize (safety 3)))
          (the* (,type :context (slot ,slot-name)
-                :silent-conflict t)
+                      :restart t
+                      :silent-conflict t)
                (progn ,@body)))
       `(progn ,@body)))
 

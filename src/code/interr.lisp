@@ -173,7 +173,7 @@
          (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
          (context (sb-di:error-context)))
     (cond (context
-           (destructuring-bind (name type . restart) context
+           (destructuring-bind (restart name . type) context
                (restart-case
                    (error 'simple-program-error
                           :format-control "Function~@[ ~s~] declared to return ~s returned ~a value~:p"
@@ -377,11 +377,12 @@
                                         'type-error)
                                     :datum object
                                     :expected-type expected-type
-                                    :context (and (not (integerp context))
-                                                  (not (eq context 'cerror))
-                                                  context))))
-              (cond ((integerp context)
-                     (restart-type-error type condition context))
+                                    :context (and (not (eq context 'cerror))
+                                                  (if (typep context '(cons integer))
+                                                      (cdr context)
+                                                      context)))))
+              (cond ((typep context '(cons integer))
+                     (restart-type-error type condition (car context)))
                     ((eq context 'cerror)
                      (restart-type-error type condition))
                     (t

@@ -203,9 +203,9 @@
                                   :unknown-return))
       (flet ((check-nargs ()
                (assemble ()
-                 (let* ((*location-context* (list* name
-                                                   (type-specifier type)
-                                                   (make-restart-location SKIP)))
+                 (let* ((*location-context* (list* (make-restart-location SKIP)
+                                                   name
+                                                   (type-specifier type)))
                         (err-lab (generate-error-code vop 'invalid-arg-count-error))
                         (min min-values)
                         (max (and (< max-values call-arguments-limit)

@@ -175,25 +175,23 @@
 (defvar *previous-form-number*)
 
 (defun encode-restart-location (location x)
-  (typecase x
-    (restart-location
-     (let ((offset (- (label-position (restart-location-label x))
-                      location))
-           (tn (restart-location-tn x))
-           (registers-size #.(integer-length (sb-size (sb-or-lose 'sb-vm::registers)))))
-       (if tn
-           (the fixnum (logior (ash offset registers-size)
-                               (tn-offset tn)))
-           offset)))
-    (cons (let ((last (cdr (last x))))
-            (if (restart-location-p last)
-                (let ((new (copy-list x)))
-                  (setf (cdr (last new))
-                        (encode-restart-location location last))
-                  new)
-                x)))
-    (t
-     x)))
+  (flet ((encode-restart (restart)
+           (let ((offset (- (label-position (restart-location-label restart))
+                            location))
+                 (tn (restart-location-tn restart))
+                 (registers-size #.(integer-length (sb-size (sb-or-lose 'sb-vm::registers)))))
+             (if tn
+                 (the fixnum (logior (ash offset registers-size)
+                                     (tn-offset tn)))
+                 offset))))
+    (typecase x
+      ((cons restart-location)
+       (cons (encode-restart (car x))
+             (cdr x)))
+      (restart-location
+       (encode-restart x))
+      (t
+       x))))
 
 (defun decode-restart-location (x)
   (declare (fixnum x))

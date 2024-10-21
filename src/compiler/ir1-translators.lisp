@@ -1135,9 +1135,7 @@ care."
                             (ensure-source-path source-form)
                             (ensure-source-path form)))
         (context (cond (restart
-                        ;; For now, these share the same place in the debug info
-                        (aver (not context))
-                        :restart)
+                        (cons :restart context))
                        (context))))
     (cond (derive-type-only
            ;; For something where we really know the type and need no mismatch checking,

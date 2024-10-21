@@ -405,8 +405,9 @@
 (defun make-type-check-form (types cast)
   (let* ((temps (make-gensym-list (length types)))
          (context (cast-context cast))
-         (restart (and (eq context :restart)
-                       (setf context (make-restart-location)))))
+         (restart (and (typep context '(cons (eql :restart)))
+                       (setf context (cons (make-restart-location)
+                                           (cdr context))))))
     (lambda (dummy)
       `(multiple-value-bind ,temps ,dummy
          ,@(mapcar
@@ -421,7 +422,7 @@
                                                     type-to-report)
                                                 context))
                    ,@(and restart
-                          `((restart-point ,restart))))))
+                          `((restart-point ,(car restart)))))))
             temps
             types)
          (values ,@temps)))))
