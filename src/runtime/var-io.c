@@ -117,6 +117,17 @@ static int __attribute__((unused)) mem_is_zeroed(char* from, char* to) {
     for ( ; from < to ; ++from) if (*from) return 0;
     return 1;
 }
+int pack_varint(unsigned int input, char output[5])
+{
+    int i = 0;
+    do {
+        unsigned int next = input>>7;
+        output[i++] = (input & 0x7F) | (next ? 0x80 : 0);
+        input = next;
+    } while (input);
+    return i;
+}
+
 int compress_vector(lispobj vector, size_t used_length) {
     struct vector *v = VECTOR(vector);
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG);
@@ -124,6 +135,8 @@ int compress_vector(lispobj vector, size_t used_length) {
     gc_dcheck(mem_is_zeroed(used_length + (char*)&v->data,
                             (size_t)vector_len(v) + (char*)&v->data));
 
+    char prefix[5];
+    int prefix_length = pack_varint(used_length, prefix);
     size_t buf_size = ZSTD_compressBound(used_length);
     char* buf = successful_malloc(buf_size);
     size_t new_length = ZSTD_compress(buf, buf_size, v->data, used_length, 22);
@@ -131,57 +144,49 @@ int compress_vector(lispobj vector, size_t used_length) {
         free(buf);
         return 0;
     }
-
     int compressed = 0;
-    if (new_length < used_length) {
+    if (prefix_length + new_length < used_length) {
         assign_widetag(&v->header, SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG);
-        memcpy(&v->data, buf, new_length);
-        memset(((char*)&v->data)+new_length, 0, used_length-new_length);
+        char* output = (char*)&v->data;
+        memcpy(output, prefix, prefix_length);
+        memcpy(output + prefix_length, buf, new_length);
+        new_length += prefix_length;
+        memset(output+new_length, 0, used_length-new_length);
         used_length = new_length;
         compressed = 1;
     }
+    // Length is assigned regardless of whether compression occurred, as the physical vector
+    // can potentially be shrunk in all cases since vector-push-extend overallocates.
     v->length_ = make_fixnum(used_length);
     free(buf);
     return compressed;
 }
 
-unsigned char* decompress_vector(lispobj vector, size_t *result_size) {
+/* I think it's no coincidence that any time I would attach to a stuck SBCL process
+ * which was attempting to self-diagnose a memory fault using backtrace, it seemed
+ * to be stuck in the backtracer thusly or similarly:
+ * #0  0x00007faafc41f099 in syscall () from /usr/grte/v5/lib64/libc.so.6
+ * #1  0x00005561518e3c54 in AbslInternalSpinLockDelay ()
+ * #2  0x00005561519b652d in absl::base_internal::SpinLock::SlowLock() ()
+ * #3  0x00005561519af3ed in tcmalloc::tcmalloc_internal::ThreadCache::CreateCacheIfNecessary() ()
+ * #4  0x000055615196d32d in tcmalloc::tcmalloc_internal::TCMallocPolicy<...>
+ * #5  0x00005561517dc6f0 in ZSTD_createDStream ()
+ * #6  0x000055615176141f in decompress_vector ()
+ *
+ * While ZSTD_decompress is not promised to be signal-safe, it seems to fare better
+ * than relying on ZSTD_createDStream.
+ */
+int decompress_vector(lispobj l_input, int input_offset,
+                      unsigned char* output_buffer, int buffer_length) {
 
-    struct vector *v = VECTOR(vector);
+    struct vector *iv = VECTOR(l_input);
+    unsigned char* src = (unsigned char*)iv->data + input_offset;
+    int compressedsize = vector_len(iv) - input_offset;
+    size_t result = ZSTD_decompress(output_buffer, buffer_length, src, compressedsize);
+    if (result != (size_t)buffer_length)
+        lose("Zstd uncompressed size is wrong for input %"OBJ_FMTX": %ld vs %d (%s)",
+             l_input, result, buffer_length, ZSTD_getErrorName(result));
 
-    ZSTD_inBuffer input;
-    input.src = v->data;
-    input.pos = 0;
-    input.size = vector_len(v);
-
-    size_t out_increment = ZSTD_CStreamOutSize();
-    size_t buf_size = 0;
-
-    unsigned char* buf = NULL;
-    size_t ret;
-
-    ZSTD_DStream *stream = ZSTD_createDStream();
-    if (stream == NULL)
-        lose("unable to create zstd decompression context");
-    ret = ZSTD_initDStream(stream);
-    if (ZSTD_isError(ret))
-        lose("ZSTD_initDStream failed with error: %s", ZSTD_getErrorName(ret));
-
-    while (input.pos < input.size) {
-        buf = realloc(buf, buf_size + out_increment);
-
-        ZSTD_outBuffer output = { buf+buf_size, out_increment, 0 };
-
-        size_t const ret = ZSTD_decompressStream(stream, &output , &input);
-        if (ZSTD_isError(ret))
-            lose("ZSTD_decompressStream failed with error: %s",
-                 ZSTD_getErrorName(ret));
-        buf_size += output.pos;
-
-    }
-    ZSTD_freeDStream(stream);
-
-    *result_size = buf_size;
-    return buf;
+    return 1;
 }
 #endif

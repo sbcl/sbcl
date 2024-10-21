@@ -1073,23 +1073,23 @@
 #+(and sb-core-compression (not sb-xc-host))
 (progn
   (defun compress (vector)
-    (with-alien ((compress-vector (function int (* char) size-t) :extern "compress_vector"))
-      (let* ((data (truly-the (simple-array * (*)) (%array-data vector))))
-        (with-pinned-objects (data)
-          (alien-funcall compress-vector (int-sap (get-lisp-obj-address data)) (length vector)))
-        data)))
+    (let ((backing (truly-the (simple-array * (*)) (%array-data vector))))
+      (with-pinned-objects (backing)
+        (with-alien ((compress-vector (function int unsigned size-t) :extern))
+          (alien-funcall compress-vector (get-lisp-obj-address backing) (length vector)))
+        backing)))
 
   (defun decompress (vector)
+    (declare (sb-c::tlab :system))
     (if (typep vector '(simple-array (signed-byte 8) (*)))
-        (with-alien ((decompress-vector (function (* unsigned-char) (* char) (* size-t)) :extern "decompress_vector")
-                     (size size-t))
-          (let* ((pointer
-                   (with-pinned-objects (vector)
-                     (alien-funcall decompress-vector (int-sap (get-lisp-obj-address vector)) (addr size))))
-                 (length size)
-                 (new (make-array length :element-type '(unsigned-byte 8))))
-            (loop for i below length
-                  do (setf (aref new i) (deref pointer i)))
-            (free-alien pointer)
-            new))
+        (with-alien ((decompress-vector (function int unsigned int system-area-pointer int) :extern))
+          (with-pinned-objects (vector)
+            (binding* ((sap (vector-sap vector))
+                       ((preamble skip) (sap-read-var-integer sap 0)) ; preamble = uncompressed size
+                       (output (make-array preamble :element-type '(unsigned-byte 8))))
+              (with-pinned-objects (output)
+                (alien-funcall decompress-vector
+                               (get-lisp-obj-address vector) skip
+                               (vector-sap output) preamble))
+              output)))
         vector)))

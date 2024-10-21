@@ -61,9 +61,19 @@ debug_function_name_from_pc (struct code* code, void *pc)
     unsigned char *map = (unsigned char*)v->data;
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-    int compressed = widetag_of(&v->header) == SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG;
-    if (compressed)
-        map = decompress_vector(di->fun_map, (size_t*)&len);
+    int uncompressed_len = 0;
+    if (widetag_of(&v->header) == SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG) {
+        int offset = 0;
+        uncompressed_len = read_var_integer(map, &offset);
+        /* os_allocate should never acquire a global lock.
+         * This causes a ton of system-call overhead in the 'debug.pure' regression test,
+         * but implementing a thread-local cache of the last-used allocation within backtrace
+         * just to speed up an artificial use would be the wrong thing to do,
+         * as it would potentially introduce yet another way to fail */
+        map = (void*)os_allocate(uncompressed_len);
+        decompress_vector(di->fun_map, offset, map, uncompressed_len);
+        len = uncompressed_len;
+    }
 #endif
 
     uword_t code_start_pc = 0;
@@ -172,8 +182,7 @@ debug_function_name_from_pc (struct code* code, void *pc)
         lose("failed to parse debug function name");
   done:
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-    if (compressed)
-        free(map);
+    if (uncompressed_len) os_deallocate((void*)map, uncompressed_len);
 #endif
     return last_name;
 }

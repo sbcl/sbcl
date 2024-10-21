@@ -296,10 +296,10 @@ Please check that all strings which were not recognizable to the compiler
     (when (typep info 'sb-c::compiled-debug-info)
       (let ((map (sb-c::compiled-debug-info-fun-map info)))
         (when (typep map '(simple-array (unsigned-byte 8) (*)))
-          (sb-alien:with-alien ((compress-vector (function int (* char) size-t) :extern "compress_vector"))
+          (sb-alien:with-alien ((compress-vector (function int unsigned size-t) :extern))
             (sb-sys:with-pinned-objects (map)
               (sb-alien:alien-funcall compress-vector
-                                      (sb-sys:int-sap (sb-kernel:get-lisp-obj-address map))
+                                      (sb-kernel:get-lisp-obj-address map)
                                       (length map)))))))))
 (progn
   ;; Remove source forms of compiled-to-memory lambda expressions.

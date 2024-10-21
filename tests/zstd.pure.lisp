@@ -1,3 +1,19 @@
+(defun random-test (n-iter &aux (rs (make-random-state t)))
+  (dotimes (iter n-iter)
+    (let* ((length (+ 1000 (random 10000 rs)))
+           (testcase (make-array length :element-type '(unsigned-byte 8)
+                                        :fill-pointer t)))
+      ;; too much randomness makes the data not as compressibe
+      (dotimes (i length) (setf (aref testcase i) (random 100 rs)))
+      (let* ((original (copy-seq testcase))
+             (compressed (sb-c::compress testcase)))
+        ;;(format t "~&length=~d -> ~d~%" length (length compressed))
+        (let ((uncompressed (sb-c::decompress compressed)))
+          (assert (equalp uncompressed original)))))))
+
+(with-test (:name :random)
+  (random-test 500))
+
 (with-test (:name :compressed-debug-info-not-larger)
   (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
     (let ((di (sb-kernel:%code-debug-info c)))
