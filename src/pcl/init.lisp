@@ -91,14 +91,12 @@
        ;; The normal, good case: compile an efficient typecheck function.
        (let ((*typecheck-stack* (cons cookie *typecheck-stack*)))
          (handler-bind (((or style-warning compiler-note) #'muffle-warning))
-           (let* ((context `(slot-context ,(class-name class) . ,(slot-definition-name slotd)))
-                  (fun (pcl-compile
-                        `(named-lambda (slot-typecheck ,type) (value)
-                           (declare (optimize (sb-c:store-coverage-data 0)
-                                              (sb-c::type-check 3)
-                                              (sb-c:verify-arg-count 0)))
-                           (the* (,type :restart t :context context)
-                                 value))
+           (let ((fun (pcl-compile
+                       `(named-lambda (slot-typecheck ,type) (value)
+                          (declare (optimize (sb-c:store-coverage-data 0)
+                                             (sb-c::type-check 3)
+                                             (sb-c:verify-arg-count 0)))
+                          (the* (,type :restart t) value))
                        :safe)))
              (setf (gethash type **typecheck-cache**) fun
                    (slot-info-typecheck info) fun))))))))
