@@ -831,8 +831,9 @@ with that condition (or with no condition) will be returned."
        (struct-context
         (format nil "when setting slot ~s of structure ~s"
                 (cddr context) (cadr context)))
-       (sb-pcl::slot
-        (format nil "when setting slot ~s" (cadr context)))
+       (sb-pcl::slot-context
+        (format nil "when setting slot ~s of an instance of class ~s"
+                (cddr context) (cadr context)))
        (t context)))
     ((eql sb-c::aref-context)
      (let (*print-circle*)
