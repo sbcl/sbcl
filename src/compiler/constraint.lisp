@@ -53,6 +53,8 @@
 (declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
 (defvar *blocks-to-terminate*)
+(defvar *constraint-blocks*)
+(defvar *constraint-blocks-p*)
 
 (defstruct (vector-length-constraint
             (:constructor make-vector-length-constraint (var))
@@ -1334,7 +1336,7 @@
                                  (conset= call-in gen))))
               (setf (combination-constraints-in node)
                     (copy-conset gen))
-              (when (boundp '*constraint-blocks*)
+              (when *constraint-blocks-p*
                 (enqueue-block-for-constraints (lambda-block fun))))))))))
   gen)
 
@@ -1588,8 +1590,6 @@
     (when (eql (car x) obj)
       (return-from nconc-new list))))
 
-(defvar *constraint-blocks*)
-
 (defun enqueue-block-for-constraints (block)
   (when (block-type-check block)
     (setq *constraint-blocks* (nconc-new block *constraint-blocks*))))
@@ -1614,7 +1614,8 @@
     ;; done, hence any inherited type constraints from such
     ;; constraints will be wrong as well.
     (dolist (join-types-p '(nil t))
-      (let ((*constraint-blocks* (copy-list rest-of-blocks)))
+      (let ((*constraint-blocks-p* t)
+            (*constraint-blocks* (copy-list rest-of-blocks)))
         ;; The rest of the blocks.
         (dolist (block rest-of-blocks)
           (aver (eq block (pop *constraint-blocks*)))
@@ -1645,7 +1646,8 @@
         (setf (if-alternative-constraints last) nil)
         (setf (if-consequent-constraints last) nil))))
 
-  (let (*blocks-to-terminate*)
+  (let (*blocks-to-terminate*
+        *constraint-blocks-p*)
     (dolist (block (find-and-propagate-constraints component))
       (unless (block-delete-p block)
         (use-result-constraints block)))
