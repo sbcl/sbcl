@@ -608,7 +608,10 @@
           (constructor-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
               (apply (let ((*compiling-optimized-constructor* t))
-                       (pcl-compile `(lambda ,names ,form) :unsafe))
+                       (pcl-compile `(lambda ,names ,form)
+                                    (if (ctor-safe-p ctor)
+                                        :safe
+                                        :unsafe)))
                      locations)
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
@@ -805,7 +808,10 @@
        `(named-lambda
             (make-instance ,(ctor-class-or-name ctor))
             ,(make-ctor-parameter-list ctor)
-          (declare #.*optimize-speed*)
+          (declare ,(remove (and (ctor-safe-p ctor)
+                                 '(debug 0))
+                            '#.*optimize-speed*
+                            :test #'equal))
           (block nil
             (when (layout-invalid ,wrapper)
               (install-initial-constructor ,ctor t)
