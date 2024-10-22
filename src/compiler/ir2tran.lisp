@@ -1352,13 +1352,13 @@
                            (loc-refs)
                            arg-locs nargs named
                            (emit-step-p node)))
-                    ((and fixed-args-p
-                          (vop-existsp :named sb-vm::fixed-multiple-call-named))
-                     (vop* sb-vm::fixed-multiple-call-named node block
-                           (fp #-linkage-space fun-tn args) ; args
-                           (loc-refs)                       ; results
-                           arg-locs nargs #+linkage-space named ; info
-                                          (emit-step-p node)))
+                    (fixed-args-p
+                     (when-vop-existsp (:named sb-vm::fixed-multiple-call-named)
+                       (vop* sb-vm::fixed-multiple-call-named node block
+                             (fp #-linkage-space fun-tn args) ; args
+                             (loc-refs) ; results
+                             arg-locs nargs #+linkage-space named ; info
+                             (emit-step-p node))))
                     (t
                      (vop* multiple-call-named node block
                            (fp #-linkage-space fun-tn args) ; args

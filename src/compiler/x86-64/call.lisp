@@ -731,7 +731,8 @@
 
      (:ignore   ,@(unless (or variable (eq return :tail)) '(arg-locs))
                 ,@(unless variable '(args))
-                ,@(when (eq return :unboxed) '(values)))
+                ,@(when (eq return :unboxed) '(values))
+                ,@(when (eq args :fixed) '(nargs)))
 
      ;; For anonymous call, RAX is the function. For named call, RAX will be the linkage
      ;; table base if not stepping, or the linkage cell itself if stepping.
@@ -740,12 +741,11 @@
      (:temporary (:sc descriptor-reg :offset rax-offset :from (:argument 0) :to :eval) rax)
 
      ;; We pass the number of arguments in RCX.
-     (:temporary
-      (:sc unsigned-reg :offset rcx-offset
-           ,@(if (eq args :fixed)
-                 `(:from :eval :to :save)
-                 `(:to ,(if (eq return :fixed) :save :eval))))
-      rcx)
+     ,@(unless (eq args :fixed)
+         `((:temporary
+            (:sc unsigned-reg :offset rcx-offset
+             :to ,(if (eq return :fixed) :save :eval))
+            rcx)))
 
      ,@(when (eq return :fixed)
                    ;; Save it for DEFAULT-UNKNOWN-VALUES to work
@@ -782,25 +782,25 @@
                ;; changed! RAX stores the 'lexical environment' needed
                ;; for closures.
        ,@(unless named '((move rax fun)))
-
-       ,@(if variable
-                     ;; For variable call, compute the number of
-                     ;; arguments and move some of the arguments to
-                     ;; registers.
-             `((inst mov rcx new-fp)
-               (inst sub rcx rsp-tn)
-               (inst shr rcx ,(- word-shift n-fixnum-tag-bits))
-                              ;; Move the necessary args to registers,
-                              ;; this moves them all even if they are
-                              ;; not all needed.
-               ,@(loop for name in *register-arg-names*
-                       for index downfrom -1
-                       collect `(loadw ,name new-fp ,index)))
-             '((cond ((listp nargs)) ;; no-verify-arg-count
-                     ((zerop nargs)
-                      (zeroize rcx))
-                     (t
-                      (inst mov rcx (fixnumize nargs))))))
+       ,@(unless (eq args :fixed)
+           (if variable
+               ;; For variable call, compute the number of
+               ;; arguments and move some of the arguments to
+               ;; registers.
+               `((inst mov rcx new-fp)
+                 (inst sub rcx rsp-tn)
+                 (inst shr rcx ,(- word-shift n-fixnum-tag-bits))
+                 ;; Move the necessary args to registers,
+                 ;; this moves them all even if they are
+                 ;; not all needed.
+                 ,@(loop for name in *register-arg-names*
+                         for index downfrom -1
+                         collect `(loadw ,name new-fp ,index)))
+               '((cond ((listp nargs)) ;; no-verify-arg-count
+                       ((zerop nargs)
+                        (zeroize rcx))
+                       (t
+                        (inst mov rcx (fixnumize nargs)))))))
        ,@(cond ((eq return :tail)
                 '(        ;; Python has figured out what frame we should
                           ;; return to so might as well use that clue.
