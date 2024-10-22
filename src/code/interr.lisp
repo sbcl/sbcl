@@ -172,7 +172,7 @@
   (let* ((frame (find-interrupted-frame))
          (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
          (context (sb-di:error-context)))
-    (cond (context
+    (cond ((typep context '(cons integer cons))
            (destructuring-bind (restart name . type) context
                (restart-case
                    (error 'simple-program-error
@@ -184,10 +184,23 @@
                    (sb-vm::incf-context-pc *current-internal-error-context*
                                            restart)))))
           (t
-           (when (typep name '(cons (eql sb-pcl::fast-method)))
-             (decf nargs 2))
            (restart-case
-               (%program-error "invalid number of arguments: ~S" nargs)
+               (error 'simple-program-error
+                      :format-control "invalid number of arguments: ~S"
+                      :format-arguments (list (if (typep name '(cons (eql sb-pcl::fast-method)))
+                                                  (- nargs 2)
+                                                  nargs)))
+             (continue ()
+               :report (lambda (stream)
+                         (format stream "Ignore extra arguments"))
+               :test (lambda ()
+                       (and context
+                            (> nargs (cdr context))))
+               (destructuring-bind (restart . max) context
+                 (setf (sb-vm:boxed-context-register *current-internal-error-context* sb-vm::nargs-offset)
+                       max)
+                 (sb-vm::incf-context-pc *current-internal-error-context*
+                                         restart)))
              #+(or x86-64 arm64)
              (replace-function (value)
                :report (lambda (stream)

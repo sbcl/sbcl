@@ -1437,11 +1437,16 @@
   (:temporary (:sc unsigned-reg :offset rbx-offset) temp)
   (:info min max)
   (:vop-var vop)
+  (:node-var node)
   (:save-p :compute-only)
   (:generator 3
+    RESTART
     ;; NOTE: copy-more-arg expects this to issue a CMP for min > 1
-    (let ((err-lab
-            (generate-error-code vop 'invalid-arg-count-error nargs)))
+    (let* ((*location-context* (and max
+                                    (policy node (> debug 1))
+                                    (cons (make-restart-location RESTART) max)))
+           (err-lab
+             (generate-error-code vop 'invalid-arg-count-error nargs)))
       (cond ((not min)
              (if (zerop max)
                  (inst test :dword nargs nargs)
