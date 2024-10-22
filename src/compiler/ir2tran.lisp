@@ -1325,13 +1325,14 @@
 ;;; Do full call when unknown values are desired.
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (let ((info (combination-fun-info node)))
-    (if (or (and info
-                 (ir1-attributep (fun-info-attributes info) unboxed-return fixed-args))
-            (typep (lvar-fun-name (basic-combination-fun node))
-                   '(cons (eql sb-impl::specialized-xep))))
+  (let ((unboxed-return (or (let ((info (combination-fun-info node)))
+                              (and info
+                                   (ir1-attributep (fun-info-attributes info) unboxed-return)))
+                            (unboxed-specialized-return-p
+                             (lvar-fun-name (basic-combination-fun node))))))
+    (if unboxed-return
         (ir2-convert-fixed-full-call node block)
-        (multiple-value-bind (fp args arg-locs nargs)
+        (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
             (ir2-convert-full-call-args node block)
           (let* ((lvar (node-lvar node))
                  (locs (ir2-lvar-locs (lvar-info lvar)))
@@ -1351,12 +1352,19 @@
                            (loc-refs)
                            arg-locs nargs named
                            (emit-step-p node)))
+                    ((and fixed-args-p
+                          (vop-existsp :named sb-vm::fixed-multiple-call-named))
+                     (vop* sb-vm::fixed-multiple-call-named node block
+                           (fp #-linkage-space fun-tn args) ; args
+                           (loc-refs)                       ; results
+                           arg-locs nargs #+linkage-space named ; info
+                                          (emit-step-p node)))
                     (t
                      (vop* multiple-call-named node block
                            (fp #-linkage-space fun-tn args) ; args
-                           (loc-refs)   ; results
+                           (loc-refs)                       ; results
                            arg-locs nargs #+linkage-space named ; info
-                           (emit-step-p node)))))))))
+                                          (emit-step-p node)))))))))
   (values))
 
 ;;; stuff to check in PONDER-FULL-CALL
