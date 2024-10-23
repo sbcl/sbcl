@@ -740,11 +740,12 @@ invoked. In that case it will store into PLACE and start over."
                     (type-specifier ctype)
                     type))))
     (if (symbolp expanded)
-        `(do ()
-             ((typep ,place ',type))
-           (setf ,place (check-type-error ',place ,place ',type
-                                          ,@(and type-string
-                                                 `(,type-string)))))
+        `(unless (typep ,place ',type)
+           (setf ,place
+                 ,(if type-string
+                      `(check-type-error-trap '(,place . ,type) ,place (the string ,type-string))
+                      `(check-type-error-trap ',place ,place ',type)))
+           nil)
         (let ((value (gensym)))
           `(do ((,value ,place ,place))
                ((typep ,value ',type))

@@ -1817,6 +1817,7 @@
 (defknown method-combination-error (format-control &rest t) *)
 (defknown assert-error (t &rest t) null)
 (defknown check-type-error (t t type-specifier &optional (or null string)) t)
+(defknown check-type-error-trap (t t t) t)
 (defknown invoke-debugger (condition) nil)
 (defknown break (&optional format-control &rest t) null)
 (defknown make-condition (type-specifier &rest t) condition ())

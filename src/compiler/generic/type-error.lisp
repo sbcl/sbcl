@@ -65,6 +65,26 @@
     ;; a jump, it's in the regular segment which pollutes the
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
+
+#+(or arm64 x86-64 x86) ;; can continue after cerror-trap
+(define-vop ()
+  (:translate check-type-error-trap)
+  (:args (var :scs (descriptor-reg constant immediate)
+              :to :save)
+         (value :scs (any-reg descriptor-reg) :target r)
+         (type :scs (descriptor-reg constant immediate)
+               :to :save))
+  (:policy :fast-safe)
+  (:results (r :scs (any-reg descriptor-reg)))
+  (:result-types *)
+  (:save-p :compute-only)
+  (:vop-var vop)
+  (:generator 3
+    (move r value)
+    (emit-error-break vop
+      cerror-trap
+      (error-number-or-lose 'check-type-error)
+      (list r var type))))
 
 #+(or immobile-space permgen) ; i.e. can LAYOUT instance have immediate SC
 (defun type-err-type-tn-loadp (thing)

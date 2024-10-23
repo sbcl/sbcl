@@ -1809,3 +1809,10 @@
   `(or (%other-pointer-subtype-p x '(,sb-vm:symbol-widetag ,@sb-vm::+string-widetags+))
        (null (truly-the (not (or (and symbol (not null)) string)) x))
        (characterp (truly-the (not (or symbol string)) x))))
+
+(defoptimizer (check-type-error-trap derive-type) ((place place-value type/string))
+  (when (constant-lvar-p type/string)
+    (let ((type (lvar-value type/string)))
+      (if (stringp type)
+          (careful-specifier-type (cdr (lvar-value place)))
+          (careful-specifier-type type)))))

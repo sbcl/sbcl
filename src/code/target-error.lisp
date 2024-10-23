@@ -2517,6 +2517,30 @@ you did not expect to see this message, please report it."
         :interactive read-evaluated-form
         value))))
 
+(defun check-type-error-trap (place value type)
+  (multiple-value-bind (place type type-string)
+      (if (stringp type)
+          (values (car place) (cdr place) type)
+          (values place type))
+    (loop
+     (let ((condition
+             (make-condition
+              'simple-type-error
+              :datum value
+              :expected-type type
+              :format-control
+              "The value of ~S is ~S, which is not ~:[of type ~S~;~:*~A~]."
+              :format-arguments (list place value type-string type))))
+       (restart-case (error condition)
+         (store-value (new-value)
+           :report (lambda (stream)
+                     (format stream "Supply a new value for ~S." place))
+           :interactive read-evaluated-form
+           (setf value new-value)
+           (when (typep new-value type)
+             (return))))))
+    value))
+
 (define-error-wrapper etypecase-failure (value keys)
   (error 'case-failure
          :name 'etypecase

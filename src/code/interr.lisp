@@ -409,6 +409,12 @@
   (def ecase-failure-error ecase-failure)
   (def object-not-type-error object-not-type-error))
 
+(deferr check-type-error (value place type)
+  (declare (notinline check-type-error-trap))
+  (setf (sb-vm:boxed-context-register *current-internal-error-context*
+                                      (sb-c:sc+offset-offset (first *current-internal-error-args*)))
+        (check-type-error-trap place value type)))
+
 (deferr odd-key-args-error ()
   (%program-error "odd number of &KEY arguments"))
 
