@@ -1516,6 +1516,8 @@
                ((and (global-var-p leaf)
                      (eq (global-var-kind leaf) :global-function)
                      (leaf-has-source-name-p leaf)
+                     (or (not (defined-fun-p leaf))
+                         (not (eq (defined-fun-inlinep leaf) 'notinline)))
                      (or (info :function :source-transform (leaf-source-name leaf))
                          (and info
                               (ir1-attributep (fun-info-attributes info)

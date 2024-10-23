@@ -4539,3 +4539,8 @@
 
 (with-test (:name :lvar-fun-type-specials)
   (checked-compile `(lambda (y) (find t y :test *))))
+
+(with-test (:name :notinline-with-source-transforms)
+  (checked-compile `(lambda (x y z)
+                      (declare (notinline make-array))
+                      (make-array x y z))))
