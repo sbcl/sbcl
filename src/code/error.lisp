@@ -45,7 +45,7 @@
 ;;; This condition inherits from the hosts's classes when compiling
 ;;; the cross-compiler and the target's when cross-compiling.
 (define-condition simple-program-error (simple-condition program-error) ())
-(defun %program-error (&optional datum &rest arguments)
+(define-error-wrapper %program-error (&optional datum &rest arguments)
   (error (apply #'coerce-to-condition datum
                 'simple-program-error '%program-error arguments)))
 

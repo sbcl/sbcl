@@ -1115,7 +1115,7 @@ and no value was provided for it." name)))))))))))
                unportable because THROW and CATCH use EQ comparison)~@:>"
              (rest sources) (first sources) (lvar-type tag)))))))
 
-(defun %compile-time-type-error (values atype dtype detail code-context cast-context)
+(define-error-wrapper %compile-time-type-error (values atype dtype detail code-context cast-context)
   (declare (ignore dtype))
   (cond ((eq cast-context 'ftype-context)
          (error 'simple-type-error
