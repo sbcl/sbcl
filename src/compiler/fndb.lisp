@@ -2347,7 +2347,7 @@
 (defknown (sb-impl::%with-standard-io-syntax
            sb-impl::%with-rebound-io-syntax
            sb-impl::call-with-sane-io-syntax)
-    ((function ())) *)
+    ((function ())) * (no-verify-arg-count))
 (defknown sb-debug::funcall-with-debug-io-syntax ((function ((rest-args))) &rest t) *)
 (defknown sb-impl::%print-unreadable-object (t t t &optional (function ())) null)
 
