@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.9:
+  * bug fix: RUN-PROGRAM no longer leaks memory by referencing otherwise
+    unreachable stream instances.
+
 changes in sbcl-2.4.9 relative to sbcl-2.4.8:
   * minor incompatible change: FIND, POSITION (and variants) now check :START
     and :END arguments for validity as bounding index designators for list

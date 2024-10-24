@@ -410,7 +410,7 @@ status slot."
 ;;; exits due to an error
 (defvar *close-fds-on-error* nil)
 ;;; Separate from fds to ensure the finalizer and all the buffers are cleared too.
-(defvar *close-streams-on-error* nil)
+(defvar *close-streams-on-error*)
 
 ;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
 (defvar *close-in-parent* nil)
@@ -856,6 +856,7 @@ Users Manual for details about the PROCESS structure.
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
          ;; communicate cleanup info.
          *close-fds-on-error*
+         *close-streams-on-error*
          *close-in-parent*
          *handlers-installed*
          ;; Establish PROC at this level so that we can return it.
