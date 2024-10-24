@@ -19,7 +19,9 @@
 # include "genesis/cons.h"
 # include "genesis/compiled-debug-info.h"
 # include "code.h"
+# include "interr.h" // for lose()
 #endif
+#include <string.h>
 
 // Read a variable-length encoded 32-bit integer from SOURCE and
 // return its value.
@@ -184,8 +186,8 @@ int decompress_vector(lispobj l_input, int input_offset,
     int compressedsize = vector_len(iv) - input_offset;
     size_t result = ZSTD_decompress(output_buffer, buffer_length, src, compressedsize);
     if (result != (size_t)buffer_length)
-        lose("Zstd uncompressed size is wrong for input %"OBJ_FMTX": %ld vs %d (%s)",
-             l_input, result, buffer_length, ZSTD_getErrorName(result));
+        lose("Zstd uncompressed size is wrong for input %p: %ld vs %d (%s)",
+             (void*)l_input, result, buffer_length, ZSTD_getErrorName(result));
 
     return 1;
 }

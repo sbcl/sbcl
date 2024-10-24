@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include "genesis/sbcl.h"
+#include "lispobj.h"
 #include "runtime.h"
 #include "globals.h"
 #include "os.h"
