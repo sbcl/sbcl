@@ -337,10 +337,11 @@
                               (add x (specifier-type `(integer ,l ,h))))))))))))))))
 
 (defoptimizer (unary-truncate constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
-  (declare (ignore nth-value alternative))
+  (declare (ignore alternative))
   (case kind
     (typep
-     (cond ((csubtypep constraint (specifier-type 'integer))
+     (cond ((not (eql nth-value 1)))
+           ((csubtypep constraint (specifier-type 'integer))
             (add-back-constraint gen 'typep x (specifier-type 'integer) consequent))
            (t
             (numeric-contagion-constraint-back nil x gen constraint consequent :x-type nil))))))

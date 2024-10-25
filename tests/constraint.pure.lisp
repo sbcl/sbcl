@@ -1854,6 +1854,11 @@
    (or double-float null))
   (assert-type
    (lambda (m)
+     (if (typep (truncate m) 'fixnum)
+         m))
+   (or real null))
+  (assert-type
+   (lambda (m)
      (if (typep (nth-value 1 (truncate m 2.0)) 'double-float)
          m))
    (or double-float null)))
