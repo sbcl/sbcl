@@ -1870,3 +1870,10 @@
      (when (typep (nth-value 1 (truncate x 1)) 'float)
        x))
    (or null real)))
+
+(with-test (:name :not-eq-eql)
+  (assert-type
+   (lambda (a b)
+     (and (eql a b)
+          (not (eq a b))))
+   boolean))

@@ -463,12 +463,12 @@
     (map-equality-constraints x y gen
                               (lambda (op not-p)
                                 (case op
-                                  ((eq eql char=)
+                                  ((eq char=)
                                    (return (not not-p)))
                                   ((> <)
                                    (unless not-p
                                      (return nil)))
-                                  ((= <= >= char-equal)
+                                  ((= <= >= char-equal eql)
                                    (when not-p
                                      (return nil))))))
     :give-up))
