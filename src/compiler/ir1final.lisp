@@ -231,6 +231,8 @@
                   (unlink-node if)
                   (%delete-lvar-use combination)
                   (use-lvar combination ref-lvar)
+                  (push "unwrap-predicates" (node-source-path con-ref))
+                  (push "unwrap-predicates" (node-source-path alt-ref))
                   (link-blocks block (node-block next)))))))))))
 
 ;;; Convert function designators to functions in calls to known functions

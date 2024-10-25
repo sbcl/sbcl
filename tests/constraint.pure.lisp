@@ -1877,3 +1877,11 @@
      (and (eql a b)
           (not (eq a b))))
    boolean))
+
+(with-test (:name :equal-no-notes)
+  (checked-compile
+   `(lambda (a b)
+      (if (eq a b)
+          (equal a b)
+          nil))
+   :allow-notes nil))
