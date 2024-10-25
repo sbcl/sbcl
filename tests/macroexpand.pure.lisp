@@ -233,7 +233,9 @@
   e)
 (with-test (:name :macroexpand-setf-instance-ref.1)
   (assert (equal-mod-gensyms
-           (macroexpand-1 '(setf (foo-a x) 3))
+           (macroexpand-1 '(setf (foo-a x) 3)
+                          (locally (declare (optimize (sb-c::store-xref-data 0)))
+                            (capture-env)))
            `(let ((#1=instance (the foo x))
                   (#2=val (sb-kernel:the* (fixnum :context (sb-kernel::struct-context foo . a)) 3)))
               (sb-kernel:%instance-set #1# #.sb-vm:instance-data-start #2#)

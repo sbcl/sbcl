@@ -24,7 +24,8 @@
 ;;; of a structure slot expands. It is likewise unportable to
 ;;; expect that a NOTINLINE does anything, but we'll check anyway.
 (defun transformable-struct-setf-p (form env)
-  (when (singleton-p (cdr form))
+  (when (and (singleton-p (cdr form))
+             (sb-c:policy env (zerop sb-c::store-xref-data)))
     (let* ((fun (car form))
            (slot-info (structure-instance-accessor-p fun)))
       (when (and slot-info (not (dsd-read-only (cdr slot-info))))
