@@ -1,8 +1,32 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.9:
+  * minor incompatible change: SB-POSIX::POSIX-FORK is no longer exported from
+    SB-POSIX.  (The interface function, SB-POSIX:FORK, remains exported).
+  * platform support:
+    ** fix bugs in instruction encoding on RISC-V; (reported by Guillaume Le
+       Vaillant)
+    ** fix the location of the linkage-table comment in disassembly on 64-bit
+       powerpc;
+    ** elide allocation of empty number stack frames on arm64;
+    ** fix crash on x86 platforms in compiling array dereferencing with
+       computed offsets with negative intermediate results.  (lp#2084943)
+  * enhancement: the error message from standard object slot typecheck
+    functions in optimized constructors is clearer about the context of the
+    failed type check.
+  * enhancement: BREAK is no longer tail-called, even when in tail position.
+  * enhancement: on arm64 and x86-64, specialized entry points for functions
+    known to take or return fixed numbers of double floats are generated and
+    can be automatically called without boxing intermediate floats.
   * bug fix: RUN-PROGRAM no longer leaks memory by referencing otherwise
     unreachable stream instances.
+  * bug fix: exporting or unexporting symbols during package iteration no
+    longer causes any symbol to be visited more times than expected.
+  * bug fix: DISASSEMBLE preserves the comment marker across line-breaks for
+    long function or segment names.  (lp#1889456, thanks to Fedorov Alexander)
+  * bug fix: the compiler no longer loops infinitely trying to compile
+    NOTINLINE calls to known functions with source transform definitions.
+    (lp#2085451, reported by Fedorov Alexander)
 
 changes in sbcl-2.4.9 relative to sbcl-2.4.8:
   * minor incompatible change: FIND, POSITION (and variants) now check :START
