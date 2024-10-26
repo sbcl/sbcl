@@ -8,7 +8,7 @@
 
 ;; sb-xref-for-internals is actively harmful to tree-shaking.
 ;; Remove some symbols to make the hide-packages test pass.
-#+sb-xref-for-internals
+#+(and sb-xref-for-internals (not sb-devel))
 (progn
   (fmakunbound 'sb-kernel::type-class-fun-slot)
   (fmakunbound 'sb-kernel::new-ctype))

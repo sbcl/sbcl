@@ -1498,6 +1498,42 @@
 ;;; optimizations.
 (defvar *derived-numeric-union-complexity-limit* 6)
 
+(defun widen-bignum-types (numeric-type)
+  (labels ((strip-cons (x)
+             (if (consp x)
+                 (car x)
+                 x))
+           (cut-ratio-p (r)
+             (and (ratiop r)
+                  (or (not (fixnump (numerator r)))
+                      (not (fixnump (denominator r))))))
+           (cut-bignum-p (n)
+             (and (integerp n)
+                  (> (integer-length n) 512))))
+    (let* ((lo (strip-cons (numeric-type-low numeric-type)))
+           (hi (strip-cons (numeric-type-high numeric-type)))
+           (new-lo lo)
+           (new-hi hi))
+      (when (cut-ratio-p lo)
+        (setf new-lo
+              (list (floor lo))))
+      (when (cut-ratio-p hi)
+        (setf new-hi
+              (list (ceiling hi))))
+      (let ((lo (strip-cons new-lo)))
+        (when (cut-bignum-p lo)
+          (setf new-lo (if (> lo 0)
+                           (expt 2 512)))))
+      (let ((hi (strip-cons new-hi)))
+        (when (cut-bignum-p hi)
+          (setf new-hi (if (< hi 0)
+                           (- (expt 2 512))))))
+      (if (and (eq lo new-lo)
+               (eq hi new-hi))
+          numeric-type
+          (modified-numeric-type numeric-type :low new-lo
+                                              :high new-hi)))))
+
 (defun make-derived-union-type (type-list)
   (let ((xset (alloc-xset))
         (fp-zeroes '())
@@ -1513,7 +1549,7 @@
                     (add-to-xset member xset)))
               type))
             ((numeric-type-p type)
-             (setf numeric-type (type-union type numeric-type)))
+             (setf numeric-type (type-union (widen-bignum-types type) numeric-type)))
             (t
              (push type misc-types))))
     (setf numeric-type (sb-kernel::weaken-numeric-type-union *derived-numeric-union-complexity-limit* numeric-type))
