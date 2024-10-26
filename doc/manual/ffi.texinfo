@@ -796,7 +796,7 @@ Each element of the @var{arg-specifiers} list
 specifies an argument to the foreign function, and is
 of the form
 @lisp
-(aname atype &amp;optional style)
+(aname atype &optional style)
 @end lisp
 
 @var{aname} is the symbol name of the argument to the constructed
