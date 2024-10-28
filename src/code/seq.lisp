@@ -557,8 +557,8 @@
 
 (defun list-fill* (sequence item start end)
   (declare (type list sequence)
-           (type unsigned-byte start)
-           (type (or null unsigned-byte) end))
+           (type index start)
+           (type (or null index) end))
   (flet ((oops ()
            (sequence-bounding-indices-bad-error sequence start end)))
     (let ((pointer sequence))
