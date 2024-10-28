@@ -155,10 +155,6 @@
       (> two-arg->)
       (<= two-arg-<=)
       (>= two-arg->=)
-      #+sb-xc-host
-      ,@'((sb-xc:< two-arg-<)
-          (sb-xc:= two-arg-=)
-          (sb-xc:> two-arg->))
       (char-equal two-arg-char-equal)
       (char-greaterp two-arg-char-greaterp)
       (char-lessp two-arg-char-lessp)
@@ -257,7 +253,7 @@
                (labels ((translate-two-args (name)
                           (and (eql arg-count 2)
                                (not (fun-lexically-notinline-p name (node-lexenv node)))
-                               (cadr (assoc name *two-arg-functions*))))
+                               (cadr (assoc (uncross name) *two-arg-functions*))))
                         (translate (ref)
                           (let* ((leaf (ref-leaf ref))
                                  (fun-name (and (constant-p leaf)
@@ -308,7 +304,7 @@
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
     (cond ((eq (combination-kind combination) :known)
-           (let ((two-arg (assoc combination-name *two-arg-functions*)))
+           (let ((two-arg (assoc (uncross combination-name) *two-arg-functions*)))
              (when (and two-arg
                         (= (length args) 2))
                (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
