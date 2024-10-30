@@ -2857,6 +2857,7 @@
                                        (find-free-fun 'values "values-list optimizer"))
                       (setf (combination-kind list-call) :full)
                       (setf (node-derived-type list-call) *wild-type*)
+                      (delete-ref null-ref)
                       (replace-node null-ref '(values))
                       (substitute-lvar-uses (node-lvar node) list nil)
                       (unlink-node node)
