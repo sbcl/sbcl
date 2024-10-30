@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.9:
+changes in sbcl-2.4.10 relative to sbcl-2.4.9:
   * minor incompatible change: SB-POSIX::POSIX-FORK is no longer exported from
     SB-POSIX.  (The interface function, SB-POSIX:FORK, remains exported).
   * platform support:
