@@ -817,6 +817,25 @@
         (locall-analyze-component *current-component*))))
   (values))
 
+(defun replace-node (node form)
+  (let ((ctran (node-prev node)))
+    (with-ir1-environment-from-node node
+      (ensure-block-start ctran)
+      (let* ((old-block (ctran-block ctran))
+             (new-start (make-ctran))
+             (lvar (node-lvar node))
+             (new-block (ctran-starts-block new-start)))
+        ;; Splice in the new block before DEST, giving the new block
+        ;; all of DEST's predecessors.
+        (dolist (block (block-pred old-block))
+          (change-block-successor block old-block new-block))
+        (ir1-convert new-start ctran lvar form)
+        (unlink-node node)
+        ;; The form may have introduced new local calls, for example,
+        ;; from LET bindings, so invoke local call analysis.
+        (locall-analyze-component *current-component*))))
+  (values))
+
 ;;; Delete NODE and VALUE. It may result in some calls becoming tail.
 (defun delete-filter (node lvar value)
   (aver (eq (lvar-dest value) node))
