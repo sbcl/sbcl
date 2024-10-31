@@ -2034,9 +2034,9 @@ bootstrapping.
   arg-info-metatypes
   arg-info-number-optional
   arg-info-key/rest-p
-  arg-info-keys   ;nil        no &KEY or &REST allowed
-                  ;(k1 k2 ..) Each method must accept these &KEY arguments.
-                  ;T          must have &KEY or &REST
+  arg-info-keys   ;nil                   no &KEY or &REST allowed
+                  ;(k1 k2 ..)            Each method must accept these &KEY arguments.
+                  ;T/:allow-other-keys   must have &KEY or &REST
 
   gf-info-simple-accessor-type ; nil, reader, writer, boundp, makunbound
   (gf-precompute-dfun-and-emf-p nil) ; set by set-arg-info
@@ -2121,7 +2121,7 @@ bootstrapping.
         (setf (arg-info-key/rest-p arg-info) (ll-keyp-or-restp llks))
         (setf (arg-info-keys arg-info)
               (if lambda-list-p
-                  (if (ll-kwds-allowp llks) t keywords)
+                  (if (ll-kwds-allowp llks) :allow-other-keys keywords)
                   (arg-info-key/rest-p arg-info)))))
     (when new-method
       (check-method-arg-info gf arg-info new-method))
