@@ -83,10 +83,11 @@
                 (merge-pathnames "**/*.*" (truename "../../obj/")))
           (logical-pathname-translations "SYS"))
     (sb-int:collect ((alien-constants) (flattened-sources) (fasls))
-      (with-open-file (f (merge-pathnames "module-setup.lisp" objdir)
-                         :direction :output :if-exists :supersede)
-        (format f "~{(require \"~A\")~%~}" *deps*))
-      (flattened-sources `(t "module-setup"))
+      (when *deps*
+        (let ((fasl (sb-c:compile-form-to-file
+                     `(progn ,@(mapcar (lambda (x) `(require ,(string x))) *deps*))
+                     (merge-pathnames "module-setup" objdir))))
+          (flattened-sources `(t ,fasl))))
       ;; Compile all files serially. :depends-on is just documentation for the user
       (sb-int:named-let flatten ((prefix "") (sources specified-sources))
         (dolist (source sources)
@@ -115,11 +116,10 @@
                  (unless (alien-constants) ; add in a source file
                    (flattened-sources `(t ,+genfile+)))
                  (alien-constants (cons specfile package))))))))
-      (with-open-file (f (merge-pathnames "module-provide.lisp" objdir)
-                         :direction :output :if-exists :supersede)
-        (format f "(provide \"~A\")~%" (string-upcase *system*)))
-      (flattened-sources `(t "module-provide"))
-
+      (let ((fasl (sb-c:compile-form-to-file
+                   `(provide ,(string-upcase *system*))
+                   (merge-pathnames "module-provide" objdir))))
+        (flattened-sources `(t ,fasl)))
       (when (alien-constants)
         (load "../sb-grovel/defpackage") ; faster to interpret than compile
         (let ((*evaluator-mode* :compile)) (load "../sb-grovel/def-to-lisp"))
@@ -134,14 +134,16 @@
                             (push c wcu-warnings)))))
           (with-compilation-unit ()
             (loop for (generated-p stem) in (flattened-sources)
-             do
-                (format t "Compile-File ~S~%" stem)
-                (multiple-value-bind (output warnings errors)
-                    (compile-file (logicalize stem generated-p)
-                                  :output-file (format nil "~A~A.fasl" objdir stem))
-                  (when (or warnings errors) (sb-sys:os-exit 1))
-                  (fasls output)
-                  (load output)))))
+             do (let ((fasl
+                       (if (string= (pathname-type stem) "fasl")
+                           stem
+                           (multiple-value-bind (output warnings errors)
+                               (compile-file (logicalize stem generated-p)
+                                             :output-file (format nil "~A~A.fasl" objdir stem))
+                             (when (or warnings errors) (sb-sys:os-exit 1))
+                             output))))
+                  (fasls fasl)
+                  (load fasl)))))
         ;; Deferred warnings occur *after* exiting the W-C-U body.
         ;; See also lp#1078460 - "unknown variable" is not really ever resolved.
         (when wcu-warnings (sb-sys:os-exit 1)))
