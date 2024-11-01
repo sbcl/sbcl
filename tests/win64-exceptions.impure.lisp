@@ -57,6 +57,9 @@
     (assert (string= (princ-to-string error)
                      "EXCEPTION_INT_DIVIDE_BY_ZERO"))))
 
+(defvar *lose-on-corruption* (extern-alien "lose_on_corruption_p" int))
+(setf (extern-alien "lose_on_corruption_p" int) 0)
+
 (with-test (:name :raise-access-violation)
   (assert (eql 1 (raise-access-violation 1)))
   (assert-error (raise-access-violation 0) sb-sys:memory-fault-error))
@@ -65,6 +68,8 @@
   (let ((p (allocate-readonly-int)))
     (assert-error (setf (deref p) 42) sb-sys:memory-fault-error)
     (free-readonly-int p)))
+
+(setf (extern-alien "lose_on_corruption_p" int) *lose-on-corruption*)
 
 ;;; Not a very robust test since neither free() nor HeapFree() document this
 ;;; exception. The main result we wish for is not having the process abruptly
