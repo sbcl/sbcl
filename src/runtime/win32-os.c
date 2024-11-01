@@ -1065,6 +1065,8 @@ handle_access_violation(os_context_t *ctx,
     return -1;
 }
 
+void lisp_memory_fault_warning(os_context_t *context, os_vm_address_t addr);
+
 static void
 signal_internal_error_or_lose(os_context_t *ctx,
                               EXCEPTION_RECORD *exception_record,
@@ -1075,6 +1077,11 @@ signal_internal_error_or_lose(os_context_t *ctx,
      * the exception to the lisp-side exception handler if it's
      * set up, or drop to LDB.
      */
+
+    if ((long int)exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+        lisp_memory_fault_warning(ctx, fault_address);
+        undo_fake_foreign_function_call(ctx);
+    }
 
     if (internal_errors_enabled) {
         /* The exception system doesn't automatically clear pending
@@ -1115,17 +1122,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
             (void*)(intptr_t)exception_record->ExceptionCode);
     fprintf(stderr, "Faulting IP: %p.\n",
             (void*)(intptr_t)exception_record->ExceptionAddress);
-    if ((long int)exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
-        MEMORY_BASIC_INFORMATION mem_info;
 
-        if (VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
-            fprintf(stderr, "page status: 0x%lx.\n", mem_info.State);
-        }
-
-        fprintf(stderr, "Was writing: %p, where: %p.\n",
-                (void*)exception_record->ExceptionInformation[0],
-                fault_address);
-    }
 
     fflush(stderr);
 

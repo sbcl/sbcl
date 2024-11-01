@@ -2075,17 +2075,7 @@ interrupt_init(void)
 #endif
 }
 
-#ifndef LISP_FEATURE_WIN32
-int
-siginfo_code(siginfo_t *info)
-{
-    return info->si_code;
-}
-
-void
-lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
-{
-
+void lisp_memory_fault_warning(os_context_t *context, os_vm_address_t addr) {
     /* If it's a store to read-only space, it's not "corruption", so don't say that.
      * Lisp will change its wording of the memory-fault-error string */
 
@@ -2116,6 +2106,20 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     } else {
         fake_foreign_function_call(context);
     }
+}
+
+
+#ifndef LISP_FEATURE_WIN32
+int
+siginfo_code(siginfo_t *info)
+{
+    return info->si_code;
+}
+
+void
+lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
+{
+    lisp_memory_fault_warning(context, addr);
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
