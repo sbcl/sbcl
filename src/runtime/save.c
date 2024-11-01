@@ -104,7 +104,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
         output.size = buf_size;
 
         unsigned char * written, * end;
-        long total_written = 0;
+        size_t total_written = 0;
         ZSTD_CStream *stream = ZSTD_createCStream();
         if (stream == NULL)
             lose("failed to create zstd compression context");
@@ -134,7 +134,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
                 }
             }
         } while (ret != 0);
-        printf("compressed %lu bytes into %lu at level %i\n",
+        printf("compressed %zu bytes into %zu at level %i\n",
                bytes, total_written, compression);
 
         ZSTD_freeCStream(stream);
