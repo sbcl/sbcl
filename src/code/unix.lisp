@@ -916,15 +916,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                  seconds)
   nil)
 
-;;;; sys/time.h
-
-;;; Structure crudely representing a timezone. KLUDGE: This is
-;;; obsolete and should never be used.
-(define-alien-type nil
-  (struct timezone
-    (tz-minuteswest int)                ; minutes west of Greenwich
-    (tz-dsttime int)))                  ; type of dst correction
-
 
 ;; Type of the second argument to `getitimer' and
 ;; the second and third arguments `setitimer'.
