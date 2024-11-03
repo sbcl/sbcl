@@ -26,6 +26,9 @@
 #ifndef LISP_FEATURE_WIN32
 #include <sys/wait.h>
 #endif
+#ifdef ZSTD_STATIC_LINKING_ONLY
+#include <zstd.h>
+#endif
 
 #include "runtime.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
@@ -412,6 +415,9 @@ void sb_posix_after_fork() { // for use by sb-posix:fork
 void free_thread_struct(struct thread *th)
 {
     struct extra_thread_data *extra_data = thread_extra_data(th);
+#ifdef ZSTD_STATIC_LINKING_ONLY
+    ZSTD_freeDCtx(extra_data->zstd_dcontext);
+#endif
     if (extra_data->arena_savearea) free(extra_data->arena_savearea);
     os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 }
@@ -1031,6 +1037,9 @@ alloc_thread_struct(void* spaces) {
 #endif
 #if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
     os_sem_init(&extra_data->sprof_sem, 0);
+#endif
+#ifdef ZSTD_STATIC_LINKING_ONLY
+    extra_data->zstd_dcontext = ZSTD_createDCtx();
 #endif
     extra_data->sprof_lock = 0;
     th->sprof_data = 0;

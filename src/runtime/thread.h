@@ -90,6 +90,9 @@ struct extra_thread_data
 #endif
     int arena_count; // number of structures in arena_saveareas
     arena_state* arena_savearea;
+    // opaque pointer to zstd decompression context so it doesn't matter whether
+    // core-compression and/or static linking are enabled.
+    void* zstd_dcontext;
     // These values influence get_alloc_start_page() when arenas are in use
     // and allocation switches back and forth between arena and heap.
     page_index_t mixed_page_hint;
