@@ -1028,7 +1028,7 @@ alloc_thread_struct(void* spaces) {
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
     struct extra_thread_data *extra_data = thread_extra_data(th);
-    void* zstd_dcontext = extra_data->zstd_dcontext;
+    __attribute__((unused)) void* zstd_dcontext = extra_data->zstd_dcontext;
     memset(extra_data, 0, sizeof *extra_data);
 
 #ifdef ZSTD_STATIC_LINKING_ONLY
