@@ -43,6 +43,29 @@
 # include <dlfcn.h>
 #endif
 
+lispobj asm_routine_name(char* pc, struct hash_table* ht)
+{
+    struct code *c = (void*)asm_routines_start;
+    int offset = pc - code_text_start(c);
+
+    if (ht) { // cold-init will have no hash-table
+        struct vector* v = (void*)native_pointer(ht->pairs);
+        int len = vector_len(v);
+        int i;
+        for (i = 2; i < len; i += 2) {
+            if (lowtag_of(v->data[i+1]) != LIST_POINTER_LOWTAG) continue;
+            struct cons* c = CONS(v->data[i+1]);
+            struct cons* cdr = CONS(c->cdr);
+            int from_byteindex = fixnum_value(c->car);
+            int to_byteindex = fixnum_value(cdr->car);
+            if (offset >= from_byteindex && offset <= to_byteindex) {
+                return v->data[i];
+            }
+        }
+    }
+    return (lispobj)NULL;
+}
+
 lispobj
 debug_function_name_from_pc (struct code* code, void *pc)
 {
@@ -54,6 +77,10 @@ debug_function_name_from_pc (struct code* code, void *pc)
         di = (void*)native_pointer(CONS(code->debug_info)->car);
     else
         return (lispobj)NULL;
+
+    if (pc >= (void*)asm_routines_start && pc < (void*)asm_routines_end) {
+        return asm_routine_name(pc, (struct hash_table *)di);
+    }
 
     uword_t offset = (char*)pc - code_text_start(code);
 
@@ -492,11 +519,12 @@ lisp_backtrace(int nframes)
             absolute_pc = (char*)info.pc;
             printf("pc=%p ", absolute_pc);
         }
-
+#ifdef reg_LRA
         // If LRA does not match the PC, print it. This should not happen.
         if (info.lra != make_lispobj(absolute_pc, OTHER_POINTER_LOWTAG)
             && info.lra != NIL)
             printf("LRA=%p ", (void*)info.lra);
+#endif
 
         int fpvalid = (lispobj*)info.frame >= thread->control_stack_start
           && (lispobj*)info.frame < thread->control_stack_end;
@@ -622,31 +650,6 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
-static char* asm_routine_name(char* pc)
-{
-    struct code *c = (void*)asm_routines_start;
-    int offset = pc - code_text_start(c);
-    struct hash_table* ht = (void*)native_pointer(c->debug_info);
-    if (ht) { // cold-init will have no hash-table
-        struct vector* v = (void*)native_pointer(ht->pairs);
-        int len = vector_len(v);
-        int i;
-        for (i = 2; i < len; i += 2) {
-            if (lowtag_of(v->data[i+1]) != LIST_POINTER_LOWTAG) continue;
-            struct cons* c = CONS(v->data[i+1]);
-            struct cons* cdr = CONS(c->cdr);
-            int from_byteindex = fixnum_value(c->car);
-            int to_byteindex = fixnum_value(cdr->car);
-            if (offset >= from_byteindex && offset <= to_byteindex) {
-                struct symbol* sym = SYMBOL(v->data[i]);
-                struct vector* string = VECTOR(decode_symbol_name(sym->name));
-                return (char*)string->data;
-            }
-        }
-    }
-    return "?";
-}
-
 static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
 #ifdef BACKTRACE_SHOW_FRAME_SIZE
     // This display is a little confusing.  It's the size of the frame that this
@@ -660,8 +663,6 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
         lispobj name = debug_function_name_from_pc(code, pc);
         if (name)
             print_entry_name(barrier_load(&name), f);
-        else if (pc >= (char*)asm_routines_start && pc < (char*)asm_routines_end)
-            fprintf(f, "%s (asm)", asm_routine_name(pc));
         else
             fprintf(f, "{code_serialno=%x}", code_serialno(code));
     } else if (gc_managed_heap_space_p((uword_t)pc)) {
