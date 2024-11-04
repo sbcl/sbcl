@@ -925,14 +925,14 @@ alloc_thread_struct(void* spaces) {
      * from failing to obtain contiguous memory. Note that the OS may have a smaller
      * alignment granularity than BACKEND_PAGE_BYTES so we may have to adjust the
      * result to make it conform to our guard page alignment requirement. */
-    bool zeroize_stack = 0;
+    bool is_recycled = 0;
     if (spaces) {
         // If reusing memory from a previously exited thread, start by removing
         // some old junk from the stack. This is imperfect since we only clear a little
         // at the top, but doing so enables diagnosing some garbage-retention issues
         // using a fine-toothed comb. It would not be possible at all to diagnose
         // if any newly started thread could refer a dead thread's heap objects.
-        zeroize_stack = 1;
+        is_recycled = 1;
     } else {
         spaces = os_alloc_gc_space(THREAD_STRUCT_CORE_SPACE_ID, MOVABLE,
                                    NULL, THREAD_STRUCT_SIZE);
@@ -989,7 +989,7 @@ alloc_thread_struct(void* spaces) {
         (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
     th->control_stack_end = th->binding_stack_start;
 
-    if (zeroize_stack) {
+    if (is_recycled) {
 #if GENCGC_IS_PRECISE
     /* Clear the entire control stack. Without this I was able to induce a GC failure
      * in a test which hammered on thread creation for hours. The control stack is
@@ -1028,7 +1028,12 @@ alloc_thread_struct(void* spaces) {
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
     struct extra_thread_data *extra_data = thread_extra_data(th);
+    void* zstd_dcontext = extra_data->zstd_dcontext;
     memset(extra_data, 0, sizeof *extra_data);
+
+#ifdef ZSTD_STATIC_LINKING_ONLY
+    extra_data->zstd_dcontext = (is_recycled && zstd_dcontext) ? zstd_dcontext : ZSTD_createDCtx();
+#endif
 
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
     os_sem_init(&extra_data->state_sem, 1);
@@ -1037,9 +1042,6 @@ alloc_thread_struct(void* spaces) {
 #endif
 #if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
     os_sem_init(&extra_data->sprof_sem, 0);
-#endif
-#ifdef ZSTD_STATIC_LINKING_ONLY
-    extra_data->zstd_dcontext = ZSTD_createDCtx();
 #endif
     extra_data->sprof_lock = 0;
     th->sprof_data = 0;
