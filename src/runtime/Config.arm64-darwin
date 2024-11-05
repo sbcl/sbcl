@@ -17,9 +17,17 @@ OS_LIBS = -lc -ldl
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
+
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+
+ifneq (,$(wildcard /opt/homebrew/lib))
+  export LIBRARY_PATH := ${LIBRARY_PATH}:/opt/homebrew/lib/
+  export CPATH := ${CPATH}:/opt/homebrew/include/
+endif
+
   OS_LIBS += -lzstd
 endif
+
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
   USE_LIBSBCL = -Wl,-force_load libsbcl.a
