@@ -186,7 +186,8 @@
   #+win32 copiers ; list of sb-win32::io-copier
   #+win32 (handle nil :type (or null (signed-byte 32)))
   #-win32
-  serve-event-pipe)
+  serve-event-pipe
+  closed-p)
 (declaim (freeze-type process))
 
 (defmethod print-object ((process process) stream)
@@ -203,14 +204,14 @@
   (handle unsigned) (exit-code unsigned :out))
 
 (defun process-exit-code (process)
-  "Return the exit code of PROCESS."
+  "Return the exit code of PROCESS. Can return NIL on a closed process."
   (or (process-%exit-code process)
       (progn (get-processes-status-changes)
              (process-%exit-code process))))
 
 (defun process-status (process)
   "Return the current status of PROCESS.  The result is one of :RUNNING,
-   :STOPPED, :EXITED, or :SIGNALED."
+   :STOPPED, :EXITED, :SIGNALED."
   (get-processes-status-changes)
   (process-%status process))
 
@@ -330,7 +331,8 @@ PROCESS."
         (get-processes-status-changes)))))
 
 (defun process-alive-p (process)
-  "Return T if PROCESS is still alive, NIL otherwise."
+  "Return T if PROCESS is still alive, NIL otherwise. Can return a false
+positive on a closed process."
   (let ((status (process-status process)))
     (if (or (eq status :running)
             (eq status :stopped))
@@ -338,8 +340,10 @@ PROCESS."
         nil)))
 
 (defun process-close (process)
-  "Close all streams connected to PROCESS and stop maintaining the
-status slot."
+  "Close all streams connected to PROCESS, stop maintaining the
+status slot. After PROCESS-CLOSE, PROCESS-ALIVE-P and
+PROCESS-EXIT-CODE can return stale information about a process, so
+should not be used."
   (macrolet ((frob (stream abort)
                `(when ,stream (close ,stream :abort ,abort))))
     #-win32
@@ -347,15 +351,23 @@ status slot."
     (frob (process-input process) t) ; .. 'cause it will generate SIGPIPE.
     (frob (process-output process) nil)
     (frob (process-error process) nil))
-  ;; FIXME: Given that the status-slot is no longer updated,
-  ;; maybe it should be set to :CLOSED, or similar?
-  (with-active-processes-lock ()
-   (setf *active-processes* (delete process *active-processes*)))
+  ;; The process is now closed: PROCESS-ALIVE-P and PROCESS-EXIT-CODE
+  ;; won't return accurate information (unless the process has already
+  ;; exited).
+  (setf (process-closed-p process) t
+        (process-status-hook process) nil)
+  ;; FIXME: I think that on Windows, closing the handle will prevent a
+  ;; zombie process, but if that's wrong, then #+win32 should probably
+  ;; not remove PROCESS from *ACTIVE-PROCESSES*, and should defer the
+  ;; handle close to GET-PROCESSES-STATUS-CHANGES.
   #+win32
-  (let ((handle (shiftf (process-handle process) nil)))
-    (when handle
-      (or (plusp (sb-win32:close-handle handle))
-          (sb-win32::win32-error 'process-close))))
+  (progn
+    (with-active-processes-lock ()
+      (setf *active-processes* (delete process *active-processes*)))
+    (let ((handle (shiftf (process-handle process) nil)))
+      (when handle
+        (or (plusp (sb-win32:close-handle handle))
+            (sb-win32::win32-error 'process-close)))))
   process)
 
 (defun get-processes-status-changes ()
@@ -371,7 +383,8 @@ status slot."
                          ;; race with the SIGCHLD signal handler.
                          (multiple-value-bind (status code core)
                              (waitpid (process-pid proc))
-                           (when status
+                           (when (and status
+                                      (not (process-closed-p proc)))
                              (wake-serve-event proc)
                              (setf (process-%status proc) status)
                              (setf (process-%exit-code proc) code)
