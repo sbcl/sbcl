@@ -73,13 +73,15 @@ debug_function_name_from_pc (struct code* code, void *pc)
 
     if (instancep(code->debug_info))
         di = (void*)native_pointer(code->debug_info);
-    else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
-        di = (void*)native_pointer(CONS(code->debug_info)->car);
     else
         return (lispobj)NULL;
 
     if (pc >= (void*)asm_routines_start && pc < (void*)asm_routines_end) {
+#ifdef LISP_FEATURE_DARWIN_JIT
+        return asm_routine_name(pc, (struct hash_table *)(CONS(code->debug_info)->car));
+#else
         return asm_routine_name(pc, (struct hash_table *)di);
+#endif
     }
 
     uword_t offset = (char*)pc - code_text_start(code);
