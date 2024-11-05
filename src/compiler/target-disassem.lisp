@@ -2052,7 +2052,7 @@
          (list it)))
       (sb-pcl::%method-function
        ;; user's code is in the fast-function
-       (cons fun (recurse (sb-pcl::%method-function-fast-function fun))))
+       (recurse (sb-pcl::%method-function-fast-function fun)))
       (funcallable-instance
        (list (%funcallable-instance-fun fun)))
       (function
