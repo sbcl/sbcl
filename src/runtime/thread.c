@@ -331,6 +331,28 @@ char* thread_name_from_pthread(pthread_t pointer){
 }
 #endif
 
+/* This function is seemingly unused by the C runtime, but DO NOT DELETE.
+ * It's needed when the C runtime is compiled with --fsanitize=address, because the sanitizer
+ * falsely reports that all the threads running at exit have leaked their zstd_dcontext.
+ * While it's possible to make the sanitizer shut up about particular allocations,
+ * you need to know the size in order to pass it to the unpoisoning routine.
+ * The allocator of the ZSTD context object is opaque; we don't know the size.
+ * Interestingly the sanitizer does not complain about the thread structure per se,
+ * and I think that's because it does not track mmap().
+ * I wanted to register this function using atexit() but apparently that's not soon enough
+ * to solve the problem. It has to to be called by *EXIT-HOOKS* instead */
+void asan_lisp_thread_cleanup() {
+#if defined ADDRESS_SANITIZER && defined ZSTD_STATIC_LINKING_ONLY
+    struct thread* th;
+    for_each_thread(th) {
+        struct extra_thread_data *extra_data = thread_extra_data(th);
+        void* dctx = extra_data->zstd_dcontext;
+        if (dctx && __sync_bool_compare_and_swap(&extra_data->zstd_dcontext, dctx, 0))
+            ZSTD_freeDCtx(dctx);
+    }
+#endif
+}
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -818,6 +840,13 @@ static void detach_os_thread(init_thread_data *scribble)
         gc_assert(rc == 0 && sig == SIG_STOP_FOR_GC);
 #endif
     }
+#endif
+#if defined ADDRESS_SANITIZER && defined ZSTD_STATIC_LINKING_ONLY
+    /* ASAN doesn't understand that all the zstd_dcontexts in the thread recycle bin
+     * are _not_ leaked, so free them eagerly. alloc_thread_struct can make a new one */
+    struct extra_thread_data *extra_data = thread_extra_data(th);
+    ZSTD_freeDCtx(extra_data->zstd_dcontext);
+    extra_data->zstd_dcontext = 0;
 #endif
     put_recyclebin_item(th);
 #ifndef LISP_FEATURE_WIN32 // native threads have no signal mask

@@ -971,7 +971,7 @@ sweep_fixedobj_pages(int raise)
     // By storing in the page table the count of holes that really existed
     // at the start of the prior GC, and subtracting from that the number
     // that exist now, we know how much usable space was obtained (per page).
-    int n_holes = 0;
+    __attribute__((unused)) int n_holes = 0;
 
     SETUP_GENS();
 
