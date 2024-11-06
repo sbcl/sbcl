@@ -98,7 +98,7 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
         input.pos = 0;
 
         size_t buf_size = ZSTD_CStreamOutSize();
-        unsigned char* buf = successful_malloc(buf_size);
+        unsigned char* buf = checked_malloc(buf_size);
         ZSTD_outBuffer output;
         output.dst = buf;
         output.size = buf_size;
@@ -413,7 +413,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
         size_t ptes_nbytes = next_free_page * sizeof(struct corefile_pte);
         size_t aligned_size = ALIGN_UP((bitmapsize+ptes_nbytes), N_WORD_BYTES);
-        char* data = successful_malloc(aligned_size);
+        char* data = checked_malloc(aligned_size);
         // Zeroize the final few bytes of data that get written out
         // but might be untouched by gc_store_corefile_ptes().
         memset(data + aligned_size - N_WORD_BYTES, 0, N_WORD_BYTES);
@@ -503,7 +503,7 @@ load_runtime(char *runtime_path, size_t *size_out)
     if (core_offset != -1 && size > (size_t) core_offset)
         size = core_offset;
 
-    buf = successful_malloc(size);
+    buf = checked_malloc(size);
     if ((count = fread(buf, 1, size, input)) != size) {
         fprintf(stderr, "Premature EOF while reading runtime.\n");
         goto lose;
@@ -563,7 +563,7 @@ bool save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size
 
     padding = (os_vm_page_size - (runtime_size % os_vm_page_size)) & ~os_vm_page_size;
     if (padding > 0) {
-        padbytes = successful_malloc(padding);
+        padbytes = checked_malloc(padding);
         memset(padbytes, 0, padding);
         if (padding != fwrite(padbytes, 1, padding, output)) {
             perror("Error saving runtime");

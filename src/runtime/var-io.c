@@ -141,7 +141,7 @@ int compress_vector(lispobj vector, size_t used_length) {
     char prefix[5];
     int prefix_length = pack_varint(used_length, prefix);
     size_t buf_size = ZSTD_compressBound(used_length);
-    char* buf = successful_malloc(buf_size);
+    char* buf = checked_malloc(buf_size);
     size_t new_length = ZSTD_compress(buf, buf_size, v->data, used_length, 22);
     if (ZSTD_isError(new_length)) {
         free(buf);

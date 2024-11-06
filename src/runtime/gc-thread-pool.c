@@ -40,13 +40,13 @@ void thread_pool_init() {
 #else
   if (!start_semaphores) {
 #endif
-    start_semaphores = successful_malloc(sizeof(os_sem_t) * gc_threads);
+    start_semaphores = checked_malloc(sizeof(os_sem_t) * gc_threads);
     for (unsigned int i = 0; i < gc_threads; i++)
       os_sem_init(start_semaphores + i, 0);
     os_sem_init(&join_semaphore, 0);
   }
 
-  threads = successful_malloc(sizeof(pthread_t) * gc_threads);
+  threads = checked_malloc(sizeof(pthread_t) * gc_threads);
   for (uword_t i = 0; i < gc_threads; i++)
     if (pthread_create(threads + i, NULL, worker, (void*)i))
       lose("Failed to create GC thread #%ld", i);

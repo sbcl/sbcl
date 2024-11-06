@@ -124,7 +124,7 @@ void dyndebug_init(void);
 #define never_returns
 #endif
 
-extern void *successful_malloc (size_t size);
+extern void *checked_malloc (size_t size);
 extern char *copied_string (char *string);
 
 void *os_dlsym_default(char *name); // Why not in 'os.h' ?

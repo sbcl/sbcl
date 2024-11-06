@@ -188,7 +188,7 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 
     int ret;
     size_t buf_size = ZSTD_DStreamInSize();
-    unsigned char* buf = successful_malloc(buf_size);
+    unsigned char* buf = checked_malloc(buf_size);
     ZSTD_inBuffer input;
     input.src = buf;
     input.pos = 0;
@@ -1047,7 +1047,7 @@ bool gc_allocate_ptes()
                                      ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
     gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
 #elif defined LISP_FEATURE_PPC64
-    unsigned char* mem = successful_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
+    unsigned char* mem = checked_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
     gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
     /* Copy linkage entries from where they were allocated to where they're accessible
      * off the GC card table register using negative indices. */
@@ -1055,7 +1055,7 @@ bool gc_allocate_ptes()
     os_deallocate((void*)linkage_space, LISP_LINKAGE_SPACE_SIZE);
     linkage_space = (lispobj*)mem;
 #else
-    gc_card_mark = successful_malloc(num_gc_cards);
+    gc_card_mark = checked_malloc(num_gc_cards);
 #endif
 
     /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
@@ -1321,7 +1321,7 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
     // Indexing of spaces[] by the space ID should conveniently just work,
     // so we have to leave an empty row for space ID 0 which doesn't exist.
     struct coreparse_space* output =
-      successful_malloc(sizeof (struct coreparse_space)*(MAX_CORE_SPACE_ID+1));
+      checked_malloc(sizeof (struct coreparse_space)*(MAX_CORE_SPACE_ID+1));
     int i;
     for (i=0; i<n; ++i) {
         int id = input[i].id;

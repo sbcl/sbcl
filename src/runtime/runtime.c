@@ -95,7 +95,7 @@ copied_realpath(const char *pathname)
      * an absolute path, so we prepend the cwd to relative paths */
     messy = NULL;
     if (pathname[0] != '/') {
-        messy = successful_malloc(PATH_MAX + 1);
+        messy = checked_malloc(PATH_MAX + 1);
         if (getcwd(messy, PATH_MAX + 1) == NULL) {
             free(messy);
             return NULL;
@@ -104,7 +104,7 @@ copied_realpath(const char *pathname)
         snprintf(messy + len, PATH_MAX + 1 - len, "/%s", pathname);
     }
 
-    tidy = successful_malloc(PATH_MAX + 1);
+    tidy = checked_malloc(PATH_MAX + 1);
 #ifdef LISP_FEATURE_ANSI_COMPLIANT_LOAD_TRUENAME
     if (realpath((messy ? messy : pathname), tidy) == NULL) {
         if (messy)
@@ -257,7 +257,7 @@ search_for_executable(const char *argv0)
     if (search == NULL)
         return NULL;
     search = copied_string(search);
-    buf = successful_malloc(PATH_MAX + 1);
+    buf = checked_malloc(PATH_MAX + 1);
     for (start = search; (end = strchr(start, ':')) != NULL; start = end + 1) {
         *end = '\0';
         snprintf(buf, PATH_MAX + 1, "%s/%s", start, argv0);
@@ -360,7 +360,7 @@ char *dir_name(char *path) {
 
     if (slash) {
         int prefixlen = slash - path + 1; // keep the slash in the prefix
-        result = successful_malloc(prefixlen + 1);
+        result = checked_malloc(prefixlen + 1);
         memcpy(result, path, prefixlen);
         result[prefixlen] = 0;
         return result;
@@ -460,13 +460,13 @@ parse_argv(struct memsize_options memsize_options,
         int output_index = 1;
 
 #ifndef LISP_FEATURE_WIN32
-        sbcl_argv = successful_malloc((argc + 1) * sizeof(char *));
+        sbcl_argv = checked_malloc((argc + 1) * sizeof(char *));
         char **argv_source = argv;
 #else
         int wargc;
         wchar_t **argv_source;
         argv_source = CommandLineToArgvW(GetCommandLineW(), &wargc);
-        sbcl_argv = successful_malloc((wargc + 1) * sizeof(wchar_t *));
+        sbcl_argv = checked_malloc((wargc + 1) * sizeof(wchar_t *));
 #endif
         sbcl_argv[0] = argv_source[0];
 
@@ -553,7 +553,7 @@ parse_argv(struct memsize_options memsize_options,
 #ifndef LISP_FEATURE_WIN32
             /* (argc - argi) for the arguments, one for the binary,
                and one for the terminating NULL. */
-            sbcl_argv = successful_malloc((2 + argc - argi) * sizeof(char *));
+            sbcl_argv = checked_malloc((2 + argc - argi) * sizeof(char *));
             sbcl_argv[0] = argv[0];
             while (argi < argc) {
                 char *arg = argv[argi++];
@@ -575,7 +575,7 @@ parse_argv(struct memsize_options memsize_options,
             int wargc;
             wchar_t** wargv;
             wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
-            sbcl_argv = successful_malloc((((argi < wargc) ? (wargc - argi) : 0) + 2)
+            sbcl_argv = checked_malloc((((argi < wargc) ? (wargc - argi) : 0) + 2)
                                           * sizeof(wchar_t *));
             sbcl_argv[0] = wargv[0];
             while (argi < wargc) {
