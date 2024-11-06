@@ -44,7 +44,9 @@
 (with-test (:name :disassemble-method
             :skipped-on :interpreter)
   (with-output-to-string (s)
-    (sb-c:dis (defmethod hello ((self cons)) "here i am") s)))
+    (sb-c:dis (defmethod hello ((self cons)) "here i am") s)
+    (disassemble (sb-mop:method-function (car (sb-mop:generic-function-methods #'documentation)))
+                 :stream s)))
 
 (with-test (:name :lp-bug-1861418)
   (disassemble '(lambda ()
