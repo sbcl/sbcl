@@ -1252,6 +1252,13 @@
              (when (and (constant-fold-call-p node)
                         (constant-fold-call node))
                (return-from ir1-optimize-combination))
+             ;; Don't transform locally flushable functions,
+             ;; their transforms won't know that they are flushable.
+             (when (and (not (node-tail-p node))
+                        (not (node-lvar node))
+                        (let ((name (lvar-fun-name (combination-fun node) t)))
+                          (memq name (lexenv-flushable (node-lexenv node)))))
+               (return-from ir1-optimize-combination))
              (when (fold-call-derived-to-constant node)
                (return-from ir1-optimize-combination))
              (when (and (ir1-attributep attr commutative)
@@ -2831,7 +2838,7 @@
 
                ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
                (change-ref-leaf (lvar-uses (combination-fun node))
-                                (find-free-fun 'values "values-list optimizer"))
+                                (find-free-fun 'values "VALUES-LIST"))
                (setf (combination-kind node) :full)
                (dolist (arg args)
                  (setf (lvar-dest arg) node))
@@ -2861,7 +2868,7 @@
                            (replace-node use `(values ,@(constant-value (ref-leaf use)))))
                           (t
                            (change-ref-leaf (lvar-uses (combination-fun use))
-                                            (find-free-fun 'values "values-list optimizer"))
+                                            (find-free-fun 'values "VALUES-LIST"))
                            (setf (combination-kind use) :full)
                            (setf (node-derived-type use) *wild-type*)))))
              (mapc #'transform use)

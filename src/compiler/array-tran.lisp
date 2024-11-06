@@ -683,7 +683,8 @@
      (if (constantp initial-contents env)
          (map 'vector (lambda (x) (constant-form-value x env)) output)
          (let ((f (if (singleton-p output) 'list 'vector)))
-           `(locally (declare (notinline ,f))
+           `(locally (declare (notinline ,f)
+                              (flushable ,f))
              (,f ,@(mapcar (lambda (x)
                              (cond ((and (symbolp x)
                                          (not (nth-value
@@ -1003,7 +1004,7 @@
     (flet ((wrap (underlying)
              `(let* ((%length ,(or c-length '(the index dims)))
                      (nwords ,n-words-form))
-                (declare (flushable sb-vm::splat))
+                (declare (flushable sb-vm::splat quickfill))
                 ,(if (not array-header-p)
                      underlying     ; was already cast using TRULY-THE
                      (let* ((constant-fill-pointer-p (and fill-pointer
