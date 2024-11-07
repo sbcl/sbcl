@@ -961,6 +961,14 @@
                         (if h
                             (incf max-sum h)
                             (setf max nil))))
+                     ((and subseq
+                           (constant-lvar-p arg)
+                           (eq (lvar-value arg) 'sb-impl::%splice))
+                      (let ((n (lvar-value (pop args))))
+                        (incf min-sum n)
+                        (incf max-sum n)
+                        (loop repeat n
+                              do (pop args))))
                      (t
                       (let ((int (type-approximate-interval (type-intersection (or (vector-length-type (lvar-type arg))
                                                                                    *universal-type*)

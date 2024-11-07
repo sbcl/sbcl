@@ -1201,25 +1201,34 @@ many elements are copied."
                                (if (> start end)
                                    (sequence-bounding-indices-bad-error seq start end))
                                (incf length (- end (truly-the index start)))))
+                            ((eq arg '%splice)
+                             (let ((n (truly-the index (fast-&rest-nth (incf index) sequences))))
+                               (incf index n)
+                               (incf length n)))
                             (t
                              (incf length (length arg)))))
                     (let ((result (make-array length :element-type ',element-type))
                           (start 0))
                       (declare (index start))
                       (do-rest-arg ((arg index) sequences)
-                        (multiple-value-bind (seq start2 end2 length)
-                            (cond ((eq arg '%subseq)
-                                   (let* ((seq (fast-&rest-nth (incf index) sequences))
-                                          (start (truly-the index (fast-&rest-nth (incf index) sequences)))
-                                          (end (truly-the (or null index) (fast-&rest-nth (incf index) sequences)))
-                                          (end (or end (length seq))))
-                                     (values seq start end (- end start))))
-
-                                  (t
-                                   (values (truly-the sequence arg) 0 nil (length arg))))
-                          (string-dispatch (,@dispatch t) seq
-                            (replace result seq :start1 start :start2 start2 :end2 end2)
-                            (incf start length))))
+                        (if (eq arg '%splice)
+                            (let ((n (truly-the index (fast-&rest-nth (incf index) sequences))))
+                              (loop repeat n
+                                    do (setf (aref result start)
+                                             (fast-&rest-nth (incf index) sequences))
+                                       (incf start)))
+                            (multiple-value-bind (seq start2 end2 length)
+                                (cond ((eq arg '%subseq)
+                                       (let* ((seq (fast-&rest-nth (incf index) sequences))
+                                              (start (truly-the index (fast-&rest-nth (incf index) sequences)))
+                                              (end (truly-the (or null index) (fast-&rest-nth (incf index) sequences)))
+                                              (end (or end (length seq))))
+                                         (values seq start end (- end start))))
+                                      (t
+                                       (values (truly-the sequence arg) 0 nil (length arg))))
+                              (string-dispatch (,@dispatch t) seq
+                                (replace result seq :start1 start :start2 start2 :end2 end2)
+                                (incf start length)))))
                       result))))))
   #+sb-unicode
   (def %concatenate-to-string character
@@ -1260,16 +1269,21 @@ many elements are copied."
   (let* ((result (list nil))
          (splice result))
     (do-rest-arg ((arg index) sequences)
-      (multiple-value-bind (seq start2 end2)
-          (cond ((eq arg '%subseq)
-                 (let* ((seq (fast-&rest-nth (incf index) sequences))
-                        (start (the index (fast-&rest-nth (incf index) sequences)))
-                        (end (the (or null index) (fast-&rest-nth (incf index) sequences))))
-                   (values seq start end)))
-                (t
-                 (values arg 0 nil)))
-        (do-subsequence (e seq start2 end2)
-          (setf splice (cdr (rplacd splice (list e)))))))
+      (if (eq arg '%splice)
+          (let ((n (truly-the index (fast-&rest-nth (incf index) sequences))))
+            (loop repeat n
+                  do
+                  (setf splice (cdr (rplacd splice (list (fast-&rest-nth (incf index) sequences)))))))
+          (multiple-value-bind (seq start2 end2)
+              (cond ((eq arg '%subseq)
+                     (let* ((seq (fast-&rest-nth (incf index) sequences))
+                            (start (the index (fast-&rest-nth (incf index) sequences)))
+                            (end (the (or null index) (fast-&rest-nth (incf index) sequences))))
+                       (values seq start end)))
+                    (t
+                     (values arg 0 nil)))
+            (do-subsequence (e seq start2 end2)
+              (setf splice (cdr (rplacd splice (list e))))))))
     (cdr result)))
 
 (defun %concatenate-to-vector-subseq (widetag &rest sequences)
@@ -1285,6 +1299,10 @@ many elements are copied."
                (if (> start end)
                    (sequence-bounding-indices-bad-error seq start end))
                (incf length (- end (truly-the index start)))))
+            ((eq arg '%splice)
+             (let ((n (truly-the index (fast-&rest-nth (incf index) sequences))))
+               (incf index n)
+               (incf length n)))
             (t
              (incf length (length arg)))))
     (let* ((n-bits-shift (aref sb-vm::%%simple-array-n-bits-shifts%% widetag))
@@ -1294,18 +1312,23 @@ many elements are copied."
            (index 0))
       (declare (index index))
       (do-rest-arg ((arg rest-index) sequences)
-        (multiple-value-bind (seq start2 end2)
-            (cond ((eq arg '%subseq)
-                   (let* ((seq (truly-the sequence (fast-&rest-nth (incf rest-index) sequences)))
-                          (start (truly-the index (fast-&rest-nth (incf rest-index) sequences)))
-                          (end (truly-the (or null index) (fast-&rest-nth (incf rest-index) sequences)))
-                          (end (or end (length seq))))
-                     (values seq start end (- end start))))
-                  (t
-                   (values arg 0 nil)))
-          (do-subsequence (e seq start2 end2)
-            (funcall setter result index e)
-            (incf index))))
+        (if (eq arg '%splice)
+            (let ((n (truly-the index (fast-&rest-nth (incf rest-index) sequences))))
+              (loop repeat n
+                    do (funcall setter result index (fast-&rest-nth (incf rest-index) sequences))
+                       (incf index)))
+            (multiple-value-bind (seq start2 end2)
+                (cond ((eq arg '%subseq)
+                       (let* ((seq (truly-the sequence (fast-&rest-nth (incf rest-index) sequences)))
+                              (start (truly-the index (fast-&rest-nth (incf rest-index) sequences)))
+                              (end (truly-the (or null index) (fast-&rest-nth (incf rest-index) sequences)))
+                              (end (or end (length seq))))
+                         (values seq start end (- end start))))
+                      (t
+                       (values arg 0 nil)))
+              (do-subsequence (e seq start2 end2)
+                (funcall setter result index e)
+                (incf index)))))
       result)))
 
 ;;;; MAP
