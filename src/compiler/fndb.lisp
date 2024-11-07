@@ -599,32 +599,33 @@
   (movable)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
-(defknown concatenate (type-specifier &rest proper-sequence) consed-sequence ()
+(defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence
+  (foldable-read-only)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown %concatenate-to-string (&rest (read-only sequence)) simple-string
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-base-string (&rest (read-only sequence)) simple-base-string
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-list (&rest (read-only sequence)) list
-    (flushable))
+    (flushable foldable-read-only))
 (defknown %concatenate-to-simple-vector (&rest (read-only sequence)) simple-vector
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest (read-only sequence))
     vector
-  (flushable no-verify-arg-count))
+  (flushable foldable-read-only no-verify-arg-count))
 
 (defknown %concatenate-to-string-subseq (&rest (read-only t)) simple-string
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-base-string-subseq (&rest (read-only t)) simple-base-string
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-list-subseq (&rest (read-only t)) list
-    (flushable))
+    (flushable foldable-read-only))
 (defknown %concatenate-to-simple-vector-subseq (&rest (read-only t)) simple-vector
-  (flushable))
+  (flushable foldable-read-only))
 (defknown %concatenate-to-vector-subseq ((unsigned-byte #.sb-vm:n-widetag-bits) &rest (read-only t))
     vector
-  (flushable no-verify-arg-count))
+  (flushable foldable-read-only no-verify-arg-count))
 
 (defknown (possibly-base-stringize possibly-base-stringize-to-heap) ((or null string)) (or null simple-string)
   (flushable no-verify-arg-count))
