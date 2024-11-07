@@ -1150,9 +1150,7 @@
             ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with constant LENGTH.
             ((and c-length
                   (lvar-matches initial-contents
-                                ;; FIXME: probably don't need all 4 of these now?
-                                :fun-names '(list vector
-                                             sb-impl::|List| sb-impl::|Vector|)
+                                :fun-names '(list vector)
                                 :arg-count c-length
                                 :notinline nil))
              (let ((parameters (eliminate-keyword-args
