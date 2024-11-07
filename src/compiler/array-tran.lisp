@@ -585,8 +585,12 @@
 ;;;; constructors
 
 ;;; Convert VECTOR into a MAKE-ARRAY.
-(define-source-transform vector (&rest elements)
-  `(make-array ,(length elements) :initial-contents (list ,@elements)))
+(deftransform vector ((&rest elements) * * :node node)
+  ;; Some transforms recognize VECTOR as an argument
+  (delay-ir1-transform node :constraint)
+  (let ((vars (make-gensym-list (length elements))))
+    `(lambda ,vars
+       (make-array ,(length elements) :initial-contents (list ,@vars)))))
 
 ;;; Convert it into a MAKE-ARRAY if the element-type is known at compile-time.
 ;;; Otherwise, don't. This prevents allocating memory for a million element
