@@ -20,11 +20,6 @@
 ;;; breakdown of side effects, since we do very little code motion on
 ;;; IR1. We are interested in some deeper semantic properties such as
 ;;; whether it is safe to pass stack closures to.
-;;;
-;;; FIXME: This whole notion of "bad" explicit attributes is bad for
-;;; maintenance. How confident are we that we have no defknowns for functions
-;;; with functional arguments that are missing the CALL attribute? Much better
-;;; to have NO-CALLS, as it is much less likely to break accidentally.
 (!def-boolean-attribute ir1
   ;; may call functions that are passed as arguments. In order to
   ;; determine what other effects are present, we must find the
@@ -99,7 +94,9 @@
   ;; performed, and the number of arguments passed in registers can be
   ;; greater than the standard number. Only fixed arguments can be used.
   fixed-args
-  unboxed-return)
+  unboxed-return
+  ;; Can be constant-folded if it's not retained or modified
+  foldable-read-only)
 
 (defstruct (fun-info (:copier nil)
                      #-sb-xc-host (:pure t))
@@ -178,7 +175,11 @@
   ;; For functions with unboxed args/returns
   (folder nil :type (or function null))
   (externally-checkable-type nil :type (or function null))
-  (constants nil :type (or function null)))
+  (constants nil :type (or function null))
+  ;; A description of read-only arguments that can be constant folded.
+  ;; An integer bitmap for positional arguments.
+  ;; Sign-extended into a negative integer for &rest arguments.
+  (read-only-args nil))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

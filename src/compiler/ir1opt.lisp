@@ -1857,7 +1857,16 @@
   (let* ((info (basic-combination-fun-info combination))
          (attr (fun-info-attributes info))
          (args (basic-combination-args combination)))
-    (cond ((not (ir1-attributep attr foldable))
+    (cond ((not (or (ir1-attributep attr foldable)
+                    (and (ir1-attributep attr foldable-read-only)
+                         (let ((dest (node-dest combination)))
+                           (and (combination-p dest)
+                                (eq (combination-kind dest) :known)
+                                (let* ((info (combination-fun-info dest))
+                                       (read-only (fun-info-read-only-args info)))
+                                  (when read-only
+                                    (logbitp (position (node-lvar combination) (combination-args dest))
+                                             read-only))))))))
            nil)
           ((ir1-attributep attr call)
            (map-combination-args-and-types
