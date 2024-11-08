@@ -121,7 +121,10 @@
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
   (declare (explicit-check))
-  (cond ((eql base 1)
+  (cond ((and (eql base 10)
+              (typep power '(integer 0 20)))
+         (expt 10 power))
+        ((eql base 1)
          base)
         ((eql base -1)
          (if (evenp power)
@@ -160,6 +163,14 @@
               ((zerop nextn) total)
            (setq base (* base base))
            (setq power nextn)))))
+
+(defun 10expt (power)
+  (declare (explicit-check))
+  (cond ((typep power '(integer 0 20))
+         (expt 10 power))
+        (t
+         (locally (declare (notinline expt))
+           (expt 10 power)))))
 
 ;;; If an integer power of a rational, use INTEXP above. Otherwise, do
 ;;; floating point stuff. If both args are real, we try %POW right

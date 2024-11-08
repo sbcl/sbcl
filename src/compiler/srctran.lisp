@@ -3390,6 +3390,17 @@
                   (reciprocate %denominator)
                   %denominator))))))
 
+
+(deftransform expt ((base power) ((integer 10 10) t) * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(sb-kernel::10expt power))
+
+(deftransform expt ((base power) ((integer 10 10) (integer 0 20)) * :important nil)
+  `(aref #.(coerce (loop for i to 20
+                         collect (expt 10 i))
+                   'vector)
+         power))
+
 (deftransform expt ((base power) ((constant-arg unsigned-byte) unsigned-byte))
   (let ((base (lvar-value base)))
     (unless (= (logcount base) 1)

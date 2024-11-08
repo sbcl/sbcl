@@ -307,6 +307,9 @@
 (defknown sb-kernel::intexp ((or rational (complex rational)) integer) rational
   (movable foldable flushable recursive no-verify-arg-count))
 
+(defknown sb-kernel::10expt (number) rational
+  (movable foldable flushable no-verify-arg-count))
+
 (defknown log (number &optional real) irrational
   (movable foldable flushable recursive))
 (defknown sqrt (number) irrational
