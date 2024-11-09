@@ -724,15 +724,7 @@ case "$sbcl_arch" in
     esac
     ;;
   ppc)
-    if [ "$sbcl_os" = "linux" ]; then
-        # Use a C program to detect which kind of glibc we're building on,
-        # to bandage across the break in source compatibility between
-        # versions 2.3.1 and 2.3.2
-        #
-        # FIXME: integrate to grovel-features, mayhaps
-	$GNUMAKE -C tools-for-build where-is-mcontext -I ../src/runtime
-	tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
-    elif [ "$sbcl_os" = "darwin" ]; then
+    if [ "$sbcl_os" = "darwin" ]; then
         # We provide a dlopen shim, so a little lie won't hurt
  	printf ' :os-provides-dlopen' >> $ltf
         # The default stack ulimit under darwin is too small to run PURIFY.
@@ -745,10 +737,6 @@ case "$sbcl_arch" in
     fi
     ;;
   ppc64)
-    # there is no glibc bug that requires the 'where-is-mcontext' hack.
-    # (Sufficiently new glibc uses the correct definition, which is the same as
-    # 2.3.1, so define our constant for that)
-    echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
    ;;
   riscv)
     if [ "$xlen" = "64" ]; then
