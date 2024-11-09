@@ -1,6 +1,8 @@
 #ifndef _PPC_LINUX_OS_H
 #define _PPC_LINUX_OS_H
 
+#include <asm/ptrace.h>
+
 typedef ucontext_t os_context_t;
 typedef unsigned long os_context_register_t;
 
