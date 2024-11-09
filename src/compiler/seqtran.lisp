@@ -2410,12 +2410,19 @@
              lengths
              vars
              fills
-             (constants -1))
+             (constants -1)
+             lets)
         (loop for lvar in lvars
               for value in lvar-values
               for var = (gensym)
+              for length-code = `(sb-impl::string-dispatch ((simple-array * (*))
+                                                            sequence)
+                                                           ,var
+                                   #-sb-xc-host
+                                   (declare (muffle-conditions compiler-note))
+                                   (length ,var))
               do
-              (flet ((gen-replace (&optional start end)
+              (flet ((gen-replace (&optional start end (length `(length ,var)))
                        `(sb-impl::string-dispatch
                             (#+sb-unicode
                              (simple-array character (*))
@@ -2434,11 +2441,7 @@
                                           `(:start2 ,start))
                                    ,@(and end
                                           `(:end2 ,end)))
-                          (incf (truly-the index .pos.)
-                                ,(if start
-                                     `(- ,(or end `(length ,var))
-                                         ,start)
-                                     `(length ,var))))))
+                          (incf (truly-the index .pos.) ,length))))
                 (cond (value
                        (push var vars)
                        (push (length value) lengths)
@@ -2467,15 +2470,15 @@
                        (destructuring-bind (sequence start &optional end) (combination-args (lvar-uses lvar))
                          (declare (ignorable sequence start))
                          (splice-fun-args lvar :any (if end 3 2))
-                         (let* ((seq (car (push var vars)))
-                                (start (car (push (gensym) vars)))
+                         (push var vars)
+                         (let* ((start (car (push (gensym) vars)))
                                 (end (and end
                                           (car (push (gensym) vars))))
-                                (length (if end
-                                            `(- ,end ,start)
-                                            `(- (length ,seq) ,start))))
+                                (length (gensym)))
+                           (push (list length `(- (or ,end ,length-code) ,start))
+                                 lets)
                            (push length lengths)
-                           (push (gen-replace start end) fills))))
+                           (push (gen-replace start end length) fills))))
                       ((lvar-matches lvar :fun-names '(list vector))
                        (destructuring-bind (&rest elements) (combination-args (lvar-uses lvar))
                          (splice-fun-args lvar :any nil)
@@ -2496,14 +2499,7 @@
                                fills)))
                       (t
                        (push var vars)
-                       (push
-                        `(sb-impl::string-dispatch ((simple-array * (*))
-                                                    sequence)
-                             ,var
-                           #-sb-xc-host
-                           (declare (muffle-conditions compiler-note))
-                           (length ,var))
-                        lengths)
+                       (push length-code lengths)
                        (push (gen-replace)
                              fills)))))
         (setf lengths (nreverse lengths)
@@ -2513,7 +2509,8 @@
            (declare (ignore .dummy.)
                     (ignorable ,@vars))
            (declare (optimize (insert-array-bounds-checks 0)))
-           (let* ((.length. (+ ,@lengths))
+           (let* (,@lets
+                  (.length. (+ ,@lengths))
                   (.pos. ,non-constant-start)
                   (.string. (make-string .length. :element-type ',element-type)))
              (declare (type index .length. .pos.)
