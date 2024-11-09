@@ -704,7 +704,7 @@
   :derive-type #'result-type-first-arg
   :result-arg 0)
 
-(defknown replace ((modifying sequence) proper-sequence &rest t &key (:start1 index)
+(defknown replace ((modifying sequence) (read-only proper-sequence) &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t

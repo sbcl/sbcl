@@ -310,7 +310,6 @@
                                      (if (lvar-matches arg :fun-names '(list vector))
                                          (destructuring-bind (&rest elements) (combination-args call)
                                            (splice-fun-args arg :any nil)
-
                                            (list* ''sb-impl::%splice
                                                   (length elements)
                                                   (loop for elt in elements

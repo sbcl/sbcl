@@ -2378,96 +2378,149 @@
 (defvar *concatenate-open-code-limit* 129)
 
 (defun string-concatenate-transform (node type lvars)
-  (let ((vars (make-gensym-list (length lvars))))
-    (if (policy node (<= speed space))
-        ;; Out-of-line
-        (let ((constants-to-string
-                ;; Strings are handled more efficiently by
-                ;; %concatenate-to-* functions
-                (loop for var in vars
-                      for lvar in lvars
-                      collect (if (and (constant-lvar-p lvar)
-                                       (proper-sequence-p (lvar-value lvar))
-                                       (every #'characterp (lvar-value lvar)))
-                                  (coerce (lvar-value lvar) 'string)
-                                  var))))
-          `(lambda (.dummy. ,@vars)
-             (declare (ignore .dummy.)
-                      (ignorable ,@vars))
-             ,(ecase type
-                ((string simple-string)
-                 `(%concatenate-to-string ,@constants-to-string))
-                ((base-string simple-base-string)
-                 `(%concatenate-to-base-string ,@constants-to-string)))))
-        ;; Inline
-        (let* ((element-type (ecase type
-                               ((string simple-string) 'character)
-                               ((base-string simple-base-string) 'base-char)))
-               (lvar-values (loop for lvar in lvars
-                                  collect (when (constant-lvar-p lvar)
-                                            (lvar-value lvar))))
-               (lengths
-                 (loop for value in lvar-values
-                       for var in vars
-                       collect (if value
-                                   (length value)
-                                   `(sb-impl::string-dispatch ((simple-array * (*))
-                                                               sequence)
-                                                              ,var
-                                      #-sb-xc-host
-                                      (declare (muffle-conditions compiler-note))
-                                      (length ,var)))))
-               (non-constant-start
-                 (loop for value in lvar-values
-                       while (and (stringp value)
-                                  (< (length value) *concatenate-open-code-limit*))
-                       sum (length value))))
-          `(lambda (.dummy. ,@vars)
-             (declare (ignore .dummy.)
-                      (ignorable ,@vars))
-             (declare (optimize (insert-array-bounds-checks 0)))
-             (let* ((.length. (+ ,@lengths))
-                    (.pos. ,non-constant-start)
-                    (.string. (make-string .length. :element-type ',element-type)))
-               (declare (type index .length. .pos.)
-                        #-sb-xc-host (muffle-conditions compiler-note)
-                        (ignorable .pos.))
-               ,@(loop with constants = -1
-                       for value in lvar-values
-                       for var in vars
-                       collect
-                       (cond ((and (stringp value)
-                                   (< (length value) *concatenate-open-code-limit*))
-                              ;; Fold the array reads for constant arguments
-                              `(progn
-                                 ,@(loop for c across value
-                                         for i from 0
-                                         collect
-                                         ;; Without truly-the we get massive numbers
-                                         ;; of pointless error traps.
-                                         `(setf (aref .string.
-                                                      (truly-the index ,(if constants
-                                                                            (incf constants)
-                                                                            `(+ .pos. ,i))))
-                                                ,c))
-                                 ,(unless constants
-                                    `(incf (truly-the index .pos.) ,(length value)))))
-                             (t
-                              (prog1
-                                  `(sb-impl::string-dispatch
-                                       (#+sb-unicode
-                                        (simple-array character (*))
-                                        (simple-array base-char (*))
-                                        t)
-                                       ,var
-                                     (replace .string. ,var
-                                              ,@(cond ((not constants)
-                                                       '(:start1 .pos.))
-                                                      ((plusp non-constant-start)
-                                                       `(:start1 ,non-constant-start))))
-                                     (incf (truly-the index .pos.) (length ,var)))
-                                (setf constants nil)))))
-               .string.))))))
+  (if (policy node (<= speed space))
+      ;; Out-of-line
+      (let* ((vars (make-gensym-list (length lvars)))
+             (constants-to-string
+               ;; Strings are handled more efficiently by
+               ;; %concatenate-to-* functions
+               (loop for var in vars
+                     for lvar in lvars
+                     collect (if (and (constant-lvar-p lvar)
+                                      (proper-sequence-p (lvar-value lvar))
+                                      (every #'characterp (lvar-value lvar)))
+                                 (coerce (lvar-value lvar) 'string)
+                                 var))))
+        `(lambda (.dummy. ,@vars)
+           (declare (ignore .dummy.)
+                    (ignorable ,@vars))
+           ,(ecase type
+              ((string simple-string)
+               `(%concatenate-to-string ,@constants-to-string))
+              ((base-string simple-base-string)
+               `(%concatenate-to-base-string ,@constants-to-string)))))
+      ;; Inline
+      (let* ((element-type (ecase type
+                             ((string simple-string) 'character)
+                             ((base-string simple-base-string) 'base-char)))
+             (lvar-values (loop for lvar in lvars
+                                collect (when (constant-lvar-p lvar)
+                                          (lvar-value lvar))))
+             (non-constant-start 0)
+             lengths
+             vars
+             fills
+             (constants -1))
+        (loop for lvar in lvars
+              for value in lvar-values
+              for var = (gensym)
+              do
+              (flet ((gen-replace (&optional start end)
+                       `(sb-impl::string-dispatch
+                            (#+sb-unicode
+                             (simple-array character (*))
+                             (simple-array base-char (*))
+                             t)
+                            ,var
+                          (replace .string. ,var
+                                   ,@(cond ((not constants)
+                                            '(:start1 .pos.))
+                                           (t
+                                            (setf non-constant-start (1+ constants)
+                                                  constants nil)
+                                            (when (plusp non-constant-start)
+                                              `(:start1 ,non-constant-start))))
+                                   ,@(and start
+                                          `(:start2 ,start))
+                                   ,@(and end
+                                          `(:end2 ,end)))
+                          (incf (truly-the index .pos.)
+                                ,(if start
+                                     `(- ,(or end `(length ,var))
+                                         ,start)
+                                     `(length ,var))))))
+                (cond (value
+                       (push var vars)
+                       (push (length value) lengths)
+                       (push
+                        (if (and (stringp value)
+                                 (< (length value) *concatenate-open-code-limit*))
+                            ;; Fold the array reads for constant arguments
+                            `(progn
+                               ,@(loop for c across value
+                                       for i from 0
+                                       collect
+                                       ;; Without truly-the we get massive numbers
+                                       ;; of pointless error traps.
+                                       `(setf (aref .string.
+                                                    (truly-the index ,(if constants
+                                                                          (incf constants)
+                                                                          `(+ .pos. ,i))))
+                                              ,c))
+                               ,(unless constants
+                                  `(incf (truly-the index .pos.) ,(length value))))
+                            (gen-replace))
+                        fills))
+                      ((and (lvar-matches lvar :fun-names '(vector-subseq* subseq))
+                            ;; Nothing should be modifying the original sequence
+                            (almost-immediately-used-p lvar (lvar-use lvar) :flushable t))
+                       (destructuring-bind (sequence start &optional end) (combination-args (lvar-uses lvar))
+                         (declare (ignorable sequence start))
+                         (splice-fun-args lvar :any (if end 3 2))
+                         (let* ((seq (car (push var vars)))
+                                (start (car (push (gensym) vars)))
+                                (end (and end
+                                          (car (push (gensym) vars))))
+                                (length (if end
+                                            `(- ,end ,start)
+                                            `(- (length ,seq) ,start))))
+                           (push length lengths)
+                           (push (gen-replace start end) fills))))
+                      ((lvar-matches lvar :fun-names '(list vector))
+                       (destructuring-bind (&rest elements) (combination-args (lvar-uses lvar))
+                         (splice-fun-args lvar :any nil)
+                         (push (length elements) lengths)
+                         (push (let ((i 0))
+                                 `(progn
+                                    ,@(loop for let in elements
+                                            for var = (car (push (gensym) vars))
+                                            collect
+                                            `(setf (aref .string.
+                                                         (truly-the index ,(if constants
+                                                                               (incf constants)
+                                                                               `(+ .pos. ,i))))
+                                                   ,var)
+                                            do (incf i))
+                                    ,(unless constants
+                                       `(incf (truly-the index .pos.) ,i))))
+                               fills)))
+                      (t
+                       (push var vars)
+                       (push
+                        `(sb-impl::string-dispatch ((simple-array * (*))
+                                                    sequence)
+                             ,var
+                           #-sb-xc-host
+                           (declare (muffle-conditions compiler-note))
+                           (length ,var))
+                        lengths)
+                       (push (gen-replace)
+                             fills)))))
+        (setf lengths (nreverse lengths)
+              vars (nreverse vars)
+              fills (nreverse fills))
+        `(lambda (.dummy. ,@vars)
+           (declare (ignore .dummy.)
+                    (ignorable ,@vars))
+           (declare (optimize (insert-array-bounds-checks 0)))
+           (let* ((.length. (+ ,@lengths))
+                  (.pos. ,non-constant-start)
+                  (.string. (make-string .length. :element-type ',element-type)))
+             (declare (type index .length. .pos.)
+                      #-sb-xc-host (muffle-conditions compiler-note)
+                      (ignorable .pos.))
+             ,@fills
+             .string.)))))
 
 (defun vector-specifier-widetag (type)
   ;; FIXME: This only accepts vectors without dimensions even though
