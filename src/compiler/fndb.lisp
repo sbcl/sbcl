@@ -1278,7 +1278,7 @@
   (flushable no-verify-arg-count)
   :result-arg 1)
 
-(defknown vector (&rest t) simple-vector (flushable))
+(defknown vector (&rest t) simple-vector (flushable foldable-read-only))
 
 (defknown aref (array &rest index) t (foldable)
   :call-type-deriver #'array-call-type-deriver)
