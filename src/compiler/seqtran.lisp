@@ -1491,8 +1491,8 @@
                      (declare (optimize (insert-array-bounds-checks 0)))
                      (setf (aref seq1 i) (data-vector-ref seq2 j))))
                  (up ()
-                   '(do ((i start1 (1+ i))
-                         (j start2 (1+ j))
+                   '(do ((i start1 (truly-the index (1+ i)))
+                         (j start2 (truly-the index (1+ j)))
                          (end (+ start1 replace-len)))
                      ((>= i end))
                      (declare (optimize (insert-array-bounds-checks 0)))
@@ -2412,7 +2412,7 @@
              fills
              (constants -1)
              lets)
-        (loop for lvar in lvars
+        (loop for (lvar . more) on lvars
               for value in lvar-values
               for var = (gensym)
               for length-code = `(sb-impl::string-dispatch ((simple-array * (*))
@@ -2441,7 +2441,8 @@
                                           `(:start2 ,start))
                                    ,@(and end
                                           `(:end2 ,end)))
-                          (incf (truly-the index .pos.) ,length))))
+                          ,(unless (not more)
+                             `(incf (truly-the index .pos.) ,length)))))
                 (cond (value
                        (push var vars)
                        (push (length value) lengths)
@@ -2494,7 +2495,8 @@
                                                                                `(+ .pos. ,i))))
                                                    ,var)
                                             do (incf i))
-                                    ,(unless constants
+                                    ,(unless (or constants
+                                                 (not more))
                                        `(incf (truly-the index .pos.) ,i))))
                                fills)))
                       (t
@@ -2510,7 +2512,7 @@
                     (ignorable ,@vars))
            (declare (optimize (insert-array-bounds-checks 0)))
            (let* (,@lets
-                  (.length. (+ ,@lengths))
+                  (.length. (truly-the index (+ ,@lengths)))
                   (.pos. ,non-constant-start)
                   (.string. (make-string .length. :element-type ',element-type)))
              (declare (type index .length. .pos.)
