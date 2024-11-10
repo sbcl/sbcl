@@ -374,24 +374,36 @@
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
   (block nil
-    (flet ((give-up (&optional reason)
-             (cond ((= (length subscripts) 1)
-                    (return
-                      `(lambda (array arg)
-                         (and (typep arg '(and fixnum unsigned-byte))
-                              (< arg (array-dimension array 0))))))
-                   (t
-                    (give-up-ir1-transform
-                     (or reason
-                         "~@<lower array bounds unknown or negative and upper bounds not ~
+    (let (dimensions)
+      (flet ((give-up (&optional reason)
+               (cond ((= (length subscripts) 1)
+                      (return
+                        `(lambda (array arg)
+                           (and (typep arg '(and fixnum unsigned-byte))
+                                (< arg (array-dimension array 0))))))
+                     ((and (consp dimensions)
+                           (= (length subscripts)
+                              (length dimensions)))
+                      (let ((vars (make-gensym-list (length subscripts))))
+                        `(lambda (array ,@vars)
+                           (and
+                            ,@(loop for var in vars
+                                    for i from 0
+                                    collect
+                                    `(< -1 ,var (array-dimension array ,i)))))))
+                     (t
+                      (give-up-ir1-transform
+                       (or reason
+                           "~@<lower array bounds unknown or negative and upper bounds not ~
                          negative~:@>")))))
-           (bound-known-p (x)
-             (integerp x)))             ; might be NIL or *
-      (let ((dimensions (catch-give-up-ir1-transform
-                            ((array-type-dimensions-or-give-up
-                              (lvar-conservative-type array))
-                             args)
-                          (give-up (car args)))))
+             (bound-known-p (x)
+               (integerp x)))           ; might be NIL or *
+        (setf dimensions
+              (catch-give-up-ir1-transform
+                  ((array-type-dimensions-or-give-up
+                    (lvar-conservative-type array))
+                   args)
+                (give-up (car args))))
         (when (eq '* dimensions)
           (give-up "array bounds unknown"))
         ;; shortcut for zero dimensions
