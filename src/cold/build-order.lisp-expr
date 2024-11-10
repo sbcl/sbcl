@@ -405,6 +405,7 @@
  ("src/compiler/{arch}/memory")
  ("src/compiler/{arch}/arith")
  ("src/compiler/{arch}/pred")
+ ("src/compiler/{arch}/c-call")
 
  ;; The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a
@@ -439,7 +440,6 @@
 
  ("src/compiler/{arch}/subprim")
  ("src/compiler/{arch}/debug")
- ("src/compiler/{arch}/c-call")
  ("src/compiler/{arch}/cell")
  ("src/compiler/{arch}/call")
  ("src/compiler/{arch}/nlx")
