@@ -2205,8 +2205,9 @@
                    ;; This type logic corresponds to the special
                    ;; case for strings in HAIRY-DATA-VECTOR-REF
                    ;; (generic/vm-tran.lisp)
-                   (not (csubtypep type (specifier-type 'simple-string))))
-              (not (null (conservative-array-type-complexp type))))
+                   (not (csubtypep type (specifier-type 'string))))
+              (unless-vop-existsp (:named %data-vector-and-index)
+                (conservative-array-type-complexp type)))
       (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
     `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-dimension array 0) 'index index))))
 
@@ -2215,8 +2216,9 @@
          (element-type (array-type-upgraded-element-type type))
          (simple (null (conservative-array-type-complexp type))))
     (if (or (and (eq element-type *wild-type*)
-                 (not (csubtypep type (specifier-type 'simple-string))))
-            (not simple))
+                 (not (csubtypep type (specifier-type 'string))))
+            (unless-vop-existsp (:named %data-vector-and-index)
+              (not simple)))
         ;; The new value is only suitable for a simple-vector
         (if (and simple
                  (csubtypep (lvar-type new-value) (specifier-type '(not (or number character)))))

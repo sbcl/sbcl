@@ -129,3 +129,29 @@
   (inst add start n-word-bytes)
   (inst cmp start count)
   (inst jmp :b FINAL-LOOP))
+
+(define-assembly-routine (%data-vector-and-index
+                          (:translate %data-vector-and-index)
+                          (:policy :fast-safe)
+                          (:arg-types t positive-fixnum)
+                          (:result-types t positive-fixnum))
+    ((:arg array descriptor-reg rdx-offset)
+     (:arg index any-reg rdi-offset)
+     (:temp temp unsigned-reg rcx-offset)
+     (:res result descriptor-reg rdx-offset)
+     (:res offset any-reg rdi-offset))
+  (declare (ignore result offset))
+  LOOP
+  (inst mov :byte temp (ea (- other-pointer-lowtag) array))
+
+  (inst cmp :byte temp simple-array-widetag)
+  (inst jmp :eq SKIP)
+  (inst cmp :byte temp complex-base-string-widetag)
+  (inst jmp :l DONE)
+  SKIP
+
+  (inst mov temp (ea (+ (* 8 array-displacement-slot) (- other-pointer-lowtag)) array))
+  (inst add index temp)
+  (inst mov array (ea (+ (* 8 array-data-slot) (- other-pointer-lowtag)) array))
+  (inst jmp LOOP)
+  DONE)

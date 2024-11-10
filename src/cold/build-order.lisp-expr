@@ -406,6 +406,18 @@
  ("src/compiler/{arch}/arith")
  ("src/compiler/{arch}/pred")
 
+ ;; The assembly files need to be compiled twice: once as
+ ;; normal lisp files, and once by sb-c:assemble-file.  We use a
+ ;; different suffix / "file type" for the :assem versions to make
+ ;; sure we don't scribble over anything we shouldn't.
+
+ ("src/assembly/{arch}/assem-rtns")
+ ("src/assembly/{arch}/array")
+ ("src/assembly/{arch}/arith")
+ ("src/assembly/{arch}/alloc")
+ ;; assembly files are all loaded by genesis before any compiled files.
+ ("src/assembly/master" :assem :not-host)
+
  ("src/compiler/float-tran")
  ("src/compiler/array-tran")
  ("src/compiler/generic/vm-tran")
@@ -436,18 +448,6 @@
  ("src/compiler/{arch}/array")
  ("src/compiler/generic/type-error")
  ("src/compiler/envanal")
-
- ;; The assembly files need to be compiled twice: once as
- ;; normal lisp files, and once by sb-c:assemble-file.  We use a
- ;; different suffix / "file type" for the :assem versions to make
- ;; sure we don't scribble over anything we shouldn't.
-
- ("src/assembly/{arch}/assem-rtns")
- ("src/assembly/{arch}/array")
- ("src/assembly/{arch}/arith")
- ("src/assembly/{arch}/alloc")
- ;; assembly files are all loaded by genesis before any compiled files.
- ("src/assembly/master" :assem :not-host)
 
  ("src/compiler/pseudo-vops")
 

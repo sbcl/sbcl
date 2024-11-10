@@ -201,17 +201,21 @@
           ((simple-array base-char (*))
            (data-vector-ref string index))))))
 
-;;; This and the corresponding -SET transform work equally well on non-simple
-;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
-;;; where it actually helped with non-simple arrays -- to the contrary, it
-;;; only made for bigger and up to 100% slower code.
-(deftransform hairy-data-vector-ref ((array index) (simple-array t) *)
+(deftransform hairy-data-vector-ref ((array index) * * :node node)
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (declared-array-element-type type)))
-    (declare (type ctype element-ctype))
-    (when (eq *wild-type* element-ctype)
+         (declared-element-ctype (node-derived-type node))
+         (simple (csubtypep type (specifier-type 'simple-array)))
+         stringp)
+    (unless simple
+      (if-vop-existsp (:named %data-vector-and-index)
+         (delay-ir1-transform node :ir1-phases)
+         (give-up-ir1-transform "Not a simple array")))
+
+    (when (and (eq *wild-type* element-ctype)
+               (not (and (not simple)
+                         (setf stringp (csubtypep type (specifier-type 'string))))))
       (give-up-ir1-transform
        "Upgraded element type of array is not known at compile time."))
     ;; (The expansion here is basically a degenerate case of
@@ -222,7 +226,12 @@
       `(multiple-value-bind (array index)
            (%data-vector-and-index array index)
          (declare (type (simple-array ,element-type-specifier 1) array))
-         ,(let ((bare-form '(data-vector-ref array index)))
+         ,(let ((bare-form
+                  (if stringp
+                      `(if (simple-base-string-p array)
+                           (data-vector-ref (truly-the (simple-array base-char (*)) array) index)
+                           (data-vector-ref (truly-the (simple-array character (*)) array) index))
+                      '(data-vector-ref array index))))
             (cond ((eql element-ctype *empty-type*)
                    `(data-nil-vector-ref array index))
                   ((type= element-ctype declared-element-ctype)
@@ -294,19 +303,22 @@
               (data-vector-set string index c)
               c))))))
 
-;;; This and the corresponding -REF transform work equally well on non-simple
-;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
-;;; where it actually helped with non-simple arrays -- to the contrary, it
-;;; only made for bigger and up 1o 100% slower code.
 (deftransform hairy-data-vector-set ((array index new-value)
-                                     (simple-array t t)
-                                     *)
+                                     (array t t)
+                                     * :node node)
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (declared-array-element-type type)))
-    (declare (type ctype element-ctype))
-    (cond ((eq *wild-type* element-ctype)
+         (declared-element-ctype (declared-array-element-type type))
+         (simple (csubtypep type (specifier-type 'simple-array)))
+         stringp)
+    (unless simple
+      (if-vop-existsp (:named %data-vector-and-index)
+                      (delay-ir1-transform node :ir1-phases)
+                      (give-up-ir1-transform "Not a simple array")))
+    (cond ((and (eq *wild-type* element-ctype)
+                (not (and (not simple)
+                          (setf stringp (csubtypep type (specifier-type 'string))))))
            ;; The new value is only suitable for a simple-vector
            (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
                `(hairy-data-vector-set (the simple-vector array) index new-value)
@@ -314,16 +326,25 @@
                 "Upgraded element type of array is not known at compile time.")))
           (t
            (let ((element-type-specifier (type-specifier element-ctype)))
-             `(multiple-value-bind (array index)
-                  (%data-vector-and-index array index)
-                (declare (type (simple-array ,element-type-specifier 1) array)
-                         (type ,element-type-specifier new-value))
-                ,(if (type= element-ctype declared-element-ctype)
-                     '(progn (data-vector-set array index new-value)
-                       new-value)
-                     `(progn (data-vector-set array index
-                                              ,(the-unwild declared-element-ctype 'new-value))
-                             ,(truly-the-unwild declared-element-ctype 'new-value)))))))))
+             (multiple-value-bind (new-value truly-new-value)
+                 (cond ((type= element-ctype declared-element-ctype)
+                        (values 'new-value 'new-value))
+                       (stringp
+                        (values 'new-value '(truly-the character new-value)))
+                       (t
+                        (values (the-unwild declared-element-ctype 'new-value)
+                                (truly-the-unwild declared-element-ctype 'new-value))))
+              `(multiple-value-bind (array index)
+                   (%data-vector-and-index array index)
+                 (declare (type (simple-array ,element-type-specifier 1) array)
+                          ,@(unless stringp
+                              `((type ,element-type-specifier new-value))))
+                 ,(if stringp
+                      `(if (simple-base-string-p array)
+                           (data-vector-set (truly-the (simple-array base-char (*)) array) index (the base-char ,new-value))
+                           (data-vector-set (truly-the (simple-array character (*)) array) index (the character ,new-value)))
+                      `(data-vector-set array index ,new-value))
+                 ,truly-new-value)))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.

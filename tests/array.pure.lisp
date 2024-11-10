@@ -790,7 +790,7 @@
   (assert (= (count 'sb-kernel:%check-bound
                     (ctu:ir1-named-calls
                      `(lambda (x)
-                        (declare ((vector t) x))
+                        (declare (vector x))
                         (aref x 0))
                      nil))
              0)))

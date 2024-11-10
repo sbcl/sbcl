@@ -101,3 +101,28 @@
   (inst cmp words tmp-tn)
   (inst b :gt LOOP)
   (inst stp temp length (@ tmp-tn)))
+
+(define-assembly-routine (%data-vector-and-index
+                          (:translate %data-vector-and-index)
+                          (:policy :fast-safe)
+                          (:arg-types t positive-fixnum)
+                          (:result-types t positive-fixnum))
+    ((:arg array descriptor-reg r0-offset)
+     (:arg index any-reg r1-offset)
+     (:res result descriptor-reg r0-offset)
+     (:res offset any-reg r1-offset))
+  (declare (ignore result offset))
+  LOOP
+  (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
+
+  (inst cmp tmp-tn simple-array-widetag)
+  (inst b :eq SKIP)
+  (inst cmp tmp-tn complex-base-string-widetag)
+  (inst b :lt DONE)
+  SKIP
+
+  (inst ldr tmp-tn (@ array (+ (* 8 array-displacement-slot) (- other-pointer-lowtag))))
+  (inst add index index tmp-tn)
+  (inst ldr array (@ array (+ (* 8 array-data-slot) (- other-pointer-lowtag))))
+  (inst b LOOP)
+  DONE)

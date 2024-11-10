@@ -195,6 +195,9 @@
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
+(defknown vector-data (array index) (values simple-array index)
+  (flushable))
+
 (defknown simple-array-header-of-rank-p (t %array-rank) boolean
   (flushable))
 (defknown sb-kernel::check-array-shape (simple-array list)
