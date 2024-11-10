@@ -191,6 +191,7 @@
 
 
 (defun hairy-data-vector-ref-transform (array node accessor)
+  (declare (ignorable node))
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
          (declared-element-ctype (node-derived-type node))
@@ -228,6 +229,7 @@
                    (the-unwild declared-element-ctype bare-form))))))))
 
 (defun hairy-data-vector-set-transform (array new-value node accessor)
+  (declare (ignorable node))
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
          (declared-element-ctype (declared-array-element-type type))
@@ -263,12 +265,12 @@
                `((unless (simple-vector-p data)
                    (sb-c::%type-check-error/c array 'sb-kernel::object-not-vector-t-error nil))))
            (let ((data (truly-the (simple-array ,element-type-specifier 1) data)))
-            ,(if stringp
-                 `(if (simple-base-string-p data)
-                      (data-vector-set (truly-the (simple-array base-char (*)) data) index (the base-char ,new-value))
-                      (data-vector-set (truly-the (simple-array character (*)) data) index (the character ,new-value)))
-                 `(data-vector-set data index ,new-value))
-            ,truly-new-value))))))
+             ,(if stringp
+                  `(if (simple-base-string-p data)
+                       (data-vector-set (truly-the (simple-array base-char (*)) data) index (the base-char ,new-value))
+                       (data-vector-set (truly-the (simple-array character (*)) data) index (the character ,new-value)))
+                  `(data-vector-set data index ,new-value))
+             ,truly-new-value))))))
 
 (deftransform hairy-data-vector-ref ((array index) * * :node node)
   "avoid runtime dispatch on array element type"
