@@ -60,6 +60,10 @@
           (%with-array-data array index nil)
         (values vector index))
       (values (truly-the (simple-array * (*)) array) index)))
+
+(defun sb-c::%data-vector-and-index/check-bound (array index)
+  (%check-bound array (array-dimension array 0) index)
+  (%data-vector-and-index array index))
 
 
 ;;;; MAKE-ARRAY

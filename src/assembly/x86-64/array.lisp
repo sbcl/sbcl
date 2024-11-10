@@ -150,8 +150,58 @@
   (inst jmp :l DONE)
   SKIP
 
-  (inst mov temp (ea (+ (* 8 array-displacement-slot) (- other-pointer-lowtag)) array))
-  (inst add index temp)
-  (inst mov array (ea (+ (* 8 array-data-slot) (- other-pointer-lowtag)) array))
+  (inst add index (object-slot-ea array array-displacement-slot other-pointer-lowtag))
+  (loadw array array array-data-slot other-pointer-lowtag)
   (inst jmp LOOP)
   DONE)
+
+
+(define-assembly-routine (%data-vector-and-index/check-bound
+                          (:translate %data-vector-and-index/check-bound)
+                          (:policy :fast-safe)
+                          (:arg-types t positive-fixnum)
+                          (:result-types t positive-fixnum))
+    ((:arg array descriptor-reg rdx-offset)
+     (:arg index any-reg rdi-offset)
+     (:temp temp any-reg rcx-offset)
+     (:res result descriptor-reg rdx-offset)
+     (:res offset any-reg rdi-offset))
+  (declare (ignore result offset))
+  (let ((error
+          (assemble (:elsewhere)
+            error
+            ;; Fake up a stack frame so that backtraces come out right.
+            (inst push rbp-tn)
+            (inst mov rbp-tn rsp-tn)
+            (emit-error-break nil error-trap
+                              (error-number-or-lose 'invalid-array-index-error)
+                              (list array temp index))
+            (progn error))))
+    (assemble ()
+      (inst mov :byte temp (ea (- other-pointer-lowtag) array))
+      (inst cmp :byte temp simple-array-widetag)
+      (inst jmp :eq HEADER)
+      (inst cmp :byte temp complex-base-string-widetag)
+      (inst jmp :ge HEADER)
+
+      (loadw temp array array-fill-pointer-slot other-pointer-lowtag)
+      (inst cmp temp index)
+      (inst jmp :be error)
+      (inst jmp DONE)
+
+      HEADER
+      (loadw temp array array-elements-slot other-pointer-lowtag)
+      (inst cmp temp index)
+      (inst jmp :be error)
+
+      LOOP
+      (inst add index (object-slot-ea array array-displacement-slot other-pointer-lowtag))
+      (loadw array array array-data-slot other-pointer-lowtag)
+
+      (inst mov :byte temp (ea (- other-pointer-lowtag) array))
+      (inst cmp :byte temp simple-array-widetag)
+      (inst jmp :eq LOOP)
+      (inst cmp :byte temp complex-base-string-widetag)
+      (inst jmp :ge LOOP)
+
+      DONE)))

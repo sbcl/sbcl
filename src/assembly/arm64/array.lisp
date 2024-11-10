@@ -121,8 +121,61 @@
   (inst b :lt DONE)
   SKIP
 
-  (inst ldr tmp-tn (@ array (+ (* 8 array-displacement-slot) (- other-pointer-lowtag))))
+  (loadw tmp-tn array array-displacement-slot other-pointer-lowtag)
   (inst add index index tmp-tn)
-  (inst ldr array (@ array (+ (* 8 array-data-slot) (- other-pointer-lowtag))))
+  (loadw array array array-data-slot other-pointer-lowtag)
   (inst b LOOP)
   DONE)
+
+(define-assembly-routine (%data-vector-and-index/check-bound
+                          (:translate %data-vector-and-index/check-bound)
+                          (:policy :fast-safe)
+                          (:arg-types t positive-fixnum)
+                          (:result-types t positive-fixnum))
+    ((:arg array descriptor-reg r0-offset)
+     (:arg index any-reg r1-offset)
+     (:res result descriptor-reg r0-offset)
+     (:res offset any-reg r1-offset))
+  (declare (ignore result offset))
+  (let ((error
+          (assemble (:elsewhere)
+            error
+            ;; Fake up a stack frame so that backtraces come out right.
+            (inst mov ocfp-tn cfp-tn)
+            (inst mov cfp-tn csp-tn)
+            (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
+            (emit-error-break nil error-trap
+                              (error-number-or-lose 'invalid-array-index-error)
+                              (list array tmp-tn index))
+            (progn error))))
+    (assemble ()
+
+      (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
+      (inst cmp tmp-tn simple-array-widetag)
+      (inst b :eq HEADER)
+      (inst cmp tmp-tn complex-base-string-widetag)
+      (inst b :ge HEADER)
+
+      (loadw tmp-tn array array-fill-pointer-slot other-pointer-lowtag)
+      (inst cmp tmp-tn index)
+      (inst b :ls ERROR)
+      (inst b DONE)
+
+      HEADER
+      (loadw tmp-tn array array-elements-slot other-pointer-lowtag)
+      (inst cmp tmp-tn index)
+      (inst b :ls error)
+
+      LOOP
+      (loadw tmp-tn array array-displacement-slot other-pointer-lowtag)
+      (inst add index index tmp-tn)
+      (loadw array array array-data-slot other-pointer-lowtag)
+
+
+      (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
+      (inst cmp tmp-tn simple-array-widetag)
+      (inst b :eq LOOP)
+      (inst cmp tmp-tn complex-base-string-widetag)
+      (inst b :ge LOOP)
+
+      DONE)))

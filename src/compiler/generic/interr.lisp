@@ -248,7 +248,8 @@
   ((or symbol string) object-not-symbol-or-string)
   ((or symbol string character) object-not-string-designator)
   ((and unsigned-byte fixnum) object-not-unsigned-fixnum)
-  bit-index))
+  bit-index
+  ((vector t) object-not-vector-t)))
 
 (defun error-number-or-lose (name)
   (or (position name sb-c:+backend-internal-errors+

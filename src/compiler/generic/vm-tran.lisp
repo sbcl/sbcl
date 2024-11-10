@@ -189,20 +189,8 @@
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
-(deftransform hairy-data-vector-ref ((string index) (simple-string t))
-  (let ((ctype (lvar-type string)))
-    (if (array-type-p ctype)
-        ;; the other transform will kick in, so that's OK
-        (give-up-ir1-transform)
-        `(etypecase string
-          ((simple-array character (*))
-           (data-vector-ref string index))
-          #+sb-unicode
-          ((simple-array base-char (*))
-           (data-vector-ref string index))))))
 
-(deftransform hairy-data-vector-ref ((array index) * * :node node)
-  "avoid runtime dispatch on array element type"
+(defun hairy-data-vector-ref-transform (array node accessor)
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
          (declared-element-ctype (node-derived-type node))
@@ -210,8 +198,8 @@
          stringp)
     (unless simple
       (if-vop-existsp (:named %data-vector-and-index)
-         (delay-ir1-transform node :ir1-phases)
-         (give-up-ir1-transform "Not a simple array")))
+                      (delay-ir1-transform node :ir1-phases)
+                      (give-up-ir1-transform "Not a simple array")))
 
     (when (and (eq *wild-type* element-ctype)
                (not (and (not simple)
@@ -223,21 +211,96 @@
     ;; macro, and macros aren't expanded in transform output, we have
     ;; to hand-expand it ourselves.)
     (let* ((element-type-specifier (type-specifier element-ctype)))
-      `(multiple-value-bind (array index)
-           (%data-vector-and-index array index)
-         (declare (type (simple-array ,element-type-specifier 1) array))
+      `(multiple-value-bind (data offset)
+           (truly-the (simple-array ,element-type-specifier 1)
+                      (,accessor array index))
          ,(let ((bare-form
                   (if stringp
-                      `(if (simple-base-string-p array)
-                           (data-vector-ref (truly-the (simple-array base-char (*)) array) index)
-                           (data-vector-ref (truly-the (simple-array character (*)) array) index))
-                      '(data-vector-ref array index))))
+                      `(if (simple-base-string-p data)
+                           (data-vector-ref (truly-the (simple-array base-char (*)) data) offset)
+                           (data-vector-ref (truly-the (simple-array character (*)) data) offset))
+                      '(data-vector-ref data offset))))
             (cond ((eql element-ctype *empty-type*)
-                   `(data-nil-vector-ref array index))
+                   `(data-nil-vector-ref data offset))
                   ((type= element-ctype declared-element-ctype)
                    bare-form)
                   (t
                    (the-unwild declared-element-ctype bare-form))))))))
+
+(defun hairy-data-vector-set-transform (array new-value node accessor)
+  (let* ((type (lvar-type array))
+         (element-ctype (array-type-upgraded-element-type type))
+         (declared-element-ctype (declared-array-element-type type))
+         (simple (csubtypep type (specifier-type 'simple-array)))
+         stringp
+         vector-t)
+    (unless simple
+      (if-vop-existsp (:named %data-vector-and-index)
+                      (delay-ir1-transform node :ir1-phases)
+                      (give-up-ir1-transform "Not a simple array")))
+    (when (and (eq *wild-type* element-ctype)
+               (not (and (not simple)
+                         (setf stringp (csubtypep type (specifier-type 'string))))))
+      ;; The new value is only suitable for a simple-vector
+      (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
+          (setf vector-t t
+                element-ctype *universal-type*)
+          (give-up-ir1-transform
+           "Upgraded element type of array is not known at compile time.")))
+    (let ((element-type-specifier (type-specifier element-ctype)))
+      (multiple-value-bind (new-value truly-new-value)
+          (cond ((type= element-ctype declared-element-ctype)
+                 (values 'new-value 'new-value))
+                (stringp
+                 (values 'new-value '(truly-the character new-value)))
+                (t
+                 (values (the-unwild declared-element-ctype 'new-value)
+                         (truly-the-unwild declared-element-ctype 'new-value))))
+        `(multiple-value-bind (data index) (,accessor array index)
+           (declare ,@(unless stringp
+                        `((type ,element-type-specifier new-value))))
+           ,@(when vector-t
+               `((unless (simple-vector-p data)
+                   (sb-c::%type-check-error/c array 'sb-kernel::object-not-vector-t-error nil))))
+           (let ((data (truly-the (simple-array ,element-type-specifier 1) data)))
+            ,(if stringp
+                 `(if (simple-base-string-p data)
+                      (data-vector-set (truly-the (simple-array base-char (*)) data) index (the base-char ,new-value))
+                      (data-vector-set (truly-the (simple-array character (*)) data) index (the character ,new-value)))
+                 `(data-vector-set data index ,new-value))
+            ,truly-new-value))))))
+
+(deftransform hairy-data-vector-ref ((array index) * * :node node)
+  "avoid runtime dispatch on array element type"
+  (hairy-data-vector-ref-transform array node '%data-vector-and-index))
+
+(deftransform hairy-data-vector-set ((array index new-value)
+                                     (array t t)
+                                     * :node node)
+  "avoid runtime dispatch on array element type"
+  (hairy-data-vector-set-transform array new-value node '%data-vector-and-index))
+
+(when-vop-existsp (:named %data-vector-and-index/check-bound)
+  (deftransform hairy-data-vector-ref/check-bounds ((array index) * * :node node)
+    "avoid runtime dispatch on array element type"
+    (hairy-data-vector-ref-transform array node '%data-vector-and-index/check-bound))
+  (deftransform hairy-data-vector-set/check-bounds ((array index new-value)
+                                                    (array t t)
+                                                    * :node node)
+    "avoid runtime dispatch on array element type"
+    (hairy-data-vector-set-transform array new-value node '%data-vector-and-index/check-bound)))
+
+(deftransform hairy-data-vector-ref ((string index) (simple-string t))
+  (let ((ctype (lvar-type string)))
+    (if (array-type-p ctype)
+        ;; the other transform will kick in, so that's OK
+        (give-up-ir1-transform)
+        `(etypecase string
+          ((simple-array character (*))
+           (data-vector-ref string index))
+          #+sb-unicode
+          ((simple-array base-char (*))
+           (data-vector-ref string index))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
@@ -302,49 +365,6 @@
             (let ((c (the* (base-char :context aref-context :silent-conflict t) new-value)))
               (data-vector-set string index c)
               c))))))
-
-(deftransform hairy-data-vector-set ((array index new-value)
-                                     (array t t)
-                                     * :node node)
-  "avoid runtime dispatch on array element type"
-  (let* ((type (lvar-type array))
-         (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (declared-array-element-type type))
-         (simple (csubtypep type (specifier-type 'simple-array)))
-         stringp)
-    (unless simple
-      (if-vop-existsp (:named %data-vector-and-index)
-                      (delay-ir1-transform node :ir1-phases)
-                      (give-up-ir1-transform "Not a simple array")))
-    (cond ((and (eq *wild-type* element-ctype)
-                (not (and (not simple)
-                          (setf stringp (csubtypep type (specifier-type 'string))))))
-           ;; The new value is only suitable for a simple-vector
-           (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
-               `(hairy-data-vector-set (the simple-vector array) index new-value)
-               (give-up-ir1-transform
-                "Upgraded element type of array is not known at compile time.")))
-          (t
-           (let ((element-type-specifier (type-specifier element-ctype)))
-             (multiple-value-bind (new-value truly-new-value)
-                 (cond ((type= element-ctype declared-element-ctype)
-                        (values 'new-value 'new-value))
-                       (stringp
-                        (values 'new-value '(truly-the character new-value)))
-                       (t
-                        (values (the-unwild declared-element-ctype 'new-value)
-                                (truly-the-unwild declared-element-ctype 'new-value))))
-              `(multiple-value-bind (array index)
-                   (%data-vector-and-index array index)
-                 (declare (type (simple-array ,element-type-specifier 1) array)
-                          ,@(unless stringp
-                              `((type ,element-type-specifier new-value))))
-                 ,(if stringp
-                      `(if (simple-base-string-p array)
-                           (data-vector-set (truly-the (simple-array base-char (*)) array) index (the base-char ,new-value))
-                           (data-vector-set (truly-the (simple-array character (*)) array) index (the character ,new-value)))
-                      `(data-vector-set array index ,new-value))
-                 ,truly-new-value)))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.

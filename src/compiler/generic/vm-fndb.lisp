@@ -717,6 +717,9 @@
 (defknown %data-vector-and-index (array index)
                                  (values (simple-array * (*)) index)
                                  (foldable flushable))
+(defknown %data-vector-and-index/check-bound (array index)
+    (values (simple-array * (*)) index)
+    (foldable))
 
 (defknown restart-point (t) t ())
 

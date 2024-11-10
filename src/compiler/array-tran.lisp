@@ -2198,30 +2198,25 @@
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
 
-(deftransform hairy-data-vector-ref/check-bounds ((array index))
+(deftransform hairy-data-vector-ref/check-bounds ((array index) (simple-array t))
   (let* ((type (lvar-type array))
          (element-type (array-type-upgraded-element-type type)))
     (when (or (and (eq element-type *wild-type*)
                    ;; This type logic corresponds to the special
                    ;; case for strings in HAIRY-DATA-VECTOR-REF
                    ;; (generic/vm-tran.lisp)
-                   (not (csubtypep type (specifier-type 'string))))
-              (unless-vop-existsp (:named %data-vector-and-index)
-                (conservative-array-type-complexp type)))
+                   (not (csubtypep type (specifier-type 'simple-string))))
+              (not (null (conservative-array-type-complexp type))))
       (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
     `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-dimension array 0) 'index index))))
 
-(deftransform hairy-data-vector-set/check-bounds ((array index new-value))
+(deftransform hairy-data-vector-set/check-bounds ((array index new-value) (simple-array t t))
   (let* ((type (lvar-type array))
-         (element-type (array-type-upgraded-element-type type))
-         (simple (null (conservative-array-type-complexp type))))
-    (if (or (and (eq element-type *wild-type*)
-                 (not (csubtypep type (specifier-type 'string))))
-            (unless-vop-existsp (:named %data-vector-and-index)
-              (not simple)))
+         (element-type (array-type-upgraded-element-type type)))
+    (if (and (eq element-type *wild-type*)
+             (not (csubtypep type (specifier-type 'simple-string))))
         ;; The new value is only suitable for a simple-vector
-        (if (and simple
-                 (csubtypep (lvar-type new-value) (specifier-type '(not (or number character)))))
+        (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
             `(hairy-data-vector-set/check-bounds (the simple-vector array) index new-value)
             (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
         `(hairy-data-vector-set array
