@@ -477,6 +477,33 @@
 (defoptimizer (vector-pop derive-type) ((array))
   (derive-aref-type array))
 
+(deftransform vector-push-extend ((element vector) * * :node node)
+  (let* ((type (lvar-type vector))
+         (element-ctype (array-type-upgraded-element-type type))
+         stringp
+         vector-t)
+    (when (and (eq *wild-type* element-ctype)
+               (not (setf stringp (csubtypep type (specifier-type 'string)))))
+      ;; The new value is only suitable for a t-vector
+      (if (csubtypep (lvar-type element) (specifier-type '(not (or number character))))
+          (setf vector-t t
+                element-ctype *universal-type*)
+          (give-up-ir1-transform
+           "Upgraded element type of array is not known at compile time.")))
+    `(multiple-value-bind (data index fill-pointer)
+         (sb-vm::prepare-vector-push-extend vector)
+       ,@(when vector-t
+           `((unless (simple-vector-p data)
+               (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
+       (locally (declare (optimize (insert-array-bounds-checks 0)))
+         (setf (aref (truly-the ,(if stringp
+                                     'simple-string
+                                     `(simple-array ,(type-specifier element-ctype) (*)))
+                                data)
+                     (truly-the index index))
+               element))
+       fill-pointer)))
+
 (defoptimizers derive-type
     (hairy-data-vector-set
      hairy-data-vector-set/check-bounds)

@@ -1279,6 +1279,16 @@ of specialized arrays is supported."
                 (setf (%array-fill-pointer array)
                       (1- fill-pointer)))))))
 
+(defun prepare-vector-push-extend (vector)
+  (declare (explicit-check))
+  (let* ((fill-pointer (fill-pointer vector))
+         (new-fill-pointer (1+ fill-pointer)))
+    (if (= fill-pointer (%array-available-elements vector))
+        (extend-vector vector nil)
+        (setf (%array-fill-pointer vector) new-fill-pointer))
+    (multiple-value-bind (array index) (%data-vector-and-index vector fill-pointer)
+      (values array index fill-pointer))))
+
 
 ;;;; ADJUST-ARRAY
 

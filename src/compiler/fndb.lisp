@@ -1336,6 +1336,9 @@
 (defknown vector-push (t (modifying complex-vector)) (or index null) ())
 (defknown vector-push-extend (t (modifying complex-vector) &optional (and index (integer 1))) index
     ())
+(defknown sb-vm::prepare-vector-push-extend ((modifying complex-vector))
+    (values (simple-array * (*)) index index)
+    (no-verify-arg-count))
 (defknown vector-pop ((modifying complex-vector)) t ())
 
 ;;; FIXME: complicated MODIFYING
