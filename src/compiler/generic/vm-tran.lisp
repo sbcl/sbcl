@@ -449,18 +449,26 @@
                             %data-vector-and-index/check-bound) ((array index))
   (let ((atype (lvar-type array))
         (index-type (lvar-type index)))
-    (when (array-type-p atype)
-      (values-specifier-type
-       `(values ,(or
-                  (simple-array-storage-vector-type atype)
-                  `(simple-array ,(type-specifier
-                                   (array-type-specialized-element-type atype))
-                                 (*)))
-                ,(if (and (integer-type-p index-type)
-                          (numeric-type-low index-type))
-                     `(integer ,(numeric-type-low index-type)
-                               (,array-dimension-limit))
-                     `index))))))
+    (cond ((array-type-p atype)
+           (values-specifier-type
+            `(values ,(or
+                       (simple-array-storage-vector-type atype)
+                       `(simple-array ,(type-specifier
+                                        (array-type-specialized-element-type atype))
+                                      (*)))
+                     ,(if (and (integer-type-p index-type)
+                               (numeric-type-low index-type))
+                          `(integer ,(numeric-type-low index-type)
+                                    (,array-dimension-limit))
+                          `index))))
+          ((csubtypep atype (specifier-type 'string))
+           (values-specifier-type
+            `(values simple-string index)))
+          ((let ((etype (upgraded-element-type-specifier array)))
+             (unless (eq etype '*)
+               (values-specifier-type
+                `(values (simple-array ,etype (*))
+                         index))))))))
 
 (deftransform %data-vector-and-index ((array index)
                                       (simple-array t)
