@@ -885,8 +885,7 @@
            (error (generate-error-code+ (lambda ()
                                           (inst mov r (fixnumize y)))
                                         vop
-                                        'sb-kernel::mul-overflow2-error x
-                                        r)))
+                                        'sb-kernel::mul-overflow2-error x r)))
       (inst imul r x y)
       (inst jmp :o error))))
 
@@ -1049,6 +1048,27 @@
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
       (inst jmp :o error))))
 
+(define-vop (overflow+-fixnum)
+  (:translate overflow+)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg (immediate
+                           (plausible-signed-imm32-operand-p (fixnumize (tn-value tn)))))))
+  (:arg-types tagged-num tagged-num)
+  (:info type)
+  (:results (r :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 1
+    (move r x)
+    (inst add r (if (sc-is y immediate)
+                    (fixnumize (tn-value y))
+                    y))
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
+      (inst jmp :o error))))
+
 (define-vop (overflow+-signed=>unsigned)
   (:translate overflow+)
   (:args (x :scs (signed-reg))
@@ -1151,6 +1171,27 @@
   (:generator 2
     (move r x)
     (inst sub r y)
+    (let* ((*location-context* (unless (eq type 'fixnum)
+                                 type))
+           (error (generate-error-code vop 'sb-kernel::sub-overflow-error r)))
+      (inst jmp :o error))))
+
+(define-vop (overflow-fixnum)
+  (:translate overflow-)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg (immediate
+                           (plausible-signed-imm32-operand-p (fixnumize (tn-value tn)))))))
+  (:arg-types tagged-num tagged-num)
+  (:info type)
+  (:results (r :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 1
+    (move r x)
+    (inst sub r (if (sc-is y immediate)
+                    (fixnumize (tn-value y))
+                    y))
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow-error r)))

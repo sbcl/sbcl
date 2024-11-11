@@ -61,7 +61,7 @@
                                                   (force-output))
                                                 (handler-case
                                                     (apply fun args)
-                                                  (error (c)
+                                                  (type-error (c)
                                                     (if (typep result result-type)
                                                         (error "~a => ~a /= ~a" (list* lambda args) c result)
                                                         (let ((x (type-error-datum c))
@@ -74,6 +74,10 @@
                                                                  (error "~a => type error ~a /= ~a" (list* lambda args)
                                                                         c
                                                                         x))))))
+                                                  (error (c)
+                                                    (error "~a => type error ~a /= ~a" (list* lambda args)
+                                                           c
+                                                           result-type))
                                                   (:no-error (x)
                                                     (if (typep result result-type)
                                                         (unless (eql x result)
