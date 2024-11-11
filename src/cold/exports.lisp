@@ -1528,6 +1528,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%COS" "%COS-QUICK"
            "%COSH"
            "%DATA-VECTOR-AND-INDEX" "%DATA-VECTOR-AND-INDEX/CHECK-BOUND"
+           "%DATA-VECTOR-AND-INDEX/KNOWN"
            "%DEPOSIT-FIELD"
            "%DOUBLE-FLOAT" "%DPB" "%EQL"
            "%EXIT"

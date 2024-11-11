@@ -472,8 +472,7 @@
        (values array index)))
 
 (deftransform %data-vector-and-index/check-bound ((array index)
-                                                  (simple-array t)
-                                                  *)
+                                                  (simple-array t))
   (upgraded-element-type-specifier-or-give-up array)
   '(multiple-value-bind (data index)
     (if (array-header-p array)
@@ -481,6 +480,20 @@
         (values array index))
     (%check-bound array (length data) index)
     (values array index)))
+
+;;; Only use %data-vector-and-index if element-type is known. Always
+;;; using %data-vector-and-index will not help if a call to
+;;; hairy-data-vector-ref is still needed.
+(deftransform %data-vector-and-index/known ((array index) * * :node node)
+  (let ((type (lvar-type array)))
+    (cond ((csubtypep type (specifier-type '(simple-array * (*))))
+           `(values array index))
+          ((and (eq (array-type-upgraded-element-type type) *wild-type*)
+                (not (csubtypep type (specifier-type 'string))))
+           (delay-ir1-transform node :constraint)
+           `(values array index))
+          (t
+           `(%data-vector-and-index array index)))))
 
 ;;;; BIT-VECTOR hackery
 

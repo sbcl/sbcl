@@ -1364,7 +1364,9 @@ code to be loaded.
 (defun loop-for-across (var val data-type)
   (loop-make-var var nil data-type)
   (let ((vector-var (gensym "V"))
-        (index-var (gensym "I")))
+        (data-var (gensym "D"))
+        (index-var (gensym "I"))
+        (compiling (sb-c::compiling-p (macro-environment *loop*))))
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
       (loop-make-var
@@ -1372,15 +1374,24 @@ code to be loaded.
        (if (and (consp vector-form) (eq (car vector-form) 'the))
            (cadr vector-form)
            'vector))
-      (loop-make-var index-var 0 'fixnum)
+      (cond (compiling
+             (push `(multiple-value-bind (,data-var ,index-var)
+                        (%data-vector-and-index/known ,vector-var 0))
+                   (wrappers *loop*)))
+            (t
+             (loop-make-var index-var 0 'fixnum)
+             (setf data-var vector-var)))
       (let* ((length-form (if constantp
                               (length vector-value)
                               (let ((v (gensym "LIM")))
-                                (push `(let ((,v (length ,vector-var))))
+                                (push (if compiling
+                                          `(let ((,v (+ (length ,vector-var) ,index-var)))
+                                             (sb-c::%in-bounds-constraint ,data-var ,v))
+                                          `(let ((,v (length ,vector-var)))))
                                          (wrappers *loop*))
                                    v)))
              (test `(>= ,index-var ,length-form))
-             (step `(,var (aref ,vector-var ,index-var)))
+             (step `(,var (aref ,data-var ,index-var)))
              (pstep `(,index-var (1+ ,index-var))))
         `(,test ,step () ,pstep)))))
 
