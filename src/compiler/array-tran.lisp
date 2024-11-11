@@ -490,19 +490,70 @@
                 element-ctype *universal-type*)
           (give-up-ir1-transform
            "Upgraded element type of array is not known at compile time.")))
-    `(multiple-value-bind (data index fill-pointer)
-         (sb-vm::prepare-vector-push-extend vector)
+    `(progn
+       (the ,(type-specifier element-ctype) element)
        ,@(when vector-t
-           `((unless (simple-vector-p data)
+           `((unless (typep vector '(vector t))
                (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
-       (locally (declare (optimize (insert-array-bounds-checks 0)))
-         (setf (aref (truly-the ,(if stringp
-                                     'simple-string
-                                     `(simple-array ,(type-specifier element-ctype) (*)))
-                                data)
-                     (truly-the index index))
-               element))
-       fill-pointer)))
+       (multiple-value-bind (data index fill-pointer)
+           (sb-vm::prepare-vector-push-extend vector)
+         (locally (declare (optimize (insert-array-bounds-checks 0)))
+           (setf (aref (truly-the ,(if stringp
+                                       'simple-string
+                                       `(simple-array ,(type-specifier element-ctype) (*)))
+                                  data)
+                       (truly-the index index))
+                 element))
+         fill-pointer))))
+
+(when-vop-existsp (:named %data-vector-pop)
+  (deftransform vector-pop ((vector) * * :node node)
+    (let* ((type (lvar-type vector))
+           (element-ctype (array-type-upgraded-element-type type))
+           stringp)
+      (when (and (eq *wild-type* element-ctype)
+                 (not (setf stringp (csubtypep type (specifier-type 'string)))))
+        ;; The new value is only suitable for a t-vector
+        (give-up-ir1-transform
+         "Upgraded element type of array is not known at compile time."))
+      `(multiple-value-bind (data index)
+           (%data-vector-pop vector)
+         (locally (declare (optimize (insert-array-bounds-checks 0)))
+           (aref (truly-the ,(if stringp
+                                 'simple-string
+                                 `(simple-array ,(type-specifier element-ctype) (*)))
+                            data)
+                 (truly-the index index))))))
+
+  (deftransform vector-push ((element vector) * * :node node)
+    (let* ((type (lvar-type vector))
+           (element-ctype (array-type-upgraded-element-type type))
+           stringp
+           vector-t)
+      (when (and (eq *wild-type* element-ctype)
+                 (not (setf stringp (csubtypep type (specifier-type 'string)))))
+        ;; The new value is only suitable for a t-vector
+        (if (csubtypep (lvar-type element) (specifier-type '(not (or number character))))
+            (setf vector-t t
+                  element-ctype *universal-type*)
+            (give-up-ir1-transform
+             "Upgraded element type of array is not known at compile time.")))
+      `(progn
+         (the ,(type-specifier element-ctype) element)
+         ,@(when vector-t
+             `((unless (typep vector '(vector t))
+                 (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
+         (multiple-value-bind (data index)
+             (%data-vector-push vector)
+           (when index
+             (locally (declare (optimize (insert-array-bounds-checks 0)))
+               (setf (aref (truly-the ,(if stringp
+                                           'simple-string
+                                           `(simple-array ,(type-specifier element-ctype) (*)))
+                                      data)
+                           index)
+                     element))
+             index))))))
 
 (defoptimizers derive-type
     (hairy-data-vector-set

@@ -272,21 +272,29 @@
   (declare (type lvar lvar))
   (let ((dest (lvar-dest lvar)))
     (when (basic-combination-p dest)
-      (when (call-full-like-p dest)
-        (let ((info (and (eq (basic-combination-kind dest) :known)
-                         (basic-combination-fun-info dest))))
-          (if (and info
-                   (fun-info-externally-checkable-type info))
-              (return-from lvar-externally-checkable-type
-                (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
-              (map-combination-args-and-types
-               (lambda (arg type &rest args)
-                 (declare (ignore args))
-                 (when (eq arg lvar)
-                   (return-from lvar-externally-checkable-type
-                     (coerce-to-values type))))
-               dest
-               :defined-here t :asserted-type t)))))
+      (if (lvar-fun-is (basic-combination-fun dest)
+                       ;; Assembly routines that perform type-checks
+                       '(%data-vector-pop
+                         %data-vector-push))
+          (and (eq lvar (first (basic-combination-args dest)))
+               (return-from
+                lvar-externally-checkable-type
+                (values-specifier-type '(values complex-vector &optional))))
+          (when (call-full-like-p dest)
+            (let ((info (and (eq (basic-combination-kind dest) :known)
+                             (basic-combination-fun-info dest))))
+              (if (and info
+                       (fun-info-externally-checkable-type info))
+                  (return-from lvar-externally-checkable-type
+                    (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
+                  (map-combination-args-and-types
+                   (lambda (arg type &rest args)
+                     (declare (ignore args))
+                     (when (eq arg lvar)
+                       (return-from lvar-externally-checkable-type
+                         (coerce-to-values type))))
+                   dest
+                   :defined-here t :asserted-type t))))))
     *wild-type*))
 
 ;;;; interface routines used by optimizers

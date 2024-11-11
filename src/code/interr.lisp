@@ -592,6 +592,15 @@
       (if (numberp x)
           (object-not-type-error (- x) type nil)
           (object-not-type-error x 'number nil)))))
+
+(deferr fill-pointer-error (array)
+  (declare (notinline fill-pointer-error))
+  (if (and (arrayp array)
+           (array-has-fill-pointer-p array))
+      (error (if (zerop (fill-pointer array))
+                 "There is nothing left to pop."
+                 "Unexpected FILL-POINTER error"))
+      (fill-pointer-error array)))
 
 ;;;; INTERNAL-ERROR signal handler
 
