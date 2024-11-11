@@ -285,10 +285,11 @@
                                (unless (eql modular-fun :good)
                                  (setq did-something t
                                        over-wide t)
-                                 (change-ref-leaf
-                                  fun-ref
-                                  (find-free-fun name "in a strange place"))
-                                 (setf (combination-kind node) :full))
+                                 (unless (eq name t)
+                                   (change-ref-leaf
+                                    fun-ref
+                                    (find-free-fun name "CUT-TO-WIDTH"))
+                                   (setf (combination-kind node) :full)))
                                (unless (functionp modular-fun)
                                  (dolist (arg (basic-combination-args node))
                                    (multiple-value-bind (change wide)
@@ -300,7 +301,9 @@
                                  ;; But the outer functions don't want the type to get
                                  ;; widened and their VOPs may never be applied.
                                  (setf (node-derived-type node)
-                                       (fun-type-returns (global-ftype name)))
+                                       (fun-type-returns (global-ftype (if (eq name t)
+                                                                           fun-name
+                                                                           name))))
                                  (setf (lvar-%derived-type (node-lvar node)) nil)
                                  (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))))
@@ -491,7 +494,7 @@
                               (not (csubtypep integer-type (specifier-type 'sb-vm:signed-word)))
                               (csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum))))
                          (cut-to-width integer ,kind width ,signedp)
-                         nil)))))
+                         t)))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (t (constant-arg (eql 0))))
