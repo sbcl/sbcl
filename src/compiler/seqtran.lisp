@@ -2512,7 +2512,7 @@
                     (ignorable ,@vars))
            (declare (optimize (insert-array-bounds-checks 0)))
            (let* (,@lets
-                  (.length. (truly-the index (+ ,@lengths)))
+                  (.length. (+ ,@lengths))
                   (.pos. ,non-constant-start)
                   (.string. (make-string .length. :element-type ',element-type)))
              (declare (type index .length. .pos.)
