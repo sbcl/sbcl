@@ -169,7 +169,7 @@ code:
           (:function
            (printf "(cl:declaim (cl:inline ~A))" lispname)
            (destructuring-bind (f-cname &rest definition) cname
-             (printf "(sb-grovel::define-foreign-routine (\"~A\" ~A)" f-cname lispname)
+             (printf "(sb-alien:define-alien-routine (\"~A\" ~A)" f-cname lispname)
              (printf "~{  ~W~^\\n~})" definition)))
           (:structure
            (c-for-structure lispname cname))

@@ -4,18 +4,6 @@
 ;;;; generated from constants.lisp by the C compiler as driven by that
 ;;;; wacky def-to-lisp thing.
 
-;;; (def-foreign-routine ("stat" STAT ) (INTEGER 32) (FILE-NAME
-;;; C-CALL:C-STRING) (BUF (* T)) )
-
-;;; I can't help thinking this was originally going to do something a
-;;; lot more complex
-(defmacro define-foreign-routine
-  (&whole it (c-name lisp-name) return-type &rest args)
-  (declare (ignorable c-name lisp-name return-type args))
-  `(define-alien-routine ,@(cdr it)))
-
-
-
 ;;; strctures
 
 #| C structs need: the with-... interface.
