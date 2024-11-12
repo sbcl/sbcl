@@ -2462,7 +2462,7 @@
                                 (when (and arg
                                            (lvar-reoptimize arg)
                                            (null (basic-var-sets var)))
-                                  (lvar-type arg)))
+                                  (list (lvar-type arg))))
                               (basic-combination-args call)
                               vars))
                (this-ref (lvar-use (basic-combination-fun call))))
@@ -2478,13 +2478,13 @@
                       (mapcar (lambda (this-arg old)
                                 (when old
                                   (setf (lvar-reoptimize this-arg) nil)
-                                  (type-union (lvar-type this-arg) old)))
+                                  (cons (lvar-type this-arg) old)))
                               (basic-combination-args dest)
                               union)))))
 
           (loop for var in vars
                 and type in union
-                when type do (propagate-to-refs var type))
+                when type do (propagate-to-refs var (sb-kernel::%type-union type)))
 
           ;; It's possible to discover new inline calls which may have
           ;; incompatible argument types, so don't allow reuse of this
