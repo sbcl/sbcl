@@ -1063,3 +1063,13 @@ Form: C   Context: EVAL; lexically bound
           (declare (fixnum x))
           (incf x 1))))
    :allow-notes nil))
+
+(defmethod symbol-macrolet-special (s)
+  (declare (special s))
+  (symbol-macrolet ((s (slot-value x 'x)))
+    (let ()
+      (declare (special s))
+      s)))
+
+(test-util:with-test (:name :symbol-macrolet-declarations)
+  (assert (eql (symbol-macrolet-special 10) 10)))

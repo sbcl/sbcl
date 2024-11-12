@@ -800,25 +800,35 @@ instead of
            (let ((type (car declaration))
                  (name (cadr declaration))
                  (args (cddr declaration)))
-             (if (walked-var-declaration-p type)
-                 (note-declaration `(,type
-                                     ,(or (var-lexical-p name env) name)
-                                     ,.args)
-                                   env)
-                 (let ((canonical (sb-c::canonized-decl-spec declaration)))
-                   (typecase canonical
-                     ((cons (eql type) cons)
-                      (destructuring-bind (type &rest vars) (cdr canonical)
-                        (loop for name in vars
-                              for symbol-macro = (and (symbolp name)
-                                                      (car (variable-symbol-macro-p name env)))
-                              do (if symbol-macro
-                                     (push (list* name 'sb-sys:macro
-                                                  `(the ,type ,(cddr symbol-macro)))
-                                           (cadddr (env-lock env)))
-                                     (note-declaration canonical env)))))
-                     (t
-                      (note-declaration canonical env)))))
+             (cond ((eq type 'special)
+                    (loop for name in (cdr declaration)
+                          for var = (or (var-lexical-p name env)
+                                        name)
+                          do
+                          (note-declaration `(special ,(or var name)) env)
+                          ;; Shadow
+                          (when (variable-symbol-macro-p name env)
+                            (note-var-binding name env))))
+                   ((walked-var-declaration-p type)
+                    (note-declaration `(,type
+                                        ,(or (var-lexical-p name env) name)
+                                        ,.args)
+                                      env))
+                   (t
+                    (let ((canonical (sb-c::canonized-decl-spec declaration)))
+                      (typecase canonical
+                        ((cons (eql type) cons)
+                         (destructuring-bind (type &rest vars) (cdr canonical)
+                           (loop for name in vars
+                                 for symbol-macro = (and (symbolp name)
+                                                         (car (variable-symbol-macro-p name env)))
+                                 do (if symbol-macro
+                                        (push (list* name 'sb-sys:macro
+                                                     `(the ,type ,(cddr symbol-macro)))
+                                              (cadddr (env-lock env)))
+                                        (note-declaration canonical env)))))
+                        (t
+                         (note-declaration canonical env))))))
              (push declaration declarations)))
          (recons body
                  form
