@@ -892,35 +892,36 @@ process_directory(int count, struct ndir_entry *entry,
             {
                 load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len, id == READ_ONLY_CORE_SPACE_ID);
             }
-        }
+
 #ifdef LISP_FEATURE_DARWIN_JIT
-        if (id == READ_ONLY_CORE_SPACE_ID)
-            os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+            if (id == READ_ONLY_CORE_SPACE_ID)
+                os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
 #endif
 #ifdef MADV_MERGEABLE
-        if ((merge_core_pages == 1)
-            || ((merge_core_pages == -1) && compressed)) {
-            madvise((void *)addr, len, MADV_MERGEABLE);
-        }
+            if ((merge_core_pages == 1)
+                || ((merge_core_pages == -1) && compressed)) {
+                madvise((void *)addr, len, MADV_MERGEABLE);
+            }
 #endif
 
-        lispobj *free_pointer = (lispobj *) addr + entry->nwords;
-        switch (id) {
-        default:
-            // text free ptr is already nonzero if Lisp code in executable
-            if (!*spaces[id].pfree_pointer)
-                *spaces[id].pfree_pointer = free_pointer;
-            break;
-        case DYNAMIC_CORE_SPACE_ID:
-            next_free_page = ALIGN_UP(entry->nwords<<WORD_SHIFT, GENCGC_PAGE_BYTES)
-              / GENCGC_PAGE_BYTES;
-            anon_dynamic_space_start = (os_vm_address_t)(addr + len);
-        }
+            lispobj *free_pointer = (lispobj *) addr + entry->nwords;
+            switch (id) {
+            default:
+                // text free ptr is already nonzero if Lisp code in executable
+                if (!*spaces[id].pfree_pointer)
+                    *spaces[id].pfree_pointer = free_pointer;
+                break;
+            case DYNAMIC_CORE_SPACE_ID:
+                next_free_page = ALIGN_UP(entry->nwords<<WORD_SHIFT, GENCGC_PAGE_BYTES)
+                    / GENCGC_PAGE_BYTES;
+                anon_dynamic_space_start = (os_vm_address_t)(addr + len);
+            }
 #ifdef DEBUG_COREPARSE
-        printf("space %d @ %10lx pg=%4d+%4d nwords=%9ld checksum=%lx\n",
-               (int)id, addr, (int)entry->data_page, (int)entry->page_count,
-               entry->nwords, corespace_checksum((void*)addr, entry->nwords));
+            printf("space %d @ %10lx pg=%4d+%4d nwords=%9ld checksum=%lx\n",
+                   (int)id, addr, (int)entry->data_page, (int)entry->page_count,
+                   entry->nwords, corespace_checksum((void*)addr, entry->nwords));
 #endif
+        }
     }
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
