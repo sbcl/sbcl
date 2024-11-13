@@ -6668,6 +6668,16 @@
 (deftransform princ ((object &optional stream) (string &optional t) * :important nil)
   `(write-string object stream))
 
+(deftransform write-char ((object stream) (t ansi-stream) * :important nil)
+  `(progn (funcall (ansi-stream-cout stream) stream object)
+          object))
+
+(deftransform write-string ((object stream &key (start 0) end)
+                            (simple-string ansi-stream &rest t) * :important nil)
+  `(progn (funcall (ansi-stream-sout stream) stream object start (or end
+                                                                     (length object)))
+          object))
+
 #+sb-thread
 (progn
   (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex))
