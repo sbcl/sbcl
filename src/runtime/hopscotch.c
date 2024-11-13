@@ -810,7 +810,7 @@ int hopscotch_delete(tableptr ht, uword_t key)
         return 0;
     ht->keys[physical_index] = 0;
     set_val(ht, physical_index, 0);
-    ht->hops[logical_index] ^= (1<<(physical_index - logical_index));
+    ht->hops[logical_index] ^= (1U<<(physical_index - logical_index));
     --ht->count;
     return 1;
 }
