@@ -1017,14 +1017,14 @@ bool gc_allocate_ptes()
     int nbits = 13;
     long num_gc_cards = 1L << nbits;
 
-    // 2 Gigacards should suffice for now. That would span 2TiB of memory
-    // using 1Kb card size, or more if larger card size.
-    if (page_table_pages > (int)((1U<<31)/CARDS_PER_PAGE))
-        lose("dynamic space too large");
-
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
-    while (num_gc_cards < (long)page_table_pages*CARDS_PER_PAGE) { ++nbits; num_gc_cards <<= 1; }
+    while (num_gc_cards / CARDS_PER_PAGE < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+
+    // 2 Gigacards should suffice for now. That would span 2TiB of memory
+    // using 1Kb card size, or more if larger card size.
+    if (nbits > 31)
+        lose("dynamic space too large");
 
     // If the space size is less than or equal to the number of cards
     // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
