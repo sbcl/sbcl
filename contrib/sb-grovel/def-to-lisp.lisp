@@ -64,11 +64,11 @@ code:
            args)))
 
 (defun c-for-enum (lispname elements export)
-  (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
+  (printf "(sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
   (dolist (element elements)
     (destructuring-bind (lisp-element-name c-element-name) element
       (printf " (~S %ld)" lisp-element-name (word-cast c-element-name))))
-  (printf ")))")
+  (printf "))")
   (when export
     (dolist (element elements)
       (destructuring-bind (lisp-element-name c-element-name) element
@@ -160,7 +160,7 @@ code:
           (:enum
            (c-for-enum lispname cname export))
           (:type
-           (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:%ssigned %ld)))" lispname
+           (printf "(sb-alien:define-alien-type ~A (sb-alien:%ssigned %ld))" lispname
                    (format nil "SIGNED_(~A)" cname)
                    (word-cast (format nil "(8*sizeof(~A))" cname))))
           (:string

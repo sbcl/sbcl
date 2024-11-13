@@ -354,43 +354,34 @@ deeply nested structures."
                                             (size root)))
                                   (size root)))))
         (generate-struct-definition name root nil))
-    (sb-int:with-unique-names (var field-values body field-name pair
-                                   object c-object index)
-      (let ((with (intern (format nil "WITH-~A" name)))
-            (allocate (intern (format nil "ALLOCATE-~A" name)))
-            (size-of (intern (format nil "SIZE-OF-~A" name))))
-        `(progn
+    `(progn
            (sb-alien:define-alien-type ,@(first struct-elements))
            ,@accessors
-           (defmacro ,with (,var (&rest ,field-values) &body ,body)
-             (labels ((,field-name (,var)
-                        (intern
-                         (format nil ,(format nil "~A-~~A" (symbol-name name))
-                                 (symbol-name ,var))
-                         ,(symbol-package name))))
-               `(sb-alien:with-alien ((,,var (* ,',name) ,'(,allocate)))
-                  (unwind-protect
-                      (progn
-                        (setf ,@(mapcan
-                                 (lambda (,pair)
-                                   `((,(,field-name (first ,pair)) ,,var)
-                                     ,(second ,pair)))
-                                 ,field-values))
-                        ,@,body)
-                    (sb-alien:free-alien ,,var)))))
-           (defconstant ,size-of ,size)
-           (defun ,allocate ()
-             (let* ((,object (sb-alien:make-alien ,name))
-                    (,c-object (cast ,object (* (unsigned 8)))))
-               ;; we have to initialize the object to all-0 before we can
-               ;; expect to make sensible use of it - the object returned
-               ;; by make-alien is initialized to all-D0 bytes.
-
-               ;; FIXME: This should be fixed in sb-alien, where better
-               ;; optimizations might be possible.
-               (dotimes (,index ,size)
-                 (setf (deref ,c-object ,index) 0))
-               ,object)))))))
+           ;; This macro's lambda vars are uninterned so that they don't refer to
+           ;; the SB-GROVEL package, but they don't need to be GENSYMed.
+           (defmacro ,(sb-int:symbolicate "WITH-" name)
+               (alien (&rest #1=#:initializers) &body #2=#:body)
+             `(sb-alien:with-alien ((,alien ,',name))
+                (alien-funcall (extern-alien "memset"
+                                (function void system-area-pointer int sb-kernel::os-vm-size-t))
+                               (sb-alien:alien-sap ,alien) 0 ,,size)
+                (let ((,alien (cast ,alien (* ,',name))))
+                  (setf ,@(mapcan
+                           (lambda (pair)
+                             `((,(sb-int:package-symbolicate ,(package-name (symbol-package name))
+                                                             ,(concatenate 'string (string name) "-")
+                                                             (first pair)) ,alien)
+                               ,(second pair)))
+                           #1#))
+                  ,@#2#)))
+           (defconstant ,(sb-int:symbolicate "SIZE-OF-" name) ,size) ; why does this exist?
+           (defun ,(sb-int:symbolicate "ALLOCATE-" name) () ; and this?
+             (let ((object (sb-alien:make-alien ,name)))
+               ;; The allocator returns 0-filled aliens. It's unknowable whether anyone cares.
+               (alien-funcall (extern-alien "memset"
+                               (function void system-area-pointer int sb-kernel::os-vm-size-t))
+                              (sb-alien:alien-sap object) 0 ,size)
+               object)))))
 
 ;; FIXME: Nothing in SBCL uses this, but kept it around in case there
 ;; are third-party sb-grovel clients.  It should go away eventually,
