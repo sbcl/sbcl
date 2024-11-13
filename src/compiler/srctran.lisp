@@ -6668,10 +6668,12 @@
 (deftransform princ ((object &optional stream) (string &optional t) * :important nil)
   `(write-string object stream))
 
+#-sb-xc-host ;; ansi-stream not defined
 (deftransform write-char ((object stream) (t ansi-stream) * :important nil)
   `(progn (funcall (ansi-stream-cout stream) stream object)
           object))
 
+#-sb-xc-host
 (deftransform write-string ((object stream &key (start 0) end)
                             (simple-string ansi-stream &rest t) * :important nil)
   `(progn (funcall (ansi-stream-sout stream) stream object start (or end

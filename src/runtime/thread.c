@@ -362,7 +362,7 @@ char* thread_name_from_pthread(pthread_t pointer){
  * I wanted to register this function using atexit() but apparently that's not soon enough
  * to solve the problem. It has to to be called by *EXIT-HOOKS* instead */
 void asan_lisp_thread_cleanup() {
-    mutex_acquire(&all_threads_lock);
+    ignore_value(mutex_acquire(&all_threads_lock));
 #if defined ADDRESS_SANITIZER && defined ZSTD_STATIC_LINKING_ONLY
     asan_cleanup_called = 1;
     struct thread* th;
@@ -373,7 +373,7 @@ void asan_lisp_thread_cleanup() {
             ZSTD_freeDCtx(dctx);
     }
 #endif
-    mutex_release(&all_threads_lock);
+    ignore_value(mutex_release(&all_threads_lock));
 }
 
 void create_main_lisp_thread(lispobj function) {
