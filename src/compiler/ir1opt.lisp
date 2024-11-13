@@ -1521,8 +1521,19 @@
       (:full
        (multiple-value-bind (leaf info)
            (multiple-value-bind (type name leaf asserted) (lvar-fun-type fun-lvar)
-             (declare (ignore name))
-             (validate-call-type call type leaf nil asserted))
+             (declare (ignorable name asserted))
+             (validate-call-type call type leaf nil
+                                 (or asserted
+                                     #+sb-xc-host t
+                                     ;; Trust types coming from the system structures
+                                     (let ((source (lvar-uses fun-lvar)))
+                                       (and (combination-p source)
+                                            (lvar-fun-is (combination-fun source) '(%instance-ref))
+                                            (let ((type (lvar-type (car (combination-args source)))))
+                                              (and (structure-classoid-p type)
+                                                   (let ((package (sb-xc:symbol-package (classoid-name type))))
+                                                     (or (eq package *cl-package*)
+                                                         (and package (system-package-p package)))))))))))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))

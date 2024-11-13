@@ -154,9 +154,9 @@
               index))
 
   ;; output functions
-  (cout #'ill-out :type function)               ; WRITE-CHAR function
-  (bout #'ill-bout :type function)              ; byte output function
-  (sout #'ill-out :type function)               ; string output function
+  (cout #'ill-out :type (sfunction * t))               ; WRITE-CHAR function
+  (bout #'ill-bout :type (sfunction * t))              ; byte output function
+  (sout #'ill-out :type (sfunction * t))               ; string output function
 
   ;; other, less-used methods
   (misc #'no-op-placeholder :type (function (stream (integer 0 17) t) *))
