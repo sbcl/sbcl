@@ -658,7 +658,7 @@
             (incf string-offset (* 4 sb-vm:n-word-bytes))
             finally (incf head n))
       (setf (buffer-head ibuf) head)
-      (truly-the index (truncate string-offset 4)))))
+      (truly-the index (values (truncate string-offset 4))))))
 
 #+(and sb-unicode 64-bit little-endian)
 (defun sb-vm::simd-copy-utf8-crlf-to-character-string-with-size (start end string ibuf size-buffer)
@@ -993,6 +993,95 @@
                    (stream-decoding-error-and-handle stream (- tail head) 1))
            (return index)))))))
 
+#+(and sb-unicode 64-bit little-endian
+       (not (or)))
+(defun sb-vm::simd-copy-character-string-to-utf8 (start end string obuf)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string)
+    (let* ((tail (buffer-tail obuf))
+           (sap (buffer-sap obuf))
+           (buffer-left (- (buffer-length obuf) tail))
+           (string-left (logand (- end start) -2))
+           (n (min buffer-left string-left))
+           (ascii-mask (ldb (byte 64 0)
+                            (lognot (logior 127 (ash 127 32)))))
+           (string-sap (vector-sap string))
+           (string-offset (truly-the fixnum (* start 4))))
+      (declare (optimize sb-c::preserve-single-use-debug-variables
+                         sb-c::preserve-constants))
+      (loop for obuf-offset from tail below (+ tail n) by 2
+            do
+            (let ((word (sap-ref-word string-sap string-offset)))
+              (when (logtest word ascii-mask)
+                (setf tail obuf-offset)
+                (return))
+              (setf (sap-ref-16 sap obuf-offset)
+                    (logior (ash word -24)
+                            (ldb (byte 8 0) word))))
+            (incf string-offset 8)
+            finally (incf tail n))
+      (setf (buffer-tail obuf) tail)
+      (truly-the index (values (truncate string-offset 4))))))
+
+(defun output-bytes/utf-8/lf (stream string flush-p start end)
+  (declare (optimize (sb-c:verify-arg-count 0)))
+  (%output-bytes/utf-8/lf stream string flush-p start end))
+
+(defun %output-bytes/utf-8/lf (stream string flush-p start end)
+  (declare (optimize (sb-c:verify-arg-count 0)))
+  (let ((start (or start 0)) (end (or end (length string))))
+    (declare (type index start end))
+    (when (fd-stream-synchronize-output stream) (synchronize-stream-output stream))
+    (unless (<= 0 start end (length string)) (sequence-bounding-indices-bad-error string start end))
+    (do ()
+        ((= end start))
+      (let ((obuf (fd-stream-obuf stream)))
+        (string-dispatch (simple-base-string (simple-array character (*)) string)
+                         string
+          #+(and sb-unicode 64-bit little-endian)
+          (when (and (typep string '(simple-array character (*)))
+                     (>= (- end start) 16))
+            (setf start (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)))
+          (let ((len (- (buffer-length obuf) 4))
+                (sap (buffer-sap obuf))
+                (tail (buffer-tail obuf)))
+            (declare (type index tail)
+                     (optimize (safety 0)))
+            (block output-nothing
+              (do* ()
+                   ((or (= start end) (>= tail len)))
+                (let* ((|ch| (aref string start)) (bits (char-code |ch|)))
+                  (declare (ignorable |ch| bits))
+                  (cond ((< bits 128)
+                         (setf (sap-ref-8 sap tail) bits) (incf tail))
+                        ((< bits 2048)
+                         (setf (sap-ref-8 sap tail) (logior 192 (ldb (byte 5 6) bits))
+                               (sap-ref-8 sap (+ 1 tail)) (logior 128 (ldb (byte 6 0) bits)))
+                         (incf tail 2))
+                        ((< bits 65536)
+                         (when (<= 55296 bits 57343)
+                           (external-format-encoding-error stream bits))
+                         (setf (sap-ref-8 sap tail) (logior 224 (ldb (byte 4 12) bits))
+                               (sap-ref-8 sap (+ 1 tail)) (logior 128 (ldb (byte 6 6) bits))
+                               (sap-ref-8 sap (+ 2 tail)) (logior 128 (ldb (byte 6 0) bits)))
+                         (incf tail 3))
+                        (t
+                         (setf (sap-ref-8 sap tail) (logior 240 (ldb (byte 3 18) bits))
+                               (sap-ref-8 sap (+ 1 tail)) (logior 128 (ldb (byte 6 12) bits))
+                               (sap-ref-8 sap (+ 2 tail)) (logior 128 (ldb (byte 6 6) bits))
+                               (sap-ref-8 sap (+ 3 tail)) (logior 128 (ldb (byte 6 0) bits)))
+                         (incf tail 4)))
+                  (setf (buffer-tail obuf) tail)
+                  (incf start)))
+              (go flush))
+            (incf start))))
+     flush
+      (when (< start end)
+        (flush-output-buffer stream)))
+    (when flush-p
+      (flush-output-buffer stream))))
+
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
   (let ((bits (char-code |ch|)))
@@ -1056,6 +1145,7 @@
   string->utf8
   #+sb-unicode :base-string-direct-mapping #+sb-unicode t
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
+  :write-n-bytes-fun output-bytes/utf-8/lf
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :handle-size nil)
 
@@ -1284,7 +1374,7 @@
                      (incf head 2)
                      (incf string-offset 8)))))
       (setf (buffer-head ibuf) head)
-      (truly-the index (truncate string-offset 4)))))
+      (truly-the index (values (truncate string-offset 4))))))
 
 (defun fd-stream-read-sequence/utf-8-crlf-to-character-string (stream string start end)
   (declare (type fd-stream stream)
