@@ -668,27 +668,27 @@
     `(let* ((,stream-var ,stream)
             (obuf (fd-stream-obuf ,stream-var))
             (tail (buffer-tail obuf))
-            (size ,size))
-      ,@(unless (eq (car buffering) :none)
-         `((when (< (buffer-length obuf) (+ tail size))
-            (setf obuf (flush-output-buffer ,stream-var)
-                  tail (buffer-tail obuf)))))
-      ,@(unless (eq (car buffering) :none)
-         ;; FIXME: Why this here? Doesn't seem necessary.
-         `((when (fd-stream-synchronize-output ,stream-var)
-             (synchronize-stream-output ,stream-var))))
-      ,(if restart
-           `(block output-nothing
-              ,@body
-              (setf (buffer-tail obuf) (+ tail size)))
-           `(progn
-             ,@body
-             (setf (buffer-tail obuf) (+ tail size))))
-      ,@(ecase (car buffering)
-         (:none `((flush-output-buffer ,stream-var)))
-         (:line `((when (eql |ch| #\Newline)
-                    (flush-output-buffer ,stream-var))))
-         (:full)))))
+            ,@(if size
+                  `((size ,size))))
+       ,@(unless (eq (car buffering) :none)
+           `((when (< (buffer-length obuf) (+ tail 4))
+               (setf obuf (flush-output-buffer ,stream-var)
+                     tail (buffer-tail obuf)))))
+       ,@(unless (eq (car buffering) :none)
+           ;; FIXME: Why this here? Doesn't seem necessary.
+           `((when (fd-stream-synchronize-output ,stream-var)
+               (synchronize-stream-output ,stream-var))))
+       (,@(if restart
+              '(block output-nothing)
+              '(progn))
+        ,@body
+        (setf (buffer-tail obuf) (+ tail
+                                    ,@(and size `(size)))))
+       ,@(ecase (car buffering)
+           (:none `((flush-output-buffer ,stream-var)))
+           (:line `((when (eql |ch| #\Newline)
+                      (flush-output-buffer ,stream-var))))
+           (:full)))))
 
 (defmacro output-wrapper ((stream size buffering restart) &body body)
   (let ((stream-var '#:stream))
@@ -1540,6 +1540,7 @@
      out-size-expr out-expr in-size-expr in-expr
      octets-to-string-sym string-to-octets-sym
      &key base-string-direct-mapping
+          (handle-size t)
           fd-stream-read-n-characters
           write-n-bytes-fun
           (newline-variant :lf)
@@ -1592,10 +1593,12 @@
                                ((or (= start end) (>= tail len)))
                             (let* ((|ch| (aref string start))
                                    (bits (char-code |ch|))
-                                   (size ,out-size-expr))
+                                   ,@(when handle-size
+                                       `((size ,out-size-expr))))
                               (declare (ignorable |ch| bits))
                               ,out-expr
-                              (incf tail size)
+                              ,@(when handle-size
+                                  `((incf tail size)))
                               (setf (buffer-tail obuf) tail)
                               (incf start)))
                           (go flush))
@@ -1607,7 +1610,8 @@
                  (when flush-p
                    (flush-output-buffer stream))))))
        (def-output-routines/variable-width (,format
-                                            ,out-size-expr
+                                            ,(and handle-size
+                                                  out-size-expr)
                                             ,output-restart
                                             ,external-format
                                             (:none character)
@@ -1618,8 +1622,7 @@
              (setf (fd-stream-output-column stream)
                    (+ (truly-the unsigned-byte (fd-stream-output-column stream)) 1)))
          (let ((bits (char-code |ch|))
-               (sap (buffer-sap obuf))
-               (tail (buffer-tail obuf)))
+               (sap (buffer-sap obuf)))
            ,out-expr))
        ,@(unless fd-stream-read-n-characters
            `((defun ,in-function (stream buffer sbuffer start end &aux (index start))
@@ -1829,7 +1832,6 @@
                     (declare (optimize (speed 3) (safety 0)))
                   (block output-nothing
                     (let* ((length (length string))
-                           ;; wtf? why not just "LET ((bits 0))" ?
                            (null-size (let* ((|ch| (code-char 0))
                                              (bits (char-code |ch|)))
                                         (declare (ignorable |ch| bits))
@@ -1853,14 +1855,19 @@
                           (loop for i of-type index below length
                                 for |ch| of-type character = (aref string i)
                                 for bits = (char-code |ch|)
-                                for size of-type index = ,out-size-expr
+                                ,@(when handle-size
+                                    `(for size of-type index = ,out-size-expr))
                                 do (prog1
                                        ,out-expr
-                                     (incf tail size)))
+                                     ,@(when handle-size
+                                         `((incf tail size)))))
                           (let* ((bits 0)
-                                 (|ch| (code-char bits)) ; more wtf
-                                 (size null-size))
-                            (declare (ignorable bits |ch| size))
+                                 (|ch| (code-char bits))
+                                 ,@(when handle-size
+                                     `((size null-size))))
+                            (declare (ignorable bits |ch|
+                                                ,@(when handle-size
+                                                    `(size))))
                             ,out-expr)))
                       ,n-buffer))))))
 

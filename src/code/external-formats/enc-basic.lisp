@@ -1000,19 +1000,27 @@
           ((< bits #x800) 2)
           ((< bits #x10000) 3)
           (t 4)))
-  (ecase size
-    (1 (setf (sap-ref-8 sap tail) bits))
-    (2 (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (3 (when (<= #xd800 bits #xdfff)
-         (external-format-encoding-error stream bits))
+  (cond
+    ((< bits #x80)
+     (setf (sap-ref-8 sap tail) bits)
+     (incf tail))
+    ((< bits #x800)
+     (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 2))
+    ((< bits #x10000)
+     (when (<= #xd800 bits #xdfff)
+       (external-format-encoding-error stream bits))
      (setf (sap-ref-8 sap tail)       (logior #xe0 (ldb (byte 4 12) bits))
            (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 6) bits))
-           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (4 (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
-             (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
-             (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 3))
+    (t
+     (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
+           (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 4)))
   (1 (cond ((< byte #x80) 1)
            ((< byte #xc2) (return-from decode-break-reason 1))
            ((< byte #xe0) 2)
@@ -1048,7 +1056,8 @@
   string->utf8
   #+sb-unicode :base-string-direct-mapping #+sb-unicode t
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
-  :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff))))
+  :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
+  :handle-size nil)
 
 (define-external-format/variable-width (:utf-8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1057,19 +1066,27 @@
           ((< bits #x800) 2)
           ((< bits #x10000) 3)
           (t 4)))
-  (ecase size
-    (1 (setf (sap-ref-8 sap tail) (if (= bits 10) 13 bits)))
-    (2 (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (3 (when (<= #xd800 bits #xdfff)
-         (external-format-encoding-error stream bits))
+  (cond
+    ((< bits #x80)
+     (setf (sap-ref-8 sap tail) (if (= bits 10) 13 bits))
+     (incf tail))
+    ((< bits #x800)
+     (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 2))
+    ((< bits #x10000)
+     (when (<= #xd800 bits #xdfff)
+       (external-format-encoding-error stream bits))
      (setf (sap-ref-8 sap tail)       (logior #xe0 (ldb (byte 4 12) bits))
            (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 6) bits))
-           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (4 (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
-             (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
-             (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 3))
+    (t
+     (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
+           (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 4)))
   (1 (cond ((< byte #x80) 1)
            ((< byte #xc2) (return-from decode-break-reason 1))
            ((< byte #xe0) 2)
@@ -1104,7 +1121,8 @@
   utf8->string/cr-aref
   string/cr->utf8
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
-  :newline-variant :cr)
+  :newline-variant :cr
+  :handle-size nil)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1114,21 +1132,31 @@
           ((< bits #x800) 2)
           ((< bits #x10000) 3)
           (t 4)))
-  (ecase size
-    (1 (setf (sap-ref-8 sap tail) bits))
-    (2 (if (= bits 10)
-           (setf (sap-ref-8 sap tail) 13 (sap-ref-8 sap (+ 1 tail)) 10)
-           (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
-                 (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
-    (3 (when (<= #xd800 bits #xdfff)
-         (external-format-encoding-error stream bits))
+  (cond
+    ((= bits 10)
+     (setf (sap-ref-8 sap tail) 13
+           (sap-ref-8 sap (+ 1 tail)) 10)
+     (incf tail 2))
+    ((< bits #x80)
+     (setf (sap-ref-8 sap tail) (if (= bits 10) 13 bits))
+     (incf tail))
+    ((< bits #x800)
+     (setf (sap-ref-8 sap tail)       (logior #xc0 (ldb (byte 5 6) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 2))
+    ((< bits #x10000)
+     (when (<= #xd800 bits #xdfff)
+       (external-format-encoding-error stream bits))
      (setf (sap-ref-8 sap tail)       (logior #xe0 (ldb (byte 4 12) bits))
            (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 6) bits))
-           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits))))
-    (4 (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
-             (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
-             (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
-             (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 3))
+    (t
+     (setf (sap-ref-8 sap tail)       (logior #xf0 (ldb (byte 3 18) bits))
+           (sap-ref-8 sap (+ 1 tail)) (logior #x80 (ldb (byte 6 12) bits))
+           (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
+           (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))
+     (incf tail 4)))
   ((2 1)
    (cond
      ((< byte #x80)
@@ -1173,7 +1201,8 @@
   string/crlf->utf8
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8/crlf
-  :newline-variant :crlf)
+  :newline-variant :crlf
+  :handle-size nil)
 
 #+(and sb-unicode 64-bit little-endian
        (not arm64)) ;; have true simd definitions or might be redefined with def-variant
