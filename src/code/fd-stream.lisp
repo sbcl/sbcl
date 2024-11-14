@@ -1541,11 +1541,13 @@
      octets-to-string-sym string-to-octets-sym
      &key base-string-direct-mapping
           fd-stream-read-n-characters
+          write-n-bytes-fun
           (newline-variant :lf)
           (char-encodable-p t))
   (let* ((name (first external-format))
          (suffix (symbolicate name '/ newline-variant))
-         (out-function (symbolicate "OUTPUT-BYTES/" suffix))
+         (out-function (or write-n-bytes-fun
+                           (symbolicate "OUTPUT-BYTES/" suffix)))
          (format (format nil "OUTPUT-CHAR-~A/~A-~~A-BUFFERED" (string name) newline-variant))
          (in-function (or fd-stream-read-n-characters
                           (symbolicate "FD-STREAM-READ-N-CHARACTERS/" suffix)))
@@ -1560,50 +1562,50 @@
          (declare (ignorable |ch|)
                   (optimize (sb-c:verify-arg-count 0)))
          (and ,char-encodable-p ,out-size-expr))
-       (defun ,out-function (stream string flush-p start end)
-         (declare (optimize (sb-c:verify-arg-count 0)))
-         (let ((start (or start 0))
-               (end (or end (length string))))
-           (declare (type index start end))
-           (when (fd-stream-synchronize-output stream)
-             (synchronize-stream-output stream))
-           (unless (<= 0 start end (length string))
-             (sequence-bounding-indices-bad-error string start end))
-           (do ()
-               ((= end start))
-             (let ((obuf (fd-stream-obuf stream)))
-               (string-dispatch (simple-base-string
-                                 #+sb-unicode (simple-array character (*))
-                                 string)
-                                string
-                 (let ((len (buffer-length obuf))
-                       (sap (buffer-sap obuf))
-                       ;; FIXME: Rename
-                       (tail (buffer-tail obuf)))
-                   (declare (type index tail)
-                            ;; STRING bounds have already been checked.
-                            (optimize (safety 0)))
-                   (,@(if output-restart
-                          `(block output-nothing)
-                          `(progn))
-                    (do* ()
-                         ((or (= start end) (< (- len tail) 4)))
-                      (let* ((|ch| (aref string start))
-                             (bits (char-code |ch|))
-                             (size ,out-size-expr))
-                        (declare (ignorable |ch| bits))
-                        ,out-expr
-                        (incf tail size)
-                        (setf (buffer-tail obuf) tail)
-                        (incf start)))
-                    (go flush))
-                   ;; Exited via RETURN-FROM OUTPUT-NOTHING: skip the current character.
-                   (incf start))))
-            flush
-             (when (< start end)
-               (flush-output-buffer stream)))
-           (when flush-p
-             (flush-output-buffer stream))))
+       ,@(unless write-n-bytes-fun
+           `((defun ,out-function (stream string flush-p start end)
+               (declare (optimize (sb-c:verify-arg-count 0)))
+               (let ((start (or start 0))
+                     (end (or end (length string))))
+                 (declare (type index start end))
+                 (when (fd-stream-synchronize-output stream)
+                   (synchronize-stream-output stream))
+                 (unless (<= 0 start end (length string))
+                   (sequence-bounding-indices-bad-error string start end))
+                 (do ()
+                     ((= end start))
+                   (let ((obuf (fd-stream-obuf stream)))
+                     (string-dispatch (simple-base-string
+                                       #+sb-unicode (simple-array character (*))
+                                       string)
+                                      string
+                       (let ((len (- (buffer-length obuf) 4))
+                             (sap (buffer-sap obuf))
+                             (tail (buffer-tail obuf)))
+                         (declare (type index tail)
+                                  ;; STRING bounds have already been checked.
+                                  (optimize (safety 0)))
+                         (,@(if output-restart
+                                `(block output-nothing)
+                                `(progn))
+                          (do* ()
+                               ((or (= start end) (>= tail len)))
+                            (let* ((|ch| (aref string start))
+                                   (bits (char-code |ch|))
+                                   (size ,out-size-expr))
+                              (declare (ignorable |ch| bits))
+                              ,out-expr
+                              (incf tail size)
+                              (setf (buffer-tail obuf) tail)
+                              (incf start)))
+                          (go flush))
+                         ;; Exited via RETURN-FROM OUTPUT-NOTHING: skip the current character.
+                         (incf start))))
+                  flush
+                   (when (< start end)
+                     (flush-output-buffer stream)))
+                 (when flush-p
+                   (flush-output-buffer stream))))))
        (def-output-routines/variable-width (,format
                                             ,out-size-expr
                                             ,output-restart
