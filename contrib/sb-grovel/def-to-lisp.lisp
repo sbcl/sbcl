@@ -78,7 +78,7 @@ code:
 
 (defun c-for-structure (lispname cstruct)
   (destructuring-bind (cname &rest elements) cstruct
-    (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-grovel::define-c-struct ~A %ld" lispname
+    (printf "(sb-grovel::define-c-struct ~A %ld" lispname
             (word-cast (format nil "sizeof(~A)" cname)))
     (dolist (e elements)
       (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
@@ -99,7 +99,7 @@ code:
               (printf "  %ld)"
                       (word-cast (format nil "sizeof(t.~A)" c-el-name)))
               (as-c "}")))))
-    (printf "))")))
+    (printf ")")))
 
 (defun print-c-source (stream headers definitions package-name)
   (declare (ignorable definitions package-name))

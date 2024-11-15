@@ -44,8 +44,8 @@
                 `(unsigned-byte ,(* 8 size)))
       (signed `(signed ,(* 8 size))
               `(signed-byte ,(* 8 size)))
-      (c-string `(array char ,size) 'cl:simple-string)
-      (c-string-pointer 'c-string 'cl:simple-string)
+      (c-string `(array char ,size) 'simple-string)
+      (c-string-pointer 'c-string 'simple-string)
       ;; TODO: multi-dimensional arrays, if they are ever needed.
       (array (destructuring-bind (array-tag elt-type &optional array-size) type
                (declare (ignore array-tag))
@@ -290,7 +290,7 @@ deeply nested structures."
                                  (symbol-name (name root)))))
          (offset-constant-name (intern
                                 (format nil "OFFSET-OF-~A" accessor-name)))
-         (var (gensym "VAR-"))
+         (var '#:val)
          (place (apply #'sane-slot 'struct
                        (mapcar 'name (append (rest rpath) (list root)))))
          (reader (let ((reader (accessor-modifier-for
@@ -367,21 +367,23 @@ deeply nested structures."
                                (sb-alien:alien-sap ,alien) 0 ,,size)
                 (let ((,alien (cast ,alien (* ,',name))))
                   (setf ,@(mapcan
-                           (lambda (pair)
+                           ;; The symbol CONS is not in the SB-GROVEL package, making it more
+                           ;; clear that this expander works fine in the absence of sb-grovel.
+                           (lambda (cons)
                              `((,(sb-int:package-symbolicate ,(package-name (symbol-package name))
                                                              ,(concatenate 'string (string name) "-")
-                                                             (first pair)) ,alien)
-                               ,(second pair)))
+                                                             (car cons)) ,alien)
+                               ,(cadr cons)))
                            #1#))
                   ,@#2#)))
            (defconstant ,(sb-int:symbolicate "SIZE-OF-" name) ,size) ; why does this exist?
            (defun ,(sb-int:symbolicate "ALLOCATE-" name) () ; and this?
-             (let ((object (sb-alien:make-alien ,name)))
+             (let ((sb-kernel:instance (sb-alien:make-alien ,name)))
                ;; The allocator returns 0-filled aliens. It's unknowable whether anyone cares.
                (alien-funcall (extern-alien "memset"
                                (function void system-area-pointer int sb-kernel::os-vm-size-t))
-                              (sb-alien:alien-sap object) 0 ,size)
-               object)))))
+                              (sb-alien:alien-sap sb-kernel:instance) 0 ,size)
+               sb-kernel:instance)))))
 
 ;; FIXME: Nothing in SBCL uses this, but kept it around in case there
 ;; are third-party sb-grovel clients.  It should go away eventually,
