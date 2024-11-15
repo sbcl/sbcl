@@ -1024,21 +1024,26 @@
       (setf (buffer-tail obuf) tail)
       (truly-the index (values (truncate string-offset 4))))))
 
-(defun output-bytes/utf-8/lf (stream string flush-p start end)
+
+(defun output-bytes/utf-8/lf2 (stream string start* end)
   (declare (optimize (sb-c:verify-arg-count 0)))
-  (let ((start (or start 0)) (end (or end (length string))))
+  (let ((start (or start* 0))
+        (end (or end (length string)))
+        last-newline)
     (declare (type index start end))
-    (when (fd-stream-synchronize-output stream) (synchronize-stream-output stream))
-    (unless (<= 0 start end (length string)) (sequence-bounding-indices-bad-error string start end))
+    (when (fd-stream-synchronize-output stream)
+      (synchronize-stream-output stream))
+    (unless (<= 0 start end (length string))
+      (sequence-bounding-indices-bad-error string start end))
     (do ()
         ((= end start))
       (let ((obuf (fd-stream-obuf stream)))
         (string-dispatch (simple-base-string (simple-array character (*)) string)
                          string
-          #+(and sb-unicode 64-bit little-endian)
-          (when (and (typep string '(simple-array character (*)))
-                     (>= (- end start) 16))
-            (setf start (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)))
+          ;; #+(and sb-unicode 64-bit little-endian)
+          ;; (when (and (typep string '(simple-array character (*)))
+          ;;            (>= (- end start) 16))
+          ;;   (setf start (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)))
           (let ((len (- (buffer-length obuf) 4))
                 (sap (buffer-sap obuf))
                 (tail (buffer-tail obuf)))
@@ -1047,8 +1052,11 @@
             (block output-nothing
               (do* ()
                    ((or (= start end) (>= tail len)))
-                (let* ((|ch| (aref string start)) (bits (char-code |ch|)))
-                  (declare (ignorable |ch| bits))
+                (let* ((|ch| (aref string start))
+                       (bits (char-code |ch|)))
+                  (declare (ignorable bits))
+                  (when (char= |ch| #\Newline)
+                    (setf last-newline start))
                   (cond ((< bits 128)
                          (setf (sap-ref-8 sap tail) bits) (incf tail))
                         ((< bits 2048)
@@ -1075,8 +1083,16 @@
      flush
       (when (< start end)
         (flush-output-buffer stream)))
-    (when flush-p
-      (flush-output-buffer stream))))
+    (ecase (fd-stream-buffering stream)
+      (:full)
+      (:line
+       (when last-newline
+         (flush-output-buffer stream)))
+      (:none
+       (flush-output-buffer stream)))
+    (if last-newline
+        (setf (fd-stream-output-column stream) (- end last-newline 1))
+        (incf (fd-stream-output-column stream) (- end (truly-the index start*))))))
 
 (define-external-format/variable-width (:utf-8 :utf8) t
   #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
@@ -1141,7 +1157,7 @@
   string->utf8
   #+sb-unicode :base-string-direct-mapping #+sb-unicode t
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
-  :write-n-bytes-fun output-bytes/utf-8/lf
+  ;:write-n-bytes-fun output-bytes/utf-8/lf2
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :handle-size nil)
 

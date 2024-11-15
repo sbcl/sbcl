@@ -847,20 +847,14 @@
   (let ((start (or start 0))
         (end (or end (length (the vector thing)))))
     (declare (fixnum start end))
-    (let ((last-newline
-           (string-dispatch (simple-base-string
-                             #+sb-unicode
-                             (simple-array character (*))
-                             string)
-               thing
-             (position #\newline thing :from-end t
-                       :start start :end end))))
-      (if (and (typep thing 'base-string)
-               (let ((external-format (fd-stream-external-format stream)))
-                 (and (memq (external-format-keyword external-format)
-                            '(#+sb-unicode :utf-8 :latin-1))
-                      (or (null last-newline)
-                          (eq (external-format-newline-variant external-format) :lf)))))
+    (if (and (typep thing 'base-string)
+             (let ((external-format (fd-stream-external-format stream)))
+               (and (memq (external-format-keyword external-format)
+                          '(#+sb-unicode :utf-8 :latin-1))
+                    (eq (external-format-newline-variant external-format) :lf))))
+        (let ((last-newline
+                (position #\newline thing :from-end t
+                                          :start start :end end)))
           (ecase (fd-stream-buffering stream)
             (:full
              (buffer-output stream thing start end))
@@ -870,16 +864,11 @@
                (flush-output-buffer stream)))
             (:none
              (write-or-buffer-output stream thing start end)))
-          (ecase (fd-stream-buffering stream)
-            (:full (funcall (fd-stream-output-bytes stream)
-                            stream thing nil start end))
-            (:line (funcall (fd-stream-output-bytes stream)
-                            stream thing last-newline start end))
-            (:none (funcall (fd-stream-output-bytes stream)
-                            stream thing t start end))))
-      (if last-newline
-          (setf (fd-stream-output-column stream) (- end last-newline 1))
-          (incf (fd-stream-output-column stream) (- end start))))))
+          (if last-newline
+              (setf (fd-stream-output-column stream) (- end last-newline 1))
+              (incf (fd-stream-output-column stream) (- end start))))
+        (funcall (fd-stream-output-bytes stream)
+                 stream thing start end))))
 
 (defstruct (external-format
              (:constructor %make-external-format)
@@ -1564,10 +1553,11 @@
                   (optimize (sb-c:verify-arg-count 0)))
          (and ,char-encodable-p ,out-size-expr))
        ,@(unless write-n-bytes-fun
-           `((defun ,out-function (stream string flush-p start end)
+           `((defun ,out-function (stream string start* end)
                (declare (optimize (sb-c:verify-arg-count 0)))
-               (let ((start (or start 0))
-                     (end (or end (length string))))
+               (let ((start (or start* 0))
+                     (end (or end (length string)))
+                     (last-newline nil))
                  (declare (type index start end))
                  (when (fd-stream-synchronize-output stream)
                    (synchronize-stream-output stream))
@@ -1595,7 +1585,9 @@
                                    (bits (char-code |ch|))
                                    ,@(when handle-size
                                        `((size ,out-size-expr))))
-                              (declare (ignorable |ch| bits))
+                              (declare (ignorable bits))
+                              (when (char= |ch| #\Newline)
+                                (setf last-newline start))
                               ,out-expr
                               ,@(when handle-size
                                   `((incf tail size)))
@@ -1607,8 +1599,16 @@
                   flush
                    (when (< start end)
                      (flush-output-buffer stream)))
-                 (when flush-p
-                   (flush-output-buffer stream))))))
+                 (ecase (fd-stream-buffering stream)
+                   (:full)
+                   (:line
+                    (when last-newline
+                      (flush-output-buffer stream)))
+                   (:none
+                    (flush-output-buffer stream)))
+                 (if last-newline
+                     (setf (fd-stream-output-column stream) (- end last-newline 1))
+                     (incf (fd-stream-output-column stream) (- end (truly-the index start*))))))))
        (def-output-routines/variable-width (,format
                                             ,(and handle-size
                                                   out-size-expr)
