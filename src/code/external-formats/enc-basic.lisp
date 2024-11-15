@@ -994,7 +994,7 @@
            (return index)))))))
 
 #+(and sb-unicode 64-bit little-endian
-       (not (or)))
+       (not (or arm64)))
 (defun sb-vm::simd-copy-character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
@@ -1025,10 +1025,6 @@
       (truly-the index (values (truncate string-offset 4))))))
 
 (defun output-bytes/utf-8/lf (stream string flush-p start end)
-  (declare (optimize (sb-c:verify-arg-count 0)))
-  (%output-bytes/utf-8/lf stream string flush-p start end))
-
-(defun %output-bytes/utf-8/lf (stream string flush-p start end)
   (declare (optimize (sb-c:verify-arg-count 0)))
   (let ((start (or start 0)) (end (or end (length string))))
     (declare (type index start end))

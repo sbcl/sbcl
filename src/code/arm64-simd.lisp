@@ -912,3 +912,61 @@
                 (inst sub new-head byte-array byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ start (ash copied -2))))))))
+
+(defun simd-copy-character-string-to-utf8 (start end string obuf)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (string)
+    (let* ((tail (sb-impl::buffer-tail obuf))
+           (buffer-left (- (sb-impl::buffer-length obuf) tail))
+           (string-left (- end start))
+           (n (logand (min buffer-left string-left) -16))
+           (string-start (truly-the fixnum (* start 4)))
+           (copied
+             (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
+                          ((byte-array sap-reg t))
+                          ((32-bit-array sap-reg t) (vector-sap string))
+                          ((string-start any-reg) string-start)
+                          ((end unsigned-reg))
+                          ((tail any-reg) tail)
+                          ((n any-reg) n)
+                          ((ascii-mask complex-double-reg))
+                          ((bytes complex-double-reg))
+                          ((bytes2 complex-double-reg))
+                          ((bytes3 complex-double-reg))
+                          ((bytes4 complex-double-reg))
+                          ((temp complex-double-reg)))
+                 ((res unsigned-reg unsigned-num))
+               (inst mvni ascii-mask 127 :4s)
+
+               (inst add byte-array* byte-array* (lsr tail 1))
+               (inst mov byte-array byte-array*)
+               (inst add end byte-array* (lsr n 1))
+               (inst add 32-bit-array 32-bit-array (lsr string-start 1))
+               (inst b start)
+
+               LOOP
+               (inst ldp bytes bytes2 (@ 32-bit-array))
+               (inst ldp bytes3 bytes4 (@ 32-bit-array 32))
+
+               (loop for bytes in (list bytes bytes2 bytes3 bytes4)
+                     do
+                     (inst s-and temp bytes ascii-mask)
+                     (inst umaxv temp temp :4s)
+                     (inst umov tmp-tn temp 0 :s)
+                     (inst cbnz tmp-tn DONE))
+
+               (inst add 32-bit-array 32-bit-array 64)
+
+               (inst uzp1 bytes2 bytes bytes2 :8h)
+               (inst uzp1 bytes4 bytes3 bytes4 :8h)
+               (inst uzp1 bytes4 bytes2 bytes4 :16b)
+               (inst str  bytes4 (@ byte-array 16 :post-index))
+               start
+               (inst cmp byte-array end)
+               (inst b :lt LOOP)
+
+               DONE
+               (inst sub res byte-array byte-array*))))
+      (setf (sb-impl::buffer-tail obuf) (+ tail copied))
+      (+ start copied))))
