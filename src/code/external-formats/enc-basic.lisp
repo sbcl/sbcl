@@ -1025,11 +1025,11 @@
       (truly-the index (values (truncate string-offset 4))))))
 
 
-(defun output-bytes/utf-8/lf2 (stream string start* end)
+(defun output-bytes/utf-8/lf (stream string start* end)
   (declare (optimize (sb-c:verify-arg-count 0)))
   (let ((start (or start* 0))
         (end (or end (length string)))
-        last-newline)
+        (last-newline -1))
     (declare (type index start end))
     (when (fd-stream-synchronize-output stream)
       (synchronize-stream-output stream))
@@ -1040,10 +1040,12 @@
       (let ((obuf (fd-stream-obuf stream)))
         (string-dispatch (simple-base-string (simple-array character (*)) string)
                          string
-          ;; #+(and sb-unicode 64-bit little-endian)
-          ;; (when (and (typep string '(simple-array character (*)))
-          ;;            (>= (- end start) 16))
-          ;;   (setf start (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)))
+          #+(and sb-unicode 64-bit little-endian
+                 (or arm64))
+          (when (and (typep string '(simple-array character (*)))
+                     (>= (- end start) 16))
+            (setf (values start last-newline)
+                  (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)))
           (let ((len (- (buffer-length obuf) 4))
                 (sap (buffer-sap obuf))
                 (tail (buffer-tail obuf)))
@@ -1086,11 +1088,11 @@
     (ecase (fd-stream-buffering stream)
       (:full)
       (:line
-       (when last-newline
+       (when (>= last-newline 0)
          (flush-output-buffer stream)))
       (:none
        (flush-output-buffer stream)))
-    (if last-newline
+    (if (>= last-newline 0)
         (setf (fd-stream-output-column stream) (- end last-newline 1))
         (incf (fd-stream-output-column stream) (- end (truly-the index start*))))))
 
@@ -1157,7 +1159,7 @@
   string->utf8
   #+sb-unicode :base-string-direct-mapping #+sb-unicode t
   :fd-stream-read-n-characters fd-stream-read-n-characters/utf-8
-  ;:write-n-bytes-fun output-bytes/utf-8/lf2
+  :write-n-bytes-fun output-bytes/utf-8/lf
   :char-encodable-p (let ((bits (char-code |ch|))) (not (<= #xd800 bits #xdfff)))
   :handle-size nil)
 

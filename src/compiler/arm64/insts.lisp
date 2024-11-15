@@ -2809,7 +2809,10 @@
         (t 'orr))
       :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
   (def s-and #b0 #b00 #b00011)
-  (def s-eor #b1 #b00 #b00011))
+  (def s-eor #b1 #b00 #b00011)
+  (def bsl #b1 #b01 #b00011)
+  (def bit #b1 #b10 #b00011)
+  (def bif #b1 #b11 #b00011))
 
 (macrolet ((def (name u op)
              `(define-instruction ,name (segment rd rn rm &optional (size :16b))
@@ -2824,12 +2827,17 @@
                                          ,op
                                          (fpr-offset rn)
                                          (fpr-offset rd)))))))
+  (def s-add #b0 #b10000)
   (def s-sub #b1 #b10000)
   (def cmeq #b1 #b10001)
   (def cmgt #b0 #b00110)
   (def cmge #b0 #b00111)
   (def cmhi #b1 #b00110)
-  (def cmhs #b1 #b00111))
+  (def cmhs #b1 #b00111)
+  (def umin #b1 #b01101)
+  (def umax #b1 #b01100)
+  (def smin #b0 #b01101)
+  (def smax #b0 #b01100))
 
 (def-emitter simd-scalar-three-same
     (#b01 2 30)
@@ -2935,20 +2943,23 @@
   (rn :fields (list (byte 5 5) (byte 5 16)) :type 'simd-copy-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'sized-reg))
 
-(define-instruction umov (segment rd rn index size)
-  (:printer simd-copy-to-general ((op 0) (imm4 #b0111)))
-  (:emitter
-   (let ((size (position size '(:B :H :S :D))))
-     (emit-simd-copy segment
-                     (case size
-                       (:d 1)
-                       (t 0))
-                     0
-                     (logior (ash index (1+ size))
-                             (ash 1 size))
-                     #b0111
-                     (fpr-offset rn)
-                     (gpr-offset rd)))))
+(macrolet ((def (name op imm4 q)
+             `(define-instruction ,name (segment rd rn index size)
+                (:printer simd-copy-to-general ((op ,op) (imm4 ,imm4)))
+                (:emitter
+                 (let ((isize (position size '(:B :H :S :D))))
+                   (emit-simd-copy segment
+                                   (case size
+                                     (,q 1)
+                                     (t 0))
+                                   ,op
+                                   (logior (ash index (1+ isize))
+                                           (ash 1 isize))
+                                   ,imm4
+                                   (fpr-offset rn)
+                                   (gpr-offset rd)))))))
+  (def umov 0 #b0111 (:d))
+  (def smov 0 #b0101 (:d :s)))
 
 (define-instruction dup (segment rd rn size)
   (:printer simd-copy-to-general
@@ -3067,7 +3078,9 @@
                     (fpr-offset rn)
                     (fpr-offset rd)))))))
   (def uminv 1 #b11010)
-  (def umaxv 1 #b01010))
+  (def umaxv 1 #b01010)
+  (def sminv 0 #b11010)
+  (def smaxv 0 #b01010))
 
 (define-instruction-format (simd-two-misc 32
                             :default-printer '(:name :tab rd ", " rn))
