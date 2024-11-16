@@ -564,3 +564,9 @@
            (let ((node (sb-c::vop-node sb-assem::*current-vop*)))
              (and (sb-c::combination-p node)
                   (eq (sb-c::combination-info node) :aligned-stack))))))
+
+;;; Print registers from VOPs
+(defmacro mprint (value)
+  `(let ((*location-context* ',value))
+     (emit-error-break sb-assem::*current-vop* cerror-trap (error-number-or-lose 'sb-kernel::mprint-error)
+                       (list ,value))))

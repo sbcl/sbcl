@@ -24,8 +24,9 @@
   (context (* os-context-t) :in)
   (index int :in))
 
-(defun context-float-register (context index format)
-  (declare (type (alien (* os-context-t)) context))
+(defun context-float-register (context index format &optional integer)
+  (declare (ignore integer)
+           (type (alien (* os-context-t)) context))
   (let ((addr (context-float-register-addr context index)))
     (declare (type (alien (* os-context-register-t)) addr))
     (coerce (deref addr) format)))

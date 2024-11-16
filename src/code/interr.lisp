@@ -601,6 +601,17 @@
                  "There is nothing left to pop."
                  "Unexpected FILL-POINTER error"))
       (fill-pointer-error array)))
+
+(deferr mprint-error (x)
+  (declare (ignore x))
+  (let* ((raw-x (car *current-internal-error-args*))
+         (tn-name (sb-disassem::get-random-tn-name raw-x))
+         (context (sb-di:error-context)))
+    (multiple-value-bind (value size)
+        (sb-di::sub-access-debug-var-slot nil raw-x *current-internal-error-context* t)
+      (if size
+          (format t "~7a = ~v,'0x ~a~%" tn-name (* size 2) value context)
+          (format t "~7a = ~a ~a~%" tn-name value context)))))
 
 ;;;; INTERNAL-ERROR signal handler
 

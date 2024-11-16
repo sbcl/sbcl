@@ -21,8 +21,8 @@
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 
-(defun context-float-register (context index format)
-  (declare (ignorable context index))
+(defun context-float-register (context index format &optional integer)
+  (declare (ignorable context index integer))
   #-(or darwin linux openbsd win32 sunos (and freebsd x86-64))
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")
@@ -38,8 +38,13 @@
        (complex (sap-ref-single sap 0)
                 (sap-ref-single sap 4)))
       (complex-double-float
-       (complex (sap-ref-double sap 0)
-                (sap-ref-double sap 8)))
+       (if integer
+           (values (dpb (sap-ref-64 sap 8)
+                        (byte 64 64)
+                        (sap-ref-64 sap 0))
+                   16)
+           (complex (sap-ref-double sap 0)
+                    (sap-ref-double sap 8))))
       #+sb-simd-pack
       (simd-pack-int
        (%make-simd-pack-ub64
