@@ -3459,11 +3459,11 @@ is :ANY, the function name is not checked."
 
 (defun compiling-p (environment)
   (and (boundp 'sb-c:*compilation*)
-       (not (null-lexenv-p environment))
        #+sb-fasteval
        (not (typep environment 'sb-interpreter:basic-env))
        #+sb-eval
-       (not (typep environment 'sb-eval::eval-lexenv))))
+       (not (typep environment 'sb-eval::eval-lexenv))
+       (not (null-lexenv-p environment))))
 
 ;;; Return T if SYMBOL will always have a value in its TLS cell that is
 ;;; not EQ to NO-TLS-VALUE-MARKER-WIDETAG. As an optimization, set and ref
