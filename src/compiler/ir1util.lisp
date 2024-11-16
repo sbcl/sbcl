@@ -3459,6 +3459,7 @@ is :ANY, the function name is not checked."
 
 (defun compiling-p (environment)
   (and (boundp 'sb-c:*compilation*)
+       (not (null-lexenv-p environment))
        #+sb-fasteval
        (not (typep environment 'sb-interpreter:basic-env))
        #+sb-eval
