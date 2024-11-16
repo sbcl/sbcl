@@ -2858,21 +2858,40 @@
                                       :remaining-bytes 1)
                  (emit-byte segment imm))))
 
-           (define-insert-sse-instruction (name prefix op1 op2)
+           (define-insert-sse-instruction (name prefix op1 op2
+                                           &key explicit-qword)
              `(define-instruction ,name (segment dst src imm)
-                (:printer
-                 ,(if op2 'ext-2byte-xmm-reg/mem 'ext-xmm-reg/mem)
-                 ((prefix '(,prefix))
-                  ,@(if op2
-                        `((op1 '(,op1)) (op2 '(,op2)))
-                        `((op '(,op1))))
-                  (imm nil :type 'imm-byte))
-                 '(:name :tab reg ", " reg/mem ", " imm))
+                ,@(case name
+                    (pinsrq nil)
+                    (pinsrd
+                     `((:printer
+                        ext-2byte-xmm-reg/mem
+                        ((prefix '(,prefix))
+                         (rex nil :prefilter (lambda (dstate)
+                                               (if (dstate-getprop dstate +rex-w+) 1 0))
+                                  :printer #("PINSRD" "PINSRQ"))
+                         (op1 '(,op1))
+                         (op2 '(,op2))
+                         (imm nil :type 'imm-byte))
+                        '(rex :tab reg ", " reg/mem ", " imm))))
+
+                    (t
+                     `((:printer
+                        ,(if op2 'ext-2byte-xmm-reg/mem 'ext-xmm-reg/mem)
+                        ((prefix '(,prefix))
+                         ,@(if op2
+                               `((op1 '(,op1)) (op2 '(,op2)))
+                               `((op '(,op1))))
+                         (imm nil :type 'imm-byte))
+                        '(:name :tab reg ", " reg/mem ", " imm)))))
+
                 (:emitter
                  (aver (and (xmm-register-p dst) (not (xmm-register-p src))))
                  ,(if op2
                       `(emit-sse-inst-2byte segment dst src ,prefix ,op1 ,op2
-                                            :operand-size :do-not-set
+                                            :operand-size ,(if explicit-qword
+                                                               :qword
+                                                               :do-not-set)
                                             :remaining-bytes 1)
                       `(emit-sse-inst segment dst src ,prefix ,op1
                                       :operand-size :do-not-set
@@ -2880,10 +2899,10 @@
                  (emit-byte segment imm)))))
 
 
-  ;; pinsrq not encodable in 64-bit mode ;; FIXME: that's not true
   (define-insert-sse-instruction pinsrb #x66 #x3a #x20)
   (define-insert-sse-instruction pinsrw #x66 #xc4 nil)
   (define-insert-sse-instruction pinsrd #x66 #x3a #x22)
+  (define-insert-sse-instruction pinsrq #x66 #x3a #x22 :explicit-qword t)
 
   (define-extract-sse-instruction pextrb #x66 #x3a #x14)
   (define-extract-sse-instruction pextrd #x66 #x3a #x16)

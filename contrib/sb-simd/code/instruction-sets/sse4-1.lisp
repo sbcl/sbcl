@@ -35,7 +35,6 @@
    (two-arg-u64.2=      #:pcmpeqq   (u64.2) (u64.2 u64.2)      :cost 1 :encoding :sse :associative t)
    (two-arg-u64.2/=     nil         (u64.2) (u64.2 u64.2)      :cost 2 :encoding :fake-vop :associative t)
    (u64.2-elt           #:pextrq    (u64)   (u64.2 imm1)       :cost 1)
-   #+(or) ;; TODO: PINSRQ is currently missing in SBCL.
    (u64.2-insert        #:pinsrq    (u64.2) (u64.2 u64 imm1)   :cost 1 :encoding :sse)
    ;; s8.16
    (s8.16-blend         #:pblendvb  (s8.16) (s8.16 s8.16 u8.16) :cost 1 :encoding :sse+xmm0)
@@ -71,7 +70,6 @@
    (two-arg-s64.2=      #:pcmpeqq   (u64.2) (s64.2 s64.2)      :cost 1 :encoding :sse :associative t)
    (two-arg-s64.2/=     nil         (u64.2) (s64.2 s64.2)      :cost 2 :encoding :fake-vop :associative t)
    (s64.2-elt           #:pextrq    (s64)   (s64.2 imm1)       :cost 1)
-   #+(or) ;; TODO: PINSRQ is currently missing in SBCL.
    (s64.2-insert        #:pinsrq    (s64.2) (s64.2 s64 imm1)   :cost 1 :encoding :sse))
   (:loads
    (f32.4-ntload #:movntdqa f32.4 f32vec f32-array f32.4-non-temporal-aref f32.4-non-temporal-row-major-aref)
