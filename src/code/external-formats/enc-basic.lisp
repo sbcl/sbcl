@@ -994,7 +994,7 @@
            (return index)))))))
 
 #+(and sb-unicode 64-bit little-endian
-       (not (or arm64)))
+       (not (or arm64 x86-64)))
 (defun sb-vm::simd-copy-character-string-to-utf8 (start end string obuf)
   (declare (type index start end)
            (optimize speed (safety 0)))
