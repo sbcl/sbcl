@@ -1050,7 +1050,7 @@
           (when (and (typep string '(simple-array character (*)))
                      (>= (- end start) 16))
             (multiple-value-bind (new-start newline)
-                (sb-vm::simd-copy-character-string-to-utf8 start end string obuf)
+                (truly-the (values index fixnum &optional) (sb-vm::simd-copy-character-string-to-utf8 start end string obuf))
               (setf start new-start)
               (when (>= newline 0)
                 (setf last-newline newline))))

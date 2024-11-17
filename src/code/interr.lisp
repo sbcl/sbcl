@@ -610,7 +610,7 @@
     (multiple-value-bind (value size)
         (sb-di::sub-access-debug-var-slot nil raw-x *current-internal-error-context* t)
       (if size
-          (format t "~7a = ~v,'0x ~a~%" tn-name (* size 2) value context)
+          (format t "~7a = ~v,'0,'|,32:x ~a~%" tn-name (* size 2) value context)
           (format t "~7a = ~a ~a~%" tn-name value context)))))
 
 ;;;; INTERNAL-ERROR signal handler
