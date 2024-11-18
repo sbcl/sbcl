@@ -1300,13 +1300,87 @@
       (loop repeat 15
             do (inst cmp byte-array end)
                (inst jmp :ge DONE)
-               (inst mov :byte left (ea byte-array))
-               (inst cmp left element)
+               (inst cmp :byte element (ea byte-array))
                (inst jmp :eq FOUND-SCALAR)
                (inst inc byte-array))
       (inst jmp DONE)
 
       FOUND
+      (inst bsf :dword left left)
+      (inst add byte-array left)
+
+      FOUND-SCALAR
+      (inst sub byte-array byte-array*)
+      (move res byte-array)
+      (inst shl res n-fixnum-tag-bits)
+      DONE)))
+
+(def-variant simd-position8 :avx2 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+                 ((start unsigned-reg) start)
+                 ((end unsigned-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((byte-array sap-reg t))
+                 ((bytes int-avx2-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst lea byte-array (ea start byte-array*))
+      (inst add end byte-array*)
+
+      (move left end)
+      (inst sub left byte-array)
+
+      (inst cmp left 32)
+      (inst jmp :l SSE)
+
+      (inst vmovd search element)
+      (inst vpbroadcastb search search)
+
+      LOOP
+      (inst vpcmpeqb bytes search (ea byte-array))
+      (inst vpmovmskb left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (inst add byte-array 32)
+      (move left end)
+      (inst sub left byte-array)
+      (inst cmp left 32)
+      (inst jmp :ge LOOP)
+      (inst vzeroupper)
+
+      SSE
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (let ((bytes (reg-in-sc bytes 'complex-double-reg))
+            (search (reg-in-sc search 'complex-double-reg)))
+        (inst vmovd search element)
+        (inst vpbroadcastb search search)
+        (inst vpcmpeqb bytes search (ea byte-array))
+        (inst vpmovmskb left bytes)
+        (inst test :dword left left)
+        (inst jmp :nz FOUND)
+
+        (inst add byte-array 16))
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp byte-array end)
+               (inst jmp :ge DONE)
+               (inst cmp :byte element (ea byte-array))
+               (inst jmp :eq FOUND-SCALAR)
+               (inst inc byte-array))
+      (inst jmp DONE)
+
+      FOUND
+      (inst vzeroupper)
       (inst bsf :dword left left)
       (inst add byte-array left)
 
@@ -1365,8 +1439,7 @@
             do (inst cmp byte-array start)
                (inst jmp :le DONE)
                (inst dec byte-array)
-               (inst mov :byte left (ea byte-array))
-               (inst cmp left element)
+               (inst cmp :byte element (ea byte-array))
                (inst jmp :eq FOUND-SCALAR))
       (inst jmp DONE)
 
@@ -1379,6 +1452,82 @@
       (move res byte-array)
       (inst shl res n-fixnum-tag-bits)
       DONE)))
+
+(def-variant simd-position8-from-end :avx2 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+                 ((start unsigned-reg) start)
+                 ((end unsigned-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((byte-array sap-reg t))
+                 ((bytes int-avx2-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst lea byte-array (ea end byte-array*))
+      (inst add start byte-array*)
+
+      (move left byte-array)
+      (inst sub left start)
+
+      (inst cmp left 32)
+      (inst jmp :l SSE)
+
+      (inst vmovd search element)
+      (inst vpbroadcastb search search)
+
+
+      LOOP
+      (inst sub byte-array 32)
+      (inst vpcmpeqb bytes search (ea byte-array))
+      (inst vpmovmskb left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (move left byte-array)
+      (inst sub left start)
+      (inst cmp left 32)
+      (inst jmp :ge LOOP)
+      (inst vzeroupper)
+
+      SSE
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (let ((bytes (reg-in-sc bytes 'complex-double-reg))
+            (search (reg-in-sc search 'complex-double-reg)))
+        (inst vmovd search element)
+        (inst vpbroadcastb search search)
+        (inst sub byte-array 16)
+        (inst vpcmpeqb bytes search (ea byte-array))
+        (inst vpmovmskb left bytes)
+        (inst test :dword left left)
+        (inst jmp :nz FOUND))
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp byte-array start)
+               (inst jmp :le DONE)
+               (inst dec byte-array)
+               (inst cmp :byte element (ea byte-array))
+               (inst jmp :eq FOUND-SCALAR))
+      (inst jmp DONE)
+
+      FOUND
+      (inst vzeroupper)
+      (inst bsr :dword left left)
+      (inst add byte-array left)
+
+      FOUND-SCALAR
+      (inst sub byte-array byte-array*)
+      (move res byte-array)
+      (inst shl res n-fixnum-tag-bits)
+      DONE)))
+
 
 (defun simd-position32 (element vector start end)
   (declare (type index start end)
@@ -1426,8 +1575,83 @@
       (loop repeat 15
             do (inst cmp 32-bit-array end)
                (inst jmp :ge DONE)
-               (inst mov :dword left (ea 32-bit-array))
-               (inst cmp :dword left element)
+               (inst cmp :dword element (ea 32-bit-array))
+               (inst jmp :eq FOUND-SCALAR)
+               (inst add 32-bit-array 4))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsf :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))
+
+(def-variant simd-position32 :avx2 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes int-avx2-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+      (inst shl end 1)
+      (inst lea 32-bit-array (ea 32-bit-array* start 2))
+
+      (inst add end 32-bit-array*)
+
+      (move left end)
+      (inst sub left 32-bit-array)
+
+      (inst cmp left 32)
+      (inst jmp :l SSE)
+
+      (inst vmovd search element)
+      (inst vpbroadcastd search search)
+
+      LOOP
+      (inst vpcmpeqd bytes search (ea 32-bit-array))
+      (inst vmovmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (inst add 32-bit-array 32)
+      (move left end)
+      (inst sub left 32-bit-array)
+      (inst cmp left 32)
+      (inst jmp :ge LOOP)
+      (inst vzeroupper)
+
+      SSE
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (let ((bytes (reg-in-sc bytes 'complex-double-reg))
+            (search (reg-in-sc search 'complex-double-reg)))
+        (inst vmovd search element)
+        (inst vpbroadcastd search search)
+        (inst vpcmpeqd bytes search (ea 32-bit-array))
+        (inst vmovmskps left bytes)
+        (inst test :dword left left)
+        (inst jmp :nz FOUND)
+
+        (inst add 32-bit-array 16))
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array end)
+               (inst jmp :ge DONE)
+               (inst cmp :dword element (ea 32-bit-array))
                (inst jmp :eq FOUND-SCALAR)
                (inst add 32-bit-array 4))
       (inst jmp DONE)
@@ -1490,12 +1714,88 @@
             do (inst cmp 32-bit-array start)
                (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
-               (inst mov :byte left (ea 32-bit-array))
-               (inst cmp left element)
+               (inst cmp :byte element (ea 32-bit-array))
                (inst jmp :eq FOUND-SCALAR))
       (inst jmp DONE)
 
       FOUND
+      (inst bsr :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))
+
+(def-variant simd-position32-from-end :avx2 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes int-avx2-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst shl start 1)
+      (inst lea 32-bit-array (ea 32-bit-array* end 2))
+      (inst add start 32-bit-array*)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+
+      (inst cmp left 32)
+      (inst jmp :l SSE)
+
+      (inst vmovd search element)
+      (inst vpbroadcastd search search)
+
+
+      LOOP
+      (inst sub 32-bit-array 32)
+      (inst vpcmpeqd bytes search (ea 32-bit-array))
+      (inst vmovmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+      (inst cmp left 32)
+      (inst jmp :ge LOOP)
+      (inst vzeroupper)
+
+      SSE
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (let ((bytes (reg-in-sc bytes 'complex-double-reg))
+            (search (reg-in-sc search 'complex-double-reg)))
+        (inst vmovd search element)
+        (inst vpbroadcastd search search)
+        (inst sub 32-bit-array 16)
+        (inst vpcmpeqd bytes search (ea 32-bit-array))
+        (inst vmovmskps left bytes)
+        (inst test :dword left left)
+        (inst jmp :nz FOUND))
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array start)
+               (inst jmp :le DONE)
+               (inst sub 32-bit-array 4)
+               (inst cmp :byte element (ea 32-bit-array))
+               (inst jmp :eq FOUND-SCALAR))
+      (inst jmp DONE)
+
+      FOUND
+      (inst vzeroupper)
       (inst bsr :dword left left)
       (inst shl left 2)
       (inst add 32-bit-array left)
