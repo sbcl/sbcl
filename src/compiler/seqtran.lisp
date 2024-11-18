@@ -2917,11 +2917,12 @@
                        (eql (lvar-value start) 0)
                        (constant-lvar-p end)
                        (null (lvar-value end))))
-              (let ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
-                    (test (lvar-fun-name* test))
-                    (item (lvar-type item)))
+              (let* ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+                     (et-specifier (type-specifier element-type))
+                     (test (lvar-fun-name* test))
+                     (item (lvar-type item)))
                 (when (and (neq element-type *wild-type*)
-                           (case (type-specifier element-type)
+                           (case et-specifier
                              ((double-float single-float)
                               (and (csubtypep item element-type)
                                    (memq test '(= eql equal equalp))))
@@ -2941,7 +2942,7 @@
                                    (csubtypep item element-type)
                                    (memq test '(eq eql equal equalp =))))))
                   (cond #+(or arm64 x86-64)
-                        ((and (csubtypep (lvar-type sequence) (specifier-type 'simple-base-string))
+                        ((and (memq et-specifier '(base-char character))
                               (constant-lvar-p from-end)
                               (neq test 'char-equal)
                               (not (and (eq test 'char=)
@@ -2949,9 +2950,13 @@
                          (delay-ir1-transform node :ir1-phases)
                          (return
                            `(let ((pos (and (characterp item)
-                                            (,(if (lvar-value from-end)
-                                                  'sb-vm::simd-position-from-end-ub8
-                                                  'sb-vm::simd-position-ub8)
+                                            (,(if (eq et-specifier 'base-char)
+                                                  (if (lvar-value from-end)
+                                                      'sb-vm::simd-position-from-end-ub8
+                                                      'sb-vm::simd-position-ub8)
+                                                  (if (lvar-value from-end)
+                                                      'sb-vm::simd-position-from-end-ub32
+                                                      'sb-vm::simd-position-ub32))
                                              (char-code (truly-the character item)) sequence start
                                              (or end (length sequence))))))
                               (if pos

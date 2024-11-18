@@ -1379,3 +1379,130 @@
       (move res byte-array)
       (inst shl res n-fixnum-tag-bits)
       DONE)))
+
+(defun simd-position-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+      (inst shl end 1)
+      (inst lea 32-bit-array (ea 32-bit-array* start 2))
+
+      (inst add end 32-bit-array*)
+
+      (move left end)
+      (inst sub left 32-bit-array)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst pshufd search search 0)
+
+      LOOP
+      (inst movdqu bytes (ea 32-bit-array))
+      (inst pcmpeqd bytes search)
+      (inst movmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (inst add 32-bit-array 16)
+      (move left end)
+      (inst sub left 32-bit-array)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array end)
+               (inst jmp :ge DONE)
+               (inst mov :dword left (ea 32-bit-array))
+               (inst cmp :dword left element)
+               (inst jmp :eq FOUND-SCALAR)
+               (inst add 32-bit-array 4))
+      (inst jmp DONE)
+
+      FOUND
+      (mprint left)
+      (inst bsf :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))
+
+(defun simd-position-from-end-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst shl start 1)
+      (inst lea 32-bit-array (ea 32-bit-array* end 2))
+      (inst add start 32-bit-array*)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst pshufd search search 0)
+
+      LOOP
+      (inst sub 32-bit-array 16)
+      (inst movdqu bytes (ea 32-bit-array))
+      (inst pcmpeqd bytes search)
+      (inst movmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array start)
+               (inst jmp :l DONE)
+               (inst sub 32-bit-array 4)
+               (inst mov :byte left (ea 32-bit-array))
+               (inst cmp left element)
+               (inst jmp :eq FOUND-SCALAR))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsr :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))
