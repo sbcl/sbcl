@@ -1151,3 +1151,137 @@
       (inst sub left byte-array byte-array*)
       (inst lsl res left n-fixnum-tag-bits)
       DONE)))
+
+(defun simd-position-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end* any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((end))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((cmp complex-double-reg))
+                 ((temp complex-double-reg))
+                 ((indexes))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res null-tn)
+      (inst dup search element :4s)
+      (inst add 32-bit-array 32-bit-array* (lsl start 1))
+      (inst add end 32-bit-array* (lsl end* 1))
+
+      (inst sub left end 32-bit-array)
+      (inst cmp left 16)
+
+      (inst b :lt SCALAR)
+
+      LOOP
+      (inst ldr bytes (@ 32-bit-array))
+      (inst cmeq cmp bytes search :4s)
+
+      (inst umaxv temp cmp :4s)
+      (inst umov left temp 0 :s)
+
+      (inst cbnz left FOUND)
+      (inst add 32-bit-array 32-bit-array 16)
+      (inst sub left end 32-bit-array)
+      (inst cmp left 16)
+      (inst b :ge LOOP)
+
+      SCALAR
+      (loop repeat 7
+            do (inst cmp 32-bit-array end)
+               (inst b :ge DONE)
+               (inst ldr (32-bit-reg left) (@ 32-bit-array))
+               (inst cmp left element)
+               (inst b :eq FOUND-SCALAR)
+               (inst add 32-bit-array 32-bit-array 4))
+
+      (inst b DONE)
+
+
+      FOUND
+      (load-inline-constant indexes :oword
+                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
+                                                collect i)))
+      (inst s-orn indexes indexes cmp)
+
+      (inst uminv indexes indexes :4s)
+      (inst umov left indexes 0 :s)
+
+      (inst add 32-bit-array 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub left 32-bit-array 32-bit-array*)
+      (inst lsr res left 1)
+      DONE)))
+
+(defun simd-position-from-end-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start* any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((start))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((cmp complex-double-reg))
+                 ((temp complex-double-reg))
+                 ((indexes))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res null-tn)
+      (inst dup search element :4s)
+      (inst add 32-bit-array 32-bit-array* (lsl end 1))
+
+      (inst add start 32-bit-array* (lsl start* 1))
+      (inst sub left 32-bit-array start)
+
+      (inst cmp left 16)
+      (inst b :lt SCALAR)
+
+
+      LOOP
+      (inst ldr bytes (@ 32-bit-array -16 :pre-index))
+      (inst cmeq cmp bytes search :4s)
+      (inst umaxv temp cmp :4s)
+      (inst umov tmp-tn temp 0 :s)
+      (inst cbnz tmp-tn FOUND)
+      (inst sub left 32-bit-array start)
+      (inst cmp left 16)
+      (inst b :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 7
+            do (inst cmp 32-bit-array start)
+               (inst b :lt DONE)
+               (inst ldr (32-bit-reg left) (@ 32-bit-array -4 :pre-index))
+               (inst cmp left element)
+               (inst b :eq FOUND-SCALAR))
+
+      (inst b DONE)
+
+
+      FOUND
+      (load-inline-constant indexes :oword
+                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
+                                                collect i)))
+      (inst sub left 32-bit-array 32-bit-array*)
+
+      (inst s-orn indexes indexes cmp)
+      (inst smaxv indexes indexes :4s)
+      (inst umov left indexes 0 :s)
+      (inst add 32-bit-array 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub left 32-bit-array 32-bit-array*)
+      (inst lsr res left 1)
+      DONE)))
