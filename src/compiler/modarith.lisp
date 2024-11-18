@@ -136,14 +136,18 @@
   `(%define-good-modular-fun ',name ',kind ',signedp))
 
 (defmacro define-modular-fun-optimizer
-    (name ((&rest lambda-list) kind signedp &key (width (gensym "WIDTH")))
+    (name ((&rest lambda-list) kind signedp &key (width (gensym "WIDTH"))
+                                                 result-width)
      &body body)
   (%check-modular-fun-macro-arguments name kind lambda-list)
-  (with-unique-names (call args)
+  (with-unique-names (call args result-width-name)
     `(setf (gethash ',name (modular-class-funs (find-modular-class ',kind ',signedp)))
-           (lambda (,call ,width)
+           (lambda (,call ,width ,(or result-width
+                                   result-width-name))
              (declare (type basic-combination ,call)
-                      (type (integer 0) ,width))
+                      (type (integer 0) ,width)
+                      ,@(unless result-width
+                          `((ignore ,result-width-name))))
              (let ((,args (basic-combination-args ,call)))
                (when (= (length ,args) ,(length lambda-list))
                  (destructuring-bind ,lambda-list ,args
@@ -167,7 +171,7 @@
 ;;; modular version, if it exists, or NIL. If we have changed
 ;;; anything, we need to flush old derived types, because they have
 ;;; nothing in common with the new code.
-(defun cut-to-width (lvar kind width signedp)
+(defun cut-to-width (lvar kind width signedp &optional (result-width width))
   (declare (type lvar lvar) (type (integer 0) width))
   (let ((type (specifier-type (if (zerop width)
                                   '(eql 0)
@@ -274,17 +278,18 @@
                                                 (modular-fun-info
                                                  (modular-fun-info-name modular-fun))
                                                 (function
-                                                 (funcall modular-fun node width)))
+                                                 (funcall modular-fun node width result-width)))
                                               :exit-if-null)
                                         (did-something nil)
                                         (over-wide nil))
                                (unless (eql modular-fun :good)
                                  (setq did-something t
                                        over-wide t)
-                                 (change-ref-leaf
-                                  fun-ref
-                                  (find-free-fun name "in a strange place"))
-                                 (setf (combination-kind node) :full))
+                                 (unless (eq name t)
+                                   (change-ref-leaf
+                                    fun-ref
+                                    (find-free-fun name "CUT-TO-WIDTH"))
+                                   (setf (combination-kind node) :full)))
                                (unless (functionp modular-fun)
                                  (dolist (arg (basic-combination-args node))
                                    (multiple-value-bind (change wide)
@@ -296,7 +301,9 @@
                                  ;; But the outer functions don't want the type to get
                                  ;; widened and their VOPs may never be applied.
                                  (setf (node-derived-type node)
-                                       (fun-type-returns (global-ftype name)))
+                                       (fun-type-returns (global-ftype (if (eq name t)
+                                                                           fun-name
+                                                                           name))))
                                  (setf (lvar-%derived-type (node-lvar node)) nil)
                                  (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))))
@@ -386,8 +393,8 @@
               ;; We cut to W not WIDTH if SIGNEDP is true, because
               ;; signed constant replacement needs to know which bit
               ;; in the field is the signed bit.
-              (let ((xact (cut-to-width x kind (if signedp w width) signedp))
-                    (yact (cut-to-width y kind (if signedp w width) signedp)))
+              (let ((xact (cut-to-width x kind (if signedp w width) signedp width))
+                    (yact (cut-to-width y kind (if signedp w width) signedp width)))
                 (declare (ignore xact yact))
                 nil) ; After fixing above, replace with T, meaning
                                         ; "don't reoptimize this (LOGAND) node any more".
@@ -463,7 +470,8 @@
             (defknown ,left-name (integer (integer 0)) (,type ,width)
                 (foldable flushable movable)
               :derive-type (make-modular-fun-type-deriver 'ash ',width ',signedp))
-            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
+            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width
+                                               :result-width result-width)
               (let ((integer-type (lvar-type integer))
                     (count-type (lvar-type count)))
                 (declare (ignorable integer-type))
@@ -481,7 +489,12 @@
                               (not (csubtypep count-type (specifier-type '(integer 0 *))))
                               (or (csubtypep integer-type (specifier-type `(unsigned-byte ,sb-vm:n-word-bits)))
                                   (csubtypep integer-type (specifier-type `(signed-byte ,sb-vm:n-word-bits)))))
-                         ',name)))))
+                         ',name)
+                        ((and (not (csubtypep integer-type (specifier-type 'word)))
+                              (not (csubtypep integer-type (specifier-type 'sb-vm:signed-word)))
+                              (csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum))))
+                         (cut-to-width integer ,kind width ,signedp)
+                         t)))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (t (constant-arg (eql 0))))

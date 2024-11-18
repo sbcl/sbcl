@@ -623,3 +623,12 @@
    (lambda (a)
      (* a #c(1d0 0d0)))
     (complex double-float)))
+
+(with-test (:name :bignum-ash-modarith)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (bignum a))
+         (logand (ash a -1) 1))
+    (((expt 2 129)) 0)
+    (((+ (expt 2 129) 2)) 1)))

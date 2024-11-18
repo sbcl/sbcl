@@ -580,7 +580,7 @@
                    'ymm-ymm/mem-imm prefix #x70
                    :printer '(:name :tab reg ", " reg/mem ", " imm))
                 (:emitter
-                 (emit-avx2-inst segment dst src ,prefix #x70
+                 (emit-avx2-inst segment src dst ,prefix #x70
                                  :remaining-bytes 1)
                  (emit-byte segment pattern)))))
   (def vpshufd  #x66)

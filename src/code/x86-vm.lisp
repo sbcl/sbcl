@@ -36,8 +36,9 @@
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
-(defun context-float-register (context index format)
-  (declare (ignorable context index))
+(defun context-float-register (context index format &optional integer)
+  (declare (ignore integer)
+           (ignorable context index))
   #-(or linux win32)
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")

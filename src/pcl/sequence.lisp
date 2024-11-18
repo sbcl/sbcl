@@ -107,10 +107,9 @@
    "Returns a freshly allocated sequence of length LENGTH and of the
    same class as SEQUENCE. Elements of the new sequence are
    initialized to INITIAL-ELEMENT, if supplied, initialized to
-   INITIAL-CONTENTS if supplied, or identical to the elements of
-   SEQUENCE if neither is supplied. Signals a PROTOCOL-UNIMPLEMENTED
-   error if the sequence protocol is not implemented for the class of
-   SEQUENCE."))
+   INITIAL-CONTENTS if supplied, or undefined if neither is supplied.
+   Signals a PROTOCOL-UNIMPLEMENTED error if the sequence protocol is
+   not implemented for the class of SEQUENCE."))
 
 (defgeneric sequence:adjust-sequence
     (sequence length &key initial-element initial-contents)
@@ -144,7 +143,7 @@
     (declare (ignore args))
     (sequence:protocol-unimplemented 'sequence:adjust-sequence s))
   (:documentation
-   "Return destructively modified SEQUENCE or a freshly allocated
+   "Returns destructively modified SEQUENCE or a freshly allocated
    sequence of the same class as SEQUENCE of length LENGTH. Elements
    of the returned sequence are initialized to INITIAL-ELEMENT, if
    supplied, initialized to INITIAL-CONTENTS if supplied, or identical

@@ -17,19 +17,28 @@
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
-(defun context-float-register (context index format)
+(defun context-float-register (context index format &optional integer)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
-       (sap-ref-single sap 0))
+       (if integer
+           (values (sap-ref-32 sap 0) 4)
+           (sap-ref-single sap 0)))
       (double-float
-       (sap-ref-double sap 0))
+       (if integer
+           (values (sap-ref-64 sap 0) 8)
+           (sap-ref-double sap 0)))
       (complex-single-float
        (complex (sap-ref-single sap 0)
                 (sap-ref-single sap 4)))
       (complex-double-float
-       (complex (sap-ref-double sap 0)
-                (sap-ref-double sap 8))))))
+       (if integer
+           (values (dpb (sap-ref-64 sap 8)
+                        (byte 64 64)
+                        (sap-ref-64 sap 0))
+                   16)
+           (complex (sap-ref-double sap 0)
+                    (sap-ref-double sap 8)))))))
 
 (defun %set-context-float-register (context index format value)
   (let ((sap (alien-sap (context-float-register-addr context index))))

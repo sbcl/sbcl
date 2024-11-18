@@ -236,7 +236,7 @@ maintained."
         (cond ((< (truly-the index ,index) (length ,rest-var))
                (let ((,var (fast-&rest-nth ,index ,rest-var)))
                  ,@body)
-               (incf ,index))
+               (incf (truly-the index ,index)))
               (t
                (return ,result)))))))
 

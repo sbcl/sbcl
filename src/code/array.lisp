@@ -60,6 +60,10 @@
           (%with-array-data array index nil)
         (values vector index))
       (values (truly-the (simple-array * (*)) array) index)))
+
+(defun sb-c::%data-vector-and-index/check-bound (array index)
+  (%check-bound array (array-dimension array 0) index)
+  (%data-vector-and-index array index))
 
 
 ;;;; MAKE-ARRAY
@@ -1164,26 +1168,6 @@ of specialized arrays is supported."
                     :format-arguments (list new max)))
            (setf (%array-fill-pointer vector) (truly-the index new))))))
 
-;;; FIXME: It'd probably make sense to use a MACROLET to share the
-;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
-;;; should probably be based on the VECTOR-PUSH-EXTEND code (which is
-;;; new ca. sbcl-0.7.0) rather than the VECTOR-PUSH code (which dates
-;;; back to CMU CL).
-(defun vector-push (new-element array)
-  "Attempt to set the element of ARRAY designated by its fill pointer
-   to NEW-ELEMENT, and increment the fill pointer by one. If the fill pointer is
-   too large, NIL is returned, otherwise the index of the pushed element is
-   returned."
-  (declare (explicit-check))
-  (let ((fill-pointer (fill-pointer array)))
-    (cond ((= fill-pointer (%array-available-elements array))
-           nil)
-          (t
-           (locally (declare (optimize (safety 0)))
-             (setf (aref array fill-pointer) new-element))
-           (setf (%array-fill-pointer array) (1+ fill-pointer))
-           fill-pointer))))
-
 #-system-tlabs
 (defmacro reallocate-vector-with-widetag (old-vector &rest args)
   (declare (ignore old-vector))
@@ -1262,6 +1246,16 @@ of specialized arrays is supported."
       (setf (aref vector fill-pointer) new-element))
     fill-pointer))
 
+(defun prepare-vector-push-extend (vector)
+  (declare (explicit-check))
+  (let* ((fill-pointer (fill-pointer vector))
+         (new-fill-pointer (1+ fill-pointer)))
+    (if (= fill-pointer (%array-available-elements vector))
+        (extend-vector vector nil)
+        (setf (%array-fill-pointer vector) new-fill-pointer))
+    (multiple-value-bind (array index) (%data-vector-and-index vector fill-pointer)
+      (values array index fill-pointer))))
+
 (defun vector-pop (array)
   "Decrease the fill pointer by 1 and return the element pointed to by the
   new fill pointer."
@@ -1274,6 +1268,21 @@ of specialized arrays is supported."
           (aref array
                 (setf (%array-fill-pointer array)
                       (1- fill-pointer)))))))
+
+(defun vector-push (new-element array)
+  "Attempt to set the element of ARRAY designated by its fill pointer
+   to NEW-ELEMENT, and increment the fill pointer by one. If the fill pointer is
+   too large, NIL is returned, otherwise the index of the pushed element is
+   returned."
+  (declare (explicit-check))
+  (let ((fill-pointer (fill-pointer array)))
+    (cond ((= fill-pointer (%array-available-elements array))
+           nil)
+          (t
+           (locally (declare (optimize (safety 0)))
+             (setf (aref array fill-pointer) new-element))
+           (setf (%array-fill-pointer array) (1+ fill-pointer))
+           fill-pointer))))
 
 
 ;;;; ADJUST-ARRAY

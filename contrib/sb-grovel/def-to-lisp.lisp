@@ -64,11 +64,11 @@ code:
            args)))
 
 (defun c-for-enum (lispname elements export)
-  (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
+  (printf "(sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
   (dolist (element elements)
     (destructuring-bind (lisp-element-name c-element-name) element
       (printf " (~S %ld)" lisp-element-name (word-cast c-element-name))))
-  (printf ")))")
+  (printf "))")
   (when export
     (dolist (element elements)
       (destructuring-bind (lisp-element-name c-element-name) element
@@ -78,7 +78,7 @@ code:
 
 (defun c-for-structure (lispname cstruct)
   (destructuring-bind (cname &rest elements) cstruct
-    (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-grovel::define-c-struct ~A %ld" lispname
+    (printf "(sb-grovel::define-c-struct ~A %ld" lispname
             (word-cast (format nil "sizeof(~A)" cname)))
     (dolist (e elements)
       (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
@@ -99,7 +99,7 @@ code:
               (printf "  %ld)"
                       (word-cast (format nil "sizeof(t.~A)" c-el-name)))
               (as-c "}")))))
-    (printf "))")))
+    (printf ")")))
 
 (defun print-c-source (stream headers definitions package-name)
   (declare (ignorable definitions package-name))
@@ -160,7 +160,7 @@ code:
           (:enum
            (c-for-enum lispname cname export))
           (:type
-           (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:%ssigned %ld)))" lispname
+           (printf "(sb-alien:define-alien-type ~A (sb-alien:%ssigned %ld))" lispname
                    (format nil "SIGNED_(~A)" cname)
                    (word-cast (format nil "(8*sizeof(~A))" cname))))
           (:string
@@ -169,7 +169,7 @@ code:
           (:function
            (printf "(cl:declaim (cl:inline ~A))" lispname)
            (destructuring-bind (f-cname &rest definition) cname
-             (printf "(sb-grovel::define-foreign-routine (\"~A\" ~A)" f-cname lispname)
+             (printf "(sb-alien:define-alien-routine (\"~A\" ~A)" f-cname lispname)
              (printf "~{  ~W~^\\n~})" definition)))
           (:structure
            (c-for-structure lispname cname))

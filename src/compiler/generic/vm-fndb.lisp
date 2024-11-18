@@ -195,6 +195,9 @@
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
+(defknown vector-data (array index) (values simple-array index)
+  (flushable))
+
 (defknown simple-array-header-of-rank-p (t %array-rank) boolean
   (flushable))
 (defknown sb-kernel::check-array-shape (simple-array list)
@@ -711,9 +714,29 @@
   sb-interpreter::interpreted-fun-prototype (flushable))
 
 
-(defknown %data-vector-and-index (array index)
-                                 (values (simple-array * (*)) index)
-                                 (foldable flushable))
+(defknown %data-vector-and-index
+    (array index)
+    (values (simple-array * (*)) index)
+    (foldable flushable))
+
+(defknown %data-vector-and-index/check-bound (array index)
+    (values (simple-array * (*)) index)
+    (foldable))
+
+(defknown %data-vector-and-index/known
+    (array index)
+    (values array index)
+    (flushable always-translatable))
+
+;;; Checks for and adjusts fill-pointer for vector-pop/push and
+;;; returns the underlying simple data vector.
+(defknown %data-vector-pop
+    (array)
+    (values (simple-array * (*)) index))
+
+(defknown %data-vector-push
+    (array)
+    (values (simple-array * (*)) (or null index)))
 
 (defknown restart-point (t) t ())
 

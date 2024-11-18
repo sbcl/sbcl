@@ -11,6 +11,6 @@
 
 include Config.x86-bsd
 
-LINKFLAGS += -dynamic -export-dynamic
+LINKFLAGS += -dynamic -export-dynamic -m32
 
-CFLAGS += -g -Wall -O2 -fno-omit-frame-pointer
+CFLAGS += -g -Wall -O2 -fno-omit-frame-pointer -m32

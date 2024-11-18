@@ -141,7 +141,7 @@ int compress_vector(lispobj vector, size_t used_length) {
     char prefix[5];
     int prefix_length = pack_varint(used_length, prefix);
     size_t buf_size = ZSTD_compressBound(used_length);
-    char* buf = successful_malloc(buf_size);
+    char* buf = checked_malloc(buf_size);
     size_t new_length = ZSTD_compress(buf, buf_size, v->data, used_length, 22);
     if (ZSTD_isError(new_length)) {
         free(buf);
@@ -191,7 +191,7 @@ int decompress_vector(lispobj l_input, int input_offset,
     ZSTD_DCtx* dctx = 0;
     bool context_borrowed = 0;
     if (ZSTD_getFrameHeader(&zfh, src, compressedsize)) lose("could not get ZSTD frame header\n");
-    gc_assert(buffer_length == zfh.frameContentSize);
+    gc_assert(buffer_length == (int)zfh.frameContentSize);
     struct thread* th = get_sb_vm_thread();
     if (th) {
         struct extra_thread_data *extra_data = thread_extra_data(th);
@@ -208,10 +208,10 @@ int decompress_vector(lispobj l_input, int input_offset,
     if (!dctx) dctx = ZSTD_createDCtx();
     ZSTD_decompressBegin(dctx);
     size_t regeneratedSize = 0;
-    char* input_ptr = src;
-    char* input_end = src + compressedsize;
+    char* input_ptr = (char*)src;
+    char* input_end = input_ptr + compressedsize;
     size_t remainingCapacity = buffer_length;
-    char* output_ptr = output_buffer;
+    char* output_ptr = (char*)output_buffer;
     while (input_ptr < input_end) {
         size_t iSize = ZSTD_nextSrcSizeToDecompress(dctx);
         if (iSize == 0) lose("ZSTD API usage error");
@@ -224,7 +224,7 @@ int decompress_vector(lispobj l_input, int input_offset,
         output_ptr += decodedSize;
         remainingCapacity -= decodedSize;
     }
-    gc_assert(regeneratedSize == buffer_length);
+    gc_assert((int)regeneratedSize == buffer_length);
     if (context_borrowed)
         thread_extra_data(th)->zstd_dcontext = dctx;
     else

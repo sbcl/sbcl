@@ -299,20 +299,32 @@
                 vars
                 (args (loop for arg in args
                             if (and subseq
-                                    (lvar-matches arg :fun-names '(vector-subseq* subseq))
-                                    ;; Nothing should be modifying the original sequence
-                                    (almost-immediately-used-p arg (lvar-use arg) :flushable t))
+                                    (or
+                                     (and (lvar-matches arg :fun-names '(vector-subseq* subseq))
+                                          ;; Nothing should be modifying the original sequence
+                                          (almost-immediately-used-p arg (lvar-use arg) :flushable t))
+                                     (lvar-matches arg :fun-names '(list vector))))
                             append (let ((call (lvar-uses arg)))
                                      (setf new t
                                            subseqp t)
-                                     (destructuring-bind (sequence start &optional end) (combination-args call)
-                                       (declare (ignorable sequence start))
-                                       (splice-fun-args arg :any (if end 3 2))
-                                       (list ''sb-impl::%subseq
-                                             (car (push (gensym) vars))
-                                             (car (push (gensym) vars))
-                                             (when end
-                                               (car (push (gensym) vars))))))
+                                     (if (lvar-matches arg :fun-names '(list vector))
+                                         (destructuring-bind (&rest elements) (combination-args call)
+                                           (splice-fun-args arg :any nil)
+                                           (list* ''sb-impl::%splice
+                                                  (length elements)
+                                                  (loop for elt in elements
+                                                        for sym = (gensym)
+                                                        do
+                                                        (push sym vars)
+                                                        collect sym)))
+                                         (destructuring-bind (sequence start &optional end) (combination-args call)
+                                           (declare (ignorable sequence start))
+                                           (splice-fun-args arg :any (if end 3 2))
+                                           (list ''sb-impl::%subseq
+                                                 (car (push (gensym) vars))
+                                                 (car (push (gensym) vars))
+                                                 (when end
+                                                   (car (push (gensym) vars)))))))
                             else if (or (eq (lvar-type arg) (specifier-type 'null))
                                         (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
                             do (setf new t)
@@ -363,6 +375,10 @@
                       (check (pop args) (specifier-type 'sequence))
                       (check (pop args) (specifier-type 'index))
                       (check (pop args) (specifier-type '(or null index))))
+                     ((and (constant-lvar-p arg)
+                           (eq (lvar-value arg) 'sb-impl::%splice))
+                      (loop repeat (lvar-value (pop args))
+                            do (pop args)))
                      (t
                       (check arg (specifier-type 'sequence))))))))
 
@@ -3373,6 +3389,17 @@
                   (reciprocate %denominator)
                   %denominator))))))
 
+
+(deftransform expt ((base power) ((integer 10 10) t) * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(sb-kernel::10expt power))
+
+(deftransform expt ((base power) ((integer 10 10) (integer 0 20)) * :important nil)
+  `(aref #.(coerce (loop for i to 20
+                         collect (expt 10 i))
+                   'vector)
+         power))
+
 (deftransform expt ((base power) ((constant-arg unsigned-byte) unsigned-byte))
   (let ((base (lvar-value base)))
     (unless (= (logcount base) 1)
@@ -3478,9 +3505,6 @@
     (give-up-ir1-transform))
   (delay-ir1-transform node :ir1-phases)
   (let ((type (single-value-type (node-derived-type node))))
-    (when (or (csubtypep type (specifier-type 'word))
-              (csubtypep type (specifier-type 'sb-vm:signed-word)))
-      (give-up-ir1-transform))
     (unless (and (or (csubtypep (lvar-type x) (specifier-type 'word))
                      (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
                  (or (csubtypep (lvar-type y) (specifier-type 'word))
@@ -3492,6 +3516,15 @@
            (result-type (type-intersection type cast)))
       (when (eq result-type *empty-type*)
         (give-up-ir1-transform))
+      (let ((wordp (or (csubtypep type (specifier-type 'word))
+                       (csubtypep type (specifier-type 'sb-vm:signed-word)))))
+        (when (if (csubtypep result-type (specifier-type 'fixnum))
+                  (or (csubtypep type (specifier-type 'fixnum))
+                      (and wordp
+                           (not (and (csubtypep (lvar-type x) (specifier-type 'fixnum))
+                                     (csubtypep (lvar-type y) (specifier-type 'fixnum))))))
+                  wordp)
+         (give-up-ir1-transform)))
       (flet ((subp (lvar type)
                (cond
                  ((not (constant-type-p type))
@@ -6634,6 +6667,18 @@
 
 (deftransform princ ((object &optional stream) (string &optional t) * :important nil)
   `(write-string object stream))
+
+#-sb-xc-host ;; ansi-stream not defined
+(deftransform write-char ((object stream) (t ansi-stream) * :important nil)
+  `(progn (funcall (ansi-stream-cout stream) stream object)
+          object))
+
+#-sb-xc-host
+(deftransform write-string ((object stream &key (start 0) end)
+                            (simple-string ansi-stream &rest t) * :important nil)
+  `(progn (funcall (ansi-stream-sout stream) stream object start (or end
+                                                                     (length object)))
+          object))
 
 #+sb-thread
 (progn

@@ -133,7 +133,8 @@
   (def "ETYPECASE-FAILURE"       etypecase-failure            nil value keys)
   (def "NIL-FUN-RETURNED"        nil-fun-returned-error       nil fun)
   (def "UNREACHABLE"             sb-impl::unreachable         nil)
-  (def "FAILED-AVER"             sb-impl::%failed-aver        nil form))
+  (def "FAILED-AVER"             sb-impl::%failed-aver        nil form)
+  (def "FILL-POINTER"            fill-pointer-error           nil array))
 
 
 (defun emit-internal-error (kind code values &key trap-emitter)

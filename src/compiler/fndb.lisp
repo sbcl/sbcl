@@ -307,6 +307,9 @@
 (defknown sb-kernel::intexp ((or rational (complex rational)) integer) rational
   (movable foldable flushable recursive no-verify-arg-count))
 
+(defknown sb-kernel::10expt (number) number
+  (movable foldable flushable no-verify-arg-count))
+
 (defknown log (number &optional real) irrational
   (movable foldable flushable recursive))
 (defknown sqrt (number) irrational
@@ -599,32 +602,33 @@
   (movable)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
-(defknown concatenate (type-specifier &rest proper-sequence) consed-sequence ()
+(defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence
+  (foldable-read-only)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
-(defknown %concatenate-to-string (&rest sequence) simple-string
-  (flushable))
-(defknown %concatenate-to-base-string (&rest sequence) simple-base-string
-  (flushable))
-(defknown %concatenate-to-list (&rest sequence) list
-    (flushable))
-(defknown %concatenate-to-simple-vector (&rest sequence) simple-vector
-  (flushable))
-(defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest sequence)
+(defknown %concatenate-to-string (&rest (read-only sequence)) simple-string
+  (flushable foldable-read-only))
+(defknown %concatenate-to-base-string (&rest (read-only sequence)) simple-base-string
+  (flushable foldable-read-only))
+(defknown %concatenate-to-list (&rest (read-only sequence)) list
+    (flushable foldable-read-only))
+(defknown %concatenate-to-simple-vector (&rest (read-only sequence)) simple-vector
+  (flushable foldable-read-only))
+(defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest (read-only sequence))
     vector
-  (flushable no-verify-arg-count))
+  (flushable foldable-read-only no-verify-arg-count))
 
-(defknown %concatenate-to-string-subseq (&rest t) simple-string
-  (flushable))
-(defknown %concatenate-to-base-string-subseq (&rest t) simple-base-string
-  (flushable))
-(defknown %concatenate-to-list-subseq (&rest t) list
-    (flushable))
-(defknown %concatenate-to-simple-vector-subseq (&rest t) simple-vector
-  (flushable))
-(defknown %concatenate-to-vector-subseq ((unsigned-byte #.sb-vm:n-widetag-bits) &rest t)
+(defknown %concatenate-to-string-subseq (&rest (read-only t)) simple-string
+  (flushable foldable-read-only))
+(defknown %concatenate-to-base-string-subseq (&rest (read-only t)) simple-base-string
+  (flushable foldable-read-only))
+(defknown %concatenate-to-list-subseq (&rest (read-only t)) list
+    (flushable foldable-read-only))
+(defknown %concatenate-to-simple-vector-subseq (&rest (read-only t)) simple-vector
+  (flushable foldable-read-only))
+(defknown %concatenate-to-vector-subseq ((unsigned-byte #.sb-vm:n-widetag-bits) &rest (read-only t))
     vector
-  (flushable no-verify-arg-count))
+  (flushable foldable-read-only no-verify-arg-count))
 
 (defknown (possibly-base-stringize possibly-base-stringize-to-heap) ((or null string)) (or null simple-string)
   (flushable no-verify-arg-count))
@@ -652,11 +656,10 @@
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t))
 
-(defknown #.(loop for info across sb-vm:*specialized-array-element-type-properties*
-                  collect
-                  (intern (concatenate 'string "VECTOR-MAP-INTO/"
-                                       (string (sb-vm:saetp-primitive-type-name info)))
-                          :sb-impl))
+(defknown #.(map 'list (lambda (x)
+                         (package-symbolicate "SB-IMPL" "VECTOR-MAP-INTO/"
+                                              (sb-vm:saetp-primitive-type-name x)))
+                 sb-vm:*specialized-array-element-type-properties*)
     (simple-array index index (function ((rest-args :sequence t))
                                         (nth-arg 0 :sequence t))
                   &rest sequence)
@@ -700,7 +703,7 @@
   :derive-type #'result-type-first-arg
   :result-arg 0)
 
-(defknown replace ((modifying sequence) proper-sequence &rest t &key (:start1 index)
+(defknown replace ((modifying sequence) (read-only proper-sequence) &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
@@ -997,8 +1000,8 @@
 (defknown %lastn/fixnum (list (and unsigned-byte fixnum)) t (foldable flushable no-verify-arg-count))
 (defknown %lastn/bignum (list (and unsigned-byte bignum)) t (foldable flushable no-verify-arg-count))
 
-(defknown list (&rest t) list (movable flushable))
-(defknown list* (t &rest t) t (movable flushable))
+(defknown list (&rest t) list (movable flushable foldable-read-only))
+(defknown list* (t &rest t) t (movable flushable foldable-read-only))
 
 ;;; A stack allocated cons cell used for list accumulation routines.
 ;;; The lowtag might be incorrect because it's unaligned.
@@ -1274,7 +1277,7 @@
   (flushable no-verify-arg-count)
   :result-arg 1)
 
-(defknown vector (&rest t) simple-vector (flushable))
+(defknown vector (&rest t) simple-vector (flushable foldable-read-only))
 
 (defknown aref (array &rest index) t (foldable)
   :call-type-deriver #'array-call-type-deriver)
@@ -1332,6 +1335,9 @@
 (defknown vector-push (t (modifying complex-vector)) (or index null) ())
 (defknown vector-push-extend (t (modifying complex-vector) &optional (and index (integer 1))) index
     ())
+(defknown sb-vm::prepare-vector-push-extend ((modifying complex-vector))
+    (values (simple-array * (*)) index index)
+    (no-verify-arg-count))
 (defknown vector-pop ((modifying complex-vector)) t ())
 
 ;;; FIXME: complicated MODIFYING

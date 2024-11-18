@@ -374,24 +374,36 @@
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
   (block nil
-    (flet ((give-up (&optional reason)
-             (cond ((= (length subscripts) 1)
-                    (return
-                      `(lambda (array arg)
-                         (and (typep arg '(and fixnum unsigned-byte))
-                              (< arg (array-dimension array 0))))))
-                   (t
-                    (give-up-ir1-transform
-                     (or reason
-                         "~@<lower array bounds unknown or negative and upper bounds not ~
+    (let (dimensions)
+      (flet ((give-up (&optional reason)
+               (cond ((= (length subscripts) 1)
+                      (return
+                        `(lambda (array arg)
+                           (and (typep arg '(and fixnum unsigned-byte))
+                                (< arg (array-dimension array 0))))))
+                     ((and (consp dimensions)
+                           (= (length subscripts)
+                              (length dimensions)))
+                      (let ((vars (make-gensym-list (length subscripts))))
+                        `(lambda (array ,@vars)
+                           (and
+                            ,@(loop for var in vars
+                                    for i from 0
+                                    collect
+                                    `(< -1 ,var (array-dimension array ,i)))))))
+                     (t
+                      (give-up-ir1-transform
+                       (or reason
+                           "~@<lower array bounds unknown or negative and upper bounds not ~
                          negative~:@>")))))
-           (bound-known-p (x)
-             (integerp x)))             ; might be NIL or *
-      (let ((dimensions (catch-give-up-ir1-transform
-                            ((array-type-dimensions-or-give-up
-                              (lvar-conservative-type array))
-                             args)
-                          (give-up (car args)))))
+             (bound-known-p (x)
+               (integerp x)))           ; might be NIL or *
+        (setf dimensions
+              (catch-give-up-ir1-transform
+                  ((array-type-dimensions-or-give-up
+                    (lvar-conservative-type array))
+                   args)
+                (give-up (car args))))
         (when (eq '* dimensions)
           (give-up "array bounds unknown"))
         ;; shortcut for zero dimensions
@@ -464,6 +476,88 @@
 
 (defoptimizer (vector-pop derive-type) ((array))
   (derive-aref-type array))
+
+(deftransform vector-push-extend ((element vector) * * :node node)
+  (let* ((type (lvar-type vector))
+         (element-ctype (array-type-upgraded-element-type type))
+         stringp
+         vector-t)
+    (when (and (eq *wild-type* element-ctype)
+               (not (setf stringp (csubtypep type (specifier-type 'string)))))
+      ;; The new value is only suitable for a t-vector
+      (if (csubtypep (lvar-type element) (specifier-type '(not (or number character))))
+          (setf vector-t t
+                element-ctype *universal-type*)
+          (give-up-ir1-transform
+           "Upgraded element type of array is not known at compile time.")))
+    `(progn
+       (the ,(if stringp
+                 'character
+                 (type-specifier element-ctype)) element)
+       ,@(when vector-t
+           `((unless (typep vector '(vector t))
+               (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
+       (multiple-value-bind (data index fill-pointer)
+           (sb-vm::prepare-vector-push-extend vector)
+         (locally (declare (optimize (insert-array-bounds-checks 0)))
+           (setf (aref (truly-the ,(if stringp
+                                       'simple-string
+                                       `(simple-array ,(type-specifier element-ctype) (*)))
+                                  data)
+                       (truly-the index index))
+                 element))
+         fill-pointer))))
+
+(when-vop-existsp (:named %data-vector-pop)
+  (deftransform vector-pop ((vector) * * :node node)
+    (let* ((type (lvar-type vector))
+           (element-ctype (array-type-upgraded-element-type type))
+           stringp)
+      (when (and (eq *wild-type* element-ctype)
+                 (not (setf stringp (csubtypep type (specifier-type 'string)))))
+        ;; The new value is only suitable for a t-vector
+        (give-up-ir1-transform
+         "Upgraded element type of array is not known at compile time."))
+      `(multiple-value-bind (data index)
+           (%data-vector-pop vector)
+         (locally (declare (optimize (insert-array-bounds-checks 0)))
+           (aref (truly-the ,(if stringp
+                                 'simple-string
+                                 `(simple-array ,(type-specifier element-ctype) (*)))
+                            data)
+                 (truly-the index index))))))
+
+  (deftransform vector-push ((element vector) * * :node node)
+    (let* ((type (lvar-type vector))
+           (element-ctype (array-type-upgraded-element-type type))
+           stringp
+           vector-t)
+      (when (and (eq *wild-type* element-ctype)
+                 (not (setf stringp (csubtypep type (specifier-type 'string)))))
+        ;; The new value is only suitable for a t-vector
+        (if (csubtypep (lvar-type element) (specifier-type '(not (or number character))))
+            (setf vector-t t
+                  element-ctype *universal-type*)
+            (give-up-ir1-transform
+             "Upgraded element type of array is not known at compile time.")))
+      `(progn
+         (the ,(if stringp
+                   'character
+                   (type-specifier element-ctype)) element)
+         ,@(when vector-t
+             `((unless (typep vector '(vector t))
+                 (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
+         (multiple-value-bind (data index)
+             (%data-vector-push vector)
+           (when index
+             (locally (declare (optimize (insert-array-bounds-checks 0)))
+               (setf (aref (truly-the ,(if stringp
+                                           'simple-string
+                                           `(simple-array ,(type-specifier element-ctype) (*)))
+                                      data)
+                           index)
+                     element))
+             index))))))
 
 (defoptimizers derive-type
     (hairy-data-vector-set
@@ -585,8 +679,12 @@
 ;;;; constructors
 
 ;;; Convert VECTOR into a MAKE-ARRAY.
-(define-source-transform vector (&rest elements)
-  `(make-array ,(length elements) :initial-contents (list ,@elements)))
+(deftransform vector ((&rest elements) * * :node node)
+  ;; Some transforms recognize VECTOR as an argument
+  (delay-ir1-transform node :constraint)
+  (let ((vars (make-gensym-list (length elements))))
+    `(lambda ,vars
+       (make-array ,(length elements) :initial-contents (list ,@vars)))))
 
 ;;; Convert it into a MAKE-ARRAY if the element-type is known at compile-time.
 ;;; Otherwise, don't. This prevents allocating memory for a million element
@@ -683,7 +781,8 @@
      (if (constantp initial-contents env)
          (map 'vector (lambda (x) (constant-form-value x env)) output)
          (let ((f (if (singleton-p output) 'list 'vector)))
-           `(locally (declare (notinline ,f))
+           `(locally (declare (notinline ,f)
+                              (flushable ,f))
              (,f ,@(mapcar (lambda (x)
                              (cond ((and (symbolp x)
                                          (not (nth-value
@@ -1003,7 +1102,7 @@
     (flet ((wrap (underlying)
              `(let* ((%length ,(or c-length '(the index dims)))
                      (nwords ,n-words-form))
-                (declare (flushable sb-vm::splat))
+                (declare (flushable sb-vm::splat quickfill))
                 ,(if (not array-header-p)
                      underlying     ; was already cast using TRULY-THE
                      (let* ((constant-fill-pointer-p (and fill-pointer
@@ -1145,9 +1244,7 @@
             ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with constant LENGTH.
             ((and c-length
                   (lvar-matches initial-contents
-                                ;; FIXME: probably don't need all 4 of these now?
-                                :fun-names '(list vector
-                                             sb-impl::|List| sb-impl::|Vector|)
+                                :fun-names '(list vector)
                                 :arg-count c-length
                                 :notinline nil))
              (let ((parameters (eliminate-keyword-args
@@ -2183,7 +2280,7 @@
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
 
-(deftransform hairy-data-vector-ref/check-bounds ((array index))
+(deftransform hairy-data-vector-ref/check-bounds ((array index) (simple-array t))
   (let* ((type (lvar-type array))
          (element-type (array-type-upgraded-element-type type)))
     (when (or (and (eq element-type *wild-type*)
@@ -2195,16 +2292,13 @@
       (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
     `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-dimension array 0) 'index index))))
 
-(deftransform hairy-data-vector-set/check-bounds ((array index new-value))
+(deftransform hairy-data-vector-set/check-bounds ((array index new-value) (simple-array t t))
   (let* ((type (lvar-type array))
-         (element-type (array-type-upgraded-element-type type))
-         (simple (null (conservative-array-type-complexp type))))
-    (if (or (and (eq element-type *wild-type*)
-                 (not (csubtypep type (specifier-type 'simple-string))))
-            (not simple))
+         (element-type (array-type-upgraded-element-type type)))
+    (if (and (eq element-type *wild-type*)
+             (not (csubtypep type (specifier-type 'simple-string))))
         ;; The new value is only suitable for a simple-vector
-        (if (and simple
-                 (csubtypep (lvar-type new-value) (specifier-type '(not (or number character)))))
+        (if (csubtypep (lvar-type new-value) (specifier-type '(not (or number character))))
             `(hairy-data-vector-set/check-bounds (the simple-vector array) index new-value)
             (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
         `(hairy-data-vector-set array

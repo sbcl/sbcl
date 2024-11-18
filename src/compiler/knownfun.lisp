@@ -101,7 +101,8 @@
                        overwrite-fndb-silently
                        call-type-deriver
                        annotation
-                       folder)
+                       folder
+                       read-only)
   (let* ((ctype (specifier-type type))
          (type-to-store (if (contains-unknown-type-p ctype)
                             ;; unparse it, so SFUNCTION -> FUNCTION
@@ -143,7 +144,8 @@
                        (fun-info-result-arg old-fun-info) result-arg
                        (fun-info-annotation old-fun-info) annotation
                        (fun-info-call-type-deriver old-fun-info) call-type-deriver
-                       (fun-info-folder old-fun-info) folder))
+                       (fun-info-folder old-fun-info) folder
+                       (fun-info-read-only-args old-fun-info) read-only))
                 (t
                  (setf (info :function :info name)
                        (make-fun-info :attributes attributes
@@ -152,7 +154,8 @@
                                       :result-arg result-arg
                                       :call-type-deriver call-type-deriver
                                       :annotation annotation
-                                      :folder folder))))
+                                      :folder folder
+                                      :read-only-args read-only))))
           (if location
               (setf (getf (info :source-location :declaration name) 'defknown)
                     location)
@@ -203,7 +206,7 @@
             (memq 'unboxed-return attributes))
     (pushnew 'no-verify-arg-count attributes))
 
-  (multiple-value-bind (type annotation)
+  (multiple-value-bind (type annotation read-only)
       (split-type-info arg-types result-type)
     `(%defknown ',(if (and (consp name)
                            (not (legal-fun-name-p name)))
@@ -220,7 +223,9 @@
                                (memq 'fixed-args attributes)
                                (memq 'unboxed-return attributes))
                               (let ((args (make-gensym-list (length arg-types))))
-                                `(lambda ,args (funcall ',name ,@args)))))))
+                                `(lambda ,args (funcall ',name ,@args))))
+                :read-only ',(unless (eql read-only 0)
+                               read-only))))
 
 (defstruct (fun-type-annotation
             (:copier nil))
@@ -243,7 +248,8 @@
               positional-annotation
               rest-annotation
               key-annotation
-              return-annotation)
+              return-annotation
+              (read-only 0))
           (labels ((annotation-p (x)
                      (typep x '(or (cons (member function function-designator modifying
                                           inhibit-flushing))
@@ -260,6 +266,9 @@
                            (t x))))
                    (process-positional (type)
                      (incf i)
+                     (when (typep type '(cons (eql read-only)))
+                       (setf (ldb (byte 1 i) read-only) 1)
+                       (setf type (second type)))
                      (cond ((annotation-p type)
                             (push (cons i (ensure-list type)) positional-annotation)
                             (strip-annotation type))
@@ -273,6 +282,9 @@
                            (t
                             pair)))
                    (process-rest (type)
+                     (when (typep type '(cons (eql read-only)))
+                       (setf read-only (logior (dpb read-only (byte (1+ i) 0) -1)))
+                       (setf type (second type)))
                      (cond ((annotation-p type)
                             (setf rest-annotation (ensure-list type))
                             (strip-annotation type))
@@ -302,7 +314,8 @@
                  `(make-fun-type-annotation :positional ',positional-annotation
                                             :rest ',rest-annotation
                                             :key ',key-annotation
-                                            :returns ',return-annotation)))))))))
+                                            :returns ',return-annotation))
+               read-only)))))))
 
 ;;; Return the FUN-INFO for NAME or die trying.
 (declaim (ftype (sfunction (t) fun-info) fun-info-or-lose))

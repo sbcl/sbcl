@@ -1221,7 +1221,7 @@
                          (pathname  +pathname-layout-flag+)
                          (t         +structure-layout-flag+))))
             (if (vop-existsp :translate structure-typep)
-                `(structure-typep object ,flag)
+                `(structure-typep object ,layout)
                 `(and (%instancep object)
                       (logtest (,get-flags (%instance-layout object)) ,flag)))))
 
@@ -1767,12 +1767,7 @@
 
 (deftransform structure-typep ((object type) (t (constant-arg t)))
   (let* ((layout (lvar-value type))
-         (type (case layout
-                 (#.+condition-layout-flag+ (specifier-type 'condition))
-                 (#.+pathname-layout-flag+  (specifier-type 'pathname))
-                 (#.+structure-layout-flag+ (specifier-type 'structure-object))
-                 (t
-                  (layout-classoid layout))))
+         (type (layout-classoid layout))
          (diff (type-difference (lvar-type object) type))
          (pred (backend-type-predicate diff)))
     (cond ((not (types-equal-or-intersect (lvar-type object) type))

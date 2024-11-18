@@ -1058,49 +1058,55 @@
       (inst cmp :dword (read-depthoid) (fixnumize k))))
 
   (defun structure-is-a (layout test-layout &optional target not-p done)
-    (cond ((integerp test-layout)
-           (inst test
-                 (if (typep test-layout '(unsigned-byte 8))
-                     :byte
-                     :dword)
-                 (ea (- (ash (+ instance-slots-offset
-                                (get-dsd-index layout sb-kernel::flags))
-                             word-shift)
-                        instance-pointer-lowtag)
-                     layout)
-                 test-layout))
-          ((let ((classoid (layout-classoid test-layout)))
-             (and (eq (classoid-state classoid) :sealed)
-                  (not (classoid-subclasses classoid))))
-           (emit-constant test-layout)
-           #+compact-instance-header
-           (inst cmp :dword
-                 layout (make-fixup test-layout :layout))
-           #-compact-instance-header
-           (inst cmp (emit-constant test-layout) layout))
+    (let ((test-layout
+            (case (layout-classoid-name test-layout)
+                       (condition +condition-layout-flag+)
+                       (pathname  +pathname-layout-flag+)
+                       (structure-object +structure-layout-flag+)
+                       (t test-layout))))
+     (cond ((integerp test-layout)
+            (inst test
+                  (if (typep test-layout '(unsigned-byte 8))
+                      :byte
+                      :dword)
+                  (ea (- (ash (+ instance-slots-offset
+                                 (get-dsd-index layout sb-kernel::flags))
+                              word-shift)
+                         instance-pointer-lowtag)
+                      layout)
+                  test-layout))
+           ((let ((classoid (layout-classoid test-layout)))
+              (and (eq (classoid-state classoid) :sealed)
+                   (not (classoid-subclasses classoid))))
+            (emit-constant test-layout)
+            #+compact-instance-header
+            (inst cmp :dword
+                  layout (make-fixup test-layout :layout))
+            #-compact-instance-header
+            (inst cmp (emit-constant test-layout) layout))
 
-          (t
-           (let* ((depthoid (layout-depthoid test-layout))
-                  (offset (+ (id-bits-offset)
-                             (ash (- depthoid 2) 2)
-                             (- instance-pointer-lowtag))))
-             (when (and target
-                        (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
-               (inst cmp :dword (read-depthoid) (fixnumize depthoid))
-               (inst jmp :l (if not-p target done)))
-             (inst cmp :dword
-                       (ea offset layout)
-                       ;; Small layout-ids can only occur for layouts made in genesis.
-                       ;; Therefore if the compile-time value of the ID is small,
-                       ;; it is permanently assigned to that type.
-                       ;; Otherwise, we allow for the possibility that the compile-time ID
-                       ;; is not the same as the load-time ID.
-                       ;; I don't think layout-id 0 can get here, but be sure to exclude it.
-                       (cond ((or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
-                                  (not (sb-c::producing-fasl-file)))
-                              (layout-id test-layout))
-                             (t
-                              (make-fixup test-layout :layout-id)))))))))
+           (t
+            (let* ((depthoid (layout-depthoid test-layout))
+                   (offset (+ (id-bits-offset)
+                              (ash (- depthoid 2) 2)
+                              (- instance-pointer-lowtag))))
+              (when (and target
+                         (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
+                (inst cmp :dword (read-depthoid) (fixnumize depthoid))
+                (inst jmp :l (if not-p target done)))
+              (inst cmp :dword
+                    (ea offset layout)
+                    ;; Small layout-ids can only occur for layouts made in genesis.
+                    ;; Therefore if the compile-time value of the ID is small,
+                    ;; it is permanently assigned to that type.
+                    ;; Otherwise, we allow for the possibility that the compile-time ID
+                    ;; is not the same as the load-time ID.
+                    ;; I don't think layout-id 0 can get here, but be sure to exclude it.
+                    (cond ((or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+                               (not (sb-c::producing-fasl-file)))
+                           (layout-id test-layout))
+                          (t
+                           (make-fixup test-layout :layout-id))))))))))
 
 (define-vop ()
   (:translate sb-c::%structure-is-a)
@@ -1125,7 +1131,8 @@
     (unless (instance-tn-ref-p args)
       (%test-lowtag object layout (if not-p target done) t instance-pointer-lowtag))
 
-    (cond ((and (not (integerp test-layout))
+    (cond ((and (not (memq (layout-classoid-name test-layout)
+                           '(condition pathname structure-object)))
                 (let ((classoid (layout-classoid test-layout)))
                   (and (eq (classoid-state classoid) :sealed)
                        (not (classoid-subclasses classoid)))))
@@ -1144,7 +1151,8 @@
            #-compact-instance-header
            (loadw layout object instance-slots-offset instance-pointer-lowtag)
            (structure-is-a layout test-layout target not-p done)))
-    (inst jmp (if (if (integerp test-layout)
+    (inst jmp (if (if  (memq (layout-classoid-name test-layout)
+                             '(condition pathname structure-object))
                       (not not-p)
                       not-p)
                   :ne :e) target)
@@ -1157,7 +1165,8 @@
   (:info target not-p test-layout)
   (:generator 4
     (structure-is-a layout test-layout target not-p done)
-    (inst jmp (if (if (integerp test-layout)
+    (inst jmp (if (if  (memq (layout-classoid-name test-layout)
+                             '(condition pathname structure-object))
                       (not not-p)
                       not-p)
                   :ne :e) target)

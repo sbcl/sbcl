@@ -15,8 +15,8 @@
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
-(defun context-float-register (context index format)
-  (declare (ignorable context index))
+(defun context-float-register (context index format &optional integer)
+  (declare (ignorable context index integer))
   (warn "stub CONTEXT-FLOAT-REGISTER")
   (coerce 0 format))
 

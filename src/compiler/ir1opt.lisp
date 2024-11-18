@@ -272,21 +272,29 @@
   (declare (type lvar lvar))
   (let ((dest (lvar-dest lvar)))
     (when (basic-combination-p dest)
-      (when (call-full-like-p dest)
-        (let ((info (and (eq (basic-combination-kind dest) :known)
-                         (basic-combination-fun-info dest))))
-          (if (and info
-                   (fun-info-externally-checkable-type info))
-              (return-from lvar-externally-checkable-type
-                (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
-              (map-combination-args-and-types
-               (lambda (arg type &rest args)
-                 (declare (ignore args))
-                 (when (eq arg lvar)
-                   (return-from lvar-externally-checkable-type
-                     (coerce-to-values type))))
-               dest
-               :defined-here t :asserted-type t)))))
+      (if (lvar-fun-is (basic-combination-fun dest)
+                       ;; Assembly routines that perform type-checks
+                       '(%data-vector-pop
+                         %data-vector-push))
+          (and (eq lvar (first (basic-combination-args dest)))
+               (return-from
+                lvar-externally-checkable-type
+                (values-specifier-type '(values complex-vector &optional))))
+          (when (call-full-like-p dest)
+            (let ((info (and (eq (basic-combination-kind dest) :known)
+                             (basic-combination-fun-info dest))))
+              (if (and info
+                       (fun-info-externally-checkable-type info))
+                  (return-from lvar-externally-checkable-type
+                    (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
+                  (map-combination-args-and-types
+                   (lambda (arg type &rest args)
+                     (declare (ignore args))
+                     (when (eq arg lvar)
+                       (return-from lvar-externally-checkable-type
+                         (coerce-to-values type))))
+                   dest
+                   :defined-here t :asserted-type t))))))
     *wild-type*))
 
 ;;;; interface routines used by optimizers
@@ -1252,6 +1260,13 @@
              (when (and (constant-fold-call-p node)
                         (constant-fold-call node))
                (return-from ir1-optimize-combination))
+             ;; Don't transform locally flushable functions,
+             ;; their transforms won't know that they are flushable.
+             (when (and (not (node-tail-p node))
+                        (not (node-lvar node))
+                        (let ((name (lvar-fun-name (combination-fun node) t)))
+                          (memq name (lexenv-flushable (node-lexenv node)))))
+               (return-from ir1-optimize-combination))
              (when (fold-call-derived-to-constant node)
                (return-from ir1-optimize-combination))
              (when (and (ir1-attributep attr commutative)
@@ -1506,8 +1521,19 @@
       (:full
        (multiple-value-bind (leaf info)
            (multiple-value-bind (type name leaf asserted) (lvar-fun-type fun-lvar)
-             (declare (ignore name))
-             (validate-call-type call type leaf nil asserted))
+             (declare (ignorable name asserted))
+             (validate-call-type call type leaf nil
+                                 (or asserted
+                                     #+sb-xc-host t
+                                     ;; Trust types coming from the system structures
+                                     (let ((source (lvar-uses fun-lvar)))
+                                       (and (combination-p source)
+                                            (lvar-fun-is (combination-fun source) '(%instance-ref))
+                                            (let ((type (lvar-type (car (combination-args source)))))
+                                              (and (structure-classoid-p type)
+                                                   (let ((package (sb-xc:symbol-package (classoid-name type))))
+                                                     (or (eq package *cl-package*)
+                                                         (and package (system-package-p package)))))))))))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))
@@ -1850,7 +1876,16 @@
   (let* ((info (basic-combination-fun-info combination))
          (attr (fun-info-attributes info))
          (args (basic-combination-args combination)))
-    (cond ((not (ir1-attributep attr foldable))
+    (cond ((not (or (ir1-attributep attr foldable)
+                    (and (ir1-attributep attr foldable-read-only)
+                         (let ((dest (node-dest combination)))
+                           (and (combination-p dest)
+                                (eq (combination-kind dest) :known)
+                                (let* ((info (combination-fun-info dest))
+                                       (read-only (fun-info-read-only-args info)))
+                                  (when read-only
+                                    (logbitp (position (node-lvar combination) (combination-args dest))
+                                             read-only))))))))
            nil)
           ((ir1-attributep attr call)
            (map-combination-args-and-types
@@ -2438,7 +2473,7 @@
                                 (when (and arg
                                            (lvar-reoptimize arg)
                                            (null (basic-var-sets var)))
-                                  (lvar-type arg)))
+                                  (list (lvar-type arg))))
                               (basic-combination-args call)
                               vars))
                (this-ref (lvar-use (basic-combination-fun call))))
@@ -2454,13 +2489,13 @@
                       (mapcar (lambda (this-arg old)
                                 (when old
                                   (setf (lvar-reoptimize this-arg) nil)
-                                  (type-union (lvar-type this-arg) old)))
+                                  (cons (lvar-type this-arg) old)))
                               (basic-combination-args dest)
                               union)))))
 
           (loop for var in vars
                 and type in union
-                when type do (propagate-to-refs var type))
+                when type do (propagate-to-refs var (sb-kernel::%type-union type)))
 
           ;; It's possible to discover new inline calls which may have
           ;; incompatible argument types, so don't allow reuse of this
@@ -2831,7 +2866,7 @@
 
                ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
                (change-ref-leaf (lvar-uses (combination-fun node))
-                                (find-free-fun 'values "values-list optimizer"))
+                                (find-free-fun 'values "VALUES-LIST"))
                (setf (combination-kind node) :full)
                (dolist (arg args)
                  (setf (lvar-dest arg) node))
@@ -2861,7 +2896,7 @@
                            (replace-node use `(values ,@(constant-value (ref-leaf use)))))
                           (t
                            (change-ref-leaf (lvar-uses (combination-fun use))
-                                            (find-free-fun 'values "values-list optimizer"))
+                                            (find-free-fun 'values "VALUES-LIST"))
                            (setf (combination-kind use) :full)
                            (setf (node-derived-type use) *wild-type*)))))
              (mapc #'transform use)

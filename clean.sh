@@ -110,7 +110,6 @@ find . \( \
         -name 'test.log' -o \
         -name 'a.out' -o \
         -name 'sbcl' -o \
-        -name 'ppc-linux-mcontext.h' -o \
         -name 'depend' -o \
         -name 'TAGS' -o \
         -name 'tags' -o \

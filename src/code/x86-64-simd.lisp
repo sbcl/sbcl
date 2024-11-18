@@ -142,17 +142,16 @@
   result)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun concat-ub8 (ub8s)
+  (defun concat-ub (size ubs)
     (let ((result 0))
-      (loop for ub8 in ub8s
-            do (setf result (logior (ash result 8) ub8)))
+      (loop for ub in ubs
+            do (setf result (logior (ash result size)
+                                    (ldb (byte size 0) ub))))
       result))
-
-  (defun concat-ub32 (ub32s)
-    (let ((result 0))
-      (loop for ub32 in ub32s
-            do (setf result (logior (ash result 32) ub32)))
-      result)))
+  (defun reg-in-sc (tn sc)
+    (make-random-tn :kind :normal
+                    :sc (sc-or-lose sc)
+                    :offset (tn-offset tn))))
 
 (def-variant simd-nreverse8 :avx2 (result vector start end)
   (declare (optimize speed (safety 0)))
@@ -170,7 +169,7 @@
                  ((vl-xmm))
                  ((vr-xmm)))
         ()
-      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub8 (loop for i below 32 collect i)))))
+      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub 8 (loop for i below 32 collect i)))))
         (assemble ()
           (inst shr end 1)
           (inst shr start 1)
@@ -322,7 +321,8 @@
       (inst jmp :b XMM)
       (inst sub right 32)
 
-      (inst vmovdqu reverse-mask (register-inline-constant :avx2 (concat-ub32 (loop for i to 7 collect i))))
+      (inst vmovdqu reverse-mask (register-inline-constant :avx2
+                                                           (concat-ub 32 (loop for i to 7 collect i))))
       LOOP
       (inst vmovdqu vl (ea left))
       (inst vmovdqu vr (ea right))
@@ -440,7 +440,7 @@
                  ((reverse-mask-xmm int-sse-reg))
                  ((v-xmm)))
         ()
-      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub8 (loop for i below 32 collect i)))))
+      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub 8 (loop for i below 32 collect i)))))
         (assemble ()
           (inst shr start 1)
           (inst add source start)
@@ -560,7 +560,8 @@
       (inst jmp :b XMM)
       (inst sub s-i 32)
 
-      (inst vmovdqu reverse-mask (register-inline-constant :avx2 (concat-ub32 (loop for i to 7 collect i))))
+      (inst vmovdqu reverse-mask (register-inline-constant :avx2
+                                                           (concat-ub 32 (loop for i to 7 collect i))))
       LOOP
       (inst vmovdqu v (ea source s-i))
       (inst vpermd v reverse-mask v)
@@ -818,7 +819,7 @@
                            ((shuffle-mask2 complex-double-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa crlf-mask (register-inline-constant :sse (concat-ub8 (loop for i below 8
+                (inst movdqa crlf-mask (register-inline-constant :sse (concat-ub 8 (loop for i below 8
                                                                                         collect #x0A
                                                                                         collect #x0D))))
                 (inst lea byte-array (ea head byte-array*))
@@ -931,9 +932,10 @@
                            ((zero int-sse-reg)))
                   ((new-head unsigned-reg positive-fixnum :from :load)
                    (copied unsigned-reg positive-fixnum :from :load))
-                (inst movdqa crlf-mask (register-inline-constant :sse (concat-ub8 (loop for i below 8
-                                                                                        collect #x0A
-                                                                                        collect #x0D))))
+                (inst movdqa crlf-mask (register-inline-constant :sse
+                                                                 (concat-ub 8 (loop for i below 8
+                                                                                    collect #x0A
+                                                                                    collect #x0D))))
                 (inst pxor zero zero)
                 (inst lea byte-array (ea head byte-array*))
                 (inst add end byte-array)
@@ -1023,3 +1025,483 @@
                 (inst sub new-head byte-array*))
             (setf (sb-impl::buffer-head ibuf) new-head)
             (truly-the index (+ start (truncate copied 4))))))))
+
+(defun simd-copy-character-string-to-utf8 (start end string obuf)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string)
+    (let* ((tail (sb-impl::buffer-tail obuf))
+           (buffer-left (- (sb-impl::buffer-length obuf) tail))
+           (string-left (- end start))
+           (n (logand (min buffer-left string-left) -16))
+           (string-start (truly-the fixnum (* start 4))))
+      (multiple-value-bind (copied last-newline)
+          (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
+                       ((32-bit-array sap-reg t) (vector-sap string))
+                       ((string-start unsigned-reg) string-start)
+                       ((end unsigned-reg) n)
+                       ((tail unsigned-reg) tail)
+                       ((ascii-mask complex-double-reg))
+                       ((newlines complex-double-reg))
+                       ((bytes1 complex-double-reg))
+                       ((bytes2 complex-double-reg))
+                       ((bytes3 complex-double-reg))
+                       ((bytes4 complex-double-reg))
+                       ((temp1))
+                       ((temp complex-double-reg))
+                       ((indexes))
+                       ((increment))
+                       ((last-newlines)))
+              ((byte-array unsigned-reg unsigned-num :from :load)
+               (last-newline signed-reg signed-num))
+
+            (inst movdqa ascii-mask (register-inline-constant :sse
+                                                              (concat-ub 32 (loop repeat 4
+                                                                                  collect 127))))
+            (inst movdqa newlines (register-inline-constant :sse
+                                                            (concat-ub 32 (loop repeat 4
+                                                                                collect 10))))
+            (inst movdqa increment (register-inline-constant :sse
+                                                             (concat-ub 32 (loop repeat 4
+                                                                                 collect 4))))
+            (inst movdqa indexes (register-inline-constant :sse
+                                                           (concat-ub 32 '(3 2 1 0))))
+            (inst movdqa last-newlines (register-inline-constant :sse
+                                                                 (concat-ub 32 (loop repeat 4
+                                                                                     collect -1))))
+            (inst add byte-array* tail)
+            (move byte-array byte-array*)
+            (inst add end byte-array*)
+            (inst add 32-bit-array string-start)
+            (inst jmp start)
+
+            LOOP
+            (inst movdqu bytes1 (ea 32-bit-array))
+            (inst movdqu bytes2 (ea 16 32-bit-array))
+            (inst movdqu bytes3 (ea 32 32-bit-array))
+            (inst movdqu bytes4 (ea 48 32-bit-array))
+
+            (loop for bytes in (list bytes1 bytes2 bytes3 bytes4)
+                  do
+                  (inst movdqa temp bytes)
+                  (inst pcmpgtd temp ascii-mask)
+                  (inst pmovmskb tail temp)
+                  (inst test :dword tail tail)
+                  (inst jmp :nz done))
+
+            (loop for bytes in (list bytes1 bytes2 bytes3 bytes4)
+                  do
+                  (inst movdqa temp bytes)
+                  (inst pcmpeqd temp newlines)
+                  (inst movdqa temp1 indexes)
+                  (inst pand temp1 temp)
+                  (inst pandn temp last-newlines)
+                  (inst movdqa last-newlines temp)
+                  (inst por last-newlines temp1)
+                  (inst paddd indexes increment))
+
+            (inst add 32-bit-array 64)
+
+            (inst movdqa    temp1 bytes1)
+            (inst punpcklwd bytes1 bytes2)
+            (inst punpckhwd temp1 bytes2)
+
+            (inst movdqa    bytes2 bytes1)
+            (inst punpckhwd bytes2 temp1)
+            (inst punpcklwd bytes1 temp1)
+            (inst punpcklwd bytes1 bytes2)
+
+            (inst movdqa    bytes2 bytes3)
+            (inst punpcklwd bytes3 bytes4)
+            (inst punpckhwd bytes2 bytes4)
+            (inst movdqa    bytes4 bytes3)
+            (inst punpckhwd bytes4 bytes2)
+            (inst punpcklwd bytes3 bytes2)
+            (inst punpcklwd bytes3 bytes4)
+            (inst packuswb bytes1 bytes3)
+
+            (inst movdqu (ea byte-array) bytes1)
+            (inst add byte-array 16)
+
+            start
+            (inst cmp byte-array end)
+            (inst jmp :l LOOP)
+
+            DONE
+
+            ;; Find the max last-newline...
+            (progn
+              (inst movdqa  temp last-newlines)
+              (inst psrldq  temp 8)
+              (inst movdqa  temp1 temp)
+              (inst pcmpgtd temp1 last-newlines)
+              (inst pand    temp temp1)
+              (inst pandn   temp1 last-newlines)
+              (inst por     temp1 temp)
+              (inst movdqa  last-newlines temp1)
+              (inst psrldq  last-newlines 4)
+              (inst movdqa  temp last-newlines)
+              (inst pcmpgtd temp temp1)
+              (inst pand    last-newlines temp)
+              (inst pandn   temp temp1)
+              (inst por     temp last-newlines)
+              (inst movd    last-newline temp)
+              (inst movsx '(:dword :qword) last-newline last-newline))
+            (inst sub byte-array byte-array*))
+        (setf (sb-impl::buffer-tail obuf) (+ tail copied))
+        (values (+ start copied)
+                (if (>= last-newline 0)
+                    (truly-the index (+ start last-newline))
+                    -1))))))
+
+(def-variant simd-copy-character-string-to-utf8 :avx2 (start end string obuf)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (string)
+    (let* ((tail (sb-impl::buffer-tail obuf))
+           (buffer-left (- (sb-impl::buffer-length obuf) tail))
+           (string-left (- end start))
+           (n (logand (min buffer-left string-left) -16))
+           (string-start (truly-the fixnum (* start 4))))
+      (multiple-value-bind (copied last-newline)
+          (inline-vop (((byte-array* sap-reg t) (sb-impl::buffer-sap obuf))
+                       ((32-bit-array sap-reg t) (vector-sap string))
+                       ((string-start unsigned-reg) string-start)
+                       ((end unsigned-reg) n)
+                       ((tail unsigned-reg) tail)
+                       ((ascii-mask int-avx2-reg))
+                       ((newlines int-avx2-reg))
+                       ((bytes1 int-avx2-reg))
+                       ((bytes2 int-avx2-reg))
+                       ((temp int-avx2-reg))
+                       ((indexes))
+                       ((increment))
+                       ((last-newlines)))
+              ((byte-array unsigned-reg unsigned-num :from :load)
+               (last-newline signed-reg signed-num))
+            (inst vmovdqu ascii-mask (register-inline-constant :avx2
+                                                               (concat-ub 32 (loop repeat 8
+                                                                                   collect 127))))
+            (inst vmovdqu newlines (register-inline-constant :avx2
+                                                            (concat-ub 32 (loop repeat 8
+                                                                                collect 10))))
+            (inst vmovdqu increment (register-inline-constant :avx2
+                                                             (concat-ub 32 (loop repeat 8
+                                                                                 collect 8))))
+            (inst vmovdqu indexes (register-inline-constant :avx2
+                                                           (concat-ub 32 '(7 6 5 4 3 2 1 0))))
+            (inst vmovdqu last-newlines (register-inline-constant :avx2
+                                                                 (concat-ub 32 (loop repeat 8
+                                                                                     collect -1))))
+
+            (inst add byte-array* tail)
+            (move byte-array byte-array*)
+            (inst add end byte-array*)
+            (inst add 32-bit-array string-start)
+
+            (inst jmp start)
+
+            LOOP
+            (inst vmovdqu bytes1 (ea 32-bit-array))
+            (inst vmovdqu bytes2 (ea 32 32-bit-array))
+
+            (loop for bytes in (list bytes1 bytes2)
+                  do
+                  (inst vpcmpgtd temp bytes ascii-mask)
+                  (inst vpmovmskb tail temp)
+                  (inst test :dword tail tail)
+                  (inst jmp :nz done))
+
+            (loop for bytes in (list bytes1 bytes2)
+                  do
+                  (inst vpcmpeqd temp bytes newlines)
+                  (inst vpblendvb last-newlines last-newlines indexes temp)
+                  (inst vpaddd indexes indexes increment))
+
+            (inst vpackusdw bytes1 bytes1 bytes2)
+            (inst vpermq bytes1 bytes1 216)
+            (inst vpackuswb bytes1 bytes1 bytes1)
+            (inst vpermq bytes1 bytes1 216)
+
+            (inst add 32-bit-array 64)
+
+            (inst vmovdqu (ea byte-array) (reg-in-sc bytes1 'int-sse-reg))
+            (inst add byte-array 16)
+
+            start
+            (inst cmp byte-array end)
+            (inst jmp :l LOOP)
+
+            DONE
+            (let ((xlast-newlines (reg-in-sc last-newlines 'int-sse-reg))
+                  (temp (reg-in-sc temp 'int-sse-reg)))
+              (inst vextracti128 temp last-newlines 1)
+              (inst vzeroupper)
+              (inst vpmaxsd xlast-newlines temp xlast-newlines)
+              (inst vpsrldq temp xlast-newlines 8)
+              (inst vpmaxsd xlast-newlines xlast-newlines temp)
+              (inst vpsrldq temp xlast-newlines 4)
+              (inst vpmaxsd xlast-newlines xlast-newlines temp)
+              (inst vmovd  last-newline xlast-newlines))
+
+            (inst movsx '(:dword :qword) last-newline last-newline)
+            (inst sub byte-array byte-array*))
+        (setf (sb-impl::buffer-tail obuf) (+ tail copied))
+        (values (+ start copied)
+                (if (>= last-newline 0)
+                    (truly-the index (+ start last-newline))
+                    -1))))))
+
+(defun simd-position-ub8 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+                 ((start unsigned-reg) start)
+                 ((end unsigned-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((byte-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst lea byte-array (ea start byte-array*))
+      (inst add end byte-array*)
+
+      (move left end)
+      (inst sub left byte-array)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst punpcklbw search search)
+      (inst punpcklwd search search)
+      (inst punpckldq search search)
+      (inst punpcklqdq search search)
+
+      LOOP
+      (inst movdqu bytes (ea byte-array))
+      (inst pcmpeqb bytes search)
+      (inst pmovmskb left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (inst add byte-array 16)
+      (move left end)
+      (inst sub left byte-array)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp byte-array end)
+               (inst jmp :ge DONE)
+               (inst mov :byte left (ea byte-array))
+               (inst cmp left element)
+               (inst jmp :eq FOUND-SCALAR)
+               (inst inc byte-array))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsf :dword left left)
+      (inst add byte-array left)
+
+      FOUND-SCALAR
+      (inst sub byte-array byte-array*)
+      (move res byte-array)
+      (inst shl res n-fixnum-tag-bits)
+      DONE)))
+
+(defun simd-position-from-end-ub8 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+                 ((start unsigned-reg) start)
+                 ((end unsigned-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((byte-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst lea byte-array (ea end byte-array*))
+      (inst add start byte-array*)
+
+      (move left byte-array)
+      (inst sub left start)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst punpcklbw search search)
+      (inst punpcklwd search search)
+      (inst punpckldq search search)
+      (inst punpcklqdq search search)
+
+      LOOP
+      (inst sub byte-array 16)
+      (inst movdqu bytes (ea byte-array))
+      (inst pcmpeqb bytes search)
+      (inst pmovmskb left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (move left byte-array)
+      (inst sub left start)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp byte-array start)
+               (inst jmp :l DONE)
+               (inst dec byte-array)
+               (inst mov :byte left (ea byte-array))
+               (inst cmp left element)
+               (inst jmp :eq FOUND-SCALAR))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsr :dword left left)
+      (inst add byte-array left)
+
+      FOUND-SCALAR
+      (inst sub byte-array byte-array*)
+      (move res byte-array)
+      (inst shl res n-fixnum-tag-bits)
+      DONE)))
+
+(defun simd-position-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+      (inst shl end 1)
+      (inst lea 32-bit-array (ea 32-bit-array* start 2))
+
+      (inst add end 32-bit-array*)
+
+      (move left end)
+      (inst sub left 32-bit-array)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst pshufd search search 0)
+
+      LOOP
+      (inst movdqu bytes (ea 32-bit-array))
+      (inst pcmpeqd bytes search)
+      (inst movmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (inst add 32-bit-array 16)
+      (move left end)
+      (inst sub left 32-bit-array)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array end)
+               (inst jmp :ge DONE)
+               (inst mov :dword left (ea 32-bit-array))
+               (inst cmp :dword left element)
+               (inst jmp :eq FOUND-SCALAR)
+               (inst add 32-bit-array 4))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsf :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))
+
+(defun simd-position-from-end-ub32 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects (vector)
+    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((32-bit-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res nil-value)
+
+      (inst shl start 1)
+      (inst lea 32-bit-array (ea 32-bit-array* end 2))
+      (inst add start 32-bit-array*)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+
+      (inst cmp left 16)
+      (inst jmp :l SCALAR)
+
+      (inst movd search element)
+      (inst pshufd search search 0)
+
+      LOOP
+      (inst sub 32-bit-array 16)
+      (inst movdqu bytes (ea 32-bit-array))
+      (inst pcmpeqd bytes search)
+      (inst movmskps left bytes)
+      (inst test :dword left left)
+      (inst jmp :nz FOUND)
+
+      (move left 32-bit-array)
+      (inst sub left start)
+      (inst cmp left 16)
+      (inst jmp :ge LOOP)
+
+
+      SCALAR
+      (loop repeat 15
+            do (inst cmp 32-bit-array start)
+               (inst jmp :l DONE)
+               (inst sub 32-bit-array 4)
+               (inst mov :byte left (ea 32-bit-array))
+               (inst cmp left element)
+               (inst jmp :eq FOUND-SCALAR))
+      (inst jmp DONE)
+
+      FOUND
+      (inst bsr :dword left left)
+      (inst shl left 2)
+      (inst add 32-bit-array left)
+
+      FOUND-SCALAR
+      (inst sub 32-bit-array 32-bit-array*)
+      (move res 32-bit-array)
+      (inst shr res 1)
+      DONE)))

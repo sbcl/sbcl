@@ -2803,13 +2803,19 @@
                                        ,op
                                        (fpr-offset rn)
                                        (fpr-offset rd))))))
+  (def s-and #b0 #b00 #b00011)
+  (def s-bic #b0 #b01 #b00011)
   (def s-orr #b0 #b10 #b00011
     '((:cond
         ((rn :same-as rm) 'mov)
         (t 'orr))
       :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
-  (def s-and #b0 #b00 #b00011)
-  (def s-eor #b1 #b00 #b00011))
+  (def s-orn #b0 #b11 #b00011)
+
+  (def s-eor #b1 #b00 #b00011)
+  (def bsl #b1 #b01 #b00011)
+  (def bit #b1 #b10 #b00011)
+  (def bif #b1 #b11 #b00011))
 
 (macrolet ((def (name u op)
              `(define-instruction ,name (segment rd rn rm &optional (size :16b))
@@ -2824,12 +2830,17 @@
                                          ,op
                                          (fpr-offset rn)
                                          (fpr-offset rd)))))))
+  (def s-add #b0 #b10000)
   (def s-sub #b1 #b10000)
   (def cmeq #b1 #b10001)
   (def cmgt #b0 #b00110)
   (def cmge #b0 #b00111)
   (def cmhi #b1 #b00110)
-  (def cmhs #b1 #b00111))
+  (def cmhs #b1 #b00111)
+  (def umin #b1 #b01101)
+  (def umax #b1 #b01100)
+  (def smin #b0 #b01101)
+  (def smax #b0 #b01100))
 
 (def-emitter simd-scalar-three-same
     (#b01 2 30)
@@ -2935,20 +2946,23 @@
   (rn :fields (list (byte 5 5) (byte 5 16)) :type 'simd-copy-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'sized-reg))
 
-(define-instruction umov (segment rd rn index size)
-  (:printer simd-copy-to-general ((op 0) (imm4 #b0111)))
-  (:emitter
-   (let ((size (position size '(:B :H :S :D))))
-     (emit-simd-copy segment
-                     (case size
-                       (:d 1)
-                       (t 0))
-                     0
-                     (logior (ash index (1+ size))
-                             (ash 1 size))
-                     #b0111
-                     (fpr-offset rn)
-                     (gpr-offset rd)))))
+(macrolet ((def (name op imm4 q)
+             `(define-instruction ,name (segment rd rn index size)
+                (:printer simd-copy-to-general ((op ,op) (imm4 ,imm4)))
+                (:emitter
+                 (let ((isize (position size '(:B :H :S :D))))
+                   (emit-simd-copy segment
+                                   (case size
+                                     (,q 1)
+                                     (t 0))
+                                   ,op
+                                   (logior (ash index (1+ isize))
+                                           (ash 1 isize))
+                                   ,imm4
+                                   (fpr-offset rn)
+                                   (gpr-offset rd)))))))
+  (def umov 0 #b0111 (:d))
+  (def smov 0 #b0101 (:d :s)))
 
 (define-instruction dup (segment rd rn size)
   (:printer simd-copy-to-general
@@ -3067,7 +3081,9 @@
                     (fpr-offset rn)
                     (fpr-offset rd)))))))
   (def uminv 1 #b11010)
-  (def umaxv 1 #b01010))
+  (def umaxv 1 #b01010)
+  (def sminv 0 #b11010)
+  (def smaxv 0 #b01010))
 
 (define-instruction-format (simd-two-misc 32
                             :default-printer '(:name :tab rd ", " rn))
@@ -3102,6 +3118,24 @@
   (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s))
   (def not #b1 #b00101))
 
+(macrolet
+    ((def (name u op q &optional sizes)
+       `(define-instruction ,name (segment rd rn &optional (size ,(car sizes)))
+          (:printer simd-two-misc ((q ,q) (u ,u) (op ,op)))
+          (:emitter
+           (check-type size (member ,@sizes))
+           (multiple-value-bind (q size) (encode-vector-size size)
+             (declare (ignore q))
+             (emit-simd-two-misc segment
+                                 ,q
+                                 ,u
+                                 size
+                                 ,op
+                                 (fpr-offset rn)
+                                 (fpr-offset rd)))))))
+  (def xtn #b0 #b10010 0 (:8b :4h :2s))
+  (def xtn2 #b0 #b10010 1 (:16b :8h :4s)))
+
 (def-emitter simd-shift-by-imm
   (#b0 1 31)
   (q 1 30)
@@ -3129,7 +3163,15 @@
 (macrolet
     ((def (name q u op)
        `(define-instruction ,name (segment rd sized rn sizen &optional (shift 0))
-          (:printer simd-shift-by-imm ((q ,q) (u ,u) (op ,op)))
+          ;; Conflicts with simd-modified-imm where immh=0
+          ,@(loop for (size pos) in '((4 19)
+                                      (3 20)
+                                      (2 21)
+                                      (1 22))
+                  collect
+                  `(:printer simd-shift-by-imm ((q ,q)
+                                                (immh #b1 :field (byte ,size ,pos))
+                                                (u ,u) (op ,op))))
           (:emitter
            (let ((immh 0)
                  (immb 0))
@@ -3172,7 +3214,8 @@
           ;; Conflicts with simd-modified-imm where immh=0
           ,@(loop for (size pos) in '((4 19)
                                       (3 20)
-                                      (2 21))
+                                      (2 21)
+                                      (1 22))
                   collect
                   `(:printer simd-shift-by-imm ((u ,u) (op ,op)
                                                 (immh #b1 :field (byte ,size ,pos))
@@ -3246,15 +3289,15 @@
   (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0)) :type 'simd-reg-cmode))
 
 (macrolet
-    ((def (name o2)
+    ((def (name o2 op)
        `(define-instruction ,name (segment rd imm size &optional (shift 0))
           ;; 8-bit
-          (:printer simd-modified-imm ((o2 ,o2) (op 0)))
+          (:printer simd-modified-imm ((o2 ,o2)
+                                       (op ,op)))
           (:emitter
            (let ((abc 0)
                  (defgh 0)
-                 (cmode 0)
-                 (op 0))
+                 (cmode 0))
              (setf abc (ldb (byte 3 5) imm)
                    defgh (ldb (byte 5 0) imm))
              (ecase size
@@ -3274,13 +3317,14 @@
                            1))))
              (emit-simd-modified-imm segment
                                      (encode-vector-size size)
-                                     op
+                                     ,op
                                      abc
                                      cmode
                                      ,o2
                                      defgh
                                      (fpr-offset rd)))))))
-  (def movi 0))
+  (def movi 0 0)
+  (def mvni 0 1))
 
 (def-emitter fp-cond-select
   (0 1 31)
@@ -3436,6 +3480,52 @@
                             (fpr-offset rd))))))
   (def tbl 0)
   (def tbx 1))
+
+(def-emitter simd-permute
+  (#b0 1 31)
+  (q 1 30)
+  (#b001110 6 24)
+  (size 2 22)
+  (#b0 1 21)
+  (rm 5 16)
+  (#b0 1 15)
+  (opc 3 12)
+  (#b10 2 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-permute 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op1 :field (byte 1 31) :value #b0)
+  (u :field (byte 1 29))
+  (op2 :field (byte 6 24) :value #b001110)
+  (size :field (byte 2 22))
+  (op3 :field (byte 1 21) :value #b0)
+  (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+  (op4 :field (byte 1 15) :value #b0)
+  (op :field (byte 3 12))
+  (op5 :field (byte 2 10) :value #b10)
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+
+(macrolet
+    ((def (name op)
+       `(define-instruction ,name (segment rd rn rm &optional (size :16b))
+          (:printer simd-permute ((op ,op)))
+          (:emitter
+           (multiple-value-bind (q size) (encode-vector-size size)
+             (emit-simd-permute segment
+                                q
+                                size
+                                (fpr-offset rm)
+                                ,op
+                                (fpr-offset rn)
+                                (fpr-offset rd)))))))
+  (def uzp1 #b001)
+  (def trn1 #b011)
+  (def zip1 #b101)
+  (def uzp2 #b110)
+  (def trn2 #b111))
 
 
 ;;; Inline constants

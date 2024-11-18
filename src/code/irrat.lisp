@@ -121,7 +121,10 @@
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
   (declare (explicit-check))
-  (cond ((eql base 1)
+  (cond ((and (eql base 10)
+              (typep power '(integer 0 20)))
+         (expt 10 power))
+        ((eql base 1)
          base)
         ((eql base -1)
          (if (evenp power)
@@ -151,15 +154,45 @@
          (/ (intexp base (- power))))
         ((eql base 2)
          (ash 1 power))
+        ((not (fixnump power))
+         (error "Exponent too large to fit into memory: ~a" power))
         (t
-         (do* ((base base)
-               (power power)
-               (nextn (ash power -1) (ash power -1))
-               (total (if (oddp power) base 1)
-                      (if (oddp power) (* base total) total)))
-              ((zerop nextn) total)
-           (setq base (* base base))
-           (setq power nextn)))))
+         (prog ((base base)
+                (total (if (oddp power) base 1))
+                (power (ash power -1)))
+            (unless (typep base '#1=(integer #.(- (isqrt most-positive-fixnum)) #.(isqrt most-positive-fixnum)))
+              (go slow1))
+          fast
+            (when (zerop power)
+              (return total))
+            (setf base (* base base))
+            (unless (typep base '#1#)
+              (go slow2))
+            (setf total
+                  (if (oddp power)
+                      (* base (truly-the #1# total))
+                      total)
+                  power (truly-the fixnum (ash power -1)))
+            (go fast)
+          slow1
+            (when (zerop power)
+              (return total))
+            (setf base (* base base))
+          slow2
+            (setf total
+                  (if (oddp power)
+                      (* base total)
+                      total)
+                  power (truly-the fixnum (ash power -1)))
+            (go slow1)))))
+
+(defun 10expt (power)
+  (declare (explicit-check))
+  (cond ((typep power '(integer 0 20))
+         (expt 10 power))
+        (t
+         (locally (declare (notinline expt))
+           (expt 10 power)))))
 
 ;;; If an integer power of a rational, use INTEXP above. Otherwise, do
 ;;; floating point stuff. If both args are real, we try %POW right

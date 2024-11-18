@@ -492,3 +492,35 @@
              (process (run-program "test" (list "-e" (format nil "/dev/fd/~a" fd))
                                    :search t)))
         (assert (not (zerop (process-exit-code process))))))))
+
+;; PROCESS-CLOSE's contract is "close the streams and stop updating
+;; the process", but SBCL should still internally watch the process:
+;; to do otherwise will cause an accumulation of zombies.
+(with-test (:name (run-program :minimizes-zombies)
+            ;; 1. IDK whether Windows has the zombies, &
+            ;; 2. this test runs ps(1) to look for them,
+            ;; so skip on Windows.
+            :skipped-on :win32)
+  (flet ((gather-process-output (&rest argv)
+           (with-output-to-string (s)
+             (run-program (first argv) (rest argv) :output s :search t)))
+         (make-zombies (count &rest argv)
+           (loop repeat count
+                 for proc = (run-program (first argv) (rest argv)
+                                :wait nil :search t)
+                 collect (process-pid proc)
+                 do (process-close proc)
+                    (process-kill proc #+unix sb-unix:sigterm #+win32 :ignore))))
+    (let ((pids (make-zombies 3 "sleep" "300")))
+      ;; Give a little time for signal delivery (to kids, and to SBCL).
+      (sleep 1/100)
+      (let ((ps-output
+             (gather-process-output
+              ;; Test written in 2024; these ps(1) flags are specified
+              ;; as early as 2008, so hopefully everybody has 'em.
+              ;; https://pubs.opengroup.org/onlinepubs/9699919799.2008edition/
+              "ps" "-opid" "-oppid" "-oargs" (format nil "-p~{~D~^,~}" pids))))
+        ;; Should be just a header line.
+        (assert (= 1 (count #\newline ps-output)) ()
+                "Zombies found in ps(1) output (SBCL pid ~D):~%~A"
+                (sb-unix:unix-getpid) ps-output)))))

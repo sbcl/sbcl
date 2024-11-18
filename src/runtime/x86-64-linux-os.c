@@ -188,6 +188,13 @@ os_context_float_register_addr(os_context_t *context, int offset)
     return (os_context_register_t*)&context->uc_mcontext.fpregs->_xmm[offset];
 }
 
+os_context_register_t *
+os_context_ymm_register_addr(os_context_t *context, int offset)
+{
+    struct _xstate *xstate = (void*)context->uc_mcontext.fpregs;
+    return (os_context_register_t*)&(xstate->ymmh.ymmh_space[offset * 4]);
+}
+
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {

@@ -559,3 +559,4 @@
                                other-pointer-lowtag))
     (inst add lip object offset)
     (inst ldaddal diff result lip)))
+

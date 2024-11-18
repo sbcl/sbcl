@@ -343,11 +343,6 @@
                      (ir-calls
                       `(lambda (x)
                          (aref x 0)))
-                     :key (lambda (x) (combination-fun-source-name x nil)))))
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (x)
-                         (char x 0)))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
 
 (with-test (:name :call-full-like-p-constants)

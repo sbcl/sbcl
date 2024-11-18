@@ -1491,8 +1491,8 @@
                      (declare (optimize (insert-array-bounds-checks 0)))
                      (setf (aref seq1 i) (data-vector-ref seq2 j))))
                  (up ()
-                   '(do ((i start1 (1+ i))
-                         (j start2 (1+ j))
+                   '(do ((i start1 (truly-the index (1+ i)))
+                         (j start2 (truly-the index (1+ j)))
                          (end (+ start1 replace-len)))
                      ((>= i end))
                      (declare (optimize (insert-array-bounds-checks 0)))
@@ -2378,96 +2378,148 @@
 (defvar *concatenate-open-code-limit* 129)
 
 (defun string-concatenate-transform (node type lvars)
-  (let ((vars (make-gensym-list (length lvars))))
-    (if (policy node (<= speed space))
-        ;; Out-of-line
-        (let ((constants-to-string
-                ;; Strings are handled more efficiently by
-                ;; %concatenate-to-* functions
-                (loop for var in vars
-                      for lvar in lvars
-                      collect (if (and (constant-lvar-p lvar)
-                                       (proper-sequence-p (lvar-value lvar))
-                                       (every #'characterp (lvar-value lvar)))
-                                  (coerce (lvar-value lvar) 'string)
-                                  var))))
-          `(lambda (.dummy. ,@vars)
-             (declare (ignore .dummy.)
-                      (ignorable ,@vars))
-             ,(ecase type
-                ((string simple-string)
-                 `(%concatenate-to-string ,@constants-to-string))
-                ((base-string simple-base-string)
-                 `(%concatenate-to-base-string ,@constants-to-string)))))
-        ;; Inline
-        (let* ((element-type (ecase type
-                               ((string simple-string) 'character)
-                               ((base-string simple-base-string) 'base-char)))
-               (lvar-values (loop for lvar in lvars
-                                  collect (when (constant-lvar-p lvar)
-                                            (lvar-value lvar))))
-               (lengths
-                 (loop for value in lvar-values
-                       for var in vars
-                       collect (if value
-                                   (length value)
-                                   `(sb-impl::string-dispatch ((simple-array * (*))
-                                                               sequence)
-                                                              ,var
-                                      #-sb-xc-host
-                                      (declare (muffle-conditions compiler-note))
-                                      (length ,var)))))
-               (non-constant-start
-                 (loop for value in lvar-values
-                       while (and (stringp value)
-                                  (< (length value) *concatenate-open-code-limit*))
-                       sum (length value))))
-          `(lambda (.dummy. ,@vars)
-             (declare (ignore .dummy.)
-                      (ignorable ,@vars))
-             (declare (optimize (insert-array-bounds-checks 0)))
-             (let* ((.length. (+ ,@lengths))
-                    (.pos. ,non-constant-start)
-                    (.string. (make-string .length. :element-type ',element-type)))
-               (declare (type index .length. .pos.)
-                        #-sb-xc-host (muffle-conditions compiler-note)
-                        (ignorable .pos.))
-               ,@(loop with constants = -1
-                       for value in lvar-values
-                       for var in vars
-                       collect
-                       (cond ((and (stringp value)
-                                   (< (length value) *concatenate-open-code-limit*))
-                              ;; Fold the array reads for constant arguments
-                              `(progn
-                                 ,@(loop for c across value
-                                         for i from 0
-                                         collect
-                                         ;; Without truly-the we get massive numbers
-                                         ;; of pointless error traps.
-                                         `(setf (aref .string.
-                                                      (truly-the index ,(if constants
-                                                                            (incf constants)
-                                                                            `(+ .pos. ,i))))
-                                                ,c))
-                                 ,(unless constants
-                                    `(incf (truly-the index .pos.) ,(length value)))))
-                             (t
-                              (prog1
-                                  `(sb-impl::string-dispatch
-                                       (#+sb-unicode
-                                        (simple-array character (*))
-                                        (simple-array base-char (*))
-                                        t)
-                                       ,var
-                                     (replace .string. ,var
-                                              ,@(cond ((not constants)
-                                                       '(:start1 .pos.))
-                                                      ((plusp non-constant-start)
-                                                       `(:start1 ,non-constant-start))))
-                                     (incf (truly-the index .pos.) (length ,var)))
-                                (setf constants nil)))))
-               .string.))))))
+  (if (policy node (<= speed space))
+      ;; Out-of-line
+      (let* ((vars (make-gensym-list (length lvars)))
+             (constants-to-string
+               ;; Strings are handled more efficiently by
+               ;; %concatenate-to-* functions
+               (loop for var in vars
+                     for lvar in lvars
+                     collect (if (and (constant-lvar-p lvar)
+                                      (proper-sequence-p (lvar-value lvar))
+                                      (every #'characterp (lvar-value lvar)))
+                                 (coerce (lvar-value lvar) 'string)
+                                 var))))
+        `(lambda (.dummy. ,@vars)
+           (declare (ignore .dummy.)
+                    (ignorable ,@vars))
+           ,(ecase type
+              ((string simple-string)
+               `(%concatenate-to-string ,@constants-to-string))
+              ((base-string simple-base-string)
+               `(%concatenate-to-base-string ,@constants-to-string)))))
+      ;; Inline
+      (let* ((element-type (ecase type
+                             ((string simple-string) 'character)
+                             ((base-string simple-base-string) 'base-char)))
+             (lvar-values (loop for lvar in lvars
+                                collect (when (constant-lvar-p lvar)
+                                          (lvar-value lvar))))
+             (non-constant-start 0)
+             lengths
+             vars
+             fills
+             (constants -1)
+             lets)
+        (loop for (lvar . more) on lvars
+              for value in lvar-values
+              for var = (gensym)
+              for length-code = `(sb-impl::string-dispatch ((simple-array * (*))
+                                                            sequence)
+                                                           ,var
+                                   #-sb-xc-host
+                                   (declare (muffle-conditions compiler-note))
+                                   (length ,var))
+              do
+              (flet ((gen-replace (&optional start end (length `(length ,var)))
+                       `(sb-impl::string-dispatch
+                            (#+sb-unicode
+                             (simple-array character (*))
+                             (simple-array base-char (*))
+                             t)
+                            ,var
+                          (replace .string. ,var
+                                   ,@(cond ((not constants)
+                                            '(:start1 .pos.))
+                                           (t
+                                            (setf non-constant-start (1+ constants)
+                                                  constants nil)
+                                            (when (plusp non-constant-start)
+                                              `(:start1 ,non-constant-start))))
+                                   ,@(and start
+                                          `(:start2 ,start))
+                                   ,@(and end
+                                          `(:end2 ,end)))
+                          ,(unless (not more)
+                             `(incf (truly-the index .pos.) ,length)))))
+                (cond (value
+                       (push var vars)
+                       (push (length value) lengths)
+                       (push
+                        (if (and (stringp value)
+                                 (< (length value) *concatenate-open-code-limit*))
+                            ;; Fold the array reads for constant arguments
+                            `(progn
+                               ,@(loop for c across value
+                                       for i from 0
+                                       collect
+                                       ;; Without truly-the we get massive numbers
+                                       ;; of pointless error traps.
+                                       `(setf (aref .string.
+                                                    (truly-the index ,(if constants
+                                                                          (incf constants)
+                                                                          `(+ .pos. ,i))))
+                                              ,c))
+                               ,(unless constants
+                                  `(incf (truly-the index .pos.) ,(length value))))
+                            (gen-replace))
+                        fills))
+                      ((and (lvar-matches lvar :fun-names '(vector-subseq* subseq))
+                            ;; Nothing should be modifying the original sequence
+                            (almost-immediately-used-p lvar (lvar-use lvar) :flushable t))
+                       (destructuring-bind (sequence start &optional end) (combination-args (lvar-uses lvar))
+                         (declare (ignorable sequence start))
+                         (splice-fun-args lvar :any (if end 3 2))
+                         (push var vars)
+                         (let* ((start (car (push (gensym) vars)))
+                                (end (and end
+                                          (car (push (gensym) vars))))
+                                (length (gensym)))
+                           (push (list length `(- (or ,end ,length-code) ,start))
+                                 lets)
+                           (push length lengths)
+                           (push (gen-replace start end length) fills))))
+                      ((lvar-matches lvar :fun-names '(list vector))
+                       (destructuring-bind (&rest elements) (combination-args (lvar-uses lvar))
+                         (splice-fun-args lvar :any nil)
+                         (push (length elements) lengths)
+                         (push (let ((i 0))
+                                 `(progn
+                                    ,@(loop for let in elements
+                                            for var = (car (push (gensym) vars))
+                                            collect
+                                            `(setf (aref .string.
+                                                         (truly-the index ,(if constants
+                                                                               (incf constants)
+                                                                               `(+ .pos. ,i))))
+                                                   ,var)
+                                            do (incf i))
+                                    ,(unless (or constants
+                                                 (not more))
+                                       `(incf (truly-the index .pos.) ,i))))
+                               fills)))
+                      (t
+                       (push var vars)
+                       (push length-code lengths)
+                       (push (gen-replace)
+                             fills)))))
+        (setf lengths (nreverse lengths)
+              vars (nreverse vars)
+              fills (nreverse fills))
+        `(lambda (.dummy. ,@vars)
+           (declare (ignore .dummy.)
+                    (ignorable ,@vars))
+           (declare (optimize (insert-array-bounds-checks 0)))
+           (let* (,@lets
+                  (.length. (+ ,@lengths))
+                  (.pos. ,non-constant-start)
+                  (.string. (make-string .length. :element-type ',element-type)))
+             (declare (type index .length. .pos.)
+                      #-sb-xc-host (muffle-conditions compiler-note)
+                      (ignorable .pos.))
+             ,@fills
+             .string.)))))
 
 (defun vector-specifier-widetag (type)
   ;; FIXME: This only accepts vectors without dimensions even though
@@ -2853,44 +2905,71 @@
                               :node node)
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
-  (unless
-      (or (policy node (> speed space))
-          ;; These have compact inline expansion
-          (and (or (not key)
-                   (lvar-fun-is key '(identity)))
-               (and (constant-lvar-p start)
-                    (eql (lvar-value start) 0))
-               (and (constant-lvar-p end)
-                    (null (lvar-value end)))
-               (csubtypep (lvar-type sequence) (specifier-type 'simple-array))
-               (let ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+  (block nil
+    (unless
+        (or
+         ;; These have compact inline expansion
+         (and (or (not key)
+                  (lvar-fun-is key '(identity)))
+              (csubtypep (lvar-type sequence) (specifier-type 'simple-array))
+              (or (policy node (zerop insert-array-bounds-checks))
+                  (and (constant-lvar-p start)
+                       (eql (lvar-value start) 0)
+                       (constant-lvar-p end)
+                       (null (lvar-value end))))
+              (let* ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+                     (et-specifier (type-specifier element-type))
                      (test (lvar-fun-name* test))
                      (item (lvar-type item)))
-                 (when (neq element-type *wild-type*)
-                   (case (type-specifier element-type)
-                     ((double-float single-float)
-                      (and (csubtypep item element-type)
-                           (memq test '(= eql equal equalp))))
-                     ((t)
-                      (eq test 'eq))
-                     (character
-                      (or (memq test '(eq eql equal char=))
-                          (and (eq test 'char-equal)
-                               (or (csubtypep item (specifier-type 'base-char))
-                                   (and (constant-lvar-p sequence)
-                                        (every (lambda (x) (typep x 'base-char))
-                                               (lvar-value sequence)))))))
-                     (base-char
-                      (memq test '(eq eql equal char= char-equal)))
-                     (t
-                      (and (csubtypep element-type (specifier-type 'integer))
-                           (csubtypep item element-type)
-                           (memq test '(eq eql equal equalp =)))))))))
-    (give-up-ir1-transform))
-  ;; Delay to prefer the string and bit-vector transforms
-  (delay-ir1-transform node :constraint)
-  '(%find-position-vector-macro item sequence
-    from-end start end key test))
+                (when (and (neq element-type *wild-type*)
+                           (case et-specifier
+                             ((double-float single-float)
+                              (and (csubtypep item element-type)
+                                   (memq test '(= eql equal equalp))))
+                             ((t)
+                              (eq test 'eq))
+                             (character
+                              (or (memq test '(eq eql equal char=))
+                                  (and (eq test 'char-equal)
+                                       (or (csubtypep item (specifier-type 'base-char))
+                                           (and (constant-lvar-p sequence)
+                                                (every (lambda (x) (typep x 'base-char))
+                                                       (lvar-value sequence)))))))
+                             (base-char
+                              (memq test '(eq eql equal char= char-equal)))
+                             (t
+                              (and (csubtypep element-type (specifier-type 'integer))
+                                   (csubtypep item element-type)
+                                   (memq test '(eq eql equal equalp =))))))
+                  (cond #+(or arm64 x86-64)
+                        ((and (memq et-specifier '(base-char character))
+                              (constant-lvar-p from-end)
+                              (neq test 'char-equal)
+                              (not (and (eq test 'char=)
+                                        (not (csubtypep item (specifier-type 'character))))))
+                         (delay-ir1-transform node :ir1-phases)
+                         (return
+                           `(let ((pos (and (characterp item)
+                                            (,(if (eq et-specifier #+sb-unicode 'base-char
+                                                                   #-sb-unicode 'character)
+                                                  (if (lvar-value from-end)
+                                                      'sb-vm::simd-position-from-end-ub8
+                                                      'sb-vm::simd-position-ub8)
+                                                  (if (lvar-value from-end)
+                                                      'sb-vm::simd-position-from-end-ub32
+                                                      'sb-vm::simd-position-ub32))
+                                             (char-code (truly-the character item)) sequence start
+                                             (or end (length sequence))))))
+                              (if pos
+                                  (values item pos)
+                                  (values nil nil)))))
+                        (t)))))
+         (policy node (> speed space)))
+      (give-up-ir1-transform))
+    ;; Delay to prefer the string and bit-vector transforms
+    (delay-ir1-transform node :constraint)
+    '(%find-position-vector-macro item sequence
+      from-end start end key test)))
 
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t bit-vector t t t t t)

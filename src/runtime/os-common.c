@@ -391,7 +391,7 @@ os_context_register_t* os_context_pc_addr(os_context_t* context) {
     return (os_context_register_t*)&(OS_CONTEXT_PC(context));
 }
 
-void *successful_malloc(size_t size)
+void *checked_malloc(size_t size)
 {
     void* result = malloc(size);
     if (0 == result) {
@@ -404,7 +404,7 @@ void *successful_malloc(size_t size)
 
 char *copied_string(char *string)
 {
-    return strcpy(successful_malloc(1+strlen(string)), string);
+    return strcpy(checked_malloc(1+strlen(string)), string);
 }
 
 lispobj* duplicate_codeblob_offheap(lispobj code)

@@ -210,9 +210,6 @@ Creating and destroying objects:
 Function @code{(allocate-mystruct)} - allocates an object of type @code{mystruct}and
 returns a system area pointer to it.
 @item
-Function @code{(free-mystruct var)} - frees the alien object pointed to by
-@var{var}.
-@item
 Macro @code{(with-mystruct var ((member init) [...]) &body body)} -
 allocates an object of type @code{mystruct} that is valid in
 @var{body}. If @var{body} terminates or control unwinds out of

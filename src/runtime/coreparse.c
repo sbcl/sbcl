@@ -188,7 +188,7 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 
     int ret;
     size_t buf_size = ZSTD_DStreamInSize();
-    unsigned char* buf = successful_malloc(buf_size);
+    unsigned char* buf = checked_malloc(buf_size);
     ZSTD_inBuffer input;
     input.src = buf;
     input.pos = 0;
@@ -892,18 +892,18 @@ process_directory(int count, struct ndir_entry *entry,
             {
                 load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len, id == READ_ONLY_CORE_SPACE_ID);
             }
-        }
+
 #ifdef LISP_FEATURE_DARWIN_JIT
-        if (id == READ_ONLY_CORE_SPACE_ID)
-            os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+            if (id == READ_ONLY_CORE_SPACE_ID)
+                os_protect((os_vm_address_t)addr, len, OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
 #endif
 #ifdef MADV_MERGEABLE
-        if ((merge_core_pages == 1)
-            || ((merge_core_pages == -1) && compressed)) {
-            madvise((void *)addr, len, MADV_MERGEABLE);
-        }
+            if ((merge_core_pages == 1)
+                || ((merge_core_pages == -1) && compressed)) {
+                madvise((void *)addr, len, MADV_MERGEABLE);
+            }
 #endif
-
+        }
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         switch (id) {
         default:
@@ -913,7 +913,7 @@ process_directory(int count, struct ndir_entry *entry,
             break;
         case DYNAMIC_CORE_SPACE_ID:
             next_free_page = ALIGN_UP(entry->nwords<<WORD_SHIFT, GENCGC_PAGE_BYTES)
-              / GENCGC_PAGE_BYTES;
+                / GENCGC_PAGE_BYTES;
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
         }
 #ifdef DEBUG_COREPARSE
@@ -921,6 +921,7 @@ process_directory(int count, struct ndir_entry *entry,
                (int)id, addr, (int)entry->data_page, (int)entry->page_count,
                entry->nwords, corespace_checksum((void*)addr, entry->nwords));
 #endif
+
     }
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
@@ -1019,10 +1020,13 @@ bool gc_allocate_ptes()
 
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
-    while (num_gc_cards < page_table_pages*CARDS_PER_PAGE) { ++nbits; num_gc_cards <<= 1; }
+    while (num_gc_cards / CARDS_PER_PAGE < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+
     // 2 Gigacards should suffice for now. That would span 2TiB of memory
     // using 1Kb card size, or more if larger card size.
-    gc_assert(nbits < 32);
+    if (nbits > 31)
+        lose("dynamic space too large");
+
     // If the space size is less than or equal to the number of cards
     // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
     // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
@@ -1047,7 +1051,7 @@ bool gc_allocate_ptes()
                                      ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
     gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
 #elif defined LISP_FEATURE_PPC64
-    unsigned char* mem = successful_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
+    unsigned char* mem = checked_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
     gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
     /* Copy linkage entries from where they were allocated to where they're accessible
      * off the GC card table register using negative indices. */
@@ -1055,7 +1059,7 @@ bool gc_allocate_ptes()
     os_deallocate((void*)linkage_space, LISP_LINKAGE_SPACE_SIZE);
     linkage_space = (lispobj*)mem;
 #else
-    gc_card_mark = successful_malloc(num_gc_cards);
+    gc_card_mark = checked_malloc(num_gc_cards);
 #endif
 
     /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
@@ -1321,7 +1325,7 @@ init_coreparse_spaces(int n, struct coreparse_space* input)
     // Indexing of spaces[] by the space ID should conveniently just work,
     // so we have to leave an empty row for space ID 0 which doesn't exist.
     struct coreparse_space* output =
-      successful_malloc(sizeof (struct coreparse_space)*(MAX_CORE_SPACE_ID+1));
+      checked_malloc(sizeof (struct coreparse_space)*(MAX_CORE_SPACE_ID+1));
     int i;
     for (i=0; i<n; ++i) {
         int id = input[i].id;

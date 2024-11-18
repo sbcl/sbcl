@@ -500,22 +500,37 @@
 (sb-c::when-vop-existsp (:translate overflow+)
   (flet ((err (x of cf)
            (let* ((raw-x (car *current-internal-error-args*))
-                  (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
-             (let ((type (or (sb-di:error-context)
-                             'fixnum))
-                   (x (if signed
-                          (cond ((and of cf)
-                                 (dpb x (byte sb-vm:n-word-bits 0) -1))
-                                (of
-                                 (ldb (byte sb-vm:n-word-bits 0) x))
-                                (t
-                                 x))
-                          (cond (cf
-                                 (dpb 1 (byte 1 sb-vm:n-word-bits) x))
-                                (of
-                                 (sb-c::mask-signed-field sb-vm:n-word-bits x))
-                                (t
-                                 (dpb x (byte sb-vm:n-word-bits 0) -1))))))
+                  (scn (sb-c:sc+offset-scn raw-x)))
+             (let* ((type (or (sb-di:error-context)
+                              'fixnum))
+                    (x (cond ((or (= scn sb-vm:descriptor-reg-sc-number)
+                                  (= scn sb-vm:any-reg-sc-number))
+                              (let ((x (sb-di::sub-access-debug-var-slot
+                                        nil (sb-c:make-sc+offset sb-vm:signed-reg-sc-number
+                                                                 (sb-c:sc+offset-offset raw-x))
+                                        *current-internal-error-context*)))
+                                (cond ((and of cf)
+                                       (dpb (ldb (byte sb-vm:n-fixnum-bits sb-vm:n-fixnum-tag-bits) x)
+                                            (byte sb-vm:n-fixnum-bits 0)
+                                            -1))
+                                      (of
+                                       (ldb (byte sb-vm:n-fixnum-bits sb-vm:n-fixnum-tag-bits) x))
+                                      (t
+                                       x))))
+                             ((= scn sb-vm:signed-reg-sc-number)
+                              (cond ((and of cf)
+                                     (dpb x (byte sb-vm:n-word-bits 0) -1))
+                                    (of
+                                     (ldb (byte sb-vm:n-word-bits 0) x))
+                                    (t
+                                     x)))
+                             (t
+                              (cond (cf
+                                     (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                                    (of
+                                     (sb-c::mask-signed-field sb-vm:n-word-bits x))
+                                    (t
+                                     (dpb x (byte sb-vm:n-word-bits 0) -1)))))))
                (object-not-type-error x type nil)))))
     (deferr add-sub-overflow-error (x)
       (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
@@ -577,6 +592,26 @@
       (if (numberp x)
           (object-not-type-error (- x) type nil)
           (object-not-type-error x 'number nil)))))
+
+(deferr fill-pointer-error (array)
+  (declare (notinline fill-pointer-error))
+  (if (and (arrayp array)
+           (array-has-fill-pointer-p array))
+      (error (if (zerop (fill-pointer array))
+                 "There is nothing left to pop."
+                 "Unexpected FILL-POINTER error"))
+      (fill-pointer-error array)))
+
+(deferr mprint-error (x)
+  (declare (ignore x))
+  (let* ((raw-x (car *current-internal-error-args*))
+         (tn-name (sb-disassem::get-random-tn-name raw-x))
+         (context (sb-di:error-context)))
+    (multiple-value-bind (value size)
+        (sb-di::sub-access-debug-var-slot nil raw-x *current-internal-error-context* t)
+      (if size
+          (format t "~7a = ~v,'0,'|,32:x ~a~%" tn-name (* size 2) value context)
+          (format t "~7a = ~a ~a~%" tn-name value context)))))
 
 ;;;; INTERNAL-ERROR signal handler
 
