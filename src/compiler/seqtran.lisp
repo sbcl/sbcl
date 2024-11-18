@@ -2940,7 +2940,7 @@
                               (and (csubtypep element-type (specifier-type 'integer))
                                    (csubtypep item element-type)
                                    (memq test '(eq eql equal equalp =))))))
-                  (cond #+arm64
+                  (cond #+(or arm64 x86-64)
                         ((and (csubtypep (lvar-type sequence) (specifier-type 'simple-base-string))
                               (constant-lvar-p from-end)
                               (neq test 'char-equal)

@@ -35,9 +35,13 @@
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
-       (sap-ref-single sap 0))
+       (if integer
+           (values (sap-ref-32 sap 0) 4)
+           (sap-ref-single sap 0)))
       (double-float
-       (sap-ref-double sap 0))
+       (if integer
+           (values (sap-ref-64 sap 0) 8)
+           (sap-ref-double sap 0)))
       (complex-single-float
        (complex (sap-ref-single sap 0)
                 (sap-ref-single sap 4)))
