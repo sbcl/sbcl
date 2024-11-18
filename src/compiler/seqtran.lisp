@@ -2946,12 +2946,13 @@
                               (neq test 'char-equal)
                               (not (and (eq test 'char=)
                                         (not (csubtypep item (specifier-type 'character))))))
+                         (delay-ir1-transform node :ir1-phases)
                          (return
                            `(let ((pos (and (characterp item)
                                             (,(if (lvar-value from-end)
                                                   'sb-vm::simd-position-from-end-ub8
                                                   'sb-vm::simd-position-ub8)
-                                             (char-code item) sequence start
+                                             (char-code (truly-the character item)) sequence start
                                              (or end (length sequence))))))
                               (if pos
                                   (values item pos)

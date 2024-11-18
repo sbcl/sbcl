@@ -1301,9 +1301,9 @@
             do (inst cmp byte-array end)
                (inst jmp :ge DONE)
                (inst mov :byte left (ea byte-array))
-               (inst inc byte-array)
                (inst cmp left element)
-               (inst jmp :eq FOUND-SCALAR))
+               (inst jmp :eq FOUND-SCALAR)
+               (inst inc byte-array))
       (inst jmp DONE)
 
       FOUND
