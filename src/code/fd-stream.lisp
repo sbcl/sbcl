@@ -853,8 +853,10 @@
                           '(#+sb-unicode :utf-8 :latin-1))
                     (eq (external-format-newline-variant external-format) :lf))))
         (let ((last-newline
-                (position #\newline thing :from-end t
-                                          :start start :end end)))
+                (string-dispatch (simple-base-string string) thing
+                  (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+                    (position #\newline thing :from-end t
+                                              :start start :end end)))))
           (ecase (fd-stream-buffering stream)
             (:full
              (buffer-output stream thing start end))

@@ -2942,15 +2942,17 @@
                                    (memq test '(eq eql equal equalp =))))))
                   (cond #+arm64
                         ((and (csubtypep (lvar-type sequence) (specifier-type 'simple-base-string))
-                              (and (constant-lvar-p from-end)
-                                   (null (lvar-value from-end)))
+                              (constant-lvar-p from-end)
                               (neq test 'char-equal)
                               (not (and (eq test 'char=)
                                         (not (csubtypep item (specifier-type 'character))))))
                          (return
                            `(let ((pos (and (characterp item)
-                                            (sb-vm::simd-position-ub8 (char-code item) sequence start
-                                                                      (or end (length sequence))))))
+                                            (,(if (lvar-value from-end)
+                                                  'sb-vm::simd-position-from-end-ub8
+                                                  'sb-vm::simd-position-ub8)
+                                             (char-code item) sequence start
+                                             (or end (length sequence))))))
                               (if pos
                                   (values item pos)
                                   (values nil nil)))))
