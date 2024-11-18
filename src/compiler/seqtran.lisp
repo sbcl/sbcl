@@ -2905,44 +2905,62 @@
                               :node node)
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
-  (unless
-      (or (policy node (> speed space))
-          ;; These have compact inline expansion
-          (and (or (not key)
-                   (lvar-fun-is key '(identity)))
-               (and (constant-lvar-p start)
-                    (eql (lvar-value start) 0))
-               (and (constant-lvar-p end)
-                    (null (lvar-value end)))
-               (csubtypep (lvar-type sequence) (specifier-type 'simple-array))
-               (let ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
-                     (test (lvar-fun-name* test))
-                     (item (lvar-type item)))
-                 (when (neq element-type *wild-type*)
-                   (case (type-specifier element-type)
-                     ((double-float single-float)
-                      (and (csubtypep item element-type)
-                           (memq test '(= eql equal equalp))))
-                     ((t)
-                      (eq test 'eq))
-                     (character
-                      (or (memq test '(eq eql equal char=))
-                          (and (eq test 'char-equal)
-                               (or (csubtypep item (specifier-type 'base-char))
-                                   (and (constant-lvar-p sequence)
-                                        (every (lambda (x) (typep x 'base-char))
-                                               (lvar-value sequence)))))))
-                     (base-char
-                      (memq test '(eq eql equal char= char-equal)))
-                     (t
-                      (and (csubtypep element-type (specifier-type 'integer))
-                           (csubtypep item element-type)
-                           (memq test '(eq eql equal equalp =)))))))))
-    (give-up-ir1-transform))
-  ;; Delay to prefer the string and bit-vector transforms
-  (delay-ir1-transform node :constraint)
-  '(%find-position-vector-macro item sequence
-    from-end start end key test))
+  (block nil
+    (unless
+        (or
+         ;; These have compact inline expansion
+         (and (or (not key)
+                  (lvar-fun-is key '(identity)))
+              (csubtypep (lvar-type sequence) (specifier-type 'simple-array))
+              (or (policy node (zerop insert-array-bounds-checks))
+                  (and (constant-lvar-p start)
+                       (eql (lvar-value start) 0)
+                       (constant-lvar-p end)
+                       (null (lvar-value end))))
+              (let ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+                    (test (lvar-fun-name* test))
+                    (item (lvar-type item)))
+                (when (and (neq element-type *wild-type*)
+                           (case (type-specifier element-type)
+                             ((double-float single-float)
+                              (and (csubtypep item element-type)
+                                   (memq test '(= eql equal equalp))))
+                             ((t)
+                              (eq test 'eq))
+                             (character
+                              (or (memq test '(eq eql equal char=))
+                                  (and (eq test 'char-equal)
+                                       (or (csubtypep item (specifier-type 'base-char))
+                                           (and (constant-lvar-p sequence)
+                                                (every (lambda (x) (typep x 'base-char))
+                                                       (lvar-value sequence)))))))
+                             (base-char
+                              (memq test '(eq eql equal char= char-equal)))
+                             (t
+                              (and (csubtypep element-type (specifier-type 'integer))
+                                   (csubtypep item element-type)
+                                   (memq test '(eq eql equal equalp =))))))
+                  (cond #+arm64
+                        ((and (csubtypep (lvar-type sequence) (specifier-type 'simple-base-string))
+                              (and (constant-lvar-p from-end)
+                                   (null (lvar-value from-end)))
+                              (neq test 'char-equal)
+                              (not (and (eq test 'char=)
+                                        (not (csubtypep item (specifier-type 'character))))))
+                         (return
+                           `(let ((pos (and (characterp item)
+                                            (sb-vm::simd-position-ub8 (char-code item) sequence start
+                                                                      (or end (length sequence))))))
+                              (if pos
+                                  (values item pos)
+                                  (values nil nil)))))
+                        (t)))))
+         (policy node (> speed space)))
+      (give-up-ir1-transform))
+    ;; Delay to prefer the string and bit-vector transforms
+    (delay-ir1-transform node :constraint)
+    '(%find-position-vector-macro item sequence
+      from-end start end key test)))
 
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t bit-vector t t t t t)

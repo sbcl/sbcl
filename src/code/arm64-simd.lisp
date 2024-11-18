@@ -992,3 +992,83 @@
                 (if (>= last-newline 0)
                     (truly-the index (+ start last-newline))
                     -1))))))
+
+(defun simd-position-ub8 (element vector start end)
+  (declare (type index start end)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (vector)
+    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+                 ((start any-reg) start)
+                 ((end any-reg) end)
+                 ((element unsigned-reg) element)
+                 ((left))
+                 ((byte-array sap-reg t))
+                 ((bytes complex-double-reg))
+                 ((cmp complex-double-reg))
+                 ((temp complex-double-reg))
+                 ((indexes))
+                 ((search)))
+        ((res descriptor-reg t :from :load))
+      (inst mov res null-tn)
+      (inst dup search element :16b)
+      (inst add byte-array byte-array* (lsr start 1))
+      (inst add end byte-array* (lsr end 1))
+
+      (inst sub left end byte-array)
+      (inst cmp left 16)
+      (inst b :lt DOUBLE)
+
+
+      LOOP
+      (inst ldr bytes (@ byte-array))
+      (inst cmeq cmp bytes search)
+      (inst umaxv temp cmp :16b)
+      (inst umov tmp-tn temp 0 :b)
+      (inst cbnz tmp-tn FOUND)
+      (inst add byte-array byte-array 16)
+      (inst sub left end byte-array)
+      (inst cmp left 16)
+      (inst b :ge LOOP)
+
+      DOUBLE
+      (inst cmp left 8)
+      (inst b :lt SCALAR)
+
+      (let ((bytes (reg-in-sc bytes 'double-reg))
+            (cmp (reg-in-sc cmp 'double-reg))
+            (temp (reg-in-sc temp 'double-reg)))
+
+        (inst ldr bytes (@ byte-array))
+        (inst cmeq cmp bytes search :8b)
+        (inst umaxv temp cmp :8b)
+        (inst umov tmp-tn temp 0 :b)
+        (inst cbnz tmp-tn FOUND)
+        (inst add byte-array byte-array 8)
+        (inst sub left end byte-array))
+
+      SCALAR
+      (loop repeat 7
+            do (inst cmp byte-array end)
+               (inst b :ge DONE)
+               (inst ldrb left (@ byte-array))
+               (inst cmp left element)
+               (inst b :eq FOUND-SCALAR)
+               (inst add byte-array byte-array 1))
+
+
+      (inst b DONE)
+
+
+      FOUND
+      (load-inline-constant indexes :oword (concat-ub 8 (loop for i downfrom 15 to 0
+                                                              collect i)))
+      (inst s-orn indexes indexes cmp)
+
+      (inst uminv indexes indexes :16b)
+      (inst umov tmp-tn indexes 0 :b)
+      (inst add byte-array byte-array tmp-tn)
+
+      FOUND-SCALAR
+      (inst sub left byte-array byte-array*)
+      (inst lsl res left n-fixnum-tag-bits)
+      DONE)))

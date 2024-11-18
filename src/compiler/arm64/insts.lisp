@@ -2803,12 +2803,15 @@
                                        ,op
                                        (fpr-offset rn)
                                        (fpr-offset rd))))))
+  (def s-and #b0 #b00 #b00011)
+  (def s-bic #b0 #b01 #b00011)
   (def s-orr #b0 #b10 #b00011
     '((:cond
         ((rn :same-as rm) 'mov)
         (t 'orr))
       :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
-  (def s-and #b0 #b00 #b00011)
+  (def s-orn #b0 #b11 #b00011)
+
   (def s-eor #b1 #b00 #b00011)
   (def bsl #b1 #b01 #b00011)
   (def bit #b1 #b10 #b00011)
