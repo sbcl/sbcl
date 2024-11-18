@@ -1433,7 +1433,6 @@
       (inst jmp DONE)
 
       FOUND
-      (mprint left)
       (inst bsf :dword left left)
       (inst shl left 2)
       (inst add 32-bit-array left)

@@ -2950,7 +2950,8 @@
                          (delay-ir1-transform node :ir1-phases)
                          (return
                            `(let ((pos (and (characterp item)
-                                            (,(if (eq et-specifier 'base-char)
+                                            (,(if (eq et-specifier #+sb-unicode 'base-char
+                                                                   #-sb-unicode 'character)
                                                   (if (lvar-value from-end)
                                                       'sb-vm::simd-position-from-end-ub8
                                                       'sb-vm::simd-position-ub8)
