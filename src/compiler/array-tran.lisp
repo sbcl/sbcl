@@ -491,7 +491,9 @@
           (give-up-ir1-transform
            "Upgraded element type of array is not known at compile time.")))
     `(progn
-       (the ,(type-specifier element-ctype) element)
+       (the ,(if stringp
+                 'character
+                 (type-specifier element-ctype)) element)
        ,@(when vector-t
            `((unless (typep vector '(vector t))
                (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
@@ -539,7 +541,9 @@
             (give-up-ir1-transform
              "Upgraded element type of array is not known at compile time.")))
       `(progn
-         (the ,(type-specifier element-ctype) element)
+         (the ,(if stringp
+                   'character
+                   (type-specifier element-ctype)) element)
          ,@(when vector-t
              `((unless (typep vector '(vector t))
                  (%type-check-error/c vector 'sb-kernel::object-not-vector-t-error nil))))
