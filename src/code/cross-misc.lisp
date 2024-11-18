@@ -448,7 +448,9 @@
 (defun range<= (l x h) (<= l x h))
 (defun range<<= (l x h) (and (< l x) (<= x h)))
 (defun range<=< (l x h) (and (<= l x) (< x h)))
-
+(defun check-range<= (l x h)
+  (and (typep x 'sb-xc:fixnum)
+       (<= l x h)))
 (defvar *unbound-marker* (make-symbol "UNBOUND-MARKER"))
 
 (defun make-unbound-marker ()

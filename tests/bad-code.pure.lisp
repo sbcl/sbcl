@@ -738,7 +738,15 @@
        :allow-warnings t)
     (declare (ignore failure))
     (assert warning)
-    (assert-error (funcall fun "abcdef") sb-kernel:bounding-indices-bad-error)))
+    (assert-error (funcall fun "abcdef") sb-kernel:bounding-indices-bad-error))
+  (multiple-value-bind (fun failure warning)
+      (checked-compile
+       `(lambda (s)
+          (position #\a (the simple-base-string s) :start 4 :end 2))
+       :allow-warnings t)
+    (declare (ignore failure))
+    (assert warning)
+    (assert-error (funcall fun (string 'list)) sb-kernel:bounding-indices-bad-error)))
 
 (with-test (:name :cast-movement-empty-types)
   (assert (nth-value 2

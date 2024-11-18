@@ -1252,7 +1252,7 @@
                     (truly-the index (+ start last-newline))
                     -1))))))
 
-(defun simd-position-ub8 (element vector start end)
+(defun simd-position8 (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (vector)
@@ -1316,7 +1316,7 @@
       (inst shl res n-fixnum-tag-bits)
       DONE)))
 
-(defun simd-position-from-end-ub8 (element vector start end)
+(defun simd-position8-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (vector)
@@ -1363,7 +1363,7 @@
       SCALAR
       (loop repeat 15
             do (inst cmp byte-array start)
-               (inst jmp :l DONE)
+               (inst jmp :le DONE)
                (inst dec byte-array)
                (inst mov :byte left (ea byte-array))
                (inst cmp left element)
@@ -1380,7 +1380,7 @@
       (inst shl res n-fixnum-tag-bits)
       DONE)))
 
-(defun simd-position-ub32 (element vector start end)
+(defun simd-position32 (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (vector)
@@ -1443,7 +1443,7 @@
       (inst shr res 1)
       DONE)))
 
-(defun simd-position-from-end-ub32 (element vector start end)
+(defun simd-position32-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects (vector)
@@ -1488,7 +1488,7 @@
       SCALAR
       (loop repeat 15
             do (inst cmp 32-bit-array start)
-               (inst jmp :l DONE)
+               (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
                (inst mov :byte left (ea 32-bit-array))
                (inst cmp left element)
