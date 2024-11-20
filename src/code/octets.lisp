@@ -498,18 +498,18 @@ STRING (or the subsequence bounded by START and END)."
 ;;; the name of any format? Shouldn't those be handled higher up,
 ;;; or else this should return the actual default?
 (defun get-external-format (external-format)
-  (let* ((external-format (ensure-list external-format))
-         (options (cdr external-format)))
-    (unless (symbolp (car external-format))
+  (multiple-value-bind (format-name options)
+      (if (consp external-format)
+          (values (car external-format) (cdr external-format))
+          (values external-format nil))
+    (unless (symbolp format-name)
       (return-from get-external-format nil))
     (loop for (option value) on options by 'cddr
           unless (or (eql option :newline) (eql option :replacement))
           do (return-from get-external-format nil))
     (binding*
-        (((format-name newline replacement)
-          (values (car external-format)
-                  (getf options :newline :lf)
-                  (getf options :replacement)))
+        ((newline (getf options :newline :lf))
+         (replacement (getf options :replacement))
          (table-index (get format-name :external-format) :exit-if-null)
          (formats *external-formats*)
          (table-entry
@@ -538,28 +538,30 @@ STRING (or the subsequence bounded by START and END)."
          (newline-base-format
           (if (eql newline :lf)
               base-format
-              (cdr (assoc (list newline) variations :test #'equal)))
+              (cdr (assoc-if (lambda (x)
+                               (equal x (list newline))) ;; transformed to not cons
+                             variations)))
           :exit-if-null))
       (unless (typep replacement '(or null character string (unsigned-byte 8) (simple-array (unsigned-byte 8) 1)))
         (return-from get-external-format nil))
       (when (or (not newline-base-format) (not replacement))
         (return-from get-external-format newline-base-format))
       (loop
-        (let ((key (cons newline replacement)))
-          (awhen (assoc key variations :test #'equal)
-            (return (cdr it)))
-          (let* ((new-ef (let ((copy (copy-structure newline-base-format)))
-                           (setf (ef-replacement copy) replacement)
-                           copy))
-                 (new-table-entry
+       (let ((key (cons newline replacement)))
+         (awhen (assoc key variations :test #'equal)
+           (return (cdr it)))
+         (let* ((new-ef (let ((copy (copy-structure newline-base-format)))
+                          (setf (ef-replacement copy) replacement)
+                          copy))
+                (new-table-entry
                   (cons base-format (acons key new-ef variations)))
-                 (old (cas (svref formats table-index) table-entry new-table-entry)))
-            (when (eq old table-entry)
-              (return new-ef))
-            ;; CAS failure -> some other thread added an entry. It's probably
-            ;; for the same replacement char which is usually #\ufffd.
-            ;; So try again. At worst this conses some more garbage.
-            (setq table-entry old)))))))
+                (old (cas (svref formats table-index) table-entry new-table-entry)))
+           (when (eq old table-entry)
+             (return new-ef))
+           ;; CAS failure -> some other thread added an entry. It's probably
+           ;; for the same replacement char which is usually #\ufffd.
+           ;; So try again. At worst this conses some more garbage.
+           (setq table-entry old)))))))
 
 (push
   `("SB-IMPL"
