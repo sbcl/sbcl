@@ -966,6 +966,10 @@ possibly temporarily, because it might be used internally.")
    "*REPL-PROMPT-FUN*"
    "*REPL-READ-FORM-FUN*"
 
+   ;; an experimental thing
+   "STDIO-FILE"
+   "MAKE-STDIO-FILE"
+
    ;; for SB-COVER
 
    "*CODE-COVERAGE-INFO*"
@@ -1278,7 +1282,7 @@ interface stability.")
    "INO-T" "UNIX-ACCESS" "UNIX-SETITIMER" "UNIX-GETITIMER"
    "L_INCR" "L_SET" "L_XTND" "O_APPEND" "O_CREAT" "O_NOCTTY" "O_EXCL"
    "O_RDONLY" "O_RDWR" "O_TRUNC" "O_WRONLY" "POSIX-GETCWD"
-   "POSIX-GETCWD/"
+   "POSIX-GETCWD/" "POSIX-TMPFILE"
    "RU-IDRSS" "RU-INBLOCK" "RU-ISRSS" "RU-IXRSS"
    "RU-MAJFLT" "RU-MAXRSS" "RU-MINFLT" "RU-MSGRCV" "RU-MSGSND"
    "RU-NIVCSW" "RU-NSIGNALS" "RU-NSWAP" "RU-NVCSW" "RU-OUBLOCK"

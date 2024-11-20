@@ -2828,3 +2828,40 @@
         (track-newlines stream)))
      ;; call next method
      (fd-stream-misc-routine stream operation arg1))))
+
+;;; This stream writes to the underlying file descriptor, _not_ the stdio object.
+;;; The struct is merely a wrapper to give FILE* a Lisp type other than SAP.
+(defstruct (stdio-file
+            (:constructor make-stdio-file
+                (sap &aux (fd
+                           (alien-funcall (extern-alien "sb_fileno" (function int system-area-pointer))
+                                          sap))))
+            (:copier nil)
+            (:predicate nil))
+  (sap 0 :type system-area-pointer)
+  (fd -1 :type fixnum))
+
+(defun stream-from-stdio-file (stdio-file &rest rest)
+  (let ((stream (apply #'make-fd-stream (stdio-file-fd stdio-file)
+                       :element-type '(unsigned-byte 8)
+                       rest)))
+    (setf (ansi-stream-misc stream)
+          (lambda (stream operation arg)
+            (stream-misc-case (operation :default nil)
+             (:file-length
+              ;; there are at least 2 ways to do this: stat() or lseek() a few times
+              (let* ((fd (stdio-file-fd stdio-file))
+                     (cur (sb-unix:unix-lseek fd 0 sb-unix:L_SET)) ; SEEK-SET
+                     (end (sb-unix:unix-lseek fd 0 sb-unix:L_XTND))) ; SEEK-END
+                ;; go back to where it was
+                (sb-unix:unix-lseek fd cur sb-unix:L_SET)
+                end))
+             (:close
+              (finish-fd-stream-output stream)
+              ;; The Lisp stream does not own the fd. Setting fd to -1
+              ;; prevents RELEASE-FD-STREAM-RESOURCES from closing it.
+              (setf (fd-stream-fd stream) -1)
+              (release-fd-stream-resources stream))
+             (t
+              (fd-stream-misc-routine stream operation arg)))))
+    stream))

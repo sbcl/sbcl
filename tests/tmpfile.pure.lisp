@@ -1,0 +1,12 @@
+(with-test (:name :posix-tmpfile :fails-on :win32)
+  (let ((tmpfile (sb-unix:posix-tmpfile)))
+    (multiple-value-bind (output warn err)
+        (sb-c:compile-form-to-file '(progn (defvar *foo* 3)) tmpfile)
+      (assert (and output (not warn) (not err)))
+      (let ((stream (sb-impl::stream-from-stdio-file tmpfile :input t)))
+        (sb-fasl::load-as-fasl stream nil nil)
+        (alien-funcall
+         (extern-alien "fclose" (function int sb-sys:system-area-pointer))
+         (sb-impl::stdio-file-sap tmpfile))
+        (assert (eq (sb-int:info :variable :kind '*foo*) :special))
+        (assert (= (symbol-value '*foo*) 3))))))
