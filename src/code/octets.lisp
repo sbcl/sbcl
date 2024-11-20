@@ -346,18 +346,48 @@
 ;;;; external formats
 
 (defvar *default-external-format* :utf-8)
+(defvar *default-source-external-format*
+  #+win32 '(:default :newline :crlf)
+  #-win32 :default)
 
 (defun default-external-format ()
   (/show0 "/getting default external format")
   *default-external-format*)
 
+(defun parse-external-format (external-format)
+  (let* ((defaulted-external-format (typecase external-format
+                                      ((eql :default)
+                                       *default-external-format*)
+                                      ((cons (eql :default))
+                                       (let ((default *default-external-format*)
+                                             (options (cdr external-format)))
+                                         (if (consp *default-external-format*)
+                                             (cons (car *default-external-format*)
+                                                   (append options (cdr default)))
+                                             (cons default options))))
+                                      (t
+                                       external-format)))
+         (external-format-entry (get-external-format defaulted-external-format))
+         (canonized-external-format
+           (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
+    (values external-format-entry canonized-external-format)))
+
 
 ;;;; public interface
 
 (defun maybe-defaulted-external-format (external-format)
-  (get-external-format-or-lose (if (eq external-format :default)
-                                   (default-external-format)
-                                   external-format)))
+  (get-external-format-or-lose (typecase external-format
+                                 ((eql :default)
+                                  *default-external-format*)
+                                 ((cons (eql :default))
+                                  (let ((default *default-external-format*)
+                                        (options (cdr external-format)))
+                                    (if (consp *default-external-format*)
+                                        (cons (car *default-external-format*)
+                                              (append options (cdr default)))
+                                        (cons default options))))
+                                 (t
+                                  external-format))))
 
 (declaim (inline %octets-to-string))
 (declaim (ftype (sfunction (function (vector (unsigned-byte 8)) index sequence-end t)

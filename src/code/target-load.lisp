@@ -224,7 +224,7 @@
 
    :EXTERNAL-FORMAT
        The external-format to use when opening the FILENAME. The default is
-       :DEFAULT which uses the SB-EXT:*DEFAULT-EXTERNAL-FORMAT*."
+       :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*."
   (labels ((load-stream (stream faslp)
              (if (and (fd-stream-p stream)
                       (eq (sb-impl::fd-stream-fd-type stream) :directory))
@@ -270,7 +270,10 @@
     (when (streamp filespec)
       (return-from load (load-stream filespec (fasl-header-p filespec))))
 
-    (let ((pathname (pathname filespec)))
+    (let ((pathname (pathname filespec))
+          (external-format (if (eq external-format :default)
+                               sb-ext:*default-source-external-format*
+                               external-format)))
       ;; Case 2: Open as binary, try to process as a fasl.
       (with-open-stream
           (stream (or (open filespec :element-type '(unsigned-byte 8)

@@ -1808,6 +1808,7 @@ returning its filename.
 
   :EXTERNAL-FORMAT
      The external format to use when opening the source file.
+      The default is :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
 
   :BLOCK-COMPILE {NIL | :SPECIFIED | T}
      Determines whether multiple functions are compiled together as a unit,
@@ -1848,6 +1849,9 @@ returning its filename.
          (failure-p t) ; T in case error keeps this from being set later
          ((start-sec start-nsec) (get-thread-virtual-time))
          (input-pathname (verify-source-file input-file))
+         (external-format (if (eq external-format :default)
+                              sb-ext:*default-source-external-format*
+                              external-format))
          (source-info
           (make-file-source-info input-pathname external-format
                                  #-sb-xc-host t)) ; can't track, no SBCL streams

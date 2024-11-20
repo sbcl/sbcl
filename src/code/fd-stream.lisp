@@ -2448,12 +2448,8 @@
   ;; :EXTERNAL-FORMAT argument, so we need to repeat the check and
   ;; canonization here, but if we detect a problem we must make sure
   ;; to close the FD.
-  (let* ((defaulted-external-format (if (eql external-format :default)
-                                        (default-external-format)
-                                        external-format))
-         (external-format-entry (get-external-format defaulted-external-format))
-         (canonized-external-format
-          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
+  (multiple-value-bind (external-format-entry canonized-external-format)
+      (parse-external-format external-format)
     (unless external-format-entry
       (unwind-protect
            (error "Undefined external-format: ~S" external-format)
@@ -2594,12 +2590,8 @@
                        :OVERWRITE, :APPEND, :SUPERSEDE or NIL
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
   See the manual for details."
-  (let* ((defaulted-external-format (if (eql external-format :default)
-                                        (default-external-format)
-                                        external-format))
-         (external-format-entry (get-external-format defaulted-external-format))
-         (canonized-external-format
-          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
+  (multiple-value-bind (external-format-entry canonized-external-format)
+      (parse-external-format external-format)
     (unless external-format-entry
       (error "Undefined external-format: ~S" external-format))
     ;; Calculate useful stuff.
@@ -2692,26 +2684,26 @@
              ;; whether the file already exists, make sure the original
              ;; file is not a directory, and keep the mode.
              (let ((exists
-                    (and namestring
-                         (multiple-value-bind (okay err/dev inode orig-mode)
-                             (sb-unix:unix-stat namestring)
-                           (declare (ignore inode)
-                                    (type (or index null) orig-mode))
-                           (cond
-                             (okay
-                              (when (and output (= (logand orig-mode #o170000)
-                                                   #o40000))
-                                (file-perror
-                                 pathname nil
-                                 "Can't open ~S for output: is a directory"
-                                 pathname))
-                              (setf mode (logand orig-mode #o777))
-                              t)
-                             ((eql err/dev sb-unix:enoent)
-                              nil)
-                             (t
-                              (file-perror namestring err/dev
-                                           "Can't find ~S" namestring)))))))
+                     (and namestring
+                          (multiple-value-bind (okay err/dev inode orig-mode)
+                              (sb-unix:unix-stat namestring)
+                            (declare (ignore inode)
+                                     (type (or index null) orig-mode))
+                            (cond
+                              (okay
+                               (when (and output (= (logand orig-mode #o170000)
+                                                    #o40000))
+                                 (file-perror
+                                  pathname nil
+                                  "Can't open ~S for output: is a directory"
+                                  pathname))
+                               (setf mode (logand orig-mode #o777))
+                               t)
+                              ((eql err/dev sb-unix:enoent)
+                               nil)
+                              (t
+                               (file-perror namestring err/dev
+                                            "Can't find ~S" namestring)))))))
                (unless (and exists
                             (rename-the-old-one namestring original))
                  (setf original nil)
@@ -2732,7 +2724,7 @@
                    (sb-unix:unix-open namestring mask mode
                                       #+win32 :overlapped #+win32 overlapped)
                    (values nil #-win32 sb-unix:enoent
-                           #+win32 sb-win32::error_file_not_found))
+                               #+win32 sb-win32::error_file_not_found))
              (when (numberp fd)
                (return (case direction
                          ((:input :output :io)
@@ -2756,10 +2748,10 @@
                                           :auto-close t))
                          (:probe
                           (let ((stream
-                                 (%make-fd-stream :name namestring
-                                                  :fd fd
-                                                  :pathname pathname
-                                                  :element-type element-type)))
+                                  (%make-fd-stream :name namestring
+                                                   :fd fd
+                                                   :pathname pathname
+                                                   :element-type element-type)))
                             (close stream)
                             stream)))))
              (destructuring-bind (&key return

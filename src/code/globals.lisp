@@ -84,7 +84,11 @@
                   sb-debug:*stack-top-hint*
                   *gc-inhibit* *gc-pending*
                   #+sb-thread *stop-for-gc-pending*
-                  *posix-argv*))
+                  *posix-argv*
+                  *default-external-format*
+                  *default-source-external-format*))
+(declaim (always-bound *default-external-format* *default-source-external-format*))
+
 ;;; This constant is assigned by Genesis and never read by Lisp code.
 ;;; (To prove that it isn't used, it's not a toplevel form)
 (let ()
