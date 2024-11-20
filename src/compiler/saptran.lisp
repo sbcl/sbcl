@@ -41,7 +41,7 @@
   (unsigned-byte #.sb-vm:n-machine-word-bits)
   (movable flushable foldable))
 (defknown int-sap ((unsigned-byte #.sb-vm:n-machine-word-bits))
-  system-area-pointer (movable))
+  system-area-pointer (movable flushable))
 
 (macrolet ((defsapref (fun value-type
                  &aux (setter (symbolicate "%SET-" fun))

@@ -832,7 +832,13 @@ way that the argument is passed.
          ;; alien values) both messy to do by hand and very important
          ;; for performance of later code which uses the return value.
          (declaim (ftype (function ,(lisp-arg-types)
-                                   (values ,@(lisp-result-types) &optional))
+                                   ;; c-string also accepts aliens and
+                                   ;; byte-arrays, but on output it
+                                   ;; produces strings.
+                                   (values ,@(substitute '(or simple-string null)
+                                                         '(alien c-string)
+                                                         (lisp-result-types)
+                                                         :test #'equal) &optional))
                          ,lisp-name))
          (defun ,lisp-name ,(lisp-args)
            ,@(docs)
