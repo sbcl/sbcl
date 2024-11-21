@@ -2721,7 +2721,8 @@ many elements are copied."
                               `(((and (eq #'identity key)
                                       (or (eq #'eq test)
                                           (eq #'eql test)
-                                          (and (eq test #'char=)
+                                          (and (or (eq test #'sb-c::two-arg-char=)
+                                                   (eq test #'char=))
                                                (characterp item))
                                           (eq #'equal test)))
                                  (locally
