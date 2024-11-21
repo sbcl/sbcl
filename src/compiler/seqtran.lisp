@@ -3044,10 +3044,11 @@
          (sb-impl::string-dispatch ((simple-array character (*))
                                     (simple-array base-char (*)))
                                    sequence
-           (let ((p (locally (declare (optimize (insert-array-bounds-checks 0)))
-                      (nth-value 1 (%find-position item sequence from-end start end key test)))))
-             (if p
-                 (values item (truly-the index (- p offset)))
+           (multiple-value-bind (result position)
+               (locally (declare (optimize (insert-array-bounds-checks 0)))
+                 (%find-position item sequence from-end start end key test))
+             (if position
+                 (values result (truly-the index (- position offset)))
                  (values nil nil)))))
       ;; The type is known exactly, other transforms will take care of it.
       (give-up-ir1-transform)))

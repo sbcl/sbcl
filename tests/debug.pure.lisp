@@ -25,7 +25,8 @@
       (assert (null (sb-kernel:fun-code-header #'foo)))))
 
 ;;; Cross-check the C and lisp implementations of debug fun unpacking.
-(with-test (:name :c-unpack-compiled-debug-info-fun-map)
+(with-test (:name :c-unpack-compiled-debug-info-fun-map
+                  :skipped-on :gc-stress)
   (with-alien ((debug-function-name-from-pc
                 (function (* t) (* t) (* char))
                 :extern)

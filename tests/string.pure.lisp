@@ -378,3 +378,12 @@ claim that any particular result from these edge cases constitutes a bug.
 (with-test (:name :downcase-ascii)
   (assert (string= (string-downcase (code-char 192))
                    (string (char-downcase (code-char 192))))))
+
+(with-test (:name :find-on-string)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (declare (string s))
+      (find #\1 s :test #'char/=))
+   ((" ") #\Space)
+   (("1") nil)))
