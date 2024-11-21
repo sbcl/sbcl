@@ -2958,8 +2958,8 @@
                                   (multiple-value-bind (size test value)
                                       (cond
                                         ((eq et-specifier #+sb-unicode 'base-char #-sb-unicode 'character)
-                                         (values 8 '(characterp item)
-                                                 '(char-code (truly-the character item))))
+                                         (values 8 '(base-char-p item)
+                                                 '(char-code (truly-the base-char item))))
                                         #+sb-unicode
                                         ((eq et-specifier  'character)
                                          (values 32 '(characterp item)
