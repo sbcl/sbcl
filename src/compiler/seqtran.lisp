@@ -2957,13 +2957,14 @@
                          (flet ((gen (end &optional offset)
                                   (multiple-value-bind (size test value)
                                       (cond
-                                        ((eq et-specifier #+sb-unicode 'base-char #-sb-unicode 'character)
+                                        ((eq et-specifier 'character)
+                                         (values #+sb-unicode 32  #-sb-unicode 8
+                                                 '(characterp item)
+                                                 '(char-code (truly-the character item))))
+                                        #+sb-unicode
+                                        ((eq et-specifier 'base-char)
                                          (values 8 '(base-char-p item)
                                                  '(char-code (truly-the base-char item))))
-                                        #+sb-unicode
-                                        ((eq et-specifier  'character)
-                                         (values 32 '(characterp item)
-                                                 '(char-code (truly-the character item))))
                                         ((equal et-specifier '(unsigned-byte 8))
                                          (values 8 '(typep item '(unsigned-byte 8))
                                                  '(truly-the (unsigned-byte 8) item)))
