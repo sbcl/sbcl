@@ -1694,7 +1694,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
     if (instanceoid_widetag_p(widetag)) {
         lispobj layout = layout_of(object);
         if (layout) {
-            CHECK(layout, object);
+            CHECK(layout, (lispobj*)&layout_of(object));
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             if (lockfree_list_node_layout_p(LAYOUT(layout))) {
                 struct list_node* node = (void*)object;
