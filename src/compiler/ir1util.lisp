@@ -3155,7 +3155,8 @@ is :ANY, the function name is not checked."
                   when (eq v lambda-var)
                   do (funcall function combination arg))))))))
 
-(defun map-refs (function leaf/lvar &key leaf-set)
+(defun map-refs (function leaf/lvar &key leaf-set
+                                         multiple-uses)
   (let ((seen-calls))
     (labels ((recur (leaf/lvar)
                (typecase leaf/lvar
@@ -3167,7 +3168,10 @@ is :ANY, the function name is not checked."
                     (recur (node-lvar ref))))
                  (lvar
                   (let* ((dest (lvar-dest leaf/lvar)))
-                    (cond ((and (combination-p dest)
+                    (cond ((and multiple-uses
+                                (consp (lvar-uses leaf/lvar)))
+                           (funcall multiple-uses))
+                          ((and (combination-p dest)
                                 (eq (combination-kind dest) :local))
                            (let ((lambda (combination-lambda dest)))
                              (when (cond ((functional-kind-eq lambda let))
@@ -3182,6 +3186,9 @@ is :ANY, the function name is not checked."
                           ((and (combination-p dest)
                                 (lvar-fun-is (combination-fun dest) '(values))
                                 (let ((mv (node-dest dest)))
+                                  (when (and multiple-uses
+                                             (consp (lvar-uses (node-lvar dest))))
+                                    (funcall multiple-uses))
                                   (when (and (mv-combination-p mv)
                                              (eq (basic-combination-kind mv) :local))
                                     (let ((fun (combination-lambda mv)))

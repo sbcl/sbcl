@@ -480,9 +480,8 @@
                       (t
                        (return))))
               (node-lvar node)
-              :leaf-set
-              (lambda ()
-                (return)))
+              :leaf-set (lambda () (return))
+              :multiple-uses (lambda () (return)))
              alien-saps)
            (setf (node-derived-type node)
                  (values-specifier-type '(values system-area-pointer &optional)))
