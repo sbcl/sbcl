@@ -170,7 +170,8 @@
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (setf (info :function :type ',variant) (info :function :type ',name)
-               (info :function :info ',variant) (info :function :info ',name)))
+               (info :function :info ',variant) (info :function :info ',name)
+               (info :function :where-from ',variant) :declared))
        (defun ,variant ,lambda-list
          ,@body)
        ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.
