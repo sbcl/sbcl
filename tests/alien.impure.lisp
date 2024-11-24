@@ -571,7 +571,8 @@
 
 (define-alien-variable internal-errors-enabled int)
 
-(with-test (:name :direct-and-indirect-deref)
+(with-test (:name :direct-and-indirect-deref
+                  :fails-on :interpreter)
   (let ((fun (checked-compile
               `(lambda (x y b)
                  (declare (optimize speed (safety 0)))
