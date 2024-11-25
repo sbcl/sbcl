@@ -1793,9 +1793,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 returning its filename.
 
   :OUTPUT-FILE
-     The name of the FASL to output, NIL for none, T for the default.
-     (Note the difference between the treatment of NIL :OUTPUT-FILE
-     here and in COMPILE-FILE-PATHNAME.)  The returned pathname of the
+     The name of the FASL to output.  The returned pathname of the
      output file may differ from the pathname of the :OUTPUT-FILE
      parameter, e.g. when the latter is a designator for a directory.
 
