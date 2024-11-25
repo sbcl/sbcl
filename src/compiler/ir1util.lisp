@@ -3174,6 +3174,8 @@ is :ANY, the function name is not checked."
                           ((and (combination-p dest)
                                 (eq (combination-kind dest) :local))
                            (let ((lambda (combination-lambda dest)))
+                             (when (cdr (leaf-refs lambda))
+                               (funcall multiple-uses))
                              (when (cond ((functional-kind-eq lambda let))
                                          ((memq dest seen-calls)
                                           nil)
