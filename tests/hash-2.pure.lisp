@@ -39,7 +39,7 @@
                                :initial-element 0)))
       ;; with this many sxhashes we should see a 1 bit in
       ;; in each bit position.
-      (when (make-things-for-sxhash-test (+ 20 #+arm64 10))
+      (when (make-things-for-sxhash-test (+ 20 #-x86-64 10))
         (gc)
         (sb-int:dovector (thing *things*)
           (destructuring-bind (old-addr old-hash object) thing
