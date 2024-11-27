@@ -1173,9 +1173,3 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
-
-;;; tmpfile() is the new ideal way to make a temporary file. It is not subject to any filesystem
-;;; race conditions and (at least on Linux) does not make use of any shell environment variables
-;;; to determine a directory - in fact it doesn't make a filesystem entry at all.
-(defun posix-tmpfile ()
-  (make-stdio-file (alien-funcall (extern-alien "tmpfile" (function system-area-pointer)))))

@@ -2834,12 +2834,18 @@
 (defstruct (stdio-file
             (:constructor make-stdio-file
                 (sap &aux (fd
-                           (alien-funcall (extern-alien "sb_fileno" (function int system-area-pointer))
-                                          sap))))
+                           (let ((fileno
+                                  (alien-funcall (extern-alien "sb_fileno"
+                                                  (function int system-area-pointer))
+                                                 sap)))
+                             #-unix (alien-funcall (extern-alien "_get_osfhandle"
+                                                    (function signed int))
+                                                   fileno)
+                             #+unix fileno))))
             (:copier nil)
             (:predicate nil))
   (sap 0 :type system-area-pointer)
-  (fd -1 :type fixnum))
+  (fd -1 :type #-win32 fixnum #+win32 sb-vm:signed-word))
 
 (defun stream-from-stdio-file (stdio-file &rest rest)
   (let ((stream (apply #'make-fd-stream (stdio-file-fd stdio-file)
@@ -2865,3 +2871,13 @@
              (t
               (fd-stream-misc-routine stream operation arg)))))
     stream))
+
+;;; tmpfile() is the new ideal way to make a temporary file. It is not subject to any filesystem
+;;; race conditions and (at least on Linux) does not make use of any shell environment variables
+;;; to determine a directory - in fact it doesn't make a directory entry at all.
+(defun sb-unix:unix-tmpfile ()
+  (make-stdio-file (alien-funcall (extern-alien "tmpfile" (function system-area-pointer)))))
+
+(defun sb-unix:unix-fclose (file)
+  (alien-funcall (extern-alien "fclose" (function int system-area-pointer))
+                 (stdio-file-sap file)))

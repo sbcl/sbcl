@@ -1918,6 +1918,35 @@ returning its filename.
             warnings-p
             failure-p)))
 
+;;; Produce an anonymous fasl from INPUT-FILE
+#-sb-xc-host
+(defun compile-file-to-tempfile
+    (input-file &key (external-format :default)
+                     ((:block-compile *block-compile-argument*)
+                      *block-compile-default*))
+  (let* ((abort-p t)
+         (warnings-p nil)
+         (failure-p t) ; T in case error keeps this from being set later
+         (input-pathname (verify-source-file input-file))
+         (external-format (if (eq external-format :default)
+                              sb-ext:*default-source-external-format*
+                              external-format))
+         (source-info (make-file-source-info input-pathname external-format t))
+         (*last-message-count* (list* 0 nil nil))
+         (*last-error-context* nil)
+         (stdio-file (sb-unix:unix-tmpfile))
+         (fasl-output (open-fasl-output
+                       (sb-impl::stream-from-stdio-file stdio-file :output t)
+                       (namestring input-pathname))))
+    (unwind-protect
+         (let ((*entry-points-argument* nil)
+               (*compile-object* fasl-output))
+           (setf (values abort-p warnings-p failure-p) (sub-compile-file source-info nil)))
+      (when abort-p (sb-unix:unix-fclose stdio-file))
+      (awhen (source-info-stream source-info) (close it))
+      (close-fasl-output fasl-output abort-p))
+    (values (unless abort-p stdio-file) warnings-p failure-p)))
+
 ;;; Produce a FASL named by OUTPUT-FILE from FORM.
 ;;; The accepted keywords are a subset of those to COMPILE-FILE.
 ;;; *COMPILE-VERBOSE* has no effect - this is silent in general.
