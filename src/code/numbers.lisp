@@ -1742,15 +1742,15 @@ and the number of 0 bits if INTEGER is negative."
 
 ;;;; miscellaneous number predicates
 
-(macrolet ((def (name doc)
-             `(defun ,name (number) ,doc
+(macrolet ((def (name var doc)
+             `(defun ,name (,var) ,doc
                 (declare (explicit-check))
-                (,name number))))
-  (def zerop "Is this number zero?")
-  (def plusp "Is this real number strictly positive?")
-  (def minusp "Is this real number strictly negative?")
-  (def oddp "Is this integer odd?")
-  (def evenp "Is this integer even?"))
+                (,name ,var))))
+  (def zerop number "Is this number zero?")
+  (def plusp number "Is this real number strictly positive?")
+  (def minusp number "Is this real number strictly negative?")
+  (def oddp integer "Is this integer odd?")
+  (def evenp integer "Is this integer even?"))
 
 ;;;; modular functions
 #.
