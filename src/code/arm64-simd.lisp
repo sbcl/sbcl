@@ -1006,8 +1006,6 @@
                  ((byte-array sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
@@ -1023,9 +1021,10 @@
       LOOP
       (inst ldr bytes (@ byte-array))
       (inst cmeq cmp bytes search)
-      (inst umaxv temp cmp :16b)
-      (inst umov tmp-tn temp 0 :b)
-      (inst cbnz tmp-tn FOUND)
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov left (reg-in-sc cmp 'double-reg))
+      (inst cbnz left FOUND)
+
       (inst add byte-array byte-array 16)
       (inst sub left end byte-array)
       (inst cmp left 16)
@@ -1036,14 +1035,13 @@
       (inst b :lt SCALAR)
 
       (let ((bytes (reg-in-sc bytes 'double-reg))
-            (cmp (reg-in-sc cmp 'double-reg))
-            (temp (reg-in-sc temp 'double-reg)))
+            (cmp (reg-in-sc cmp 'double-reg)))
 
         (inst ldr bytes (@ byte-array))
         (inst cmeq cmp bytes search :8b)
-        (inst umaxv temp cmp :8b)
-        (inst umov tmp-tn temp 0 :b)
-        (inst cbnz tmp-tn FOUND)
+        (inst shrn cmp cmp :8b 4)
+        (inst fmov left (reg-in-sc cmp 'double-reg))
+        (inst cbnz left FOUND)
         (inst add byte-array byte-array 8))
 
       SCALAR
@@ -1060,13 +1058,9 @@
 
 
       FOUND
-      (load-inline-constant indexes :oword (concat-ub 8 (loop for i downfrom 15 to 0
-                                                              collect i)))
-      (inst s-orn indexes indexes cmp)
-
-      (inst uminv indexes indexes :16b)
-      (inst umov tmp-tn indexes 0 :b)
-      (inst add byte-array byte-array tmp-tn)
+      (inst rbit left left)
+      (inst clz left left)
+      (inst add byte-array byte-array (lsr left 2))
 
       FOUND-SCALAR
       (inst sub left byte-array byte-array*)
@@ -1086,8 +1080,6 @@
                  ((byte-array sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
@@ -1102,10 +1094,12 @@
 
       LOOP
       (inst ldr bytes (@ byte-array -16 :pre-index))
+
       (inst cmeq cmp bytes search)
-      (inst umaxv temp cmp :16b)
-      (inst umov tmp-tn temp 0 :b)
-      (inst cbnz tmp-tn FOUND)
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov left (reg-in-sc cmp 'double-reg))
+      (inst cbnz left FOUND)
+
       (inst sub left byte-array start)
       (inst cmp left 16)
       (inst b :ge LOOP)
@@ -1116,14 +1110,14 @@
       (inst b :lt SCALAR)
 
       (let ((bytes (reg-in-sc bytes 'double-reg))
-            (cmp (reg-in-sc cmp 'double-reg))
-            (temp (reg-in-sc temp 'double-reg)))
+            (cmp (reg-in-sc cmp 'double-reg)))
 
         (inst ldr bytes (@ byte-array -8 :pre-index))
+
         (inst cmeq cmp bytes search :8b)
-        (inst umaxv temp cmp :8b)
-        (inst umov tmp-tn temp 0 :b)
-        (inst cbnz tmp-tn FOUND))
+        (inst shrn cmp cmp :8b 4)
+        (inst fmov left (reg-in-sc cmp 'double-reg))
+        (inst cbnz left FOUND))
 
       SCALAR
       (loop repeat 7
@@ -1137,14 +1131,9 @@
 
 
       FOUND
-      (load-inline-constant indexes :oword (concat-ub 8 (loop for i downfrom 15 to 0
-                                                              collect i)))
-      (inst sub left byte-array byte-array*)
-
-      (inst s-orn indexes indexes cmp)
-      (inst smaxv indexes indexes :16b)
-      (inst umov left indexes 0 :b)
-      (inst add byte-array byte-array left)
+      (inst clz left left)
+      (inst eor left left 63)
+      (inst add byte-array byte-array (lsr left 2))
 
       FOUND-SCALAR
       (inst sub left byte-array byte-array*)
@@ -1164,8 +1153,6 @@
                  ((32-bit-array sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
@@ -1181,18 +1168,17 @@
       LOOP
       (inst ldr bytes (@ 32-bit-array))
       (inst cmeq cmp bytes search :4s)
-
-      (inst umaxv temp cmp :4s)
-      (inst umov left temp 0 :s)
-
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov left (reg-in-sc cmp 'double-reg))
       (inst cbnz left FOUND)
+
       (inst add 32-bit-array 32-bit-array 16)
       (inst sub left end 32-bit-array)
       (inst cmp left 16)
       (inst b :ge LOOP)
 
       SCALAR
-      (loop repeat 7
+      (loop repeat 3
             do (inst cmp 32-bit-array end)
                (inst b :ge DONE)
                (inst ldr (32-bit-reg left) (@ 32-bit-array))
@@ -1202,17 +1188,11 @@
 
       (inst b DONE)
 
-
       FOUND
-      (load-inline-constant indexes :oword
-                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
-                                                collect i)))
-      (inst s-orn indexes indexes cmp)
 
-      (inst uminv indexes indexes :4s)
-      (inst umov left indexes 0 :s)
-
-      (inst add 32-bit-array 32-bit-array left)
+      (inst rbit left left)
+      (inst clz left left)
+      (inst add 32-bit-array 32-bit-array (lsr left 2))
 
       FOUND-SCALAR
       (inst sub left 32-bit-array 32-bit-array*)
@@ -1232,8 +1212,6 @@
                  ((32-bit-array sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
@@ -1249,17 +1227,19 @@
 
       LOOP
       (inst ldr bytes (@ 32-bit-array -16 :pre-index))
+
       (inst cmeq cmp bytes search :4s)
-      (inst umaxv temp cmp :4s)
-      (inst umov tmp-tn temp 0 :s)
-      (inst cbnz tmp-tn FOUND)
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov left (reg-in-sc cmp 'double-reg))
+      (inst cbnz left FOUND)
+
       (inst sub left 32-bit-array start)
       (inst cmp left 16)
       (inst b :ge LOOP)
 
 
       SCALAR
-      (loop repeat 7
+      (loop repeat 3
             do (inst cmp 32-bit-array start)
                (inst b :le DONE)
                (inst ldr (32-bit-reg left) (@ 32-bit-array -4 :pre-index))
@@ -1270,15 +1250,11 @@
 
 
       FOUND
-      (load-inline-constant indexes :oword
-                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
-                                                collect i)))
-      (inst sub left 32-bit-array 32-bit-array*)
+      (inst lsr left left 15)
+      (inst clz left left)
+      (inst eor left left 63)
 
-      (inst s-orn indexes indexes cmp)
-      (inst smaxv indexes indexes :4s)
-      (inst umov left indexes 0 :s)
-      (inst add 32-bit-array 32-bit-array left)
+      (inst add 32-bit-array 32-bit-array (lsr left 2))
 
       FOUND-SCALAR
       (inst sub left 32-bit-array 32-bit-array*)
