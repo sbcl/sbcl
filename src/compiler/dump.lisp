@@ -372,16 +372,18 @@
 ;;; object for dumping to it. Some human-readable information about
 ;;; the source code is given by the string WHERE.
 (defun open-fasl-output (name where)
-  (declare (type pathname name))
+  (declare (type (or pathname #-sb-xc-host stream) name))
   (flet ((fasl-write-string (string stream)
            ;; UTF-8 is safe to use, because +FASL-HEADER-STRING-STOP-CHAR-CODE+
            ;; may not appear in UTF-8 encoded bytes
            (write-sequence (string-to-octets string :external-format :utf-8)
                            stream)))
-    (let* ((stream (open name
+    (let* ((stream (if (streamp name)
+                       name
+                       (open name
                          :direction :output
                          :if-exists :supersede
-                         :element-type 'sb-assem:assembly-unit))
+                         :element-type 'sb-assem:assembly-unit)))
            (res (make-fasl-output stream)))
       ;; Before the actual FASL header, write a shebang line using the current
       ;; runtime path, so our fasls can be executed directly from the shell.

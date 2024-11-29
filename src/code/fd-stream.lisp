@@ -2448,12 +2448,8 @@
   ;; :EXTERNAL-FORMAT argument, so we need to repeat the check and
   ;; canonization here, but if we detect a problem we must make sure
   ;; to close the FD.
-  (let* ((defaulted-external-format (if (eql external-format :default)
-                                        (default-external-format)
-                                        external-format))
-         (external-format-entry (get-external-format defaulted-external-format))
-         (canonized-external-format
-          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
+  (multiple-value-bind (external-format-entry canonized-external-format)
+      (parse-external-format external-format)
     (unless external-format-entry
       (unwind-protect
            (error "Undefined external-format: ~S" external-format)
@@ -2594,12 +2590,8 @@
                        :OVERWRITE, :APPEND, :SUPERSEDE or NIL
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
   See the manual for details."
-  (let* ((defaulted-external-format (if (eql external-format :default)
-                                        (default-external-format)
-                                        external-format))
-         (external-format-entry (get-external-format defaulted-external-format))
-         (canonized-external-format
-          (and external-format-entry (canonize-external-format defaulted-external-format external-format-entry))))
+  (multiple-value-bind (external-format-entry canonized-external-format)
+      (parse-external-format external-format)
     (unless external-format-entry
       (error "Undefined external-format: ~S" external-format))
     ;; Calculate useful stuff.
@@ -2692,26 +2684,26 @@
              ;; whether the file already exists, make sure the original
              ;; file is not a directory, and keep the mode.
              (let ((exists
-                    (and namestring
-                         (multiple-value-bind (okay err/dev inode orig-mode)
-                             (sb-unix:unix-stat namestring)
-                           (declare (ignore inode)
-                                    (type (or index null) orig-mode))
-                           (cond
-                             (okay
-                              (when (and output (= (logand orig-mode #o170000)
-                                                   #o40000))
-                                (file-perror
-                                 pathname nil
-                                 "Can't open ~S for output: is a directory"
-                                 pathname))
-                              (setf mode (logand orig-mode #o777))
-                              t)
-                             ((eql err/dev sb-unix:enoent)
-                              nil)
-                             (t
-                              (file-perror namestring err/dev
-                                           "Can't find ~S" namestring)))))))
+                     (and namestring
+                          (multiple-value-bind (okay err/dev inode orig-mode)
+                              (sb-unix:unix-stat namestring)
+                            (declare (ignore inode)
+                                     (type (or index null) orig-mode))
+                            (cond
+                              (okay
+                               (when (and output (= (logand orig-mode #o170000)
+                                                    #o40000))
+                                 (file-perror
+                                  pathname nil
+                                  "Can't open ~S for output: is a directory"
+                                  pathname))
+                               (setf mode (logand orig-mode #o777))
+                               t)
+                              ((eql err/dev sb-unix:enoent)
+                               nil)
+                              (t
+                               (file-perror namestring err/dev
+                                            "Can't find ~S" namestring)))))))
                (unless (and exists
                             (rename-the-old-one namestring original))
                  (setf original nil)
@@ -2732,7 +2724,7 @@
                    (sb-unix:unix-open namestring mask mode
                                       #+win32 :overlapped #+win32 overlapped)
                    (values nil #-win32 sb-unix:enoent
-                           #+win32 sb-win32::error_file_not_found))
+                               #+win32 sb-win32::error_file_not_found))
              (when (numberp fd)
                (return (case direction
                          ((:input :output :io)
@@ -2756,10 +2748,10 @@
                                           :auto-close t))
                          (:probe
                           (let ((stream
-                                 (%make-fd-stream :name namestring
-                                                  :fd fd
-                                                  :pathname pathname
-                                                  :element-type element-type)))
+                                  (%make-fd-stream :name namestring
+                                                   :fd fd
+                                                   :pathname pathname
+                                                   :element-type element-type)))
                             (close stream)
                             stream)))))
              (destructuring-bind (&key return
@@ -2836,3 +2828,56 @@
         (track-newlines stream)))
      ;; call next method
      (fd-stream-misc-routine stream operation arg1))))
+
+;;; This stream writes to the underlying file descriptor, _not_ the stdio object.
+;;; The struct is merely a wrapper to give FILE* a Lisp type other than SAP.
+(defstruct (stdio-file
+            (:constructor make-stdio-file
+                (sap &aux (fd
+                           (let ((fileno
+                                  (alien-funcall (extern-alien "sb_fileno"
+                                                  (function int system-area-pointer))
+                                                 sap)))
+                             #-unix (alien-funcall (extern-alien "_get_osfhandle"
+                                                    (function signed int))
+                                                   fileno)
+                             #+unix fileno))))
+            (:copier nil)
+            (:predicate nil))
+  (sap 0 :type system-area-pointer)
+  (fd -1 :type #-win32 fixnum #+win32 sb-vm:signed-word))
+
+(defun stream-from-stdio-file (stdio-file &rest rest)
+  (let ((stream (apply #'make-fd-stream (stdio-file-fd stdio-file)
+                       :element-type '(unsigned-byte 8)
+                       rest)))
+    (setf (ansi-stream-misc stream)
+          (lambda (stream operation arg)
+            (stream-misc-case (operation :default nil)
+             (:file-length
+              ;; there are at least 2 ways to do this: stat() or lseek() a few times
+              (let* ((fd (stdio-file-fd stdio-file))
+                     (cur (sb-unix:unix-lseek fd 0 sb-unix:L_SET)) ; SEEK-SET
+                     (end (sb-unix:unix-lseek fd 0 sb-unix:L_XTND))) ; SEEK-END
+                ;; go back to where it was
+                (sb-unix:unix-lseek fd cur sb-unix:L_SET)
+                end))
+             (:close
+              (finish-fd-stream-output stream)
+              ;; The Lisp stream does not own the fd. Setting fd to -1
+              ;; prevents RELEASE-FD-STREAM-RESOURCES from closing it.
+              (setf (fd-stream-fd stream) -1)
+              (release-fd-stream-resources stream))
+             (t
+              (fd-stream-misc-routine stream operation arg)))))
+    stream))
+
+;;; tmpfile() is the new ideal way to make a temporary file. It is not subject to any filesystem
+;;; race conditions and (at least on Linux) does not make use of any shell environment variables
+;;; to determine a directory - in fact it doesn't make a directory entry at all.
+(defun sb-unix:unix-tmpfile ()
+  (make-stdio-file (alien-funcall (extern-alien "tmpfile" (function system-area-pointer)))))
+
+(defun sb-unix:unix-fclose (file)
+  (alien-funcall (extern-alien "fclose" (function int system-area-pointer))
+                 (stdio-file-sap file)))

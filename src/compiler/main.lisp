@@ -1793,9 +1793,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 returning its filename.
 
   :OUTPUT-FILE
-     The name of the FASL to output, NIL for none, T for the default.
-     (Note the difference between the treatment of NIL :OUTPUT-FILE
-     here and in COMPILE-FILE-PATHNAME.)  The returned pathname of the
+     The name of the FASL to output.  The returned pathname of the
      output file may differ from the pathname of the :OUTPUT-FILE
      parameter, e.g. when the latter is a designator for a directory.
 
@@ -1808,6 +1806,7 @@ returning its filename.
 
   :EXTERNAL-FORMAT
      The external format to use when opening the source file.
+      The default is :DEFAULT which uses the SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT*.
 
   :BLOCK-COMPILE {NIL | :SPECIFIED | T}
      Determines whether multiple functions are compiled together as a unit,
@@ -1848,6 +1847,9 @@ returning its filename.
          (failure-p t) ; T in case error keeps this from being set later
          ((start-sec start-nsec) (get-thread-virtual-time))
          (input-pathname (verify-source-file input-file))
+         (external-format (if (eq external-format :default)
+                              sb-ext:*default-source-external-format*
+                              external-format))
          (source-info
           (make-file-source-info input-pathname external-format
                                  #-sb-xc-host t)) ; can't track, no SBCL streams
@@ -1916,20 +1918,67 @@ returning its filename.
             warnings-p
             failure-p)))
 
+;;; Produce an anonymous fasl from INPUT-FILE
+#-sb-xc-host
+(defun compile-file-to-tempfile
+    (input-file &key (external-format :default)
+                     ((:block-compile *block-compile-argument*)
+                      *block-compile-default*))
+  (let* ((abort-p t)
+         (warnings-p nil)
+         (failure-p t) ; T in case error keeps this from being set later
+         (input-pathname (verify-source-file input-file))
+         (external-format (if (eq external-format :default)
+                              sb-ext:*default-source-external-format*
+                              external-format))
+         (source-info (make-file-source-info input-pathname external-format t))
+         (*last-message-count* (list* 0 nil nil))
+         (*last-error-context* nil)
+         (stdio-file (sb-unix:unix-tmpfile))
+         (fasl-output (open-fasl-output
+                       (sb-impl::stream-from-stdio-file stdio-file :output t)
+                       (namestring input-pathname))))
+    (unwind-protect
+         (let ((*entry-points-argument* nil)
+               (*compile-object* fasl-output))
+           (setf (values abort-p warnings-p failure-p) (sub-compile-file source-info nil)))
+      (when abort-p (sb-unix:unix-fclose stdio-file))
+      (awhen (source-info-stream source-info) (close it))
+      (close-fasl-output fasl-output abort-p))
+    (values (unless abort-p stdio-file) warnings-p failure-p)))
+
 ;;; Produce a FASL named by OUTPUT-FILE from FORM.
 ;;; The accepted keywords are a subset of those to COMPILE-FILE.
 ;;; *COMPILE-VERBOSE* has no effect - this is silent in general.
+#-sb-xc-host
 (defun compile-form-to-file
     (form output-file &key ((:progress *compile-progress*) *compile-progress*)
-                           (trace-file nil))
-  (let* ((abort-p t)
+                      (trace-file nil))
+  ;; As a special case, if PATHNAME-DESIGNATOR is a STDIO-FILE, then we write _directly_ to
+  ;; that. This allows treating Lisp STREAM subtypes as pathname designators in the ordinary
+  ;; way they are treated, which deduces a name from the stream, versus directly utilizing
+  ;; the OS resource for which the Lisp object is a proxy. The latter would have made sense
+  ;; to me, but that's not what the language specifies to happen. In particular, the specified
+  ;; behavior makes it really difficult to utilize temporary files, because the easiest-to-use
+  ;; API is tmpfile() which does not require any name template, and returns a stdio stream,
+  ;; but on Linux at least returns the file in an already-deleted-from-the-filesystem state.
+  ;; You can see the name through /proc/self/fd and /dev/fd/n but SBCL is very reluctant
+  ;; to operate on those magic filenames.
+  (declare (type (or pathname-designator stdio-file) output-file))
+  (binding*
+        ((abort-p t)
          (warnings-p nil)
          (failure-p t)
          (source-info (make-lisp-source-info form))
          (*last-message-count* (list* 0 nil nil))
          (*last-error-context* nil)
-         (pathname (compile-file-pathname "" :output-file output-file))
-         (fasl-output (open-fasl-output pathname "?"))
+         ((result fasl-output)
+          (if (typep output-file 'stdio-file)
+              (values output-file
+                      (open-fasl-output (sb-impl::stream-from-stdio-file output-file :output t)
+                                        "?"))
+              (let ((pathname (compile-file-pathname "" :output-file output-file)))
+                (values pathname (open-fasl-output pathname "?")))))
          (*compiler-trace-output*
           (when trace-file
             (open-trace-file trace-file fasl-output))))
@@ -1942,7 +1991,7 @@ returning its filename.
         (close-fasl-output fasl-output abort-p))
       (when (and trace-file (not (streamp trace-file)))
         (close *compiler-trace-output*)))
-    (values (unless abort-p pathname) warnings-p failure-p))))
+    (values (unless abort-p result) warnings-p failure-p))))
 
 ;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
 ;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,

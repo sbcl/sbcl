@@ -1778,13 +1778,14 @@
    (integer 4 4)))
 
 (with-test (:name :inherit-length-var)
-  (assert (not (ctu:ir1-named-calls
-                `(lambda (x y n)
-                   (declare (optimize (space 0))
-                            (fixnum n)
-                            (simple-base-string y))
-                   (when (< n (length y))
-                     (find x y :start n))))))
+  (assert (not (find 'sb-int:sequence-bounding-indices-bad-error
+                     (ctu:ir1-named-calls
+                      `(lambda (x y n)
+                         (declare (optimize (space 0))
+                                  (fixnum n)
+                                  (simple-base-string y))
+                         (when (< n (length y))
+                           (find x y :start n)))))))
   (assert-type
    (lambda (x y)
      (declare (simple-vector x))

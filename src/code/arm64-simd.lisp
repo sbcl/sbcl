@@ -993,7 +993,7 @@
                     (truly-the index (+ start last-newline))
                     -1))))))
 
-(defun simd-position-ub8 (element vector start end)
+(defun simd-position8 (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
@@ -1073,7 +1073,7 @@
       (inst lsl res left n-fixnum-tag-bits)
       DONE)))
 
-(defun simd-position-from-end-ub8 (element vector start end)
+(defun simd-position8-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
@@ -1099,7 +1099,6 @@
 
       (inst cmp left 16)
       (inst b :lt DOUBLE)
-
 
       LOOP
       (inst ldr bytes (@ byte-array -16 :pre-index))
@@ -1129,7 +1128,7 @@
       SCALAR
       (loop repeat 7
             do (inst cmp byte-array start)
-               (inst b :lt DONE)
+               (inst b :le DONE)
                (inst ldrb left (@ byte-array -1 :pre-index))
                (inst cmp left element)
                (inst b :eq FOUND-SCALAR))
@@ -1152,7 +1151,7 @@
       (inst lsl res left n-fixnum-tag-bits)
       DONE)))
 
-(defun simd-position-ub32 (element vector start end)
+(defun simd-position32 (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
@@ -1220,7 +1219,7 @@
       (inst lsr res left 1)
       DONE)))
 
-(defun simd-position-from-end-ub32 (element vector start end)
+(defun simd-position32-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
@@ -1262,7 +1261,7 @@
       SCALAR
       (loop repeat 7
             do (inst cmp 32-bit-array start)
-               (inst b :lt DONE)
+               (inst b :le DONE)
                (inst ldr (32-bit-reg left) (@ 32-bit-array -4 :pre-index))
                (inst cmp left element)
                (inst b :eq FOUND-SCALAR))

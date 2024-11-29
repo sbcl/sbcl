@@ -617,3 +617,5 @@ double sb_hypot (double x, double y) {
 }
 
 #endif
+
+int sb_fileno(FILE* f) { return fileno(f); } // might be a C macro

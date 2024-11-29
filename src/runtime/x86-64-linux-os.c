@@ -191,8 +191,13 @@ os_context_float_register_addr(os_context_t *context, int offset)
 os_context_register_t *
 os_context_ymm_register_addr(os_context_t *context, int offset)
 {
+#ifdef __USE_GNU
     struct _xstate *xstate = (void*)context->uc_mcontext.fpregs;
     return (os_context_register_t*)&(xstate->ymmh.ymmh_space[offset * 4]);
+#else
+    void *xstate = (void*)context->uc_mcontext.fpregs;
+    return (os_context_register_t*)&((char*)xstate+0x240)[offset * 16];
+#endif
 }
 
 sigset_t *

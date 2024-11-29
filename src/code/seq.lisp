@@ -2706,7 +2706,7 @@ many elements are copied."
 (macrolet (;; shared logic for defining %FIND-POSITION and
            ;; %FIND-POSITION-IF in terms of various inlineable cases
            ;; of the expression defined in FROB and VECTOR*-FROB
-           (frobs (&optional bit-frob)
+           (frobs (&optional specialized)
              `(seq-dispatch-checking sequence-arg
                (frob sequence-arg from-end)
                (with-array-data ((sequence sequence-arg :offset-var offset)
@@ -2714,12 +2714,31 @@ many elements are copied."
                                  (end end)
                                  :check-fill-pointer t)
                  (typecase sequence
-                   #+sb-unicode
                    ((simple-array character (*))
-                    (vector*-frob sequence))
+                    #1=
+                    (cond ,@(when specialized
+                              #+(or arm64 x86-64) ;; invoke simd routines
+                              `(((and (eq #'identity key)
+                                      (or (eq #'eq test)
+                                          (eq #'eql test)
+                                          (and (or (eq test #'sb-c::two-arg-char=)
+                                                   (eq test #'char=))
+                                               (characterp item))
+                                          (eq #'equal test)))
+                                 (locally
+                                     (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+                                   (let ((p (if from-end
+                                                (nth-value 1 (%find-position item sequence t start end #'identity #'eq))
+                                                (nth-value 1 (%find-position item sequence nil start end #'identity #'eq)))))
+                                     (if p
+                                         (values item (truly-the index (- p offset)))
+                                         (values nil nil)))))))
+                          (t
+                           (vector*-frob sequence))))
+                   #+sb-unicode
                    ((simple-array base-char (*))
-                    (vector*-frob sequence))
-                   ,@(when bit-frob
+                    #1#)
+                   ,@(when specialized
                        `((simple-bit-vector
                           (if (and (typep item 'bit)
                                    (eq #'identity key)

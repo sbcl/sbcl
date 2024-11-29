@@ -455,20 +455,53 @@
       (combination
        (splice-fun-args alien '%sap-alien 2)
        '(lambda (sap type)
-          (declare (ignore type))
-          sap))
+         (declare (ignore type))
+         sap))
+      (ref
+       ;; Go through a variable in the %sap-alien transform below
+       (map-all-uses (lambda (use)
+                       (when (combination-is use '(%sap-alien))
+                         (reoptimize-node use)))
+                     alien)
+       (give-up-ir1-transform))
       (t
        (give-up-ir1-transform)))))
+
+(deftransform %sap-alien ((sap type) * * :node node)
+  "optimize away %SAP-ALIEN"
+  (let (alien-saps)
+    ;; Optimize multiple alien-saps through a variable
+    (cond ((block nil
+             (map-refs
+              (lambda (dest)
+                (cond ((combination-is dest '(alien-sap))
+                       (pushnew dest alien-saps :test #'eq))
+                      ((combination-is dest '(eq)))
+                      (t
+                       (return))))
+              (node-lvar node)
+              :leaf-set (lambda () (return))
+              :multiple-uses (lambda () (return)))
+             alien-saps)
+           (setf (node-derived-type node)
+                 (values-specifier-type '(values system-area-pointer &optional)))
+           (erase-lvar-type (node-lvar node))
+           (loop for alien-sap in alien-saps
+                 do
+                 (transform-call alien-sap
+                                 `(lambda (sap)
+                                    sap)
+                                 'alien-sap
+                                 nil))
+           'sap)
+          (t
+           (give-up-ir1-transform
+            "forced to do runtime allocation of alien-value structure")))))
 
 (defoptimizer (%sap-alien derive-type) ((sap type))
   (if (constant-lvar-p type)
       (make-alien-type-type (lvar-value type))
       *wild-type*))
-
-(deftransform %sap-alien ((sap type))
-  "optimize away %SAP-ALIEN"
-  (give-up-ir1-transform
-   "forced to do runtime allocation of alien-value structure"))
 
 ;;;; NATURALIZE/DEPORT/EXTRACT/DEPOSIT magic
 
