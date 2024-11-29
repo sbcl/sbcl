@@ -1,5 +1,58 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.10:
+  * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the
+    external format for reading source files (for direct use in LOAD and
+    COMPILE-FILE).  On Windows, this defaults to an external format with CRLF
+    line-endings.  (lp#720517, reported by Mark David)
+  * minor incompatible change: the documentation of
+    SB-SEQUENCE:MAKE-SEQUENCE-LIKE has been altered to match its
+    implementation regarding the (un)initialization of the sequence if neither
+    :INITIAL-CONTENTS nor :INITIAL-ELEMENT is provided.
+  * minor incompatible change: the outputs from SB-GROVEL no longer contain
+    calls to SB-GROVEL::DEFINE-FOREIGN-ROUTINE, but call
+    SB-ALIEN:DEFINE-ALIEN-ROUTINE directly; the defintions of some other
+    SB-GROVEL utilities has also changed.
+  * platform support:
+    ** The system is more likely to build with the musl C library.  (thanks to
+       Masatoshi SANO)
+    ** It is possible to build 32-bit binaries on NetBSD/x86-64 systems.
+       (thanks to Masatoshi SANO)
+    ** Stale big-endian ARM code in callbacks is no longer present.
+       (lp#2087866, reported by Rongcui Dong)
+    ** Correct the encoding of the VPSHUFD AVX2 instruction.  (reported by
+       Dmitry Ignatiev)
+    ** Implement the PINSRQ SSE instruction and provide access to it in
+       SB-SIMD.
+    ** Fix some signed/unsigned and 32-bit issues in the runtime leading to
+       problems with large --dynamic-space-size.  (lp#2087986)
+  * bug fix: cross-reference information about structure accessors is
+    preserved when compilation policy requires it.
+  * bug fix: changing &ALLOW-OTHER-KEYS in a generic function's lambda list
+    needs to invalidate the effective methods cache.  (reported by Robert
+    Strandh)
+  * bug fix: calling DISASSEMBLE on a method-function provides a more useful
+    disassembly.
+  * bug fix: PROCESS-CLOSE no longer leaks a zombie process.
+  * bug fix: interaction between SYMBOL-MACROLET and SPECIAL declarations is
+    handled more correctly in the code walker.  (lp#1053198)
+  * bug fix: better scaling when compiling large numbers of calls to local
+    functions.  (lp#1379661, reported by 3b and Burton Samograd)
+  * bug fix: allow the compiler to approximate types involving large bignums
+    or ratios with large numerator or denominator.  (lp#2085637)
+  * bug fix: miscompilation of type tests involving STRUCTURE-OBJECT.
+    (lp#2088417)
+  * optimization: CONCATENATE with consing arguments can elide some of the
+    intermediate consing.
+  * optimization: AREF on non-simple arrays with known element type is faster,
+    along with uses such as LOOP ACROSS.
+  * optimization: the implementations of various external-formats have been
+    sped up.
+  * optimization: SIMD variants for POSITION on some specialized simple array
+    types.
+  * optimization: elide %SAP-ALIEN calls if all uses dereference the resulting
+    ALIEN object.
+
 changes in sbcl-2.4.10 relative to sbcl-2.4.9:
   * minor incompatible change: SB-POSIX::POSIX-FORK is no longer exported from
     SB-POSIX.  (The interface function, SB-POSIX:FORK, remains exported).
