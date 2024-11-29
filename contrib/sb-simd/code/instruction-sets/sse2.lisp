@@ -165,8 +165,8 @@
    (u16.8-elt         #:pextrw     (u16)   (u16.8 imm3)  :cost 1)
    (u16.8-shufflehi   #:pshufhw    (u16.8) (u16.8 imm8)  :cost 1)
    (u16.8-shufflelo   #:pshuflw    (u16.8) (u16.8 imm8)  :cost 1)
-   (u16.8-shiftl      #:psllw-imm  (u16.8) (u16.8 imm4)  :cost 1 :encoding :sse)
-   (u16.8-shiftr      #:psrlw-imm  (u16.8) (u16.8 imm4)  :cost 1 :encoding :sse)
+   (u16.8-shiftl      #:psllw      (u16.8) (u16.8 imm4)  :cost 1 :encoding :sse)
+   (u16.8-shiftr      #:psrlw      (u16.8) (u16.8 imm4)  :cost 1 :encoding :sse)
    ;; u32.4
    (u32.4!-from-u32   #:movq       (u32.4) (u16)         :cost 1)
    (u32.4!-from-p128  #:movdqu     (u32.4) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -191,8 +191,8 @@
    (u32.4-unpacklo    #:punpckldq  (u32.4) (u32.4 u32.4) :cost 1 :encoding :sse)
    (u32.4-movemask    #:movmskps   (u4)    (u32.4)       :cost 1)
    (u32.4-shuffle     #:pshufd     (u32.4) (u32.4 imm8)  :cost 1)
-   (u32.4-shiftl      #:pslld-imm  (u32.4) (u32.4 imm5)  :cost 1 :encoding :sse)
-   (u32.4-shiftr      #:psrld-imm  (u32.4) (u32.4 imm5)  :cost 1 :encoding :sse)
+   (u32.4-shiftl      #:pslld      (u32.4) (u32.4 imm5)  :cost 1 :encoding :sse)
+   (u32.4-shiftr      #:psrld      (u32.4) (u32.4 imm5)  :cost 1 :encoding :sse)
    ;; u64.2
    (u64.2!-from-u64   #:movq       (u64.2) (u64)         :cost 1)
    (u64.2!-from-p128  #:movdqu     (u64.2) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -209,8 +209,8 @@
    (u64.2-unpackhi    #:punpckhqdq (u64.2) (u64.2 u64.2) :cost 1 :encoding :sse)
    (u64.2-unpacklo    #:punpcklqdq (u64.2) (u64.2 u64.2) :cost 1 :encoding :sse)
    (u64.2-movemask    #:movmskpd   (u2)    (u64.2)       :cost 1)
-   (u64.2-shiftl      #:psllq-imm  (u64.2) (u64.2 imm6)  :cost 1 :encoding :sse)
-   (u64.2-shiftr      #:psrlq-imm  (u64.2) (u64.2 imm6)  :cost 1 :encoding :sse)
+   (u64.2-shiftl      #:psllq      (u64.2) (u64.2 imm6)  :cost 1 :encoding :sse)
+   (u64.2-shiftr      #:psrlq      (u64.2) (u64.2 imm6)  :cost 1 :encoding :sse)
    ;; s8.16
    (s8.16!-from-s8    nil          (s8.16) (s8)          :cost 1 :encoding :fake-vop)
    (s8.16!-from-p128  #:movdqu     (s8.16) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -259,8 +259,8 @@
    (s16.8-elt         #:pextrw     (s16)   (s16.8 imm3)  :cost 1)
    (s16.8-shufflehi   #:pshufhw    (s16.8) (s16.8 imm8)  :cost 1)
    (s16.8-shufflelo   #:pshuflw    (s16.8) (s16.8 imm8)  :cost 1)
-   (s16.8-shiftl      #:psllw-imm  (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
-   (s16.8-shiftr      #:psrlw-imm  (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
+   (s16.8-shiftl      #:psllw      (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
+   (s16.8-shiftr      #:psrlw      (s16.8) (s16.8 imm4)  :cost 1 :encoding :sse)
    ;; s32.4
    (s32.4!-from-s32   nil          (s32.4) (s32)         :cost 1 :encoding :fake-vop)
    (s32.4!-from-p128  #:movdqu     (s32.4) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -286,8 +286,8 @@
    (s32.4-unpacklo    #:punpckldq  (s32.4) (s32.4 s32.4) :cost 1 :encoding :sse)
    (s32.4-movemask    #:movmskps   (u4)    (s32.4)       :cost 1)
    (s32.4-shuffle     #:pshufd     (s32.4) (s32.4 imm8)  :cost 1)
-   (s32.4-shiftl      #:pslld-imm  (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
-   (s32.4-shiftr      #:psrld-imm  (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
+   (s32.4-shiftl      #:pslld      (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
+   (s32.4-shiftr      #:psrld      (s32.4) (s32.4 imm5)  :cost 1 :encoding :sse)
    ;; s64.2
    (s64.2!-from-s64   nil          (s64.2) (s64)         :cost 1 :encoding :fake-vop)
    (s64.2!-from-p128  #:movdqu     (s64.2) (p128)        :cost 1 :encoding :move :always-translatable nil)
@@ -304,8 +304,8 @@
    (s64.2-unpackhi    #:punpckhqdq (s64.2) (s64.2 s64.2) :cost 1 :encoding :sse)
    (s64.2-unpacklo    #:punpcklqdq (s64.2) (s64.2 s64.2) :cost 1 :encoding :sse)
    (s64.2-movemask    #:movmskpd   (u2)    (s64.2)       :cost 1)
-   (s64.2-shiftl      #:psllq-imm  (s64.2) (s64.2 imm6)  :cost 1 :encoding :sse)
-   (s64.2-shiftr      #:psrlq-imm  (s64.2) (s64.2 imm6)  :cost 1 :encoding :sse))
+   (s64.2-shiftl      #:psllq      (s64.2) (s64.2 imm6)  :cost 1 :encoding :sse)
+   (s64.2-shiftr      #:psrlq      (s64.2) (s64.2 imm6)  :cost 1 :encoding :sse))
   (:loads
    #+sb-unicode
    (u32.4-load-from-string #:movdqu u32.4 charvec char-array u32.4-string-ref u32.4-row-major-string-ref)
