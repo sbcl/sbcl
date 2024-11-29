@@ -11,7 +11,7 @@ changes relative to sbcl-2.4.10:
     :INITIAL-CONTENTS nor :INITIAL-ELEMENT is provided.
   * minor incompatible change: the outputs from SB-GROVEL no longer contain
     calls to SB-GROVEL::DEFINE-FOREIGN-ROUTINE, but call
-    SB-ALIEN:DEFINE-ALIEN-ROUTINE directly; the defintions of some other
+    SB-ALIEN:DEFINE-ALIEN-ROUTINE directly; the definitions of some other
     SB-GROVEL utilities has also changed.
   * platform support:
     ** The system is more likely to build with the musl C library.  (thanks to
@@ -44,14 +44,19 @@ changes relative to sbcl-2.4.10:
     (lp#2088417)
   * optimization: CONCATENATE with consing arguments can elide some of the
     intermediate consing.
-  * optimization: AREF on non-simple arrays with known element type is faster,
-    along with uses such as LOOP ACROSS.
   * optimization: the implementations of various external-formats have been
     sped up.
-  * optimization: SIMD variants for POSITION on some specialized simple array
-    types.
   * optimization: elide %SAP-ALIEN calls if all uses dereference the resulting
     ALIEN object.
+  * optimization: faster (expt integer integer) when computing fixnum results.
+  * optimization: (ash unknown-integer right) can use modular arithmetic.
+  * optimization: (apply x ... list) avoids consing intermediate lists in more
+    situations.
+  * optimizations for arm64, x86-64:
+    ** AREF on non-simple arrays with known element type is faster, along with
+       uses such as LOOP ACROSS, VECTOR-PUSH/POP/EXTEND.
+    ** SIMD variants for POSITION for strings, 8 and 32 bit integer arrays.
+    ** faster overflow checking for (the fixnum (+ fixnum fixnum))
 
 changes in sbcl-2.4.10 relative to sbcl-2.4.9:
   * minor incompatible change: SB-POSIX::POSIX-FORK is no longer exported from
