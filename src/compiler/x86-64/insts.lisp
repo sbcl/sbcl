@@ -2433,15 +2433,20 @@
 
 (macrolet
     ((define-imm-sse-instruction (name opcode vopcode /i)
-       `(define-instruction ,name (segment dst/src src/imm)
-          ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
-          ,@(sse-inst-printer 'xmm-xmm/mem #x66 vopcode)
-          (:emitter
-           (if (integerp src/imm)
-               (emit-sse-inst-with-imm segment dst/src src/imm
-                                       #x66 ,opcode ,/i
-                                       :operand-size :do-not-set)
-               (emit-regular-sse-inst segment dst/src src/imm #x66 ,vopcode))))))
+       `(progn
+          ;; Some code in the wild uses the old separate instructions
+          ;; for immediates.
+          (define-instruction-macro ,(symbolicate name "-IMM") (&rest args)
+            `(inst ,',name ,@args))
+          (define-instruction ,name (segment dst/src src/imm)
+            ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
+            ,@(sse-inst-printer 'xmm-xmm/mem #x66 vopcode)
+            (:emitter
+             (if (integerp src/imm)
+                 (emit-sse-inst-with-imm segment dst/src src/imm
+                                         #x66 ,opcode ,/i
+                                         :operand-size :do-not-set)
+                 (emit-regular-sse-inst segment dst/src src/imm #x66 ,vopcode)))))))
   (define-imm-sse-instruction psllw #x71 #xf1 6)
   (define-imm-sse-instruction pslld #x72 #xf2 6)
   (define-imm-sse-instruction psllq #x73 #xf3 6)
