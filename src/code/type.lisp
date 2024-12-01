@@ -4185,22 +4185,29 @@ used for a COMPLEX component.~:@>"
                                   (member-type-fp-zeroes type2))))
 
 (define-type-method (member :complex-intersection2) (type1 type2)
-  (block punt
-    (let ((xset (alloc-xset))
-          (fp-zeroes nil))
-      (mapc-member-type-members
-       (lambda (member)
-         (multiple-value-bind (ok sure) (ctypep member type1)
-           (unless sure
-             (return-from punt nil))
-           (when ok
+  (let ((xset (alloc-xset))
+        (fp-zeroes nil)
+        (not-sure)
+        (any-skipped))
+    (mapc-member-type-members
+     (lambda (member)
+       (multiple-value-bind (ok sure) (ctypep member type1)
+         (when (not sure)
+           (setf not-sure t))
+         (if (or ok (not sure))
              (if (fp-zero-p member)
                  (pushnew member fp-zeroes)
-                 (add-to-xset member xset)))))
-       type2)
-      (if (and (xset-empty-p xset) (not fp-zeroes))
-          *empty-type*
-          (make-member-type xset fp-zeroes)))))
+                 (add-to-xset member xset))
+             (setf any-skipped t))))
+     type2)
+    (let ((member
+            (if (and (xset-empty-p xset) (not fp-zeroes))
+                *empty-type*
+                (make-member-type xset fp-zeroes))))
+      (if not-sure
+          (and any-skipped
+               (type-intersection type1 member))
+          member))))
 
 ;;; We don't need a :COMPLEX-UNION2, since the only interesting case is
 ;;; a union type, and the member/union interaction is handled by the
