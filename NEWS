@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.4.11:
+  * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
+    specialized to structure classes are compiled to the corresponding
+    structure accessor.
+
 changes in sbcl-2.4.11 relative to sbcl-2.4.10:
   * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the
     external format for reading source files (for direct use in LOAD and
