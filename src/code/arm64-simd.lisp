@@ -701,14 +701,15 @@
                 (inst cbnz tmp-tn DONE)
 
                 LOOP
-                (inst add byte-array byte-array 16)
                 (inst s-mov bytes next-bytes)
-                (inst ldr next-bytes (@ byte-array))
+                (inst ldr next-bytes (@ byte-array 16))
 
                 (inst s-and temp next-bytes ascii-mask)
                 (inst umaxv temp temp :4s)
                 (inst umov tmp-tn temp 0 :s)
                 (inst cbnz tmp-tn DONE)
+                (inst add byte-array byte-array 16)
+
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
@@ -839,14 +840,14 @@
                 (inst cbnz tmp-tn DONE)
 
                 LOOP
-                (inst add byte-array byte-array 16)
                 (inst s-mov bytes next-bytes)
-                (inst ldr next-bytes (@ byte-array))
+                (inst ldr next-bytes (@ byte-array 16))
 
                 (inst s-and temp next-bytes ascii-mask)
                 (inst umaxv temp temp :4s)
                 (inst umov tmp-tn temp 0 :s)
                 (inst cbnz tmp-tn DONE)
+                (inst add byte-array byte-array 16)
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
