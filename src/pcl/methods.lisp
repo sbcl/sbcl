@@ -901,9 +901,7 @@
 ;;;
 ;;; FIXME: Change all these wacky function names to something sane.
 (defun get-accessor-method-function (gf type class slotd)
-  (let* ((std-method (standard-svuc-method type))
-         (str-method (structure-svuc-method type))
-         (types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
+  (let* ((types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
          (types (if (eq type 'writer) `(t ,@types1) types1))
          (methods (compute-applicable-methods-using-types gf types))
          (std-p (null (cdr methods))))
@@ -914,10 +912,10 @@
                  (get-optimized-std-slot-value-using-class-method-function
                   class slotd type))
                 (method-alist
-                 `((,(car (or (member std-method methods :test #'eq)
-                              (member str-method methods :test #'eq)
-                              (bug "error in ~S"
-                                   'get-accessor-method-function)))
+                 `((,(or (find (standard-svuc-method type) methods :test #'eq)
+                         (find (structure-svuc-method type) methods :test #'eq)
+                         (find (condition-svuc-method type) methods :test #'eq)
+                         (bug "error in ~S" 'get-accessor-method-function))
                     ,optimized-std-fun)))
                 (wrappers
                  (let ((wrappers (list (layout-of class)

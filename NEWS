@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.11:
+  * bug fix: defining a method on SB-MOP:SLOT-VALUE-USING-CLASS where the
+    object argument is specialized to a CONDITION-CLASS no longer leads to an
+    internal error.
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
     specialized to structure classes are compiled to the corresponding
     structure accessor.

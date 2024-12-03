@@ -87,3 +87,9 @@
   (let* ((method (find-method #'read-a-struct-y nil (list (find-class 'a-struct))))
          (lines (ctu:disassembly-lines (sb-mop:method-function method))))
     (assert (some (lambda (x) (search "CALL" x)) lines))))
+
+(define-condition a-condition () ((a :initarg :a)))
+(defmethod sb-mop:slot-value-using-class :around (class (c a-condition) slotd)
+  (list :a-slot-value (call-next-method)))
+(with-test (:name :condition-slot-value-using-class-method)
+  (assert (equal (slot-value (make-condition 'a-condition :a 4) 'a) '(:a-slot-value 4))))
