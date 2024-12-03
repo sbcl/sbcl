@@ -95,6 +95,14 @@
 (let ((class (find-class 'function)))
   (setf (slot-value class 'prototype) #'identity))
 
+;;; consistency check: all our standard SLOT-VALUE-USING-CLASS methods are available
+;;; and distinct from each other.
+(let (set)
+  (dolist (type '(reader writer boundp makunbound))
+    (dolist (fun '(standard-svuc-method structure-svuc-method condition-svuc-method))
+      (pushnew (funcall fun type) set)))
+  (assert (= (length set) 12)))
+
 (dolist (symbol '(add-method allocate-instance class-name compute-applicable-methods
                   ensure-generic-function make-instance method-qualifiers
                   remove-method add-dependent add-direct-method add-direct-subclass

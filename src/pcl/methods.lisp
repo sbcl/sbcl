@@ -990,7 +990,7 @@
     (reader *structure-slot-value-using-class-method*)
     (writer *structure-setf-slot-value-using-class-method*)
     (boundp *structure-slot-boundp-using-class-method*)
-    (makunbound *standard-slot-makunbound-using-class-method*)))
+    (makunbound *structure-slot-makunbound-using-class-method*)))
 
 (defun set-structure-svuc-method (type method)
   (case type
