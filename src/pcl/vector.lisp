@@ -79,7 +79,7 @@
 
 (defun use-standard-slot-access-p (class slot-name type)
   (or (not (eq **boot-state** 'complete))
-      (and (standard-class-p class)
+      (and (std-class-p class)
            (let ((slotd (find-slot-definition class slot-name)))
              (and slotd
                   (slot-accessor-std-p slotd type))))))
@@ -364,7 +364,7 @@
         (cond ((or
                 ;; Conditions, and classes for which FIND-CLASS
                 ;; doesn't return them yet.
-                (not (standard-class-p class))
+                (not (std-class-p class))
                 ;; Should not happen... (FIXME: assert instead?)
                 (eq class *the-class-t*)
                 (not (class-finalized-p class))

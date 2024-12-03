@@ -4,6 +4,10 @@ changes relative to sbcl-2.4.11:
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
     specialized to structure classes are compiled to the corresponding
     structure accessor.
+  * optimization: calls to SLOT-VALUE (and related operators) on method
+    arguments specialized to instances of SB-MOP:FUNCALLABLE-STANDARD-CLASS
+    are optimized similarly to calls on method arguments specialized to
+    instances of STANDARD-CLASS.
 
 changes in sbcl-2.4.11 relative to sbcl-2.4.10:
   * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the
