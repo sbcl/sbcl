@@ -885,3 +885,9 @@
      (make-array (array-total-size a)
                  :displaced-to a))
    (and (vector t) (not simple-array))))
+
+(with-test (:name :storage-vector-type)
+  (assert-type
+   (lambda (x)
+     (sb-ext:array-storage-vector (the string x)))
+   simple-string))
