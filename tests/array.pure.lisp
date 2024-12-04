@@ -872,3 +872,16 @@
       (declare ((simple-vector 8) v)
                ((integer -4 -1) n))
       (aref v (+ n 4)))))
+
+(with-test (:name :make-array-non-simple-type)
+  (assert-type
+   (lambda (x e)
+     (make-array 10
+                 :element-type e
+                 :fill-pointer (1- x)))
+   (and vector (not simple-array)))
+  (assert-type
+   (lambda (a)
+     (make-array (array-total-size a)
+                 :displaced-to a))
+   (and (vector t) (not simple-array))))
