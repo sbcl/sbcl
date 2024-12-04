@@ -1103,13 +1103,13 @@
   (cond
     ((eq class *the-class-t*) t)
     ((eq class *the-class-standard-object*)
-     `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
+     `(pcl-instance-p ,arg))
     ((eq class *the-class-funcallable-standard-object*)
-     `(fsc-instance-p ,arg))
+     `(and (pcl-instance-p ,arg) (fsc-instance-p ,arg)))
     ;; This is going to be cached (in *fgens*),
     ;; and structure type tests do not check for invalid layout.
     ;; Cache the wrapper itself, which is going to be different after
-    ;; redifinition.
+    ;; redefinition.
     ((structure-class-p class)
      `(sb-c::%instance-typep ,arg ,(class-wrapper class)))
     (t

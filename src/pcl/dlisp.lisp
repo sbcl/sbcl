@@ -400,14 +400,14 @@
      ;; instance-slots-layout instead of for-std-class-p, as if there
      ;; are no layouts there are no slots to worry about.
      (with-unique-names (wrapper)
-       `(cond ((std-instance-p ,argument)
+       `(cond ((%instancep ,argument)
                ,(if slots-var
                     `(let ((,wrapper (%instance-layout ,argument)))
                        (when (layout-for-pcl-obj-p ,wrapper)
                          (setq ,slots-var (std-instance-slots ,argument)))
                        ,wrapper)
                     `(%instance-layout ,argument)))
-              ((fsc-instance-p ,argument)
+              ((function-with-layout-p ,argument)
                ,(if slots-var
                     `(let ((,wrapper (%fun-layout ,argument)))
                        (when (layout-for-pcl-obj-p ,wrapper)

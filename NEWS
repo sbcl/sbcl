@@ -1,6 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.11:
+  * bug fix: generic functions with a large number of required arguments, with
+    methods with specializations on exactly STANDARD-OBJECT or
+    FUNCALLABLE-STANDARD-OBJECT, test the types of their arguments more
+    correctly.
   * bug fix: defining a method on SB-MOP:SLOT-VALUE-USING-CLASS where the
     object argument is specialized to a CONDITION-CLASS no longer leads to an
     internal error.
