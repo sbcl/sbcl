@@ -3585,7 +3585,9 @@ is :ANY, the function name is not checked."
       (let ((mock (copy-structure combination)))
         (setf (combination-args mock)
               (loop for type in types
-                    for lvar = (make-lvar)
-                    do (setf (lvar-%derived-type lvar) type)
-                    collect lvar))
+                    collect (if (lvar-p type)
+                                type
+                                (let ((lvar (make-lvar)))
+                                  (setf (lvar-%derived-type lvar) type)
+                                  lvar))))
         (funcall deriver mock)))))

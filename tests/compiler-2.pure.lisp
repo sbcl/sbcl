@@ -4544,3 +4544,23 @@
   (checked-compile `(lambda (x y z)
                       (declare (notinline make-array))
                       (make-array x y z))))
+
+(with-test (:name :setq-derive-type)
+  (assert-type
+   (lambda (x)
+     (declare (optimize speed))
+     (values (sb-kernel:%with-array-data-macro (the string x) 0 10)))
+   simple-string)
+  (assert-type
+   (lambda (n m)
+     (let ((f most-positive-single-float))
+       (tagbody
+        :next
+          (unless (> f n)
+            (go :end))
+          (funcall m f)
+          (setq f (/ f 2.0))
+          (go :next)
+        :end)
+       f))
+   single-float))
