@@ -441,11 +441,11 @@
                if derived
                do (push derived types)
                else return (and final
-                                (specifier-type 'simple-array))
+                                (specifier-type '(simple-array * (*))))
                finally (return (sb-kernel::%type-union types)))))
       (t
        (when final
-         (specifier-type 'simple-array))))))
+         (specifier-type '(simple-array * (*))))))))
 
 (defoptimizer (array-storage-vector derive-type) ((array))
   (array-storage-type (lvar-type array) t))
