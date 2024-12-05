@@ -137,16 +137,6 @@
 ;;; when it reads #- and #+ syntax)
 (declaim (type function *in-target-compilation-mode-fn*))
 (defvar *in-target-compilation-mode-fn*)
-
-;;; a function with the same calling convention as CL:COMPILE-FILE, to be
-;;; used to translate ordinary Lisp source files into target object files
-(declaim (type function *target-compile-file*))
-(defvar *target-compile-file*)
-
-;;; designator for a function with the same calling convention as
-;;; SB-C:ASSEMBLE-FILE, to be used to translate assembly files into target
-;;; object files
-(defvar *target-assemble-file*)
 
 ;;;; some tools
 
@@ -621,12 +611,12 @@
                                                  (muffle-warning c)))))
                               (apply #'compile-file args)))
                           #-(or abcl ccl) #'compile-file)
-                         (:target-compile (if (find :assem flags)
-                                              *target-assemble-file*
-                                              *target-compile-file*))))
+                         (:target-compile
+                          (intern (if (find :assem flags) "ASSEMBLE-FILE" "COMPILE-FILE")
+                                  "SB-C"))))
          (trace-file (if (find :trace-file flags) t nil))
          (block-compile (if (find :block-compile flags) t :specified)))
-    (declare (type function compilation-fn))
+    (declare (type (or function symbol) compilation-fn))
 
     (ensure-directories-exist obj :verbose cl:*compile-print*) ; host's value
 
@@ -813,7 +803,7 @@
 (defun target-compile-file (filename)
   (funcall *in-target-compilation-mode-fn*
            (lambda ()
-             (funcall *target-compile-file* filename))))
+             (funcall (intern "COMPILE-FILE" "SB-XC") filename))))
 (compile 'target-compile-file)
 
 (defvar *math-ops-memoization* (make-hash-table :test 'equal))

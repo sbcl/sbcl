@@ -2605,7 +2605,7 @@ be submitted as a CDR")
            "ALLOCATE-FULL-CALL-FRAME"
            "ALWAYS-TRANSLATABLE"
            "ANCESTOR-FRAME-REF" "ANCESTOR-FRAME-SET"
-           "ANY" "ASSEMBLE-FILE"
+           "ANY"
            "ATTRIBUTES" "ATTRIBUTES-INTERSECTION" "ATTRIBUTES-UNION"
            "ATTRIBUTES="
            "BRANCH"
