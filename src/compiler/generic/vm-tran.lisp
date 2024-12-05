@@ -440,7 +440,8 @@
                                   (one type))
                if derived
                do (push derived types)
-               else return nil
+               else return (and final
+                                (specifier-type 'simple-array))
                finally (return (sb-kernel::%type-union types)))))
       (t
        (when final
