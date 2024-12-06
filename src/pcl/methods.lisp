@@ -901,9 +901,7 @@
 ;;;
 ;;; FIXME: Change all these wacky function names to something sane.
 (defun get-accessor-method-function (gf type class slotd)
-  (let* ((std-method (standard-svuc-method type))
-         (str-method (structure-svuc-method type))
-         (types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
+  (let* ((types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
          (types (if (eq type 'writer) `(t ,@types1) types1))
          (methods (compute-applicable-methods-using-types gf types))
          (std-p (null (cdr methods))))
@@ -914,10 +912,10 @@
                  (get-optimized-std-slot-value-using-class-method-function
                   class slotd type))
                 (method-alist
-                 `((,(car (or (member std-method methods :test #'eq)
-                              (member str-method methods :test #'eq)
-                              (bug "error in ~S"
-                                   'get-accessor-method-function)))
+                 `((,(or (find (standard-svuc-method type) methods :test #'eq)
+                         (find (structure-svuc-method type) methods :test #'eq)
+                         (find (condition-svuc-method type) methods :test #'eq)
+                         (bug "error in ~S" 'get-accessor-method-function))
                     ,optimized-std-fun)))
                 (wrappers
                  (let ((wrappers (list (layout-of class)
@@ -934,7 +932,7 @@
 ;;; used by OPTIMIZE-SLOT-VALUE-BY-CLASS-P (vector.lisp)
 (defun update-slot-value-gf-info (gf type)
   (unless *new-class*
-    (update-std-or-str-methods gf type))
+    (update-std-slot-methods gf type))
   (when (and (standard-svuc-method type) (structure-svuc-method type))
     (flet ((update-accessor-info (class)
              (when (class-finalized-p class)
@@ -990,7 +988,7 @@
     (reader *structure-slot-value-using-class-method*)
     (writer *structure-setf-slot-value-using-class-method*)
     (boundp *structure-slot-boundp-using-class-method*)
-    (makunbound *standard-slot-makunbound-using-class-method*)))
+    (makunbound *structure-slot-makunbound-using-class-method*)))
 
 (defun set-structure-svuc-method (type method)
   (case type
@@ -999,7 +997,7 @@
     (boundp (setq *structure-slot-boundp-using-class-method* method))
     (makunbound (setq *structure-slot-makunbound-using-class-method* method))))
 
-(defun update-std-or-str-methods (gf type)
+(defun update-std-slot-methods (gf type)
   (dolist (method (generic-function-methods gf))
     (let ((specls (method-specializers method)))
       (when (and (or (not (eq type 'writer))
@@ -1009,16 +1007,19 @@
                     (eq (class-name (cadr specls)) 'standard-object)
                     (eq (class-name (caddr specls))
                         'standard-effective-slot-definition))
+               (aver (null (method-qualifiers method)))
                (set-standard-svuc-method type method))
               ((and (eq (class-name (car specls)) 'condition-class)
                     (eq (class-name (cadr specls)) 'condition)
                     (eq (class-name (caddr specls))
                         'condition-effective-slot-definition))
+               (aver (null (method-qualifiers method)))
                (set-condition-svuc-method type method))
               ((and (eq (class-name (car specls)) 'structure-class)
                     (eq (class-name (cadr specls)) 'structure-object)
                     (eq (class-name (caddr specls))
                         'structure-effective-slot-definition))
+               (aver (null (method-qualifiers method)))
                (set-structure-svuc-method type method)))))))
 
 (defun mec-all-classes-internal (spec precompute-p)
@@ -1102,13 +1103,13 @@
   (cond
     ((eq class *the-class-t*) t)
     ((eq class *the-class-standard-object*)
-     `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
+     `(pcl-instance-p ,arg))
     ((eq class *the-class-funcallable-standard-object*)
-     `(fsc-instance-p ,arg))
+     `(and (pcl-instance-p ,arg) (fsc-instance-p ,arg)))
     ;; This is going to be cached (in *fgens*),
     ;; and structure type tests do not check for invalid layout.
     ;; Cache the wrapper itself, which is going to be different after
-    ;; redifinition.
+    ;; redefinition.
     ((structure-class-p class)
      `(sb-c::%instance-typep ,arg ,(class-wrapper class)))
     (t

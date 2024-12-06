@@ -1698,14 +1698,6 @@ necessary, since type inference may take arbitrarily long to converge.")
             ((fast-probe-file pathname) pathname)
             ((try-with-type "lisp")))))))
 
-(defun elapsed-time-to-string (internal-time-delta)
-  (multiple-value-bind (tsec remainder)
-      (truncate internal-time-delta internal-time-units-per-second)
-    (let ((ms (truncate remainder (/ internal-time-units-per-second 1000))))
-      (multiple-value-bind (tmin sec) (truncate tsec 60)
-        (multiple-value-bind (thr min) (truncate tmin 60)
-          (format nil "~D:~2,'0D:~2,'0D.~3,'0D" thr min sec ms))))))
-
 ;;; Print some junk at the beginning and end of compilation.
 (defun print-compile-start-note (source-info)
   (declare (type source-info source-info))
@@ -1722,15 +1714,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                                             :style :government
                                             :print-weekday nil
                                             :print-timezone nil)))
-  (values))
-
-(defun print-compile-end-note (source-info won)
-  (declare (type source-info source-info))
-  (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
-                   won
-                   (elapsed-time-to-string
-                    (- (get-internal-real-time)
-                       (source-info-start-real-time source-info))))
   (values))
 
 (defglobal *compile-elapsed-time* 0) ; nanoseconds
@@ -1857,6 +1840,19 @@ returning its filename.
          (*last-error-context* nil)
          (*compiler-trace-output* nil)) ; might be modified below
 
+   (labels ((print-compile-end-note ()
+              (compiler-mumble "~&; compilation ~:[finished in~;aborted after~] ~A~&"
+                               abort-p
+                               (elapsed-time-to-string
+                                (- (get-internal-real-time)
+                                   (source-info-start-real-time source-info)))))
+            (elapsed-time-to-string (internal-time-delta)
+              (multiple-value-bind (tsec remainder)
+                  (truncate internal-time-delta internal-time-units-per-second)
+                (let ((ms (truncate remainder (/ internal-time-units-per-second 1000))))
+                  (multiple-value-bind (tmin sec) (truncate tsec 60)
+                    (multiple-value-bind (thr min) (truncate tmin 60)
+                      (format nil "~D:~2,'0D:~2,'0D.~3,'0D" thr min sec ms)))))))
     (unwind-protect
         (progn
           (setq fasl-output (open-fasl-output output-file-pathname (namestring input-pathname)))
@@ -1869,32 +1865,22 @@ returning its filename.
             (setf (values abort-p warnings-p failure-p)
                   (sub-compile-file source-info cfasl-output))))
 
+      ;; Close all files prior to showing any message
       (awhen (source-info-stream source-info) (close it))
       (setf (source-info-stream source-info) nil)
-
-      (when fasl-output
-        (close-fasl-output fasl-output abort-p)
-        ;; There was an assignment here
-        ;;   (setq fasl-pathname (pathname (fasl-output-stream fasl-output)))
-        ;; which seems pretty bogus, because we've computed the fasl-pathname,
-        ;; and should return exactly what was computed so that it 100% agrees
-        ;; with what COMPILE-FILE-PATHNAME said we would write into.
-        ;; A distorted variation of the name coming from the stream is just wrong,
-        ;; because do not support versioned pathnames.
-        (when (and (not abort-p) *compile-verbose*)
-          (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-pathname))))
-
-      (when cfasl-output
-        (close-fasl-output cfasl-output abort-p)
-        (when (and (not abort-p) *compile-verbose*)
-          (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname))))
-
-      (when *compile-verbose*
-        (print-compile-end-note source-info (not abort-p)))
-
+      (when fasl-output (close-fasl-output fasl-output abort-p))
+      (when cfasl-output (close-fasl-output cfasl-output abort-p))
       ;; Don't nuke stdout if you use :trace-file *standard-output*
       (when (and trace-file (not (streamp trace-file)))
-        (close *compiler-trace-output*)))
+        (close *compiler-trace-output*))
+      (when (and *compile-verbose* abort-p)
+        (print-compile-end-note)))
+
+    ;; In the normal case show the artifact names, then say we're done
+    (when (and *compile-verbose* (not abort-p))
+      (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-pathname))
+      (when cfasl-output (compiler-mumble "; wrote ~A~%" (namestring cfasl-pathname)))
+      (print-compile-end-note)))
 
     (accumulate-compiler-time '*compile-file-elapsed-time* start-sec start-nsec)
 

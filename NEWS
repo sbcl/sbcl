@@ -1,6 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.10:
+changes relative to sbcl-2.4.11:
+  * bug fix: generic functions with a large number of required arguments, with
+    methods with specializations on exactly STANDARD-OBJECT or
+    FUNCALLABLE-STANDARD-OBJECT, test the types of their arguments more
+    correctly.
+  * bug fix: defining a method on SB-MOP:SLOT-VALUE-USING-CLASS where the
+    object argument is specialized to a CONDITION-CLASS no longer leads to an
+    internal error.
+  * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
+    specialized to structure classes are compiled to the corresponding
+    structure accessor.
+  * optimization: calls to SLOT-VALUE (and related operators) on method
+    arguments specialized to instances of SB-MOP:FUNCALLABLE-STANDARD-CLASS
+    are optimized similarly to calls on method arguments specialized to
+    instances of STANDARD-CLASS.
+
+changes in sbcl-2.4.11 relative to sbcl-2.4.10:
   * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the
     external format for reading source files (for direct use in LOAD and
     COMPILE-FILE).  On Windows, this defaults to an external format with CRLF

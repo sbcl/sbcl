@@ -32,7 +32,9 @@
 #include <termios.h>
 #include <errno.h>
 #include <dirent.h>
+#ifndef __HAIKU__
 #include <sys/syscall.h>
+#endif
 #include "interr.h" // for lose()
 
 #ifdef LISP_FEATURE_OPENBSD

@@ -611,7 +611,6 @@ NOTE: This interface is experimental and subject to change."
        (defun ,(symbolicate name "-CACHE-CLEAR") () (setq ,var-name nil))
        ',var-name)))
 
-(eval-when (:compile-toplevel :execute) ; leave this out of the core image
 (#+sb-xc-host defmacro #-sb-xc-host sb-xc:defmacro
  with-cache ((fun-name &rest actual-args) &body computation)
   (let* ((var-name (package-symbolicate (cl:symbol-package fun-name)
@@ -715,7 +714,7 @@ NOTE: This interface is experimental and subject to change."
                                                 `((incf (aref ,statistics-name 2))))
                                             idx1)))
                      ,entry)))
-           (values ,@result-temps)))))))
+           (values ,@result-temps))))))
 
 ;;; some syntactic sugar for defining a function whose values are
 ;;; cached by !DEFINE-HASH-CACHE

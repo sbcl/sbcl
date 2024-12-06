@@ -701,14 +701,15 @@
                 (inst cbnz tmp-tn DONE)
 
                 LOOP
-                (inst add byte-array byte-array 16)
                 (inst s-mov bytes next-bytes)
-                (inst ldr next-bytes (@ byte-array))
+                (inst ldr next-bytes (@ byte-array 16))
 
                 (inst s-and temp next-bytes ascii-mask)
                 (inst umaxv temp temp :4s)
                 (inst umov tmp-tn temp 0 :s)
                 (inst cbnz tmp-tn DONE)
+                (inst add byte-array byte-array 16)
+
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
@@ -839,14 +840,14 @@
                 (inst cbnz tmp-tn DONE)
 
                 LOOP
-                (inst add byte-array byte-array 16)
                 (inst s-mov bytes next-bytes)
-                (inst ldr next-bytes (@ byte-array))
+                (inst ldr next-bytes (@ byte-array 16))
 
                 (inst s-and temp next-bytes ascii-mask)
                 (inst umaxv temp temp :4s)
                 (inst umov tmp-tn temp 0 :s)
                 (inst cbnz tmp-tn DONE)
+                (inst add byte-array byte-array 16)
 
                 ;; Shift bytes right to find CRLF starting at odd indexes
                 ;; and grab the first byte from the next vector to check if it
@@ -997,290 +998,287 @@
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
-    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+    (inline-vop (((vector* sap-reg t) (vector-sap vector))
                  ((start any-reg) start)
                  ((end* any-reg) end)
                  ((element unsigned-reg) element)
-                 ((left))
+                 ((length))
+                 ((diff signed-reg))
                  ((end))
-                 ((byte-array sap-reg t))
+                 ((vector sap-reg t))
+                 ((vector-start))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
       (inst dup search element :16b)
-      (inst add byte-array byte-array* (lsr start 1))
-      (inst add end byte-array* (lsr end* 1))
+      (inst add vector vector* (lsr start 1))
+      (inst add end vector* (lsr end* 1))
 
-      (inst sub left end byte-array)
-      (inst cmp left 16)
-      (inst b :lt DOUBLE)
+      (inst sub length end vector)
+      (inst cbz length done)
 
+      ;; Align up
+      (inst add diff length 15)
+      (inst and diff diff -16)
+
+      ;; How much to read before the start.
+      ;; Vector header and length are 16-byte long, so it's always safe.
+      (inst sub diff diff length)
+      (inst sub vector-start vector diff)
+
+      (inst ldr bytes (@ vector-start))
+      (inst cmeq cmp bytes search)
+      (inst shrn cmp cmp :8b 4)
+
+      (inst fmov length (reg-in-sc cmp 'double-reg))
+
+      ;; Discard the matching padding bits, multiplied by 4 because
+      ;; each matching byte is 4-bit long after shrn.
+      (inst lsl tmp-tn diff 2)
+      (inst lsr length length tmp-tn)
+
+      (inst cbnz length FOUND)
+
+      (inst add vector vector-start 16)
 
       LOOP
-      (inst ldr bytes (@ byte-array))
+      (inst cmp vector end)
+      (inst b :eq DONE)
+      (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search)
-      (inst umaxv temp cmp :16b)
-      (inst umov tmp-tn temp 0 :b)
-      (inst cbnz tmp-tn FOUND)
-      (inst add byte-array byte-array 16)
-      (inst sub left end byte-array)
-      (inst cmp left 16)
-      (inst b :ge LOOP)
-
-      DOUBLE
-      (inst cmp left 8)
-      (inst b :lt SCALAR)
-
-      (let ((bytes (reg-in-sc bytes 'double-reg))
-            (cmp (reg-in-sc cmp 'double-reg))
-            (temp (reg-in-sc temp 'double-reg)))
-
-        (inst ldr bytes (@ byte-array))
-        (inst cmeq cmp bytes search :8b)
-        (inst umaxv temp cmp :8b)
-        (inst umov tmp-tn temp 0 :b)
-        (inst cbnz tmp-tn FOUND)
-        (inst add byte-array byte-array 8))
-
-      SCALAR
-      (loop repeat 7
-            do (inst cmp byte-array end)
-               (inst b :ge DONE)
-               (inst ldrb left (@ byte-array))
-               (inst cmp left element)
-               (inst b :eq FOUND-SCALAR)
-               (inst add byte-array byte-array 1))
-
-
-      (inst b DONE)
-
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst cbnz length FOUND)
+      (inst add vector vector 16)
+      (inst b LOOP)
 
       FOUND
-      (load-inline-constant indexes :oword (concat-ub 8 (loop for i downfrom 15 to 0
-                                                              collect i)))
-      (inst s-orn indexes indexes cmp)
+      (inst rbit length length)
+      (inst clz length length)
+      (inst add vector vector (lsr length 2))
 
-      (inst uminv indexes indexes :16b)
-      (inst umov tmp-tn indexes 0 :b)
-      (inst add byte-array byte-array tmp-tn)
-
-      FOUND-SCALAR
-      (inst sub left byte-array byte-array*)
-      (inst lsl res left n-fixnum-tag-bits)
+      (inst sub length vector vector*)
+      (inst lsl res length n-fixnum-tag-bits)
       DONE)))
 
 (defun simd-position8-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
-    (inline-vop (((byte-array* sap-reg t) (vector-sap vector))
+    (inline-vop (((vector* sap-reg t) (vector-sap vector))
                  ((start* any-reg) start)
                  ((end any-reg) end)
                  ((element unsigned-reg) element)
-                 ((left))
+                 ((length))
+                 ((padded-length))
                  ((start))
-                 ((byte-array sap-reg t))
+                 ((padded))
+                 ((found-bits))
+                 ((vector sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
       (inst dup search element :16b)
-      (inst add byte-array byte-array* (lsr end 1))
+      (inst add vector vector* (lsr end 1))
 
-      (inst add start byte-array* (lsr start* 1))
-      (inst sub left byte-array start)
+      (inst add start vector* (lsr start* 1))
 
-      (inst cmp left 16)
-      (inst b :lt DOUBLE)
+      (inst sub length vector start)
+      (inst cbz length done)
+
+      ;; Align the start to 16-bytes and then process the tail.
+      (inst add padded-length length 15)
+      (inst and padded-length padded-length -16)
+      (inst sub padded vector padded-length)
 
       LOOP
-      (inst ldr bytes (@ byte-array -16 :pre-index))
+      (inst sub vector vector 16)
+      (inst cmp vector padded)
+      (inst b :le TAIL)
+
+      (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search)
-      (inst umaxv temp cmp :16b)
-      (inst umov tmp-tn temp 0 :b)
-      (inst cbnz tmp-tn FOUND)
-      (inst sub left byte-array start)
-      (inst cmp left 16)
-      (inst b :ge LOOP)
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst cbnz found-bits FOUND)
 
-      DOUBLE
-      (inst cmp left 8)
+      (inst b LOOP)
 
-      (inst b :lt SCALAR)
+      TAIL
+      ;; Read past the start if needed.
+      ;; Vector header and length are 16-byte long, making it safe.
+      (inst ldr bytes (@ vector))
+      (inst cmeq cmp bytes search)
+      (inst shrn cmp cmp :8b 4)
 
-      (let ((bytes (reg-in-sc bytes 'double-reg))
-            (cmp (reg-in-sc cmp 'double-reg))
-            (temp (reg-in-sc temp 'double-reg)))
+      ;; Clear the extra bits
+      (inst sub padded padded-length length)
 
-        (inst ldr bytes (@ byte-array -8 :pre-index))
-        (inst cmeq cmp bytes search :8b)
-        (inst umaxv temp cmp :8b)
-        (inst umov tmp-tn temp 0 :b)
-        (inst cbnz tmp-tn FOUND))
+      (inst add padded padded 16)
+      (inst lsl padded padded 2)
 
-      SCALAR
-      (loop repeat 7
-            do (inst cmp byte-array start)
-               (inst b :le DONE)
-               (inst ldrb left (@ byte-array -1 :pre-index))
-               (inst cmp left element)
-               (inst b :eq FOUND-SCALAR))
+      (inst mov length -1)
+      (inst lsl padded length padded)
 
-      (inst b DONE)
+      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst and found-bits found-bits padded)
+      (inst cbz found-bits DONE)
 
 
       FOUND
-      (load-inline-constant indexes :oword (concat-ub 8 (loop for i downfrom 15 to 0
-                                                              collect i)))
-      (inst sub left byte-array byte-array*)
+      (inst clz found-bits found-bits)
+      (inst eor found-bits found-bits 63)
+      (inst add vector vector (lsr found-bits 2))
 
-      (inst s-orn indexes indexes cmp)
-      (inst smaxv indexes indexes :16b)
-      (inst umov left indexes 0 :b)
-      (inst add byte-array byte-array left)
-
-      FOUND-SCALAR
-      (inst sub left byte-array byte-array*)
-      (inst lsl res left n-fixnum-tag-bits)
+      (inst sub found-bits vector vector*)
+      (inst lsl res found-bits n-fixnum-tag-bits)
       DONE)))
 
 (defun simd-position32 (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
-    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+    (inline-vop (((vector* sap-reg t) (vector-sap vector))
                  ((start any-reg) start)
                  ((end* any-reg) end)
                  ((element unsigned-reg) element)
-                 ((left))
+                 ((length))
+                 ((diff signed-reg))
                  ((end))
-                 ((32-bit-array sap-reg t))
+                 ((vector sap-reg t))
+                 ((vector-start))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
       (inst dup search element :4s)
-      (inst add 32-bit-array 32-bit-array* (lsl start 1))
-      (inst add end 32-bit-array* (lsl end* 1))
+      (inst add vector vector* (lsl start 1))
+      (inst add end vector* (lsl end* 1))
 
-      (inst sub left end 32-bit-array)
-      (inst cmp left 16)
+      (inst sub length end vector)
+      (inst cbz length done)
 
-      (inst b :lt SCALAR)
+      ;; Align up
+      (inst add diff length 15)
+      (inst and diff diff -16)
+
+      ;; How much to read before the start.
+      ;; Vector header and length are 16-byte long, so it's always safe.
+      (inst sub diff diff length)
+      (inst sub vector-start vector diff)
+
+      (inst ldr bytes (@ vector-start))
+      (inst cmeq cmp bytes search :4s)
+      (inst shrn cmp cmp :8b 4)
+
+      (inst fmov length (reg-in-sc cmp 'double-reg))
+
+      ;; Discard the matching padding bits, multiplied by 4 because
+      ;; each matching byte is 4-bit long after shrn.
+      (inst lsl tmp-tn diff 2)
+      (inst lsr length length tmp-tn)
+
+      (inst cbnz length FOUND)
+
+      (inst add vector vector-start 16)
 
       LOOP
-      (inst ldr bytes (@ 32-bit-array))
+      (inst cmp vector end)
+      (inst b :eq DONE)
+      (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
-
-      (inst umaxv temp cmp :4s)
-      (inst umov left temp 0 :s)
-
-      (inst cbnz left FOUND)
-      (inst add 32-bit-array 32-bit-array 16)
-      (inst sub left end 32-bit-array)
-      (inst cmp left 16)
-      (inst b :ge LOOP)
-
-      SCALAR
-      (loop repeat 7
-            do (inst cmp 32-bit-array end)
-               (inst b :ge DONE)
-               (inst ldr (32-bit-reg left) (@ 32-bit-array))
-               (inst cmp left element)
-               (inst b :eq FOUND-SCALAR)
-               (inst add 32-bit-array 32-bit-array 4))
-
-      (inst b DONE)
-
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov length (reg-in-sc cmp 'double-reg))
+      (inst cbnz length FOUND)
+      (inst add vector vector 16)
+      (inst b LOOP)
 
       FOUND
-      (load-inline-constant indexes :oword
-                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
-                                                collect i)))
-      (inst s-orn indexes indexes cmp)
+      (inst rbit length length)
+      (inst clz length length)
+      (inst add vector vector (lsr length 2))
 
-      (inst uminv indexes indexes :4s)
-      (inst umov left indexes 0 :s)
-
-      (inst add 32-bit-array 32-bit-array left)
-
-      FOUND-SCALAR
-      (inst sub left 32-bit-array 32-bit-array*)
-      (inst lsr res left 1)
+      (inst sub length vector vector*)
+      (inst lsr res length 1)
       DONE)))
 
 (defun simd-position32-from-end (element vector start end)
   (declare (type index start end)
            (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
-    (inline-vop (((32-bit-array* sap-reg t) (vector-sap vector))
+    (inline-vop (((vector* sap-reg t) (vector-sap vector))
                  ((start* any-reg) start)
                  ((end any-reg) end)
                  ((element unsigned-reg) element)
-                 ((left))
+                 ((found-bits))
                  ((start))
-                 ((32-bit-array sap-reg t))
+                 ((length))
+                 ((padded))
+                 ((padded-length))
+                 ((vector sap-reg t))
                  ((bytes complex-double-reg))
                  ((cmp complex-double-reg))
-                 ((temp complex-double-reg))
-                 ((indexes))
                  ((search)))
         ((res descriptor-reg t :from :load))
       (inst mov res null-tn)
       (inst dup search element :4s)
-      (inst add 32-bit-array 32-bit-array* (lsl end 1))
+      (inst add vector vector* (lsl end 1))
 
-      (inst add start 32-bit-array* (lsl start* 1))
-      (inst sub left 32-bit-array start)
+      (inst add start vector* (lsl start* 1))
 
-      (inst cmp left 16)
-      (inst b :lt SCALAR)
+      (inst sub length vector start)
+      (inst cbz length done)
 
+      ;; Align the start to 16-bytes and then process the tail.
+      (inst add padded-length length 15)
+      (inst and padded-length padded-length -16)
+      (inst sub padded vector padded-length)
 
       LOOP
-      (inst ldr bytes (@ 32-bit-array -16 :pre-index))
+      (inst sub vector vector 16)
+      (inst cmp vector padded)
+      (inst b :le TAIL)
+      (inst ldr bytes (@ vector))
       (inst cmeq cmp bytes search :4s)
-      (inst umaxv temp cmp :4s)
-      (inst umov tmp-tn temp 0 :s)
-      (inst cbnz tmp-tn FOUND)
-      (inst sub left 32-bit-array start)
-      (inst cmp left 16)
-      (inst b :ge LOOP)
+      (inst shrn cmp cmp :8b 4)
+      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst cbnz found-bits FOUND)
+      (inst b LOOP)
 
+      TAIL
+      ;; Read past the start if needed.
+      ;; Vector header and length are 16-byte long, making it safe.
+      (inst ldr bytes (@ vector))
+      (inst cmeq cmp bytes search :4s)
+      (inst shrn cmp cmp :8b 4)
 
-      SCALAR
-      (loop repeat 7
-            do (inst cmp 32-bit-array start)
-               (inst b :le DONE)
-               (inst ldr (32-bit-reg left) (@ 32-bit-array -4 :pre-index))
-               (inst cmp left element)
-               (inst b :eq FOUND-SCALAR))
+      ;; Clear the extra bits
+      (inst sub padded padded-length length)
 
-      (inst b DONE)
+      (inst add padded padded 16)
+      (inst lsl padded padded 2)
+
+      (inst mov length -1)
+      (inst lsl padded length padded)
+
+      (inst fmov found-bits (reg-in-sc cmp 'double-reg))
+      (inst and found-bits found-bits padded)
+      (inst cbz found-bits DONE)
+
 
 
       FOUND
-      (load-inline-constant indexes :oword
-                            (concat-ub 32 (loop for i downfrom 16 to 0 by 4
-                                                collect i)))
-      (inst sub left 32-bit-array 32-bit-array*)
+      (inst lsr found-bits found-bits 15)
+      (inst clz found-bits found-bits)
+      (inst eor found-bits found-bits 63)
 
-      (inst s-orn indexes indexes cmp)
-      (inst smaxv indexes indexes :4s)
-      (inst umov left indexes 0 :s)
-      (inst add 32-bit-array 32-bit-array left)
+      (inst add vector vector (lsr found-bits 2))
 
-      FOUND-SCALAR
-      (inst sub left 32-bit-array 32-bit-array*)
-      (inst lsr res left 1)
+      (inst sub found-bits vector vector*)
+      (inst lsr res found-bits 1)
       DONE)))

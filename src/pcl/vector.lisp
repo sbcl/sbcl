@@ -79,7 +79,7 @@
 
 (defun use-standard-slot-access-p (class slot-name type)
   (or (not (eq **boot-state** 'complete))
-      (and (standard-class-p class)
+      (and (std-class-p class)
            (let ((slotd (find-slot-definition class slot-name)))
              (and slotd
                   (slot-accessor-std-p slotd type))))))
@@ -156,12 +156,9 @@
 
 (defun can-optimize-access (form required-parameters env)
   (destructuring-bind (op var-form slot-name-form &optional new-value) form
-    (let ((type (ecase op
-                  (slot-value 'reader)
-                  (set-slot-value 'writer)
-                  (slot-boundp 'boundp)
-                  (slot-makunbound 'makunbound)))
-          (var (extract-the var-form))
+    (declare (ignore op))
+    (aver (constantp slot-name-form env))
+    (let ((var (extract-the var-form))
           (slot-name (constant-form-value slot-name-form env)))
       (when (and (symbolp var) (not (var-special-p var env)))
         (let* ((rebound? (caddr (var-declaration '%variable-rebinding var env)))
@@ -185,13 +182,9 @@
                           class form))
                        (setf class nil))))
               (when (and class-name (not (eq class-name t)))
-                (when (not (and class
-                                (memq *the-class-structure-object*
-                                      (class-precedence-list class))))
-                  (aver type)
-                  (values (cons parameter-or-nil (or class class-name))
-                          slot-name
-                          new-value))))))))))
+                (values (cons parameter-or-nil (or class class-name))
+                        slot-name
+                        new-value)))))))))
 
 ;;; Check whether the binding of the named variable is modified in the
 ;;; method body.
@@ -295,23 +288,27 @@
 (defun optimize-instance-access (slots read/write sparameter slot-name
                                  new-value &optional safep)
   (let ((class (if (consp sparameter) (cdr sparameter) *the-class-t*))
-        (parameter (if (consp sparameter) (car sparameter) sparameter)))
+        (parameter (if (consp sparameter) (car sparameter) sparameter))
+        slotd)
     (if (and (eq **boot-state** 'complete)
              (classp class)
-             (memq *the-class-structure-object* (class-precedence-list class)))
-        (let ((slotd (find-slot-definition class slot-name)))
-          (ecase read/write
-            (:read
-             `(,(slot-definition-defstruct-accessor-symbol slotd) ,parameter))
-            (:write
-             `(setf (,(slot-definition-defstruct-accessor-symbol slotd)
-                     ,parameter)
-                    ,new-value))
-            (:boundp
-             t)
-            (:makunbound
-             ;; what should SLOT-MAKUNBOUND on a structure slot do?  Do that here.
-             )))
+             (typep (setq slotd (find-slot-definition class slot-name))
+                    'structure-effective-slot-definition))
+        (ecase read/write
+          (:read
+           `(,(slot-definition-defstruct-accessor-symbol slotd) ,parameter))
+          (:write
+           `(setf (,(slot-definition-defstruct-accessor-symbol slotd)
+                   ,parameter)
+                  ,new-value))
+          (:boundp
+           (if (slot-definition-always-bound-p slotd)
+               t
+               ;; no need for speed for BOUNDP on structure slots
+               `(accessor-slot-boundp ,parameter ,slot-name)))
+          (:makunbound
+           ;; no need for speed for MAKUNBOUND on structure slots
+           `(accessor-slot-makunbound ,parameter ,slot-name)))
         (let* ((parameter-entry (assq parameter slots))
                (slot-entry      (assq slot-name (cdr parameter-entry)))
                (position (posq parameter-entry slots))
@@ -365,10 +362,9 @@
   (if (eq **boot-state** 'complete)
       (let (slotd)
         (cond ((or
-                ;; Conditions, structures, and classes for which FIND-CLASS
+                ;; Conditions, and classes for which FIND-CLASS
                 ;; doesn't return them yet.
-                ;; FIXME: surely we can get faster accesses for structures?
-                (not (standard-class-p class))
+                (not (std-class-p class))
                 ;; Should not happen... (FIXME: assert instead?)
                 (eq class *the-class-t*)
                 (not (class-finalized-p class))

@@ -46,7 +46,7 @@
 ;;; so any flag in this list may or may not be present
 ;;; in the *FEATURES* list of this particular build.
 (defglobal *features-potentially-affecting-fasl-format*
-    (append '(:sb-thread :sb-unicode :cheneygc :gencgc :msan :sb-safepoint)))
+    '(:sb-thread :sb-unicode :mark-region-gc :gencgc :msan :sb-safepoint))
 
 ;;; the code for a character which terminates a fasl file header
 (defconstant +fasl-header-string-stop-char-code+ 255)

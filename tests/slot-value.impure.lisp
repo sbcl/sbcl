@@ -61,3 +61,35 @@
             ;; some slots may be raw, don't worry about being EQ
             (assert (eql (read-slot-way1 x slot-name)
                          (read-slot-way2 x slot-name)))))))))
+
+(defstruct a-struct x)
+(defstruct (another-struct (:include a-struct)) y)
+
+(defmethod read-a-struct-x ((o a-struct))
+  (slot-value o 'x))
+(defmethod read-a-struct-y ((o a-struct))
+  (slot-value o 'y))
+
+(with-test (:name :fast-structure-slot-value-in-method)
+  (assert (eql (read-a-struct-x (make-a-struct :x 42)) 42))
+  (assert (eql (read-a-struct-x (make-another-struct :x 43 :y 44)) 43))
+  (assert-error (read-a-struct-y (make-a-struct :x 45)) sb-pcl::missing-slot)
+  (assert (eql (read-a-struct-y (make-another-struct :x 46 :y 47)) 47)))
+
+(with-test (:name :structure-slot-value-in-method-actually-fast
+            :skipped-on (not (or :x86 :x86-64)))
+  (let* ((method (find-method #'read-a-struct-x nil (list (find-class 'a-struct))))
+         (lines (ctu:disassembly-lines (sb-mop:method-function method))))
+    (assert (notany (lambda (x) (search "CALL" x)) lines))))
+
+(with-test (:name :structure-missing-slot-value-in-method-calls-global
+            :skipped-on (not (or :x86 :x86-64)))
+  (let* ((method (find-method #'read-a-struct-y nil (list (find-class 'a-struct))))
+         (lines (ctu:disassembly-lines (sb-mop:method-function method))))
+    (assert (some (lambda (x) (search "CALL" x)) lines))))
+
+(define-condition a-condition () ((a :initarg :a)))
+(defmethod sb-mop:slot-value-using-class :around (class (c a-condition) slotd)
+  (list :a-slot-value (call-next-method)))
+(with-test (:name :condition-slot-value-using-class-method)
+  (assert (equal (slot-value (make-condition 'a-condition :a 4) 'a) '(:a-slot-value 4))))

@@ -98,9 +98,9 @@ struct page {
      */
 #if CONDENSED_PAGE_TABLE
     // The low bit of the offset indicates the scale factor:
-    // 0 = double-lispwords, 1 = gc cards. Large objects are card-aligned,
+    // 0 = double-lispwords, 1 = gc cards. Large objects are page-aligned,
     // and this representation allows for a 32TB contiguous block using 32K
-    // card size. Larger allocations will have pages that can't directly
+    // page size. Larger allocations will have pages that can't directly
     // store the full offset. That has to be dealt with by the accessor.
     unsigned int scan_start_offset_;
 #else

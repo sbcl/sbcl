@@ -6694,6 +6694,79 @@
                                                                      (length object)))
           object))
 
+(deftransform read-char ((&optional stream eof-error-p eof-value recursive-p))
+  (when stream
+    (let ((uses (lvar-uses stream)))
+      (when (cast-p uses)
+        (delete-cast uses))))
+  `(block nil
+     (or (and (sb-impl::ansi-stream-p stream)
+              (let* ((buffer (sb-impl::ansi-stream-cin-buffer stream))
+                     (index (ansi-stream-in-index stream)))
+                (if buffer
+                    (when (/= index sb-impl::+ansi-stream-in-buffer-length+)
+                      (prog1
+                          (aref buffer index)
+                        (setf (ansi-stream-in-index stream) (1+ index))))
+                    (return (funcall (ansi-stream-in stream) stream ,(if eof-error-p
+                                                                         'eof-error-p
+                                                                         t) eof-value)))))
+         (locally (declare (notinline read-char))
+           (read-char ,@(loop for (lvar var) on (list stream 'stream
+                                                      eof-error-p 'eof-error-p
+                                                      eof-value 'eof-value
+                                                      recursive-p 'recursive-p)
+                              by #'cddr
+                              when lvar
+                              collect var))))))
+
+(deftransform read-byte ((stream &optional eof-error-p eof-value))
+  (when stream
+    (let ((uses (lvar-uses stream)))
+      (when (cast-p uses)
+        (delete-cast uses))))
+  `(block nil
+     (or (and (sb-impl::ansi-stream-p stream)
+              (let* ((buffer (ansi-stream-in-buffer stream))
+                     (index (ansi-stream-in-index stream)))
+                (if buffer
+                    (when (/= index sb-impl::+ansi-stream-in-buffer-length+)
+                      (prog1
+                          (aref buffer index)
+                        (setf (ansi-stream-in-index stream) (1+ index))))
+                    (return (funcall (ansi-stream-bin stream) stream ,(if eof-error-p
+                                                                          'eof-error-p
+                                                                          t) eof-value)))))
+         (locally (declare (notinline read-byte))
+           (read-byte stream
+                      ,@(loop for (lvar var) on (list eof-error-p 'eof-error-p
+                                                      eof-value 'eof-value)
+                              by #'cddr
+                              when lvar
+                              collect var))))))
+
+(deftransform peek-char ((&optional peek-type stream eof-error-p eof-value recursive-p)
+                         (null &rest t))
+  (when stream
+    (let ((uses (lvar-uses stream)))
+      (when (cast-p uses)
+        (delete-cast uses))))
+  `(or (and (sb-impl::ansi-stream-p stream)
+            (let* ((buffer (sb-impl::ansi-stream-cin-buffer stream))
+                   (index (ansi-stream-in-index stream)))
+              (when (and buffer
+                         (/= index sb-impl::+ansi-stream-in-buffer-length+))
+                (aref (truly-the vector buffer) index))))
+       (locally (declare (notinline peek-char))
+         (peek-char peek-type
+                    ,@(loop for (lvar var) on (list stream 'stream
+                                                    eof-error-p 'eof-error-p
+                                                    eof-value 'eof-value
+                                                    recursive-p 'recursive-p)
+                            by #'cddr
+                            when lvar
+                            collect var)))))
+
 #+sb-thread
 (progn
   (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex))

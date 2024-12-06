@@ -2421,26 +2421,42 @@
 
 (macrolet
     ((define-imm-sse-instruction (name opcode /i)
-         `(define-instruction ,name (segment dst/src imm)
-            ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
-            (:emitter
-             (emit-sse-inst-with-imm segment dst/src imm
-                                     #x66 ,opcode ,/i
-                                     :operand-size :do-not-set)))))
-  ;; FIXME: why did someone decide to invent new mnemonics for the immediate forms?
-  ;; Can we put them back to normal?
+       `(define-instruction ,name (segment dst/src imm)
+          ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
+          (:emitter
+           (emit-sse-inst-with-imm segment dst/src imm
+                                   #x66 ,opcode ,/i
+                                   :operand-size :do-not-set)))))
+
   (define-imm-sse-instruction pslldq #x73 7)
-  (define-imm-sse-instruction psllw-imm #x71 6)
-  (define-imm-sse-instruction pslld-imm #x72 6)
-  (define-imm-sse-instruction psllq-imm #x73 6)
+  (define-imm-sse-instruction psrldq #x73 3))
 
-  (define-imm-sse-instruction psraw-imm #x71 4)
-  (define-imm-sse-instruction psrad-imm #x72 4)
+(macrolet
+    ((define-imm-sse-instruction (name opcode vopcode /i)
+       `(progn
+          ;; Some code in the wild uses the old separate instructions
+          ;; for immediates.
+          (define-instruction-macro ,(symbolicate name "-IMM") (&rest args)
+            `(inst ,',name ,@args))
+          (define-instruction ,name (segment dst/src src/imm)
+            ,@(sse-inst-printer 'xmm-imm #x66 opcode :more-fields `((/i ,/i)))
+            ,@(sse-inst-printer 'xmm-xmm/mem #x66 vopcode)
+            (:emitter
+             (if (integerp src/imm)
+                 (emit-sse-inst-with-imm segment dst/src src/imm
+                                         #x66 ,opcode ,/i
+                                         :operand-size :do-not-set)
+                 (emit-regular-sse-inst segment dst/src src/imm #x66 ,vopcode)))))))
+  (define-imm-sse-instruction psllw #x71 #xf1 6)
+  (define-imm-sse-instruction pslld #x72 #xf2 6)
+  (define-imm-sse-instruction psllq #x73 #xf3 6)
 
-  (define-imm-sse-instruction psrldq #x73 3)
-  (define-imm-sse-instruction psrlw-imm #x71 2)
-  (define-imm-sse-instruction psrld-imm #x72 2)
-  (define-imm-sse-instruction psrlq-imm #x73 2))
+  (define-imm-sse-instruction psraw #x71 #xe1 4)
+  (define-imm-sse-instruction psrad #x72 #xe2 4)
+
+  (define-imm-sse-instruction psrlw #x71 #xd1 2)
+  (define-imm-sse-instruction psrld #x72 #xd2 2)
+  (define-imm-sse-instruction psrlq #x73 #xd3 2))
 
 ;;; Emit an SSE instruction that has an XMM register as the destination
 ;;; operand and for which the size of the operands is implicitly given
@@ -2563,14 +2579,7 @@
   (define-regular-sse-inst pmullw   #x66 #xd5)
   (define-regular-sse-inst pmuludq  #x66 #xf4)
   (define-regular-sse-inst psadbw   #x66 #xf6)
-  (define-regular-sse-inst psllw    #x66 #xf1)
-  (define-regular-sse-inst pslld    #x66 #xf2)
-  (define-regular-sse-inst psllq    #x66 #xf3)
-  (define-regular-sse-inst psraw    #x66 #xe1)
-  (define-regular-sse-inst psrad    #x66 #xe2)
-  (define-regular-sse-inst psrlw    #x66 #xd1)
-  (define-regular-sse-inst psrld    #x66 #xd2)
-  (define-regular-sse-inst psrlq    #x66 #xd3)
+
   (define-regular-sse-inst psubb    #x66 #xf8)
   (define-regular-sse-inst psubw    #x66 #xf9)
   (define-regular-sse-inst psubd    #x66 #xfa)

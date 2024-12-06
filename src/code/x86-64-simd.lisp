@@ -847,8 +847,8 @@
                 (inst pcmpeqw shifted crlf-mask)
                 ;; pcmpeqw will have FFFF, shifting in different directions and then combining
                 ;; will have FF in the right places for CR in the original chunk.
-                (inst psrlw-imm temp 8)
-                (inst psllw-imm shifted 8)
+                (inst psrlw temp 8)
+                (inst psllw shifted 8)
                 (inst por temp shifted)
 
                 ;; Get a 16-bit mask
@@ -962,8 +962,8 @@
                 (inst pcmpeqw shifted crlf-mask)
                 ;; pcmpeqw will have FFFF, shifting in different directions and then combining
                 ;; will have FF in the right places for CR in the original chunk.
-                (inst psrlw-imm temp 8)
-                (inst psllw-imm shifted 8)
+                (inst psrlw temp 8)
+                (inst psllw shifted 8)
                 (inst por temp shifted)
 
                 ;; Get a 16-bit mask

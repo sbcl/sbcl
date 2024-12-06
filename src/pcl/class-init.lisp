@@ -680,7 +680,7 @@
 ;;; The only bit of cleverness in the implementation is to make the
 ;;; vectors fairly tight, but always longer then 0 elements:
 ;;;
-;;; -- We don't want to waste huge amounts of space no these vectors,
+;;; -- We don't want to waste huge amounts of space on these vectors,
 ;;;    which are mostly required by things like SLOT-VALUE with a
 ;;;    variable slot name, so a constant extension over the minimum
 ;;;    size seems like a good choise.
@@ -754,8 +754,7 @@
                (setf (svref vector index)
                      (acons name
                             (cons (when (or bootstrap
-                                            (and (or (standard-class-p class)
-                                                     (funcallable-standard-class-p class))
+                                            (and (std-class-p class)
                                                  (slot-accessor-std-p slot 'all)))
                                     (if bootstrap
                                         (early-slot-definition-location slot)

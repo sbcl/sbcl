@@ -140,9 +140,8 @@
 
 (defun supplied-and-true (arg)
   (and arg
-       (constant-lvar-p arg)
-       (lvar-value arg)
-       t))
+       (not (types-equal-or-intersect (lvar-type arg)
+                                      (specifier-type 'null)))))
 
 ;;;; DERIVE-TYPE optimizers
 

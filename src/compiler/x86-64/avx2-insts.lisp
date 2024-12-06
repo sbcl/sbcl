@@ -349,17 +349,30 @@
            (emit-avx2-inst-imm segment dst src imm
                                #x66 ,opcode ,/i)))))
   (def vpslldq #x73 7)
-  (def vpsllw-imm #x71 6)               ; FIXME: get rid of that -IMM
-  (def vpslld-imm #x72 6)
-  (def vpsllq-imm #x73 6)
+  (def vpsrldq #x73 3))
 
-  (def vpsraw-imm #x71 4)
-  (def vpsrad-imm #x72 4)
+(macrolet
+    ((def (name opcode vopcode /i)
+       `(define-instruction ,name (segment dst src src2/imm)
+          ,@(avx2-inst-printer-list 'ymm-ymm-imm #x66 opcode
+                                    :more-fields `((/i ,/i)))
+          ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 vopcode :nds t)
+          (:emitter
+           (if (integerp src2/imm)
+               (emit-avx2-inst-imm segment dst src src2/imm
+                                   #x66 ,opcode ,/i)
+               (emit-avx2-inst segment src2/imm dst #x66 ,vopcode
+                               :vvvv src))))))
+  (def vpsllw #x71 #xf1 6)
+  (def vpslld #x72 #xf2 6)
+  (def vpsllq #x73 #xf3 6)
 
-  (def vpsrldq #x73 3)
-  (def vpsrlw-imm #x71 2)
-  (def vpsrld-imm #x72 2)
-  (def vpsrlq-imm #x73 2))
+  (def vpsraw #x71 #xe1 4)
+  (def vpsrad #x72 #xe2 4)
+
+  (def vpsrlw #x71 #xd1 2)
+  (def vpsrld #x72 #xd2 2)
+  (def vpsrlq #x73 #xd3 2))
 
 (macrolet ((def (name prefix opcode &optional (opcode-prefix #x0F))
              `(define-instruction ,name (segment dst src src2)
@@ -453,14 +466,7 @@
   (def vpmullw   #x66 #xd5)
   (def vpmuludq  #x66 #xf4)
   (def vpsadbw   #x66 #xf6)
-  (def vpsllw    #x66 #xf1)
-  (def vpslld    #x66 #xf2)
-  (def vpsllq    #x66 #xf3)
-  (def vpsraw    #x66 #xe1)
-  (def vpsrad    #x66 #xe2)
-  (def vpsrlw    #x66 #xd1)
-  (def vpsrld    #x66 #xd2)
-  (def vpsrlq    #x66 #xd3)
+
   (def vpsubb    #x66 #xf8)
   (def vpsubw    #x66 #xf9)
   (def vpsubd    #x66 #xfa)

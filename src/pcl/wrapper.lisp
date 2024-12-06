@@ -249,9 +249,9 @@
              (let ((new (the layout (cdr state))))
                (ecase (car state)
                  (:flush
-                  (cond ((std-instance-p instance)
+                  (cond ((%instancep instance)
                          (setf (%instance-layout instance) new))
-                        ((fsc-instance-p instance)
+                        ((function-with-layout-p instance)
                          (setf (%fun-layout instance) new))
                         (t
                          (bug "unrecognized instance type"))))

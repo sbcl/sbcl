@@ -308,6 +308,9 @@
 (defun erase-lvar-type (lvar)
   (when lvar
     (setf (lvar-%derived-type lvar) nil)
+    (loop for annotation in (lvar-annotations lvar)
+          when (lvar-type-annotation-p annotation)
+          do (setf (lvar-annotation-fired annotation) t))
     (let ((dest (lvar-dest lvar)))
       (cond ((cast-p dest)
              (derive-node-type dest *wild-type* :from-scratch t)
@@ -3582,7 +3585,9 @@ is :ANY, the function name is not checked."
       (let ((mock (copy-structure combination)))
         (setf (combination-args mock)
               (loop for type in types
-                    for lvar = (make-lvar)
-                    do (setf (lvar-%derived-type lvar) type)
-                    collect lvar))
+                    collect (if (lvar-p type)
+                                type
+                                (let ((lvar (make-lvar)))
+                                  (setf (lvar-%derived-type lvar) type)
+                                  lvar))))
         (funcall deriver mock)))))

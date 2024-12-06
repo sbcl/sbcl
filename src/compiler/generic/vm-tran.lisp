@@ -414,61 +414,59 @@
                              sb-vm:vector-data-offset
                              index offset t))))
 
-(defun simple-array-storage-vector-type (type)
-  (let ((dims (array-type-dimensions type)))
-    (cond ((array-type-complexp type)
-           nil)
-          (t
-           `(simple-array ,(type-specifier
-                            (array-type-specialized-element-type type))
-                          (,(if (and (listp dims)
-                                     (every #'integerp dims))
-                                (reduce #'* dims)
-                                '*)))))))
+(defun array-storage-type (type final)
+  (flet ((one (type)
+           (let ((dims (array-type-dimensions type)))
+             (specifier-type
+              (cond ((not (array-type-complexp type))
+                     `(simple-array ,(type-specifier
+                                      (array-type-specialized-element-type type))
+                                    (,(if (and (listp dims)
+                                               (every #'integerp dims))
+                                          (reduce #'* dims)
+                                          '*))))
+                    (t
+                     (if final
+                         `(simple-array ,(type-specifier (array-type-specialized-element-type type))
+                                        (*))
+                         `(array ,(type-specifier (array-type-specialized-element-type type))))))))))
+    (typecase type
+      (array-type
+       (one type))
+      (union-type
+       (let ((types))
+         (loop for type in (union-type-types type)
+               for derived = (and (array-type-p type)
+                                  (one type))
+               if derived
+               do (push derived types)
+               else return (and final
+                                (specifier-type '(simple-array * (*))))
+               finally (return (sb-kernel::%type-union types)))))
+      (t
+       (when final
+         (specifier-type '(simple-array * (*))))))))
 
 (defoptimizer (array-storage-vector derive-type) ((array))
-  (let ((atype (lvar-type array)))
-    (when (array-type-p atype)
-      (specifier-type (or (simple-array-storage-vector-type atype)
-                          `(simple-array ,(type-specifier
-                                           (array-type-specialized-element-type atype))
-                                         (*)))))))
+  (array-storage-type (lvar-type array) t))
 
 (deftransform array-storage-vector ((array) ((simple-array * (*))))
   'array)
 
 (defoptimizer (%array-data derive-type) ((array))
-  (let ((atype (lvar-type array)))
-    (when (array-type-p atype)
-      (specifier-type (or
-                       (simple-array-storage-vector-type atype)
-                       `(array ,(type-specifier
-                                 (array-type-specialized-element-type atype))))))))
+  (array-storage-type (lvar-type array) nil))
 
 (defoptimizers derive-type (%data-vector-and-index
                             %data-vector-and-index/check-bound) ((array index))
   (let ((atype (lvar-type array))
         (index-type (lvar-type index)))
-    (cond ((array-type-p atype)
-           (values-specifier-type
-            `(values ,(or
-                       (simple-array-storage-vector-type atype)
-                       `(simple-array ,(type-specifier
-                                        (array-type-specialized-element-type atype))
-                                      (*)))
-                     ,(if (and (integer-type-p index-type)
-                               (numeric-type-low index-type))
-                          `(integer ,(numeric-type-low index-type)
-                                    (,array-dimension-limit))
-                          `index))))
-          ((csubtypep atype (specifier-type 'string))
-           (values-specifier-type
-            `(values simple-string index)))
-          ((let ((etype (upgraded-element-type-specifier array)))
-             (unless (eq etype '*)
-               (values-specifier-type
-                `(values (simple-array ,etype (*))
-                         index))))))))
+    (values-specifier-type
+     `(values ,(type-specifier (array-storage-type atype t))
+              ,(if (and (integer-type-p index-type)
+                        (numeric-type-low index-type))
+                   `(integer ,(numeric-type-low index-type)
+                             (,array-dimension-limit))
+                   `index)))))
 
 (deftransform %data-vector-and-index ((array index)
                                       (simple-array t)

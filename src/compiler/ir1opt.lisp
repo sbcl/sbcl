@@ -2193,20 +2193,67 @@
       (reoptimize-lvar (set-value dest))))
   (give-up-ir1-transform))
 
+;;; Remove bounds
+(defun simplify-numeric-type (x)
+  (macrolet ((m (&rest types)
+               `(cond ,@(loop for type in types
+                              collect
+                              `((csubtypep x (specifier-type ',type))
+                                (specifier-type ',type)))
+                      (t x))))
+    (m single-float double-float integer float real)))
+
+;;; Try to invoke the type deriver of FUNCTION in (setf x (function x))
+(defun set-type-of-combination (var set initial-type)
+  (let ((combination (lvar-uses (set-value set))))
+    (when (and (combination-p combination)
+               (eq (combination-kind combination) :known))
+      (let* ((args (combination-args combination))
+             (var-args
+               (loop for arg in args
+                     for arg-var = (lvar-lambda-var arg)
+                     when (eq arg-var var)
+                     collect arg)))
+        (when var-args
+          (flet ((derive (type)
+                   (single-value-type
+                    (or
+                     (combination-derive-type-for-arg-types combination
+                                                            (loop for arg in args
+                                                                  collect (if (memq arg var-args)
+                                                                              type
+                                                                              arg)))
+                     (return-from set-type-of-combination)))))
+           (let* ((initial-type (simplify-numeric-type initial-type)) ;; remove bounds or the types won't converge
+                  (derived (derive initial-type)))
+             (when derived
+               ;; Does it converge to the same type again?
+               (let* ((union (type-union derived initial-type))
+                      (again-derived (derive union)))
+                 (when (type= derived again-derived)
+                   union))))))))))
+
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
 ;;; values and do a PROPAGATE-TO-REFS with this type.
 (defun propagate-from-sets (var initial-type)
-  (let ((types nil))
-    (dolist (set (lambda-var-sets var))
-      (let ((type (lvar-type (set-value set))))
-        (push type types)
-        (when (and (node-reoptimize set)
-                   (not (node-to-be-deleted-p set)))
-          (let ((old-type (node-derived-type set)))
-            (unless (values-subtypep old-type type)
-              (derive-node-type set (make-single-value-type type))))
-          (setf (node-reoptimize set) nil))))
+  (let ((types nil)
+        (sets (lambda-var-sets var)))
+    (or (and sets
+             (not (cdr sets))
+             (let ((type (set-type-of-combination var (car sets) initial-type)))
+               (when type
+                 (push type types))))
+        (dolist (set sets)
+          (let ((type (lvar-type (set-value set))))
+            (push type types)
+            (when (and (node-reoptimize set)
+                       (not (node-to-be-deleted-p set)))
+              (let ((old-type (node-derived-type set)))
+                (set-type-of-combination var set initial-type)
+                (unless (values-subtypep old-type type)
+                  (derive-node-type set (make-single-value-type type))))
+              (setf (node-reoptimize set) nil)))))
     (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
                         (apply #'type-union initial-type types))))
       (propagate-to-refs var res-type)))

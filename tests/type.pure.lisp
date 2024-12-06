@@ -977,3 +977,10 @@
    ((#2A()) nil)
    (((make-array '(2 2) :adjustable t)) t)
    (((make-array 2 :adjustable t)) nil)))
+
+(with-test (:name :member-hairy-type-intersection)
+  (assert
+   (sb-kernel:type=
+    (sb-kernel:type-intersection  (sb-kernel:specifier-type '(member #1=(m) a))
+                                  (sb-kernel:specifier-type '(cons (satisfies eval))))
+    (sb-kernel:specifier-type '(and (cons (satisfies eval) t) (member #1#))))))
