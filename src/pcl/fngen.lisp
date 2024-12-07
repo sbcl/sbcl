@@ -48,9 +48,15 @@
             (lexenv
              (sb-c::make-almost-null-lexenv
               (ecase safety
-                (:safe base-policy)
+                ;; Stepping invokes the printer on forms, which might
+                ;; invoke print-object, which might require dispatch
+                ;; function recompilation.
+                (:safe (if (sb-c:policy base-policy (= sb-c:insert-step-conditions 0))
+                           base-policy
+                           (sb-c::process-optimize-decl '(optimize (sb-c:insert-step-conditions 0))
+                                                        base-policy)))
                 (:unsafe (sb-c::process-optimize-decl
-                          '((space 1) (compilation-speed 1)
+                          '(optimize (space 1) (compilation-speed 1)
                             (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
                           base-policy)))
               ;; I suspect that INHIBIT-WARNINGS precludes them from happening
