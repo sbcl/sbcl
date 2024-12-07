@@ -479,3 +479,14 @@
                      (loop for x in l
                            collect x)))))
           '(values list &optional))))
+
+
+(with-test (:name :loop-in-reverse-by-cddr)
+  (checked-compile-and-assert
+   (:optimize nil)
+   `(lambda (l)
+      (loop for x in (reverse l) by #'cddr collect x))
+   (('(1)) '(1) :test #'equal)
+   (('(1 2)) '(2) :test #'equal)
+   (('(1 2 3)) '(3 1) :test #'equal)
+   (('(1 2 3 4)) '(4 2) :test #'equal)))

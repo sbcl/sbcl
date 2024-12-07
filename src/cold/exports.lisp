@@ -1810,7 +1810,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LIST-COPY-SEQ*"
            "LIST-FILL*"
            "LIST-SUBSEQ*"
-           "LIST-REVERSE-INTO-VECTOR"
+           "LIST-REVERSE-INTO-VECTOR" "LIST-REVERSE-INTO-VECTOR-CDDR"
            "ANSI-STREAM"
            "ANSI-STREAM-BIN" "ANSI-STREAM-BOUT"
            "ANSI-STREAM-IN"
