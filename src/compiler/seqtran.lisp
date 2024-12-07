@@ -1534,6 +1534,31 @@
                 node)
                (transform-replace t node)))
          (give-up-ir1-transform)))))
+
+;;; replace + reverse
+(deftransform replace ((seq1 seq2)
+                       ((or null (simple-array * (*))) list) *
+                       :node node)
+  (upgraded-element-type-specifier-or-give-up seq1)
+  (cond ((and (lvar-matches seq2 :fun-names '(reverse sb-impl::list-reverse))
+              ;; Nothing should be modifying the original sequence
+              (almost-immediately-used-p seq2 (lvar-use seq2)
+                                         :flushable t))
+         (splice-fun-args seq2 :any 1)
+         `(let* ((list-length (length seq2))
+                 (vector-length (length seq1))
+                 (diff (- list-length vector-length)))
+            (when (> diff 0)
+              (setf seq2 (nthcdr diff seq2)))
+            (loop for i from (+ vector-length (if (< diff 0)
+                                                  (1- diff)
+                                                  -1))
+                  downto 0
+                  for elt in seq2
+                  do (setf (aref seq1 i) elt))))
+        (t
+         (give-up-ir1-transform))))
+
 #+sb-unicode
 (progn
 (deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
