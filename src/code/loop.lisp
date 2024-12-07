@@ -1446,9 +1446,8 @@ code to be loaded.
               (not (sb-c::fun-lexically-notinline-p 'reverse
                                                     (macro-environment *loop*)))
               (let ((stepper (and (loop-tequal (car (source-code *loop*)) :by)
-                                  (cdr (source-code *loop*)))))
-                (cond ((or (equal (car stepper) '#'cddr)
-                           (equal (car stepper) ''cddr))
+                                  (source-code *loop*))))
+                (cond ((member (cadr stepper) '(#'cddr 'cddr) :test #'equal)
                        (loop-pop-source)
                        (loop-pop-source)
                        (loop-for-across var `(list-reverse-into-vector-cddr ,(second val)) data-type))
