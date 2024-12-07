@@ -3053,6 +3053,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
   #+(and win32 x86-64) "LLU" ; "long" is 32 bits, "long long" is 64 bits
   #-(and win32 x86-64) "LU") ; "long" is 64 bits
 
+(defun gc-strategy-id ()
+  (or #+gencgc 1
+      #+mark-region-gc 2
+      (error "Missing a GC feature")))
+
 (defun write-constants-h (*standard-output*)
   (let ((constants nil))
     (flet ((record (string priority symbol suffix)
@@ -3179,6 +3184,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   ;; values never needed in Lisp, so therefore not a defconstant
   (format t "~:{#define ~A ~D~%~}"
           `(("MAX_CONSES_PER_PAGE" ,sb-vm::max-conses-per-page)
+            ("GC_STRATEGY_ID" ,(gc-strategy-id))
             ("GENCGC_PAGE_SHIFT" ,(1- (integer-length sb-vm:gencgc-page-bytes)))
             ("GENCGC_CARD_SHIFT" ,sb-vm::gencgc-card-shift)
             ("CARDS_PER_PAGE" ,sb-vm::cards-per-page)))
@@ -4046,7 +4052,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
         ;; ID string, then base string chars + maybe padding.
         (write-words core-file build-id-core-entry-type-code
                      (+ 5 nwords) ; 5 = fixed overhead including this word
-                     (or #+gencgc 1 #+mark-region-gc 2 (error "Bad GC selection"))
+                     (gc-strategy-id)
                      (or #-relocatable-static-space sb-vm:nil-value 0)
                      (length build-id))
         (dovector (char build-id) (write-byte (char-code char) core-file))
