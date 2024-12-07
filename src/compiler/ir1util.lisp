@@ -454,7 +454,12 @@
                     (combination
                      (when (and flushable
                                 (flushable-combination-p node))
-                       (go :next)))
+                       (go :next))
+                     (let (fun)
+                       (when (and (eq (combination-kind node) :local)
+                                  (functional-kind-eq (setf fun (combination-lambda node)) let))
+                         (setf node (lambda-bind fun))
+                         (go :next))))
                     ((or enclose entry)
                      (go :next)))))
              (t
