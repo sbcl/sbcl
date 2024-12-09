@@ -17,7 +17,7 @@
    ;; s16.8
    (two-arg-s16.8-mulhrs #:pmulhrsw  (s16.8) (s16.8 s16.8) :cost 1 :encoding :sse :associative t)
    (s16.8-abs     #:pabsw     (s16.8) (s16.8)       :cost 2)
-   (s16.8-maddubs #:pmaddubsw (s16.8) (u16.8 s16.8) :cost 2 :encoding :sse)
+   (s16.8-maddubs #:pmaddubsw (s16.8) (u8.16 s8.16) :cost 2 :encoding :sse)
    (s16.8-sign    #:psignw    (s16.8) (s16.8 s16.8) :cost 2 :encoding :sse)
    ;; s16.8
    (s16.8-hadd    #:phaddw    (s16.8) (s16.8 s16.8) :cost 3 :encoding :sse)
