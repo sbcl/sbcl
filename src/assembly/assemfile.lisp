@@ -34,9 +34,11 @@
          (sb-vm::*adjustable-vectors* nil))
     (declare (special sb-vm::*adjustable-vectors*))
     (unwind-protect
-        (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
-              (*readtable* sb-cold:*xc-readtable*))
-          (load (merge-pathnames name (make-pathname :type "lisp")))
+        (progn
+          (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
+                (sb-c::*compilation* (sb-c::make-compilation))
+                (*readtable* sb-cold:*xc-readtable*))
+            (load (merge-pathnames name (make-pathname :type "lisp"))))
           (resolve-ep-labels (asmstream-code-section asmstream))
           ;; Reserve space for the jump table. The first word of the table
           ;; indicates the total length in words, counting the length word itself

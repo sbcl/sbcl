@@ -2088,3 +2088,14 @@ returning its filename.
     ;; Compiling to fasl considers a symbol always-bound if its
     ;; :always-bound info value is now T or will eventually be T.
     (:eventually (producing-fasl-file))))
+
+(defun default-gc-strategy ()
+  ;; We can notionally cross-compile for a different GC if *FEATURES* override the runtime
+  (cond ((member :gencgc sb-xc:*features*) :gencgc)
+        ((member :mark-region-gc sb-xc:*features*) :mark-region-gc)
+        (t
+         #-sb-xc-host ; TODO: autogenerate constants
+         (ecase (alien-funcall (extern-alien "lisp_gc_strategy_id" (function int)))
+           (1 :gencgc)
+           (2 :mark-region-gc))
+         #+sb-xc-host (bug "c'est impossible"))))
