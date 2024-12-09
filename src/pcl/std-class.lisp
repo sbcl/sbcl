@@ -960,19 +960,23 @@
                (error "~@<Specified class ~S as a superclass of ~
                        itself.~@:>"
                       class))
-             (without-package-locks
-               (with-world-lock ()
-                 (when (or finalizep (class-finalized-p class))
-                   (%update-cpl class (compute-class-precedence-list class))
-                   ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-                   ;; class
-                   (%update-slots class (compute-slots class))
-                   (update-gfs-of-class class)
-                   (setf (plist-value class 'default-initargs) (compute-default-initargs class))
-                   (update-ctors 'finalize-inheritance :class class))
-                 (let ((seen (list* class seen)))
-                   (dolist (sub (class-direct-subclasses class))
-                     (rec sub nil seen)))))))
+             (when (without-package-locks
+                     (with-world-lock ()
+                       (prog1
+                           (when (or finalizep (class-finalized-p class))
+                             (%update-cpl class (compute-class-precedence-list class))
+                             ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
+                             ;; class
+                             (%update-slots class (compute-slots class))
+                             (update-gfs-of-class class)
+                             (setf (plist-value class 'default-initargs) (compute-default-initargs class))
+                             (update-ctors 'finalize-inheritance :class class)
+                             t)
+                         (let ((seen (list* class seen)))
+                           (dolist (sub (class-direct-subclasses class))
+                             (rec sub nil seen))))))
+               ;; Warn outside the world lock
+               (style-warn-about-duplicate-slots class))))
     (rec class finalizep)))
 
 (define-condition cpl-protocol-violation (reference-condition error)
@@ -1140,7 +1144,6 @@
             (layout-slot-table nwrapper) (make-slot-table class eslotds)
             (layout-length nwrapper) nslots
             (slot-value class 'wrapper) nwrapper)
-      (style-warn-about-duplicate-slots class)
       (setf (slot-value class 'finalized-p) t))))
 
 (defun update-gf-dfun (class gf)
