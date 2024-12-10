@@ -105,7 +105,11 @@
     (member-type
      ;; Convert member-type to an union-type.
      (array-type-upgraded-element-type
-      (apply #'type-union (mapcar #'ctype-of (member-type-members type)))))
+      (apply #'type-union
+             ;; Ignore NULL
+             (loop for m in (member-type-members type)
+                   when m
+                   collect (ctype-of m)))))
     (t
      ;; KLUDGE: there is no good answer here, but at least
      ;; *wild-type* won't cause HAIRY-DATA-VECTOR-{REF,SET} to be

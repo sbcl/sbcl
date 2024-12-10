@@ -1545,17 +1545,19 @@
               (almost-immediately-used-p seq2 (lvar-use seq2)
                                          :flushable t))
          (splice-fun-args seq2 :any 1)
-         `(let* ((list-length (length seq2))
-                 (vector-length (length seq1))
-                 (diff (- list-length vector-length)))
-            (when (> diff 0)
-              (setf seq2 (nthcdr diff seq2)))
-            (loop for i from (+ vector-length (if (< diff 0)
-                                                  (1- diff)
-                                                  -1))
-                  downto 0
-                  for elt in seq2
-                  do (setf (aref seq1 i) elt))))
+         `(when seq1
+            (let* ((list-length (length seq2))
+                   (vector-length (length seq1))
+                   (diff (- list-length vector-length)))
+              (when (> diff 0)
+                (setf seq2 (nthcdr diff seq2)))
+              (loop for i from (+ vector-length (if (< diff 0)
+                                                    (1- diff)
+                                                    -1))
+                    downto 0
+                    for elt in seq2
+                    do (setf (aref seq1 i) elt))
+              seq1)))
         (t
          (give-up-ir1-transform))))
 
