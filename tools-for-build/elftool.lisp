@@ -1717,7 +1717,13 @@
               (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
                            :search t))
              (:mark-region-gc
-              (move-dynamic-code-to-text-space input-pathname tmp)))
+              ;; Assume that the free space in the core hasn't been squashed out yet.
+              ;; I'm not sure which of these steps can operate in-place,
+              ;; so use an intermediate temp file for the reorg.
+              (let ((other-temp (concatenate 'string tmp "0")))
+                (reorganize-core input-pathname other-temp)
+                (move-dynamic-code-to-text-space other-temp tmp)
+                (delete-file other-temp))))
            #+x86-64 (redirect-text-space-calls tmp)
            (apply #'really-split-core tmp asm-pathname args))
       (delete-file tmp))))

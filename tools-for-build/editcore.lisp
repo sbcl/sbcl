@@ -1846,7 +1846,9 @@
          ;;; on subsequent pages, and put the end-of-page free space in a list.
          ;;; It's not worth the hassle.
          (largep (ecase *heap-arrangement*
-                   (:mark-region-gc (>= size large-object-size))
+                   ;; FIXME: once-and-only-three-times?
+                   ;; (is also in generic/utils and late-objdef)
+                   (:mark-region-gc (>= size (* 3/4 gencgc-page-bytes)))
                    (:gencgc (>= size gencgc-page-bytes))))
          (page-type (pick-page-type descriptor sap largep old-spacemap))
          (newspace (get-space dynamic-core-space-id new-spacemap))
