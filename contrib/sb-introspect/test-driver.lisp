@@ -792,3 +792,14 @@
     (let ((*standard-output* (make-broadcast-stream)))
       (sb-introspect::largest-objects))
   nil)
+
+(defun sets-equalp (a b) (and (subsetp a b) (subsetp b a)))
+(deftest find-callees
+    (sets-equalp (sb-introspect:find-function-callees #'sb-c::find-dominators)
+                 (list #'sb-c::dfo-as-needed #'sb-c::number-blocks))
+  t)
+(deftest find-callers
+    (let ((callers (sb-introspect:find-function-callers #'sb-c::dfo-as-needed)))
+      (and (>= (length callers) 5)
+           (not (null (member #'sb-c::find-dominators callers)))))
+  t)
