@@ -306,7 +306,7 @@
 (defun make-core (spacemap code-bounds fixedobj-bounds &key enable-pie linkage-space-info)
   (let* ((linkage-bounds
           (let ((text-space (get-space immobile-text-core-space-id spacemap)))
-            (if text-space
+            (if (and text-space (/= (space-addr text-space) 0))
                 (let ((linkage-spaces-size
                        (+ #+linkage-space (ash 1 (+ n-linkage-index-bits word-shift))
                           alien-linkage-space-size))
