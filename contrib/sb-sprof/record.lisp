@@ -190,20 +190,13 @@ EXPERIMENTAL: Interface subject to change."
           ((eq code sb-fasl:*assembler-routines*)
            (values (sb-disassem::find-assembler-routine pc-int)
                    pc-int :asm-routine))
+          ;; This is mainly just defensive, e.g. if interrupted in code resulting
+          ;; from MAKE-BPT-LRA. There should otherwise not exist code lacking debug info
+          ((not (typep (sb-kernel:%code-debug-info code) 'sb-c::compiled-debug-info))
+           (values code pc-int nil))
           (t
-           (let* (;; Give up if we land in the 2 or 3 instructions of a
-                  ;; code component sans simple-fun that is not an asm routine.
-                  ;; While it's conceivable that this could be improved,
-                  ;; the problem will be different or nonexistent after
-                  ;; funcallable-instances each contain their own trampoline.
-                  #+immobile-code
-                  (di (unless (typep (sb-kernel:%code-debug-info code)
-                                     'sb-c::compiled-debug-info)
-                        (return-from debug-info
-                          (values code pc-int nil))))
-                  (pc-offset (sap- (int-sap pc-int) (sb-kernel:code-instructions code)))
+           (let* ((pc-offset (sap- (int-sap pc-int) (sb-kernel:code-instructions code)))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
-             #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
                     (values code pc-int nil))
                    (df
