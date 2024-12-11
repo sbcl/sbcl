@@ -405,6 +405,7 @@
                                                       :complexp :real)
                                type)))
                  (rational 'rational)
+                 (ratio 'ratio)
                  (float (or (numeric-type-format type) 'float))
                  ((nil) 'real)))
          (low (numeric-type-low type))
@@ -675,8 +676,8 @@
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
-(defun source-transform-union-typep (object type)
-  (let* ((types (union-type-types type))
+(defun source-transform-union-typep (object types)
+  (let* ((types (sb-kernel::flatten-numeric-range-types types))
          (type-cons (specifier-type 'cons))
          (type-symbol (specifier-type 'symbol))
          (mtype (find-if #'member-type-p types))
@@ -744,7 +745,7 @@
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
              (multiple-value-bind (predicate more-union-types)
-                 (split-union-type-tests type)
+                 (split-union-type-tests types)
                (cond ((and predicate
                            (< (length more-union-types)
                               (length more-types)))
@@ -1350,8 +1351,10 @@
             (source-transform-hairy-typep object ctype))
            (negation-type
             (source-transform-negation-typep object ctype))
+           (numeric-range-type
+            (source-transform-union-typep object (numeric-range-to-numeric-types ctype)))
            (union-type
-            (source-transform-union-typep object ctype))
+            (source-transform-union-typep object (union-type-types ctype)))
            (intersection-type
             (source-transform-intersection-typep object ctype))
            (member-type

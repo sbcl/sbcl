@@ -4775,11 +4775,10 @@
                       (ash a b))))
 
 (with-test (:name (compile :nconc-derive-type))
-  (let ((function (checked-compile `(lambda (x y)
-                                      (declare (type (or cons fixnum) x))
-                                      (nconc x y)))))
-    (assert (equal (sb-kernel:%simple-fun-type function)
-                   '(function ((or cons fixnum) t) (values cons &optional))))))
+  (assert-type (lambda (x y)
+                 (declare (type (or cons fixnum) x))
+                 (nconc x y))
+               (function ((or cons fixnum) t) (values cons &optional))))
 
 ;; make sure that all data-vector-ref-with-offset VOPs are either
 ;; specialised on a 0 offset or accept signed indices

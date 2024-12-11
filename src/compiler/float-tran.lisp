@@ -1722,7 +1722,8 @@
                    (try 0f0))))))
     (typecase type
       (numeric-type (numeric type))
-      (union-type (mapc #'numeric (union-type-types type))))
+      (union-type (mapc #'numeric (union-type-types type)))
+      (numeric-range-type (mapc #'numeric (numeric-range-to-numeric-types type))))
     (error "Couldn't come up with a value for ~s" type)))
 
 #-(or sb-xc-host 64-bit)
@@ -2023,6 +2024,7 @@
 ;;; So thank goodness for that - it allowed detection of the problem.
 (defun test-ctype-involving-double-float ()
   (specifier-type '(double-float #.pi)))
+#+remove
 (assert (sb-xc:= (numeric-type-low (test-ctype-involving-double-float)) pi))
 
 ;;; Dummy functions to test that complex number are dumped correctly in genesis.

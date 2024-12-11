@@ -1470,7 +1470,9 @@
              (numeric-type
               (list arg))
              (union-type
-              (union-type-types arg))
+              (sb-kernel::flatten-numeric-range-types (union-type-types arg)))
+             (numeric-range-type
+              (numeric-range-to-numeric-types arg))
              (list
               arg)
              (t
@@ -3413,6 +3415,10 @@
     ;; KLUDGE: this is not INTEGER-type-numeric-bounds
     (numeric-type (values (numeric-type-low type)
                           (numeric-type-high type)))
+    (numeric-range-type
+     (if (eql (numeric-range-type-types type) numeric-range-integer)
+         (sb-kernel::numeric-range-bounds type)
+         (values nil nil)))
     (union-type
      (let ((low  nil)
            (high nil))

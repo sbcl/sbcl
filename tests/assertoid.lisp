@@ -77,15 +77,20 @@
       ',condition-type)))
 
 (defmacro assert-type (lambda type)
-  `(assert
-    (test-util:type-specifiers-equal
-     (caddr
-      (sb-kernel:%simple-fun-type
-       (test-util:checked-compile
-        ',lambda)))
-     ',(if (typep type '(cons (eql values)))
-           type
-           `(values ,type &optional)))))
+  (if (typep type '(cons (eql function)))
+      `(assert
+        (test-util:type-specifiers-equal
+         (sb-kernel:%simple-fun-type
+          (test-util:checked-compile ',lambda))
+         ',type))
+      `(assert
+        (test-util:type-specifiers-equal
+         (caddr
+          (sb-kernel:%simple-fun-type
+           (test-util:checked-compile ',lambda)))
+         ',(if (typep type '(cons (eql values)))
+               type
+               `(values ,type &optional))))))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of

@@ -2009,36 +2009,39 @@
 
 ;;; Turn (or (integer 1 1) (integer 3 3)) to (integer 1 3)
 (defun weaken-numeric-union-type (type)
-  (if (union-type-p type)
-      (let ((low  nil)
-            (high nil)
-            class
-            (format :no))
-        (dolist (part (union-type-types type)
-                      (make-numeric-type :class class
-                                         :format format
-                                         :low low
-                                         :high high))
-          (unless (and (numeric-type-real-p part)
-                       (if class
-                           (eql (numeric-type-class part) class)
-                           (setf class (numeric-type-class part)))
-                       (cond ((eq format :no)
-                              (setf format (numeric-type-format part))
-                              t)
-                             ((eql (numeric-type-format part) format))))
-            (return type))
-          (let ((this-low (numeric-type-low part))
-                (this-high (numeric-type-high part)))
-            (unless (and this-low this-high)
-              (return type))
-            (when (consp this-low)
-              (setf this-low (car this-low)))
-            (when (consp this-high)
-              (setf this-high (car this-high)))
-            (setf low  (sb-xc:min this-low  (or low  this-low))
-                  high (sb-xc:max this-high (or high this-high))))))
-      type))
+  (cond ((union-type-p type)
+         (let ((low  nil)
+               (high nil)
+               class
+               (format :no))
+           (dolist (part (union-type-types type)
+                         (make-numeric-type :class class
+                                            :format format
+                                            :low low
+                                            :high high))
+             (unless (and (numeric-type-real-p part)
+                          (if class
+                              (eql (numeric-type-class part) class)
+                              (setf class (numeric-type-class part)))
+                          (cond ((eq format :no)
+                                 (setf format (numeric-type-format part))
+                                 t)
+                                ((eql (numeric-type-format part) format))))
+               (return type))
+             (let ((this-low (numeric-type-low part))
+                   (this-high (numeric-type-high part)))
+               (unless (and this-low this-high)
+                 (return type))
+               (when (consp this-low)
+                 (setf this-low (car this-low)))
+               (when (consp this-high)
+                 (setf this-high (car this-high)))
+               (setf low  (sb-xc:min this-low  (or low  this-low))
+                     high (sb-xc:max this-high (or high this-high)))))))
+        ((numeric-range-type-p type)
+         (numeric-range-to-numeric-type type))
+        (t
+         type)))
 
 ;;; Iteration variable: only SETQs of the form:
 ;;;

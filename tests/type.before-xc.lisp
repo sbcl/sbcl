@@ -26,7 +26,10 @@
 ;;; memoization performed in SPECIFIER-TYPE, which is only a best effort
 ;;; to produce the EQ model object given an EQUAL specifier.
 (dolist (type sb-kernel::*special-union-types*)
-  (dolist (constituent-type (union-type-types (specifier-type type)))
+  (dolist (constituent-type (let ((s (specifier-type type)))
+                              (if (union-type-p s)
+                                  (union-type-types s)
+                                  (numeric-range-to-numeric-types s))))
     (let ((specifier (type-specifier constituent-type)))
       (drop-all-hash-caches)
       (let ((parse (specifier-type specifier)))

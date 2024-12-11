@@ -653,6 +653,9 @@
 
  ("src/code/stubs")
 
+ #+sb-devel
+ ("src/code/cold-init-helper-macros")
+
  ;; CLOS, derived from the PCL reference implementation
  ;;
  ;; This PCL build order is based on a particular
