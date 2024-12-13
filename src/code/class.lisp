@@ -795,14 +795,16 @@ between the ~A definition and the ~A definition"
   `(logior ,(ctype-class-bits 'classoid)
            (logand (hash-layout-name ,x) +ctype-hash-mask+)))
 ;;; Now that the type-class has an ID, the various constructors can be defined.
-(macrolet ((def-make (name args &aux (allocator (symbolicate "!ALLOC-" name)))
+(macrolet ((def-make (name args &optional (flags 0)
+                      &aux (allocator (symbolicate "!ALLOC-" name)))
              `(defun ,(symbolicate "MAKE-" name) ,args
                 (declare (inline ,allocator))
-                (,allocator (classoid-bits name) ,@(remove '&key args)))))
+                (,allocator (logior (classoid-bits name) ,flags)
+                            ,@(remove '&key args)))))
   (def-make undefined-classoid (name))
   (def-make condition-classoid (&key name))
   (def-make structure-classoid (&key name))
-  (def-make standard-classoid (&key name pcl-class))
+  (def-make standard-classoid (&key name pcl-class) ctype-contains-class)
   (def-make static-classoid (&key name)))
 
 (defun classoid-inherits-from (sub super-or-name)

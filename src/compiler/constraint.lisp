@@ -416,7 +416,7 @@
 (declaim (inline type-for-constraints-p))
 (defun type-for-constraints-p (type)
   (not (or (eq type *universal-type*)
-           (contains-hairy-type-p type))))
+           (opaque-type-p type))))
 
 ;;; Actual conset interface
 ;;;
@@ -1181,19 +1181,10 @@
       (when type
         (unless set
           (setf (lambda-var-unused-initial-value leaf) nil))
-        ;; CHANGE-CLASS can change the type, lower down to standard-object,
+        ;; CHANGE-CLASS can change the type,
         ;; type propagation for classes is not as important anyway.
-        (cond #-sb-xc-host
-              ((and
-                (eq sb-pcl::**boot-state** 'sb-pcl::complete)
-                (block nil
-                  (let ((standard-object (find-classoid 'standard-object)))
-                    (sb-kernel::map-type
-                     (lambda (type)
-                       (when (and (classoid-p type)
-                                  (csubtypep type standard-object))
-                         (return t)))
-                     type)))))
+        (cond ((logtest sb-kernel::ctype-contains-class
+                        (sb-kernel::type-flags type)))
               (t
                (derive-node-type ref
                                  (make-single-value-type type))

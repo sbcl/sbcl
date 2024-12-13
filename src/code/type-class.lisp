@@ -258,14 +258,15 @@
 ;;; You could always make it SB-XC:FIXNUM at the risk of forcing the host to
 ;;; deal in bignums. Why cause it undue slowness when we don't need so many bits?
 ;;; NOTE: we _do_ use the sign bit, leaving us 25 pseudorandom bits, but
-;;; the 2 bits of least significance are NOT pseudorandom, so it's best
+;;; the 3 bits of least significance are NOT pseudorandom, so it's best
 ;;; not to use them directly in the hash index.
 (defconstant ctype-hash-size  30)  ; all significant bits, for the slot type specifier
 (defconstant ctype-PRNG-nbits 25)  ; from pseudorandom number generator
-(defconstant ctype-contains-unknown #b01)
-(defconstant ctype-contains-hairy   #b10) ; any hairy type, including UNKNOWN
-(defconstant +ctype-flag-mask+ #b11)
-(defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b11))
+(defconstant ctype-contains-unknown #b001)
+(defconstant ctype-contains-hairy   #b010) ; any hairy type, including UNKNOWN
+(defconstant ctype-contains-class   #b100) ; standard-class
+(defconstant +ctype-flag-mask+ #b111)
+(defconstant +ctype-hash-mask+ (logandc2 (1- (ash 1 ctype-PRNG-nbits)) #b111))
 
 (defstruct (ctype (:conc-name type-)
                    (:constructor nil)
@@ -277,11 +278,15 @@
 
 ;;; Apparently the old CONTAINS-UNKNOWN-TYPE-P function could accept NIL
 ;;; and return NIL. This seems kinda sloppy. Can we get rid of that "feature"?
-(declaim (inline contains-unknown-type-p contains-hairy-type-p))
+(declaim (inline contains-unknown-type-p contains-hairy-type-p opaque-type-p))
 (defun contains-unknown-type-p (ctype)
   (if ctype (oddp (type-%bits ctype)) nil))
 (defun contains-hairy-type-p (ctype)
   (logbitp 1 (type-%bits ctype)))
+
+;;; Can't do optimizations for satisfies, unknown types or standard-class.
+(defun opaque-type-p (ctype)
+  (logtest (type-%bits ctype) +ctype-flag-mask+))
 
 (defun ok-to-memoize-p (arg)
   (etypecase arg
@@ -332,7 +337,7 @@
       (union         union-type)
       (negation      negation-type)
       (number        numeric-type)
-      (numeric-range    numeric-range-type)
+      (numeric-range numeric-range-type)
       (array         array-type)
       (character-set character-set-type)
       (member        member-type)
