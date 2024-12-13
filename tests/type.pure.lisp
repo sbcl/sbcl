@@ -987,7 +987,10 @@
 
 (with-test (:name :subtype-array-union)
   (assert (subtypep (opaque-identity '(array t))
-                    (opaque-identity '(or simple-array (array unsigned-byte))))))
+                    (opaque-identity '(or simple-array (array unsigned-byte)))))
+  (assert (subtypep (opaque-identity '(vector character))
+                    (opaque-identity '(or (and string (not simple-array))
+                                       simple-array)))))
 
 (deftype subtype-equal-type (&rest args) `(or fixnum (member ,@args)))
 

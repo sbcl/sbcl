@@ -4721,34 +4721,40 @@ used for a COMPLEX component.~:@>"
            :element-type result-eltype
            :specialized-element-type result-stype))))))
 
-(define-type-method (array :simple-intersection2) (type1 type2)
-  (declare (type array-type type1 type2))
+(defun array-intersection (type1 type2 use-specialized)
   (if (array-types-intersect type1 type2)
-      (let ((dims1 (array-type-dimensions type1))
-            (dims2 (array-type-dimensions type2))
-            (complexp1 (array-type-complexp type1))
-            (complexp2 (array-type-complexp type2))
-            (eltype1 (array-type-element-type type1))
-            (eltype2 (array-type-element-type type2))
-            (stype1 (array-type-specialized-element-type type1))
-            (stype2 (array-type-specialized-element-type type2)))
+      (let* ((dims1 (array-type-dimensions type1))
+             (dims2 (array-type-dimensions type2))
+             (complexp1 (array-type-complexp type1))
+             (complexp2 (array-type-complexp type2))
+             (eltype1 (array-type-element-type type1))
+             (eltype2 (array-type-element-type type2))
+             (stype1 (array-type-specialized-element-type type1))
+             (stype2 (array-type-specialized-element-type type2))
+             (specialized-element-type
+               (cond
+                 ((eq stype1 *wild-type*) stype2)
+                 ((eq stype2 *wild-type*) stype1)
+                 (t
+                  (aver (type= stype1 stype2))
+                  stype1))))
         (make-array-type (cond ((eq dims1 '*) dims2)
                                ((eq dims2 '*) dims1)
                                (t
                                 (mapcar (lambda (x y) (if (eq x '*) y x))
                                         dims1 dims2)))
-         :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
-         :element-type (cond
-                         ((eq eltype1 *wild-type*) eltype2)
-                         ((eq eltype2 *wild-type*) eltype1)
-                         (t (type-intersection eltype1 eltype2)))
-         :specialized-element-type (cond
-                                     ((eq stype1 *wild-type*) stype2)
-                                     ((eq stype2 *wild-type*) stype1)
-                                     (t
-                                      (aver (type= stype1 stype2))
-                                      stype1))))
+                         :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
+                         :element-type (cond
+                                         (use-specialized
+                                          specialized-element-type)
+                                         ((eq eltype1 *wild-type*) eltype2)
+                                         ((eq eltype2 *wild-type*) eltype1)
+                                         (t (type-intersection eltype1 eltype2)))
+                         :specialized-element-type specialized-element-type))
       *empty-type*))
+
+(define-type-method (array :simple-intersection2) (type1 type2)
+  (array-intersection type1 type2 nil))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
@@ -5615,15 +5621,20 @@ used for a COMPLEX component.~:@>"
   ;; Ouch. - CSR, 2002-04-10
   (cond ((fun-designator-type-p type1)
          (type= type2 (specifier-type 'function-designator)))
-        ;; Upgrading rules do not work with intersections
-        ((array-type-p type1)
-         (any/type #'csubtypep type1 (union-type-types type2)))
         (t
          (multiple-value-bind (sub-value sub-certain?)
              (type= type1
                     (%type-union
-                     (mapcar (lambda (x) (type-intersection type1 x))
-                             (union-type-types type2))))
+                     ;; Upgrading rules do not work with intersections
+                     (if (array-type-p type1)
+                         (mapcar (lambda (x)
+                                   (if (array-type-p x)
+                                       (array-intersection type1 x t)
+                                       (type-intersection type1 x)))
+                                 (union-type-types type2))
+                         (mapcar (lambda (x)
+                                   (type-intersection type1 x))
+                                 (union-type-types type2)))))
            (if sub-certain?
                (values sub-value sub-certain?)
                ;; The ANY/TYPE expression above is a sufficient condition for
