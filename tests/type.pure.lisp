@@ -984,3 +984,7 @@
     (sb-kernel:type-intersection  (sb-kernel:specifier-type '(member #1=(m) a))
                                   (sb-kernel:specifier-type '(cons (satisfies eval))))
     (sb-kernel:specifier-type '(and (cons (satisfies eval) t) (member #1#))))))
+
+(with-test (:name :subtype-array-union)
+  (assert (subtypep (opaque-identity '(array t))
+                    (opaque-identity '(or simple-array (array unsigned-byte))))))

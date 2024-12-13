@@ -5583,6 +5583,9 @@ used for a COMPLEX component.~:@>"
   ;; Ouch. - CSR, 2002-04-10
   (cond ((fun-designator-type-p type1)
          (type= type2 (specifier-type 'function-designator)))
+        ;; Upgrading rules do not work with intersections 
+        ((array-type-p type1)
+         (any/type #'csubtypep type1 (union-type-types type2)))
         (t
          (multiple-value-bind (sub-value sub-certain?)
              (type= type1
