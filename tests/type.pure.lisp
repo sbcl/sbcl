@@ -988,3 +988,22 @@
 (with-test (:name :subtype-array-union)
   (assert (subtypep (opaque-identity '(array t))
                     (opaque-identity '(or simple-array (array unsigned-byte))))))
+
+(deftype subtype-equal-type (&rest args) `(or fixnum (member ,@args)))
+
+(with-test (:name :subtypep-equal-member)
+  (multiple-value-bind (answer certain)
+      ;; Verify that the SUBTYPEP fast path is taken
+      (subtypep (opaque-identity '((invalid)))
+                (opaque-identity '((invalid))))
+    (assert (and answer certain)))
+  (multiple-value-bind (answer certain)
+      (subtypep (opaque-identity '(eql (list 1)))
+                (opaque-identity '(eql (list 1))))
+    (assert (and (not answer) certain)))
+  (multiple-value-bind (answer certain)
+      (subtypep (opaque-identity '(subtype-equal-type 1 (list 2) 3))
+                (opaque-identity '(subtype-equal-type 1 (list 2) 3)))
+    (assert (and (not answer) certain)))
+  (assert (not (subtypep (opaque-identity '(function (&key (member t))))
+                         (opaque-identity '(function (&key (eql t))))))))

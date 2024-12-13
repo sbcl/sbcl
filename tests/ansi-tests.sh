@@ -7,7 +7,8 @@ fi
 
 cd ansi-test
 rm -fr sandbox/scratch
-../../run-sbcl.sh --lose-on-corruption --disable-ldb \
+../../run-sbcl.sh --disable-ldb --lose-on-corruption --disable-debugger \
+                  --no-userinit --no-sysinit \
                   --load gclload1.lsp --load gclload2.lsp \
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
                   --eval '(in-package :cl-test)' \

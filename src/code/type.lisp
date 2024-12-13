@@ -1181,10 +1181,42 @@
                               type1 type2
                               :complex-arg1 :complex-subtypep-arg1)))))
 
+;;; Like EQUAL but uses EQL for MEMBER and EQL.
+(defun equal-type-specifiers-p (x y)
+  (labels ((equal-rest (test x y)
+             (if (and (consp x))
+                 (and (consp y)
+                      (funcall test (car x) (car y))
+                      (equal-rest test (cdr x) (cdr y)))
+                 (funcall test x y)))
+           (equal-types (x y)
+             (cond ((eql x y)
+                    t)
+                   ((and (consp x)
+                         (cdr x)) ;; don't bother if there are no parameters
+                    (and (consp y)
+                         (cdr y)
+                         (let ((x (typexpand x))
+                               (y (typexpand y)))
+                           (if (consp x)
+                               (and (consp y)
+                                    ;; &key (name ...) can be confused with a type
+                                    (neq (first y) 'function)
+                                    (equal-types (first x) (first y))
+                                    ;; (EQL x) expands to (MEMBER x).
+                                    (equal-rest (if (eq (first x) 'member)
+                                                    #'eql
+                                                    #'equal-types)
+                                                (rest x)
+                                                (rest y)))
+                               (equal-types x y)))))
+                   (t (equal x y)))))
+    (equal-types x y)))
+
 ;;; Just parse the type specifiers and call CSUBTYPE.
 ;;; Well, not "just" - Despite memoization of parsing and CSUBTYPEP,
 ;;; it's nonetheless better to test EQUAL first, which is ~10x faster
-;;; in the positive case, and insigificant in the negative.
+;;; in the positive case, and insignificant in the negative.
 ;;; The specifiers might not be legal type specifiers,
 ;;; but we're not obligated to police that:
 ;;;   "This version eliminates the requirement to signal an error."
@@ -1208,7 +1240,7 @@
   (if (and #-sb-xc-host
            (sb-c:policy sb-c::*policy* (not (or (> debug 1)
                                                 (= safety 3))))
-           (equal type1 type2))
+           (equal-type-specifiers-p type1 type2))
       (values t t)
       (csubtypep (specifier-type type1) (specifier-type type2))))
 
@@ -5583,7 +5615,7 @@ used for a COMPLEX component.~:@>"
   ;; Ouch. - CSR, 2002-04-10
   (cond ((fun-designator-type-p type1)
          (type= type2 (specifier-type 'function-designator)))
-        ;; Upgrading rules do not work with intersections 
+        ;; Upgrading rules do not work with intersections
         ((array-type-p type1)
          (any/type #'csubtypep type1 (union-type-types type2)))
         (t
