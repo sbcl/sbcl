@@ -990,7 +990,9 @@
                     (opaque-identity '(or simple-array (array unsigned-byte)))))
   (assert (subtypep (opaque-identity '(vector character))
                     (opaque-identity '(or (and string (not simple-array))
-                                       simple-array)))))
+                                       simple-array))))
+  (assert (subtypep (opaque-identity '(vector unknown))
+                    (opaque-identity 'sequence))))
 
 (deftype subtype-equal-type (&rest args) `(or fixnum (member ,@args)))
 

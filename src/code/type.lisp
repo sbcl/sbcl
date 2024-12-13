@@ -4411,8 +4411,8 @@ used for a COMPLEX component.~:@>"
                    (eq (array-type-complexp type1)
                        (array-type-complexp type2))))
          (values nil t))
-        ((or (unknown-type-p (array-type-element-type type1))
-             (unknown-type-p (array-type-element-type type2)))
+        ((or (contains-unknown-type-p (array-type-element-type type1))
+             (contains-unknown-type-p (array-type-element-type type2)))
          (type= (array-type-element-type type1)
                 (array-type-element-type type2)))
         (t
@@ -4537,8 +4537,8 @@ used for a COMPLEX component.~:@>"
           (;; Since we didn't match any of the special cases above, if
            ;; either element type is unknown we can only give a good
            ;; answer if they are the same.
-           (or (unknown-type-p (array-type-element-type type1))
-               (unknown-type-p (array-type-element-type type2)))
+           (or (contains-unknown-type-p (array-type-element-type type1))
+               (contains-unknown-type-p (array-type-element-type type2)))
            (if (type= (array-type-element-type type1)
                       (array-type-element-type type2))
                (values t t)
@@ -5628,7 +5628,8 @@ used for a COMPLEX component.~:@>"
              (type= type1
                     (%type-union
                      ;; Upgrading rules do not work with intersections
-                     (if (array-type-p type1)
+                     (if (and (array-type-p type1)
+                              (not (contains-unknown-type-p (array-type-element-type type1))))
                          (mapcar (lambda (x)
                                    (if (array-type-p x)
                                        (array-intersection type1 x t)
