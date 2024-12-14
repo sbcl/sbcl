@@ -1184,7 +1184,7 @@
 ;;; Like EQUAL but uses EQL for MEMBER and EQL.
 (defun equal-type-specifiers-p (x y)
   (labels ((equal-rest (test x y)
-             (if (and (consp x))
+             (if (consp x)
                  (and (consp y)
                       (funcall test (car x) (car y))
                       (equal-rest test (cdr x) (cdr y)))
@@ -2858,8 +2858,23 @@ expansion happened."
                    (sb-xc:>= (type-bound-number low) (type-bound-number high))
                    (sb-xc:> low high)))
       (return-from make-numeric-type *empty-type*))
-    (when (and (eq class 'rational) (integerp low) (eql low high))
-      (setf class 'integer))
+    (when (eq class 'rational)
+      (cond ((and (integerp low)
+                  (eql low high))
+             (setf class 'integer))
+            ((let ((low low)
+                   (high high))
+               (and (or (ratiop low)
+                        (if (consp low)
+                            (setf low (car low))))
+                    (or (ratiop high)
+                        (and (consp high)
+                             (setf high
+                                   (if (integerp (car high))
+                                       (1- (car high))
+                                       (car high)))))
+                    (= (floor low) (floor high))))
+             (setf class 'ratio))))
     (flet ((normalize-zero (x)
              (cond
                ((eql x -0d0) 0d0)
@@ -3149,18 +3164,19 @@ expansion happened."
                                             (car highr)
                                             highr)))
                       (eql highi highr)))
-             (modified-numeric-type ratio :class 'rational))
+             (let ((rational
+                    (modified-numeric-type ratio :class 'rational)))
+               (unless (eq (numeric-type-class rational) 'ratio)
+                 rational)))
             ((and (or (not lowi)
                       (and lowr
                            (numeric-bound-test (1- lowi) lowr <= <=)))
                   (or (not highi)
                       (and highr
                            (numeric-bound-test (1+ highi) highr >= >=))))
-             (make-union-type
-              nil
-              (list
-               (modified-numeric-type ratio :class 'rational)
-               integer)))))))
+             (let ((rational (modified-numeric-type ratio :class 'rational)))
+               (unless (eq (numeric-type-class rational) 'ratio)
+                 (make-union-type nil (list rational integer)))))))))
 
 (define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
@@ -3884,6 +3900,9 @@ expansion happened."
                               :high (if (integerp high)
                                         (list high)
                                         high))))
+        ((and (eq type1 (specifier-type '(not ratio)))
+              (numtype-aspects-eq type2 (specifier-type 'rational)))
+         (type-intersection type2 (specifier-type 'integer)))
         ((and (negation-type-p type1)
               (numeric-type-p (negation-type-type type1)))
          (let* ((not-type1 type1)
