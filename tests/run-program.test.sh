@@ -45,11 +45,18 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
 ")))
   (format t ";;; Smoke tests: PASS~%")
 
+  #+unix
+  (defconstant unix-env
+    #+haiku
+    "/bin/env"
+    #-haiku
+    "/usr/bin/env")
+
   ;; Unix environment strings are ordinarily passed with SBCL convention
   ;; (instead of CMU CL alist-of-keywords convention).
   #+unix ; env works differently for msys2 apparently
   (let ((string (with-output-to-string (stream)
-                  (sb-ext:run-program "/usr/bin/env" ()
+                  (sb-ext:run-program unix-env ()
                                       :output stream
                                       :environment '("FEEFIE=foefum")))))
     (assert (equal string "FEEFIE=foefum
@@ -98,7 +105,7 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
   (let* ((sb-impl::*default-external-format* :latin-1)
          (sb-alien::*default-c-string-external-format* :latin-1)   
          (string (with-output-to-string (stream)
-                  (sb-ext:run-program "/usr/bin/env" ()
+                  (sb-ext:run-program unix-env ()
                                       :output stream)))
          (expected (apply #'concatenate
                          'string
