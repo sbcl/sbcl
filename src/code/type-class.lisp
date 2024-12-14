@@ -1493,11 +1493,13 @@
                     (bound-test object))))))))
 
 (defun numeric-range-typep (object type)
-  (when (eql (numeric-range-type-types type)
-             (typecase object
-               (integer numeric-range-integer)
-               (single-float numeric-range-single-float)
-               (double-float numeric-range-double-float)))
+  (when (logtest (numeric-range-type-types type)
+                 (typecase object
+                   (integer numeric-range-integer)
+                   (ratio numeric-range-ratio)
+                   (single-float numeric-range-single-float)
+                   (double-float numeric-range-double-float)
+                   (t (return-from numeric-range-typep nil))))
     ;; FIXME: do not cons
     (subtype-range-vectors (vector object object)
                            (numeric-range-type-ranges type))))
