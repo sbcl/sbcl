@@ -60,7 +60,7 @@
                                 ;; It holds on to clambdas, retaining
                                 ;; them for the duration of
                                 ;; compile-file.
-                                :weakness :key)
+                                #-sb-xc-host :weakness #-sb-xc-host :key)
    :type hash-table)
   ;; a table holding back-patching info for forward references to XEPs.
   ;; The key is the ENTRY-INFO structure for the XEP, and the value is
