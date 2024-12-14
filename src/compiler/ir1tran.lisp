@@ -380,6 +380,8 @@
           ((array t)
            (dotimes (i (array-total-size value))
              (grovel (row-major-aref value i))))
+          ;; Don't process and hold on to compiler data
+          ((or nlx-info sset-element))
           (instance
            ;; Behold the wonderfully clear sense of this-
            ;;  WHEN (EMIT-MAKE-LOAD-FORM VALUE)
