@@ -124,6 +124,12 @@
 (#(0 C49039A2 DB6D6FD7 E487643D F5B1443E)
  "(SIMPLE-VECTOR VECTOR CONS LIST NIL)"
  "(  (& (+ (>> val 4) (>> val 19)) 7))")
+(#(1 2 3 4 8 C F)
+ "(12 8 4 15 3 2 1)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 0 4 5)))
+  (let ((b (& val #x3)))
+   (let ((a (>> (<< val 28) 30)))
+    (^ a (aref tab b))))))")
 (#(1 2 8 10 40)
  "(64 16 8 2 1)"
  "(  (& (+ (>> val 0) (>> val 1) (>> val 5)) 7))")
