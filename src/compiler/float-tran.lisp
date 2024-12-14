@@ -634,7 +634,7 @@
 (defun complex-float-type (arg)
   (declare (type numeric-type arg))
   (let* ((format (case (numeric-type-class arg)
-                   ((integer rational) 'single-float)
+                   ((integer ratio rational) 'single-float)
                    (t (numeric-type-format arg))))
          (float-type (or format 'float)))
     (specifier-type `(complex ,float-type))))
@@ -646,7 +646,7 @@
   (cond
     ((numeric-type-p arg)
      (let* ((format (case (numeric-type-class arg)
-                      ((integer rational) 'single-float)
+                      ((integer ratio rational) 'single-float)
                       (t (numeric-type-format arg))))
             (float-type (or format 'float))
             (lo (coerce-numeric-bound lo float-type))
@@ -744,7 +744,7 @@
                         (res-hi (or (bound-func fun (if increasingp high low) nil)
                                     default-high))
                         (format (case (numeric-type-class arg)
-                                  ((integer rational) 'single-float)
+                                  ((integer ratio rational) 'single-float)
                                   (t (numeric-type-format arg))))
                         (bound-type (or format 'float))
                         (result-type
@@ -928,7 +928,7 @@
                      (specifier-type `(integer ,lo ,hi)))
                     (t
                      (specifier-type `(rational ,lo ,hi))))))
-           (rational
+           ((rational ratio)
             ;; Positive integer to rational power is either a rational
             ;; or a single-float.
             (let* ((lo (interval-low bnd))
@@ -1102,7 +1102,7 @@
            (let* (;; FIXME: This expression for FORMAT seems to
                   ;; appear multiple times, and should be factored out.
                   (format (case (numeric-type-class result-type)
-                            ((integer rational) 'single-float)
+                            ((integer ratio rational) 'single-float)
                             (t (numeric-type-format result-type))))
                   (bound-format (or format 'float)))
              (make-numeric-type :class 'float
@@ -1132,7 +1132,7 @@
 
 (defun phase-derive-type-aux (arg)
   (let* ((format (case (numeric-type-class arg)
-                   ((integer rational) 'single-float)
+                   ((integer ratio rational) 'single-float)
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
@@ -1547,7 +1547,7 @@
     (numeric-type
      (flet ((floatify-format ()
               (case (numeric-type-class arg)
-                ((integer rational) 'single-float)
+                ((integer ratio rational) 'single-float)
                 (t (numeric-type-format arg)))))
        (cond ((eq (numeric-type-complexp arg) :complex)
               (make-numeric-type :class 'float

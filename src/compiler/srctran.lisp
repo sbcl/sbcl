@@ -2030,7 +2030,7 @@
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational) 'single-float)
+                          ((integer rational ratio) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2169,8 +2169,8 @@
                    (numeric-type-real-p div)))
          nil)
         ;; Floats introduce rounding errors
-        ((and (memq (numeric-type-class num) '(integer rational))
-              (memq (numeric-type-class div) '(integer rational)))
+        ((and (memq (numeric-type-class num) '(integer rational ratio))
+              (memq (numeric-type-class div) '(integer rational ratio)))
          (truncate-derive-type-rem num div))
         (t
          (numeric-contagion num div))))
@@ -2352,8 +2352,8 @@
                                        (numeric-type-real-p div)))
                              nil)
                             ;; Floats introduce rounding errors
-                            ((and (memq (numeric-type-class num) '(integer rational))
-                                  (memq (numeric-type-class div) '(integer rational)))
+                            ((and (memq (numeric-type-class num) '(integer rational ratio))
+                                  (memq (numeric-type-class div) '(integer rational ratio)))
                              (,r-aux num div))
                             (t
                              (numeric-contagion num div)))))
@@ -2930,7 +2930,7 @@
          (specifier-type '(or (eql 1) (eql -1))))
         ((eq (numeric-type-complexp type) :complex)
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational) 'single-float)
+                          ((integer rational ratio) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2944,6 +2944,9 @@
                 (contains-0-p (interval-contains-p 0 interval))
                 (class (numeric-type-class type))
                 (format (numeric-type-format type))
+                (class (if (eq class 'ratio)
+                            'rational
+                            class))
                 (one (coerce 1 (or format class 'real)))
                 (zero (coerce 0 (or format class 'real)))
                 (minus-one (coerce -1 (or format class 'real)))
