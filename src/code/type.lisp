@@ -3931,6 +3931,7 @@ expansion happened."
               (typep (negation-type-type type1) '(or numeric-type numeric-range-type)))
          (make-negation-type (type-difference (negation-type-type type1) type2)))))
 
+
 (define-type-method (numeric-range :simple-intersection2) (type1 type2)
   (let ((types1 (numeric-range-type-types type1))
         (types2 (numeric-range-type-types type2)))
@@ -3948,6 +3949,24 @@ expansion happened."
 
           (t
            *empty-type*))))
+
+(defun numeric-range-difference (type1 ranges2 types2 type2)
+  (let ((types1 (numeric-range-type-types type1)))
+    (cond ((not (logtest types1 types2))
+           nil)
+          ((= types1 types2)
+           (difference-ranges (numeric-range-type-types type1)
+                              ranges2
+                              (numeric-range-type-ranges type1)))
+          ((> types1 types2)
+           (difference-ranges types2 ranges2
+                              (numeric-range-type-ranges type1)))
+          ((and (= types1 numeric-range-integer)
+                (logtest types2 numeric-range-rational))
+           (type-union
+            (type-difference (type-intersection type2 (specifier-type 'integer))
+                             type1)
+            (type-intersection type2 (specifier-type '(not integer))))))))
 
 (define-type-method (numeric-range :complex-intersection2) (type1 type2)
   (cond ((eq type1 (specifier-type 'number))
@@ -4034,42 +4053,30 @@ expansion happened."
                  (t
                   :call-other-method))))
         ((and (negation-type-p type1)
-              (numeric-range-type-p (setf type1 (negation-type-type type1))))
-         (let ((types1 (numeric-range-type-types type1))
-               (types2 (numeric-range-type-types type2)))
-           (cond ((not (logtest types1 types2))
-                  nil)
-                 ((= types1 types2)
-                  (difference-ranges (numeric-range-type-types type1)
-                                     (numeric-range-type-ranges type2)
-                                     (numeric-range-type-ranges type1)))
-                 ((> types1 types2)
-                  (difference-ranges (numeric-range-type-types type2)
-                                     (numeric-range-type-ranges type2)
-                                     (numeric-range-type-ranges type1)))
-                 ((and (= types1 numeric-range-integer)
-                       (logtest types2 numeric-range-rational))
-                  (type-union
-                   (type-difference (type-intersection type2 (specifier-type 'integer))
-                                    type1)
-                   (type-intersection type2 (specifier-type '(not integer))))))))
+              (numeric-range-type-p (negation-type-type type1)))
+         (numeric-range-difference (negation-type-type type1)
+                                   (numeric-range-type-ranges type2)
+                                   (numeric-range-type-types type2)
+                                   type2))
         (t
          :call-other-method)))
-
-(defun number-to-numeric-range (type)
-  (new-ctype numeric-range-type 0 (numeric-type-range-mask type)
-             (vector (or (numeric-type-low type)
-                         single-float-negative-infinity)
-                     (or (numeric-type-high type)
-                         single-float-positive-infinity))))
 
 (define-type-method (number :complex-intersection2) (type1 type2)
   (cond ((and (negation-type-p type1)
               (numeric-range-type-p (negation-type-type type1)))
-         (let ((mask (numeric-type-range-mask type2)))
-           (if mask
-               (type-intersection (number-to-numeric-range type2) type1)
-               type2)))
+         (if (eq type2 (specifier-type 'number))
+             (type-union (type-intersection (specifier-type 'real) type1)
+                         (type-intersection (specifier-type 'complex) type1))
+             (let ((mask (numeric-type-range-mask type2)))
+               (if mask
+                   (numeric-range-difference (negation-type-type type1)
+                                             (vector (or (numeric-type-low type2)
+                                                         single-float-negative-infinity)
+                                                     (or (numeric-type-high type2)
+                                                         single-float-positive-infinity))
+                                             mask
+                                             type2)
+                   type2))))
         ((and (eq type1 (specifier-type '(not integer)))
               (numtype-aspects-eq type2 (specifier-type 'rational)))
          (let ((low (numeric-type-low type2))

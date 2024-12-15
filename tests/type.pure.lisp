@@ -1020,5 +1020,10 @@
            (sb-kernel:type-difference (sb-kernel:specifier-type 'rational)
                                       (sb-kernel:specifier-type '(integer 0 10)))))
   (assert (sb-kernel:type= (sb-kernel:type-difference (sb-kernel:specifier-type '(or (rational * (4/3)) (rational 5)))
-                                               (sb-kernel:specifier-type '(integer 5 5)))
-                    (sb-kernel:specifier-type  '(or (rational * (4/3)) (rational (5)))))))
+                                                      (sb-kernel:specifier-type '(integer 5 5)))
+                           (sb-kernel:specifier-type  '(or (rational * (4/3)) (rational (5))))))
+  (assert (sb-kernel:type= (sb-kernel:type-difference (specifier-type 'number)
+                                                      (sb-kernel:specifier-type
+                                                       '(OR (INTEGER -71191347552279427 -71191347552279427) (INTEGER -3 -3))))
+
+                           (sb-kernel:specifier-type  '(or float complex (integer * -71191347552279428) (integer -71191347552279426 -4) (integer -2) ratio)))))
