@@ -2224,7 +2224,7 @@
                      collect arg
                      and do (when cast
                               (setf initial-type
-                                    ;; Type derivers expect the right types 
+                                    ;; Type derivers expect the right types
                                     (type-intersection initial-type (single-value-type (cast-asserted-type cast))))))))
         (when var-args
           (labels ((derive (type)
