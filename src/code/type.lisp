@@ -3600,6 +3600,15 @@ expansion happened."
                             last2
                             (cmp2<= low last2))
                    (setf low (car low)))
+                 (when (and last2
+                            (cmp2<= low last2))
+                   (setf last2 high)
+                   (unless (or (integerp last2)
+                               (eql last2 single-float-positive-infinity))
+                     (setf last2 (if (consp last2)
+                                     (ceiling (1- (car last2)))
+                                     (floor last2))))
+                   (setf (car result2) last2))
                  (cond ((and last1
                              (numeric-bound-test last1 high > >=)))
                        ((and last1
@@ -3621,10 +3630,17 @@ expansion happened."
                        (t
                         (when (and (consp last1)
                                    (cmp2<= low last1))
+                          
                           (setf (car result1) (car last1)))
                         (when (and last1
                                    (cmp2<= low last1))
-                          (setf low (cadr result1)))
+                          (setf low (cadr result1))
+                          (when integerp
+                            (unless (or (integerp low)
+                                        (eql low single-float-negative-infinity))
+                              (setf low (if (consp low)
+                                            (floor (1+ (car low)))
+                                            (ceiling low))))))
                         (push low result2)
                         (push high result2))))))
       (loop (cond ((= i1 (length ranges1))
