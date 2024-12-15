@@ -1216,12 +1216,15 @@
   (one-arg-derive-type num #'realpart-derive-type-aux #'realpart))
 
 (defun imagpart-derive-type-aux (type)
-  (let ((class (numeric-type-class type))
-        (format (numeric-type-format type)))
+  (let* ((class (numeric-type-class type))
+         (class (if (eq class 'ratio)
+                    'rational
+                    class))
+         (format (numeric-type-format type)))
     (cond ((numeric-type-real-p type)
            ;; The imagpart of a real has the same type as the input,
            ;; except that it's zero.
-           (let ((bound-format (or format (and (neq class 'ratio) class) 'real)))
+           (let ((bound-format (or format class 'real)))
              (make-numeric-type :class class
                                 :format format
                                 :complexp :real
