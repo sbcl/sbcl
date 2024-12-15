@@ -2226,7 +2226,8 @@
                               (setf initial-type
                                     ;; Type derivers expect the right types
                                     (type-intersection initial-type (single-value-type (cast-asserted-type cast))))))))
-        (when var-args
+        (when (and var-args
+                   (neq initial-type *empty-type*))
           (labels ((derive (type)
                      (single-value-type
                       (or
