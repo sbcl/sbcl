@@ -126,6 +126,9 @@
 (defconstant sigwinch 20) ; #x14
 (defconstant sigxcpu 30) ; #x1e
 (defconstant sigxfsz 31) ; #x1f
+(defconstant itimer-real 0) ; #x0
+(defconstant itimer-virtual 1) ; #x1
+(defconstant itimer-prof 2) ; #x2
 (defconstant fpe-intovf 2) ; #x2
 (defconstant fpe-intdiv 1) ; #x1
 (defconstant fpe-fltdiv 3) ; #x3

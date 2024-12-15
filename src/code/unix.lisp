@@ -924,10 +924,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     (it-interval (struct timeval))      ; timer interval
     (it-value (struct timeval))))       ; current value
 
-(defconstant itimer-real 0)
-(defconstant itimer-virtual 1)
-(defconstant itimer-prof 2)
-
 #-win32
 (defun unix-getitimer (which)
   "UNIX-GETITIMER returns the INTERVAL and VALUE slots of one of

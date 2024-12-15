@@ -56,7 +56,12 @@
   (packages () :type list)
   ;; a table mapping from the ENTRY-INFO structures for dumped XEPs to
   ;; the table offsets of the corresponding code pointers
-  (entry-table (make-hash-table :test 'eq) :type hash-table)
+  (entry-table (make-hash-table :test 'eq
+                                ;; It holds on to clambdas, retaining
+                                ;; them for the duration of
+                                ;; compile-file.
+                                #-sb-xc-host :weakness #-sb-xc-host :key)
+   :type hash-table)
   ;; a table holding back-patching info for forward references to XEPs.
   ;; The key is the ENTRY-INFO structure for the XEP, and the value is
   ;; a list of conses (<code-handle> . <offset>), where <code-handle>

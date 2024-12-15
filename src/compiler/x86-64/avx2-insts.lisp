@@ -528,7 +528,9 @@
 (macrolet ((def (name prefix opcode &optional (opcode-prefix #x0F) l)
              `(define-instruction ,name (segment dst src)
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode
-                                          :opcode-prefix opcode-prefix)
+                                          :opcode-prefix opcode-prefix
+                                          :more-fields (and (eq l :from-thing)
+                                                            '((reg nil :type 'xmmreg))))
                 (:emitter
                  (emit-avx2-inst segment src dst ,prefix ,opcode
                                  :opcode-prefix ,opcode-prefix

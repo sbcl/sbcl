@@ -875,6 +875,22 @@ many elements are copied."
         vector)
       #()))
 
+(defun list-reverse-into-vector-cddr (list)
+  (declare (explicit-check))
+  (if list
+      (let* ((list-length (length (the list list)))
+             (length (ceiling list-length 2))
+             (vector (make-array length))
+             (list list))
+        (when (evenp list-length)
+          (pop list))
+        (loop for i from (1- length) downto 0
+              do
+              (setf (aref vector i) (pop list))
+              (pop list))
+        vector)
+      #()))
+
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
   (do ((length (length to))

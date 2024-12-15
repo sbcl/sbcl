@@ -984,3 +984,38 @@
     (sb-kernel:type-intersection  (sb-kernel:specifier-type '(member #1=(m) a))
                                   (sb-kernel:specifier-type '(cons (satisfies eval))))
     (sb-kernel:specifier-type '(and (cons (satisfies eval) t) (member #1#))))))
+
+(with-test (:name :subtype-array-union)
+  (assert (subtypep (opaque-identity '(array t))
+                    (opaque-identity '(or simple-array (array unsigned-byte)))))
+  (assert (subtypep (opaque-identity '(vector character))
+                    (opaque-identity '(or (and string (not simple-array))
+                                       simple-array))))
+  (assert (subtypep (opaque-identity '(vector unknown))
+                    (opaque-identity 'sequence))))
+
+(deftype subtype-equal-type (&rest args) `(or fixnum (member ,@args)))
+
+(with-test (:name :subtypep-equal-member)
+  (multiple-value-bind (answer certain)
+      ;; Verify that the SUBTYPEP fast path is taken
+      (subtypep (opaque-identity '((invalid)))
+                (opaque-identity '((invalid))))
+    (assert (and answer certain)))
+  (multiple-value-bind (answer certain)
+      (subtypep (opaque-identity '(eql (list 1)))
+                (opaque-identity '(eql (list 1))))
+    (assert (and (not answer) certain)))
+  (multiple-value-bind (answer certain)
+      (subtypep (opaque-identity '(subtype-equal-type 1 (list 2) 3))
+                (opaque-identity '(subtype-equal-type 1 (list 2) 3)))
+    (assert (and (not answer) certain)))
+  (assert (not (subtypep (opaque-identity '(function (&key (member t))))
+                         (opaque-identity '(function (&key (eql t))))))))
+
+(with-test (:name :numeric-ranges)
+  (assert (sb-kernel:type=
+           (sb-kernel:type-union (sb-kernel:specifier-type '(or (integer * -1) (integer 11)))
+                                 (sb-kernel:specifier-type 'ratio))
+           (sb-kernel:type-difference (sb-kernel:specifier-type 'rational)
+                                      (sb-kernel:specifier-type '(integer 0 10))))))

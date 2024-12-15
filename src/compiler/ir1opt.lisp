@@ -2009,36 +2009,39 @@
 
 ;;; Turn (or (integer 1 1) (integer 3 3)) to (integer 1 3)
 (defun weaken-numeric-union-type (type)
-  (if (union-type-p type)
-      (let ((low  nil)
-            (high nil)
-            class
-            (format :no))
-        (dolist (part (union-type-types type)
-                      (make-numeric-type :class class
-                                         :format format
-                                         :low low
-                                         :high high))
-          (unless (and (numeric-type-real-p part)
-                       (if class
-                           (eql (numeric-type-class part) class)
-                           (setf class (numeric-type-class part)))
-                       (cond ((eq format :no)
-                              (setf format (numeric-type-format part))
-                              t)
-                             ((eql (numeric-type-format part) format))))
-            (return type))
-          (let ((this-low (numeric-type-low part))
-                (this-high (numeric-type-high part)))
-            (unless (and this-low this-high)
-              (return type))
-            (when (consp this-low)
-              (setf this-low (car this-low)))
-            (when (consp this-high)
-              (setf this-high (car this-high)))
-            (setf low  (sb-xc:min this-low  (or low  this-low))
-                  high (sb-xc:max this-high (or high this-high))))))
-      type))
+  (cond ((union-type-p type)
+         (let ((low  nil)
+               (high nil)
+               class
+               (format :no))
+           (dolist (part (union-type-types type)
+                         (make-numeric-type :class class
+                                            :format format
+                                            :low low
+                                            :high high))
+             (unless (and (numeric-type-real-p part)
+                          (if class
+                              (eql (numeric-type-class part) class)
+                              (setf class (numeric-type-class part)))
+                          (cond ((eq format :no)
+                                 (setf format (numeric-type-format part))
+                                 t)
+                                ((eql (numeric-type-format part) format))))
+               (return type))
+             (let ((this-low (numeric-type-low part))
+                   (this-high (numeric-type-high part)))
+               (unless (and this-low this-high)
+                 (return type))
+               (when (consp this-low)
+                 (setf this-low (car this-low)))
+               (when (consp this-high)
+                 (setf this-high (car this-high)))
+               (setf low  (sb-xc:min this-low  (or low  this-low))
+                     high (sb-xc:max this-high (or high this-high)))))))
+        ((numeric-range-type-p type)
+         (numeric-range-to-numeric-type type))
+        (t
+         type)))
 
 ;;; Iteration variable: only SETQs of the form:
 ;;;
@@ -2211,27 +2214,33 @@
       (let* ((args (combination-args combination))
              (var-args
                (loop for arg in args
-                     for arg-var = (lvar-lambda-var arg)
+                     for arg-var = (lvar-lambda-var (principal-lvar arg))
                      when (eq arg-var var)
                      collect arg)))
         (when var-args
-          (flet ((derive (type)
-                   (single-value-type
-                    (or
-                     (combination-derive-type-for-arg-types combination
-                                                            (loop for arg in args
-                                                                  collect (if (memq arg var-args)
-                                                                              type
-                                                                              arg)))
-                     (return-from set-type-of-combination)))))
-           (let* ((initial-type (simplify-numeric-type initial-type)) ;; remove bounds or the types won't converge
-                  (derived (derive initial-type)))
-             (when derived
-               ;; Does it converge to the same type again?
-               (let* ((union (type-union derived initial-type))
-                      (again-derived (derive union)))
-                 (when (type= derived again-derived)
-                   union))))))))))
+          (labels ((derive (type)
+                     (single-value-type
+                      (or
+                       (combination-derive-type-for-arg-types combination
+                                                              (loop for arg in args
+                                                                    collect (if (memq arg var-args)
+                                                                                type
+                                                                                arg)))
+                       (return-from set-type-of-combination))))
+                   (converges-p (initial-type)
+                     (let ((derived (derive initial-type)))
+                       (when derived
+                         ;; Does it converge to the same type again?
+                         (let* ((union (type-union derived initial-type))
+                                (again-derived (derive union)))
+                           (when (type= derived again-derived)
+                             union))))))
+            ;; Some functions preserve bounds, like LOGIOR
+            (or (converges-p initial-type)
+                ;; remove bounds or the types won't converge
+                (let ((simple (simplify-numeric-type initial-type)))
+                  (unless (eq simple initial-type)
+                    (converges-p simple))))))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set

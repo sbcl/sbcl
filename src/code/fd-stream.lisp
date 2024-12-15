@@ -2585,7 +2585,7 @@
   "Return a stream which reads from or writes to FILENAME.
   Defined keywords:
    :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
-   :ELEMENT-TYPE - the type of object to read or write, default BASE-CHAR
+   :ELEMENT-TYPE - the type of object to read or write, default CHARACTER
    :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME, :RENAME-AND-DELETE,
                        :OVERWRITE, :APPEND, :SUPERSEDE or NIL
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL

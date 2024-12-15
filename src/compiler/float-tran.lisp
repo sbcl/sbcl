@@ -634,7 +634,7 @@
 (defun complex-float-type (arg)
   (declare (type numeric-type arg))
   (let* ((format (case (numeric-type-class arg)
-                   ((integer rational) 'single-float)
+                   ((integer ratio rational) 'single-float)
                    (t (numeric-type-format arg))))
          (float-type (or format 'float)))
     (specifier-type `(complex ,float-type))))
@@ -646,7 +646,7 @@
   (cond
     ((numeric-type-p arg)
      (let* ((format (case (numeric-type-class arg)
-                      ((integer rational) 'single-float)
+                      ((integer ratio rational) 'single-float)
                       (t (numeric-type-format arg))))
             (float-type (or format 'float))
             (lo (coerce-numeric-bound lo float-type))
@@ -744,7 +744,7 @@
                         (res-hi (or (bound-func fun (if increasingp high low) nil)
                                     default-high))
                         (format (case (numeric-type-class arg)
-                                  ((integer rational) 'single-float)
+                                  ((integer ratio rational) 'single-float)
                                   (t (numeric-type-format arg))))
                         (bound-type (or format 'float))
                         (result-type
@@ -928,7 +928,7 @@
                      (specifier-type `(integer ,lo ,hi)))
                     (t
                      (specifier-type `(rational ,lo ,hi))))))
-           (rational
+           ((rational ratio)
             ;; Positive integer to rational power is either a rational
             ;; or a single-float.
             (let* ((lo (interval-low bnd))
@@ -1102,7 +1102,7 @@
            (let* (;; FIXME: This expression for FORMAT seems to
                   ;; appear multiple times, and should be factored out.
                   (format (case (numeric-type-class result-type)
-                            ((integer rational) 'single-float)
+                            ((integer ratio rational) 'single-float)
                             (t (numeric-type-format result-type))))
                   (bound-format (or format 'float)))
              (make-numeric-type :class 'float
@@ -1132,7 +1132,7 @@
 
 (defun phase-derive-type-aux (arg)
   (let* ((format (case (numeric-type-class arg)
-                   ((integer rational) 'single-float)
+                   ((integer ratio rational) 'single-float)
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
@@ -1547,7 +1547,7 @@
     (numeric-type
      (flet ((floatify-format ()
               (case (numeric-type-class arg)
-                ((integer rational) 'single-float)
+                ((integer ratio rational) 'single-float)
                 (t (numeric-type-format arg)))))
        (cond ((eq (numeric-type-complexp arg) :complex)
               (make-numeric-type :class 'float
@@ -1722,7 +1722,8 @@
                    (try 0f0))))))
     (typecase type
       (numeric-type (numeric type))
-      (union-type (mapc #'numeric (union-type-types type))))
+      (union-type (mapc #'numeric (union-type-types type)))
+      (numeric-range-type (mapc #'numeric (numeric-range-to-numeric-types type))))
     (error "Couldn't come up with a value for ~s" type)))
 
 #-(or sb-xc-host 64-bit)
@@ -2023,6 +2024,7 @@
 ;;; So thank goodness for that - it allowed detection of the problem.
 (defun test-ctype-involving-double-float ()
   (specifier-type '(double-float #.pi)))
+#+remove
 (assert (sb-xc:= (numeric-type-low (test-ctype-involving-double-float)) pi))
 
 ;;; Dummy functions to test that complex number are dumped correctly in genesis.

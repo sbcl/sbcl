@@ -405,6 +405,7 @@
                                                       :complexp :real)
                                type)))
                  (rational 'rational)
+                 (ratio 'ratio)
                  (float (or (numeric-type-format type) 'float))
                  ((nil) 'real)))
          (low (numeric-type-low type))
@@ -675,8 +676,8 @@
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
-(defun source-transform-union-typep (object type)
-  (let* ((types (union-type-types type))
+(defun source-transform-union-typep (object types)
+  (let* ((types (sb-kernel::flatten-numeric-range-types types))
          (type-cons (specifier-type 'cons))
          (type-symbol (specifier-type 'symbol))
          (mtype (find-if #'member-type-p types))
@@ -744,7 +745,7 @@
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
              (multiple-value-bind (predicate more-union-types)
-                 (split-union-type-tests type)
+                 (split-union-type-tests types)
                (cond ((and predicate
                            (< (length more-union-types)
                               (length more-types)))
@@ -1350,8 +1351,10 @@
             (source-transform-hairy-typep object ctype))
            (negation-type
             (source-transform-negation-typep object ctype))
+           (numeric-range-type
+            (source-transform-union-typep object (numeric-range-to-numeric-types ctype)))
            (union-type
-            (source-transform-union-typep object ctype))
+            (source-transform-union-typep object (union-type-types ctype)))
            (intersection-type
             (source-transform-intersection-typep object ctype))
            (member-type
@@ -1693,16 +1696,23 @@
                (if ,already-type-p
                    x
                    ,(cond ((eq dimension '*)
-                           #+ubsan
-                           ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
-                           ;; but redundantly checks the length of the input in MAKE-ARRAY's
-                           ;; transform because we don't or can't infer that LENGTH gives the
-                           ;; same answer each time it is called on X. There may be a way to
-                           ;; extract more efficiency - at least eliminate the unreachable
-                           ;; error-signaling code on mismatch - but I don't care to try.
-                           `(make-array (length x) ,@specialization :initial-contents x)
-                           #-ubsan ; better: do not generate a redundant LENGTH check
-                           `(replace (make-array (length x) ,@specialization) x))
+                           (cond ((and (lvar-matches x :fun-names '(reverse sb-impl::list-reverse
+                                                                    sb-impl::vector-reverse))
+                                       (almost-immediately-used-p x (lvar-use x) :flushable t))
+                                  (splice-fun-args x :any 1)
+                                  ;; The make-array transform can handle this
+                                  `(make-array (length x) ,@specialization :initial-contents (reverse x)))
+                                 (t
+                                  #+ubsan
+                                  ;; Passing :INITIAL-CONTENTS avoids allocating ubsan shadow bits,
+                                  ;; but redundantly checks the length of the input in MAKE-ARRAY's
+                                  ;; transform because we don't or can't infer that LENGTH gives the
+                                  ;; same answer each time it is called on X. There may be a way to
+                                  ;; extract more efficiency - at least eliminate the unreachable
+                                  ;; error-signaling code on mismatch - but I don't care to try.
+                                  `(make-array (length x) ,@specialization :initial-contents x)
+                                  #-ubsan ; better: do not generate a redundant LENGTH check
+                                  `(replace (make-array (length x) ,@specialization) x))))
                           ((policy node (= safety 0)) ; Disregard the input length
                            `(replace (make-array ,dimension ,@specialization) x))
                           (t

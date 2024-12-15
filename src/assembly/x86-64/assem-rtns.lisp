@@ -508,7 +508,8 @@
   ;;     RBX spill <- sp now
   ;;     RCX spill
   ;; Filter out non-permgen objects. RAX is the object
-  (inst mov rbx-tn (rip-relative-ea (make-fixup "permgen_bounds" :foreign-dataref)))
+  ;; (inst mov rbx-tn (rip-relative-ea (make-fixup "permgen_bounds" :foreign-dataref)))
+  (inst mov rbx-tn (ea (make-fixup "permgen_bounds" :foreign-dataref)))
   (inst cmp rax-tn (ea rbx-tn))
   (inst jmp :b SET-BIT-AND-DONE)
   (inst cmp rax-tn (ea 8 rbx-tn))

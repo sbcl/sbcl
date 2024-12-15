@@ -236,7 +236,7 @@
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))
-      (cond ((typep size `(integer ,large-object-size))
+      (cond ((and (integerp size) (>= size (target-heap-large-object-size)))
              ;; large objects will never be made in a per-thread region
              (cond (overflow (funcall overflow))
                    (t (fallback size)
@@ -408,7 +408,7 @@
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size n-word-bytes))
-             (zeroed #+mark-region-gc t)
+             (zeroed (target-heap-prezeroed-p))
              (prev-constant temp)) ;; a non-eq initial value
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
@@ -432,7 +432,7 @@
   (:policy :fast-safe)
   (:generator 10
     (let ((nbytes (* cons-size 2 n-word-bytes))
-          (zeroed #+mark-region-gc t)
+          (zeroed (target-heap-prezeroed-p))
           (prev-constant temp))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
@@ -477,7 +477,7 @@
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
        (let ((nbytes (* cons-size 2 n-word-bytes))
-             (zeroed #+mark-region-gc t)
+             (zeroed (target-heap-prezeroed-p))
              (prev-constant temp))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
@@ -503,7 +503,7 @@
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
     (let* ((stack-allocate-p (node-stack-allocate-p node))
            (size (* (pad-data-block cons-size) cons-cells))
-           (zeroed #+mark-region-gc (not stack-allocate-p))
+           (zeroed (and (not stack-allocate-p) (target-heap-prezeroed-p)))
            (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))

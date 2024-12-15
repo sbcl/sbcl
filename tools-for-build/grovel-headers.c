@@ -326,6 +326,10 @@ main(int argc, char __attribute__((unused)) *argv[])
     defsignal("sigxfsz", SIGXFSZ);
 #endif
 
+    defconstant("itimer-real", ITIMER_REAL);
+    defconstant("itimer-virtual", ITIMER_VIRTUAL);
+    defconstant("itimer-prof", ITIMER_PROF);
+
    /* Floating point exception codes. Some of these
     * are missing on Darwin. */
 #ifdef FPE_INTOVF

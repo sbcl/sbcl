@@ -759,7 +759,7 @@ process_directory(int count, struct ndir_entry *entry,
             || !PTR_IS_ALIGNED(&lisp_code_end, 4096))
             lose("ELF core alignment bug. Check for proper padding in 'editcore'");
 #ifdef DEBUG_COREPARSE
-        printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
+        fprintf(stderr, "Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
                (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                text_space_highwatermark);
 #endif
@@ -917,7 +917,7 @@ process_directory(int count, struct ndir_entry *entry,
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
         }
 #ifdef DEBUG_COREPARSE
-        printf("space %d @ %10lx pg=%4d+%4d nwords=%9ld checksum=%lx\n",
+        fprintf(stderr, " space %d @ %12lx pg=%4d+%4d nwords=%9ld checksum=%lx\n",
                (int)id, addr, (int)entry->data_page, (int)entry->page_count,
                entry->nwords, corespace_checksum((void*)addr, entry->nwords));
 #endif
@@ -1403,14 +1403,41 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
       init_coreparse_spaces(sizeof defined_spaces/sizeof (struct coreparse_space),
                             defined_spaces);
 
+#ifdef DEBUG_COREPARSE
+    fprintf(stderr, "core header:\n");
+#endif
     for ( ; ; ptr += remaining_len) {
         val = *ptr++;
         len = *ptr++;
+#ifdef DEBUG_COREPARSE
+        fprintf(stderr, "@ +%02x: type_code %d=#x%x len %d:",
+                (int)((char*)(ptr - 2) - (char*)header),
+                (int)val, (int)val, (int)len);
+        for (core_entry_elt_t* p = ptr; p < (ptr-2)+len; ++p)
+            fprintf(stderr, " %"OBJ_FMTX, *p);
+        putc('\n', stderr);
+#endif
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
         switch (val) {
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
-            // The first 2 data words are the GC selection and address of NIL,
-            // which are mainly of interest to 'editcore'. Here they are ignored.
+            /* The first 2 data words are the GC strategy identifier and address of NIL.
+             * The latter is mainly of interest to 'editcore' since NIL is #defined
+             * in static-symbols.h (or else is relocatable).
+             * We may want to support one of several enhancements (in increasing
+             * order of difficulty):
+             *  - building all GC strategies into the runtime. This should merely be a matter
+             *    of renaming C functions to avoid conflict, and providing an indirect table
+             *    for various routines: allocator fallback, GC main entry point, etc.
+             *    Thusly may a single runtime support any core.
+             *  - reading a core for a different GC strategy by "importing" the on-disk
+             *    heap as a batch of new allocation requests and pointer fixups.
+             *    This will presumably induce measurable startup delay, even worse than
+             *    relocation.
+             *  - actually using the strategy as chosen at runtime, for any on-disk format
+             *    core without reallocating */
+            if (ptr[0] != GC_STRATEGY_ID)
+                lose("GC strategy mismatch: runtime uses %d, core built for %d",
+                     GC_STRATEGY_ID, (int)ptr[0]);
             stringlen = ptr[2];
             ptr += 3; remaining_len -= 3;
             gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);

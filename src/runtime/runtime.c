@@ -805,3 +805,5 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     create_main_lisp_thread(initial_function);
     return 0;
 }
+
+int lisp_gc_strategy_id() { return GC_STRATEGY_ID; }

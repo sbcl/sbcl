@@ -7,7 +7,8 @@ fi
 
 cd ansi-test
 rm -fr sandbox/scratch
-../../run-sbcl.sh --lose-on-corruption --disable-ldb \
+../../run-sbcl.sh --disable-ldb --lose-on-corruption \
+                  --no-userinit --no-sysinit \
                   --load gclload1.lsp --load gclload2.lsp \
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
                   --eval '(in-package :cl-test)' \
@@ -39,7 +40,6 @@ rm -fr sandbox/scratch
  "PRINT.BACKQUOTE.RANDOM.2" "PRINT.BACKQUOTE.RANDOM.3"
  "PRINT.BACKQUOTE.RANDOM.4" "PRINT.BACKQUOTE.RANDOM.5" "PROCLAIM.ERROR.7"
  "SHIFTF.7"
- "SUBTYPEP-COMPLEX.8"
  "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
  "UNION.FOLD.1"
  (append #+win32 (list "PROBE-FILE.4")

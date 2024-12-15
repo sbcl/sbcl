@@ -592,7 +592,8 @@
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t))
 
-(defknown list-reverse-into-vector (proper-list) simple-vector
+(defknown (list-reverse-into-vector list-reverse-into-vector-cddr)
+    (proper-list) simple-vector
   (flushable no-verify-arg-count))
 
 (defknown make-sequence (type-specifier index

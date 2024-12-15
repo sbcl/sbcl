@@ -4563,4 +4563,11 @@
           (go :next)
         :end)
        f))
-   single-float))
+   single-float)
+  (assert-type
+   (lambda (l)
+     (let ((r 0))
+       (dolist (x l)
+         (setq r (logior r (truly-the (signed-byte 32) l))))
+       r))
+   (signed-byte 32)))

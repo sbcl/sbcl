@@ -68,7 +68,7 @@
            "background read attempted from control terminal." t)
  (:integer SIGTTOU "SIGTTOU"
            "background write attempted to control terminal." t)
- (:integer SIGIO "SIGIO"
+ #-haiku (:integer SIGIO "SIGIO"
            "I/O is possible on a descriptor (see fcntl(2))." t)
  (:integer SIGXCPU "SIGXCPU"
            "cpu time limit exceeded (see setrlimit(2))." t)
@@ -274,6 +274,7 @@
               #-(and linux largefile) "struct dirent"
               #-(or win32 android) (:ino-t ino "ino_t" "d_ino")
               #+android ((unsigned 64) ino "unsigned long long" "d_ino")
+              #-haiku
               (:c-string name "char *" "d_name"
                          ;; FIXME: sunos should really have :distrust-length
                          ;; t, but this is currently broken. -- Jim Wise 2010-08-31

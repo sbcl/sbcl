@@ -226,6 +226,13 @@
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)
+  ;; Which GC the code generator should target. The codegen is basically the same for now
+  ;; (with tiny alterations) but it may be quite different eventually. And it would be
+  ;; great if COMPILE-FILE can be flexibile. If you have a compiler driver image that
+  ;; itself uses a particular GC, it should work to write FASLs for either GC as long as
+  ;; you don't load incompatible artifacts into the current image. Think of it as a
+  ;; compiler that just happens to be written in nearly-the-same implementation.
+  (allocator-target (default-gc-strategy) :type (member :gencgc :mark-region-gc))
   ;; if emitting a cfasl, the fasl stream to that
   (compile-toplevel-object nil :read-only t)
   ;; The current block compilation state.  These are initialized to

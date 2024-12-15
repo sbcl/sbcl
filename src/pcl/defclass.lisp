@@ -295,6 +295,11 @@
                                 ~S in DEFCLASS ~S."
                                key name class-name))
              (push val (getf others key)))
+            ;; While any option can be passed to slot definitions, MOP
+            ;; says :INITARGs are passed as a list to :INITARGS for
+            ;; slot-definitions, so this will be just shadowed.
+            (:initargs
+             (warn "~s can't be used as a slot option" key))
             (otherwise
              ;; For non-standard options multiple entries go in a list
              (push val (getf others key))))))

@@ -565,6 +565,19 @@
              (and (sb-c::combination-p node)
                   (eq (sb-c::combination-info node) :aligned-stack))))))
 
+(defun target-heap-prezeroed-p ()
+  (eq (sb-c::allocator-target *compilation*) :mark-region-gc))
+
+(defun target-heap-large-object-size ()
+  (ecase (sb-c::allocator-target *compilation*)
+    ;; Needless to say this violates the OAOO principle as the definition
+    ;; of the "constant" for this appears in late-objdef in addition to which
+    ;; it's a crummy assumption that page-size is the same for each GC.
+    ;; For I'm just trying to solve the minimal number of issues in terms
+    ;; of having the ability to target a fasl to a different GC.
+    (:gencgc (* 4 gencgc-page-bytes))
+    (:mark-region-gc (* 3/4 gencgc-page-bytes))))
+
 ;;; Print registers from VOPs
 (defmacro mprint (value)
   `(let ((*location-context* ',value))

@@ -63,6 +63,8 @@
                           (type-union rest
                                       (specifier-type
                                        `(integer ,(or low '*) ,(or high '*)))))))
+                   ((numeric-range-type-p type)
+                    (numeric-range-to-numeric-type type))
                    (t
                     type))))
     (weaken-integer-type-part type 'integer)))

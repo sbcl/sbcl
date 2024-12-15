@@ -162,6 +162,7 @@
             ;; non-writable parent dir may return EACCES instead of ENOTDIR
             #+unix (member err `(,sb-posix:enotdir ,sb-posix:eacces)))))
 
+#-haiku
 (deftest rmdir.error.3
   (handler-case
       (sb-posix:rmdir #-win32 "/" #+win32 (sb-ext:posix-getenv "windir"))
@@ -171,7 +172,7 @@
        `(member #+(or darwin openbsd freebsd) ,sb-posix:eisdir
                 #+win32 ,sb-posix::eacces #+win32 ,sb-posix::enotempty
                 #+sunos ,sb-posix::einval
-                #-(or darwin openbsd freebsd win32 sunos) ,sb-posix::ebusy))))
+                #-(or darwin openbsd freebsd win32 sunos haiku) ,sb-posix::ebusy))))
   t)
 
 (deftest rmdir.error.4
@@ -223,7 +224,7 @@
     (logand mode (logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec)))
   #.(logior sb-posix::s-iread sb-posix::s-iwrite sb-posix::s-iexec))
 
-#-(or (and darwin x86) win32)
+#-(or (and darwin x86) win32 haiku)
 (deftest stat.2
   (eql
    (sb-posix::stat-mode (sb-posix:stat "/"))
@@ -419,7 +420,7 @@
                sb-posix::o-nonblock))
   t)
 
-#-(or gc-stress win32 netbsd) ; fix: cant handle c-vargs
+#-(or gc-stress win32 netbsd haiku) ; fix: cant handle c-vargs
 (deftest fcntl.flock.1
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
@@ -511,7 +512,7 @@
         (sb-posix:closedir dir))))
   nil)
 
-#-(and darwin x86)
+#-(or (and darwin x86) haiku)
 (deftest readdir.1
   (let ((dir (sb-posix:opendir "/")))
     (unwind-protect
@@ -524,7 +525,7 @@
       (sb-posix:closedir dir)))
   t)
 
-#-darwin
+#-(or darwin haiku)
 (test-util:with-test (:name :readdir/dirent-name)
   (let* ((dir (sb-posix:opendir *current-directory*))
          (posix-readdir (loop for entry = (sb-posix:readdir dir)
@@ -566,7 +567,7 @@
   (not (sb-posix:getpwuid 0))
   nil)
 
-#-(or android win32)
+#-(or android win32 haiku)
 (deftest pwent.2
   ;; make sure that we found something
   (not (sb-posix:getpwnam "root"))
@@ -712,7 +713,7 @@
     (plusp (sb-posix:time))
   t)
 
-#-(or (and darwin x86) win32)
+#-(or (and darwin x86) win32 haiku)
 (macrolet ((test (name posix-fun)
              `(deftest ,name
                 (let ((file (merge-pathnames #p"utimes.1" *test-directory*))
@@ -760,7 +761,7 @@
     #.(concatenate 'string "/" (make-string 255 :initial-element #\a)))
 
   ;; The error tests are in the order of exposition from SUSv3.
-  #-freebsd
+  #-(or freebsd haiku)
   (deftest readlink.error.1
     (if (zerop (sb-posix:getuid))
         sb-posix:eacces
@@ -782,6 +783,7 @@
              (sb-posix:unlink link-pathname)
              (sb-posix:rmdir subdir-pathname)))))
     #.sb-posix:eacces)
+  #-haiku
   (deftest readlink.error.2
       (let* ((non-link-pathname (make-pathname :name "readlink.error.2"
                                                :defaults *test-directory*))
@@ -812,6 +814,7 @@
     #.sb-posix:eloop)
   ;; Note: PATH_MAX and NAME_MAX need not be defined, and may vary, so
   ;; failure of this test is not too meaningful.
+  #-haiku
   (deftest readlink.error.4
       (let ((pathname
              (make-pathname :name (make-string 257 ;NAME_MAX plus some, maybe

@@ -14,10 +14,14 @@ ARCH_SRC = x86-64-arch.c
 OS_SRC = haiku-os.c x86-64-haiku-os.c
 
 LINKFLAGS += -Wl,--export-dynamic
-OS_LIBS += -lbe -lnetwork
+OS_LIBS += -lbe -lnetwork -lbsd
 
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
+endif
+
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lzstd
 endif
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer -gdwarf-2

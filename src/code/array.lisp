@@ -314,6 +314,19 @@
                     (result simple-array-complex-single-float-widetag))
                    (t
                     (result simple-vector-widetag)))))
+          (numeric-range-type
+           (ecase (numeric-range-type-types ctype)
+             (#.numeric-range-double-float
+              (result simple-array-double-float-widetag))
+             (#.numeric-range-single-float
+              (result simple-array-single-float-widetag))
+             (#.numeric-range-integer
+              (let* ((ranges (numeric-range-type-ranges ctype))
+                     (low (aref ranges 0))
+                     (high (aref ranges (1- (length ranges)))))
+                (if (and (integerp low) (integerp high))
+                    (integer-interval-widetag low high)
+                    (result simple-vector-widetag))))))
           (intersection-type
            (let ((types (intersection-type-types ctype)))
              (loop for type in types

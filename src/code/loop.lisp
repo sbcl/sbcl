@@ -1442,28 +1442,36 @@ code to be loaded.
                               `(,first-endtest ,step () ,pseudo)))))))))))
 
 (defun loop-for-in (var val data-type)
-  (if (and (typep val '(cons (eql reverse) (cons t null)))
-           (not (sb-c::fun-lexically-notinline-p 'reverse
-                                                 (macro-environment *loop*))))
-      (loop-for-across var `(list-reverse-into-vector ,(second val)) data-type)
-      (multiple-value-bind (list constantp list-value)
-          (loop-constant-fold-if-possible val)
-        (let ((listvar (gensym "L")))
-          (loop-make-var var nil data-type)
-          (loop-make-var listvar
-                         ;; Don't want to assert the type, as ENDP will do that
-                         `(the* (list :use-annotations t :source-form ,list) ,list)
-                         t)
-          (let ((list-step (loop-list-step listvar)))
-            (let* ((first-endtest `(endp ,listvar))
-                   (other-endtest first-endtest)
-                   (step `(,var (car ,listvar)))
-                   (pseudo-step `(,listvar ,list-step)))
-              (when (and constantp (listp list-value))
-                (setq first-endtest (null list-value)))
-              `(,other-endtest ,step () ,pseudo-step
-                               ,@(and (neq first-endtest other-endtest)
-                                      `(,first-endtest ,step () ,pseudo-step)))))))))
+  (cond ((and (typep val '(cons (eql reverse) (cons t null)))
+              (not (sb-c::fun-lexically-notinline-p 'reverse
+                                                    (macro-environment *loop*)))
+              (let ((stepper (and (loop-tequal (car (source-code *loop*)) :by)
+                                  (source-code *loop*))))
+                (cond ((member (cadr stepper) '(#'cddr 'cddr) :test #'equal)
+                       (loop-pop-source)
+                       (loop-pop-source)
+                       (loop-for-across var `(list-reverse-into-vector-cddr ,(second val)) data-type))
+                      ((not stepper)
+                       (loop-for-across var `(list-reverse-into-vector ,(second val)) data-type))))))
+        (t
+         (multiple-value-bind (list constantp list-value)
+             (loop-constant-fold-if-possible val)
+           (let ((listvar (gensym "L")))
+             (loop-make-var var nil data-type)
+             (loop-make-var listvar
+                            ;; Don't want to assert the type, as ENDP will do that
+                            `(the* (list :use-annotations t :source-form ,list) ,list)
+                            t)
+             (let ((list-step (loop-list-step listvar)))
+               (let* ((first-endtest `(endp ,listvar))
+                      (other-endtest first-endtest)
+                      (step `(,var (car ,listvar)))
+                      (pseudo-step `(,listvar ,list-step)))
+                 (when (and constantp (listp list-value))
+                   (setq first-endtest (null list-value)))
+                 `(,other-endtest ,step () ,pseudo-step
+                                  ,@(and (neq first-endtest other-endtest)
+                                         `(,first-endtest ,step () ,pseudo-step))))))))))
 
 ;;;; iteration paths
 

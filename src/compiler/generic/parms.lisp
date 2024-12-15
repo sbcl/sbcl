@@ -89,7 +89,7 @@
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+))
                            (static ,small-space-size)
-                           (permgen 8388608) ; 8MiB
+                           (permgen 33554432) ; 32MiB
                            #+darwin-jit
                            (static-code ,small-space-size))
                          #+immobile-space

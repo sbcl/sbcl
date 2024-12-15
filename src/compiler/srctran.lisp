@@ -1470,7 +1470,9 @@
              (numeric-type
               (list arg))
              (union-type
-              (union-type-types arg))
+              (sb-kernel::flatten-numeric-range-types (union-type-types arg)))
+             (numeric-range-type
+              (numeric-range-to-numeric-types arg))
              (list
               arg)
              (t
@@ -2028,7 +2030,7 @@
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational) 'single-float)
+                          ((integer rational ratio) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2167,8 +2169,8 @@
                    (numeric-type-real-p div)))
          nil)
         ;; Floats introduce rounding errors
-        ((and (memq (numeric-type-class num) '(integer rational))
-              (memq (numeric-type-class div) '(integer rational)))
+        ((and (memq (numeric-type-class num) '(integer rational ratio))
+              (memq (numeric-type-class div) '(integer rational ratio)))
          (truncate-derive-type-rem num div))
         (t
          (numeric-contagion num div))))
@@ -2350,8 +2352,8 @@
                                        (numeric-type-real-p div)))
                              nil)
                             ;; Floats introduce rounding errors
-                            ((and (memq (numeric-type-class num) '(integer rational))
-                                  (memq (numeric-type-class div) '(integer rational)))
+                            ((and (memq (numeric-type-class num) '(integer rational ratio))
+                                  (memq (numeric-type-class div) '(integer rational ratio)))
                              (,r-aux num div))
                             (t
                              (numeric-contagion num div)))))
@@ -2928,7 +2930,7 @@
          (specifier-type '(or (eql 1) (eql -1))))
         ((eq (numeric-type-complexp type) :complex)
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational) 'single-float)
+                          ((integer rational ratio) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2942,6 +2944,9 @@
                 (contains-0-p (interval-contains-p 0 interval))
                 (class (numeric-type-class type))
                 (format (numeric-type-format type))
+                (class (if (eq class 'ratio)
+                            'rational
+                            class))
                 (one (coerce 1 (or format class 'real)))
                 (zero (coerce 0 (or format class 'real)))
                 (minus-one (coerce -1 (or format class 'real)))
@@ -3413,6 +3418,10 @@
     ;; KLUDGE: this is not INTEGER-type-numeric-bounds
     (numeric-type (values (numeric-type-low type)
                           (numeric-type-high type)))
+    (numeric-range-type
+     (if (eql (numeric-range-type-types type) numeric-range-integer)
+         (sb-kernel::numeric-range-bounds type)
+         (values nil nil)))
     (union-type
      (let ((low  nil)
            (high nil))
@@ -4800,10 +4809,18 @@
                               (eq (car ,y) ',(car value))
                               (null (cdr ,y))))))))
            ;; (equal x (list y))
+           ;; (equal x (cons car cdr))
            (unroll-list (lvar x y)
-             (when (splice-fun-args lvar 'list 1 nil)
-               `(and (typep ,y '(cons t null))
-                     (equal (car ,y) ,x)))))
+             (cond ((splice-fun-args lvar 'list 1 nil)
+                    `(and (typep ,y '(cons t null))
+                          (equal (car ,y) ,x)))
+                   ((splice-fun-args lvar 'list* 2 nil)
+                    `(lambda ,(if (eq x 'x)
+                                  `(car cdr x)
+                                  `(x car cdr))
+                       (and (consp x)
+                            (equal (car x) car)
+                            (equal (cdr x) cdr)))))))
       (cond ((same-leaf-ref-p x y) t)
             ((array-type-dimensions-mismatch x-type y-type)
              nil)
@@ -4902,10 +4919,18 @@
                                    always (symbolp (pop cdr))))
                         `(equal x y))))))
            ;; (equalp x (list y))
+           ;; (equalp x (cons car cdr))
            (unroll-list (lvar x y)
-             (when (splice-fun-args lvar 'list 1 nil)
-               `(and (typep ,y '(cons t null))
-                     (equalp (car ,y) ,x)))))
+             (cond ((splice-fun-args lvar 'list 1 nil)
+                    `(and (typep ,y '(cons t null))
+                          (equalp (car ,y) ,x)))
+                   ((splice-fun-args lvar 'list* 2 nil)
+                    `(lambda ,(if (eq x 'x)
+                                  `(car cdr x)
+                                  `(x car cdr))
+                       (and (consp x)
+                            (equalp (car x) car)
+                            (equalp (cdr x) cdr)))))))
       (cond ((same-leaf-ref-p x y) t)
             ((array-type-dimensions-mismatch x-type y-type)
              nil)

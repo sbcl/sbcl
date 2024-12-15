@@ -85,7 +85,7 @@
                  :type `(array char ,len)
                  :offset offset
                  :size len
-                 :name (intern (format nil "PADDING-~D-~D" len offset))))
+                 :name (sb-int:symbolicate "PADDING-" len "-" offset)))
 (defun mk-struct (offset &rest children)
   (make-instance 'struct :name (gentemp "STRUCT")
                  :children (remove nil children)
@@ -284,12 +284,8 @@ deeply nested structures."
 
 (defmethod accessors-for (struct-name (root value-slot) path)
   (let* ((rpath (reverse path))
-         (accessor-name (intern
-                         (format nil "~A-~A"
-                                 (symbol-name struct-name)
-                                 (symbol-name (name root)))))
-         (offset-constant-name (intern
-                                (format nil "OFFSET-OF-~A" accessor-name)))
+         (accessor-name (sb-int:symbolicate struct-name "-" (name root)))
+         (offset-constant-name (sb-int:symbolicate "OFFSET-OF-" accessor-name))
          (var '#:val)
          (place (apply #'sane-slot 'struct
                        (mapcar 'name (append (rest rpath) (list root)))))
