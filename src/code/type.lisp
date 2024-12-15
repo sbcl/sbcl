@@ -3064,8 +3064,98 @@ expansion happened."
             (t
              nil)))))
 
-;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
+;;; Either make a disjoint cut or join left-low to a closed right-low bound
+(defun cut-low-bound (left-low left-high right-low integerp)
+  (when (and right-low
+             (not (eql right-low single-float-negative-infinity))
+             (or left-low left-high))
+    (let (new-left-high
+          new-right-low)
+      (flet ((round-down (x)
+               (let ((cx (if (consp x) (car x) x)))
+                 (if (and (consp x) (integerp cx))
+                     (if integerp
+                         (1- (setf new-right-low cx))
+                         (list cx))
+                     (if integerp
+                         (1- (ceiling cx))
+                         (list cx))))))
+        (cond
+          ((and left-low
+                (not (eql left-low single-float-negative-infinity))
+                (let ((open-right-low (if (consp right-low)
+                                          (car right-low)
+                                          right-low)))
+                  (if (and integerp
+                           (sb-xc:= left-low open-right-low))
+                      (setf new-right-low open-right-low)
+                      (sb-xc:>= (if (consp left-low)
+                                    (car left-low)
+                                    left-low)
+                                open-right-low)))))
+          ((consp left-high)
+           (if (consp right-low)
+               (when (> (car left-high)
+                        (car right-low))
+                 (setf new-left-high right-low))
+               (when (> (car left-high)
+                        right-low)
+                 (setf new-left-high (setf new-right-low (list right-low))))))
+          ((sb-xc:>= (or left-high
+                         single-float-positive-infinity)
+                     (if (consp right-low)
+                         (car right-low)
+                         right-low))
+           (setf new-left-high (round-down right-low))))
+        (values new-left-high (unless (eql new-right-low right-low)
+                                new-right-low))))))
 
+(defun cut-high-bound (left-high right-low right-high integerp)
+  (when (and left-high
+             (not (eql left-high single-float-positive-infinity))
+             (or right-low right-high))
+    (let (new-left-high
+          new-right-low)
+      (flet ((round-up (x)
+               (let ((cx (if (consp x) (car x) x)))
+                 (if (and (consp x) (integerp cx))
+                     (if integerp
+                         (1+ (setf new-left-high cx))
+                         (list cx))
+                     (if integerp
+                         (1+ (floor cx))
+                         (list cx))))))
+        (cond
+          ((and right-high
+                (not (eql right-high single-float-positive-infinity))
+                (let ((open-left-high (if (consp left-high)
+                                          (car left-high)
+                                          left-high)))
+                  (if (and integerp
+                           (sb-xc:= right-high open-left-high))
+                      (setf new-left-high open-left-high)
+                      (sb-xc:<= (if (consp right-high)
+                                    (car right-high)
+                                    right-high)
+                                open-left-high)))))
+          ((consp right-low)
+           (if (consp left-high)
+               (when (sb-xc:< (car right-low)
+                              (car left-high))
+                 (setf new-right-low left-high))
+               (when (sb-xc:< (car right-low)
+                              left-high)
+                 (setf new-right-low (setf new-left-high (list left-high))))))
+          ((sb-xc:<= (or right-low
+                         single-float-negative-infinity)
+                     (if (consp left-high)
+                         (car left-high)
+                         left-high))
+           (setf new-right-low (round-up left-high))))
+        (values new-left-high (unless (eql new-right-low right-low)
+                                new-right-low))))))
+
+;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 (defun rational-integer-union (rational integer)
   (let ((formatr (numeric-type-format rational))
         (formati (numeric-type-format integer))
@@ -3077,77 +3167,36 @@ expansion happened."
         (highr (numeric-type-high rational))
         (class (numeric-type-class integer)))
     (when (and (eq formatr formati) (eq complexpr complexpi))
-      (cond
-        ;; handle the special-case that a single integer expands the
-        ;; rational interval.
-        ((and (integerp lowi) (integerp highi) (= lowi highi)
-              (or (numeric-types-adjacent integer rational)
-                  (numeric-types-adjacent rational integer)))
-         (make-numeric-type
-          :class 'rational :format formatr :complexp complexpr
-          :low (numeric-bound-max lowr lowi <= < t)
-          :high (numeric-bound-max highr highi >= > t)))
-        ;; the general case:
-        ;;
-        ;; 1. expand the integer type by those integers contained by
-        ;; the rational type, if possible.
-        ;;
-        ;; 2. turn open bounds in the rational contained in the
-        ;; integer type into closed ones.
-        ;;
-        ;; (if neither of these applies, return NIL)
-        (t
-         (let* ((integers-of-rational
-                  (make-numeric-type
-                   :class class :format formatr :complexp complexpr
-                   :low (round-numeric-bound lowr class formatr t)
-                   :high (round-numeric-bound highr class formatr nil)))
-                (new-integer
-                 (and (numeric-type-p integers-of-rational)
-                      (or (numeric-types-intersect integers-of-rational integer)
-                          (numeric-types-adjacent integers-of-rational integer)
-                          (numeric-types-adjacent integer integers-of-rational))
-                     (let ((new-lowi (numeric-bound-max
-                                     lowi
-                                     (numeric-type-low integers-of-rational)
-                                     <= < t))
-                           (new-highi (numeric-bound-max
-                                      highi
-                                      (numeric-type-high integers-of-rational)
-                                      >= > t)))
-                       (and (or (not (eql new-lowi lowi))
-                                (not (eql new-highi highi)))
-                            (make-numeric-type
-                             :class class :format formatr :complexp complexpr
-                             :low new-lowi :high new-highi)))))
-                (new-lowr
-                 (and (consp lowr)
-                      (integerp (car lowr))
-                      (let ((low-integer
-                             (make-numeric-type
-                              :class class :format formati :complexp complexpi
-                              :low (car lowr) :high (car lowr))))
-                        (and (numeric-type-p low-integer)
-                             (numeric-types-intersect integer low-integer)
-                             (numeric-type-low low-integer)))))
-                (new-highr
-                 (and (consp highr) (integerp (car highr))
-                      (let ((high-integer
-                             (make-numeric-type
-                              :class 'integer :format formati :complexp complexpi
-                              :low (car highr) :high (car highr))))
-                        (and (numeric-type-p high-integer)
-                             (numeric-types-intersect integer high-integer)
-                             (numeric-type-high high-integer)))))
-                (new-rational
-                 (and (or new-lowr new-highr)
-                      (make-numeric-type
-                       :class 'rational :format formatr :complexp complexpr
-                       :low (or new-lowr lowr) :high (or new-highr highr)))))
-           (cond
-             ((or new-integer new-rational)
-              (make-union-type nil (list (or new-integer integer) (or new-rational rational))))
-             (t nil))))))))
+      ;; partition the types into disjoint parts
+      (multiple-value-bind (left-high new-middle-low)
+          (cut-low-bound lowi highi lowr (eq class 'integer))
+        (multiple-value-bind  (new-middle-high right-low)
+            (cut-high-bound highr lowi highi (eq class 'integer))
+          (let* ((left-integer
+                   (and left-high
+                        (make-numeric-type
+                         :class class :format formatr :complexp complexpr
+                         :low lowi
+                         :high left-high)))
+                 (right-integer
+                   (and right-low
+                        (make-numeric-type
+                         :class class :format formatr :complexp complexpr
+                         :low right-low
+                         :high highi)))
+                 (new-rational
+                   (if (or new-middle-low new-middle-high)
+                       (make-numeric-type
+                        :class 'rational :format formatr :complexp complexpr
+                        :low (or new-middle-low lowr)
+                        :high (or new-middle-high highr)))))
+            (cond ((and left-integer right-integer)
+                   (make-union-type nil (list left-integer (or new-rational rational) right-integer)))
+                  (left-integer
+                   (make-union-type nil (list left-integer (or new-rational rational))))
+                  (right-integer
+                   (make-union-type nil (list (or new-rational rational) right-integer)))
+                  (new-rational))))))))
 
 (defun ratio-integer-union (ratio integer)
   (let ((formatr (numeric-type-format ratio))
@@ -3595,20 +3644,22 @@ expansion happened."
                            (sb-xc:<= a b)))))
              (store1 (low high)
                (let ((last1 (car result1))
-                     (last2 (car result2)))
-                 (when (and (consp low)
-                            last2
-                            (cmp2<= low last2))
-                   (setf low (car low)))
-                 (when (and last2
-                            (cmp2<= low last2))
-                   (setf last2 high)
-                   (unless (or (integerp last2)
-                               (eql last2 single-float-positive-infinity))
-                     (setf last2 (if (consp last2)
-                                     (ceiling (1- (car last2)))
-                                     (floor last2))))
-                   (setf (car result2) last2))
+                     (highi (car result2)))
+                 (when highi
+                   (let ((lowi (cadr result2)))
+                     (multiple-value-bind (left-high new-middle-low)
+                         (cut-low-bound lowi highi low integerp)
+                       (multiple-value-bind  (new-middle-high right-low)
+                           (cut-high-bound high lowi highi integerp)
+                         (when left-high
+                           (setf (car result2) left-high))
+                         (when right-low
+                           (push right-low result2)
+                           (push highi result2))
+                         (when new-middle-low
+                           (setf low new-middle-low))
+                         (when new-middle-high
+                           (setf high new-middle-high))))))
                  (cond ((and last1
                              (numeric-bound-test last1 high > >=)))
                        ((and last1
@@ -3617,32 +3668,31 @@ expansion happened."
                        (t
                         (push low result1)
                         (push high result1)))))
-             (store2 (low high)
-               (let ((last1 (car result1))
+             (store2 (lowi highi)
+               (let ((highr (car result1))
                      (last2 (car result2)))
+                 (when highr
+                   (let ((lowr (cadr result1)))
+                     (multiple-value-bind (left-high new-middle-low)
+                         (cut-low-bound lowi highi lowr integerp)
+                       (multiple-value-bind  (new-middle-high right-low)
+                           (cut-high-bound highr lowi highi integerp)
+                         (aver (not left-high))
+                         (when right-low
+                           (setf lowi right-low))
+                         (aver (not new-middle-low))
+                         (when new-middle-high
+                           (setf (car result1) new-middle-high))))))
                  (cond ((and last2
-                             (numeric-bound-test last2 high > >=)))
-                       ((and last1
-                             (numeric-bound-test last1 high > >=)))
+                             (numeric-bound-test last2 highi > >=)))
+                       ((and highr
+                             (numeric-bound-test highr highi > >=)))
                        ((and last2
-                             (cmp2<= low last2))
-                        (setf (car result2) high))
+                             (cmp2<= lowi last2))
+                        (setf (car result2) highi))
                        (t
-                        (when (and (consp last1)
-                                   (cmp2<= low last1))
-
-                          (setf (car result1) (car last1)))
-                        (when (and last1
-                                   (cmp2<= low last1))
-                          (setf low (cadr result1))
-                          (when integerp
-                            (unless (or (integerp low)
-                                        (eql low single-float-negative-infinity))
-                              (setf low (if (consp low)
-                                            (floor (1+ (car low)))
-                                            (ceiling low))))))
-                        (push low result2)
-                        (push high result2))))))
+                        (push lowi result2)
+                        (push highi result2))))))
       (loop (cond ((= i1 (length ranges1))
                    (loop while (< i2 (length ranges2))
                          do (store2 (aref ranges2 i2)
