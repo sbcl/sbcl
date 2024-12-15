@@ -3630,7 +3630,7 @@ expansion happened."
                        (t
                         (when (and (consp last1)
                                    (cmp2<= low last1))
-                          
+
                           (setf (car result1) (car last1)))
                         (when (and last1
                                    (cmp2<= low last1))
@@ -3814,6 +3814,32 @@ expansion happened."
           (t
            (new-ctype numeric-range-type 0 numeric-range-integer new-range)))))))
 
+(defun coerce-ranges-to-ratio (ranges)
+  (declare (simple-vector ranges))
+  (let (result)
+    (labels ((store (low high)
+               (push low result)
+               (push high result)))
+      (loop for i below (length ranges) by 2
+            do
+            (let ((low (aref ranges i))
+                  (high (aref ranges (1+ i))))
+              (when (integerp low)
+                (setf low (list low)))
+              (when (integerp high)
+                (setf high (list high)))
+              (unless (and low high
+                           (equal low high))
+                (store low high))))
+      (let ((new-range (coerce (reverse result) 'vector)))
+        (case (length new-range)
+          (0
+           *empty-type*)
+          (2
+           (range-vector-to-number numeric-range-ratio new-range))
+          (t
+           (new-ctype numeric-range-type 0 numeric-range-ratio new-range)))))))
+
 ;;; ranges1 is an integer range
 (defun ranges=-integer (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -3830,21 +3856,21 @@ expansion happened."
                                 (eql lowr single-float-negative-infinity))
                             nil
                             (<= 0
-                               (- lowi
-                                  (if (consp lowr)
-                                      (car lowr)
-                                      lowr))
-                               1)))
+                                (- lowi
+                                   (if (consp lowr)
+                                       (car lowr)
+                                       lowr))
+                                1)))
                     (or (eql highi highr)
                         (if (or (eql highi single-float-positive-infinity)
                                 (eql highr single-float-positive-infinity))
                             nil
                             (<= 0
-                               (- (if (consp highr)
-                                      (car highr)
-                                      highr)
-                                  highi)
-                               1))))))))
+                                (- (if (consp highr)
+                                       (car highr)
+                                       highr)
+                                   highi)
+                                1))))))))
 
 (define-type-method (numeric-range :simple-union2) (type1 type2)
   (let ((types1 (numeric-range-type-types type1))
@@ -3991,11 +4017,14 @@ expansion happened."
 
                           ((not (or low high))
                            (let ((new-type  (logandc2 types2 types1)))
-                             (if (eql new-type numeric-range-integer)
-                                 (coerce-ranges-to-integer ranges)
-                                 (new-ctype numeric-range-type 0
-                                            new-type
-                                            ranges))))
+                             (cond ((eql new-type numeric-range-integer)
+                                    (coerce-ranges-to-integer ranges))
+                                   ((eql new-type numeric-range-ratio)
+                                    (coerce-ranges-to-ratio ranges))
+                                   (t
+                                    (new-ctype numeric-range-type 0
+                                               new-type
+                                               ranges)))))
                           ((and (= types1 numeric-range-integer)
                                 (logtest types2 numeric-range-rational))
                            (type-union

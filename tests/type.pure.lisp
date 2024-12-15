@@ -1018,4 +1018,7 @@
            (sb-kernel:type-union (sb-kernel:specifier-type '(or (integer * -1) (integer 11)))
                                  (sb-kernel:specifier-type 'ratio))
            (sb-kernel:type-difference (sb-kernel:specifier-type 'rational)
-                                      (sb-kernel:specifier-type '(integer 0 10))))))
+                                      (sb-kernel:specifier-type '(integer 0 10)))))
+  (assert (sb-kernel:type= (sb-kernel:type-difference (sb-kernel:specifier-type '(or (rational * (4/3)) (rational 5)))
+                                               (sb-kernel:specifier-type '(integer 5 5)))
+                    (sb-kernel:specifier-type  '(or (rational * (4/3)) (rational (5)))))))
