@@ -2849,6 +2849,9 @@ expansion happened."
          ;; represented as inclusive, not exclusive values.
          (values (if (consp low) (1+ (type-bound-number low)) low)
                  (if (consp high) (1- (type-bound-number high)) high)))
+        (ratio
+         (values (if (integerp low) (list low) low)
+                 (if (integerp high) (list high) high)))
         (t
          ;; no canonicalization necessary
          (values low high)))
@@ -3095,10 +3098,10 @@ expansion happened."
         ;; (if neither of these applies, return NIL)
         (t
          (let* ((integers-of-rational
-                 (make-numeric-type
-                  :class class :format formatr :complexp complexpr
-                  :low (round-numeric-bound lowr class formatr t)
-                  :high (round-numeric-bound highr class formatr nil)))
+                  (make-numeric-type
+                   :class class :format formatr :complexp complexpr
+                   :low (round-numeric-bound lowr class formatr t)
+                   :high (round-numeric-bound highr class formatr nil)))
                 (new-integer
                  (and (numeric-type-p integers-of-rational)
                       (or (numeric-types-intersect integers-of-rational integer)
@@ -3124,7 +3127,8 @@ expansion happened."
                              (make-numeric-type
                               :class class :format formati :complexp complexpi
                               :low (car lowr) :high (car lowr))))
-                        (and (numeric-types-intersect integer low-integer)
+                        (and (numeric-type-p low-integer)
+                             (numeric-types-intersect integer low-integer)
                              (numeric-type-low low-integer)))))
                 (new-highr
                  (and (consp highr) (integerp (car highr))
@@ -3132,7 +3136,8 @@ expansion happened."
                              (make-numeric-type
                               :class 'integer :format formati :complexp complexpi
                               :low (car highr) :high (car highr))))
-                        (and (numeric-types-intersect integer high-integer)
+                        (and (numeric-type-p high-integer)
+                             (numeric-types-intersect integer high-integer)
                              (numeric-type-high high-integer)))))
                 (new-rational
                  (and (or new-lowr new-highr)
@@ -3164,10 +3169,9 @@ expansion happened."
                                             (car highr)
                                             highr)))
                       (eql highi highr)))
-             (let ((rational
-                    (modified-numeric-type ratio :class 'rational)))
-               (unless (eq (numeric-type-class rational) 'ratio)
-                 rational)))
+             (make-numeric-type :class 'rational
+                                :low (numeric-bound-max lowi lowr < < nil)
+                                :high (numeric-bound-max highi highr > > t)))
             ((and (or (not lowi)
                       (and lowr
                            (numeric-bound-test (1- lowi) lowr <= <=)))
@@ -3176,7 +3180,57 @@ expansion happened."
                            (numeric-bound-test (1+ highi) highr >= >=))))
              (let ((rational (modified-numeric-type ratio :class 'rational)))
                (unless (eq (numeric-type-class rational) 'ratio)
-                 (make-union-type nil (list rational integer)))))))))
+                 (make-union-type nil (list rational integer)))))
+            ;; ((and (or (not lowi)
+            ;;           (and lowr
+            ;;                (numeric-bound-test lowi lowr <= <=)))
+            ;;       (or (not highi)
+            ;;           (and lowr
+            ;;                (numeric-bound-test highi lowr > >))))
+            ;;  (type-union
+            ;;   integer
+            ;;   (make-numeric-type :class 'rational
+            ;;                      :low (if (consp lowr)
+            ;;                               (car lowr)
+            ;;                               lowr)
+            ;;                      :high (and highi
+            ;;                                 (list highi)))
+            ;;   (make-numeric-type :class 'ratio
+            ;;                      :low (and highi
+            ;;                                (list highi))
+            ;;                      :high highr)))
+            ;; ((and (or (not lowi)
+            ;;           (and highr
+            ;;                (numeric-bound-test lowi highr < <)))
+            ;;       (or (not highi)
+            ;;           (and highr
+            ;;                (numeric-bound-test highi highr > >))))
+            ;;  (type-union
+            ;;   integer
+            ;;   (make-numeric-type :class 'rational
+            ;;                      :low (and lowi
+            ;;                                (list lowi))
+            ;;                      :high  (if (consp highr)
+            ;;                                 (car highr)
+            ;;                                 highr))
+            ;;   (make-numeric-type :class 'ratio
+            ;;                      :low lowr
+            ;;                      :high (list lowi))))
+            ;; ((and (not (eql lowi highi))
+            ;;       (if (not lowi)
+            ;;           (not lowr)
+            ;;           (and lowr
+            ;;                (numeric-bound-test lowi lowr > >)))
+            ;;       (if (not highi)
+            ;;           (not highr)
+            ;;           (and highr
+            ;;                (numeric-bound-test highi highr < <))))
+            ;;  (type-union
+            ;;   (make-numeric-type :class 'rational
+            ;;                      :low lowi
+            ;;                      :high highi)
+            ;;   ratio))
+            ))))
 
 (define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
@@ -3512,22 +3566,112 @@ expansion happened."
         (range-vector-to-number range-type new-range)
         (new-ctype numeric-range-type 0 range-type new-range))))
 
+;;; range1 is a supertype
+(defun union-2range-vectors (ranges1 ranges2 integerp)
+  (declare (simple-vector ranges1 ranges2))
+  (let ((i1 0)
+        (i2 0)
+        (result1)
+        (result2))
+    (labels ((cmp1<= (a b)
+               (if (consp a)
+                   (if (consp b)
+                       (sb-xc:< (car a) (car b))
+                       (sb-xc:<= (car a) b))
+                   (if (consp b)
+                       (sb-xc:<= a (car b))
+                       (sb-xc:<= a b))))
+             (cmp2<= (a b)
+               (if (and integerp
+                        (integerp a)
+                        (integerp b))
+                   (<= a (1+ b))
+                   (if (consp a)
+                       (if (consp b)
+                           (sb-xc:< (car a) (car b))
+                           (sb-xc:<= (car a) b))
+                       (if (consp b)
+                           (sb-xc:<= a (car b))
+                           (sb-xc:<= a b)))))
+             (store1 (low high)
+               (let ((last1 (car result1))
+                     (last2 (car result2)))
+                 (when (and (consp low)
+                            last2
+                            (cmp2<= low last2))
+                   (setf low (car low)))
+                 (cond ((and last1
+                             (numeric-bound-test last1 high > >=)))
+                       ((and last1
+                             (cmp1<= low last1))
+                        (setf (car result1) high))
+                       (t
+                        (push low result1)
+                        (push high result1)))))
+             (store2 (low high)
+               (let ((last1 (car result1))
+                     (last2 (car result2)))
+                 (cond ((and last2
+                             (numeric-bound-test last2 high > >=)))
+                       ((and last1
+                             (numeric-bound-test last1 high > >=)))
+                       ((and last2
+                             (cmp2<= low last2))
+                        (setf (car result2) high))
+                       (t
+                        (when (and (consp last1)
+                                   (cmp2<= low last1))
+                          (setf (car result1) (car last1)))
+                        (when (and last1
+                                   (cmp2<= low last1))
+                          (setf low (cadr result1)))
+                        (push low result2)
+                        (push high result2))))))
+      (loop (cond ((= i1 (length ranges1))
+                   (loop while (< i2 (length ranges2))
+                         do (store2 (aref ranges2 i2)
+                                   (aref ranges2 (1+ i2)))
+                            (incf i2 2))
+                   (return))
+                  ((= i2 (length ranges2))
+                   (loop while (< i1 (length ranges1))
+                         do (store1 (aref ranges1 i1)
+                                    (aref ranges1 (1+ i1)))
+                            (incf i1 2))
+                   (return))
+                  ((let ((low1 (aref ranges1 i1))
+                         (low2 (aref ranges2 i2)))
+                     (cond ((numeric-bound-test low2 low1 < <=)
+                            (store2 low2 (aref ranges2 (1+ i2)))
+                            (incf i2 2))
+                           (t
+                            (store1 low1 (aref ranges1 (1+ i1)))
+                            (incf i1 2)))))))
+      (values (coerce (reverse result1) 'vector)
+              (coerce (reverse result2) 'vector)))))
+
 ;;; ranges1 is a supertype of ranges2, e.g. rational and integer.
-;;; Returns a new subtype vector. Could return two vectors as subtypes
-;;; might connect ranges in the supertype vector, but that's probably
-;;; not that important.
-(defun union-2ranges (type1 range2-type range1 range2)
-  (let ((new-range2 (difference-range-vectors range2 range1 (= range2-type numeric-range-integer))))
-    (unless (equalp new-range2
-                    range2)
-      (case (length new-range2)
-        (0 type1)
-        (2
-         (make-union-type nil (list type1
-                                    (range-vector-to-number range2-type new-range2))))
-        (t
-         (make-union-type nil (list type1
-                                    (new-ctype numeric-range-type 0 range2-type new-range2))))))))
+(defun union-2ranges (type1 type2 range1 range2)
+  (multiple-value-bind (new-range1 new-range2) (union-2range-vectors range1 range2 (= type2 numeric-range-integer))
+    (when (= type2 numeric-range-ratio)
+      (map-into new-range2 (lambda (x)
+                             (if (integerp x)
+                                 (list x)
+                                 x))
+                new-range2))
+    (unless (and (equalp new-range1 range1)
+                 (equalp new-range2 range2))
+      (flet ((make-type (type ranges)
+               (case (length ranges)
+                 (2
+                  (range-vector-to-number type ranges))
+                 (t
+                  (new-ctype numeric-range-type 0 type ranges)))))
+        (cond ((zerop (length new-range2))
+               (make-type type1 new-range1))
+              (t
+               (make-union-type nil (list (make-type type1 new-range1)
+                                          (make-type type2 new-range2)))))))))
 
 (defun numeric-range-bounds (type)
   (let ((ranges (numeric-range-type-ranges type)))
@@ -3699,7 +3843,7 @@ expansion happened."
              (rotatef type1 type2))
            (cond
              ((logtest types1 types2)
-              (union-2ranges type1
+              (union-2ranges types1
                              types2
                              (numeric-range-type-ranges type1)
                              (numeric-range-type-ranges type2)))
@@ -3740,9 +3884,7 @@ expansion happened."
                         (rotatef range1 range2)
                         (rotatef type1 type2)
                         (rotatef types2 types1))
-                      (union-2ranges type1
-                                     types2
-                                     range1 range2)))))))
+                      (union-2ranges types1 types2 range1 range2)))))))
         ((and (negation-type-p type1)
               (typep (negation-type-type type1) '(or numeric-type numeric-range-type)))
          (make-negation-type (type-difference (negation-type-type type1) type2)))))
@@ -3848,47 +3990,41 @@ expansion happened."
                   :call-other-method))))
         ((and (negation-type-p type1)
               (numeric-range-type-p (setf type1 (negation-type-type type1))))
-         (cond ((= (numeric-range-type-types type1)
-                   (numeric-range-type-types type2))
-                (difference-ranges (numeric-range-type-types type1)
-                                   (numeric-range-type-ranges type2)
-                                   (numeric-range-type-ranges type1)))
-               ((logtest (numeric-range-type-types type1)
-                         (numeric-range-type-types type2))
-                (difference-ranges (numeric-range-type-types type2)
-                                   (numeric-range-type-ranges type2)
-                                   (numeric-range-type-ranges type1)))
-               (t
-                type2)))
+         (let ((types1 (numeric-range-type-types type1))
+               (types2 (numeric-range-type-types type2)))
+           (cond ((not (logtest types1 types2))
+                  nil)
+                 ((= types1 types2)
+                  (difference-ranges (numeric-range-type-types type1)
+                                     (numeric-range-type-ranges type2)
+                                     (numeric-range-type-ranges type1)))
+                 ((> types1 types2)
+                  (difference-ranges (numeric-range-type-types type2)
+                                     (numeric-range-type-ranges type2)
+                                     (numeric-range-type-ranges type1)))
+                 ((and (= types1 numeric-range-integer)
+                       (logtest types2 numeric-range-rational))
+                  (type-union
+                   (type-difference (type-intersection type2 (specifier-type 'integer))
+                                    type1)
+                   (type-intersection type2 (specifier-type '(not integer))))))))
         (t
          :call-other-method)))
+
+(defun number-to-numeric-range (type)
+  (new-ctype numeric-range-type 0 (numeric-type-range-mask type)
+             (vector (or (numeric-type-low type)
+                         single-float-negative-infinity)
+                     (or (numeric-type-high type)
+                         single-float-positive-infinity))))
 
 (define-type-method (number :complex-intersection2) (type1 type2)
   (cond ((and (negation-type-p type1)
               (numeric-range-type-p (negation-type-type type1)))
-         (let* ((type1 (negation-type-type type1))
-                (types1 (numeric-range-type-types type1))
-                (types2 (numeric-type-range-mask type2)))
-           (cond ((eql types1 types2)
-                  (difference-ranges types1
-                                     (vector (or (numeric-type-low type2)
-                                                 single-float-negative-infinity)
-                                             (or (numeric-type-high type2)
-                                                 single-float-positive-infinity))
-                                     (numeric-range-type-ranges type1)))
-                 ((and types1 types2
-                       (logtest types1 types2))
-                  (when (> types1 types2)
-                    (let ((low (numeric-type-low type2))
-                          (high (numeric-type-high type2)))
-                      (difference-ranges types2
-                                         (vector (or low
-                                                     single-float-negative-infinity)
-                                                 (or high
-                                                     single-float-positive-infinity))
-                                         (numeric-range-type-ranges type1)))))
-                 (t
-                  type2))))
+         (let ((mask (numeric-type-range-mask type2)))
+           (if mask
+               (type-intersection (number-to-numeric-range type2) type1)
+               type2)))
         ((and (eq type1 (specifier-type '(not integer)))
               (numtype-aspects-eq type2 (specifier-type 'rational)))
          (let ((low (numeric-type-low type2))
@@ -3927,16 +4063,21 @@ expansion happened."
                                                  single-float-positive-infinity))))
                  ((and types1 types2
                        (logtest types1 types2))
-                  (when (> types1 types2)
-                    (difference-ranges types2
-                                       (vector (or (numeric-type-low type2)
-                                                   single-float-negative-infinity)
-                                               (or (numeric-type-high type2)
-                                                   single-float-positive-infinity))
-                                       (vector (or (numeric-type-low type1)
-                                                   single-float-negative-infinity)
-                                               (or (numeric-type-high type1)
-                                                   single-float-positive-infinity)))))
+                  (cond ((> types1 types2)
+                         (difference-ranges types2
+                                            (vector (or (numeric-type-low type2)
+                                                        single-float-negative-infinity)
+                                                    (or (numeric-type-high type2)
+                                                        single-float-positive-infinity))
+                                            (vector (or (numeric-type-low type1)
+                                                        single-float-negative-infinity)
+                                                    (or (numeric-type-high type1)
+                                                        single-float-positive-infinity))))
+                        ((= types1 numeric-range-integer)
+                         (type-union
+                          (type-difference (type-intersection type2 (specifier-type 'integer))
+                                           type1)
+                          (type-intersection type2 (specifier-type '(not integer)))))))
                  (t
                   type2))))
         (t
@@ -3945,10 +4086,10 @@ expansion happened."
 (define-type-method (number :complex-union2) (type1 type2)
   (cond ((and (negation-type-p type1)
               (typep (negation-type-type type1) '(or numeric-type numeric-range-type)))
-         (let ((diff (type-difference (negation-type-type type1) type2)))
-           (if (eq diff *empty-type*)
-               *universal-type*
-               (make-negation-type diff))))))
+         (let ((intersection (type-intersection2 (negation-type-type type1)
+                                                 (type-negation type2))))
+           (when (ctype-p intersection)
+            (type-negation intersection))))))
 
 ;;; If it's longer than N
 (defun weaken-numeric-type-union (n type)

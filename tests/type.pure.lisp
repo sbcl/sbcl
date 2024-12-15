@@ -1012,3 +1012,10 @@
     (assert (and (not answer) certain)))
   (assert (not (subtypep (opaque-identity '(function (&key (member t))))
                          (opaque-identity '(function (&key (eql t))))))))
+
+(with-test (:name :numeric-ranges)
+  (assert (sb-kernel:type=
+           (sb-kernel:type-union (sb-kernel:specifier-type '(or (integer * -1) (integer 11)))
+                                 (sb-kernel:specifier-type 'ratio))
+           (sb-kernel:type-difference (sb-kernel:specifier-type 'rational)
+                                      (sb-kernel:specifier-type '(integer 0 10))))))
