@@ -2214,9 +2214,18 @@
       (let* ((args (combination-args combination))
              (var-args
                (loop for arg in args
-                     for arg-var = (lvar-lambda-var (principal-lvar arg))
+                     for cast = nil
+                     for arg-var = (or (lvar-lambda-var arg)
+                                       (let ((use (lvar-uses arg)))
+                                         (and (cast-p use)
+                                              (progn (setf cast use)
+                                                     (lvar-lambda-var (cast-value use))))))
                      when (eq arg-var var)
-                     collect arg)))
+                     collect arg
+                     and do (when cast
+                              (setf initial-type
+                                    ;; Type derivers expect the right types 
+                                    (type-intersection initial-type (single-value-type (cast-asserted-type cast))))))))
         (when var-args
           (labels ((derive (type)
                      (single-value-type
