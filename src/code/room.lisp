@@ -81,6 +81,8 @@
 
 (defconstant-eqx +heap-spaces+
   '((:dynamic   "Dynamic space"   dynamic-usage)
+    #-immobile-space
+    (:text      "Text space"      sb-kernel::text-space-usage)
     #+immobile-space
     (:immobile  "Immobile space"  sb-kernel::immobile-space-usage)
     (:read-only "Read-only space" sb-kernel::read-only-space-usage)
@@ -123,8 +125,7 @@
       (:fixed
        (bounds fixedobj-space-start
                (sap-int *fixedobj-space-free-pointer*)))
-      #+immobile-space
-      (:variable
+      (:text
        (bounds text-space-start
                (sap-int *text-space-free-pointer*)))
       (:dynamic
@@ -249,16 +250,14 @@
 ;;; MAP-ALLOCATED-OBJECTS
 (define-alien-variable "next_free_page" sb-kernel::page-index-t)
 
-#+immobile-space
-(progn
-(deftype immobile-subspaces () '(member :fixed :variable))
+(deftype immobile-subspaces () '(member :fixed :text))
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))
 (defun map-immobile-objects (function &rest subspaces) ; Perform no filtering
   (declare (dynamic-extent function))
   (do-rest-arg ((subspace) subspaces)
     (multiple-value-bind (start end) (%space-bounds subspace)
-      (map-objects-in-range function start end)))))
+      (map-objects-in-range function start end))))
 
 #|
 MAP-ALLOCATED-OBJECTS is fundamentally unsafe to use if the user-supplied
@@ -313,6 +312,7 @@ We could try a few things to mitigate this:
      (map-allocated-objects fun
                             :read-only :static
                             #+immobile-space :immobile
+                            #-immobile-space :text
                             :dynamic)))
   ;; You can't specify :ALL and also a list of spaces. Check that up front.
   (do-rest-arg ((space) spaces) (the spaces space))
@@ -330,10 +330,14 @@ We could try a few things to mitigate this:
              ;; of contiguous allocations.
              (multiple-value-bind (start end) (%space-bounds space)
                                   (map-objects-in-range fun start end)))
+            #-immobile-space
+            (:text
+             (with-system-mutex (*allocator-mutex*)
+               (map-immobile-objects fun :text)))
             #+immobile-space
             (:immobile
              (with-system-mutex (*allocator-mutex*)
-               (map-immobile-objects fun :variable))
+               (map-immobile-objects fun :text))
              ;; Filter out padding words
              (dx-flet ((filter (obj type size)
                          (unless (= type list-pointer-lowtag)
@@ -447,6 +451,10 @@ We could try a few things to mitigate this:
 
 ;;;; MEMORY-USAGE
 
+#-immobile-space
+(defun sb-kernel::text-space-usage ()
+  (- (sap-int *text-space-free-pointer*) text-space-start))
+
 #+immobile-space
 (progn
 (declaim (ftype (function (immobile-subspaces) (values t t t &optional))
@@ -471,7 +479,7 @@ We could try a few things to mitigate this:
           (setq hole-bytes (- used-bytes sum-sizes))))
     (values holes hole-bytes used-bytes)))
 
-(defun show-fragmentation (&key (subspaces '(:fixed :variable))
+(defun show-fragmentation (&key (subspaces '(:fixed :text))
                                 (stream *standard-output*))
   (dolist (subspace subspaces)
     (format stream "~(~A~) subspace fragmentation:~%" subspace)
@@ -488,7 +496,7 @@ We could try a few things to mitigate this:
   (binding* (((nil fixed-hole-bytes fixed-used-bytes)
               (immobile-fragmentation-information :fixed))
              ((nil variable-hole-bytes variable-used-bytes)
-              (immobile-fragmentation-information :variable))
+              (immobile-fragmentation-information :text))
              (total-used-bytes (+ fixed-used-bytes variable-used-bytes))
              (total-hole-bytes (+ fixed-hole-bytes variable-hole-bytes)))
     (values total-used-bytes total-hole-bytes)))
@@ -1182,7 +1190,7 @@ We could try a few things to mitigate this:
       (map-objects-in-range #'show
         (%make-lisp-obj fixedobj-space-start)
         (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
-    (when (or (eq which :variable) (eq which :both))
+    (when (or (eq which :text) (eq which :both))
       (format t "Text space~%=============~%")
       (map-objects-in-range #'show
         (%make-lisp-obj text-space-start)
