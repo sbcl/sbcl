@@ -1026,4 +1026,9 @@
                                                       (sb-kernel:specifier-type
                                                        '(OR (INTEGER -71191347552279427 -71191347552279427) (INTEGER -3 -3))))
 
-                           (sb-kernel:specifier-type  '(or float complex (integer * -71191347552279428) (integer -71191347552279426 -4) (integer -2) ratio)))))
+                           (sb-kernel:specifier-type  '(or float complex (integer * -71191347552279428) (integer -71191347552279426 -4) (integer -2) ratio))))
+  (assert (sb-kernel:type= (sb-kernel:type-union (sb-kernel:specifier-type
+                                                  '(AND (RATIONAL -33841/21922 -107287/206725) (NOT INTEGER)))
+                                                 (sb-kernel:specifier-type '(OR (RATIONAL (-107287/206725) *))))
+
+                           (sb-kernel:specifier-type  '(OR (AND (RATIONAL -33841/21922 (-1)) (NOT INTEGER)) (RATIONAL (-1)))))))
