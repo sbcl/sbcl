@@ -2024,8 +2024,8 @@
   (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:- nil))
 
 (defun abs-derive-type-aux (type)
-  (cond ((eq type (specifier-type 'ratio))
-         type)
+  (cond ((eq (numeric-type-class type) 'ratio)
+         (specifier-type 'ratio))
         ((eq (numeric-type-complexp type) :complex)
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
