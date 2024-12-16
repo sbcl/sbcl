@@ -3587,12 +3587,13 @@ is :ANY, the function name is not checked."
          (deriver (and info
                        (fun-info-derive-type info))))
     (when deriver
-      (let ((mock (copy-structure combination)))
-        (setf (combination-args mock)
-              (loop for type in types
-                    collect (if (lvar-p type)
-                                type
-                                (let ((lvar (make-lvar)))
-                                  (setf (lvar-%derived-type lvar) type)
-                                  lvar))))
-        (funcall deriver mock)))))
+      (handler-bind ((warning #'muffle-warning))
+        (let ((mock (copy-structure combination)))
+          (setf (combination-args mock)
+                (loop for type in types
+                      collect (if (lvar-p type)
+                                  type
+                                  (let ((lvar (make-lvar)))
+                                    (setf (lvar-%derived-type lvar) type)
+                                    lvar))))
+          (funcall deriver mock))))))
