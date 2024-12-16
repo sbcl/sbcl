@@ -1024,11 +1024,15 @@
                            (sb-kernel:specifier-type  '(or (rational * (4/3)) (rational (5))))))
   (assert (sb-kernel:type= (sb-kernel:type-difference (specifier-type 'number)
                                                       (sb-kernel:specifier-type
-                                                       '(OR (INTEGER -71191347552279427 -71191347552279427) (INTEGER -3 -3))))
+                                                       '(or (integer -71191347552279427 -71191347552279427) (integer -3 -3))))
 
                            (sb-kernel:specifier-type  '(or float complex (integer * -71191347552279428) (integer -71191347552279426 -4) (integer -2) ratio))))
   (assert (sb-kernel:type= (sb-kernel:type-union (sb-kernel:specifier-type
-                                                  '(AND (RATIONAL -33841/21922 -107287/206725) (NOT INTEGER)))
-                                                 (sb-kernel:specifier-type '(OR (RATIONAL (-107287/206725) *))))
-
-                           (sb-kernel:specifier-type  '(OR (AND (RATIONAL -33841/21922 (-1)) (NOT INTEGER)) (RATIONAL (-1)))))))
+                                                  '(and (rational -33841/21922 -107287/206725) (not integer)))
+                                                 (sb-kernel:specifier-type '(or (rational (-107287/206725) *))))
+                           (sb-kernel:specifier-type  '(rational -33841/21922))))
+  (assert (sb-kernel:type=
+           (sb-kernel:type-union
+            (sb-kernel:specifier-type '(rational -1 0))
+            (sb-kernel:specifier-type '(and (rational (-2) (2)) (not integer))))
+           (sb-kernel:specifier-type '(or (rational (-2) 0) (and (rational (0) (2)) (not integer)))))))
