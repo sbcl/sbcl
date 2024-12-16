@@ -162,8 +162,9 @@ run_sbcl <<\EOF
   (print (read-from-string "keyword:x") (make-broadcast-stream))
   ;; Now walk all heap objects
   (macrolet ((visit (that)
-	       `(check-undesired
-		 this ,that undesired-symbols undesired-strings hashes)))
+	       `(unless (sb-ext:stack-allocated-p ,that)
+                  (check-undesired
+		   this ,that undesired-symbols undesired-strings hashes))))
     (sb-vm:map-allocated-objects
      (lambda (this type size)
        (declare (ignore type size))
