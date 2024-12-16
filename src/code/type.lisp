@@ -3260,56 +3260,55 @@ expansion happened."
              (let ((rational (modified-numeric-type ratio :class 'rational)))
                (unless (eq (numeric-type-class rational) 'ratio)
                  (make-union-type nil (list rational integer)))))
-            ;; ((and (or (not lowi)
-            ;;           (and lowr
-            ;;                (numeric-bound-test lowi lowr <= <=)))
-            ;;       (or (not highi)
-            ;;           (and lowr
-            ;;                (numeric-bound-test highi lowr > >))))
-            ;;  (type-union
-            ;;   integer
-            ;;   (make-numeric-type :class 'rational
-            ;;                      :low (if (consp lowr)
-            ;;                               (car lowr)
-            ;;                               lowr)
-            ;;                      :high (and highi
-            ;;                                 (list highi)))
-            ;;   (make-numeric-type :class 'ratio
-            ;;                      :low (and highi
-            ;;                                (list highi))
-            ;;                      :high highr)))
-            ;; ((and (or (not lowi)
-            ;;           (and highr
-            ;;                (numeric-bound-test lowi highr < <)))
-            ;;       (or (not highi)
-            ;;           (and highr
-            ;;                (numeric-bound-test highi highr > >))))
-            ;;  (type-union
-            ;;   integer
-            ;;   (make-numeric-type :class 'rational
-            ;;                      :low (and lowi
-            ;;                                (list lowi))
-            ;;                      :high  (if (consp highr)
-            ;;                                 (car highr)
-            ;;                                 highr))
-            ;;   (make-numeric-type :class 'ratio
-            ;;                      :low lowr
-            ;;                      :high (list lowi))))
-            ;; ((and (not (eql lowi highi))
-            ;;       (if (not lowi)
-            ;;           (not lowr)
-            ;;           (and lowr
-            ;;                (numeric-bound-test lowi lowr > >)))
-            ;;       (if (not highi)
-            ;;           (not highr)
-            ;;           (and highr
-            ;;                (numeric-bound-test highi highr < <))))
-            ;;  (type-union
-            ;;   (make-numeric-type :class 'rational
-            ;;                      :low lowi
-            ;;                      :high highi)
-            ;;   ratio))
-            ))))
+            ((and (or (not lowi)
+                      (and lowr
+                           (numeric-bound-test lowi lowr <= <=)))
+                  (or (not highi)
+                      (and lowr
+                           (numeric-bound-test highi lowr > >))))
+             (type-union
+              integer
+              (make-numeric-type :class 'rational
+                                 :low (if (consp lowr)
+                                          (car lowr)
+                                          lowr)
+                                 :high (and highi
+                                            (list highi)))
+              (make-numeric-type :class 'ratio
+                                 :low (and highi
+                                           (list highi))
+                                 :high highr)))
+            ((and (or (not lowi)
+                      (and highr
+                           (numeric-bound-test lowi highr < <)))
+                  (or (not highi)
+                      (and highr
+                           (numeric-bound-test highi highr > >))))
+             (type-union
+              integer
+              (make-numeric-type :class 'rational
+                                 :low (and lowi
+                                           (list lowi))
+                                 :high  (if (consp highr)
+                                            (car highr)
+                                            highr))
+              (make-numeric-type :class 'ratio
+                                 :low lowr
+                                 :high (list lowi))))
+            ((and (not (eql lowi highi))
+                  (if (not lowi)
+                      (not lowr)
+                      (and lowr
+                           (numeric-bound-test lowi lowr > >)))
+                  (if (not highi)
+                      (not highr)
+                      (and highr
+                           (numeric-bound-test highi highr < <))))
+             (type-union
+              (make-numeric-type :class 'rational
+                                 :low lowi
+                                 :high highi)
+              ratio))))))
 
 (define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
