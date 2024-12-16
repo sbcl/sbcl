@@ -6,6 +6,11 @@ BRANCH=${1:-release}
 UPSTREAM_NAME=asdf-upstream
 UPSTREAM_DIR="../../obj/${UPSTREAM_NAME}"
 
+if [ ! -d "../../obj/" ];
+then
+    mkdir "../../obj/"
+fi
+
 # Get the current ASDF release from the upstream repo.
 
 echo "Pulling ASDF branch '${BRANCH}' from '${REPOSITORY}'"
