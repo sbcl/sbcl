@@ -456,8 +456,9 @@ Examples:
 (progn
 (defun finalizer-thread-notify (run-hooks)
   (declare (bit run-hooks))
-  (alien-funcall (extern-alien "finalizer_thread_wake" (function void int))
-                 run-hooks)
+  (without-interrupts ;; don't unwind while holding finalizer_mutex
+    (alien-funcall (extern-alien "finalizer_thread_wake" (function void int))
+                   run-hooks))
   nil)
 
 ;;; The following operations are synchronized by *MAKE-THREAD-LOCK* -
@@ -501,7 +502,8 @@ Examples:
     (sb-thread:join-thread thread))
   (let ((thread *finalizer-thread*))
     (aver (sb-thread::thread-p thread))
-    (alien-funcall (extern-alien "finalizer_thread_stop" (function void)))
+    (without-interrupts ;; don't unwind while holding finalizer_mutex
+      (alien-funcall (extern-alien "finalizer_thread_stop" (function void))))
     (sb-thread:join-thread thread)))
 )
 
