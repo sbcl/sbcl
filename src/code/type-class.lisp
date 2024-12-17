@@ -337,7 +337,6 @@
       (union         union-type)
       (negation      negation-type)
       (number        numeric-type)
-      (numeric-range numeric-range-type)
       (array         array-type)
       (character-set character-set-type)
       (member        member-type)
@@ -1021,7 +1020,7 @@
   ;; the kind of numeric type we have, or NIL if the type is NUMBER.
   ;; The types corresponding to all of REAL or all of COMPLEX are UNION types,
   ;; and no constituent type thereof will have a NIL here.
-  (class nil :read-only t :type (member integer ratio rational float nil))
+  (class nil :read-only t :type (member integer rational float nil))
   ;; "precision" for a float type (i.e. type specifier for a CPU
   ;; representation of floating point, e.g. 'SINGLE-FLOAT).
   ;; NIL if and only if CLASS is not FLOAT
@@ -1034,36 +1033,33 @@
 ;;; 1. (:REAL FLOAT SINGLE-FLOAT) and 2. (:REAL FLOAT DOUBLE-FLOAT)
 ;;; 3. (:COMPLEX FLOAT SINGLE-FLOAT) and 4. (:COMPLEX FLOAT DOUBLE-FLOAT)
 ;;; 5. (:REAL INTEGER) 6. (:COMPLEX INTEGER)
-;;; 7. (:REAL RATIO) 8. (:COMPLEX RATIO)
-;;; 9. (:REAL RATIONAL) 10. (:COMPLEX RATIONAL)
+;;; 7. (:REAL RATIONAL) 8. (:COMPLEX RATIONAL)
 ;;; any other combination that would attempt to carve out a subset
 ;;; of the numeric type space will instead be a UNION type.
 (declaim (inline !compute-numtype-aspect-id))
 (defun !compute-numtype-aspect-id (complexp class precision)
   (declare (type (member :real :complex nil) complexp)
-           (type (member integer ratio rational float nil) class)
+           (type (member integer rational float nil) class)
            (type (member single-float double-float nil) precision))
   (unless (eq class 'float) (aver (not precision)))
   (case class
     (float (+ (if (eq complexp :real) 1 3)
               (if (eq precision 'single-float) 0 1)))
     (integer (if (eq complexp :real) 5 6))
-    (ratio (if (eq complexp :real) 7 8))
-    (rational (if (eq complexp :real) 9 10))
+    (rational (if (eq complexp :real) 7 8))
     (t (aver (not class))
        (aver (not complexp))
        0)))
 (declaim (notinline !compute-numtype-aspect-id))
 
 ;;; force the SBCL-default initial value, because genesis also 0-fills it
-(defglobal *numeric-aspects-v* (make-array 11 :initial-element 0))
-(declaim (type (simple-vector 11) *numeric-aspects-v*))
+(defglobal *numeric-aspects-v* (make-array 9 :initial-element 0))
+(declaim (type (simple-vector 9) *numeric-aspects-v*))
 (loop for (complexp class precision)
       in '((nil nil nil)
            (:real float single-float) (:real float double-float)
            (:complex float single-float) (:complex float double-float)
            (:real integer nil) (:complex integer nil)
-           (:real ratio nil) (:complex ratio nil)
            (:real rational nil) (:complex rational nil))
       do (let ((index (!compute-numtype-aspect-id complexp class precision)))
            (when (eql (aref *numeric-aspects-v* index) 0)
@@ -1091,38 +1087,17 @@
              `(let ((a ,a) (b ,b))
                 (if (listp a)
                     (and (listp b) (eql (car a) (car b)))
-                    (eql a b))))
-           (hash-ranges (a)
-             `(let ((vector ,a)
-                    (h 0))
-                (loop for e across vector
-                      do
-                      (setf h (mix h (numbound-hash e))))
-                h)))
-
+                    (eql a b)))))
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
-  (def-type-model (numeric-type
-                   (:extra-mix-step)
-                   (:constructor* nil (aspects low high)))
-    (aspects (missing-arg) :type numtype-aspects :hasher numtype-aspects-id :test eq)
-    (low nil :type (or real (cons real null) null)
-             :hasher numbound-hash :test numbound-eql)
-    (high nil :type (or real (cons real null) null)
-              :hasher numbound-hash :test numbound-eql))
-
-  (defconstant numeric-range-integer      #b0001)
-  (defconstant numeric-range-ratio        #b0010)
-  (defconstant numeric-range-rational     #b0011)
-  (defconstant numeric-range-single-float #b0100)
-  (defconstant numeric-range-double-float #b1000)
-
-  (def-type-model (numeric-range-type
-                   (:extra-mix-step)
-                   (:constructor* nil (types ranges)))
-    (types (missing-arg) :type fixnum :hasher identity :test eq)
-    (ranges #() :type simple-vector :hasher hash-ranges :test equalp)))
-
+(def-type-model (numeric-type
+                 (:extra-mix-step)
+                 (:constructor* nil (aspects low high)))
+  (aspects (missing-arg) :type numtype-aspects :hasher numtype-aspects-id :test eq)
+  (low nil :type (or real (cons real null) null)
+       :hasher numbound-hash :test numbound-eql)
+  (high nil :type (or real (cons real null) null)
+        :hasher numbound-hash :test numbound-eql)))
 (declaim (inline numeric-type-complexp numeric-type-class numeric-type-format))
 (defun numeric-type-complexp (x) (numtype-aspects-complexp (numeric-type-aspects x)))
 (defun numeric-type-class (x) (numtype-aspects-class (numeric-type-aspects x)))
@@ -1464,7 +1439,6 @@
                             (or (not (complexp object))
                                 (integerp (imagpart object)))))
               (rational (rationalp num))
-              (ratio (ratiop num))
               (float
                (ecase (numeric-type-format type)
                  ;; (short-float (typep num 'short-float))
@@ -1491,18 +1465,6 @@
               (:real
                (and (not (complexp object))
                     (bound-test object))))))))
-
-(defun numeric-range-typep (object type)
-  (when (logtest (numeric-range-type-types type)
-                 (typecase object
-                   (integer numeric-range-integer)
-                   (ratio numeric-range-ratio)
-                   (single-float numeric-range-single-float)
-                   (double-float numeric-range-double-float)
-                   (t (return-from numeric-range-typep nil))))
-    ;; FIXME: do not cons
-    (subtype-range-vectors (vector object object)
-                           (numeric-range-type-ranges type))))
 
 ;;; Drop NILs, possibly reducing the storage vector length
 (defun rebuild-ctype-hashsets ()

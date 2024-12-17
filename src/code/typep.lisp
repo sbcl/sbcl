@@ -45,7 +45,6 @@
        ((extended-sequence) (extended-sequence-p object))
        ((nil) nil)))
     (numeric-type (number-typep object type))
-    (numeric-range-type (numeric-range-typep object type))
     (array-type
      (and (arrayp object)
           (or (eq (array-type-complexp type) :maybe)
@@ -275,7 +274,6 @@
   (declare (type ctype type))
   (typep-impl-macro (obj)
     ((or numeric-type
-         numeric-range-type
          named-type
          member-type
          character-set-type

@@ -75,8 +75,7 @@ sb-kernel::
                    sb-kernel:array-type
                    sb-kernel:character-set-type
                    sb-kernel:numeric-type
-                   sb-kernel:member-type
-                   sb-kernel:numeric-range-type)))))
+                   sb-kernel:member-type)))))
 
 ;;; Assert that genesis preserved shadowing symbols.
 (let ((p sb-assem::*backend-instruction-set-package*))

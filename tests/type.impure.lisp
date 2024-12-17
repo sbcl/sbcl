@@ -957,8 +957,8 @@
                   unless (eql i j)
                   collect `(array ,(sb-vm:saetp-specifier x))))
            (xform
-             (sb-c::%source-transform-typep 'myobj
-                                            `(or ,@(shuffle hair) fixnum))))
+             (sb-c::source-transform-union-typep 'myobj
+             (sb-kernel:specifier-type `(or ,@(shuffle hair) fixnum)))))
       (assert (equal xform
                      `(or (typep myobj '(and array (not (array ,excluded-type))))
                           (typep myobj 'fixnum)))))))

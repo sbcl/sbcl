@@ -286,8 +286,6 @@
                                                (32 '(unsigned-byte-31 unsigned-byte-32 signed-byte-32))
                                                (64 '(unsigned-byte-63 unsigned-byte-64 signed-byte-64)))))
                          (primitive-type-or-lose 'integer))))))))
-      (when (typep type 'numeric-range-type)
-        (setf type (numeric-range-to-numeric-type type)))
       (etypecase type
         (numeric-type
          (let ((lo (numeric-type-low type))

@@ -631,9 +631,6 @@
         (numeric-type
          (!alloc-numeric-type bits (numeric-type-aspects x)
                               (copy (numeric-type-low x)) (copy (numeric-type-high x))))
-        (numeric-range-type
-         (!alloc-numeric-range-type bits (numeric-range-type-types x)
-                                 (map 'vector #'copy (numeric-range-type-ranges x))))
         (compound-type ; UNION or INTERSECTION
          (let ((copy (!alloc-union-type bits (compound-type-enumerable x)
                                         (compound-type-types x))))
@@ -697,7 +694,7 @@
                        (bug "genesis dumped bad instance within ~X"
                             (get-lisp-obj-address instance)))))))
         (etypecase instance
-          ((or numeric-type numeric-range-type member-type character-set-type ; nothing extra to do
+          ((or numeric-type member-type character-set-type ; nothing extra to do
            #+sb-simd-pack simd-pack-type #+sb-simd-pack-256 simd-pack-256-type
            hairy-type))
           (args-type

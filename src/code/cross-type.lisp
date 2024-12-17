@@ -101,8 +101,6 @@
            (values nil t)))) ; nothing could be these
        (numeric-type
         (values (number-typep obj type) t))
-       (numeric-range-type
-        (values (numeric-range-typep obj type) t))
        (array-type
         ;; Array types correspond fairly closely between host and target, but
         ;; asking whether an array is definitely non-simple is a nonsensical
