@@ -2958,25 +2958,15 @@ expansion happened."
 (defun numeric-types-adjacent (low high)
   (let ((low-bound (numeric-type-high low))
         (high-bound (numeric-type-low high)))
-    ;; Return T if and only if X is EQL to Y, or X = 0 and -X is EQL to Y.
-    ;; If both intervals have the same sign of zero at the adjacency point,
-    ;; then they intersect (as per NUMERIC-TYPES-INTESECT)
-    ;; so it doesn't matter much what we say here.
-    (flet ((float-zeros-eqlish (x y)
-             (or (eql x y)
-                 ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
-                 ;; but not cons, however I prefer not to assume that the caller has
-                 ;; already checked for matching float formats. EQL enforces that.
-                 (and (fp-zero-p x) (fp-zero-p y) (eql (sb-xc:- x) y)))))
-      (cond ((not (and low-bound high-bound)) nil)
-            ((and (consp low-bound) (consp high-bound)) nil)
-            ((consp low-bound) (float-zeros-eqlish (car low-bound) high-bound))
-            ((consp high-bound) (float-zeros-eqlish low-bound (car high-bound)))
-            ((and (eq (numeric-type-class low) 'integer)
-                  (eq (numeric-type-class high) 'integer))
-             (eql (1+ low-bound) high-bound)) ; Integer intervals are never open
-            (t
-             nil)))))
+    (cond ((not (and low-bound high-bound)) nil)
+          ((and (consp low-bound) (consp high-bound)) nil)
+          ((consp low-bound) (eql (car low-bound) high-bound))
+          ((consp high-bound) (eql low-bound (car high-bound)))
+          ((and (eq (numeric-type-class low) 'integer)
+                (eq (numeric-type-class high) 'integer))
+           (eql (1+ low-bound) high-bound)) ; Integer intervals are never open
+          (t
+           nil))))
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 
