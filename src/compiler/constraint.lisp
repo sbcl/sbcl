@@ -331,10 +331,9 @@
   (etypecase y
     (ctype
        (awhen (lambda-var-ctype-constraints x)
-         (dolist (con (gethash (sb-kernel::type-class y) it) nil)
+         (dolist (con (gethash y it) nil)
            (when (and (eq (constraint-kind con) kind)
-                      (eq (constraint-not-p con) not-p)
-                      (type= (constraint-y con) y))
+                      (eq (constraint-not-p con) not-p))
              (return-from find-constraint con)))
          nil))
     (lvar
@@ -375,7 +374,7 @@
       (ctype
        (let ((index (ensure-hash (lambda-var-ctype-constraints x)))
              (vec   (ensure-vec  (lambda-var-inheritable-constraints x))))
-         (push con (gethash (sb-kernel::type-class y) index))
+         (push con (gethash y index))
          (vector-push-extend con vec)))
       (lvar
        (let ((index (ensure-hash (lambda-var-eq-constraints x))))

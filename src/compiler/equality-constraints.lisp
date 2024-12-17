@@ -52,31 +52,19 @@
   (let ((constraints (lambda-var-equality-constraints-hash x-var)))
     (when constraints
       (let ((constraints (gethash y-key constraints)))
-        (if (typep y-key 'sb-kernel::type-class)
-            (loop for con in constraints
-                  when (and (eq (equality-constraint-operator con) operator)
-                            (eq (constraint-not-p con) not-p)
-                            (eql (equality-constraint-amount con) amount)
-                            (vector-constraint-eq-p (constraint-x con) x)
-                            (type= (constraint-y con) y))
-                  return con)
-            (loop for con in constraints
-                  when (and (eq (equality-constraint-operator con) operator)
-                            (eq (constraint-not-p con) not-p)
-                            (vector-constraint-eq-p (constraint-x con) x)
-                            (vector-constraint-eq-p (constraint-y con) y)
-                            (eql (equality-constraint-amount con) amount))
-                  return con))))))
+        (loop for con in constraints
+              when (and (eq (equality-constraint-operator con) operator)
+                        (eq (constraint-not-p con) not-p)
+                        (vector-constraint-eq-p (constraint-x con) x)
+                        (vector-constraint-eq-p (constraint-y con) y)
+                        (eql (equality-constraint-amount con) amount))
+              return con)))))
 
 (defun find-or-create-equality-constraint (operator x y not-p &optional (amount 0))
   (unless amount
     (setf amount 0))
   (let ((x-var (constraint-var x))
         (cache-key (typecase y
-                     (numeric-type ;; eq-comparable
-                      y)
-                     (ctype
-                      (sb-kernel::type-class y))
                      (vector-length-constraint y
                       (vector-length-constraint-var y))
                      (t
