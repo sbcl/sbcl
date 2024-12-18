@@ -583,9 +583,9 @@
 (defknown list-copy-seq* (proper-list) list (flushable)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
-(defknown length (proper-sequence) index (foldable flushable dx-safe))
+(defknown length ((read-only proper-sequence)) index (foldable flushable dx-safe))
 
-(defknown reverse (proper-sequence) consed-sequence (flushable)
+(defknown reverse (proper-sequence) consed-sequence (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
@@ -638,15 +638,15 @@
                                                     (rest-args :sequence t))
                                                    (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
-    consed-sequence (call))
+    consed-sequence (call foldable-read-only))
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence
-  (call no-verify-arg-count))
+  (call no-verify-arg-count foldable-read-only))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
   (call no-verify-arg-count))
 (defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list
-   (flushable call no-verify-arg-count))
+   (flushable call no-verify-arg-count foldable-read-only))
 (defknown %map-to-simple-vector-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) simple-vector
-  (flushable call no-verify-arg-count))
+  (flushable call no-verify-arg-count foldable-read-only))
 
 (defknown map-into ((modifying sequence)
                     (function-designator ((rest-args :sequence t))

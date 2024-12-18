@@ -147,7 +147,7 @@
 
 ;;; Return the length of VECTOR.
 ;;; Ordinary code should prefer to use (LENGTH (THE VECTOR FOO)) instead.
-(defknown vector-length (vector) index (flushable dx-safe))
+(defknown vector-length ((read-only vector)) index (flushable dx-safe))
 
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
