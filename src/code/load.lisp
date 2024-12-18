@@ -757,17 +757,25 @@
                  (fop-integer (format *trace-output* " ~X" result)))))))))))
 
 (defun load-as-fasl (stream verbose print)
-  (when (zerop (file-length stream))
-    (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
+  ;; In general we issue too damn many I/O syscalls. This used to precheck for an empty fasl,
+  ;; via fstat() for no reason other than that the EOF condition would precede (thus suppress)
+  ;; MAYBE-ANNOUNCE-LOAD. To announce if and only if the file is non-empty, the announcement
+  ;; could be done in CHECK-FASL-HEADER, and we'd pass in a boolean flag saying whether this
+  ;; is the first iteration of the loop below, to announce exactly once per stream.
   (maybe-announce-load stream verbose)
-  (let ((fasl-input (make-fasl-input stream print)))
+  (let ((fasl-input (make-fasl-input stream print))
+        (empty t))
     (with-loader-package-names
       (unwind-protect
-           (loop while (load-fasl-group fasl-input))
+           (loop while (let ((success (load-fasl-group fasl-input)))
+                         (when success (setq empty nil))
+                         success))
         ;; Nuke the table and stack to avoid keeping garbage on
         ;; conservatively collected platforms.
         (nuke-fop-vector (%fasl-input-table fasl-input))
-        (nuke-fop-vector (%fasl-input-stack fasl-input)))))
+        (nuke-fop-vector (%fasl-input-stack fasl-input))))
+    (when empty
+      (error "attempt to load an empty FASL file:~%  ~S" (namestring stream))))
   t)
 
 
