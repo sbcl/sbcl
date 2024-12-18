@@ -2857,7 +2857,7 @@
              (:file-length
               ;; there are at least 2 ways to do this: stat() or lseek() a few times
               (let* ((fd (stdio-file-fd stdio-file))
-                     (cur (sb-unix:unix-lseek fd 0 sb-unix:L_SET)) ; SEEK-SET
+                     (cur (sb-unix:unix-lseek fd 0 sb-unix:L_INCR)) ; SEEK-CUR
                      (end (sb-unix:unix-lseek fd 0 sb-unix:L_XTND))) ; SEEK-END
                 ;; go back to where it was
                 (sb-unix:unix-lseek fd cur sb-unix:L_SET)
