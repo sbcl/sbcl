@@ -1895,7 +1895,8 @@
                                    ,',(if-vop-existsp (:translate %unary-ceiling)
                                                       `(truly-the fixnum (,(symbolicate '%unary- name) div))
                                                       `(%unary-truncate (truly-the ,fixnum-type quot)))
-                                   (,',unary-to-bignum quot))
+                                   (,',unary-to-bignum #+64-bit div
+                                                       #-64-bit quot))
                                (- number (* ,@(unless one-p
                                                 '(f-divisor))
                                             (+ quot
