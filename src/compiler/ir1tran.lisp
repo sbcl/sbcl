@@ -657,9 +657,11 @@
   (aver-live-component *current-component*)
   ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
   ;; no-op
-  (when (typep functional '(or optional-dispatch clambda))
-    (pushnew functional
-             (component-reanalyze-functionals *current-component*)))
+  (when (and (typep functional '(or optional-dispatch clambda))
+             (not (functional-reanalyze functional)))
+    (setf (functional-reanalyze functional) t)
+    (push functional
+          (component-reanalyze-functionals *current-component*)))
   functional)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
