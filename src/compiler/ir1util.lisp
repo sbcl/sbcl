@@ -1092,8 +1092,7 @@
 (defun insert-dynamic-extent (call)
   (let* ((dynamic-extent (with-ir1-environment-from-node call
                            (make-dynamic-extent)))
-         (cleanup (make-cleanup :kind :dynamic-extent
-                                :mess-up dynamic-extent)))
+         (cleanup (make-cleanup :dynamic-extent dynamic-extent)))
     (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
     (insert-node-before call dynamic-extent)
     (setf (node-lexenv call)
@@ -2968,11 +2967,11 @@ is :ANY, the function name is not checked."
                     (make-lvar-function-annotation
                      :type type
                      :context (shiftf context nil))))
-  (%make-cast :asserted-type type
-              :type-to-check (maybe-weaken-check type policy)
-              :value value
-              :derived-type (coerce-to-values type)
-              :context context))
+  (%make-cast type
+              (maybe-weaken-check type policy)
+              value
+              (coerce-to-values type)
+              context))
 
 (defun note-single-valuified-lvar (lvar)
   (declare (type (or lvar null) lvar))

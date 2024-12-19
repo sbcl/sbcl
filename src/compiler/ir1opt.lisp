@@ -997,7 +997,7 @@
                                     penultimate))
                    (next-block (or (node-ends-block penultimate)
                                    (car (block-succ (node-block penultimate)))))
-                   (ctran (make-ctran :kind :block-start))
+                   (ctran (make-ctran :block-start))
                    (new-block (make-block-key :start ctran
                                               :pred (block-pred next-block)
                                               :succ (list next-block)))
@@ -1015,7 +1015,7 @@
               (push ref (lambda-refs lambda))
               (setf (combination-args call) (last all-args))
               (setf (lambda-vars original-lambda) (last all-vars)
-                    (lambda-tail-set lambda) (make-tail-set :funs (list lambda)))
+                    (lambda-tail-set lambda) (make-tail-set (list lambda)))
               (setf (bind-lambda bind) lambda)
               (loop for var in vars
                     do (setf (lambda-var-home var) lambda))
@@ -1077,9 +1077,7 @@
            (use-block (node-block use))
            (new-ctran (make-ctran))
            (new-lvar (make-lvar))
-           (new-node (make-if :test new-lvar
-                              :consequent cblock
-                              :alternative ablock))
+           (new-node (make-if new-lvar cblock ablock))
            (new-block (ctran-starts-block new-ctran)))
       (link-node-to-previous-ctran new-node new-ctran)
       (setf (lvar-dest new-lvar) new-node)

@@ -76,7 +76,7 @@
              (sb-c::lexenv-vars env))))
 
     (dolist (name variable)
-      (lvars (sb-c::make-lambda-var :%source-name name)))
+      (lvars (sb-c::make-lambda-var name)))
 
     (dolist (name function)
       (clambdas

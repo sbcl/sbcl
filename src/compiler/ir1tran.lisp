@@ -217,20 +217,19 @@
           (setf ftype (specifier-type `(function ,@(cddr name)))
                 where :declared))
         (make-global-var
-         :kind :global-function
-         :%source-name name
-         :type (if (or (eq where :declared)
-                       (and (not latep)
-                            (not notinline)
-                            *derive-function-types*))
-                   ftype
-                   (specifier-type 'function))
-         :defined-type (if (and (not latep) (not notinline))
-                           ftype
-                           (specifier-type 'function))
-         :where-from (if notinline
-                         where
-                         (maybe-defined-here name where)))))))
+         :global-function name
+         (if notinline
+             where
+             (maybe-defined-here name where))
+         (if (or (eq where :declared)
+                 (and (not latep)
+                      (not notinline)
+                      *derive-function-types*))
+             ftype
+             (specifier-type 'function))
+         (if (and (not latep) (not notinline))
+             ftype
+             (specifier-type 'function)))))))
 
 ;;; If NAME already has a valid entry in (FREE-FUNS *IR1-NAMESPACE*), then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
@@ -321,10 +320,7 @@
                  (let ((value (symbol-value name)))
                    (make-constant value (ctype-of value) name)))
                 (t
-                 (make-global-var :kind kind
-                                  :%source-name name
-                                  :type type
-                                  :where-from where-from)))))))
+                 (make-global-var kind name where-from type)))))))
 
 ;;; Return T if and only if OBJ's nature as an externalizable thing renders
 ;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
@@ -1140,9 +1136,7 @@
          (then-block (ctran-starts-block then-ctran))
          (else-ctran (make-ctran))
          (else-block (ctran-starts-block else-ctran))
-         (node (make-if :test pred-lvar
-                        :consequent then-block
-                        :alternative else-block)))
+         (node (make-if pred-lvar then-block else-block)))
     (setf (lvar-dest pred-lvar) node)
     (ir1-convert-combination-checking-type start pred-ctran pred-lvar form var)
     (link-node-to-previous-ctran node pred-ctran)
@@ -1813,9 +1807,7 @@ possible.")
               name))
            found))
         (t
-         (make-global-var :kind :special
-                          :%source-name name
-                          :where-from :declared))))
+         (make-global-var :special name :declared))))
 
 (declaim (end-block))
 
@@ -1870,8 +1862,7 @@ possible.")
                     :inline-expansion (defined-fun-inline-expansion var)
                     :same-block-p (defined-fun-same-block-p var)
                     :functional (defined-fun-functional var))
-                   (make-global-var :%source-name name :type type
-                                    :where-from :declared :kind kind))))
+                   (make-global-var kind name :declared type))))
        (when (defined-fun-p var)
          (let ((fun (defined-fun-functional var)))
            (when fun
@@ -1902,9 +1893,7 @@ possible.")
           (constant)
           (global-var
            (setf (gethash name free-vars)
-                 (make-global-var :%source-name name
-                                  :type type :where-from :declared
-                                  :kind (global-var-kind var)))))))))
+                 (make-global-var (global-var-kind var) name :declared type))))))))
 
 ;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
 ;;; global-var ensures that when we substitute a functional for a
@@ -1939,11 +1928,12 @@ possible.")
              ((:special :global))
              (:unknown
               (setf (gethash name free-vars)
-                    (make-global-var :%source-name name :type (leaf-type old)
-                                     :where-from (leaf-where-from old)
-                                     :kind (ecase kind
-                                             (special :special)
-                                             (global :global))))))))))
+                    (make-global-var (ecase kind
+                                       (special :special)
+                                       (global :global))
+                                     name
+                                     (leaf-where-from old)
+                                     (leaf-type old)))))))))
     ((start-block end-block)
      #-(and sb-devel sb-xc-host)
      (process-block-compile-proclamation kind args))

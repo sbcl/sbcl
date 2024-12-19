@@ -1095,7 +1095,7 @@
                          (macroize sym `(svref (load-time-value ,payload) ,i)))
                         (t
                          (let ((leaf (sb-c::make-lambda-var
-                                      :%source-name sym
+                                      sym
                                       :type (or (cdr binding) *universal-type*))))
                            (setf (gethash binding var-map) leaf)
                            (cons sym leaf)))))))
@@ -1176,9 +1176,8 @@
                              (typecase thing
                                (cons x) ; symbol-macro
                                (sb-c::lambda-var thing)
-                               (sb-c::global-var (sb-c::make-lambda-var
-                                                  :specvar thing
-                                                  :%source-name (car x))))))
+                               (sb-c::global-var (sb-c::make-lambda-var (car x)
+                                                                        :specvar thing)))))
                          vars)
                         ;; And surely this is wrong...
                         funs)))))))
