@@ -345,7 +345,7 @@
 ;; Track the make-load-form FOPs as they fly by at load-time.
 (defvar *call-tracker* nil)
 (defvar *fop-funs*
-  (car (ctu:find-code-constants #'sb-fasl::decode-fop :type '(simple-vector 128))))
+  (car (ctu:find-code-constants #'sb-fasl::load-fasl-group :type '(simple-vector 128))))
 (dolist (fop-name '(sb-fasl::fop-instance))
   (let* ((index (position fop-name *fop-funs*
                           :key
