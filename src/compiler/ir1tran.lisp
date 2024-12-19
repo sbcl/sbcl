@@ -253,16 +253,16 @@
                    (if (or expansion inlinep)
                        (let ((where (info :function :where-from name)))
                          (make-defined-fun
-                          :%source-name name
+                          name
+                          (if (and (eq inlinep 'notinline)
+                                   (neq where :declared))
+                              (specifier-type 'function)
+                              (global-ftype name))
+                          (if (eq inlinep 'notinline)
+                              where
+                              (maybe-defined-here name where))
                           :inline-expansion expansion
-                          :inlinep inlinep
-                          :where-from (if (eq inlinep 'notinline)
-                                          where
-                                          (maybe-defined-here name where))
-                          :type (if (and (eq inlinep 'notinline)
-                                         (neq where :declared))
-                                    (specifier-type 'function)
-                                    (global-ftype name))))
+                          :inlinep inlinep))
                        (find-global-fun name nil)))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
@@ -1415,11 +1415,11 @@
                    (specifier-type 'function)
                    (leaf-type var)))
          (res (make-defined-fun
-               :%source-name (leaf-source-name var)
-               :where-from (leaf-where-from var)
-               :type (if local-type
-                         (type-intersection local-type type)
-                         type)
+               (leaf-source-name var)
+               (if local-type
+                   (type-intersection local-type type)
+                   type)
+               (leaf-where-from var)
                :inlinep inlinep)))
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)
@@ -1857,7 +1857,10 @@ possible.")
              (let ((kind (global-var-kind var)))
                (if (defined-fun-p var)
                    (make-defined-fun
-                    :%source-name name :type type :where-from :declared :kind kind
+                    name
+                    type
+                    :declared
+                    :kind kind
                     :inlinep (defined-fun-inlinep var)
                     :inline-expansion (defined-fun-inline-expansion var)
                     :same-block-p (defined-fun-same-block-p var)

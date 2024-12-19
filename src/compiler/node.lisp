@@ -929,9 +929,14 @@
 ;;; an inline proclamation) we copy the structure so that former
 ;;; INLINEP values are preserved.
 (defstruct (defined-fun (:include global-var
-                                  (where-from :defined)
-                                  (kind :global-function))
-                        (:copier nil))
+                         (where-from :defined)
+                         (kind :global-function))
+               (:constructor make-defined-fun
+                   (%source-name type &optional where-from
+                    &key kind
+                         inline-expansion inlinep
+                         same-block-p functional))
+               (:copier nil))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
   (inlinep nil :type inlinep)
