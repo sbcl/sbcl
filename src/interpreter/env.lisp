@@ -1072,9 +1072,7 @@
         (payload (env-payload env)))
     (flet ((specialize (binding) ; = make a global var, not make less general
              (let ((sym (binding-symbol binding)))
-               (cons sym (sb-c::make-global-var :%source-name sym
-                                                :kind :special
-                                                :where-from :declared))))
+               (cons sym (sb-c::make-global-var :special sym :declared))))
            (macroize (name thing) (list* name 'sb-sys:macro thing))
            (fname (f) (second (fun-name f))))
       (multiple-value-bind (vars funs)
