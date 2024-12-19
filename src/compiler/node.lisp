@@ -824,7 +824,7 @@
                 ;; I guess we state the type this way to avoid calling
                 ;; LEGAL-FUN-NAME-P unless absolutely necessary,
                 ;; but this seems a bit of a premature optimization.
-                :type (or symbol (and cons (satisfies legal-fun-name-p)))
+                :type (or symbol (and cons #-host-quirks-cmu (satisfies legal-fun-name-p)))
                 :read-only t)
   ;; the type which values of this leaf must have
   (type *universal-type* :type ctype)
