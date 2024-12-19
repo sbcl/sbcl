@@ -251,6 +251,10 @@ int sb_GetTID()
 int sb_GetTID() {
     return pthread_mach_thread_np(pthread_self());
 }
+#elif defined __HAIKU__ && defined LISP_FEATURE_SB_THREAD
+int sb_GetTID() {
+    return get_pthread_thread_id(pthread_self());
+}
 #else
 #define sb_GetTID() 0
 #endif

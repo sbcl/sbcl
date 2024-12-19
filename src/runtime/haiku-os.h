@@ -17,6 +17,9 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifdef LISP_FEATURE_SB_THREAD
+#include <OS.h>
+#endif
 
 // Needs to be defined before including target-arch.h
 typedef caddr_t os_vm_address_t;
