@@ -446,16 +446,22 @@ necessary, since type inference may take arbitrarily long to converge.")
       (maybe-mumble "."))
     t))
 
+(defvar *ir1-transforms-after-constraints*)
+(defvar *ir1-transforms-after-ir1-phases*)
 (defparameter *reoptimize-limit* 10)
 
 (defun ir1-optimize-phase-1 (component)
   (let ((loop-count 0)
         (constraint-propagate *constraint-propagate*)
-        reoptimized)
+        reoptimized
+        *ir1-transforms-after-constraints*
+        *ir1-transforms-after-ir1-phases*)
     (tagbody
      again
        (loop
         (setf reoptimized (ir1-optimize-until-done component))
+        (setf (component-reoptimize-counter component)
+              (mod (1+ (component-reoptimize-counter component)) most-positive-fixnum))
         (cond ((or (component-new-functionals component)
                    (component-reanalyze-functionals component))
                (maybe-mumble "Locall ")
@@ -471,9 +477,11 @@ necessary, since type inference may take arbitrarily long to converge.")
         (when constraint-propagate
           (maybe-mumble "Constraint ")
           (constraint-propagate component)
-          (when (retry-delayed-ir1-transforms :constraint)
+          (when (retry-delayed-ir1-transforms *ir1-transforms-after-constraints*)
+            (reoptimize-component component :maybe)
             (setf loop-count 0) ;; otherwise nothing may get retried
             (maybe-mumble "Rtran ")))
+        (setf *ir1-transforms-after-constraints* nil)
         (unless (or (component-reoptimize component)
                     (component-reanalyze component)
                     (component-new-functionals component)
@@ -484,12 +492,15 @@ necessary, since type inference may take arbitrarily long to converge.")
           (event reoptimize-maxed-out)
           (return))
         (incf loop-count))
+       (setf (component-phase-counter component)
+             (mod (1+ (component-phase-counter component)) most-positive-fixnum))
        ;; Do it once more for the transforms that will produce code
        ;; that loses some information for further optimizations and
        ;; it's better to insert it at the last moment.
        ;; Such code shouldn't need constraint propagation, the slowest
        ;; part, so avoid it.
-       (when (retry-delayed-ir1-transforms :ir1-phases)
+       (when (retry-delayed-ir1-transforms (shiftf *ir1-transforms-after-ir1-phases* nil))
+         (reoptimize-component component :maybe)
          (setf loop-count 0
                constraint-propagate nil)
          (go again)))))

@@ -621,6 +621,9 @@
   ;; could benefit from further IR1 optimization. T means that
   ;; reoptimization is necessary.
   (reoptimize t :type (member nil :maybe t))
+  ;; For delay-ir1-transform to know when to delay
+  (reoptimize-counter 0 :type fixnum)
+  (phase-counter 0 :type fixnum)
   ;; If this is true, then the control flow in this component was
   ;; messed up by IR1 optimizations, so the DFO should be recomputed.
   (reanalyze nil :type boolean)
@@ -1580,6 +1583,8 @@
   (step-info nil)
   ;; A plist of inline expansions
   (inline-expansions *inline-expansions* :type list :read-only t)
+  ;; Current COMPONENT-REOPTIMIZE-COUNTER set when calling delay-ir1-transform.
+  (delay-to -1 :type fixnum)
   (constraints-in)
   #+() (constraints-out))
 

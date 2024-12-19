@@ -1664,29 +1664,30 @@
 (defun abort-ir1-transform (&rest args)
   (throw 'give-up-ir1-transform (values :aborted args)))
 
-(defvar *delayed-ir1-transforms*)
+;;; Wait for the next component-reoptimize-counter
+(defun delay-ir1-optimizer (node reason)
+  (let ((delayed (basic-combination-delay-to node))
+        (component *component-being-compiled*))
+    (aver (eq component (node-component node)))
+    (ecase reason
+      (:constraint
+       (let ((counter (component-reoptimize-counter component)))
+         (cond ((= delayed -1)
+                (push node *ir1-transforms-after-constraints*)
+                (setf (basic-combination-delay-to node) counter)
+                t)
+               ((= delayed counter)))))
+      (:ir1-phases
+       (let ((counter (component-phase-counter component)))
+         (cond ((= delayed -1)
+                (push node *ir1-transforms-after-ir1-phases*)
+                (setf (basic-combination-delay-to node) counter)
+                t)
+               ((= delayed counter))))))))
 
-(defun delay-ir1-transform (node &rest reasons)
-  (let ((assoc (assoc node *delayed-ir1-transforms*)))
-    (cond ((not assoc)
-           (setf *delayed-ir1-transforms*
-                 (acons node reasons *delayed-ir1-transforms*))
-           (throw 'give-up-ir1-transform :delayed))
-          ((cdr assoc)
-           (dolist (reason reasons)
-             (pushnew reason (cdr assoc)))
-           (throw 'give-up-ir1-transform :delayed)))))
-
-(defun delay-ir1-optimizer (node &rest reasons)
-  (let ((assoc (assoc node *delayed-ir1-transforms*)))
-    (cond ((not assoc)
-           (setf *delayed-ir1-transforms*
-                 (acons node reasons *delayed-ir1-transforms*))
-           t)
-          ((cdr assoc)
-           (dolist (reason reasons)
-             (pushnew reason (cdr assoc)))
-           t))))
+(defun delay-ir1-transform (node reason)
+  (when (delay-ir1-optimizer node reason)
+    (throw 'give-up-ir1-transform :delayed)))
 
 ;;; Poor man's catching and resignalling
 ;;; Implicit %GIVE-UP macrolet will resignal the give-up "condition"
@@ -1707,26 +1708,14 @@
                                                                 ,',args))))
               ,@gave-up-body)))))))
 
-;;; Clear any delayed transform with no reasons - these should have
-;;; been tried in the last pass. Then remove the reason from the
-;;; delayed transform reasons, and if any become empty then set
-;;; reoptimize flags for the node. Return true if any transforms are
-;;; to be retried.
-(defun retry-delayed-ir1-transforms (reason)
-  (setf *delayed-ir1-transforms*
-        (remove-if-not #'cdr *delayed-ir1-transforms*))
+(defun retry-delayed-ir1-transforms (nodes)
   (let ((reoptimize nil))
-    (dolist (assoc *delayed-ir1-transforms*)
-      (let ((reasons (remove reason (cdr assoc))))
-        (setf (cdr assoc) reasons)
-        (unless reasons
-          (let ((node (car assoc)))
-            (unless (node-deleted node)
-              (setf reoptimize t)
-              (setf (node-reoptimize node) t)
-              (let ((block (node-block node)))
-                (setf (block-reoptimize block) t)
-                (reoptimize-component (block-component block) :maybe)))))))
+    (dolist (node nodes)
+      (unless (node-deleted node)
+        (setf reoptimize t)
+        (setf (node-reoptimize node) t)
+        (let ((block (node-block node)))
+          (setf (block-reoptimize block) t))))
     reoptimize))
 
 ;;; Take the lambda-expression RES, IR1 convert it in the proper
