@@ -101,6 +101,24 @@
 ;;; If ERORRP is true signals an error immediately -- otherwise returns
 ;;; a function that will signal the error.
 (defun compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp)
+  ;; This ridiculous check for a NIL-returning constant function cuts out hundreds of
+  ;; identical functions that result from all the turds that users seem to generate.
+  ;; It's not coming from CLOS per se because our DEFCLASS knows to use :INITFUNCTION
+  ;; as #'SB-INT:CONSTANTLY-NIL of its own volition when applicable. Likely it is user-
+  ;; written code that employs a similar paradigm with no recognition of common cases.
+  (when (and (typep form '(cons (eql lambda)))
+             (let ((cdr (cdr form)))
+               (and (typep cdr '(cons (eql nil)))
+                    (or (null (setq cdr (cdr cdr)))
+                        (equal cdr '(nil))
+                        (equal cdr '('nil))))))
+    ;; I sure hope that users don't expect COMPILE to necessarily return a
+    ;; unique blob of code. How could they?
+    (return-from compile-in-lexenv
+      (values (if (policy *lexenv* (= safety 0))
+                  (load-time-value #'constantly-nil t)
+                  (load-time-value #'sb-impl::0-arg-nil t))
+              nil nil)))
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
       (with-compilation-unit ()
