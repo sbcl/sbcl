@@ -421,15 +421,15 @@ should not be used."
 
 ;;; list of file descriptors and streams to close when RUN-PROGRAM
 ;;; exits due to an error
-(defvar *close-fds-on-error* nil)
+(defvar *close-fds-on-error*)
 ;;; Separate from fds to ensure the finalizer and all the buffers are cleared too.
 (defvar *close-streams-on-error*)
 
 ;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
-(defvar *close-in-parent* nil)
+(defvar *close-in-parent*)
 
 ;;; list of handlers installed by RUN-PROGRAM.
-(defvar *handlers-installed* nil)
+(defvar *handlers-installed*)
 
 ;;; Find an unused pty. Return three values: the file descriptor for
 ;;; the master side of the pty, the file descriptor for the slave side
