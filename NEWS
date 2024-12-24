@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.4.11:
+  * platform support:
+    ** improve support for the Haiku operating system.  (thanks to Al Hoang,
+       Estevan Castilho and Alexandru Popa)
   * bug fix: generic functions with a large number of required arguments, with
     methods with specializations on exactly STANDARD-OBJECT or
     FUNCALLABLE-STANDARD-OBJECT, test the types of their arguments more
