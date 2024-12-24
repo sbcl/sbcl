@@ -465,6 +465,7 @@
              (satisfies
               (let* ((name (second spec))
                      (expansion (fun-name-inline-expansion name)))
+                (check-global-fun name nil)
                 ;; Lambda without lexenv can easily be handled here.
                 ;; This fixes the issue that LEGAL-FUN-NAME-P which is
                 ;; just a renaming of VALID-FUNCTION-NAME-P would not
