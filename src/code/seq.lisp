@@ -74,12 +74,15 @@
            (and key (%coerce-callable-to-fun key))
            (or null function))
       (test #'eql
-            nil
+            test-p
             (%coerce-callable-to-fun test)
             function)
       (test-not nil
-                nil
-                (and test-not (%coerce-callable-to-fun test-not))
+                test-not-p
+                (and test-not-p
+                     (if test-p
+                         (error "can't specify both :TEST and :TEST-NOT")
+                         (%coerce-callable-to-fun test-not)))
                 (or null function)))))
 
 (defmacro define-sequence-traverser (name args &body body)
@@ -2976,20 +2979,13 @@ many elements are copied."
       (apply #'sb-sequence:count-if-not predicate sequence args)))
 
 (define-sequence-traverser count
-    (item sequence &rest args &key from-end start end
-          ;; FIXME: TEST and TEST-NOT are not eagerly coerced to functions
-          ;; because DEFINE-SEQUENCE-TRAVERSER does not see the arg name-
-          ;; it expects only symbols as args.
-          key (test #'eql test-p) (test-not nil test-not-p))
+    (item sequence &rest args &key from-end start end key test test-not)
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
   (declare (type fixnum start)
            (dynamic-extent args))
   (declare (explicit-check sequence))
-  (when (and test-p test-not-p)
-    ;; Use the same wording as EFFECTIVE-FIND-POSITION-TEST
-    (error "can't specify both :TEST and :TEST-NOT"))
-  (let ((test (%coerce-callable-to-fun (or test-not test))))
+  (let ((test (or test-not test)))
     (seq-dispatch-checking sequence
         (let ((end (or end length)))
           (declare (type index end))
