@@ -842,10 +842,10 @@
               (let ((expansions (memq lexical-def *inline-expansions*)))
                 (if (<= (or (cadr expansions) 0) *inline-expansion-limit*)
                     (let ((*inline-expansions*
-                            (if expansions
-                                (progn (incf (cadr expansions))
-                                       *inline-expansions*)
-                                (list* lexical-def 1 *inline-expansions*))))
+                            (list* lexical-def (if expansions
+                                                   (1+ (cadr expansions))
+                                                   1)
+                                   *inline-expansions*)))
                       (ir1-convert start next result
                                    (careful-expand-macro (cdr lexical-def) form)))
                     (progn
