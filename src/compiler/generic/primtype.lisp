@@ -375,10 +375,10 @@
                             (saetp-primitive-type-name saetp))
                            (eq (first (array-type-dimensions type)) '*))
                    (any)))))
-        (union-type
+        ((or union-type numeric-union-type)
          (if (type= type (specifier-type 'list))
              (exactly list)
-             (let ((types (union-type-types type)))
+             (let ((types (sb-kernel::flatten-numeric-union-types type)))
                (multiple-value-bind (res exact) (primitive-type (first types))
                  (dolist (type (rest types) (values res exact))
                    (multiple-value-bind (ptype ptype-exact)

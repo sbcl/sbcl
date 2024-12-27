@@ -427,7 +427,7 @@
 ;; Avg=1.7653061
 (with-test (:name :numeric-type-hash-mixer
             :skipped-on :gc-stress)
-  (let* ((hs sb-kernel::*numeric-type-hashset*)
+  (let* ((hs sb-kernel::*numeric-union-type-hashset*)
          ;; Theoretically we should be more concerned with the _average_
          ;; number of probes assuming all keys are sought equally (which is seldom true),
          ;; but we do also want to constrain the worst-case number of probes.
@@ -435,7 +435,7 @@
          (acceptable-initial-max-psl 9)
          (pre (compute-max-psl hs)))
     (when (> pre acceptable-initial-max-psl)
-      (format t "~&Dumping ~S~%" 'sb-kernel::*numeric-type-hashset*)
+      (format t "~&Dumping ~S~%" 'sb-kernel::*numeric-union-type-hashset*)
       (debug-probing hs))
     (assert (<= pre acceptable-initial-max-psl))
     (loop for i = 1 then (ash i 1)

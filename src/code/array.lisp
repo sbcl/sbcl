@@ -286,6 +286,24 @@
                          (sb-kernel::replace-hairy-type ctype))))
         (typecase ctype
           (null (result simple-vector-widetag))
+          (numeric-union-type
+           (case (sb-kernel::numtype-aspects-id (sb-kernel::numeric-union-type-aspects ctype))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'integer nil)
+              (let* ((ranges (sb-kernel::numeric-union-type-ranges ctype))
+                     (low (aref ranges 1))
+                     (high (aref ranges (1- (length ranges)))))
+                (if (and (integerp low) (integerp high))
+                    (integer-interval-widetag low high)
+                    (result simple-vector-widetag))))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'float 'double-float)
+              (result simple-array-double-float-widetag))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'float 'single-float)
+              (result simple-array-single-float-widetag))
+             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'single-float))
+             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'double-float)
+              (result simple-array-complex-double-float-widetag))
+             (t
+              (result simple-vector-widetag))))
           (union-type
            (let ((types (union-type-types ctype)))
              (cond ((not (every #'numeric-type-p types))

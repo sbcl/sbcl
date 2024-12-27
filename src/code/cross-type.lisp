@@ -57,7 +57,8 @@
   (or (member symbol
               '(closurep simple-fun-p unbound-marker-p
                 sb-impl::vector-with-fill-pointer-p
-                legal-fun-name-p extended-function-designator-p))
+                legal-fun-name-p extended-function-designator-p
+                numeric-type-p))
       (member symbol sb-vm::*backend-cross-foldable-predicates*)
       (and (eq (sb-xc:symbol-package symbol) *cl-package*)
            (or (eq usage 'sb-xc:typep)
@@ -99,8 +100,8 @@
           ((instance) (values (%instancep obj) t))
           ((nil extended-sequence funcallable-instance)
            (values nil t)))) ; nothing could be these
-       (numeric-type
-        (values (number-typep obj type) t))
+       (numeric-union-type
+        (values (numeric-union-typep obj type) t))
        (array-type
         ;; Array types correspond fairly closely between host and target, but
         ;; asking whether an array is definitely non-simple is a nonsensical

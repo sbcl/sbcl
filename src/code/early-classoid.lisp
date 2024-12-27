@@ -628,9 +628,9 @@
                       (fun-type-wild-args x) (fun-type-returns x))))
            (%set-instance-layout copy (%instance-layout x))
            copy))
-        (numeric-type
-         (!alloc-numeric-type bits (numeric-type-aspects x)
-                              (copy (numeric-type-low x)) (copy (numeric-type-high x))))
+        (numeric-union-type
+         (!alloc-numeric-union-type bits (numeric-union-type-aspects x)
+                                    (map 'vector #'copy (numeric-union-type-ranges x))))
         (compound-type ; UNION or INTERSECTION
          (let ((copy (!alloc-union-type bits (compound-type-enumerable x)
                                         (compound-type-types x))))
@@ -694,7 +694,7 @@
                        (bug "genesis dumped bad instance within ~X"
                             (get-lisp-obj-address instance)))))))
         (etypecase instance
-          ((or numeric-type member-type character-set-type ; nothing extra to do
+          ((or numeric-union-type member-type character-set-type ; nothing extra to do
            #+sb-simd-pack simd-pack-type #+sb-simd-pack-256 simd-pack-256-type
            hairy-type))
           (args-type

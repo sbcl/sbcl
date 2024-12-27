@@ -677,7 +677,7 @@
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
 (defun source-transform-union-typep (object type)
-  (let* ((types (union-type-types type))
+  (let* ((types (sb-kernel::flatten-numeric-union-types type))
          (type-cons (specifier-type 'cons))
          (type-symbol (specifier-type 'symbol))
          (mtype (find-if #'member-type-p types))
@@ -745,7 +745,7 @@
            (multiple-value-bind (widetags more-types)
                (sb-kernel::widetags-from-union-type types)
              (multiple-value-bind (predicate more-union-types)
-                 (split-union-type-tests type)
+                 (split-union-type-tests types)
                (cond ((and predicate
                            (< (length more-union-types)
                               (length more-types)))
@@ -1351,7 +1351,9 @@
             (source-transform-hairy-typep object ctype))
            (negation-type
             (source-transform-negation-typep object ctype))
-           (union-type
+           (numeric-type
+            (source-transform-numeric-typep object ctype))
+           ((or union-type numeric-union-type)
             (source-transform-union-typep object ctype))
            (intersection-type
             (source-transform-intersection-typep object ctype))
@@ -1360,8 +1362,6 @@
            (args-type
             (compiler-warn "illegal type specifier for TYPEP: ~S" type)
             (return-from %source-transform-typep (values nil t)))
-           (numeric-type
-            (source-transform-numeric-typep object ctype))
            (classoid
             `(%instance-typep ,object ',type))
            (array-type

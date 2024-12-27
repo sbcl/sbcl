@@ -44,7 +44,7 @@
        ((funcallable-instance) (funcallable-instance-p object))
        ((extended-sequence) (extended-sequence-p object))
        ((nil) nil)))
-    (numeric-type (number-typep object type))
+    (numeric-union-type (numeric-union-typep object type))
     (array-type
      (and (arrayp object)
           (or (eq (array-type-complexp type) :maybe)
@@ -273,7 +273,7 @@
 (defun ctypep (obj type)
   (declare (type ctype type))
   (typep-impl-macro (obj)
-    ((or numeric-type
+    ((or numeric-union-type
          named-type
          member-type
          character-set-type

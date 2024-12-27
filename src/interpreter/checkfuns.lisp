@@ -55,7 +55,7 @@
              (symbol-function pred))))
        (simplify (type)
          (etypecase type
-           ((or named-type numeric-type member-type classoid
+           ((or named-type numeric-union-type member-type classoid
                 character-set-type unknown-type hairy-type
                 alien-type-type #+sb-simd-pack simd-pack-type
                                 #+sb-simd-pack-256 simd-pack-256-type)

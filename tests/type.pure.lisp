@@ -595,8 +595,7 @@
           sb-kernel:type=
           sb-kernel:find-classoid
           sb-kernel:make-numeric-type
-          sb-kernel::numeric-types-adjacent
-          sb-kernel::numeric-types-intersect
+          sb-kernel:types-equal-or-intersect
           sb-kernel:*empty-type*))
 
 (with-test (:name :partition-array-into-simple/hairy)
@@ -734,15 +733,13 @@
     (dolist (y '(-0s0 0s0))
       (let ((a (specifier-type `(single-float -10s0 ,x)))
             (b (specifier-type `(single-float ,y 20s0))))
-        (assert (numeric-types-intersect a b)))
+        (assert (types-equal-or-intersect a b)))
       (let ((a (specifier-type `(single-float -10s0 (,x))))
             (b (specifier-type `(single-float ,y 20s0))))
-        (assert (not (numeric-types-intersect a b)))
-        (assert (numeric-types-adjacent a b)))
+        (assert (not (types-equal-or-intersect a b))))
       (let ((a (specifier-type `(single-float -10s0 ,x)))
             (b (specifier-type `(single-float (,y) 20s0))))
-        (assert (not (numeric-types-intersect a b)))
-        (assert (numeric-types-adjacent a b))))))
+        (assert (not (types-equal-or-intersect a b)))))))
 
 (with-test (:name :ctypep-function)
   (assert (not (sb-kernel:ctypep #'+ (eval '(sb-kernel:specifier-type '(function (list))))))))

@@ -1469,8 +1469,8 @@
            (typecase arg
              (numeric-type
               (list arg))
-             (union-type
-              (union-type-types arg))
+             ((or union-type numeric-union-type)
+              (sb-kernel::flatten-numeric-union-types arg))
              (list
               arg)
              (t
@@ -2647,7 +2647,7 @@
 ;;; - The abs of the minimal value (i.e. closest to 0) in the range.
 ;;; - The abs of the maximal value if there is one, or nil if it is
 ;;;   unbounded.
-(defun numeric-range-info (low high)
+(defun numeric-union-info (low high)
   (cond ((and low (not (minusp low)))
          (values '+ low high))
         ((and high (not (plusp high)))
@@ -2661,9 +2661,9 @@
   ;; sign might change. If we can determine the sign of either the
   ;; number or the divisor, we can eliminate some of the cases.
   (multiple-value-bind (number-sign number-min number-max)
-      (numeric-range-info number-low number-high)
+      (numeric-union-info number-low number-high)
     (multiple-value-bind (divisor-sign divisor-min divisor-max)
-        (numeric-range-info divisor-low divisor-high)
+        (numeric-union-info divisor-low divisor-high)
       (when (and divisor-max (zerop divisor-max))
         ;; We've got a problem: guaranteed division by zero.
         (return-from integer-truncate-derive-type t))
@@ -3413,6 +3413,8 @@
     ;; KLUDGE: this is not INTEGER-type-numeric-bounds
     (numeric-type (values (numeric-type-low type)
                           (numeric-type-high type)))
+    (numeric-union-type
+     (sb-kernel::numeric-union-bounds type))
     (union-type
      (let ((low  nil)
            (high nil))

@@ -1499,5 +1499,11 @@ NOTE: This interface is experimental and subject to change."
   #-(and x86-64 (not sb-xc-host))
   (1- (integer-length (logand x (- x)))))
 
+(defun integer-float-p (float)
+  (and (floatp float)
+       (multiple-value-bind (significand exponent) (integer-decode-float float)
+         (or (plusp exponent)
+             (<= (- exponent) (first-bit-set significand))))))
+
 
 (defvar *top-level-form-p* nil)

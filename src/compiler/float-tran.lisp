@@ -643,8 +643,8 @@
 ;;; should be the right kind of float. Allow bounds for the float
 ;;; part too.
 (defun float-or-complex-float-type (arg &optional lo hi)
-  (cond
-    ((numeric-type-p arg)
+  (typecase arg
+    (numeric-type
      (let* ((format (case (numeric-type-class arg)
                       ((integer rational) 'single-float)
                       (t (numeric-type-format arg))))
@@ -653,9 +653,9 @@
             (hi (coerce-numeric-bound hi float-type)))
        (specifier-type `(or (,float-type ,(or lo '*) ,(or hi '*))
                             (complex ,float-type)))))
-    ((union-type-p arg)
+    ((or union-type numeric-union-type)
      (apply #'type-union
-            (loop for type in (union-type-types arg)
+            (loop for type in (sb-kernel::flatten-numeric-union-types arg)
                   collect (float-or-complex-float-type type lo hi))))
     (t (specifier-type 'number))))
 
@@ -1029,12 +1029,6 @@
               (fixup-interval-expt type x-int y-int x y))
             (flatten-list (interval-expt x-int y-int)))))
 
-(defun integer-float-p (float)
-  (and (floatp float)
-       (multiple-value-bind (significand exponent) (integer-decode-float float)
-         (or (plusp exponent)
-             (<= (- exponent) (sb-kernel::first-bit-set significand))))))
-
 (defun expt-derive-type-aux (x y same-arg)
   (declare (ignore same-arg))
   (cond ((or (not (numeric-type-real-p x))
@@ -1042,7 +1036,7 @@
          ;; Use numeric contagion if either is not real.
          (numeric-contagion x y))
         ((or (csubtypep y (specifier-type 'integer))
-             (integer-float-p (nth-value 1 (type-singleton-p y))))
+             (sb-kernel::integer-float-p (nth-value 1 (type-singleton-p y))))
          ;; A real raised to an integer power is well-defined.
          (merged-interval-expt x y))
         ;; A real raised to a non-integral power can be a float or a
@@ -1722,7 +1716,8 @@
                    (try 0f0))))))
     (typecase type
       (numeric-type (numeric type))
-      (union-type (mapc #'numeric (union-type-types type))))
+      ((or numeric-union-type union-type)
+       (mapc #'numeric (sb-kernel::flatten-numeric-union-types type))))
     (error "Couldn't come up with a value for ~s" type)))
 
 #-(or sb-xc-host 64-bit)

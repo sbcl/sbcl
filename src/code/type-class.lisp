@@ -336,7 +336,7 @@
       (intersection  intersection-type)
       (union         union-type)
       (negation      negation-type)
-      (number        numeric-type)
+      (numeric-union numeric-union-type)
       (array         array-type)
       (character-set character-set-type)
       (member        member-type)
@@ -1066,9 +1066,9 @@
              (setf (aref *numeric-aspects-v* index)
                    (!make-numeric-aspects complexp class precision index)))))
 
-(defmacro get-numtype-aspects (&rest rest)
+(defmacro get-numtype-aspects (complexp class precision)
   `(the (not null)
-        (aref *numeric-aspects-v* (!compute-numtype-aspect-id ,@rest))))
+        (aref *numeric-aspects-v* (!compute-numtype-aspect-id ,complexp ,class ,precision))))
 
 (macrolet ((numbound-hash (b)
              ;; It doesn't matter what the hash of a number is, as long as it's stable.
@@ -1087,17 +1087,54 @@
              `(let ((a ,a) (b ,b))
                 (if (listp a)
                     (and (listp b) (eql (car a) (car b)))
-                    (eql a b)))))
-;;; A NUMERIC-TYPE represents any numeric type, including things
-;;; such as FIXNUM.
-(def-type-model (numeric-type
-                 (:extra-mix-step)
-                 (:constructor* nil (aspects low high)))
-  (aspects (missing-arg) :type numtype-aspects :hasher numtype-aspects-id :test eq)
-  (low nil :type (or real (cons real null) null)
-       :hasher numbound-hash :test numbound-eql)
-  (high nil :type (or real (cons real null) null)
-        :hasher numbound-hash :test numbound-eql)))
+                    (eql a b))))
+           (hash-ranges (a)
+             `(let ((vector ,a)
+                    (h 0))
+                (loop for e across vector
+                      do
+                      (setf h (mix h (numbound-hash e))))
+                h)))
+
+  (def-type-model (numeric-union-type
+                   (:extra-mix-step)
+                   (:constructor* nil (aspects ranges)))
+    (aspects (missing-arg) :type numtype-aspects :hasher numtype-aspects-id :test eq)
+    ;; Ranges are sorted in ascending order by their low bound.
+    ;; Rational ranges are represented by three entries,
+    ;; #(run low high ...) where run is one of range-integer-run,
+    ;; range-ratio-run, range-rational-run.
+    ;; Floats are just #(low high ...)
+    (ranges #() :type simple-vector :hasher hash-ranges :test equalp)))
+
+;;; A single-range type. Similar to the old model.
+(deftype numeric-type () `(satisfies numeric-type-p))
+
+(defun numeric-type-p (x)
+  (typecase x
+    (numeric-union-type
+     (<= (length (numeric-union-type-ranges x)) 3))))
+
+(defun numeric-type-low (x)
+  (etypecase x
+    (numeric-union-type
+     (let ((ranges (numeric-union-type-ranges x)))
+       (ecase (length ranges)
+         (3 (aref ranges 1))
+         (2 (aref ranges 0)))))))
+
+(defun numeric-type-high (x)
+  (etypecase x
+    (numeric-union-type
+     (let ((ranges (numeric-union-type-ranges x)))
+       (ecase (length ranges)
+         (3 (aref ranges 2))
+         (2 (aref ranges 1)))))))
+
+(declaim (inline numeric-type-aspects))
+(defun numeric-type-aspects (x)
+  (numeric-union-type-aspects x))
+
 (declaim (inline numeric-type-complexp numeric-type-class numeric-type-format))
 (defun numeric-type-complexp (x) (numtype-aspects-complexp (numeric-type-aspects x)))
 (defun numeric-type-class (x) (numtype-aspects-class (numeric-type-aspects x)))
@@ -1480,6 +1517,18 @@
 ;;; This is useful when we want a specifier that we can pass to TYPEP.
 (defconstant +unparse-fun-type-simplify+  2)
 
+;;; REMOVE
+(defmethod print-object ((ctype ctype) stream)
+  (let ((expr
+          (if (unknown-type-p ctype)
+              ;; Don't call the unparse method - it returns the instance itself
+              ;; which would infinitely recurse back into print-object
+              (unknown-type-specifier ctype)
+              (funcall (type-class-unparse (type-class ctype))
+                       +ctype-unparse-disambiguate+
+                       ctype))))
+    (format stream "#.(SPECIFIER-TYPE '~a)" expr)))
+#+nil
 (defmethod print-object ((ctype ctype) stream)
   (let ((expr
          (if (unknown-type-p ctype)
