@@ -2626,9 +2626,13 @@ is :ANY, the function name is not checked."
 
 (defun same-ref-p (x y)
   (declare (type ref x y))
-  (and (eq (ref-leaf x) (ref-leaf y))
-       (or (constant-reference-p x)
-           (refs-unchanged-p x y))))
+  (let ((leaf (ref-leaf x)))
+   (and (eq leaf (ref-leaf y))
+        (or (constant-reference-p x)
+            (refs-unchanged-p x y)
+            (and (lambda-var-p leaf)
+                 (setf (lambda-var-compute-same-refs leaf) t)
+                 nil)))))
 
 (defun refs-unchanged-p (ref1 ref2)
   (let ((same (ref-same-refs ref1)))

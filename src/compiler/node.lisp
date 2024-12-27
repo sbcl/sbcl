@@ -1434,7 +1434,9 @@
   no-constraints
   ;; Does it hold a constant that should't be destructively modified
   constant
-  unused-initial-value)
+  unused-initial-value
+  ;; Instruct constraint propagation to do some work.
+  compute-same-refs)
 
 (defstruct (lambda-var
             (:include basic-var) (:copier nil)
@@ -1492,6 +1494,9 @@
   `(lambda-var-attributep (lambda-var-flags ,var) constant))
 (defmacro lambda-var-unused-initial-value (var)
   `(lambda-var-attributep (lambda-var-flags ,var) unused-initial-value))
+
+(defmacro lambda-var-compute-same-refs (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) compute-same-refs))
 
 
 ;;;; basic node types

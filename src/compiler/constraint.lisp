@@ -1195,9 +1195,12 @@
                  ;; constraints for each increment.
                  (pushnew ref *blocks-to-terminate*))))
         ;; Find unchanged eql refs to a set variable.
-        (when (lambda-var-sets leaf)
+        (when (and (lambda-var-sets leaf)
+                   (lambda-var-compute-same-refs leaf))
           (let (mark
-                (eq (lambda-var-eq-constraints leaf)))
+                (old-mark (ref-same-refs ref))
+                (eq (lambda-var-eq-constraints leaf))
+                reoptimize)
             (when eq
               (loop for other-ref in (leaf-refs leaf)
                     unless (eq other-ref ref)
@@ -1207,9 +1210,13 @@
                            (unless mark
                              (setf mark (list 0))
                              (setf (ref-same-refs ref) mark))
+                           (unless (and old-mark
+                                        (eq old-mark (ref-same-refs other-ref)))
+                             (setf reoptimize t)
+                             (reoptimize-lvar (node-lvar other-ref)))
                            (setf (ref-same-refs other-ref) mark)))))
-            (when mark
-              (reoptimize-node ref))))))))
+            (when reoptimize
+              (reoptimize-lvar (node-lvar ref)))))))))
 
 ;;;; Flow analysis
 
@@ -1414,10 +1421,7 @@
                  (when (block-type-check (lambda-block fun))
                    ;; This is optimistic, make sure it's going to be
                    ;; processed.
-                   (setf (lambda-var-unused-initial-value var) t))
-                 (loop for ref in (lambda-var-refs var)
-
-                       do (setf (ref-same-refs ref) nil))))))
+                   (setf (lambda-var-unused-initial-value var) t))))))
       (frob fun)
       (dolist (let (lambda-lets fun))
         (frob let)))))
