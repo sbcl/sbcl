@@ -1579,11 +1579,11 @@
         (ref-con (single-ref-block-p con))
         (ref-test (lvar-uses test)))
     (and (ref-p ref-test)
-         ref-alt
          ref-con
+         ref-alt
          (equal (block-succ alt) (block-succ con))
          (eq (ref-lvar ref-alt) (ref-lvar ref-con))
-         (eq (ref-leaf ref-con) (ref-leaf ref-test))
+         (same-ref-p ref-test ref-con)
          (and (constant-p (ref-leaf ref-alt))
               (null (constant-value (ref-leaf ref-alt))))
          (eq (node-enclosing-cleanup ref-alt)
@@ -2621,10 +2621,14 @@ is :ANY, the function name is not checked."
         (y-use (principal-lvar-use y)))
     (when (and (ref-p x-use)
                (ref-p y-use)
-               (eq (ref-leaf x-use) (ref-leaf y-use))
-               (or (constant-reference-p x-use)
-                   (refs-unchanged-p x-use y-use)))
+               (same-ref-p x-use y-use))
       y-use)))
+
+(defun same-ref-p (x y)
+  (declare (type ref x y))
+  (and (eq (ref-leaf x) (ref-leaf y))
+       (or (constant-reference-p x)
+           (refs-unchanged-p x y))))
 
 (defun refs-unchanged-p (ref1 ref2)
   (let ((same (ref-same-refs ref1)))

@@ -4571,3 +4571,13 @@
          (setq r (logior r (truly-the (signed-byte 32) l))))
        r))
    (signed-byte 32)))
+
+(with-test (:name :if-redundant)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let* ((x nil)
+                (y x))
+           (setq x t)
+           (if y x)))
+    (() nil)))
