@@ -31,6 +31,9 @@ changes relative to sbcl-2.4.11:
     A. Korinskiy)
   * bug fix: handle BY in LOOP forms involving iteration on the reverse of a
     list.  (lp#2091210, reported by James Kalenius)
+  * bug fix: fix miscompilation of IF where the consequent and alternative
+    would have the same value but for an intervening side-effect.
+    (lp#2092588, reported by JA)
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
     specialized to structure classes are compiled to the corresponding
     structure accessor.
