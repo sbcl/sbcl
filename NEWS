@@ -11,7 +11,7 @@ changes relative to sbcl-2.4.11:
   * bug fix: defining a method on SB-MOP:SLOT-VALUE-USING-CLASS where the
     object argument is specialized to a CONDITION-CLASS no longer leads to an
     internal error.
-  * bug fix: the dissassembler on x86-64 is able to disassemble the vcvttpd2dq
+  * bug fix: the dissassembler on x86-64 correctly disassembles the vcvttpd2dq
     AVX2 instruction.
   * bug fix: ensure that the dispatch function for generic functions is
     compiled with a known compilation policy.  (reported by Neil Goldman)
@@ -38,6 +38,8 @@ changes relative to sbcl-2.4.11:
     arguments specialized to instances of SB-MOP:FUNCALLABLE-STANDARD-CLASS
     are optimized similarly to calls on method arguments specialized to
     instances of STANDARD-CLASS.
+  * optimization: (coerce (reverse list) 'vector) doesn't cons a list.
+  * optimization: (replace vector (reverse list)) doesn't cons a list.
 
 changes in sbcl-2.4.11 relative to sbcl-2.4.10:
   * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the
