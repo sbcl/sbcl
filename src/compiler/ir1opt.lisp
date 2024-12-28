@@ -2195,46 +2195,50 @@
   (let ((combination (lvar-uses (set-value set))))
     (when (and (combination-p combination)
                (eq (combination-kind combination) :known))
-      (let* ((args (combination-args combination))
-             (var-args
-               (loop for arg in args
-                     for cast = nil
-                     for arg-var = (or (lvar-lambda-var arg)
-                                       (let ((use (lvar-uses arg)))
-                                         (and (cast-p use)
-                                              (progn (setf cast use)
-                                                     (lvar-lambda-var (cast-value use))))))
-                     when (eq arg-var var)
-                     collect arg
-                     and do (when cast
-                              (setf initial-type
-                                    ;; Type derivers expect the right types
-                                    (type-intersection initial-type (single-value-type (cast-asserted-type cast))))))))
-        (when (and var-args
-                   (neq initial-type *empty-type*))
-          (labels ((derive (type)
-                     (single-value-type
-                      (or
-                       (combination-derive-type-for-arg-types combination
-                                                              (loop for arg in args
-                                                                    collect (if (memq arg var-args)
-                                                                                type
-                                                                                arg)))
-                       (return-from set-type-of-combination))))
-                   (converges-p (initial-type)
-                     (let ((derived (derive initial-type)))
-                       (when derived
-                         ;; Does it converge to the same type again?
-                         (let* ((union (type-union derived initial-type))
-                                (again-derived (derive union)))
-                           (when (type= derived again-derived)
-                             union))))))
-            ;; Some functions preserve bounds, like LOGIOR
-            (or (converges-p initial-type)
-                ;; remove bounds or the types won't converge
-                (let ((simple (simplify-numeric-type initial-type)))
-                  (unless (eq simple initial-type)
-                    (converges-p simple))))))))))
+      (let* ((info (combination-fun-info combination))
+             (deriver (and info
+                           (fun-info-derive-type info)))
+             (args (combination-args combination))
+             (var-args))
+        (when deriver
+          (map-combination-args-and-types
+           (lambda (arg type lvars &optional annotation)
+             (declare (ignore lvars annotation))
+             (let ((arg-var (or (lvar-lambda-var arg)
+                                (let ((use (lvar-uses arg)))
+                                  (and (cast-p use)
+                                       (lvar-lambda-var (cast-value use)))))))
+               (when (eq arg-var var)
+                 (setf initial-type
+                       ;; Type derivers expect the right types
+                       (type-intersection initial-type type))
+                 (push arg var-args))))
+           combination)
+          (when (and var-args
+                     (neq initial-type *empty-type*))
+            (labels ((derive (type)
+                       (single-value-type
+                        (or
+                         (combination-derive-type-for-arg-types combination
+                                                                (loop for arg in args
+                                                                      collect (if (memq arg var-args)
+                                                                                  type
+                                                                                  arg)))
+                         (return-from set-type-of-combination))))
+                     (converges-p (initial-type)
+                       (let ((derived (derive initial-type)))
+                         (when derived
+                           ;; Does it converge to the same type again?
+                           (let* ((union (type-union derived initial-type))
+                                  (again-derived (derive union)))
+                             (when (type= derived again-derived)
+                               union))))))
+              ;; Some functions preserve bounds, like LOGIOR
+              (or (converges-p initial-type)
+                  ;; remove bounds or the types won't converge
+                  (let ((simple (simplify-numeric-type initial-type)))
+                    (unless (eq simple initial-type)
+                      (converges-p simple)))))))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
