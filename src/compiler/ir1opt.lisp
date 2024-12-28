@@ -1147,6 +1147,8 @@
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
              (ir1-attributep (fun-info-attributes info) important-result)
+             ;; A constant might be propagated directly, disconnecting the lvar
+             (not (type-singleton-p (single-value-type (node-derived-type node))))
              (neq (combination-info node) :important-result-discarded))
     (when (lvar-fun-is (combination-fun node) '(adjust-array))
       (let ((type (lvar-type (car (combination-args node)))))
@@ -2257,7 +2259,6 @@
             (when (and (node-reoptimize set)
                        (not (node-to-be-deleted-p set)))
               (let ((old-type (node-derived-type set)))
-                (set-type-of-combination var set initial-type)
                 (unless (values-subtypep old-type type)
                   (derive-node-type set (make-single-value-type type))))
               (setf (node-reoptimize set) nil)))))

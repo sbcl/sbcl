@@ -4581,3 +4581,8 @@
            (setq x t)
            (if y x)))
     (() nil)))
+
+(with-test (:name :important-result-of-a-constant)
+  (checked-compile `(lambda ()
+                      (let (x)
+                        (mapcar #'cdr (sort x #'< :key (constantly nil)))))))
