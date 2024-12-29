@@ -1673,15 +1673,7 @@ forms that explicitly control this kind of evaluation.")
 ;;;; information commands
 
 (!def-debug-command "HELP" ()
-  ;; CMU CL had a little toy pager here, but "if you aren't running
-  ;; ILISP (or a smart windowing system, or something) you deserve to
-  ;; lose", so we've dropped it in SBCL. However, in case some
-  ;; desperate holdout is running this on a dumb terminal somewhere,
-  ;; we tell him where to find the message stored as a string.
-  (format *debug-io*
-          "~&~A~2%(The HELP string is stored in ~S.)~%"
-          *debug-help-string*
-          '*debug-help-string*))
+  (write-line *debug-help-string*))
 
 (!def-debug-command-alias "?" "HELP")
 
