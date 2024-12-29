@@ -5767,10 +5767,7 @@ used for a COMPLEX component.~:@>"
                                                  high2
                                                  high1)
                                              nil new-run)))
-                                  (unless (or (low-gt-high-p low high)
-                                              (and (consp low)
-                                                   (equal low high)))
-                                    (store new-run low high)))
+                                  (store new-run low high))
                                 (if (high-gt-high-p high2 high1)
                                     (incf i1 3)
                                     (incf i2 3))))))))))))
