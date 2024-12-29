@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.11:
+changes in sbcl-2.5.0 relative to sbcl-2.4.11:
   * platform support:
     ** improve support for the Haiku operating system.  (thanks to Al Hoang,
        Estevan Castilho and Alexandru Popa)
