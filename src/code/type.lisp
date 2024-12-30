@@ -5322,7 +5322,8 @@ used for a COMPLEX component.~:@>"
                                                           (car right-low)
                                                           right-low)))
                                   (if (and
-                                       (not (= right-run left-run range-ratio-run)) ;; can join (1) and (1) for ratios
+                                       (not (and (= right-run left-run range-ratio-run)
+                                                 (integerp open-right-low))) ;; can join (1) and (1) for ratios
                                        (consp left-high)
                                        (consp right-low))
                                       (sb-xc:< open-right-low open-left-high)
@@ -5581,7 +5582,8 @@ used for a COMPLEX component.~:@>"
                                               (car right-low)
                                               right-low)))
                       (if (and
-                           (not (= right-run left-run range-ratio-run)) ;; can join (1) and (1) for ratios
+                           (not (and (= right-run left-run range-ratio-run)
+                                     (integerp open-right-low))) ;; can join (1) and (1) for ratios
                            (consp left-high)
                            (consp right-low))
                           (sb-xc:< open-right-low open-left-high)
