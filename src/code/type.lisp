@@ -5308,6 +5308,8 @@ used for a COMPLEX component.~:@>"
                 (assert (not (and prev-run
                                   (numberp low)
                                   (eql prev-high low))))
+                (assert (eql run
+                             (collapse-rational-run run low high)))
                 (flet ((join-p (left-high left-run right-low right-run)
                          (cond ((not right-low)
                                 t)
