@@ -588,18 +588,21 @@
 
 (declaim (inline sb-pcl::search-struct-slot-name-vector))
 (defun sb-pcl::search-struct-slot-name-vector (mapper slot-name)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   ;; MAPPER is a vector of all slot name followed by all values of DSD-BITS
-  (let ((nsymbols (ash (length mapper) -1)))
+  (let ((nsymbols (ash (length (truly-the simple-vector mapper)) -1)))
     (dotimes (i nsymbols)
       (declare (index i))
       (when (eq (svref mapper i) slot-name)
         (return (svref mapper (truly-the index (+ i nsymbols))))))))
 
 (defun make-second-stage-slot-mapper (vector)
+  (declare (sb-c::tlab :system))
   (lambda (symbol)
     (sb-pcl::search-struct-slot-name-vector vector symbol)))
 
 (defun install-hash-based-slot-mapper (layout pairs unique-hashes fun-name)
+  (declare (sb-c::tlab :system))
   (flet ((compile-it ()
            (let* ((lexpr
                    (hash-based-slot-mapper-lexpr pairs unique-hashes fun-name))
@@ -646,8 +649,9 @@
                         (a (make-array (* n 2))))
                    (dotimes (i n a)
                      (setf (svref a i) (aref keys i)
-                           (svref a (+ i n)) (aref values i))))))
-    (when (<= (length unique-hashes) 4)
+                           (svref a (+ i n)) (aref values i)))))
+         (n-unique-hashes (length unique-hashes)))
+    (when (or (< n-unique-hashes 4) (/= n-unique-hashes (length slots)))
       (return-from install-struct-slot-mapper
         (setf (layout-slot-mapper layout) vector)))
     (let ((me (%make-slot-mapper-fn))
