@@ -1673,7 +1673,7 @@ forms that explicitly control this kind of evaluation.")
 ;;;; information commands
 
 (!def-debug-command "HELP" ()
-  (write-line *debug-help-string*))
+  (write-string *debug-help-string*))
 
 (!def-debug-command-alias "?" "HELP")
 

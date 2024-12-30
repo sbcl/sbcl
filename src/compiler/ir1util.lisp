@@ -398,6 +398,10 @@
 
   (values))
 
+(declaim (inline lvar-single-value-p))
+(defun lvar-single-value-p (lvar)
+  (or (not lvar) (%lvar-single-value-p lvar)))
+
 ;;; Return true if LVAR destination is executed immediately after
 ;;; NODE. Cleanups are ignored.
 (defun immediately-used-p (lvar node &optional single-predecessor)
@@ -418,7 +422,8 @@
 ;;;
 ;;; Uninteresting nodes are nodes in the same block which are either
 ;;; REFs, ENCLOSEs, or external CASTs to the same destination.
-(defun almost-immediately-used-p (lvar node &key flushable)
+(defun almost-immediately-used-p (lvar node &key flushable
+                                                 no-multiple-value-lvars)
   (declare (type lvar lvar)
            (type node node))
   (unless (bind-p node)
@@ -433,35 +438,41 @@
               (setf node (ctran-next ctran))
               (if (eq node dest)
                   (return-from almost-immediately-used-p t)
-                  (typecase node
-                    (ref
-                     (go :next))
-                    (cast
-                     (when (or (and (memq (cast-type-check node) '(:external nil))
-                                    (eq dest (node-dest node)))
-                               (and flushable
-                                    (not (contains-hairy-type-p (cast-type-to-check node))))
-                               ;; If the types do not match then this
-                               ;; cast is not related to the LVAR and
-                               ;; wouldn't be affected if it's
-                               ;; executed out of order.
-                               (multiple-value-bind (res true)
-                                   (values-subtypep (node-derived-type node)
-                                                    (lvar-derived-type lvar))
-                                 (and (not res)
-                                      true)))
-                       (go :next)))
-                    (combination
-                     (when (and flushable
-                                (flushable-combination-p node))
+                  (let ((node-lvar (and (valued-node-p node)
+                                        (node-lvar node))))
+                    (when (and no-multiple-value-lvars
+                               node-lvar
+                               (not (lvar-single-value-p node-lvar)))
+                      (return-from almost-immediately-used-p))
+                    (typecase node
+                      (ref
                        (go :next))
-                     (let (fun)
-                       (when (and (eq (combination-kind node) :local)
-                                  (functional-kind-eq (setf fun (combination-lambda node)) let))
-                         (setf node (lambda-bind fun))
-                         (go :next))))
-                    ((or enclose entry)
-                     (go :next)))))
+                      (cast
+                       (when (or (and (memq (cast-type-check node) '(:external nil))
+                                      (eq dest (node-dest node)))
+                                 (and flushable
+                                      (not (contains-hairy-type-p (cast-type-to-check node))))
+                                 ;; If the types do not match then this
+                                 ;; cast is not related to the LVAR and
+                                 ;; wouldn't be affected if it's
+                                 ;; executed out of order.
+                                 (multiple-value-bind (res true)
+                                     (values-subtypep (node-derived-type node)
+                                                      (lvar-derived-type lvar))
+                                   (and (not res)
+                                        true)))
+                         (go :next)))
+                      (combination
+                       (when (and flushable
+                                  (flushable-combination-p node))
+                         (go :next))
+                       (let (fun)
+                         (when (and (eq (combination-kind node) :local)
+                                    (functional-kind-eq (setf fun (combination-lambda node)) let))
+                           (setf node (lambda-bind fun))
+                           (go :next))))
+                      ((or enclose entry)
+                       (go :next))))))
              (t
               ;; Loops shouldn't cause a problem, either it will
               ;; encounter a not "uninteresting" node, or the destination
@@ -1287,9 +1298,6 @@
 (defun cast-single-value-p (cast)
   (not (values-type-p (cast-asserted-type cast))))
 
-(declaim (inline lvar-single-value-p))
-(defun lvar-single-value-p (lvar)
-  (or (not lvar) (%lvar-single-value-p lvar)))
 (defun %lvar-single-value-p (lvar)
   (let ((dest (lvar-dest lvar)))
     (typecase dest

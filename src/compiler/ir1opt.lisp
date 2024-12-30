@@ -2946,7 +2946,9 @@
                         (and (ref-leaf use)
                              (constant-p (ref-leaf use))
                              (proper-list-p (constant-value (ref-leaf use))))))
-                     (almost-immediately-used-p list use))))
+                     (almost-immediately-used-p list use
+                                                ;; Nothing should be pushed onto the stack in between
+                                                :no-multiple-value-lvars t))))
              (and (listp use)
                   (every #'use-good-p use)))
            (flet ((transform (use)

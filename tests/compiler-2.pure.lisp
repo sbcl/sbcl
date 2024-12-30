@@ -4586,3 +4586,14 @@
   (checked-compile `(lambda ()
                       (let (x)
                         (mapcar #'cdr (sort x #'< :key (constantly nil)))))))
+
+(with-test (:name :values-list-stack-push)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (let ((list (if a
+                         '(2 3)
+                         '(1))))
+           (apply #'list b list)))
+    ((t 1) '(1 2 3) :test #'equal)
+    ((nil 1) '(1 1) :test #'equal)))
