@@ -5649,7 +5649,9 @@ used for a COMPLEX component.~:@>"
                      ;; Mix ratio and integers, the overlap would be rational
                      (t
                       (let ((rational-low (max-low-rational last-low low))
-                            (rational-high (min-high-rational last-high high)))
+                            (rational-high (min-high-rational last-high high))
+                            (new-run range-rational-run))
+                        (setf new-run (collapse-rational-run range-rational-run rational-low rational-high))
                         (block done
                           (cond ((low-le-low-p rational-low last-low)
                                  ;; It might now be joinable to the preceding rational
@@ -5662,14 +5664,15 @@ used for a COMPLEX component.~:@>"
                                           (pop result)
                                           (pop result))
                                          (t
-                                          (setf (third result) range-rational-run))))
-                                 (setf (car result) rational-high)
+                                          (setf (third result) new-run)
+                                          (setf (second result) rational-low))))
+                                 (setf (first result) rational-high)
                                  (if (eql rational-high last-high)
                                      (return-from done)))
                                 (t
                                  (setf (car result)
                                        (flip-exclusion rational-low nil last-run))
-                                 (push range-rational-run result)
+                                 (push new-run result)
                                  (push rational-low result)
                                  (push rational-high result)))
                           (cond ((high-gt-high-p last-high rational-high)
