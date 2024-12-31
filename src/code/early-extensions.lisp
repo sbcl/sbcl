@@ -936,10 +936,10 @@ NOTE: This interface is experimental and subject to change."
 ;;; The "more or less" bit is that the no-bound-at-all case is
 ;;; represented by NIL (not by * as in ANSI type specifiers); and in
 ;;; this case we return NIL.
-(declaim (ftype (sfunction (t) (or null real)) type-bound-number))
+(declaim (inline type-bound-number))
 (defun type-bound-number (x)
   (if (consp x)
-      (destructuring-bind (result) x result)
+      (car x)
       x))
 
 ;;;; utilities for two-VALUES predicates
