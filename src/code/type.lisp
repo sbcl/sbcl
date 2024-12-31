@@ -3049,9 +3049,8 @@ used for a COMPLEX component.~:@>"
          (type= (array-type-element-type type1)
                 (array-type-element-type type2)))
         (t
-         ;; FIXME: I would think this can be strength-reduced to EQ
-         (values (type= (array-type-specialized-element-type type1)
-                        (array-type-specialized-element-type type2))
+         (values (eq (array-type-specialized-element-type type1)
+                     (array-type-specialized-element-type type2))
                  t))))
 
 (define-type-method (array :negate) (type)
