@@ -1009,3 +1009,13 @@
     (assert (and (not answer) certain)))
   (assert (not (subtypep (opaque-identity '(function (&key (member t))))
                          (opaque-identity '(function (&key (eql t))))))))
+
+(with-test (:name :typep-rational-ratio)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p)
+         (typep p '(and (rational 1) (not integer))))
+    ((4/3) t)
+    ((-4/3) nil)
+    ((1) nil)
+    ((2) nil)))

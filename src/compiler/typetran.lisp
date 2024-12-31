@@ -404,7 +404,9 @@
                                (modified-numeric-type type
                                                       :complexp :real)
                                type)))
-                 (rational 'rational)
+                 (rational (if (csubtypep type (specifier-type 'ratio))
+                               'ratio
+                               'rational))
                  (float (or (numeric-type-format type) 'float))
                  ((nil) 'real)))
          (low (numeric-type-low type))
