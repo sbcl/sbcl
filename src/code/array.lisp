@@ -243,36 +243,15 @@
                   (with-parameters (t) (subtype)
                     (if (eq subtype '*)
                         (result simple-vector-widetag)
-                        (let ((ctype (specifier-type type)))
-                          (cond ((eq ctype *empty-type*)
-                                 (result simple-array-nil-widetag))
-                                ((union-type-p ctype)
-                                 (cond ((csubtypep ctype (specifier-type '(complex double-float)))
-                                        (result
-                                         simple-array-complex-double-float-widetag))
-                                       ((csubtypep ctype (specifier-type '(complex single-float)))
-                                        (result
-                                         simple-array-complex-single-float-widetag))
-                                       #+long-float
-                                       ((csubtypep ctype (specifier-type '(complex long-float)))
-                                        (result
-                                         simple-array-complex-long-float-widetag))
-                                       (t
-                                        (result simple-vector-widetag))))
-                                (t
-                                 (case (numeric-type-format ctype)
-                                   (double-float
-                                    (result
-                                     simple-array-complex-double-float-widetag))
-                                   (single-float
-                                    (result
-                                     simple-array-complex-single-float-widetag))
-                                   #+long-float
-                                   (long-float
-                                    (result
-                                     simple-array-complex-long-float-widetag))
-                                   (t
-                                    (result simple-vector-widetag)))))))))
+                        (case subtype
+                          ((short-float single-float)
+                           (result simple-array-complex-single-float-widetag))
+                          ((double-float long-float)
+                           (result simple-array-complex-double-float-widetag))
+                          ((real rational float)
+                           (result simple-vector-widetag))
+                          (t
+                           (go fastidiously-parse))))))
                  ((nil)
                   (result simple-array-nil-widetag))
                  (t
@@ -299,7 +278,8 @@
               (result simple-array-double-float-widetag))
              (#.(sb-kernel::!compute-numtype-aspect-id :real 'float 'single-float)
               (result simple-array-single-float-widetag))
-             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'single-float))
+             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'single-float)
+              (result simple-array-complex-single-float-widetag))
              (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'double-float)
               (result simple-array-complex-double-float-widetag))
              (t
