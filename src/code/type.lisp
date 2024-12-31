@@ -5810,8 +5810,7 @@ used for a COMPLEX component.~:@>"
                             (high2 (aref ranges2 (+ i2 2))))
                         (cond ((low-gt-high-p low2 high)
                                (loop-finish))
-                              ((or (low-gt-high-p low high2)
-                                   (not (logtest run run2)))
+                              ((low-gt-high-p low high2)
                                (incf i2 3))
                               (t
                                (let ((bottom (low-le-low-p low2 low))
