@@ -3074,10 +3074,7 @@
                      (link-blocks (node-block use) next-block)
                      ;; At least one use is good, downgrade any possible
                      ;; type conflicts to style warnings.
-                     (setf (cast-silent-conflict cast)
-                           (if (cast-mismatch-from-inlined-p cast use)
-                               t
-                               :style-warning))
+                     (setf (cast-silent-conflict cast) :style-warning)
                      (when (and (return-p dest)
                                 (basic-combination-p use)
                                 (eq (basic-combination-kind use) :local))
@@ -3105,7 +3102,28 @@
                     (context (cast-context cast))
                     (context (if (local-call-context-p context)
                                  (local-call-context-var context)
-                                 context)))
+                                 context))
+                    (lvar (node-lvar cast))
+                    (bad-type value-type)
+                    bad-uses)
+               ;; Is the mismatch coming from some inlined function which has good uses?
+               (when (and lvar
+                          (eq (cast-silent-conflict cast) :style-warning)
+                          (block common
+                            (do-uses (bad-use value)
+                              (do-uses (good-use lvar)
+                                (unless (eq good-use cast)
+                                  (let ((common (common-inline-point bad-use good-use)))
+                                    (unless (and common
+                                                 (cast-mismatch-from-inlined-p cast common))
+                                      (push bad-use bad-uses))))))
+                            t))
+                 (cond (bad-uses
+                        (setf detail (lvar-uses-all-sources bad-uses)
+                              bad-type (sb-kernel::%type-union
+                                        (mapcar #'node-derived-type bad-uses))))
+                       (t
+                        (setf (cast-silent-conflict cast) t))))
                (when (or (not (cast-silent-conflict cast))
                          (and (eq (cast-silent-conflict cast) :style-warning)
                               (not (cast-single-value-p cast))
@@ -3115,9 +3133,9 @@
                   (if (cast-single-value-p cast)
                       (lambda (dummy) `(list ,dummy))
                       (lambda (dummy) `(multiple-value-call #'list ,dummy)))))
+
                (filter-lvar
                 (cast-value cast)
-                ;; FIXME: Derived type.
                 (if (cast-silent-conflict cast)
                     (lambda (dummy)
                       (let ((dummy-sym (gensym)))
@@ -3125,7 +3143,7 @@
                            ,@(and (eq (cast-silent-conflict cast) :style-warning)
                                   `((%compile-time-type-style-warn ,dummy-sym
                                                                    ',(type-specifier atype)
-                                                                   ',(type-specifier value-type)
+                                                                   ',(type-specifier bad-type)
                                                                    ',detail
                                                                    ',(compile-time-type-error-context source-form)
                                                                    ',context)))

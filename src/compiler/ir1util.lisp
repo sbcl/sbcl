@@ -1269,6 +1269,19 @@
                                       (node-source-path use)))))
         (list (node-source-form use)))))
 
+(defun lvar-uses-all-sources (uses)
+  (if (cdr uses)
+      (let ((forms  '())
+            (path   (node-source-path (first uses))))
+        (dolist (use uses (cons (if (find 'original-source-start path)
+                                    (find-original-source path)
+                                    "a hairy form")
+                                forms))
+          (pushnew (node-source-form use) forms)
+          (setf path (common-suffix path
+                                    (node-source-path use)))))
+      (list (node-source-form (car uses)))))
+
 ;;; Return the LAMBDA that is CTRAN's home, or NIL if there is none.
 (declaim (ftype (sfunction (ctran) (or clambda null))
                 ctran-home-lambda-or-null))
@@ -3578,9 +3591,20 @@ is :ANY, the function name is not checked."
                   (eq pkg *cl-package*))))
            (t t)))))
 
-(defun cast-mismatch-from-inlined-p (cast node)
-  (let* ((path (node-source-path node))
-         (transformed (memq 'transformed path))
+(defun common-inline-point (node1 node2)
+  (let ((path1 (member-if (lambda (x)
+                            (memq x '(inlined transformed)))
+                          (node-source-path node1)))
+        (path2 (member-if (lambda (x)
+                            (memq x '(inlined transformed)))
+                          (node-source-path node2))))
+    (loop for path on path1
+          when (and (memq (car path) '(transformed inlined))
+                    (tailp path path2))
+          return path)))
+
+(defun cast-mismatch-from-inlined-p (cast path)
+  (let* ((transformed (memq 'transformed path))
          (inlined))
     (cond ((and transformed
                 (not (eq (memq 'transformed (node-source-path cast))
