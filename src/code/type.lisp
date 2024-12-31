@@ -6114,17 +6114,28 @@ used for a COMPLEX component.~:@>"
            nil)
           ((memq (numtype-aspects-class aspects1) '(integer rational))
            (when (memq (numtype-aspects-class aspects2) '(integer rational))
-             (multiple-value-bind (ranges mask) (union-rational (numeric-union-type-ranges type1)
-                                                                (numeric-union-type-ranges type2))
+             (cond ((eq type1 (specifier-type 'rational))
+                    type1)
+                   ((eq type2 (specifier-type 'rational))
+                    type2)
+                   ((and (eq type1 (specifier-type 'integer))
+                         (eq (numtype-aspects-class aspects2) 'integer))
+                    type1)
+                   ((and (eq type2 (specifier-type 'integer))
+                         (eq (numtype-aspects-class aspects1) 'integer))
+                    type2)
+                   (t
+                    (multiple-value-bind (ranges mask) (union-rational (numeric-union-type-ranges type1)
+                                                                       (numeric-union-type-ranges type2))
 
-               (new-ctype numeric-union-type 0
-                          (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                               (case mask
-                                                 (#.range-integer-run 'integer)
+                      (new-ctype numeric-union-type 0
+                                 (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                                      (case mask
+                                                        (#.range-integer-run 'integer)
                                         ; FIXME: add a new class for ratios, for faster operations that use different types.
-                                                 (t 'rational))
-                                               nil)
-                          ranges))))
+                                                        (t 'rational))
+                                                      nil)
+                                 ranges))))))
           (t
            (new-ctype numeric-union-type 0 aspects1
                       (union-float (numeric-union-type-ranges type1)
@@ -6147,17 +6158,28 @@ used for a COMPLEX component.~:@>"
            *empty-type*)
           ((memq (numtype-aspects-class aspects1) '(integer rational))
            (if (memq (numtype-aspects-class aspects2) '(integer rational))
-               (multiple-value-bind (ranges mask) (intersect-rational (numeric-union-type-ranges type1)
-                                                                      (numeric-union-type-ranges type2))
-                 (if (= (length ranges) 0)
-                     *empty-type*
-                     (new-ctype numeric-union-type 0
-                                (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                                     (case mask
-                                                       (#.range-integer-run 'integer)
-                                                       (t 'rational))
-                                                     nil)
-                                ranges)))
+               (cond ((eq type1 (specifier-type 'rational))
+                      type2)
+                     ((eq type2 (specifier-type 'rational))
+                      type1)
+                     ((and (eq type1 (specifier-type 'integer))
+                           (eq (numtype-aspects-class aspects2) 'integer))
+                      type2)
+                     ((and (eq type2 (specifier-type 'integer))
+                           (eq (numtype-aspects-class aspects1) 'integer))
+                      type1)
+                     (t
+                      (multiple-value-bind (ranges mask) (intersect-rational (numeric-union-type-ranges type1)
+                                                                             (numeric-union-type-ranges type2))
+                        (if (= (length ranges) 0)
+                            *empty-type*
+                            (new-ctype numeric-union-type 0
+                                       (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                                            (case mask
+                                                              (#.range-integer-run 'integer)
+                                                              (t 'rational))
+                                                            nil)
+                                       ranges)))))
                *empty-type*))
           (t
            (let ((ranges (intersect-float (numeric-union-type-ranges type1)
@@ -6185,17 +6207,23 @@ used for a COMPLEX component.~:@>"
                   type2)
                  ((memq (numtype-aspects-class aspects1) '(integer rational))
                   (if (memq (numtype-aspects-class aspects2) '(integer rational))
-                      (multiple-value-bind (ranges mask) (difference-rational (numeric-union-type-ranges type2)
-                                                                              (numeric-union-type-ranges type1))
-                        (if (= (length ranges) 0)
-                            *empty-type*
-                            (new-ctype numeric-union-type 0
-                                       (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                                            (case mask
-                                                              (#.range-integer-run 'integer)
-                                                              (t 'rational))
-                                                            nil)
-                                       ranges)))
+                      (cond ((eq type1 (specifier-type 'rational))
+                             *empty-type*)
+                            ((and (eq type1 (specifier-type 'integer))
+                                  (eq (numtype-aspects-class aspects2) 'integer))
+                             *empty-type*)
+                            (t
+                             (multiple-value-bind (ranges mask) (difference-rational (numeric-union-type-ranges type2)
+                                                                                     (numeric-union-type-ranges type1))
+                               (if (= (length ranges) 0)
+                                   *empty-type*
+                                   (new-ctype numeric-union-type 0
+                                              (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                                                   (case mask
+                                                                     (#.range-integer-run 'integer)
+                                                                     (t 'rational))
+                                                                   nil)
+                                              ranges)))))
                       type2))
                  (t
                   (let ((ranges (difference-float (numeric-union-type-ranges type2)
@@ -6231,9 +6259,15 @@ used for a COMPLEX component.~:@>"
                        (numtype-aspects-class aspects2))
                    (and (eq (numtype-aspects-class aspects1) 'integer)
                         (eq (numtype-aspects-class aspects2) 'rational)))
-               (values (subtype-rational (numeric-union-type-ranges type1)
-                                         (numeric-union-type-ranges type2))
-                       t)
+               (cond
+                 ((eq type2 (specifier-type 'rational))
+                  (values t t))
+                 ((eq type2 (specifier-type 'integer))
+                  (values (eq (numtype-aspects-class aspects1) 'integer) t))
+                 (t
+                  (values (subtype-rational (numeric-union-type-ranges type1)
+                                            (numeric-union-type-ranges type2))
+                          t)))
                (values nil t)))
           (t
            (values (subtype-float (numeric-union-type-ranges type1)
