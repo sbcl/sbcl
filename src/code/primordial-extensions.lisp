@@ -120,7 +120,9 @@
                       (start 0))
                (unless package
                  ;; MAKE-SYMBOL doesn't copy NAME (unless non-simple).
-                 (setq name (make-array length :element-type elt-type)))
+                 (setq name (if only-base-chars
+                                (make-array length :element-type 'base-char)
+                                (make-array length :element-type 'character))))
                (dotimes (index (length things)
                                (if package
                                    (values (%intern name length package elt-type

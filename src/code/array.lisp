@@ -105,6 +105,7 @@
 ;;; This is a bit complicated, but calling subtypep over all
 ;;; specialized types is exceedingly slow
 (defun %vector-widetag-and-n-bits-shift (type)
+  (declare (explicit-check))
   (macrolet ((with-parameters ((arg-type &key intervals)
                                (&rest args) &body body)
                (let ((type-sym (gensym)))
@@ -351,8 +352,10 @@
                   (1- (integer-length n-word-bits)))))
     (ash (+ length mask) shift)))
 
+
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into array-size-in-bits,
 ;;; i.e. log(2,bits-per-elt)
+(declaim (inline allocate-vector-with-widetag))
 (defun allocate-vector-with-widetag (#+ubsan poisoned widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))

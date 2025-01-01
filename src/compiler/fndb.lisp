@@ -1256,8 +1256,12 @@
     array (flushable no-verify-arg-count))
 
 (defknown sb-vm::array-underlying-widetag-and-shift (array)
-    (values (integer 128 255) (unsigned-byte 8))
+    (values (integer 128 255) (integer 0 7))
     (flushable foldable))
+
+(defknown sb-vm::%vector-widetag-and-n-bits-shift (type-specifier)
+    (values (integer 128 255) (integer 0 7))
+    (flushable foldable recursive))
 
 (defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)

@@ -671,10 +671,7 @@
       (make-array-type '* :element-type (array-type-element-type type)
                           :specialized-element-type (array-type-specialized-element-type type)))))
 
-(defoptimizer (%make-array derive-type)
-    ((dims widetag n-bits &key adjustable fill-pointer displaced-to
-           &allow-other-keys)
-     node)
+(defun %make-array-derive-type (widetag dims adjustable fill-pointer displaced-to node)
   (let ((element-type *wild-type*))
     (cond ((constant-lvar-p widetag)
            (let ((saetp
@@ -696,6 +693,12 @@
     (derive-make-array-type dims element-type
                             adjustable fill-pointer displaced-to
                             node)))
+
+(defoptimizer (%make-array derive-type)
+    ((dims widetag n-bits &key adjustable fill-pointer displaced-to
+           &allow-other-keys)
+     node)
+  (%make-array-derive-type widetag dims adjustable fill-pointer displaced-to node))
 
 
 ;;;; constructors
@@ -1376,7 +1379,7 @@
       (let* ((eltype (cond ((not element-type) t)
                            ((not (constant-lvar-p element-type))
                             (let ((uses (lvar-uses element-type)))
-                              (when (splice-fun-args element-type 'array-element-type 1)
+                              (when (splice-fun-args element-type 'array-element-type 1 nil)
                                 (return
                                   `(multiple-value-bind (widetag shift)
                                        (with-source-path ,(node-source-path uses)
@@ -1391,6 +1394,15 @@
                                       ,@(maybe-arg fill-pointer)
                                       ,@(maybe-arg displaced-to)
                                       ,@(maybe-arg displaced-index-offset))))))
+                            #-ubsan
+                            (when (and (csubtypep (lvar-type dims)
+                                                  (specifier-type 'integer))
+                                       (not (or initial-element initial-contents
+                                                adjustable fill-pointer displaced-to displaced-index-offset)))
+                             (return
+                               `(multiple-value-bind (widetag shift)
+                                    (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+                                  (%make-array dims widetag shift))))
                             (give-up-ir1-transform
                              "ELEMENT-TYPE is not constant."))
                            (t
@@ -1577,6 +1589,12 @@
                                call
                                :adjustable adjustable
                                :fill-pointer fill-pointer))
+
+#-ubsan
+(deftransform %make-array ((dims widetag n-bits)
+                           (integer t t))
+  `(sb-vm::allocate-vector-with-widetag widetag dims n-bits))
+
 
 ;;;; ADJUST-ARRAY
 (deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
@@ -2474,10 +2492,8 @@
   (define-source-transform weak-vector-len (thing)
     `(length (the simple-vector ,thing))))
 
-(defoptimizer (allocate-vector derive-type) ((widetag length words))
-  (when (constant-lvar-p length)
-    (make-array-type (list (lvar-value length))
-                     :complexp nil :element-type *wild-type*)))
+(defoptimizer (allocate-vector derive-type) ((widetag length words) node)
+  (%make-array-derive-type widetag length nil nil nil node))
 
 (defoptimizer (sb-vm::array-underlying-widetag-and-shift derive-type) ((array))
   (block nil
@@ -2497,3 +2513,23 @@
             collect (sb-vm:saetp-n-bits-shift saetp) into shifts
             finally (return (values-specifier-type `(values (member ,@tags)
                                                             (member ,@shifts))))))))
+
+(deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type))
+  (cond
+    ((constant-lvar-p type)
+     (let ((saetp (find-saetp-by-ctype (careful-specifier-type (lvar-value type)))))
+       `(values ,(sb-vm:saetp-typecode saetp)
+                ,(sb-vm:saetp-n-bits-shift saetp))))
+    #+sb-unicode
+    ((csubtypep (lvar-type type) (specifier-type '(member character base-char)))
+     `(if (eq type 'character)
+          (values #.sb-vm:simple-character-string-widetag
+                  #.(sb-vm:saetp-n-bits-shift
+                     (find sb-vm:simple-character-string-widetag
+                           sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode)))
+          (values #.sb-vm:simple-base-string-widetag
+                  #.(sb-vm:saetp-n-bits-shift
+                     (find sb-vm:simple-base-string-widetag
+                           sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode)))))
+    (t
+     (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
