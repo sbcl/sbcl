@@ -1254,6 +1254,11 @@
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
     array (flushable no-verify-arg-count))
+
+(defknown sb-vm::array-underlying-widetag-and-shift (array)
+    (values (integer 128 255) (unsigned-byte 8))
+    (flushable foldable))
+
 (defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)

@@ -1606,7 +1606,6 @@
                  (let ((new-form (funcall fun node))
                        (fun-name (combination-fun-source-name node)))
                    (when (show-transform-p show fun-name)
-                     (format t "~a~%" transform)
                      (show-transform "ir" fun-name new-form node))
                    (transform-call node new-form fun-name))
                  (values :none nil))

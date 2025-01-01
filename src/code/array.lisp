@@ -398,8 +398,6 @@
           (recurse (%array-data x))
           (truly-the (integer 128 255) result))))))
 
-(declaim (ftype (sfunction (array) (values (integer 128 255) (unsigned-byte 8)))
-                array-underlying-widetag-and-shift))
 (defun array-underlying-widetag-and-shift (array)
   (declare (explicit-check))
   (let ((widetag (array-underlying-widetag array)))

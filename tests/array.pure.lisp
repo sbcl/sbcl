@@ -891,3 +891,14 @@
    (lambda (x)
      (sb-ext:array-storage-vector (the string x)))
    simple-string))
+
+(with-test (:name :make-array-element-type)
+  (assert-type
+   (lambda (a)
+     (declare (string a))
+     (make-array 3 :element-type (array-element-type a)))
+   (simple-string 3))
+  (assert-type
+   (lambda (a)
+     (make-array 2 :element-type (the (member character base-char) a)))
+   (simple-string 2)))

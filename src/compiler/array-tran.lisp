@@ -602,46 +602,55 @@
 (defun derive-make-array-type (dims element-type adjustable
                                fill-pointer displaced-to
                                node)
-  (let* ((simple (and (unsupplied-or-nil adjustable)
-                      (unsupplied-or-nil displaced-to)
-                      (unsupplied-or-nil fill-pointer)))
-         (spec
-           `(,(if simple 'simple-array 'array)
-             ;; element-type is usually an LVAR or nil,
-             ;; but MAKE-WEAK-VECTOR derive-type passes in 'T.
-             ,(cond ((or (not element-type) (eq element-type 't))
-                     t)
-                    ((ctype-p element-type)
-                     (type-specifier element-type))
-                    ((constant-lvar-p element-type)
-                     (let ((ctype (careful-specifier-type
-                                   (lvar-value element-type))))
-                       (cond
-                         ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                         (t (upgraded-array-element-type
-                             (lvar-value element-type))))))
-                    (t
-                     '*))
-             ,(cond ((constant-lvar-p dims)
-                     (let* ((val (lvar-value dims))
-                            (cdims (ensure-list val)))
-                       (unless (check-array-dimensions val node)
-                         (return-from derive-make-array-type))
-                       (if simple
-                           cdims
-                           (length cdims))))
-                    ((or (csubtypep (lvar-type dims)
-                                    (specifier-type 'integer))
-                         (supplied-and-true fill-pointer))
-                     '(*))
-                    (t
-                     '*)))))
-    (if (and (not simple)
-             (or (supplied-and-true adjustable)
-                 (supplied-and-true displaced-to)
-                 (supplied-and-true fill-pointer)))
-        (careful-specifier-type `(and ,spec (not simple-array)))
-        (careful-specifier-type spec))))
+  (flet ((derive (element-type)
+           (let* ((simple (and (unsupplied-or-nil adjustable)
+                               (unsupplied-or-nil displaced-to)
+                               (unsupplied-or-nil fill-pointer)))
+                  (spec
+                    `(,(if simple 'simple-array 'array)
+                      ,element-type
+                      ,(cond ((constant-lvar-p dims)
+                              (let* ((val (lvar-value dims))
+                                     (cdims (ensure-list val)))
+                                (unless (check-array-dimensions val node)
+                                  (return-from derive-make-array-type))
+                                (if simple
+                                    cdims
+                                    (length cdims))))
+                             ((or (csubtypep (lvar-type dims)
+                                             (specifier-type 'integer))
+                                  (supplied-and-true fill-pointer))
+                              '(*))
+                             (t
+                              '*)))))
+             (if (and (not simple)
+                      (or (supplied-and-true adjustable)
+                          (supplied-and-true displaced-to)
+                          (supplied-and-true fill-pointer)))
+                 (careful-specifier-type `(and ,spec (not simple-array)))
+                 (careful-specifier-type spec)))))
+    (cond ((or (not element-type) (eq element-type 't))
+           (derive t))
+          ((listp element-type)
+           (sb-kernel::%type-union
+            (mapcar #'derive element-type)))
+          ((ctype-p element-type)
+           (derive (type-specifier element-type)))
+          ((constant-lvar-p element-type)
+           (derive
+            (let ((ctype (careful-specifier-type
+                          (lvar-value element-type))))
+              (cond
+                ((or (null ctype) (contains-unknown-type-p ctype)) '*)
+                (t (upgraded-array-element-type
+                    (lvar-value element-type)))))))
+          #+sb-unicode
+          ((csubtypep (lvar-type element-type) (specifier-type '(member character base-char)))
+           (type-union (derive 'character)
+                       (derive 'base-char)))
+
+          (t
+           (derive '*)))))
 
 (defoptimizer (make-array derive-type)
     ((dims &key element-type adjustable fill-pointer displaced-to
@@ -666,13 +675,25 @@
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
      node)
-  (let ((saetp (and (constant-lvar-p widetag)
-                    (find (lvar-value widetag)
-                          sb-vm:*specialized-array-element-type-properties*
-                          :key #'sb-vm:saetp-typecode))))
-    (derive-make-array-type dims (if saetp
-                                     (sb-vm:saetp-ctype saetp)
-                                     *wild-type*)
+  (let ((element-type *wild-type*))
+    (cond ((constant-lvar-p widetag)
+           (let ((saetp
+                   (find (lvar-value widetag)
+                         sb-vm:*specialized-array-element-type-properties*
+                         :key #'sb-vm:saetp-typecode)))
+             (when saetp
+               (setf element-type (sb-vm:saetp-ctype saetp)))))
+          ((typep (lvar-type widetag) 'numeric-union-type)
+           (loop for type in (sb-kernel::flatten-numeric-union-types (lvar-type widetag))
+                 for tag = (nth-value 1 (type-singleton-p type))
+                 collect (or (find tag
+                                   sb-vm:*specialized-array-element-type-properties*
+                                   :key #'sb-vm:saetp-typecode)
+                             (return))
+                 into saetps
+                 finally (setf element-type
+                               (mapcar #'sb-vm:saetp-specifier saetps)))))
+    (derive-make-array-type dims element-type
                             adjustable fill-pointer displaced-to
                             node)))
 
@@ -2457,3 +2478,22 @@
   (when (constant-lvar-p length)
     (make-array-type (list (lvar-value length))
                      :complexp nil :element-type *wild-type*)))
+
+(defoptimizer (sb-vm::array-underlying-widetag-and-shift derive-type) ((array))
+  (block nil
+    (let ((saetps))
+      (flet ((try (type)
+               (unless (array-type-p type)
+                 (return))
+               (let ((spec (array-type-specialized-element-type type)))
+                 (when (eq spec *wild-type*)
+                   (return))
+                 (push (find-saetp-by-ctype spec) saetps))))
+        (if (union-type-p (lvar-type array))
+            (mapc #'try (union-type-types (lvar-type array)))
+            (try (lvar-type array))))
+      (loop for saetp in saetps
+            collect (sb-vm:saetp-typecode saetp) into tags
+            collect (sb-vm:saetp-n-bits-shift saetp) into shifts
+            finally (return (values-specifier-type `(values (member ,@tags)
+                                                            (member ,@shifts))))))))
