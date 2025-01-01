@@ -644,9 +644,9 @@
                 ((or (null ctype) (contains-unknown-type-p ctype)) '*)
                 (t (upgraded-array-element-type
                     (lvar-value element-type)))))))
-          #+sb-unicode
           ((csubtypep (lvar-type element-type) (specifier-type '(member character base-char)))
-           (type-union (derive 'character)
+           (type-union #+sb-unicode
+                       (derive 'character)
                        (derive 'base-char)))
 
           (t
@@ -2520,17 +2520,19 @@
      (let ((saetp (find-saetp-by-ctype (careful-specifier-type (lvar-value type)))))
        `(values ,(sb-vm:saetp-typecode saetp)
                 ,(sb-vm:saetp-n-bits-shift saetp))))
-    #+sb-unicode
+
     ((csubtypep (lvar-type type) (specifier-type '(member character base-char)))
-     `(if (eq type 'character)
-          (values #.sb-vm:simple-character-string-widetag
-                  #.(sb-vm:saetp-n-bits-shift
-                     (find sb-vm:simple-character-string-widetag
-                           sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode)))
-          (values #.sb-vm:simple-base-string-widetag
-                  #.(sb-vm:saetp-n-bits-shift
-                     (find sb-vm:simple-base-string-widetag
-                           sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode)))))
+     `(cond #+sb-unicode
+            ((eq type 'character)
+             (values #.sb-vm:simple-character-string-widetag
+                     #.(sb-vm:saetp-n-bits-shift
+                        (find sb-vm:simple-character-string-widetag
+                              sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode))))
+            (t
+             (values #.sb-vm:simple-base-string-widetag
+                     #.(sb-vm:saetp-n-bits-shift
+                        (find sb-vm:simple-base-string-widetag
+                              sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode))))))
     (t
      (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
 
