@@ -944,3 +944,8 @@
      (declare ((or cons (simple-vector 10)) x))
      (concatenate 'list x x))
    cons))
+
+(with-test (:name :sequencep-test)
+  (assert (not (ctu:ir1-named-calls `(lambda (a)
+                                       (declare ((array t) a))
+                                       (the sequence a))))))

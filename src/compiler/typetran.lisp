@@ -174,7 +174,7 @@
                                                    #-64-bit 'unsigned-byte-32-p)))
                    `(,new-predicate object))))
               ;; (typep (the float x) 'double-float) =>
-              ;; (typep x 'single-float)
+              ;; (not (typep x 'single-float))
               ((let* ((diff (type-difference otype type))
                       (pred (and (or (eq current-predicate 'sequencep) ;; always expensive
                                      (not (memory-type-test-p diff)))
@@ -1821,3 +1821,6 @@
       (if (stringp type)
           (careful-specifier-type (cdr (lvar-value place)))
           (careful-specifier-type type)))))
+
+(deftransform sequencep ((x) ((not extended-sequence)))
+  `(typep x '(or list vector)))
