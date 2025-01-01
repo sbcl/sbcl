@@ -2533,3 +2533,21 @@
                            sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode)))))
     (t
      (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
+
+(defoptimizer (sb-vm::%vector-widetag-and-n-bits-shift derive-type) ((type))
+  (let ((result *universal-type*))
+    ;; Can't do this because (and integer cons) is also NIL.
+    #+nil
+    (unless (types-equal-or-intersect (lvar-type type) (specifier-type 'null))
+      (setf result (specifier-type `(not (eql ,sb-vm:simple-array-nil-widetag)))))
+
+    ;; Try to exclude BASE-CHAR, which is null-terminated and needs to compute to adjust vector length.
+    (let ((comb (lvar-uses type)))
+      (when (combination-is comb '(list list* cons))
+        (let ((args (combination-args comb)))
+          (when (and args
+                     (csubtypep (lvar-type (first args))
+                                (specifier-type `(member unsigned-byte signed-byte integer))))
+            (setf result (type-intersection result
+                                            (specifier-type `(not (eql ,sb-vm:simple-base-string-widetag)))))))))
+    result))
