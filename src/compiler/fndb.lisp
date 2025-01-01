@@ -1996,6 +1996,10 @@
 ;;; We should never emit a call to %typep-wrapper
 (defknown %typep-wrapper (t t (or type-specifier ctype)) t
   (movable flushable always-translatable))
+
+(defknown array-type-test (t t) t
+  (flushable always-translatable))
+
 (defknown %type-constraint (t (or type-specifier ctype)) t
     (always-translatable))
 (defknown %in-bounds-constraint (t t) t

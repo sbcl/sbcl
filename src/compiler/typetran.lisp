@@ -971,11 +971,15 @@
 ;;; specified by TYPE, where STYPE is the type we have checked against (which
 ;;; is the same but for dimensions and element type). If HEADERP is true, OBJ
 ;;; is guaranteed to be an array-header.
-(defun test-array-element-type (obj type stype headerp pred length)
+(defun test-array-element-type (obj type stype headerp pred length object-type)
   (declare (type array-type type stype))
   (let ((eltype (array-type-specialized-element-type type)))
     (unless (or (type= eltype (array-type-specialized-element-type stype))
-                (eq eltype *wild-type*))
+                (eq eltype *wild-type*)
+                (csubtypep object-type
+                           (make-array-type '*
+                                            :element-type eltype
+                                            :specialized-element-type eltype)))
       (let* ((typecode (sb-vm:saetp-typecode (find-saetp-by-ctype eltype)))
              (complexp (array-type-complexp type)))
         (cond ((and headerp (not complexp))
@@ -1061,7 +1065,7 @@
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
 ;;; Otherwise, just do %TYPEP.
-(defun source-transform-array-typep (object type)
+(defun source-transform-array-typep (object type &optional (object-type *universal-type*))
   ;; Intercept (SIMPLE-ARRAY * (*)) because otherwise it tests
   ;; (AND SIMPLE-ARRAY (NOT ARRAY-HEADER)) to weed out rank 0 and >1.
   ;; By design the simple arrays of of rank 1 occupy a contiguous
@@ -1103,7 +1107,7 @@
                         (test-array-dimensions object type stype
                                                simple-array-header-p)
                       (multiple-value-bind (type-test no-check-for-array length-checked)
-                          (test-array-element-type object type stype headerp pred length)
+                          (test-array-element-type object type stype headerp pred length object-type)
                         (if no-check-for-array
                             `(and ,@type-test
                                   ,@(unless length-checked
@@ -1367,7 +1371,7 @@
            (classoid
             `(%instance-typep ,object ',type))
            (array-type
-            (source-transform-array-typep object ctype))
+            `(array-type-test ,object ',type))
            (cons-type
             (source-transform-cons-typep object ctype))
            (character-set-type
@@ -1824,3 +1828,7 @@
 
 (deftransform sequencep ((x) ((not extended-sequence)))
   `(typep x '(or list vector)))
+
+(deftransform array-type-test ((object type) * * :node node)
+  (delay-ir1-transform node :constraint)
+  (source-transform-array-typep 'object (careful-specifier-type (lvar-value type)) (lvar-type object)))
