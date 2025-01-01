@@ -153,7 +153,7 @@
 
 #-sb-thread
 (progn
-  (setf *run* t)
+  (sb-thread:signal-semaphore *run* 6)
   (remove-methods *to-remove-a*)
   (remove-methods *to-remove-b*)
   (remove-methods *to-remove-c*)

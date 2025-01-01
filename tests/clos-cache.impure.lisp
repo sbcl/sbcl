@@ -108,7 +108,7 @@
 
   #-sb-thread
   (progn
-    (setf *run-cache-test* t)
+    (sb-thread:signal-semaphore *run-cache-test* 32)
     (loop repeat 4
           do (test-loop)))
 
