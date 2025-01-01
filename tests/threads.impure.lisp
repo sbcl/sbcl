@@ -112,16 +112,17 @@
        `(with-test (:name ,name)
           (let* ((n 200000)
                  (x ,init)
-                 (run nil)
+                 (run (sb-thread:make-semaphore))
+                 (threadcount 10)
                  (threads
-                  (loop repeat 10
+                  (loop repeat threadcount
                         collect (make-thread
                                  (lambda ()
-                                   (loop until run do (thread-yield))
+                                   (sb-thread:wait-on-semaphore run)
                                    (loop repeat n do (,incf x)))))))
-            (setf run t)
+            (sb-thread:signal-semaphore run threadcount)
             (map nil #'join-thread threads)
-            (assert (= (,op x) (* 10 n)))))))
+            (assert (= (,op x) (* threadcount n)))))))
 
   (def (cas car) (cons 0 nil) incf-car car)
   (def (cas cdr) (cons nil 0) incf-cdr cdr)
