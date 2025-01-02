@@ -453,10 +453,13 @@
                  (out-range (type-approximate-interval (lvar-type amount)))
                  (new-range (when out-range
                               (interval-add in-range out-range))))
-            ;; Don't do it if the new amount won't shift in one direction
-            (when (and new-range
-                       (not (interval-range-info new-range))
-                       (interval-range-info out-range)
+
+            (when (and (or ;; Don't do it if the new amount won't shift in one direction
+                        (and new-range
+                             (not (interval-range-info new-range))
+                             (interval-range-info out-range))
+                        ;; Do not disturb the conversion to a right shift
+                        (combination-is (lvar-uses amount) '(%negate -)))
                        ;; but not if it won't be inlined anyway
                        (or (csubtypep (lvar-type value) (specifier-type 'word))
                            (csubtypep (lvar-type value) (specifier-type 'sb-vm:signed-word))))
