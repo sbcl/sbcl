@@ -5626,7 +5626,8 @@ used for a COMPLEX component.~:@>"
                                           (pop result)
                                           (pop result))
                                          (t
-                                          (setf (third result) range-rational-run))))
+                                          (setf (third result) range-rational-run)
+                                          (setf (second result) rational-low))))
                                  (setf (car result) rational-high))
                                 (t
                                  (setf (car result)
