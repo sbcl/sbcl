@@ -663,7 +663,7 @@
             (find-dominators component))
           (dominates-p block1 block2)))))
 
-(defun set-slot-old-p (node nth-value)
+(defun set-slot-old-p (node nth-object nth-value)
   (flet ((pseudo-static-value-p (lvar)
            (block nil
              (map-all-uses
@@ -692,7 +692,7 @@
            (let ((args (combination-args node)))
              (when (lvar-fun-is (combination-fun node) '(%%primitive))
                (pop args))
-             (let* ((object-lvar (first args))
+             (let* ((object-lvar (nth nth-object args))
                     (value-lvar (nth nth-value args))
                     (allocator (principal-lvar-ref-use object-lvar t)))
                (labels ((born-before-p (node)
