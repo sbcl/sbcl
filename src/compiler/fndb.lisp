@@ -1285,6 +1285,7 @@
 ;; causing difficulty if doing any futher macro-like processing.
 (defknown fill-array (sequence simple-array) (simple-array)
   (flushable no-verify-arg-count)
+  :derive-type #'result-type-last-arg
   :result-arg 1)
 
 (defknown vector (&rest t) simple-vector (flushable foldable-read-only))

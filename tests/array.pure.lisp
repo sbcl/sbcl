@@ -901,4 +901,16 @@
   (assert-type
    (lambda (a)
      (make-array 2 :element-type (the (member character base-char) a)))
-   (simple-string 2)))
+   (simple-string 2))
+  (assert-type
+   (lambda (x)
+     (make-array '(1 1)
+                 :element-type 'single-float
+                 :initial-contents x))
+   (simple-array single-float (1 1)))
+  (assert-type
+   (lambda (n)
+    (make-array (list n n)
+                :element-type 'single-float
+                :initial-contents '((1.0))))
+   (simple-array single-float (* *))))

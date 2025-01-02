@@ -203,6 +203,7 @@
 (defknown sb-kernel::check-array-shape (simple-array list)
   (simple-array)
   (flushable no-verify-arg-count)
+  :derive-type #'result-type-first-arg
   :result-arg 0)
 
 (defknown (%make-instance %make-instance/mixed) (index) instance
