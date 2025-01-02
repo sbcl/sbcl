@@ -1342,8 +1342,8 @@
   (check-sequence-ranges sequence1 start1 end1 node :suffix 1 :name 'sequence1)
   (check-sequence-ranges sequence2 start2 end2 node :suffix 2 :name 'sequence2))
 
-(defoptimizer (vector-subseq* ir2-hook) ((vector start end) node)
-  (check-sequence-ranges vector start end node))
+(defoptimizers ir2-hook (vector-subseq* list-subseq*) ((sequence start end) node)
+  (check-sequence-ranges sequence start end node))
 
 (defoptimizers ir2-hook (%member-key-test)
     ((item list key test) node)
@@ -2344,68 +2344,61 @@
          (index-length (and constant-start constant-end
                             (- constant-end constant-start)))
          (list-type (specifier-type 'list)))
-    (flet ((bad ()
-             (let ((*compiler-error-context* node))
-               (compiler-warn "Bad bounding indices ~s, ~s for ~
-                               ~/sb-impl:print-type/"
-                              constant-start constant-end sequence-type))))
-      (cond ((and index-length
-                  (minusp index-length))
-             ;; Would be a good idea to transform to something like
-             ;; %compile-time-type-error
-             (bad))
-            ((csubtypep sequence-type list-type)
-             (let ((null-type (specifier-type 'null)))
-               (cond ((csubtypep sequence-type null-type)
-                      (cond ((or (and constant-start
-                                      (plusp constant-start))
-                                 (and index-length
-                                      (plusp index-length)))
-                             (bad))
-                            ((eql constant-start 0)
-                             null-type)
-                            (t
-                             list-type)))
-                     ((not index-length)
-                      list-type)
-                     ((zerop index-length)
-                      null-type)
-                     (t
-                      (specifier-type 'cons)))))
-            ((csubtypep sequence-type (specifier-type 'vector))
-             (let* ((dimensions
-                      ;; Can't trust lengths from non-simple vectors due to
-                      ;; fill-pointer and adjust-array
-                      (and (csubtypep sequence-type (specifier-type 'simple-array))
-                           (ctype-array-dimensions sequence-type)))
-                    (dimensions-length
-                      (and (singleton-p dimensions)
-                           (integerp (car dimensions))
-                           (car dimensions)))
-                    (length (cond (index-length)
-                                  ((and dimensions-length
-                                        (not end)
-                                        constant-start)
-                                   (- dimensions-length constant-start))))
-                    (simplified (simplify-vector-type sequence-type)))
-               (cond ((and dimensions-length
-                           (or
-                            (and constant-start
-                                 (> constant-start dimensions-length))
-                            (and constant-end
-                                 (> constant-end dimensions-length))))
-                      (bad))
-                     (length
-                      (type-intersection simplified
-                                         (specifier-type `(simple-array * (,length)))))
-                     (t
-                      simplified))))
-            ((not index-length)
-             nil)
-            ((zerop index-length)
-             (specifier-type '(not cons)))
-            (t
-             (specifier-type '(not null)))))))
+    (cond ((and index-length
+                (minusp index-length))
+           nil)
+          ((csubtypep sequence-type list-type)
+           (let ((null-type (specifier-type 'null)))
+             (cond ((csubtypep sequence-type null-type)
+                    (cond ((or (and constant-start
+                                    (plusp constant-start))
+                               (and index-length
+                                    (plusp index-length)))
+                           nil)
+                          ((eql constant-start 0)
+                           null-type)
+                          (t
+                           list-type)))
+                   ((not index-length)
+                    list-type)
+                   ((zerop index-length)
+                    null-type)
+                   (t
+                    (specifier-type 'cons)))))
+          ((csubtypep sequence-type (specifier-type 'vector))
+           (let* ((dimensions
+                    ;; Can't trust lengths from non-simple vectors due to
+                    ;; fill-pointer and adjust-array
+                    (and (csubtypep sequence-type (specifier-type 'simple-array))
+                         (ctype-array-dimensions sequence-type)))
+                  (dimensions-length
+                    (and (singleton-p dimensions)
+                         (integerp (car dimensions))
+                         (car dimensions)))
+                  (length (cond (index-length)
+                                ((and dimensions-length
+                                      (not end)
+                                      constant-start)
+                                 (- dimensions-length constant-start))))
+                  (simplified (simplify-vector-type sequence-type)))
+             (cond ((and dimensions-length
+                         (or
+                          (and constant-start
+                               (> constant-start dimensions-length))
+                          (and constant-end
+                               (> constant-end dimensions-length))))
+                    nil)
+                   (length
+                    (type-intersection simplified
+                                       (specifier-type `(simple-array * (,length)))))
+                   (t
+                    simplified))))
+          ((not index-length)
+           nil)
+          ((zerop index-length)
+           (specifier-type '(not cons)))
+          (t
+           (specifier-type '(not null))))))
 
 ;;; Open-code CONCATENATE for strings. It would be possible to extend
 ;;; this transform to non-strings, but I chose to just do the case that

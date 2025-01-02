@@ -372,11 +372,21 @@
                       '(lambda () (encode-universal-time 0 0 0 1 1 1900 -1))
                       :allow-style-warnings t))))
 
-(with-test (:name :search-transform-bad-index)
+(with-test (:name :bad-index)
   (assert (nth-value 2
                      (checked-compile
                       '(lambda (a)
                         (search '(0 1 0 2) a :start1 4 :end1 5))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda ()
+                        (subseq '(0) 10))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda ()
+                        (subseq #(0) 0 10))
                       :allow-warnings t))))
 
 (with-test (:name :bound-mismatch-union-types)

@@ -569,23 +569,28 @@
 
 ;;;; from the "Sequences" chapter:
 
-(defknown elt (proper-sequence index) t (foldable unsafely-flushable))
+(defknown elt ((read-only proper-sequence) index) t (foldable unsafely-flushable))
 
-(defknown subseq (proper-sequence index &optional sequence-end) consed-sequence
-  (flushable))
+(defknown subseq ((read-only proper-sequence) index &optional sequence-end) consed-sequence
+  (flushable foldable-read-only))
 
-(defknown vector-subseq* (vector index sequence-end) (simple-array * (*))
-  (flushable))
+(defknown vector-subseq* ((read-only vector) index sequence-end) (simple-array * (*))
+  (flushable foldable-read-only no-verify-arg-count))
 
-(defknown copy-seq (proper-sequence) consed-sequence (flushable)
+(defknown list-subseq* ((read-only list) index sequence-end) list
+  (flushable foldable-read-only no-verify-arg-count))
+
+(defknown copy-seq ((read-only proper-sequence)) consed-sequence
+  (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
-(defknown list-copy-seq* (proper-list) list (flushable)
+(defknown list-copy-seq* ((read-only proper-list)) list
+  (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown length ((read-only proper-sequence)) index (foldable flushable dx-safe))
 
-(defknown reverse (proper-sequence) consed-sequence (flushable foldable-read-only)
+(defknown reverse ((read-only proper-sequence)) consed-sequence (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
@@ -600,7 +605,7 @@
                                         &key
                                         (:initial-element t))
   consed-sequence
-  (movable)
+  (movable foldable-read-only)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence
@@ -1240,7 +1245,7 @@
                       (:fill-pointer (or index boolean))
                       (:displaced-to (or array null))
                       (:displaced-index-offset index))
-  array (flushable))
+  array (flushable foldable-read-only))
 
 (defknown %make-array ((or index list)
                        (unsigned-byte #.sb-vm:n-widetag-bits)
@@ -1253,7 +1258,7 @@
                        (:fill-pointer (or index boolean))
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
-    array (flushable no-verify-arg-count))
+    array (flushable foldable-read-only no-verify-arg-count))
 
 (defknown sb-vm::array-underlying-widetag-and-shift (array)
     (values (integer 128 255) (integer 0 7))
