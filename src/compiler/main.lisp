@@ -323,10 +323,7 @@ Examples:
                        :live-tns (make-array ,size :initial-element nil)))))))
      (let ((*warnings-p* nil)
            (*failure-p* nil))
-       (handler-bind ((compiler-error #'compiler-error-handler)
-                      (style-warning #'compiler-style-warning-handler)
-                      (warning #'compiler-warning-handler))
-         (values (progn ,@body) *warnings-p* *failure-p*)))))
+       (values (progn ,@body) *warnings-p* *failure-p*))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
@@ -1649,34 +1646,37 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
-              (fasl-dump-partial-source-info info *compile-object*)
-              (with-ir1-namespace
-                (with-source-paths
-                  (do-forms-from-info ((form current-index) info
-                                       'input-error-in-compile-file)
-                    (clrhash *source-paths*)
-                    (find-source-paths form current-index)
-                    (note-top-level-form form)
-                    (let ((*gensym-counter* 0))
-                      (process-toplevel-form
-                       form `(original-source-start 0 ,current-index) nil)))
-                  (finish-block-compilation)
-                  (compile-toplevel-lambdas () t)
-                  (let ((object *compile-object*))
-                    (etypecase object
-                      (fasl-output (fasl-dump-source-info info object))
-                      #-sb-xc-host
-                      (core-object (fix-core-source-info info object))
-                      (null)))))
-              (let ((code-coverage-records
-                      (code-coverage-records (coverage-metadata *compilation*))))
-                (unless (zerop (hash-table-count code-coverage-records))
-                  ;; Dump the code coverage records into the fasl.
-                  (dump-code-coverage-records
-                   (loop for k being each hash-key of code-coverage-records
-                         collect k)
-                   *compile-object*)))
-                nil)))
+              (handler-bind ((compiler-error #'compiler-error-handler)
+                             (style-warning #'compiler-style-warning-handler)
+                             (warning #'compiler-warning-handler))
+                (fasl-dump-partial-source-info info *compile-object*)
+                (with-ir1-namespace
+                  (with-source-paths
+                    (do-forms-from-info ((form current-index) info
+                                         'input-error-in-compile-file)
+                      (clrhash *source-paths*)
+                      (find-source-paths form current-index)
+                      (note-top-level-form form)
+                      (let ((*gensym-counter* 0))
+                        (process-toplevel-form
+                         form `(original-source-start 0 ,current-index) nil)))
+                    (finish-block-compilation)
+                    (compile-toplevel-lambdas () t)
+                    (let ((object *compile-object*))
+                      (etypecase object
+                        (fasl-output (fasl-dump-source-info info object))
+                        #-sb-xc-host
+                        (core-object (fix-core-source-info info object))
+                        (null)))))
+                (let ((code-coverage-records
+                        (code-coverage-records (coverage-metadata *compilation*))))
+                  (unless (zerop (hash-table-count code-coverage-records))
+                    ;; Dump the code coverage records into the fasl.
+                    (dump-code-coverage-records
+                     (loop for k being each hash-key of code-coverage-records
+                           collect k)
+                     *compile-object*)))
+                nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.
