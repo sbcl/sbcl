@@ -345,7 +345,7 @@ request an input stream and get an output stream in response\)."
 (define-socket-condition sockint::EOPNOTSUPP operation-not-supported-error)
 (define-socket-condition sockint::EPERM operation-not-permitted-error)
 (define-socket-condition sockint::EPROTONOSUPPORT protocol-not-supported-error)
-(define-socket-condition sockint::ESOCKTNOSUPPORT socket-type-not-supported-error)
+#-haiku (define-socket-condition sockint::ESOCKTNOSUPPORT socket-type-not-supported-error)
 (define-socket-condition sockint::ENETUNREACH network-unreachable-error)
 (define-socket-condition sockint::ENOTCONN not-connected-error)
 (define-socket-condition sockint::EAFNOSUPPORT address-family-not-supported)
