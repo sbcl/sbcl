@@ -373,9 +373,11 @@
                       :allow-style-warnings t))))
 
 (with-test (:name :search-transform-bad-index)
-  (checked-compile
-   '(lambda (a)
-     (search '(0 1 0 2) a :start1 4 :end1 5))))
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda (a)
+                        (search '(0 1 0 2) a :start1 4 :end1 5))
+                      :allow-warnings t))))
 
 (with-test (:name :bound-mismatch-union-types)
   (assert (nth-value 1
@@ -703,6 +705,14 @@
                       `(lambda (x)
                          (declare (string x))
                          (replace x #(1 2 3)))
+                      :allow-warnings 'warning)))
+  (checked-compile
+   `(lambda (n)
+      (replace (the (simple-array single-float) n) '(1 1.0) :start2 1)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n)
+                         (replace n '(1 1.0) :start2 10))
                       :allow-warnings 'warning))))
 
 (with-test (:name :fill-type-mismatch)

@@ -1233,10 +1233,9 @@
                                        key
                                        (type-specifier returns)))))))))))
 
-(defun check-sequence-ranges (string start end node &key (suffix "") name (warn t))
-  (prog* ((type (lvar-type string))
-          (lengths (vector-type-lengths type))
-          (annotation (find-if #'lvar-sequence-bounds-annotation-p (lvar-annotations string))))
+(defun check-sequence-ranges (sequence start end node &key (suffix "") name (warn t))
+  (prog* ((type (lvar-type sequence))
+          (annotation (find-if #'lvar-sequence-bounds-annotation-p (lvar-annotations sequence))))
      (when annotation
        (when (shiftf (lvar-annotation-fired annotation) t)
          (return)))
@@ -1260,12 +1259,11 @@
                                                suffix)
                                            (type-specifier type))
                             (return t))))))))
-         (loop for length in lengths
-               thereis
-               (check start "start" `(integer 0 ,length)))
-         (loop for length in lengths
-               thereis
-               (check end "end" `(or null (integer 0 ,length)))))
+         (multiple-value-bind (max) (sequence-lvar-dimensions sequence)
+           (when max
+             (check start "start" `(integer 0 ,max)))
+           (when max
+             (check end "end" `(or null (integer 0 ,max))))))
        (when (and start end)
          (let* ((start-type (arg-type start))
                 (start-interval (type-approximate-interval start-type))
@@ -1580,16 +1578,32 @@
       (check-sequence-ranges seq1 start1 end1 node :suffix 1 :name 'target-sequence1)
       (check-sequence-ranges seq2 start2 end2 node :suffix 2 :name 'source-sequence2)
       (cond ((eq type1 *wild-type*))
-            ((constant-lvar-p seq2)
-             (map nil (lambda (x)
-                        (unless (ctypep x type1)
-                          (let ((*compiler-error-context* node))
-                            (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
-                                           x
-                                           (type-specifier type1)))
-                          (return-from replace-ir2-hook-optimizer))
-                        x)
-                  (lvar-value seq2)))
+            ((block nil
+               (when (constant-lvar-p seq2)
+                 (let ((sequence (lvar-value seq2))
+                       (start (if start2
+                                  (and (or (constant-lvar-p start2)
+                                           (return))
+                                       (lvar-value start2))
+
+                                  0))
+                       (end (and end2
+                                 (or (constant-lvar-p end2)
+                                     (return))
+                                 (lvar-value end2))))
+                   (when (and (<= start (length sequence))
+                              (or (not end)
+                                  (<= end (length sequence))))
+                       (map nil (lambda (x)
+                                  (unless (ctypep x type1)
+                                    (let ((*compiler-error-context* node))
+                                      (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
+                                                     x
+                                                     (type-specifier type1)))
+                                    (return-from replace-ir2-hook-optimizer))
+                                  x)
+                            (subseq sequence start end)))))))
+            ((eq type2 *wild-type*))
             ((not (types-equal-or-intersect type1 type2))
              (let ((*compiler-error-context* node))
                (compiler-warn "Incompatible array element types: ~a and ~a"
