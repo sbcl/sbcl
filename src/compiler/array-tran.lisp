@@ -2514,6 +2514,14 @@
             finally (return (values-specifier-type `(values (member ,@tags)
                                                             (member ,@shifts))))))))
 
+(deftransform sb-vm::array-underlying-widetag-and-shift ((array) (simple-array))
+  `(let ((widetag (if (vectorp array)
+                      (%other-pointer-widetag array)
+                      (%other-pointer-widetag (%array-data array)))))
+     (values widetag
+             (truly-the (unsigned-byte 8)
+                        (aref sb-vm::%%simple-array-n-bits-shifts%% widetag)))))
+
 (deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type))
   (cond
     ((constant-lvar-p type)
