@@ -788,11 +788,15 @@
                        ;; such as `((,x ,x) (,x ,x ,x)).
                        ((atom items)
                         (and (null items)
-                             (if (aref dimensions axis)
-                                 (eql length (aref dimensions axis))
-                                 (setf (aref dimensions axis) length))))
+                             (cond ((not (aref dimensions axis))
+                                    (setf (aref dimensions axis) length))
+                                   ((= length (aref dimensions axis)))
+                                   (t
+                                    (warn "Inconsistent :initial-contents dimensions.")))))
                      (declare (type index length))
                      (funcall fun (pop items))))
+        (when (constantp form)
+          (warn "Inconsistent :initial-contents rank."))
         (return-from rewrite-initial-contents (values nil nil))))
     (when (some #'null dimensions)
       ;; Unless it is the rightmost axis, a 0-length subsequence
@@ -914,7 +918,8 @@
                (when (and dims-constp (not (equal shape dims)))
                  ;; This will become a runtime error if the code is executed.
                  (warn "array dimensions are ~A but :INITIAL-CONTENTS dimensions are ~A"
-                       dims shape))
+                       dims shape)
+                 (return-from make-array (values nil t)))
                (setf data-dims shape (getf keys :initial-contents) data))
               (t ; contents could not be flattened
                ;; Preserve eval order. The only keyword arg to worry about
@@ -1255,7 +1260,7 @@
                          (<= (length initial-contents) 1000))))
              (let ((contents (lvar-value initial-contents)))
                (unless (= c-length (length contents))
-                 (abort-ir1-transform "~S has ~S elements, vector length is ~S."
+                 (abort-ir1-transform "~S has ~S element~:p, vector length is ~S."
                                       :initial-contents (length contents) c-length))
                (wrap `(initialize-vector
                        ,data-alloc-form
@@ -1268,10 +1273,15 @@
             ;; Case (4)
             ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with constant LENGTH.
             ((and c-length
-                  (lvar-matches initial-contents
-                                :fun-names '(list vector)
-                                :arg-count c-length
-                                :notinline nil))
+                  (multiple-value-bind (match arg-count)
+                      (lvar-matches initial-contents
+                                    :fun-names '(list vector)
+                                    :arg-count c-length
+                                    :notinline nil)
+                    (or match
+                        (and arg-count
+                             (abort-ir1-transform "~S has ~S element~:p, vector length is ~S."
+                                                  :initial-contents arg-count c-length)))))
              (let ((parameters (eliminate-keyword-args
                                 call 1
                                 '((:element-type element-type)
@@ -1295,6 +1305,9 @@
 
             ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
+             (lvar-matches initial-contents
+                           :fun-names '(list vector)
+                           :notinline nil)
              `(let ((content-length (length initial-contents)))
                 (unless (= content-length ,(or c-length 'dims))
                   (sb-vm::initial-contents-error content-length  ,(or c-length 'dims)))

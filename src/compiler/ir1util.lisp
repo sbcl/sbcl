@@ -3067,7 +3067,9 @@ is :ANY, the function name is not checked."
                               (fun-lexically-notinline-p name (node-lexenv use))))
                     (member name fun-names :test #'eq))))
          (or (not arg-count)
-             (= arg-count (length (combination-args use)))))))
+             (let ((length (length (combination-args use))))
+               (or (= arg-count length)
+                   (values nil length)))))))
 
 ;;; In (a (b lvar)) (lvar-matches-calls lvar '(b a)) would return T
 (defun lvar-matches-calls (lvar dest-fun-names)

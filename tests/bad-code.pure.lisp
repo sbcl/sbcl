@@ -697,6 +697,12 @@
                       `(lambda (x)
                          (declare (string x))
                          (replace x '(1 2 3)))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (replace x #(1 2 3)))
                       :allow-warnings 'warning))))
 
 (with-test (:name :fill-type-mismatch)
@@ -835,4 +841,39 @@
                      (checked-compile
                       '(lambda (n)
                         (incf (car (assoc n '((1 . 2) (3 . 4))))))
+                      :allow-warnings t))))
+
+(with-test (:name :make-array-initial-contents-warning)
+  (checked-compile
+   `(lambda (n)
+      (make-array n
+                  :element-type 'single-float
+                  :initial-contents '((1.0)))))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-array '(10 10)
+                                     :element-type 'single-float
+                                     :initial-contents '(1.0)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n)
+                         (make-array (list n n)
+                                     :element-type 'single-float
+                                     :initial-contents (list (list 1.0 1.0)
+                                                             (list 1.0 1.0 1.0))))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n)
+                         (make-array (list n n)
+                                     :element-type 'single-float
+                                     :initial-contents (list (list 1.0 1.0)
+                                                             1.0)))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (make-array 10 :element-type 'single-float :initial-contents (list 10)))
                       :allow-warnings t))))

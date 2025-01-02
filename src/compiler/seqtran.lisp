@@ -1580,17 +1580,16 @@
       (check-sequence-ranges seq1 start1 end1 node :suffix 1 :name 'target-sequence1)
       (check-sequence-ranges seq2 start2 end2 node :suffix 2 :name 'source-sequence2)
       (cond ((eq type1 *wild-type*))
-            ((eq type2 *wild-type*)
-             (when (constant-lvar-p seq2)
-               (map nil (lambda (x)
-                          (unless (ctypep x type1)
-                            (let ((*compiler-error-context* node))
-                              (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
-                                             x
-                                             (type-specifier type1)))
-                            (return-from replace-ir2-hook-optimizer))
-                          x)
-                    (lvar-value seq2))))
+            ((constant-lvar-p seq2)
+             (map nil (lambda (x)
+                        (unless (ctypep x type1)
+                          (let ((*compiler-error-context* node))
+                            (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
+                                           x
+                                           (type-specifier type1)))
+                          (return-from replace-ir2-hook-optimizer))
+                        x)
+                  (lvar-value seq2)))
             ((not (types-equal-or-intersect type1 type2))
              (let ((*compiler-error-context* node))
                (compiler-warn "Incompatible array element types: ~a and ~a"
@@ -1615,7 +1614,9 @@
              (let ((initial-contents (lvar-value initial-contents)))
                (when (sequencep initial-contents)
                  (map nil (lambda (x)
-                            (unless (ctypep x element-type)
+                            (unless (or (ctypep x element-type)
+                                        (and (not (csubtypep (lvar-type dimensions) (specifier-type 'sequence)))
+                                             (sequencep x)))
                               (let ((*compiler-error-context* node))
                                 (compiler-warn ":initial-contents has an element ~s incompatible with :element-type ~a."
                                                x
