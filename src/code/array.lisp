@@ -346,11 +346,14 @@
 
 (declaim (inline vector-length-in-words))
 (defun vector-length-in-words (length n-bits-shift)
-  (declare (type (integer 0 7) n-bits-shift))
-  (let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
-        (shift (- n-bits-shift
-                  (1- (integer-length n-word-bits)))))
-    (ash (+ length mask) shift)))
+  (declare (type index length)
+           (type (integer 0 7) n-bits-shift))
+  #.(if (fixnump (ash array-dimension-limit 7))
+        '(values (ceiling (ash length n-bits-shift) 64))
+        '(let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
+               (shift (- n-bits-shift
+                       (1- (integer-length n-word-bits)))))
+          (ash (+ length mask) shift))))
 
 
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into array-size-in-bits,
