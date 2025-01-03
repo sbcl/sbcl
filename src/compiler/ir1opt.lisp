@@ -3119,8 +3119,7 @@
                             t))
                  (cond (bad-uses
                         (setf detail (lvar-uses-all-sources bad-uses)
-                              bad-type (sb-kernel::%type-union
-                                        (mapcar #'node-derived-type bad-uses))))
+                              bad-type (reduce #'values-type-union bad-uses :key #'node-derived-type)))
                        (t
                         (setf (cast-silent-conflict cast) t))))
                (when (or (not (cast-silent-conflict cast))
