@@ -766,7 +766,7 @@
                         (add-equality-constraints name args
                                                   constraints consequent-constraints alternative-constraints)
                         (case name
-                          ((%typep %instance-typep)
+                          ((typep %typep %instance-typep)
                            (let ((type (second args)))
                              (when (constant-lvar-p type)
                                (let ((val (lvar-value type)))
@@ -775,8 +775,9 @@
                                       (if (ctype-p val)
                                           val
                                           (let ((*compiler-error-context* node))
-                                            (specifier-type val)))
-                                      nil)))))
+                                           (specifier-type val)))
+                                      nil
+                                      (first args))))))
                           ((eq eql)
                            (let* ((arg1 (first args))
                                   (var1 (ok-lvar-lambda-var arg1 constraints))

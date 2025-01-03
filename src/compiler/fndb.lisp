@@ -43,31 +43,10 @@
 
 ;;;; from the "Predicates" chapter:
 
-;;; FIXME: Is it right to have TYPEP (and TYPE-OF, elsewhere; and
-;;; perhaps SPECIAL-OPERATOR-P and others) be FOLDABLE in the
-;;; cross-compilation host? After all, some type relationships (e.g.
-;;; FIXNUMness) might be different between host and target. Perhaps
-;;; this property should be protected by #-SB-XC-HOST? Perhaps we need
-;;; 3-stage bootstrapping after all? (Ugh! It's *so* slow already!)
 (defknown typep (t type-specifier &optional lexenv-designator) boolean
-   ;; Unlike SUBTYPEP or UPGRADED-ARRAY-ELEMENT-TYPE and friends, this
-   ;; seems to be FOLDABLE. Like SUBTYPEP, it's affected by type
-   ;; definitions, but unlike SUBTYPEP, there should be no way to make
-   ;; a TYPEP expression with constant arguments which doesn't return
-   ;; an error before the type declaration (because of undefined
-   ;; type). E.g. you can do
-   ;;   (SUBTYPEP 'INTEGER 'FOO) => NIL, NIL
-   ;;   (DEFTYPE FOO () T)
-   ;;   (SUBTYPEP 'INTEGER 'FOO) => T, T
-   ;; but the analogous
-   ;;   (TYPEP 12 'FOO)
-   ;;   (DEFTYPE FOO () T)
-   ;;   (TYPEP 12 'FOO)
-   ;; doesn't work because the first call is an error.
-   ;;
-   ;; (UPGRADED-ARRAY-ELEMENT-TYPE and UPGRADED-COMPLEX-PART-TYPE have
-   ;; behavior like SUBTYPEP in this respect, not like TYPEP.)
-   (foldable))
+    ;; Avoid warnings about bad types during constant folding,
+    ;; it will be folded in the transform.
+    ())
 (defknown subtypep (type-specifier type-specifier &optional lexenv-designator)
   (values boolean boolean)
   ;; This is not FOLDABLE because its value is affected by type
@@ -2008,12 +1987,6 @@
   (movable flushable no-verify-arg-count))
 (defknown %instance-typep (t (or type-specifier ctype layout)) boolean
   (movable flushable always-translatable))
-;;; We should never emit a call to %typep-wrapper
-(defknown %typep-wrapper (t t (or type-specifier ctype)) t
-  (movable flushable always-translatable))
-
-(defknown array-type-test (t t) t
-  (flushable always-translatable))
 
 (defknown %type-constraint (t (or type-specifier ctype)) t
     (always-translatable))

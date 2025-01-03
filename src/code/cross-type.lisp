@@ -58,7 +58,7 @@
               '(closurep simple-fun-p unbound-marker-p
                 sb-impl::vector-with-fill-pointer-p
                 legal-fun-name-p extended-function-designator-p
-                numeric-type-p))
+                numeric-type-p proper-list-p))
       (member symbol sb-vm::*backend-cross-foldable-predicates*)
       (and (eq (sb-xc:symbol-package symbol) *cl-package*)
            (or (eq usage 'sb-xc:typep)

@@ -48,24 +48,56 @@
                         :key #'cdr)))
     (%deftransform name nil '(function (t) *) #'fold-type-predicate)))
 
-;;;; IR1 transforms
 
-;;; If we discover the type argument is constant during IR1
-;;; optimization, then give the source transform another chance. The
-;;; source transform can't pass, since we give it an explicit
-;;; constant. At worst, it will convert to %TYPEP, which will prevent
-;;; spurious attempts at transformation (and possible repeated
-;;; warnings.)
+(define-source-transform typep (object spec &optional env)
+  (if (and (not env)
+           (typep spec '(cons (eql quote) (cons t null))))
+      (with-current-source-form (spec)
+        ;; Decline to do the source transform when seeing an unknown
+        ;; type immediately while block converting, since it may be
+        ;; defined later. By waiting for the deftransform to fire
+        ;; during block compilation, we give ourselves a better chance
+        ;; at open-coding the type test.
+        (let ((type (cadr spec)))
+          ;;
+          #+collect-typep-regression-dataset
+          (let ((parse (specifier-type type)))
+            ;; alien types aren't externalizable as trees of symbols,
+            ;; and some classoid types aren't defined at the start of warm build,
+            ;; making it impossible to re-parse a dump produced late in the build.
+            ;; Luckily there are no cases involving compund types and classoids.
+            (unless (or (involves-alien-p parse)
+                        (or (classoid-p parse)
+                            (and (cons-type-p parse)
+                                 (classoid-p (cons-type-car-type parse)))))
+              (let ((table *interesting-types*))
+                (unless (hash-table-p table)
+                  (setq table (dump/restore-interesting-types 'read)))
+                (setf (gethash type table) t))))
+          (let ((exp (%source-transform-typep-simple object type)))
+            (if exp
+                (progn
+                  (check-deprecated-type type)
+                  exp)
+                (values nil t)))))
+      (values nil t)))
+
 (deftransform typep ((object type &optional env) * * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform "can't open-code test of non-constant type"))
   (unless (unsupplied-or-nil env)
     (give-up-ir1-transform "environment argument present and not null"))
-  (multiple-value-bind (expansion fail-p)
-      (source-transform-typep 'object (lvar-value type))
-    (if fail-p
-        (abort-ir1-transform)
-        expansion)))
+  (let* ((type (lvar-value type))
+         (ctype (ir1-transform-specifier-type type))
+         (object-type (lvar-type object)))
+    (prog1
+        (cond ((csubtypep object-type ctype)
+               t)
+              ((not (types-equal-or-intersect object-type ctype))
+               nil)
+              (t
+               (%source-transform-typep 'object object type ctype node)))
+      (check-deprecated-type type))))
 
 (sb-xc:deftype other-pointer ()
   '(or array
@@ -241,36 +273,6 @@
     `(or (classoid-cell-classoid ',cell)
          (error "Class not yet defined: ~S" name))))
 
-(defoptimizer (%typep-wrapper constraint-propagate-if) ((test-value variable type) node)
-  (aver (constant-lvar-p type))
-  (let* ((type (lvar-value type))
-         (ctype (if (ctype-p type)
-                    type
-                    (handler-case (careful-specifier-type type)
-                      (t () nil)))))
-    (if (and ctype (type-for-constraints-p ctype))
-        (values variable ctype))))
-
-(deftransform %typep-wrapper ((test-value variable type) * * :node node)
-  (aver (constant-lvar-p type))
-  (if (constant-lvar-p test-value)
-      `',(lvar-value test-value)
-      (let* ((type (lvar-value type))
-             (type (if (ctype-p type)
-                       type
-                       (handler-case (careful-specifier-type type)
-                         (t () nil))))
-             (value-type (lvar-type variable)))
-        (cond ((not type)
-               'test-value)
-              ((csubtypep value-type type)
-               t)
-              ((not (types-equal-or-intersect value-type type))
-               nil)
-              (t
-               (delay-ir1-transform node :constraint)
-               'test-value)))))
-
 (deftransform %type-constraint ((x type) * * :node node)
   (delay-ir1-transform node :constraint)
   nil)
@@ -444,7 +446,7 @@
 ;;; Do the source transformation for a test of a hairy type.
 ;;; SATISFIES is converted into the obvious. Otherwise, we convert
 ;;; to CACHED-TYPEP an possibly print an efficiency note.
-(defun source-transform-hairy-typep (object type)
+(defun source-transform-hairy-typep (object type node)
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
     (cond ((and (unknown-type-p type)
@@ -473,7 +475,7 @@
                 ;; just a renaming of VALID-FUNCTION-NAME-P would not
                 ;; be inlined when testing the FUNCTION-NAME type.
                 `(if ,(if (and (typep expansion '(cons (eql lambda)))
-                               (not (fun-lexically-notinline-p name)))
+                               (not (fun-lexically-notinline-p name (node-lexenv node))))
                           `(,expansion ,object)
                           `(funcall (global-function ,name) ,object))
                      t nil))))))))
@@ -638,16 +640,14 @@
                                            (> b-lo a-hi))
                                   (let* (typecheck
                                          (a
-                                           (%source-transform-typep object
-                                                                    `(integer ,(or a-lo '*) ,(or b-hi '*))))
+                                           `(typep object '(integer ,(or a-lo '*) ,(or b-hi '*))))
                                          (b `(not
                                               ,(cond ((= (1+ a-hi)
                                                          (1- b-lo))
                                                       `(eql ,object ,(1+ a-hi)))
                                                      (t
                                                       (setf typecheck t)
-                                                      (%source-transform-typep object
-                                                                               `(integer (,a-hi) (,b-lo))))))))
+                                                      `(typep object '(integer (,a-hi) (,b-lo))))))))
                                     (if typecheck
                                         `(and ,a ,b)
                                         `(and ,b ,a)))))))
@@ -1314,6 +1314,39 @@
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
                                   object))))))
 
+;;; Transform to backend predicates without delaying, they have their
+;;; own optimizers and are visible to constraints.
+(defun %source-transform-typep-simple (object type &optional ctype)
+  (let ((ctype (or ctype
+                   (handler-bind
+                       ((parse-unknown-type (lambda (c)
+                                              c
+                                              (return-from %source-transform-typep-simple))))
+                     (careful-specifier-type type)))))
+   (when ctype
+     (or
+      ;; It's purely a waste of compiler resources to wait for IR1 to
+      ;; see these 2 edge cases that can be decided right now.
+      (cond ((eq ctype *universal-type*) t)
+            ((eq ctype *empty-type*) nil))
+      (and (not (intersection-type-p ctype))
+           (multiple-value-bind (constantp value) (type-singleton-p ctype)
+             (and constantp
+                  `(eql ,object ',value))))
+      (handler-case
+          (or
+           (let ((pred (backend-type-predicate ctype)))
+             (when pred `(,pred ,object)))
+           (let* ((negated (type-negation ctype))
+                  (pred (backend-type-predicate negated)))
+             (cond (pred
+                    `(not (,pred ,object)))
+                   ((numeric-type-p negated)
+                    `(not (typep ,object ',(type-specifier negated)))))))
+        #+sb-xc-host
+        (sb-kernel::cross-type-warning
+            nil))))))
+
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is
 ;;; constant, but we can't transform the call, then we convert to
@@ -1327,75 +1360,43 @@
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
 ;;; when, so we ignore policy and always do them.
-(defun %source-transform-typep (object type)
-  (let ((ctype (careful-specifier-type type)))
-    (if ctype
-        (or
-         ;; It's purely a waste of compiler resources to wait for IR1 to
-         ;; see these 2 edge cases that can be decided right now.
-         (cond ((eq ctype *universal-type*) t)
-               ((eq ctype *empty-type*) nil))
-         (and (not (intersection-type-p ctype))
-              (multiple-value-bind (constantp value) (type-singleton-p ctype)
-                (and constantp
-                     `(eql ,object ',value))))
-         (handler-case
-             (or
-              (let ((pred (backend-type-predicate ctype)))
-                (when pred `(,pred ,object)))
-              (let* ((negated (type-negation ctype))
-                     (pred (backend-type-predicate negated)))
-                (cond (pred
-                       `(not (,pred ,object)))
-                      ((numeric-type-p negated)
-                       `(not ,(%source-transform-typep object (type-specifier negated)))))))
-           #+sb-xc-host
-           (sb-kernel::cross-type-warning
-             nil))
-         (typecase ctype
-           (hairy-type
-            (source-transform-hairy-typep object ctype))
-           (negation-type
-            (source-transform-negation-typep object ctype))
-           (numeric-type
-            (source-transform-numeric-typep object ctype))
-           ((or union-type numeric-union-type)
-            (source-transform-union-typep object ctype))
-           (intersection-type
-            (source-transform-intersection-typep object ctype))
-           (member-type
-            `(if (member ,object ',(member-type-members ctype)) t))
-           (args-type
-            (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-            (return-from %source-transform-typep (values nil t)))
-           (classoid
-            `(%instance-typep ,object ',type))
-           (array-type
-            `(array-type-test ,object ',type))
-           (cons-type
-            (source-transform-cons-typep object ctype))
-           (character-set-type
-            (source-transform-character-set-typep object ctype))
-           #+sb-simd-pack
-           (simd-pack-type
-            (source-transform-simd-pack-typep object ctype))
-           #+sb-simd-pack-256
-           (simd-pack-256-type
-            (source-transform-simd-pack-256-typep object ctype))
-           (t nil))
-         `(%typep ,object ',type))
-        (values nil t))))
-
-(defun source-transform-typep (object type)
-  (when (typep type 'type-specifier)
-    (check-deprecated-type type))
-  (let ((name (gensym "OBJECT")))
-    (multiple-value-bind (transform error)
-        (%source-transform-typep name type)
-      (if error
-          (values nil t)
-          (values `(let ((,name ,object))
-                     (%typep-wrapper ,transform ,name ',type)))))))
+(defun %source-transform-typep (object object-lvar type ctype node)
+  (or
+   (%source-transform-typep-simple object type ctype)
+   (progn
+     (delay-ir1-transform node :constraint)
+     (typecase ctype
+       (hairy-type
+        (source-transform-hairy-typep object ctype node))
+       (negation-type
+        (source-transform-negation-typep object ctype))
+       (numeric-type
+        (source-transform-numeric-typep object ctype))
+       ((or union-type numeric-union-type)
+        (source-transform-union-typep object ctype))
+       (intersection-type
+        (source-transform-intersection-typep object ctype))
+       (member-type
+        `(if (member ,object ',(member-type-members ctype)) t))
+       (args-type
+        (compiler-warn "illegal type specifier for TYPEP: ~S" type)
+        (return-from %source-transform-typep (values nil t)))
+       (classoid
+        `(%instance-typep ,object ',type))
+       (array-type
+        (source-transform-array-typep object ctype (lvar-type object-lvar)))
+       (cons-type
+        (source-transform-cons-typep object ctype))
+       (character-set-type
+        (source-transform-character-set-typep object ctype))
+       #+sb-simd-pack
+       (simd-pack-type
+        (source-transform-simd-pack-typep object ctype))
+       #+sb-simd-pack-256
+       (simd-pack-256-type
+        (source-transform-simd-pack-256-typep object ctype))
+       (t nil)))
+   `(%typep ,object ',type)))
 
 ;;; These things will be removed by the tree shaker, so no #+ needed.
 (defvar *interesting-types* nil)
@@ -1434,44 +1435,6 @@
                   (format t "Read ~a~%" expr)
                   (setf (gethash expr *interesting-types*) t))))))
     *interesting-types*)))
-
-(define-source-transform typep (object spec &optional env)
-  ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
-  ;; since that would overlook other kinds of constants. But it turns
-  ;; out that the DEFTRANSFORM for TYPEP detects any constant
-  ;; lvar, transforms it into a quoted form, and gives this
-  ;; source transform another chance, so it all works out OK, in a
-  ;; weird roundabout way. -- WHN 2001-03-18
-  (if (and (not env)
-           (typep spec '(cons (eql quote) (cons t null))))
-      (with-current-source-form (spec)
-        ;; Decline to do the source transform when seeing an unknown
-        ;; type immediately while block converting, since it may be
-        ;; defined later. By waiting for the deftransform to fire
-        ;; during block compilation, we give ourselves a better chance
-        ;; at open-coding the type test.
-        (let ((type (cadr spec)))
-          ;;
-          #+collect-typep-regression-dataset
-          (let ((parse (specifier-type type)))
-            ;; alien types aren't externalizable as trees of symbols,
-            ;; and some classoid types aren't defined at the start of warm build,
-            ;; making it impossible to re-parse a dump produced late in the build.
-            ;; Luckily there are no cases involving compund types and classoids.
-            (unless (or (involves-alien-p parse)
-                        (or (classoid-p parse)
-                            (and (cons-type-p parse)
-                                 (classoid-p (cons-type-car-type parse)))))
-              (let ((table *interesting-types*))
-                (unless (hash-table-p table)
-                  (setq table (dump/restore-interesting-types 'read)))
-                (setf (gethash type table) t))))
-          ;;
-          (if (and (block-compile *compilation*)
-                   (contains-unknown-type-p (careful-specifier-type type)))
-              (values nil t)
-              (source-transform-typep object type))))
-      (values nil t)))
 
 ;;;; coercion
 
@@ -1828,7 +1791,3 @@
 
 (deftransform sequencep ((x) ((not extended-sequence)))
   `(typep x '(or list vector)))
-
-(deftransform array-type-test ((object type) * * :node node)
-  (delay-ir1-transform node :constraint)
-  (source-transform-array-typep 'object (careful-specifier-type (lvar-value type)) (lvar-type object)))

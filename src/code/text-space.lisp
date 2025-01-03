@@ -26,7 +26,7 @@
              (scan-relative-operands
               code (sap-int sap) length dstate seg
               (lambda (offset operand inst)
-                (declare (ignore inst))
+                (declare (ignore operand inst))
                 ;; We used to have movable objects pointing to other movable objects,
                 ;; and during defrag, either or both could move.  This no longer occurs,
                 ;; so pass 0 as the pointed-to object.

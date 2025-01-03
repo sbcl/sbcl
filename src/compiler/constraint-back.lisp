@@ -24,12 +24,15 @@
           (conset-add-constraint-to-eql gen kind var y nil target)
           (constraint-propagate-back x kind y gen target nil)))))
 
-(defun numeric-contagion-constraint-back (x y gen constraint consequent &key complex-p
+(defun numeric-contagion-constraint-back (x y gen constraint consequent &key alternative
+                                                                             complex-p
                                                                              (same-leaf-not-complex t)
                                                                              (x-type (lvar-type x))
                                                                              (y-type (lvar-type y)))
   (flet ((add (lvar type)
-           (add-back-constraint gen 'typep lvar type consequent)))
+           (add-back-constraint gen 'typep lvar type consequent))
+         (add-alt (lvar type)
+           (add-back-constraint gen 'typep lvar type alternative)))
     (let ((real-type (if complex-p ;; complex rationals multiplied by 0 will produce an integer 0.
                          (specifier-type '(and real (not (eql 0))))
                          (specifier-type 'real))))
@@ -74,6 +77,14 @@
                               (same-leaf-ref-p x y))
                          (add x (specifier-type 'single-float)))
                         (t
+                         (when alternative
+                           (cond ((and (csubtypep x-type (specifier-type 'single-float))
+                                       (csubtypep y-type (specifier-type 'real)))
+                                  (add-alt y (specifier-type 'double-float)))
+                                 ((and (csubtypep y-type (specifier-type 'single-float))
+                                       (csubtypep x-type (specifier-type 'real)))
+                                  (add-alt x (specifier-type 'double-float)))))
+
                          (let ((x-double (types-equal-or-intersect x-type (specifier-type 'double-float)))
                                (y-double (types-equal-or-intersect y-type (specifier-type 'double-float))))
                            (when x-double
@@ -261,7 +272,8 @@
                        (csubtypep (lvar-type d) (specifier-type 'integer)))
                   (add-back-constraint gen 'typep x (specifier-type 'integer) consequent))
                  (t
-                  (numeric-contagion-constraint-back x d gen constraint consequent)))
+                  (numeric-contagion-constraint-back x d gen constraint consequent
+                                                     :alternative alternative)))
            (cond ((and
                    (csubtypep constraint (specifier-type 'integer))
                    (csubtypep (lvar-type x) (specifier-type 'integer))
