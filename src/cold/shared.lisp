@@ -877,7 +877,7 @@
   #+unix "tools-for-build/perfecthash"
   #+win32 "tools-for-build/perfecthash.exe")
 
-#+(or sbcl clisp)
+#+(or sbcl ecl ccl clisp cmucl)
 (when (probe-file (perfect-hash-generator-program))
   (pushnew :use-host-hash-generator cl:*features*)
   (setq *perfect-hash-generator-mode* :RECORD))
@@ -925,36 +925,85 @@
 #+use-host-hash-generator
 (defun run-perfecthash (input)
   (with-output-to-string (result)
-    #+clisp
-    (multiple-value-bind (io-stream input-stream output-stream)
-        (ext:run-program  (perfect-hash-generator-program)
-                          :input :stream :output :stream)
-      (declare (ignore io-stream))
-      (format output-stream "~{~X~%~}" (coerce input 'list))
-      (close output-stream)
-      (loop for char = (read-char input-stream nil)
-            while char
-            do (write-char char result))
-      (close input-stream))
-    #+sbcl
-    (let ((process
-            (sb-ext:run-program (perfect-hash-generator-program)
-                                '()
-                                ;; win32 misbehaves with :input string-stream
-                                :input :stream :output :stream
-                                :wait nil
-                                :allow-other-keys t
-                                :use-posix-spawn t)))
-      (format (sb-ext:process-input process) "~{~X~%~}" (coerce input 'list))
-      (close (sb-ext:process-input process))
-      (loop for char = (read-char (sb-ext:process-output process) nil)
-            while char
-            do (write-char char result))
-      (sb-ext:process-wait process)
-      (sb-ext:process-close process)
-      (unless (zerop (sb-ext:process-exit-code process))
-        (error "Error running perfecthash: exit code ~D"
-               (sb-ext:process-exit-code process))))))
+    (flet (#+sbcl
+           (launch ()
+             (let ((process (sb-ext:run-program (perfect-hash-generator-program)
+                                                '()
+                                                :input :stream :output :stream
+                                                :wait nil
+                                                :allow-other-keys t
+                                                :use-posix-spawn t)))
+               (values (sb-ext:process-output process)
+                       (sb-ext:process-input process)
+                       process)))
+           #+sbcl
+           (wait (process)
+             (sb-ext:process-wait process)
+             (sb-ext:process-close process)
+             (unless (zerop (sb-ext:process-exit-code process))
+               (error "Error running perfecthash: exit code ~D"
+                      (sb-ext:process-exit-code process))))
+           #+cmu
+           (launch ()
+             (let ((process (ext:run-program (perfect-hash-generator-program)
+                                             '()
+                                             :input :stream :output :stream
+                                             :wait nil)))
+               (values (ext:process-output process)
+                       (ext:process-input process)
+                       process)))
+           #+cmu
+           (wait (process)
+             (ext:process-wait process)
+             (ext:process-close process)
+             (unless (zerop (ext:process-exit-code process))
+               (error "Error running perfecthash: exit code ~D"
+                      (ext:process-exit-code process))))
+           #+clisp
+           (launch ()
+             (multiple-value-bind (io-stream input-stream output-stream)
+                 (ext:run-program (perfect-hash-generator-program)
+                                  :input :stream :output :stream)
+               (declare (ignore io-stream))
+               (values input-stream output-stream nil)))
+           
+           #+(or clisp ccl)
+           (wait (process)
+             process)
+           #+ecl
+           (launch ()
+             (let ((process
+                     (nth-value 2 (ext:run-program (perfect-hash-generator-program)
+                                                   ()
+                                                   :input :stream :output :stream
+                                                   :wait nil))))
+               (values (ext:external-process-output process)
+                       (ext:external-process-input process)
+                       process)))
+           #+ecl
+           (wait (process)
+             (multiple-value-bind (status code) (ext:external-process-wait process t)
+               (unless (and (eq status :exited)
+                            (zerop code))
+                 (error "Error running perfecthash: exit code ~D" code))))
+           #+ccl
+           (launch ()
+             (let ((process
+                     (ccl:run-program (perfect-hash-generator-program)
+                                      ()
+                                      :wait nil
+                                      :input :stream :output :stream)))
+               (values (ccl:external-process-output-stream process)
+                       (ccl:external-process-input-stream process)
+                       process))))
+      (multiple-value-bind (input-stream output-stream process) (launch)
+        (format output-stream "~{~X~%~}" (coerce input 'list))
+        (close output-stream)
+        (loop for char = (read-char input-stream nil)
+              while char
+              do (write-char char result))
+        (close input-stream)
+        (wait process)))))
 
 
 (defun emulate-generate-perfect-hash-sexpr (array identifier digest)
