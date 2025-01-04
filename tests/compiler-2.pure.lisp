@@ -1034,7 +1034,7 @@
                                 (declare ((complex rational) x))
                                 (= x 10d0)))))
     (assert (equal (sb-kernel:%simple-fun-type fun)
-                   '(function ((complex integer)) (values null &optional))))
+                   '(function ((complex rational)) (values null &optional))))
     (assert (not (funcall fun #C(10 10))))
     (assert (equal (sb-kernel:%simple-fun-type fun2)
                    '(function ((complex rational)) (values null &optional))))

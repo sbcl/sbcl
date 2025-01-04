@@ -139,14 +139,7 @@
    can hold parts of type SPEC."
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))
-  (let ((type (type-or-nil-if-unknown spec)))
-    (cond
-      ((eq type *empty-type*) nil)
-      ((not type) (error "Undefined type: ~S" spec))
-      (t
-       (let ((ctype (specifier-type `(complex ,spec)))) ; error checking
-         (declare (ignore ctype))
-         (type-specifier type))))))
+  (type-specifier (upgraded-complex-part-ctype spec)))
 
 ;;; Return the most specific integer type that can be quickly checked that
 ;;; includes the given type.

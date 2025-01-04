@@ -2668,77 +2668,43 @@ expansion happened."
                                                    (vector nil nil)))
         #-sb-xc-host (specifier-type 'number)))
 
+(defun upgraded-complex-part-ctype (typespec &optional context)
+  (let ((ctype (specifier-type typespec context)))
+    (cond
+      ((eq ctype *empty-type*)
+       *empty-type*)
+      ((not (csubtypep ctype (specifier-type 'real)))
+       (error "The component type for COMPLEX is not a subtype of REAL: ~S"
+              ctype))
+      ((csubtypep ctype (specifier-type 'rational))
+       (specifier-type 'rational))
+      ((csubtypep ctype (specifier-type 'single-float))
+       (specifier-type 'single-float))
+      ((csubtypep ctype (specifier-type 'double-float))
+       (specifier-type 'double-float))
+      ((csubtypep ctype (specifier-type 'float))
+       (specifier-type 'float))
+      (t
+       (specifier-type 'real)))))
+
 (def-type-translator complex ((:context context) &optional (typespec '*))
   (declare (inline !compute-numtype-aspect-id))
   (if (eq typespec '*)
       (specifier-type '(complex real))
-      (labels ((not-numeric ()
-                 (error "The component type for COMPLEX is not numeric: ~S"
-                        typespec))
-               (not-real ()
-                 (error "The component type for COMPLEX is not a subtype of REAL: ~S"
-                        typespec))
-               (complex1 (component-type)
-                 (unless (typep component-type '(or numeric-type numeric-union-type))
-                   (not-numeric))
-                 (unless (eq (numeric-type-complexp component-type) :real)
-                   (not-real))
-                 (if (csubtypep component-type (specifier-type '(eql 0)))
-                     *empty-type*
-                     (new-ctype numeric-union-type
-                                0 (get-numtype-aspects :complex
-                                                       (numeric-type-class component-type)
-                                                       (numeric-type-format component-type))
-                                (numeric-union-type-ranges component-type))))
-               (do-complex (ctype)
-                 (cond
-                   ((eq ctype *empty-type*) *empty-type*)
-                   ((eq ctype *universal-type*) (not-real))
-                   ((typep ctype '(or numeric-type numeric-union-type)) (complex1 ctype))
-                   ((typep ctype 'union-type)
-                    (%type-union (mapcar #'do-complex (union-type-types ctype))))
-                   ((typep ctype 'member-type)
-                    (%type-union
-                     (mapcar-member-type-members
-                      (lambda (x)
-                        (if (realp x)
-                            (do-complex (ctype-of x))
-                            (not-real)))
-                      ctype)))
-                   ((and (typep ctype 'intersection-type)
-                         ;; FIXME: This is very much a
-                         ;; not-quite-worst-effort, but we are required to do
-                         ;; something here because of our representation of
-                         ;; RATIO as (AND RATIONAL (NOT INTEGER)): we must
-                         ;; allow users to ask about (COMPLEX RATIO).  This
-                         ;; will of course fail to work right on such types
-                         ;; as (AND INTEGER (SATISFIES ZEROP))...
-                         (let ((numbers (remove-if-not
-                                         #'numeric-type-p
-                                         (intersection-type-types ctype))))
-                           (and (car numbers)
-                                (null (cdr numbers))
-                                (eq (numeric-type-complexp (car numbers)) :real)
-                                (complex1 (car numbers))))))
-                   (t
-                    (multiple-value-bind (subtypep certainly)
-                        (csubtypep ctype (specifier-type 'real))
-                      (if (and (not subtypep) certainly)
-                          (not-real)
-                          ;; ANSI just says that TYPESPEC is any subtype of
-                          ;; type REAL, not necessarily a NUMERIC-TYPE. In
-                          ;; particular, at this point TYPESPEC could legally
-                          ;; be a hairy type like (AND NUMBER (SATISFIES
-                          ;; REALP) (SATISFIES ZEROP)), in which case we fall
-                          ;; through the logic above and end up here,
-                          ;; stumped.
-                          ;; FIXME: (COMPLEX NUMBER) is not rejected but should
-                          ;; be, as NUMBER is clearly not a subtype of real.
-                          (bug "~@<(known bug #145): The type ~S is too hairy to be ~
-used for a COMPLEX component.~:@>"
-                               typespec)))))))
-        (let ((ctype (specifier-type typespec context)))
-          (do-complex ctype)))))
+      (labels ((complex1 (component-type)
+                 (new-ctype numeric-union-type
+                            0 (get-numtype-aspects :complex
+                                                   (numeric-type-class component-type)
+                                                   (numeric-type-format component-type))
+                            (numeric-union-type-ranges component-type))))
+        (let ((ctype (upgraded-complex-part-ctype typespec context)))
+          (if (eq ctype *empty-type*)
+              ctype
+              (etypecase ctype
+                (numeric-union-type
+                 (complex1 ctype))
+                (union-type
+                 (%type-union (mapcar #'complex1 (union-type-types ctype))))))))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
 ;;; member of TYPE or a one-element list of a member of TYPE.
@@ -4904,10 +4870,7 @@ used for a COMPLEX component.~:@>"
   (let ((num (if (complexp x) (realpart x) x)))
     (multiple-value-bind (complexp low high)
         (cond ((complexp x)
-               (let ((imag (imagpart x)))
-                 (if (and (floatp num) (or (float-nan-p num) (float-nan-p imag)))
-                     (values :complex nil nil)
-                     (values :complex (sb-xc:min num imag) (sb-xc:max num imag)))))
+               (values :complex nil nil))
               ((and (floatp num) (float-nan-p num))
                (values :real nil nil))
               (t

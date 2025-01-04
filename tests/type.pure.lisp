@@ -233,11 +233,11 @@
   (assert-tri-eq t   t (subtypep 'nil '(complex nil)))
   (assert-tri-eq t   t (subtypep '(complex nil) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (eql 0))))
-  (assert-tri-eq t   t (subtypep '(complex (eql 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (eql 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (integer 0 0))))
-  (assert-tri-eq t   t (subtypep '(complex (integer 0 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (integer 0 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (rational 0 0))))
-  (assert-tri-eq t   t (subtypep '(complex (rational 0 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (rational 0 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'complex '(complex real)))
   (assert-tri-eq t   t (subtypep '(complex real) 'complex))
   (assert-tri-eq t   t (subtypep '(complex (eql 1)) '(complex (member 1 2))))
@@ -581,9 +581,6 @@
                         (sb-kernel:specifier-type '(not bad)))
                  sb-kernel:parse-unknown-type 2)) ; expect 2 signals
 
-(with-test (:name (typep :complex-integer))
-  (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
-
 (with-test (:name :typep-satisfies-boolean)
   (assert (eq (eval '(typep 1 '(satisfies eval))) t)))
 
@@ -899,7 +896,7 @@
    ((36757953510256822605) t)
    ((#C(1d0 1d0)) nil)
    ((#C(1 1)) t)
-   ((#C(1 #.(expt 2 300))) nil)))
+   ((#C(1 #.(expt 2 300))) t)))
 
 #+(or arm64 x86-64)
 (with-test (:name :structure-typep-fold)
