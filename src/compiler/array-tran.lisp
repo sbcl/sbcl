@@ -1312,8 +1312,11 @@
                 (unless (= content-length ,(or c-length 'dims))
                   (sb-vm::initial-contents-error content-length  ,(or c-length 'dims)))
                 ,(wrap
-                  (if (and (lvar-matches initial-contents :fun-names '(reverse sb-impl::list-reverse
-                                                                       sb-impl::vector-reverse))
+                  (if (and (lvar-matches initial-contents :fun-names '(reverse nreverse
+                                                                       sb-impl::list-reverse
+                                                                       sb-impl::vector-reverse
+                                                                       sb-impl::list-nreverse
+                                                                       sb-impl::vector-nreverse))
                            ;; Nothing should be modifying the original sequence
                            (almost-immediately-used-p initial-contents (lvar-use initial-contents)
                                                       :flushable t))
