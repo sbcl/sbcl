@@ -966,7 +966,6 @@
                                   :input :stream :output :stream)
                (declare (ignore io-stream))
                (values input-stream output-stream nil)))
-           
            #+(or clisp ccl)
            (wait (process)
              process)

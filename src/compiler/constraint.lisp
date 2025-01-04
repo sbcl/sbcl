@@ -1035,7 +1035,7 @@
                      (setf not-xset (alloc-xset)))
                    (add-to-xset x not-xset))))
            (intersect-result (other-type)
-             (setf type (type-approx-intersection2 type other-type))))
+             (setf type (type-intersection type other-type))))
       (declare (inline intersect-result))
       (do-propagatable-constraints (con (constraints variable))
         (let* ((kind (constraint-kind con))
