@@ -190,7 +190,7 @@
                                           (and (defined-fun-p leaf)
                                                (eq (defined-fun-inlinep leaf) 'notinline))
                                           (fun-lexically-notinline-p (leaf-%source-name leaf)
-                                                                     (node-lexenv (lvar-dest (node-lvar node)))))
+                                                                     (node-lexenv node)))
                                       (setf asserted nil)
                                       lvar-type)
                                      (t
@@ -199,7 +199,7 @@
                                (cond ((or (and (defined-fun-p leaf)
                                                (eq (defined-fun-inlinep leaf) 'notinline))
                                           (fun-lexically-notinline-p (leaf-%source-name leaf)
-                                                                     (node-lexenv (lvar-dest (node-lvar node)))))
+                                                                     (node-lexenv node)))
                                       lvar-type)
                                      (t
                                       (global-ftype (leaf-%source-name leaf)))))
@@ -255,8 +255,7 @@
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
-                      (if (or (fun-lexically-notinline-p fun-name
-                                                         (node-lexenv (lvar-dest (node-lvar node))))
+                      (if (or (fun-lexically-notinline-p fun-name (node-lexenv node))
                               (and (or asserted-type
                                        defined-here)
                                    (neq (info :function :where-from fun-name) :declared)))
