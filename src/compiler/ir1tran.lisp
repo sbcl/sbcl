@@ -1257,8 +1257,7 @@
                                (int (if (or (fun-type-p type)
                                             (fun-type-p old-type))
                                         type
-                                        (type-approx-intersection2
-                                         old-type type))))
+                                        (type-intersection old-type type))))
                           (cond ((eq int *empty-type*)
                                  (unless (policy *lexenv* (= inhibit-warnings 3))
                                    (warn

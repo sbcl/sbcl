@@ -2024,7 +2024,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "CHECK-RANGE<=" "CHECK-RANGE<<=" "CHECK-RANGE<=<"
            "TYPE-*-TO-T"
            "TYPE-DIFFERENCE" "TYPE-INTERSECTION"
-           "TYPE-INTERSECTION2" "TYPE-APPROX-INTERSECTION2"
+           "TYPE-INTERSECTION2"
            "TYPE-SINGLETON-P"
            "TYPE-SINGLE-VALUE-P" "TYPE-SPECIFIER" "TYPE-UNION"
            "TYPE/=" "TYPE=" "TYPES-EQUAL-OR-INTERSECT"

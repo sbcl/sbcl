@@ -1336,15 +1336,6 @@
          ;; the ordinary case: we dispatch to type methods
          (%type-intersection2 type1 type2))))))
 
-;;; Return as restrictive and simple a type as we can discover that is
-;;; no more restrictive than the intersection of TYPE1 and TYPE2. At
-;;; worst, we arbitrarily return one of the arguments as the first
-;;; value (trying not to return a hairy type).
-(defun type-approx-intersection2 (type1 type2)
-  (cond ((type-intersection2 type1 type2))
-        ((hairy-type-p type1) type2)
-        (t type1)))
-
 ;;; a test useful for checking whether a derived type matches a
 ;;; declared type
 ;;;

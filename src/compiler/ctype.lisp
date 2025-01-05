@@ -672,7 +672,7 @@ and no value was provided for it." name)))))))))))
   (collect ((res))
     (mapc (lambda (var type)
             (let* ((vtype (leaf-type var))
-                   (int (type-approx-intersection2 vtype type)))
+                   (int (type-intersection vtype type)))
               (cond
                ((eq int *empty-type*)
                 (note-lossage

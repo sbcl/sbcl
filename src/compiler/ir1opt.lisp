@@ -1982,7 +1982,7 @@
                 (and (cdr refs)
                      (eq :declared (leaf-where-from leaf))
                      (type-needs-conservation-p var-type)))
-      (let ((int (type-approx-intersection2 var-type type)))
+      (let ((int (type-intersection var-type type)))
         ;; Can't use type/=, which gives up on hairy types.
         (unless (type= int var-type)
           (setf (leaf-type leaf) int)
