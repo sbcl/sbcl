@@ -7501,7 +7501,8 @@
                                      ,(or constant-target
                                           (node-ends-block ref))
                                      (the* (,(lvar-type (node-lvar ref)) :truly t)
-                                           ,code))))
+                                           ,code)))
+                         t)
           (loop for ref in constant-refs
                 do
                 (delete-ref ref)
