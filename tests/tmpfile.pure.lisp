@@ -3,7 +3,11 @@
     (multiple-value-bind (output warn err)
         (sb-c:compile-form-to-file '(progn (defvar *foo* 3)) tmpfile)
       (assert (and output (not warn) (not err)))
+      (assert (eq (sb-int:info :variable :kind '*foo*) :special))
+      (sb-int:clear-info :variable :kind '*foo*)
       (let ((stream (sb-impl::stream-from-stdio-file tmpfile :input t)))
+        ;; compile-form-to-file leaves the file positioned to its end.
+        (file-position stream 0)
         (sb-fasl::load-as-fasl stream nil nil)
         (sb-unix:unix-fclose tmpfile)
         (assert (eq (sb-int:info :variable :kind '*foo*) :special))

@@ -129,15 +129,15 @@
                 ,@(to-add 'f))))
   (def))
 
-(defvar *run* nil)
+(defvar *run* (sb-thread:make-semaphore))
 
 (defun remove-methods (list)
-  (loop until *run* do (sb-thread:thread-yield))
+  (sb-thread:wait-on-semaphore *run*)
   (dolist (method list)
     (remove-method #'foo method)))
 
 (defun add-methods (list)
-  (loop until *run* do (sb-thread:thread-yield))
+  (sb-thread:wait-on-semaphore *run*)
   (dolist (method list)
     (add-method #'foo method)))
 
@@ -148,12 +148,12 @@
                      (make-thread (lambda () (add-methods *to-add-d*)))
                      (make-thread (lambda () (add-methods *to-add-e*)))
                      (make-thread (lambda () (add-methods *to-add-f*))))))
-  (setf *run* t)
+  (sb-thread:signal-semaphore *run* 6)
   (mapcar #'join-thread threads))
 
 #-sb-thread
 (progn
-  (setf *run* t)
+  (sb-thread:signal-semaphore *run* 6)
   (remove-methods *to-remove-a*)
   (remove-methods *to-remove-b*)
   (remove-methods *to-remove-c*)

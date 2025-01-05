@@ -15,6 +15,7 @@
 ;;; asserts that a state change occurred, and we need to give it ample time
 ;;; to finish a background compile. There's no good way to synchronously wait,
 ;;; but running a bunch of other tests in between gives it a fighting chance.
+;;; TODO: probably move this to slot-mapper.impure
 (defvar *slot-mapper-initial-function* nil)
 (with-test (:name :fast-slot-name-mapper-initial-state)
   (let ((l (sb-kernel:find-layout 'sb-impl::fd-stream)))

@@ -53,16 +53,18 @@
   (def double-float sb-vm:signed-word)
   (def double-float word))
 
-(macrolet ((def (type from-type inline-type)
-             `(deftransform ,(symbolicate "%" type) ((n) (,from-type) * :important nil)
-                (when (or (csubtypep (lvar-type n) (specifier-type ',inline-type))
-                          (not (types-equal-or-intersect (lvar-type n) (specifier-type ',inline-type))))
+(macrolet ((def (type)
+             `(deftransform ,(symbolicate "%" type) ((n) (integer) * :important nil :node node)
+                (when (or (csubtypep (lvar-type n) (specifier-type 'word))
+                          (csubtypep (lvar-type n) (specifier-type 'sb-vm:signed-word))
+                          (not (types-equal-or-intersect (lvar-type n) (specifier-type 'fixnum))))
                   (give-up-ir1-transform))
-                '(if (typep n ',inline-type)
-                  (,(symbolicate "%" type) (truly-the ,inline-type n))
-                  (,(symbolicate "%" type) (truly-the (not ,inline-type) n))))))
-  (def single-float integer fixnum)
-  (def double-float integer fixnum))
+                (delay-ir1-transform node :ir1-phases)
+                '(if (fixnump n)
+                  (,(symbolicate "%" type) (truly-the fixnum n))
+                  (,(symbolicate "%" type) (truly-the (not fixnum) n))))))
+  (def single-float)
+  (def double-float))
 
 ;;; RANDOM
 (macrolet ((frob (fun type)
@@ -634,7 +636,7 @@
 (defun complex-float-type (arg)
   (declare (type numeric-type arg))
   (let* ((format (case (numeric-type-class arg)
-                   ((integer ratio rational) 'single-float)
+                   ((integer rational) 'single-float)
                    (t (numeric-type-format arg))))
          (float-type (or format 'float)))
     (specifier-type `(complex ,float-type))))
@@ -643,19 +645,19 @@
 ;;; should be the right kind of float. Allow bounds for the float
 ;;; part too.
 (defun float-or-complex-float-type (arg &optional lo hi)
-  (cond
-    ((numeric-type-p arg)
+  (typecase arg
+    (numeric-type
      (let* ((format (case (numeric-type-class arg)
-                      ((integer ratio rational) 'single-float)
+                      ((integer rational) 'single-float)
                       (t (numeric-type-format arg))))
             (float-type (or format 'float))
             (lo (coerce-numeric-bound lo float-type))
             (hi (coerce-numeric-bound hi float-type)))
        (specifier-type `(or (,float-type ,(or lo '*) ,(or hi '*))
                             (complex ,float-type)))))
-    ((union-type-p arg)
+    ((or union-type numeric-union-type)
      (apply #'type-union
-            (loop for type in (union-type-types arg)
+            (loop for type in (sb-kernel::flatten-numeric-union-types arg)
                   collect (float-or-complex-float-type type lo hi))))
     (t (specifier-type 'number))))
 
@@ -744,7 +746,7 @@
                         (res-hi (or (bound-func fun (if increasingp high low) nil)
                                     default-high))
                         (format (case (numeric-type-class arg)
-                                  ((integer ratio rational) 'single-float)
+                                  ((integer rational) 'single-float)
                                   (t (numeric-type-format arg))))
                         (bound-type (or format 'float))
                         (result-type
@@ -928,7 +930,7 @@
                      (specifier-type `(integer ,lo ,hi)))
                     (t
                      (specifier-type `(rational ,lo ,hi))))))
-           ((rational ratio)
+           (rational
             ;; Positive integer to rational power is either a rational
             ;; or a single-float.
             (let* ((lo (interval-low bnd))
@@ -1029,12 +1031,6 @@
               (fixup-interval-expt type x-int y-int x y))
             (flatten-list (interval-expt x-int y-int)))))
 
-(defun integer-float-p (float)
-  (and (floatp float)
-       (multiple-value-bind (significand exponent) (integer-decode-float float)
-         (or (plusp exponent)
-             (<= (- exponent) (sb-kernel::first-bit-set significand))))))
-
 (defun expt-derive-type-aux (x y same-arg)
   (declare (ignore same-arg))
   (cond ((or (not (numeric-type-real-p x))
@@ -1042,7 +1038,7 @@
          ;; Use numeric contagion if either is not real.
          (numeric-contagion x y))
         ((or (csubtypep y (specifier-type 'integer))
-             (integer-float-p (nth-value 1 (type-singleton-p y))))
+             (sb-kernel::integer-float-p (nth-value 1 (type-singleton-p y))))
          ;; A real raised to an integer power is well-defined.
          (merged-interval-expt x y))
         ;; A real raised to a non-integral power can be a float or a
@@ -1102,7 +1098,7 @@
            (let* (;; FIXME: This expression for FORMAT seems to
                   ;; appear multiple times, and should be factored out.
                   (format (case (numeric-type-class result-type)
-                            ((integer ratio rational) 'single-float)
+                            ((integer rational) 'single-float)
                             (t (numeric-type-format result-type))))
                   (bound-format (or format 'float)))
              (make-numeric-type :class 'float
@@ -1132,7 +1128,7 @@
 
 (defun phase-derive-type-aux (arg)
   (let* ((format (case (numeric-type-class arg)
-                   ((integer ratio rational) 'single-float)
+                   ((integer rational) 'single-float)
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
@@ -1547,7 +1543,7 @@
     (numeric-type
      (flet ((floatify-format ()
               (case (numeric-type-class arg)
-                ((integer ratio rational) 'single-float)
+                ((integer rational) 'single-float)
                 (t (numeric-type-format arg)))))
        (cond ((eq (numeric-type-complexp arg) :complex)
               (make-numeric-type :class 'float
@@ -1722,8 +1718,8 @@
                    (try 0f0))))))
     (typecase type
       (numeric-type (numeric type))
-      (union-type (mapc #'numeric (union-type-types type)))
-      (numeric-range-type (mapc #'numeric (numeric-range-to-numeric-types type))))
+      ((or numeric-union-type union-type)
+       (mapc #'numeric (sb-kernel::flatten-numeric-union-types type))))
     (error "Couldn't come up with a value for ~s" type)))
 
 #-(or sb-xc-host 64-bit)
@@ -1896,7 +1892,8 @@
                                    ,',(if-vop-existsp (:translate %unary-ceiling)
                                                       `(truly-the fixnum (,(symbolicate '%unary- name) div))
                                                       `(%unary-truncate (truly-the ,fixnum-type quot)))
-                                   (,',unary-to-bignum quot))
+                                   (,',unary-to-bignum #+64-bit div
+                                                       #-64-bit quot))
                                (- number (* ,@(unless one-p
                                                 '(f-divisor))
                                             (+ quot
@@ -2024,7 +2021,6 @@
 ;;; So thank goodness for that - it allowed detection of the problem.
 (defun test-ctype-involving-double-float ()
   (specifier-type '(double-float #.pi)))
-#+remove
 (assert (sb-xc:= (numeric-type-low (test-ctype-involving-double-float)) pi))
 
 ;;; Dummy functions to test that complex number are dumped correctly in genesis.

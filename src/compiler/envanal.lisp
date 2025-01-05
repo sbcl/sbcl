@@ -68,7 +68,7 @@
   (declare (type clambda fun))
   (let ((fun (lambda-home fun)))
     (or (lambda-environment fun)
-        (let ((res (make-environment :lambda fun)))
+        (let ((res (make-environment fun)))
           (setf (lambda-environment fun) res)
           (dolist (lambda (lambda-lets fun))
             (setf (lambda-environment lambda) res))
@@ -413,8 +413,7 @@
           (when values
             ;; This dynamic extent is over the whole environment and
             ;; needs no cleanup code.
-            (let ((dynamic-extent (make-dynamic-extent :values values
-                                                       :cleanup nil)))
+            (let ((dynamic-extent (make-dynamic-extent values)))
               (push dynamic-extent (lambda-dynamic-extents lambda))
               (dolist (value values)
                 (setf (lvar-dynamic-extent value) dynamic-extent)))))))

@@ -1034,7 +1034,7 @@
                                 (declare ((complex rational) x))
                                 (= x 10d0)))))
     (assert (equal (sb-kernel:%simple-fun-type fun)
-                   '(function ((complex integer)) (values null &optional))))
+                   '(function ((complex rational)) (values null &optional))))
     (assert (not (funcall fun #C(10 10))))
     (assert (equal (sb-kernel:%simple-fun-type fun2)
                    '(function ((complex rational)) (values null &optional))))
@@ -4571,3 +4571,29 @@
          (setq r (logior r (truly-the (signed-byte 32) l))))
        r))
    (signed-byte 32)))
+
+(with-test (:name :if-redundant)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let* ((x nil)
+                (y x))
+           (setq x t)
+           (if y x)))
+    (() nil)))
+
+(with-test (:name :important-result-of-a-constant)
+  (checked-compile `(lambda ()
+                      (let (x)
+                        (mapcar #'cdr (sort x #'< :key (constantly nil)))))))
+
+(with-test (:name :values-list-stack-push)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (let ((list (if a
+                         '(2 3)
+                         '(1))))
+           (apply #'list b list)))
+    ((t 1) '(1 2 3) :test #'equal)
+    ((nil 1) '(1 1) :test #'equal)))

@@ -394,6 +394,7 @@
            (fun (or new (pop (component-reanalyze-functionals component)))))
       (unless fun
         (return))
+      (setf (functional-reanalyze fun) nil)
       (let ((kind (functional-kind fun)))
         (cond ((or (functional-somewhat-letlike-p fun)
                    (logtest kind (functional-kind-attributes deleted zombie))))
@@ -1293,8 +1294,10 @@
        ;; locall.
        (when (and done-something
                   component
+                  (not (functional-reanalyze leaf))
                   (member leaf (component-lambdas component)))
-         (pushnew leaf (component-reanalyze-functionals component)))))
+         (setf (functional-reanalyze leaf) t)
+         (push leaf (component-reanalyze-functionals component)))))
   (values))
 
 ;;; This function is called when there is some reason to believe that

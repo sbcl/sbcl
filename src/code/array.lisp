@@ -105,6 +105,7 @@
 ;;; This is a bit complicated, but calling subtypep over all
 ;;; specialized types is exceedingly slow
 (defun %vector-widetag-and-n-bits-shift (type)
+  (declare (explicit-check))
   (macrolet ((with-parameters ((arg-type &key intervals)
                                (&rest args) &body body)
                (let ((type-sym (gensym)))
@@ -243,36 +244,15 @@
                   (with-parameters (t) (subtype)
                     (if (eq subtype '*)
                         (result simple-vector-widetag)
-                        (let ((ctype (specifier-type type)))
-                          (cond ((eq ctype *empty-type*)
-                                 (result simple-array-nil-widetag))
-                                ((union-type-p ctype)
-                                 (cond ((csubtypep ctype (specifier-type '(complex double-float)))
-                                        (result
-                                         simple-array-complex-double-float-widetag))
-                                       ((csubtypep ctype (specifier-type '(complex single-float)))
-                                        (result
-                                         simple-array-complex-single-float-widetag))
-                                       #+long-float
-                                       ((csubtypep ctype (specifier-type '(complex long-float)))
-                                        (result
-                                         simple-array-complex-long-float-widetag))
-                                       (t
-                                        (result simple-vector-widetag))))
-                                (t
-                                 (case (numeric-type-format ctype)
-                                   (double-float
-                                    (result
-                                     simple-array-complex-double-float-widetag))
-                                   (single-float
-                                    (result
-                                     simple-array-complex-single-float-widetag))
-                                   #+long-float
-                                   (long-float
-                                    (result
-                                     simple-array-complex-long-float-widetag))
-                                   (t
-                                    (result simple-vector-widetag)))))))))
+                        (case subtype
+                          ((short-float single-float)
+                           (result simple-array-complex-single-float-widetag))
+                          ((double-float long-float)
+                           (result simple-array-complex-double-float-widetag))
+                          ((real rational float)
+                           (result simple-vector-widetag))
+                          (t
+                           (go fastidiously-parse))))))
                  ((nil)
                   (result simple-array-nil-widetag))
                  (t
@@ -286,6 +266,25 @@
                          (sb-kernel::replace-hairy-type ctype))))
         (typecase ctype
           (null (result simple-vector-widetag))
+          (numeric-union-type
+           (case (sb-kernel::numtype-aspects-id (sb-kernel::numeric-union-type-aspects ctype))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'integer nil)
+              (let* ((ranges (sb-kernel::numeric-union-type-ranges ctype))
+                     (low (aref ranges 1))
+                     (high (aref ranges (1- (length ranges)))))
+                (if (and (integerp low) (integerp high))
+                    (integer-interval-widetag low high)
+                    (result simple-vector-widetag))))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'float 'double-float)
+              (result simple-array-double-float-widetag))
+             (#.(sb-kernel::!compute-numtype-aspect-id :real 'float 'single-float)
+              (result simple-array-single-float-widetag))
+             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'single-float)
+              (result simple-array-complex-single-float-widetag))
+             (#.(sb-kernel::!compute-numtype-aspect-id :complex 'float 'double-float)
+              (result simple-array-complex-double-float-widetag))
+             (t
+              (result simple-vector-widetag))))
           (union-type
            (let ((types (union-type-types ctype)))
              (cond ((not (every #'numeric-type-p types))
@@ -314,19 +313,6 @@
                     (result simple-array-complex-single-float-widetag))
                    (t
                     (result simple-vector-widetag)))))
-          (numeric-range-type
-           (ecase (numeric-range-type-types ctype)
-             (#.numeric-range-double-float
-              (result simple-array-double-float-widetag))
-             (#.numeric-range-single-float
-              (result simple-array-single-float-widetag))
-             (#.numeric-range-integer
-              (let* ((ranges (numeric-range-type-ranges ctype))
-                     (low (aref ranges 0))
-                     (high (aref ranges (1- (length ranges)))))
-                (if (and (integerp low) (integerp high))
-                    (integer-interval-widetag low high)
-                    (result simple-vector-widetag))))))
           (intersection-type
            (let ((types (intersection-type-types ctype)))
              (loop for type in types
@@ -360,14 +346,19 @@
 
 (declaim (inline vector-length-in-words))
 (defun vector-length-in-words (length n-bits-shift)
-  (declare (type (integer 0 7) n-bits-shift))
-  (let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
-        (shift (- n-bits-shift
-                  (1- (integer-length n-word-bits)))))
-    (ash (+ length mask) shift)))
+  (declare (type index length)
+           (type (integer 0 7) n-bits-shift))
+  #.(if (fixnump (ash array-dimension-limit 7))
+        '(values (ceiling (ash length n-bits-shift) 64))
+        '(let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
+               (shift (- n-bits-shift
+                       (1- (integer-length n-word-bits)))))
+          (ash (+ length mask) shift))))
+
 
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into array-size-in-bits,
 ;;; i.e. log(2,bits-per-elt)
+(declaim (inline allocate-vector-with-widetag))
 (defun allocate-vector-with-widetag (#+ubsan poisoned widetag length n-bits-shift)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
@@ -389,12 +380,13 @@
                       (allocate-vector nil widetag length nwords))
     #-ubsan (allocate-vector widetag length nwords)))
 
-(declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag))
+(declaim (ftype (sfunction (array) (integer 128 255)) array-underlying-widetag)
+         (inline array-underlying-widetag))
 (defun array-underlying-widetag (array)
   (macrolet ((generate-table ()
                (macrolet ((to-index (x) `(ash ,x -2)))
                  (let ((table (sb-xc:make-array 64 :initial-element 0
-                                                :element-type '(unsigned-byte 8))))
+                                                   :element-type '(unsigned-byte 8))))
                    (dovector (saetp *specialized-array-element-type-properties*)
                      (let* ((typecode (saetp-typecode saetp))
                             (complex-typecode (saetp-complex-typecode saetp)))
@@ -406,15 +398,13 @@
                          (aref table (to-index complex-array-widetag)) 0)
                    table)))
              (to-index (x) `(ash ,x -2)))
-  (named-let recurse ((x array))
-    (let ((result (aref (generate-table)
-                        (to-index (%other-pointer-widetag x)))))
-      (if (= 0 result)
-          (recurse (%array-data x))
-          (truly-the (integer 128 255) result))))))
+    (named-let recurse ((x array))
+      (let ((result (aref (generate-table)
+                          (to-index (%other-pointer-widetag x)))))
+        (if (= 0 result)
+            (recurse (%array-data x))
+            (truly-the (integer 128 255) result))))))
 
-(declaim (ftype (sfunction (array) (values (integer 128 255) (unsigned-byte 8)))
-                array-underlying-widetag-and-shift))
 (defun array-underlying-widetag-and-shift (array)
   (declare (explicit-check))
   (let ((widetag (array-underlying-widetag array)))

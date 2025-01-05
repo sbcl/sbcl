@@ -418,14 +418,12 @@
         ;; we can already decide on the result of the optimization without
         ;; even taking a look at the dimensions.
         (flet ((subscript-bounds (subscript)
-                 (let* ((type1 (lvar-type subscript))
-                        (type2 (if (csubtypep type1 (specifier-type 'integer))
-                                   (weaken-integer-type type1 :range-only t)
-                                   (give-up)))
-                        (low (if (integer-type-p type2)
-                                 (numeric-type-low type2)
+                 (unless (csubtypep (lvar-type subscript) (specifier-type 'integer))
+                   (give-up))
+                 (let* ((int (or (type-approximate-interval (lvar-type subscript))
                                  (give-up)))
-                        (high (numeric-type-high type2)))
+                        (low (interval-low int))
+                        (high (interval-high int)))
                    (cond
                      ((and (or (not (bound-known-p low)) (minusp low))
                            (or (not (bound-known-p high)) (not (minusp high))))
@@ -604,46 +602,55 @@
 (defun derive-make-array-type (dims element-type adjustable
                                fill-pointer displaced-to
                                node)
-  (let* ((simple (and (unsupplied-or-nil adjustable)
-                      (unsupplied-or-nil displaced-to)
-                      (unsupplied-or-nil fill-pointer)))
-         (spec
-           `(,(if simple 'simple-array 'array)
-             ;; element-type is usually an LVAR or nil,
-             ;; but MAKE-WEAK-VECTOR derive-type passes in 'T.
-             ,(cond ((or (not element-type) (eq element-type 't))
-                     t)
-                    ((ctype-p element-type)
-                     (type-specifier element-type))
-                    ((constant-lvar-p element-type)
-                     (let ((ctype (careful-specifier-type
-                                   (lvar-value element-type))))
-                       (cond
-                         ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                         (t (upgraded-array-element-type
-                             (lvar-value element-type))))))
-                    (t
-                     '*))
-             ,(cond ((constant-lvar-p dims)
-                     (let* ((val (lvar-value dims))
-                            (cdims (ensure-list val)))
-                       (unless (check-array-dimensions val node)
-                         (return-from derive-make-array-type))
-                       (if simple
-                           cdims
-                           (length cdims))))
-                    ((or (csubtypep (lvar-type dims)
-                                    (specifier-type 'integer))
-                         (supplied-and-true fill-pointer))
-                     '(*))
-                    (t
-                     '*)))))
-    (if (and (not simple)
-             (or (supplied-and-true adjustable)
-                 (supplied-and-true displaced-to)
-                 (supplied-and-true fill-pointer)))
-        (careful-specifier-type `(and ,spec (not simple-array)))
-        (careful-specifier-type spec))))
+  (flet ((derive (element-type)
+           (let* ((simple (and (unsupplied-or-nil adjustable)
+                               (unsupplied-or-nil displaced-to)
+                               (unsupplied-or-nil fill-pointer)))
+                  (spec
+                    `(,(if simple 'simple-array 'array)
+                      ,element-type
+                      ,(cond ((constant-lvar-p dims)
+                              (let* ((val (lvar-value dims))
+                                     (cdims (ensure-list val)))
+                                (unless (check-array-dimensions val node)
+                                  (return-from derive-make-array-type))
+                                (if simple
+                                    cdims
+                                    (length cdims))))
+                             ((or (csubtypep (lvar-type dims)
+                                             (specifier-type 'integer))
+                                  (supplied-and-true fill-pointer))
+                              '(*))
+                             (t
+                              '*)))))
+             (if (and (not simple)
+                      (or (supplied-and-true adjustable)
+                          (supplied-and-true displaced-to)
+                          (supplied-and-true fill-pointer)))
+                 (careful-specifier-type `(and ,spec (not simple-array)))
+                 (careful-specifier-type spec)))))
+    (cond ((or (not element-type) (eq element-type 't))
+           (derive t))
+          ((listp element-type)
+           (sb-kernel::%type-union
+            (mapcar #'derive element-type)))
+          ((ctype-p element-type)
+           (derive (type-specifier element-type)))
+          ((constant-lvar-p element-type)
+           (derive
+            (let ((ctype (careful-specifier-type
+                          (lvar-value element-type))))
+              (cond
+                ((or (null ctype) (contains-unknown-type-p ctype)) '*)
+                (t (upgraded-array-element-type
+                    (lvar-value element-type)))))))
+          ((csubtypep (lvar-type element-type) (specifier-type '(member character base-char)))
+           (type-union #+sb-unicode
+                       (derive 'character)
+                       (derive 'base-char)))
+
+          (t
+           (derive '*)))))
 
 (defoptimizer (make-array derive-type)
     ((dims &key element-type adjustable fill-pointer displaced-to
@@ -664,19 +671,34 @@
       (make-array-type '* :element-type (array-type-element-type type)
                           :specialized-element-type (array-type-specialized-element-type type)))))
 
+(defun %make-array-derive-type (widetag dims adjustable fill-pointer displaced-to node)
+  (let ((element-type *wild-type*))
+    (cond ((constant-lvar-p widetag)
+           (let ((saetp
+                   (find (lvar-value widetag)
+                         sb-vm:*specialized-array-element-type-properties*
+                         :key #'sb-vm:saetp-typecode)))
+             (when saetp
+               (setf element-type (sb-vm:saetp-ctype saetp)))))
+          ((typep (lvar-type widetag) 'numeric-union-type)
+           (loop for type in (sb-kernel::flatten-numeric-union-types (lvar-type widetag))
+                 for tag = (nth-value 1 (type-singleton-p type))
+                 collect (or (find tag
+                                   sb-vm:*specialized-array-element-type-properties*
+                                   :key #'sb-vm:saetp-typecode)
+                             (return))
+                 into saetps
+                 finally (setf element-type
+                               (mapcar #'sb-vm:saetp-specifier saetps)))))
+    (derive-make-array-type dims element-type
+                            adjustable fill-pointer displaced-to
+                            node)))
+
 (defoptimizer (%make-array derive-type)
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
      node)
-  (let ((saetp (and (constant-lvar-p widetag)
-                    (find (lvar-value widetag)
-                          sb-vm:*specialized-array-element-type-properties*
-                          :key #'sb-vm:saetp-typecode))))
-    (derive-make-array-type dims (if saetp
-                                     (sb-vm:saetp-ctype saetp)
-                                     *wild-type*)
-                            adjustable fill-pointer displaced-to
-                            node)))
+  (%make-array-derive-type widetag dims adjustable fill-pointer displaced-to node))
 
 
 ;;;; constructors
@@ -766,11 +788,15 @@
                        ;; such as `((,x ,x) (,x ,x ,x)).
                        ((atom items)
                         (and (null items)
-                             (if (aref dimensions axis)
-                                 (eql length (aref dimensions axis))
-                                 (setf (aref dimensions axis) length))))
+                             (cond ((not (aref dimensions axis))
+                                    (setf (aref dimensions axis) length))
+                                   ((= length (aref dimensions axis)))
+                                   (t
+                                    (warn "Inconsistent :initial-contents dimensions.")))))
                      (declare (type index length))
                      (funcall fun (pop items))))
+        (when (constantp form)
+          (warn "Inconsistent :initial-contents rank."))
         (return-from rewrite-initial-contents (values nil nil))))
     (when (some #'null dimensions)
       ;; Unless it is the rightmost axis, a 0-length subsequence
@@ -892,7 +918,8 @@
                (when (and dims-constp (not (equal shape dims)))
                  ;; This will become a runtime error if the code is executed.
                  (warn "array dimensions are ~A but :INITIAL-CONTENTS dimensions are ~A"
-                       dims shape))
+                       dims shape)
+                 (return-from make-array (values nil t)))
                (setf data-dims shape (getf keys :initial-contents) data))
               (t ; contents could not be flattened
                ;; Preserve eval order. The only keyword arg to worry about
@@ -1233,7 +1260,7 @@
                          (<= (length initial-contents) 1000))))
              (let ((contents (lvar-value initial-contents)))
                (unless (= c-length (length contents))
-                 (abort-ir1-transform "~S has ~S elements, vector length is ~S."
+                 (abort-ir1-transform "~S has ~S element~:p, vector length is ~S."
                                       :initial-contents (length contents) c-length))
                (wrap `(initialize-vector
                        ,data-alloc-form
@@ -1246,10 +1273,15 @@
             ;; Case (4)
             ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with constant LENGTH.
             ((and c-length
-                  (lvar-matches initial-contents
-                                :fun-names '(list vector)
-                                :arg-count c-length
-                                :notinline nil))
+                  (multiple-value-bind (match arg-count)
+                      (lvar-matches initial-contents
+                                    :fun-names '(list vector)
+                                    :arg-count c-length
+                                    :notinline nil)
+                    (or match
+                        (and arg-count
+                             (abort-ir1-transform "~S has ~S element~:p, vector length is ~S."
+                                                  :initial-contents arg-count c-length)))))
              (let ((parameters (eliminate-keyword-args
                                 call 1
                                 '((:element-type element-type)
@@ -1273,12 +1305,18 @@
 
             ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
+             (lvar-matches initial-contents
+                           :fun-names '(list vector)
+                           :notinline nil)
              `(let ((content-length (length initial-contents)))
                 (unless (= content-length ,(or c-length 'dims))
                   (sb-vm::initial-contents-error content-length  ,(or c-length 'dims)))
                 ,(wrap
-                  (if (and (lvar-matches initial-contents :fun-names '(reverse sb-impl::list-reverse
-                                                                       sb-impl::vector-reverse))
+                  (if (and (lvar-matches initial-contents :fun-names '(reverse nreverse
+                                                                       sb-impl::list-reverse
+                                                                       sb-impl::vector-reverse
+                                                                       sb-impl::list-nreverse
+                                                                       sb-impl::vector-nreverse))
                            ;; Nothing should be modifying the original sequence
                            (almost-immediately-used-p initial-contents (lvar-use initial-contents)
                                                       :flushable t))
@@ -1357,7 +1395,7 @@
       (let* ((eltype (cond ((not element-type) t)
                            ((not (constant-lvar-p element-type))
                             (let ((uses (lvar-uses element-type)))
-                              (when (splice-fun-args element-type 'array-element-type 1)
+                              (when (splice-fun-args element-type 'array-element-type 1 nil)
                                 (return
                                   `(multiple-value-bind (widetag shift)
                                        (with-source-path ,(node-source-path uses)
@@ -1372,6 +1410,15 @@
                                       ,@(maybe-arg fill-pointer)
                                       ,@(maybe-arg displaced-to)
                                       ,@(maybe-arg displaced-index-offset))))))
+                            #-ubsan
+                            (when (and (csubtypep (lvar-type dims)
+                                                  (specifier-type 'integer))
+                                       (not (or initial-element initial-contents
+                                                adjustable fill-pointer displaced-to displaced-index-offset)))
+                             (return
+                               `(multiple-value-bind (widetag shift)
+                                    (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+                                  (%make-array dims widetag shift))))
                             (give-up-ir1-transform
                              "ELEMENT-TYPE is not constant."))
                            (t
@@ -1558,6 +1605,12 @@
                                call
                                :adjustable adjustable
                                :fill-pointer fill-pointer))
+
+#-ubsan
+(deftransform %make-array ((dims widetag n-bits)
+                           (integer t t))
+  `(sb-vm::allocate-vector-with-widetag widetag dims n-bits))
+
 
 ;;;; ADJUST-ARRAY
 (deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
@@ -2455,7 +2508,72 @@
   (define-source-transform weak-vector-len (thing)
     `(length (the simple-vector ,thing))))
 
-(defoptimizer (allocate-vector derive-type) ((widetag length words))
-  (when (constant-lvar-p length)
-    (make-array-type (list (lvar-value length))
-                     :complexp nil :element-type *wild-type*)))
+(defoptimizer (allocate-vector derive-type) ((widetag length words) node)
+  (%make-array-derive-type widetag length nil nil nil node))
+
+(defoptimizer (sb-vm::array-underlying-widetag-and-shift derive-type) ((array))
+  (block nil
+    (let ((saetps))
+      (flet ((try (type)
+               (unless (array-type-p type)
+                 (return))
+               (let ((spec (array-type-specialized-element-type type)))
+                 (when (eq spec *wild-type*)
+                   (return))
+                 (push (find-saetp-by-ctype spec) saetps))))
+        (if (union-type-p (lvar-type array))
+            (mapc #'try (union-type-types (lvar-type array)))
+            (try (lvar-type array))))
+      (loop for saetp in saetps
+            collect (sb-vm:saetp-typecode saetp) into tags
+            collect (sb-vm:saetp-n-bits-shift saetp) into shifts
+            finally (return (values-specifier-type `(values (member ,@tags)
+                                                            (member ,@shifts))))))))
+
+(deftransform sb-vm::array-underlying-widetag-and-shift ((array) (simple-array))
+  `(let ((widetag (if (vectorp array)
+                      (%other-pointer-widetag array)
+                      (%other-pointer-widetag (%array-data array)))))
+     (values widetag
+             (truly-the (unsigned-byte 8)
+                        (aref sb-vm::%%simple-array-n-bits-shifts%% widetag)))))
+
+(deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type))
+  (cond
+    ((constant-lvar-p type)
+     (let ((saetp (find-saetp-by-ctype (careful-specifier-type (lvar-value type)))))
+       `(values ,(sb-vm:saetp-typecode saetp)
+                ,(sb-vm:saetp-n-bits-shift saetp))))
+
+    ((csubtypep (lvar-type type) (specifier-type '(member character base-char)))
+     `(cond #+sb-unicode
+            ((eq type 'character)
+             (values #.sb-vm:simple-character-string-widetag
+                     #.(sb-vm:saetp-n-bits-shift
+                        (find sb-vm:simple-character-string-widetag
+                              sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode))))
+            (t
+             (values #.sb-vm:simple-base-string-widetag
+                     #.(sb-vm:saetp-n-bits-shift
+                        (find sb-vm:simple-base-string-widetag
+                              sb-vm:*specialized-array-element-type-properties* :key #'sb-vm:saetp-typecode))))))
+    (t
+     (give-up-ir1-transform "ELEMENT-TYPE is not constant."))))
+
+(defoptimizer (sb-vm::%vector-widetag-and-n-bits-shift derive-type) ((type))
+  (let ((result *universal-type*))
+    ;; Can't do this because (and integer cons) is also NIL.
+    #+nil
+    (unless (types-equal-or-intersect (lvar-type type) (specifier-type 'null))
+      (setf result (specifier-type `(not (eql ,sb-vm:simple-array-nil-widetag)))))
+
+    ;; Try to exclude BASE-CHAR, which is null-terminated and needs to compute to adjust vector length.
+    (let ((comb (lvar-uses type)))
+      (when (combination-is comb '(list list* cons))
+        (let ((args (combination-args comb)))
+          (when (and args
+                     (csubtypep (lvar-type (first args))
+                                (specifier-type `(member unsigned-byte signed-byte integer))))
+            (setf result (type-intersection result
+                                            (specifier-type `(not (eql ,sb-vm:simple-base-string-widetag)))))))))
+    result))

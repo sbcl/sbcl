@@ -370,3 +370,11 @@
      (dolist (x input (- r)) ; no conflict when X = NIL
        (declare (string x))
        (incf r (length x))))))
+
+(with-test (:name :non-recursive-lots-of-macros)
+  (checked-compile
+   '(lambda ()
+     (macrolet ((x (m) m)
+                (b (n) `(progn ,@(make-list n :initial-element '(x 1)))))
+       (x
+        (b 1000))))))

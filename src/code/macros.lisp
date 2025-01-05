@@ -830,7 +830,7 @@ invoked. In that case it will store into PLACE and start over."
     (lambda (condition stream)
       (format stream
         "Duplicate key ~S in ~S form, ~
-         occurring in~{~#[~; and~]~{ the ~:R clause:~%~<  ~S~:>~}~^,~}."
+         occurring in~{~#[~; and~]~{ clause ~a:~%~<  ~S~:>~}~^,~}."
         (case-warning-key condition)
         (case-warning-case-kind condition)
         (duplicate-case-key-warning-occurrences condition)))))

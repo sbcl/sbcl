@@ -26,7 +26,7 @@
           (a 0)
           (b 0)
           (c 0)
-          (run! nil)
+          (run! (sb-thread:make-semaphore))
           (w-e! (cons :write-oops nil))
           (r-e! (cons :read-oops nil)))
       (flet ((maybe-pause (pause &optional value)
@@ -41,7 +41,7 @@
                     collect
                        (make-thread
                         (lambda ()
-                          (loop until run! do (thread-yield))
+                          (sb-thread:wait-on-semaphore run!)
                           (handler-case
                               (loop repeat read-count
                                     do (multiple-value-bind (a b c)
@@ -56,7 +56,7 @@
               (loop repeat writer-count
                     collect (make-thread
                              (lambda ()
-                               (loop until run! do (thread-yield))
+                               (sb-thread:wait-on-semaphore run!)
                                (handler-case
                                    (loop repeat write-count
                                          do (frlock-write (rw)
@@ -76,7 +76,7 @@
                                  (error (e)
                                    (sb-ext:atomic-update (cdr w-e!) #'cons e))))))
               (progn
-                (setf run! t)
+                (sb-thread:signal-semaphore run! (+ reader-count writer-count))
                 nil))))
       (values (cdr w-e!) (cdr r-e!))))
 

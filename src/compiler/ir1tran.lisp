@@ -163,6 +163,7 @@
 
 
 (declaim (start-block find-free-fun find-lexically-apparent-fun
+                      check-global-fun
                       ;; needed by ir1-translators
                       find-global-fun))
 
@@ -173,6 +174,25 @@
       :defined-here
       where))
 
+(defun check-global-fun (name latep)
+  (let ((where (info :function :where-from name)))
+    (when (and (eq where :assumed)
+               ;; Slot accessors are defined just-in-time, if not already.
+               (not (typep name '(cons (eql sb-pcl::slot-accessor))))
+               ;; In the ordinary target Lisp, it's silly to report
+               ;; undefinedness when the function is defined in the
+               ;; running Lisp. But at cross-compile time, the current
+               ;; definedness of a function is irrelevant to the
+               ;; definedness at runtime, which is what matters.
+               #-sb-xc-host (not (fboundp name))
+               ;; LATEP is true when the user has indicated that
+               ;; late-late binding is desired by using eg. a quoted
+               ;; symbol -- in which case it makes little sense to
+               ;; complain about undefined functions.
+               (not latep))
+      (note-undefined-reference name :function))
+    where))
+
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
 (defun find-global-fun (name latep)
@@ -180,22 +200,7 @@
     (unless kind
       (setf (info :function :kind name) :function)
       (setf (info :function :where-from name) :assumed))
-    (let ((where (info :function :where-from name)))
-      (when (and (eq where :assumed)
-                 ;; Slot accessors are defined just-in-time, if not already.
-                 (not (typep name '(cons (eql sb-pcl::slot-accessor))))
-                 ;; In the ordinary target Lisp, it's silly to report
-                 ;; undefinedness when the function is defined in the
-                 ;; running Lisp. But at cross-compile time, the current
-                 ;; definedness of a function is irrelevant to the
-                 ;; definedness at runtime, which is what matters.
-                 #-sb-xc-host (not (fboundp name))
-                 ;; LATEP is true when the user has indicated that
-                 ;; late-late binding is desired by using eg. a quoted
-                 ;; symbol -- in which case it makes little sense to
-                 ;; complain about undefined functions.
-                 (not latep))
-        (note-undefined-reference name :function))
+    (let ((where (check-global-fun name latep)))
       (case kind
         ((:macro :special-form)
          (compiler-warn "~(~a~) ~s where a function is expected" kind name)))
@@ -217,20 +222,19 @@
           (setf ftype (specifier-type `(function ,@(cddr name)))
                 where :declared))
         (make-global-var
-         :kind :global-function
-         :%source-name name
-         :type (if (or (eq where :declared)
-                       (and (not latep)
-                            (not notinline)
-                            *derive-function-types*))
-                   ftype
-                   (specifier-type 'function))
-         :defined-type (if (and (not latep) (not notinline))
-                           ftype
-                           (specifier-type 'function))
-         :where-from (if notinline
-                         where
-                         (maybe-defined-here name where)))))))
+         :global-function name
+         (if notinline
+             where
+             (maybe-defined-here name where))
+         (if (or (eq where :declared)
+                 (and (not latep)
+                      (not notinline)
+                      *derive-function-types*))
+             ftype
+             (specifier-type 'function))
+         (if (and (not latep) (not notinline))
+             ftype
+             (specifier-type 'function)))))))
 
 ;;; If NAME already has a valid entry in (FREE-FUNS *IR1-NAMESPACE*), then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
@@ -254,16 +258,16 @@
                    (if (or expansion inlinep)
                        (let ((where (info :function :where-from name)))
                          (make-defined-fun
-                          :%source-name name
+                          name
+                          (if (and (eq inlinep 'notinline)
+                                   (neq where :declared))
+                              (specifier-type 'function)
+                              (global-ftype name))
+                          (if (eq inlinep 'notinline)
+                              where
+                              (maybe-defined-here name where))
                           :inline-expansion expansion
-                          :inlinep inlinep
-                          :where-from (if (eq inlinep 'notinline)
-                                          where
-                                          (maybe-defined-here name where))
-                          :type (if (and (eq inlinep 'notinline)
-                                         (neq where :declared))
-                                    (specifier-type 'function)
-                                    (global-ftype name))))
+                          :inlinep inlinep))
                        (find-global-fun name nil)))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
@@ -321,10 +325,7 @@
                  (let ((value (symbol-value name)))
                    (make-constant value (ctype-of value) name)))
                 (t
-                 (make-global-var :kind kind
-                                  :%source-name name
-                                  :type type
-                                  :where-from where-from)))))))
+                 (make-global-var kind name where-from type)))))))
 
 ;;; Return T if and only if OBJ's nature as an externalizable thing renders
 ;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
@@ -657,9 +658,11 @@
   (aver-live-component *current-component*)
   ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
   ;; no-op
-  (when (typep functional '(or optional-dispatch clambda))
-    (pushnew functional
-             (component-reanalyze-functionals *current-component*)))
+  (when (and (typep functional '(or optional-dispatch clambda))
+             (not (functional-reanalyze functional)))
+    (setf (functional-reanalyze functional) t)
+    (push functional
+          (component-reanalyze-functionals *current-component*)))
   functional)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
@@ -839,10 +842,10 @@
               (let ((expansions (memq lexical-def *inline-expansions*)))
                 (if (<= (or (cadr expansions) 0) *inline-expansion-limit*)
                     (let ((*inline-expansions*
-                            (if expansions
-                                (progn (incf (cadr expansions))
-                                       *inline-expansions*)
-                                (list* lexical-def 1 *inline-expansions*))))
+                            (list* lexical-def (if expansions
+                                                   (1+ (cadr expansions))
+                                                   1)
+                                   *inline-expansions*)))
                       (ir1-convert start next result
                                    (careful-expand-macro (cdr lexical-def) form)))
                     (progn
@@ -1138,9 +1141,7 @@
          (then-block (ctran-starts-block then-ctran))
          (else-ctran (make-ctran))
          (else-block (ctran-starts-block else-ctran))
-         (node (make-if :test pred-lvar
-                        :consequent then-block
-                        :alternative else-block)))
+         (node (make-if pred-lvar then-block else-block)))
     (setf (lvar-dest pred-lvar) node)
     (ir1-convert-combination-checking-type start pred-ctran pred-lvar form var)
     (link-node-to-previous-ctran node pred-ctran)
@@ -1256,8 +1257,7 @@
                                (int (if (or (fun-type-p type)
                                             (fun-type-p old-type))
                                         type
-                                        (type-approx-intersection2
-                                         old-type type))))
+                                        (type-intersection old-type type))))
                           (cond ((eq int *empty-type*)
                                  (unless (policy *lexenv* (= inhibit-warnings 3))
                                    (warn
@@ -1419,11 +1419,11 @@
                    (specifier-type 'function)
                    (leaf-type var)))
          (res (make-defined-fun
-               :%source-name (leaf-source-name var)
-               :where-from (leaf-where-from var)
-               :type (if local-type
-                         (type-intersection local-type type)
-                         type)
+               (leaf-source-name var)
+               (if local-type
+                   (type-intersection local-type type)
+                   type)
+               (leaf-where-from var)
                :inlinep inlinep)))
     (when (defined-fun-p var)
       (setf (defined-fun-inline-expansion res)
@@ -1811,9 +1811,7 @@ possible.")
               name))
            found))
         (t
-         (make-global-var :kind :special
-                          :%source-name name
-                          :where-from :declared))))
+         (make-global-var :special name :declared))))
 
 (declaim (end-block))
 
@@ -1863,13 +1861,15 @@ possible.")
              (let ((kind (global-var-kind var)))
                (if (defined-fun-p var)
                    (make-defined-fun
-                    :%source-name name :type type :where-from :declared :kind kind
+                    name
+                    type
+                    :declared
+                    :kind kind
                     :inlinep (defined-fun-inlinep var)
                     :inline-expansion (defined-fun-inline-expansion var)
                     :same-block-p (defined-fun-same-block-p var)
                     :functional (defined-fun-functional var))
-                   (make-global-var :%source-name name :type type
-                                    :where-from :declared :kind kind))))
+                   (make-global-var kind name :declared type))))
        (when (defined-fun-p var)
          (let ((fun (defined-fun-functional var)))
            (when fun
@@ -1900,9 +1900,7 @@ possible.")
           (constant)
           (global-var
            (setf (gethash name free-vars)
-                 (make-global-var :%source-name name
-                                  :type type :where-from :declared
-                                  :kind (global-var-kind var)))))))))
+                 (make-global-var (global-var-kind var) name :declared type))))))))
 
 ;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
 ;;; global-var ensures that when we substitute a functional for a
@@ -1937,11 +1935,12 @@ possible.")
              ((:special :global))
              (:unknown
               (setf (gethash name free-vars)
-                    (make-global-var :%source-name name :type (leaf-type old)
-                                     :where-from (leaf-where-from old)
-                                     :kind (ecase kind
-                                             (special :special)
-                                             (global :global))))))))))
+                    (make-global-var (ecase kind
+                                       (special :special)
+                                       (global :global))
+                                     name
+                                     (leaf-where-from old)
+                                     (leaf-type old)))))))))
     ((start-block end-block)
      #-(and sb-devel sb-xc-host)
      (process-block-compile-proclamation kind args))

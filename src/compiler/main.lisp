@@ -323,10 +323,7 @@ Examples:
                        :live-tns (make-array ,size :initial-element nil)))))))
      (let ((*warnings-p* nil)
            (*failure-p* nil))
-       (handler-bind ((compiler-error #'compiler-error-handler)
-                      (style-warning #'compiler-style-warning-handler)
-                      (warning #'compiler-warning-handler))
-         (values (progn ,@body) *warnings-p* *failure-p*)))))
+       (values (progn ,@body) *warnings-p* *failure-p*))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
@@ -446,16 +443,22 @@ necessary, since type inference may take arbitrarily long to converge.")
       (maybe-mumble "."))
     t))
 
+(defvar *ir1-transforms-after-constraints*)
+(defvar *ir1-transforms-after-ir1-phases*)
 (defparameter *reoptimize-limit* 10)
 
 (defun ir1-optimize-phase-1 (component)
   (let ((loop-count 0)
         (constraint-propagate *constraint-propagate*)
-        reoptimized)
+        reoptimized
+        *ir1-transforms-after-constraints*
+        *ir1-transforms-after-ir1-phases*)
     (tagbody
      again
        (loop
         (setf reoptimized (ir1-optimize-until-done component))
+        (setf (component-reoptimize-counter component)
+              (mod (1+ (component-reoptimize-counter component)) most-positive-fixnum))
         (cond ((or (component-new-functionals component)
                    (component-reanalyze-functionals component))
                (maybe-mumble "Locall ")
@@ -471,9 +474,11 @@ necessary, since type inference may take arbitrarily long to converge.")
         (when constraint-propagate
           (maybe-mumble "Constraint ")
           (constraint-propagate component)
-          (when (retry-delayed-ir1-transforms :constraint)
+          (when (retry-delayed-ir1-transforms *ir1-transforms-after-constraints*)
+            (reoptimize-component component :maybe)
             (setf loop-count 0) ;; otherwise nothing may get retried
             (maybe-mumble "Rtran ")))
+        (setf *ir1-transforms-after-constraints* nil)
         (unless (or (component-reoptimize component)
                     (component-reanalyze component)
                     (component-new-functionals component)
@@ -484,12 +489,15 @@ necessary, since type inference may take arbitrarily long to converge.")
           (event reoptimize-maxed-out)
           (return))
         (incf loop-count))
+       (setf (component-phase-counter component)
+             (mod (1+ (component-phase-counter component)) most-positive-fixnum))
        ;; Do it once more for the transforms that will produce code
        ;; that loses some information for further optimizations and
        ;; it's better to insert it at the last moment.
        ;; Such code shouldn't need constraint propagation, the slowest
        ;; part, so avoid it.
-       (when (retry-delayed-ir1-transforms :ir1-phases)
+       (when (retry-delayed-ir1-transforms (shiftf *ir1-transforms-after-ir1-phases* nil))
+         (reoptimize-component component :maybe)
          (setf loop-count 0
                constraint-propagate nil)
          (go again)))))
@@ -1638,34 +1646,37 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
-              (fasl-dump-partial-source-info info *compile-object*)
-              (with-ir1-namespace
-                (with-source-paths
-                  (do-forms-from-info ((form current-index) info
-                                       'input-error-in-compile-file)
-                    (clrhash *source-paths*)
-                    (find-source-paths form current-index)
-                    (note-top-level-form form)
-                    (let ((*gensym-counter* 0))
-                      (process-toplevel-form
-                       form `(original-source-start 0 ,current-index) nil)))
-                  (finish-block-compilation)
-                  (compile-toplevel-lambdas () t)
-                  (let ((object *compile-object*))
-                    (etypecase object
-                      (fasl-output (fasl-dump-source-info info object))
-                      #-sb-xc-host
-                      (core-object (fix-core-source-info info object))
-                      (null)))))
-              (let ((code-coverage-records
-                      (code-coverage-records (coverage-metadata *compilation*))))
-                (unless (zerop (hash-table-count code-coverage-records))
-                  ;; Dump the code coverage records into the fasl.
-                  (dump-code-coverage-records
-                   (loop for k being each hash-key of code-coverage-records
-                         collect k)
-                   *compile-object*)))
-                nil)))
+              (handler-bind ((compiler-error #'compiler-error-handler)
+                             (style-warning #'compiler-style-warning-handler)
+                             (warning #'compiler-warning-handler))
+                (fasl-dump-partial-source-info info *compile-object*)
+                (with-ir1-namespace
+                  (with-source-paths
+                    (do-forms-from-info ((form current-index) info
+                                         'input-error-in-compile-file)
+                      (clrhash *source-paths*)
+                      (find-source-paths form current-index)
+                      (note-top-level-form form)
+                      (let ((*gensym-counter* 0))
+                        (process-toplevel-form
+                         form `(original-source-start 0 ,current-index) nil)))
+                    (finish-block-compilation)
+                    (compile-toplevel-lambdas () t)
+                    (let ((object *compile-object*))
+                      (etypecase object
+                        (fasl-output (fasl-dump-source-info info object))
+                        #-sb-xc-host
+                        (core-object (fix-core-source-info info object))
+                        (null)))))
+                (let ((code-coverage-records
+                        (code-coverage-records (coverage-metadata *compilation*))))
+                  (unless (zerop (hash-table-count code-coverage-records))
+                    ;; Dump the code coverage records into the fasl.
+                    (dump-code-coverage-records
+                     (loop for k being each hash-key of code-coverage-records
+                           collect k)
+                     *compile-object*)))
+                nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.

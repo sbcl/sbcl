@@ -101,97 +101,118 @@
 ;;; If ERORRP is true signals an error immediately -- otherwise returns
 ;;; a function that will signal the error.
 (defun compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp)
+  ;; This ridiculous check for a NIL-returning constant function cuts out hundreds of
+  ;; identical functions that result from all the turds that users seem to generate.
+  ;; It's not coming from CLOS per se because our DEFCLASS knows to use :INITFUNCTION
+  ;; as #'SB-INT:CONSTANTLY-NIL of its own volition when applicable. Likely it is user-
+  ;; written code that employs a similar paradigm with no recognition of common cases.
+  (when (and (typep form '(cons (eql lambda)))
+             (let ((cdr (cdr form)))
+               (and (typep cdr '(cons (eql nil)))
+                    (or (null (setq cdr (cdr cdr)))
+                        (equal cdr '(nil))
+                        (equal cdr '('nil))))))
+    ;; I sure hope that users don't expect COMPILE to necessarily return a
+    ;; unique blob of code. How could they?
+    (return-from compile-in-lexenv
+      (values (if (policy *lexenv* (= safety 0))
+                  (load-time-value #'constantly-nil t)
+                  (load-time-value #'sb-impl::0-arg-nil t))
+              nil nil)))
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
       (with-compilation-unit ()
-        ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
-        ;; few changes. Once things are stable, the shared bindings
-        ;; probably be merged back together into some shared utility
-        ;; macro, or perhaps both merged into one of the existing utility
-        ;; macros SB-C::WITH-COMPILATION-VALUES or
-        ;; CL:WITH-COMPILATION-UNIT.
-        (with-source-paths
-          (prog* ((tlf (or tlf 0))
-                  ;; If we have a source-info from LOAD, we will
-                  ;; also have a source-paths already set up -- so drop
-                  ;; the ones from WITH-COMPILATION-VALUES.
-                  (*source-paths* (or source-paths *source-paths*))
-                  (*source-info* (or source-info
-                                  (make-lisp-source-info
-                                   form :parent *source-info*)))
-                  (*allow-instrumenting* nil)
-                  (*compilation*
-                   (make-compilation
-                    :msan-unpoison
-                    (and (member :msan *features*)
+        (let ((*last-error-context* nil)
+              (*last-message-count* (list* 0 nil nil)))
+          (handler-bind ((compiler-error #'compiler-error-handler)
+                         (style-warning #'compiler-style-warning-handler)
+                         (warning #'compiler-warning-handler))
+            ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
+            ;; few changes. Once things are stable, the shared bindings
+            ;; probably be merged back together into some shared utility
+            ;; macro, or perhaps both merged into one of the existing utility
+            ;; macros SB-C::WITH-COMPILATION-VALUES or
+            ;; CL:WITH-COMPILATION-UNIT.
+            (with-source-paths
+              (prog* ((tlf (or tlf 0))
+                      ;; If we have a source-info from LOAD, we will
+                      ;; also have a source-paths already set up -- so drop
+                      ;; the ones from WITH-COMPILATION-VALUES.
+                      (*source-paths* (or source-paths *source-paths*))
+                      (*source-info* (or source-info
+                                      (make-lisp-source-info
+                                       form :parent *source-info*)))
+                      (*allow-instrumenting* nil)
+                      (*compilation*
+                       (make-compilation
+                        :msan-unpoison
+                        (and (member :msan *features*)
                          (find-dynamic-foreign-symbol-address "__msan_unpoison"))
-                    :block-compile nil))
-                  (*last-message-count* (list* 0 nil nil))
-                  (*last-error-context* nil)
-                  (*gensym-counter* 0)
-                  ;; KLUDGE: This rebinding of policy is necessary so that
-                  ;; forms such as LOCALLY at the REPL actually extend the
-                  ;; compilation policy correctly.  However, there is an
-                  ;; invariant that is potentially violated: future
-                  ;; refactoring must not allow this to be done in the file
-                  ;; compiler.  At the moment we're clearly alright, as we
-                  ;; call %COMPILE with a core-object, not a fasl-stream,
-                  ;; but caveat future maintainers. -- CSR, 2002-10-27
-                  (*policy* (lexenv-policy *lexenv*))
-                  ;; see above
-                  (*handled-conditions* (lexenv-handled-conditions *lexenv*))
-                  ;; ditto
-                  (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*))
-                  ;; FIXME: ANSI doesn't say anything about CL:COMPILE
-                  ;; interacting with these variables, so we shouldn't. As
-                  ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by
-                  ;; binding these variables, so as a quick hack we do so
-                  ;; too. But a proper implementation would have verbosity
-                  ;; controlled by function arguments and lexical variables.
-                  (*compile-verbose* nil)
-                  (*compile-print* nil)
-                  ;; in some circumstances, we can trigger execution
-                  ;; of user code during optimization, which can
-                  ;; re-enter the compiler through explicit calls to
-                  ;; EVAL or COMPILE.  Those inner evaluations
-                  ;; shouldn't attempt to report any compiler problems
-                  ;; using the outer compiler error context.
-                  (*compiler-error-context* nil)
-                  (oops nil))
-             (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
-               (unless source-paths
-                 (find-source-paths form tlf))
-               (let ((*current-path* (or (get-source-path form)
-                                         (cons form (or (and (boundp '*current-path*)
-                                                             *current-path*)
-                                                        `(original-source-start 0 ,tlf)))))
-                     (*compiler-error-bailout*
-                       (lambda (e)
-                         (setf oops e)
-                         ;; Unwind the compiler frames: users want the know where
-                         ;; the error came from, not how the compiler got there.
-                         (go :error))))
-                 (return
-                   (%compile form ephemeral name))))
-           :error
-             ;; Either signal the error right away, or return a function that
-             ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so
-             ;; that we retain our earlier behaviour when called with erronous
-             ;; lambdas via %SIMPLE-EVAL. We could legally do just either one
-             ;; always, but right now keeping the old behaviour seems like less
-             ;; painful option: compiler.pure.lisp is full of tests that make all
-             ;; sort of assumptions about when which things are signalled. FIXME,
-             ;; probably.
-             (if errorp
-                 (error oops)
-                 (let ((message (princ-to-string oops))
-                       (source (source-to-string form)))
-                   (return
-                     (lambda (&rest arguments)
-                       (declare (ignore arguments))
-                       (error 'compiled-program-error
-                              :message message
-                              :source source)))))))))))
+                        :block-compile nil))
+                      (*gensym-counter* 0)
+                      ;; KLUDGE: This rebinding of policy is necessary so that
+                      ;; forms such as LOCALLY at the REPL actually extend the
+                      ;; compilation policy correctly.  However, there is an
+                      ;; invariant that is potentially violated: future
+                      ;; refactoring must not allow this to be done in the file
+                      ;; compiler.  At the moment we're clearly alright, as we
+                      ;; call %COMPILE with a core-object, not a fasl-stream,
+                      ;; but caveat future maintainers. -- CSR, 2002-10-27
+                      (*policy* (lexenv-policy *lexenv*))
+                      ;; see above
+                      (*handled-conditions* (lexenv-handled-conditions *lexenv*))
+                      ;; ditto
+                      (*disabled-package-locks* (lexenv-disabled-package-locks *lexenv*))
+                      ;; FIXME: ANSI doesn't say anything about CL:COMPILE
+                      ;; interacting with these variables, so we shouldn't. As
+                      ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by
+                      ;; binding these variables, so as a quick hack we do so
+                      ;; too. But a proper implementation would have verbosity
+                      ;; controlled by function arguments and lexical variables.
+                      (*compile-verbose* nil)
+                      (*compile-print* nil)
+                      ;; in some circumstances, we can trigger execution
+                      ;; of user code during optimization, which can
+                      ;; re-enter the compiler through explicit calls to
+                      ;; EVAL or COMPILE.  Those inner evaluations
+                      ;; shouldn't attempt to report any compiler problems
+                      ;; using the outer compiler error context.
+                      (*compiler-error-context* nil)
+                      (oops nil))
+                 (handler-bind (((satisfies handle-condition-p) 'handle-condition-handler))
+                   (unless source-paths
+                     (find-source-paths form tlf))
+                   (let ((*current-path* (or (get-source-path form)
+                                             (cons form (or (and (boundp '*current-path*)
+                                                                 *current-path*)
+                                                            `(original-source-start 0 ,tlf)))))
+                         (*compiler-error-bailout*
+                           (lambda (e)
+                             (setf oops e)
+                             ;; Unwind the compiler frames: users want the know where
+                             ;; the error came from, not how the compiler got there.
+                             (go :error))))
+                     (return
+                       (%compile form ephemeral name))))
+               :error
+                 ;; Either signal the error right away, or return a function that
+                 ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so
+                 ;; that we retain our earlier behaviour when called with erronous
+                 ;; lambdas via %SIMPLE-EVAL. We could legally do just either one
+                 ;; always, but right now keeping the old behaviour seems like less
+                 ;; painful option: compiler.pure.lisp is full of tests that make all
+                 ;; sort of assumptions about when which things are signalled. FIXME,
+                 ;; probably.
+                 (if errorp
+                     (error oops)
+                     (let ((message (princ-to-string oops))
+                           (source (source-to-string form)))
+                       (return
+                         (lambda (&rest arguments)
+                           (declare (ignore arguments))
+                           (error 'compiled-program-error
+                                  :message message
+                                  :source source)))))))))))))
 
 ;;; NOTE: COMPILE may be slightly nonconforming regarding generic functions,
 ;;; but no more nonconforming than it was prior to the redefinition of

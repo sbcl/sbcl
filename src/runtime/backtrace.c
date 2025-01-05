@@ -778,6 +778,7 @@ static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
 #ifdef HAVE_LIBUNWIND
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
+int sbcl_have_libunwind() { return 1; }
 int get_sizeof_unw_context() { return sizeof (unw_context_t); }
 int get_sizeof_unw_cursor() { return sizeof (unw_cursor_t); }
 #ifdef LISP_FEATURE_DARWIN // slightly different libunwind. And it doesn't work for me
@@ -790,6 +791,7 @@ int sb_unw_get_pc(void* a, void* b) { return unw_get_reg(a, UNW_TDEP_IP, b); }
 int sb_unw_get_proc_name(void* a, void* b, int c, unw_word_t* d) { return unw_get_proc_name(a, b, c, d); }
 int sb_unw_step(void* a) { return unw_step(a); }
 #else
+int sbcl_have_libunwind() { return 0; }
 int get_sizeof_unw_context() { return 0; }
 int get_sizeof_unw_cursor() { return 0; }
 int sb_unw_init(void* a, void* b) { lose("unw_init %p %p", a, b); }

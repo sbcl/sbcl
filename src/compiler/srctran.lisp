@@ -1469,10 +1469,8 @@
            (typecase arg
              (numeric-type
               (list arg))
-             (union-type
-              (sb-kernel::flatten-numeric-range-types (union-type-types arg)))
-             (numeric-range-type
-              (numeric-range-to-numeric-types arg))
+             ((or union-type numeric-union-type)
+              (sb-kernel::flatten-numeric-union-types arg))
              (list
               arg)
              (t
@@ -2030,7 +2028,7 @@
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational ratio) 'single-float)
+                          ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2169,8 +2167,8 @@
                    (numeric-type-real-p div)))
          nil)
         ;; Floats introduce rounding errors
-        ((and (memq (numeric-type-class num) '(integer rational ratio))
-              (memq (numeric-type-class div) '(integer rational ratio)))
+        ((and (memq (numeric-type-class num) '(integer rational))
+              (memq (numeric-type-class div) '(integer rational)))
          (truncate-derive-type-rem num div))
         (t
          (numeric-contagion num div))))
@@ -2352,8 +2350,8 @@
                                        (numeric-type-real-p div)))
                              nil)
                             ;; Floats introduce rounding errors
-                            ((and (memq (numeric-type-class num) '(integer rational ratio))
-                                  (memq (numeric-type-class div) '(integer rational ratio)))
+                            ((and (memq (numeric-type-class num) '(integer rational))
+                                  (memq (numeric-type-class div) '(integer rational)))
                              (,r-aux num div))
                             (t
                              (numeric-contagion num div)))))
@@ -2649,7 +2647,7 @@
 ;;; - The abs of the minimal value (i.e. closest to 0) in the range.
 ;;; - The abs of the maximal value if there is one, or nil if it is
 ;;;   unbounded.
-(defun numeric-range-info (low high)
+(defun numeric-union-info (low high)
   (cond ((and low (not (minusp low)))
          (values '+ low high))
         ((and high (not (plusp high)))
@@ -2663,9 +2661,9 @@
   ;; sign might change. If we can determine the sign of either the
   ;; number or the divisor, we can eliminate some of the cases.
   (multiple-value-bind (number-sign number-min number-max)
-      (numeric-range-info number-low number-high)
+      (numeric-union-info number-low number-high)
     (multiple-value-bind (divisor-sign divisor-min divisor-max)
-        (numeric-range-info divisor-low divisor-high)
+        (numeric-union-info divisor-low divisor-high)
       (when (and divisor-max (zerop divisor-max))
         ;; We've got a problem: guaranteed division by zero.
         (return-from integer-truncate-derive-type t))
@@ -2930,7 +2928,7 @@
          (specifier-type '(or (eql 1) (eql -1))))
         ((eq (numeric-type-complexp type) :complex)
          (let* ((format (case (numeric-type-class type)
-                          ((integer rational ratio) 'single-float)
+                          ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
            (make-numeric-type :class 'float
@@ -2944,9 +2942,6 @@
                 (contains-0-p (interval-contains-p 0 interval))
                 (class (numeric-type-class type))
                 (format (numeric-type-format type))
-                (class (if (eq class 'ratio)
-                            'rational
-                            class))
                 (one (coerce 1 (or format class 'real)))
                 (zero (coerce 0 (or format class 'real)))
                 (minus-one (coerce -1 (or format class 'real)))
@@ -3418,10 +3413,8 @@
     ;; KLUDGE: this is not INTEGER-type-numeric-bounds
     (numeric-type (values (numeric-type-low type)
                           (numeric-type-high type)))
-    (numeric-range-type
-     (if (eql (numeric-range-type-types type) numeric-range-integer)
-         (sb-kernel::numeric-range-bounds type)
-         (values nil nil)))
+    (numeric-union-type
+     (sb-kernel::numeric-union-bounds type))
     (union-type
      (let ((low  nil)
            (high nil))
@@ -7454,10 +7447,12 @@
                                                                       ,(logxor c1 c2))
                                                             ,min)))
                                                   (t
-                                                   `(not (logtest (,@(if type-check
-                                                                         '(logand most-positive-word)
-                                                                         '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
-                                                                  ,(lognot (- max min)))))))
+                                                   (let ((mask (lognot (- max min))))
+                                                     `(not (logtest (,@(if (or type-check
+                                                                               (not (fixnump mask)))
+                                                                           '(logand most-positive-word)
+                                                                           '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
+                                                                    ,mask))))))
                                         'or-eq-transform)))))))))))
 
 ;;; Prevent slow perfect hash finder from hogging time if time spent compiling

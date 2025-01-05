@@ -43,31 +43,10 @@
 
 ;;;; from the "Predicates" chapter:
 
-;;; FIXME: Is it right to have TYPEP (and TYPE-OF, elsewhere; and
-;;; perhaps SPECIAL-OPERATOR-P and others) be FOLDABLE in the
-;;; cross-compilation host? After all, some type relationships (e.g.
-;;; FIXNUMness) might be different between host and target. Perhaps
-;;; this property should be protected by #-SB-XC-HOST? Perhaps we need
-;;; 3-stage bootstrapping after all? (Ugh! It's *so* slow already!)
 (defknown typep (t type-specifier &optional lexenv-designator) boolean
-   ;; Unlike SUBTYPEP or UPGRADED-ARRAY-ELEMENT-TYPE and friends, this
-   ;; seems to be FOLDABLE. Like SUBTYPEP, it's affected by type
-   ;; definitions, but unlike SUBTYPEP, there should be no way to make
-   ;; a TYPEP expression with constant arguments which doesn't return
-   ;; an error before the type declaration (because of undefined
-   ;; type). E.g. you can do
-   ;;   (SUBTYPEP 'INTEGER 'FOO) => NIL, NIL
-   ;;   (DEFTYPE FOO () T)
-   ;;   (SUBTYPEP 'INTEGER 'FOO) => T, T
-   ;; but the analogous
-   ;;   (TYPEP 12 'FOO)
-   ;;   (DEFTYPE FOO () T)
-   ;;   (TYPEP 12 'FOO)
-   ;; doesn't work because the first call is an error.
-   ;;
-   ;; (UPGRADED-ARRAY-ELEMENT-TYPE and UPGRADED-COMPLEX-PART-TYPE have
-   ;; behavior like SUBTYPEP in this respect, not like TYPEP.)
-   (foldable))
+    ;; Avoid warnings about bad types during constant folding,
+    ;; it will be folded in the transform.
+    ())
 (defknown subtypep (type-specifier type-specifier &optional lexenv-designator)
   (values boolean boolean)
   ;; This is not FOLDABLE because its value is affected by type
@@ -569,23 +548,28 @@
 
 ;;;; from the "Sequences" chapter:
 
-(defknown elt (proper-sequence index) t (foldable unsafely-flushable))
+(defknown elt ((read-only proper-sequence) index) t (foldable unsafely-flushable))
 
-(defknown subseq (proper-sequence index &optional sequence-end) consed-sequence
-  (flushable))
+(defknown subseq ((read-only proper-sequence) index &optional sequence-end) consed-sequence
+  (flushable foldable-read-only))
 
-(defknown vector-subseq* (vector index sequence-end) (simple-array * (*))
-  (flushable))
+(defknown vector-subseq* ((read-only vector) index sequence-end) (simple-array * (*))
+  (flushable foldable-read-only no-verify-arg-count))
 
-(defknown copy-seq (proper-sequence) consed-sequence (flushable)
+(defknown list-subseq* ((read-only list) index sequence-end) list
+  (flushable foldable-read-only no-verify-arg-count))
+
+(defknown copy-seq ((read-only proper-sequence)) consed-sequence
+  (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
-(defknown list-copy-seq* (proper-list) list (flushable)
+(defknown list-copy-seq* ((read-only proper-list)) list
+  (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
-(defknown length (proper-sequence) index (foldable flushable dx-safe))
+(defknown length ((read-only proper-sequence)) index (foldable flushable dx-safe))
 
-(defknown reverse (proper-sequence) consed-sequence (flushable)
+(defknown reverse ((read-only proper-sequence)) consed-sequence (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
@@ -600,7 +584,7 @@
                                         &key
                                         (:initial-element t))
   consed-sequence
-  (movable)
+  (movable foldable-read-only)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence
@@ -638,15 +622,15 @@
                                                     (rest-args :sequence t))
                                                    (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
-    consed-sequence (call))
+    consed-sequence (call foldable-read-only))
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence
-  (call no-verify-arg-count))
+  (call no-verify-arg-count foldable-read-only))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
   (call no-verify-arg-count))
 (defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list
-   (flushable call no-verify-arg-count))
+   (flushable call no-verify-arg-count foldable-read-only))
 (defknown %map-to-simple-vector-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) simple-vector
-  (flushable call no-verify-arg-count))
+  (flushable call no-verify-arg-count foldable-read-only))
 
 (defknown map-into ((modifying sequence)
                     (function-designator ((rest-args :sequence t))
@@ -1240,7 +1224,7 @@
                       (:fill-pointer (or index boolean))
                       (:displaced-to (or array null))
                       (:displaced-index-offset index))
-  array (flushable))
+  array (flushable foldable-read-only))
 
 (defknown %make-array ((or index list)
                        (unsigned-byte #.sb-vm:n-widetag-bits)
@@ -1253,7 +1237,16 @@
                        (:fill-pointer (or index boolean))
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
-    array (flushable no-verify-arg-count))
+    array (flushable foldable-read-only no-verify-arg-count))
+
+(defknown sb-vm::array-underlying-widetag-and-shift (array)
+    (values (integer 128 255) (integer 0 7))
+    (flushable foldable))
+
+(defknown sb-vm::%vector-widetag-and-n-bits-shift (type-specifier)
+    (values (integer 128 255) (integer 0 7))
+    (flushable foldable recursive))
+
 (defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)
@@ -1276,6 +1269,7 @@
 ;; causing difficulty if doing any futher macro-like processing.
 (defknown fill-array (sequence simple-array) (simple-array)
   (flushable no-verify-arg-count)
+  :derive-type #'result-type-last-arg
   :result-arg 1)
 
 (defknown vector (&rest t) simple-vector (flushable foldable-read-only))
@@ -1993,9 +1987,7 @@
   (movable flushable no-verify-arg-count))
 (defknown %instance-typep (t (or type-specifier ctype layout)) boolean
   (movable flushable always-translatable))
-;;; We should never emit a call to %typep-wrapper
-(defknown %typep-wrapper (t t (or type-specifier ctype)) t
-  (movable flushable always-translatable))
+
 (defknown %type-constraint (t (or type-specifier ctype)) t
     (always-translatable))
 (defknown %in-bounds-constraint (t t) t

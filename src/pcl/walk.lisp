@@ -159,11 +159,8 @@
                                     (if (eq info :lexical-var)
                                         (cons name
                                               (if (var-special-p name env)
-                                                  (sb-c::make-global-var
-                                                   :kind :special
-                                                   :%source-name name)
-                                                  (sb-c::make-lambda-var
-                                                   :%source-name name)))
+                                                  (sb-c::make-global-var :special name)
+                                                  (sb-c::make-lambda-var name)))
                                         b)))
                                 (fourth (cadar macros)))))
      :funs (append (mapcar (lambda (f)

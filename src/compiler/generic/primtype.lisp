@@ -286,8 +286,6 @@
                                                (32 '(unsigned-byte-31 unsigned-byte-32 signed-byte-32))
                                                (64 '(unsigned-byte-63 unsigned-byte-64 signed-byte-64)))))
                          (primitive-type-or-lose 'integer))))))))
-      (when (typep type 'numeric-range-type)
-        (setf type (numeric-range-to-numeric-type type)))
       (etypecase type
         (numeric-type
          (let ((lo (numeric-type-low type))
@@ -377,10 +375,10 @@
                             (saetp-primitive-type-name saetp))
                            (eq (first (array-type-dimensions type)) '*))
                    (any)))))
-        (union-type
+        ((or union-type numeric-union-type)
          (if (type= type (specifier-type 'list))
              (exactly list)
-             (let ((types (union-type-types type)))
+             (let ((types (sb-kernel::flatten-numeric-union-types type)))
                (multiple-value-bind (res exact) (primitive-type (first types))
                  (dolist (type (rest types) (values res exact))
                    (multiple-value-bind (ptype ptype-exact)

@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.4.11:
+changes in sbcl-2.5.0 relative to sbcl-2.4.11:
+  * platform support:
+    ** improve support for the Haiku operating system.  (thanks to Al Hoang,
+       Estevan Castilho and Alexandru Popa)
   * bug fix: generic functions with a large number of required arguments, with
     methods with specializations on exactly STANDARD-OBJECT or
     FUNCALLABLE-STANDARD-OBJECT, test the types of their arguments more
@@ -8,6 +11,29 @@ changes relative to sbcl-2.4.11:
   * bug fix: defining a method on SB-MOP:SLOT-VALUE-USING-CLASS where the
     object argument is specialized to a CONDITION-CLASS no longer leads to an
     internal error.
+  * bug fix: the dissassembler on x86-64 correctly disassembles the vcvttpd2dq
+    AVX2 instruction.
+  * bug fix: ensure that the dispatch function for generic functions is
+    compiled with a known compilation policy.  (reported by Neil Goldman)
+  * bug fix: the compiler retains less intermediate data between COMPILE-FILE
+    forms.  (lp#1557590, reported by andy arvid)
+  * bug fix: the (invalid) :INITARGS slot option keyword is reported on.
+    (lp#1887014, reported by Wayne Rittiman, Jr)
+  * bug fix: the SB-SIMD s16.8-maddubs accepts packs of 16 8-bit quantities,
+    not 8 16-bit quantities.  (lp#2069538, reported by Georgios Makris)
+  * bug fix: compiling a TYPECASE to dispatch between many user-defined
+    classes no longer takes exponential time.  (lp#2089311, reported by Tomas
+    Hlavaty)
+  * bug fix: derive the new type for a variable when setting it to a function
+    of its previous version.  (lp#2090997, reported by Vasily Postnicov)
+  * bug fix: properly clear compiler annotations on variables set to new
+    values involving functions of themselves.  (lp#2090967, reported by Kirill
+    A. Korinskiy)
+  * bug fix: handle BY in LOOP forms involving iteration on the reverse of a
+    list.  (lp#2091210, reported by James Kalenius)
+  * bug fix: fix miscompilation of IF where the consequent and alternative
+    would have the same value but for an intervening side-effect.
+    (lp#2092588, reported by JA)
   * optimization: SLOT-VALUE and (SETF SLOT-VALUE) on method arguments
     specialized to structure classes are compiled to the corresponding
     structure accessor.
@@ -15,6 +41,8 @@ changes relative to sbcl-2.4.11:
     arguments specialized to instances of SB-MOP:FUNCALLABLE-STANDARD-CLASS
     are optimized similarly to calls on method arguments specialized to
     instances of STANDARD-CLASS.
+  * optimization: (coerce (reverse list) 'vector) doesn't cons a list.
+  * optimization: (replace vector (reverse list)) doesn't cons a list.
 
 changes in sbcl-2.4.11 relative to sbcl-2.4.10:
   * enhancement: define SB-EXT:*DEFAULT-SOURCE-EXTERNAL-FORMAT* as the

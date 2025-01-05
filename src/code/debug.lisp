@@ -1673,15 +1673,7 @@ forms that explicitly control this kind of evaluation.")
 ;;;; information commands
 
 (!def-debug-command "HELP" ()
-  ;; CMU CL had a little toy pager here, but "if you aren't running
-  ;; ILISP (or a smart windowing system, or something) you deserve to
-  ;; lose", so we've dropped it in SBCL. However, in case some
-  ;; desperate holdout is running this on a dumb terminal somewhere,
-  ;; we tell him where to find the message stored as a string.
-  (format *debug-io*
-          "~&~A~2%(The HELP string is stored in ~S.)~%"
-          *debug-help-string*
-          '*debug-help-string*))
+  (write-string *debug-help-string*))
 
 (!def-debug-command-alias "?" "HELP")
 
@@ -2023,7 +2015,44 @@ forms that explicitly control this kind of evaluation.")
         list)))
 
 ;; Yet another stack unwinder, this one via libunwind, if present.
-;; Calls lose() if runtime was not built with -lunwind.
+;; Calls lose() if runtime was not built with -lunwind, however on x86-64
+;; we will attempt frame-pointer-based unwinding which is likely to be
+;; wrong if there is a signal frame in the call chain prior to the
+;; point of interrupt (the interrupt context itself is fine) or foreign
+;; code that lacks frame pointers.
+;; You might think this presents a big problem, but it is literally no worse
+;; than what users do already. It would appear that everybody assumes that
+;; (SB-THREAD:INTERRUPT-THREAD SOMETHREAD #'SB-DEBUG:PRINT-BACKTRACE)
+;; is a reasonable way to get a backtrace in an arbitrary thread, but chances
+;; are that if the target thread is in C code, the entirety of the backtrace
+;; consists of nothing more than frames leading back to the interrupt.
+;; Try it on the finalizer thread for example:
+;;  (SB-THREAD:INTERRUPT-THREAD SB-IMPL::*FINALIZER-THREAD* 'SB-DEBUG:PRINT-BACKTRACE)
+;; Frame number 9 is a callee of finalizer_thread_wait
+;;
+;; 0: ((FLET "WITHOUT-INTERRUPTS-BODY-" :IN SB-THREAD::%INTERRUPT-THREAD))
+;; 1: (SB-UNIX::SIGURG-HANDLER #<unused argument> #<unused argument> #.(SB-SYS:INT-SAP #X7FAD3F7FE240))
+;; 2: ((FLET SB-THREAD::EXEC :IN SB-SYS:INVOKE-INTERRUPTION))
+;; 3: ((FLET "WITHOUT-INTERRUPTS-BODY-" :IN SB-SYS:INVOKE-INTERRUPTION))
+;; 4: (SB-SYS:INVOKE-INTERRUPTION #<FUNCTION (FLET SB-UNIX::INTERRUPTION :IN SB-UNIX::%INSTALL-HANDLER) {7FAD3F7FDFAB}>)
+;; 5: ((FLET SB-UNIX::RUN-HANDLER :IN SB-UNIX::%INSTALL-HANDLER) 23 #.(SB-SYS:INT-SAP #X7FAD3F7FE370) #.(SB-SYS:INT-SAP #X7FAD3F7FE240))
+;; 6: ("foreign function: call_into_lisp_")
+;; 7: ("foreign function: funcall3")
+;; 8: ("foreign function: interrupt_handle_now")
+;; 9: ("foreign function: #x55D93A1906E3")
+;;
+;; If we attach 'gdb' to figure out where that thread is, indeed the backtrace contains 5 more
+;; frames more recent than finalizer_thread_wait:
+;; #0  0x00007fad4024f1ce in __futex_abstimed_wait_common64 (...) at ./nptl/futex-internal.c:57
+;; #1  __futex_abstimed_wait_common (...) at ./nptl/futex-internal.c:87
+;; #2  0x00007fad4024f24b in __GI___futex_abstimed_wait_cancelable64 (...) at ./nptl/futex-internal.c:139
+;; #3  0x00007fad40251930 in __pthread_cond_wait_common (...) at ./nptl/pthread_cond_wait.c:503
+;; #4  ___pthread_cond_wait (...) at ./nptl/pthread_cond_wait.c:618
+;; #5  0x000055d93a18a52f in finalizer_thread_wait () at gc-common.c:1481
+;; #6  0x000000b8006b0ca1 in ?? ()
+;; but then gdb has further problems with symbolizing Lisp (0x000000b8006b0ca1
+;; is seen to be SB-IMPL::FINALIZER-THREAD-START via SB-DI::CODE-HEADER-FROM-PC)
+;;
 #+(and x86-64 sb-thread)
 (progn
 ;; get_proc_name can slow down the unwind by 100x. Depending on whether you need
@@ -2081,33 +2110,95 @@ forms that explicitly control this kind of evaluation.")
     (2 :stopped)
     (3 :dead)))
 
+(defun thread-get-backtrace (thread-sap context)
+  (let* ((pc (sb-alien:alien-funcall
+              (sb-alien:extern-alien "os_context_pc" (function sb-alien:unsigned (* os-context-t)))
+              context))
+         (fp-addr (sb-alien:alien-funcall
+                   (sb-alien:extern-alien "os_context_fp_addr"
+                                          (function system-area-pointer (* os-context-t)))
+                   context))
+         (fp (sap-ref-word fp-addr 0))
+         (stack-start
+          (sap-ref-word thread-sap (ash sb-vm::thread-control-stack-start-slot sb-vm:word-shift)))
+         (stack-end
+          (sap-ref-word thread-sap (ash sb-vm::thread-control-stack-end-slot sb-vm:word-shift)))
+         (sp-addr (sb-alien:alien-funcall
+                   (sb-alien:extern-alien "os_context_sp_addr"
+                                          (function system-area-pointer (* os-context-t)))
+                   context))
+         (sp (sap-ref-word sp-addr 0))
+         (list))
+    (flet ((store-pc (pc &aux (code (sb-di::code-header-from-pc pc)))
+             (push (if code
+                       (cons code (sap- (int-sap pc) (code-instructions code)))
+                       pc)
+                   list)))
+      (store-pc pc)
+      (cond ((and (< stack-start fp stack-end) (> fp sp))
+             (loop
+              (let ((next-fp (sap-ref-word (int-sap fp) 0))
+                    (next-pc (sap-ref-word (int-sap fp) 8)))
+                (store-pc next-pc)
+                (unless (and (> next-fp fp) (< next-fp stack-end)) (return))
+                (setq fp next-fp))))
+            (t
+             (push :end list))))
+    (nreverse list)))
+
 (export 'backtrace-all-threads)
 (defun backtrace-all-threads (&aux (stream (make-string-output-stream))
                                    results)
-  (without-gcing
-      (when (sb-kernel::try-acquire-gc-lock
-             (sb-kernel::gc-stop-the-world))
+  (let ((tls-size (sb-alien:extern-alien "dynamic_values_bytes" (sb-alien:unsigned 32)))
+        (have-libunwind
+         (/= 0 (sb-alien:alien-funcall
+                (sb-alien:extern-alien "sbcl_have_libunwind" (function sb-alien:int))))))
+    (without-gcing
+      (when (sb-kernel::try-acquire-gc-lock (sb-kernel::gc-stop-the-world))
         ;; The GC's thread list is exactly what we want to traverse here
         ;; since that is the set of threads responding to the stop signal.
         (do ((vmthread (sb-alien:extern-alien "all_threads" system-area-pointer)
                        (sap-ref-sap vmthread (ash sb-vm::thread-next-slot sb-vm:word-shift))))
             ((zerop (sap-int vmthread)))
-          (let ((tls-size (sb-alien:extern-alien "dynamic_values_bytes" (sb-alien:unsigned 32)))
-                (thread-instance
-                 (sap-ref-lispobj vmthread
-                                  (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift))))
-            (cond ((eq thread-instance sb-thread:*current-thread*)
-                   (print-backtrace :stream stream))
-                  ((eq (vmthread-state vmthread) :stopped)
-                   (format stream "Backtrace for: ~S~%" thread-instance)
-                   (let* ((ici (sb-sys:sap-ref-lispobj
-                                vmthread (symbol-tls-index '*free-interrupt-context-index*)))
-                          (context-sap
-                           (sap-ref-sap vmthread
-                                        (+ tls-size (ash (1- ici) sb-vm:word-shift))))
-                          (context (sb-alien:sap-alien context-sap (* os-context-t))))
-                     (libunwind-backtrace thread-instance vmthread context stream)))))
-          (push (get-output-stream-string stream) results))
+          (when (eq (vmthread-state vmthread) :stopped)
+            (let* ((thread-instance
+                    (sap-ref-lispobj vmthread
+                                     (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift)))
+                   (ici (sb-sys:sap-ref-lispobj
+                         vmthread (symbol-tls-index '*free-interrupt-context-index*)))
+                   (context-sap
+                    (sap-ref-sap vmthread (+ tls-size (ash (1- ici) sb-vm:word-shift))))
+                   (context (sb-alien:sap-alien context-sap (* os-context-t))))
+              (aver (neq thread-instance sb-thread:*current-thread*))
+              (push
+               (cons thread-instance
+                     (cond (have-libunwind
+                            (libunwind-backtrace thread-instance vmthread context stream)
+                            (get-output-stream-string stream))
+                           (t
+                            (thread-get-backtrace vmthread context))))
+               results))))
         (sb-kernel::gc-start-the-world)))
-  results)
+    (flet ((symbolize (backtrace &aux (num 0))
+             (let ((*print-pretty* nil))
+               (dolist (loc backtrace (get-output-stream-string stream))
+                 (cond ((eq loc :end)
+                        (format stream "(no more frames)~%"))
+                       ((integerp loc)
+                        (format stream "~D: ~A~%" num
+                                (sb-di::foreign-function-backtrace-name (int-sap loc))))
+                       (t
+                        (format stream "~D: (~A)~%" num
+                                (sb-di:debug-fun-name
+                                 (sb-di::debug-fun-from-pc (car loc) (cdr loc) nil)))))
+                 (incf num)))))
+      (unless have-libunwind
+        (dolist (result results)
+          (rplacd result (symbolize (cdr result)))))))
+  ;; We don't need the text "Backtrace for" in any of the returned strings
+  ;; as the output of this function is an alist by thread.
+  (acons sb-thread:*current-thread*
+         (progn (print-backtrace :stream stream :print-thread nil :argument-limit 0)
+                (get-output-stream-string stream))
+         results))
 ) ; end PROGN

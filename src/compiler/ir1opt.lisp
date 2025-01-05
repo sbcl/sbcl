@@ -997,7 +997,7 @@
                                     penultimate))
                    (next-block (or (node-ends-block penultimate)
                                    (car (block-succ (node-block penultimate)))))
-                   (ctran (make-ctran :kind :block-start))
+                   (ctran (make-ctran :block-start))
                    (new-block (make-block-key :start ctran
                                               :pred (block-pred next-block)
                                               :succ (list next-block)))
@@ -1015,7 +1015,7 @@
               (push ref (lambda-refs lambda))
               (setf (combination-args call) (last all-args))
               (setf (lambda-vars original-lambda) (last all-vars)
-                    (lambda-tail-set lambda) (make-tail-set :funs (list lambda)))
+                    (lambda-tail-set lambda) (make-tail-set (list lambda)))
               (setf (bind-lambda bind) lambda)
               (loop for var in vars
                     do (setf (lambda-var-home var) lambda))
@@ -1077,9 +1077,7 @@
            (use-block (node-block use))
            (new-ctran (make-ctran))
            (new-lvar (make-lvar))
-           (new-node (make-if :test new-lvar
-                              :consequent cblock
-                              :alternative ablock))
+           (new-node (make-if new-lvar cblock ablock))
            (new-block (ctran-starts-block new-ctran)))
       (link-node-to-previous-ctran new-node new-ctran)
       (setf (lvar-dest new-lvar) new-node)
@@ -1149,6 +1147,8 @@
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
              (ir1-attributep (fun-info-attributes info) important-result)
+             ;; A constant might be propagated directly, disconnecting the lvar
+             (not (type-singleton-p (single-value-type (node-derived-type node))))
              (neq (combination-info node) :important-result-discarded))
     (when (lvar-fun-is (combination-fun node) '(adjust-array))
       (let ((type (lvar-type (car (combination-args node)))))
@@ -1664,29 +1664,30 @@
 (defun abort-ir1-transform (&rest args)
   (throw 'give-up-ir1-transform (values :aborted args)))
 
-(defvar *delayed-ir1-transforms*)
+;;; Wait for the next component-reoptimize-counter
+(defun delay-ir1-optimizer (node reason)
+  (let ((delayed (basic-combination-delay-to node))
+        (component *component-being-compiled*))
+    (aver (eq component (node-component node)))
+    (ecase reason
+      (:constraint
+       (let ((counter (component-reoptimize-counter component)))
+         (cond ((= delayed -1)
+                (push node *ir1-transforms-after-constraints*)
+                (setf (basic-combination-delay-to node) counter)
+                t)
+               ((= delayed counter)))))
+      (:ir1-phases
+       (let ((counter (component-phase-counter component)))
+         (cond ((= delayed -1)
+                (push node *ir1-transforms-after-ir1-phases*)
+                (setf (basic-combination-delay-to node) counter)
+                t)
+               ((= delayed counter))))))))
 
-(defun delay-ir1-transform (node &rest reasons)
-  (let ((assoc (assoc node *delayed-ir1-transforms*)))
-    (cond ((not assoc)
-           (setf *delayed-ir1-transforms*
-                 (acons node reasons *delayed-ir1-transforms*))
-           (throw 'give-up-ir1-transform :delayed))
-          ((cdr assoc)
-           (dolist (reason reasons)
-             (pushnew reason (cdr assoc)))
-           (throw 'give-up-ir1-transform :delayed)))))
-
-(defun delay-ir1-optimizer (node &rest reasons)
-  (let ((assoc (assoc node *delayed-ir1-transforms*)))
-    (cond ((not assoc)
-           (setf *delayed-ir1-transforms*
-                 (acons node reasons *delayed-ir1-transforms*))
-           t)
-          ((cdr assoc)
-           (dolist (reason reasons)
-             (pushnew reason (cdr assoc)))
-           t))))
+(defun delay-ir1-transform (node reason)
+  (when (delay-ir1-optimizer node reason)
+    (throw 'give-up-ir1-transform :delayed)))
 
 ;;; Poor man's catching and resignalling
 ;;; Implicit %GIVE-UP macrolet will resignal the give-up "condition"
@@ -1707,26 +1708,14 @@
                                                                 ,',args))))
               ,@gave-up-body)))))))
 
-;;; Clear any delayed transform with no reasons - these should have
-;;; been tried in the last pass. Then remove the reason from the
-;;; delayed transform reasons, and if any become empty then set
-;;; reoptimize flags for the node. Return true if any transforms are
-;;; to be retried.
-(defun retry-delayed-ir1-transforms (reason)
-  (setf *delayed-ir1-transforms*
-        (remove-if-not #'cdr *delayed-ir1-transforms*))
+(defun retry-delayed-ir1-transforms (nodes)
   (let ((reoptimize nil))
-    (dolist (assoc *delayed-ir1-transforms*)
-      (let ((reasons (remove reason (cdr assoc))))
-        (setf (cdr assoc) reasons)
-        (unless reasons
-          (let ((node (car assoc)))
-            (unless (node-deleted node)
-              (setf reoptimize t)
-              (setf (node-reoptimize node) t)
-              (let ((block (node-block node)))
-                (setf (block-reoptimize block) t)
-                (reoptimize-component (block-component block) :maybe)))))))
+    (dolist (node nodes)
+      (unless (node-deleted node)
+        (setf reoptimize t)
+        (setf (node-reoptimize node) t)
+        (let ((block (node-block node)))
+          (setf (block-reoptimize block) t))))
     reoptimize))
 
 ;;; Take the lambda-expression RES, IR1 convert it in the proper
@@ -1993,7 +1982,7 @@
                 (and (cdr refs)
                      (eq :declared (leaf-where-from leaf))
                      (type-needs-conservation-p var-type)))
-      (let ((int (type-approx-intersection2 var-type type)))
+      (let ((int (type-intersection var-type type)))
         ;; Can't use type/=, which gives up on hairy types.
         (unless (type= int var-type)
           (setf (leaf-type leaf) int)
@@ -2038,8 +2027,8 @@
                  (setf this-high (car this-high)))
                (setf low  (sb-xc:min this-low  (or low  this-low))
                      high (sb-xc:max this-high (or high this-high)))))))
-        ((numeric-range-type-p type)
-         (numeric-range-to-numeric-type type))
+        ((typep type 'numeric-union-type)
+         (sb-kernel::weaken-numeric-union  type))
         (t
          type)))
 
@@ -2211,36 +2200,50 @@
   (let ((combination (lvar-uses (set-value set))))
     (when (and (combination-p combination)
                (eq (combination-kind combination) :known))
-      (let* ((args (combination-args combination))
-             (var-args
-               (loop for arg in args
-                     for arg-var = (lvar-lambda-var (principal-lvar arg))
-                     when (eq arg-var var)
-                     collect arg)))
-        (when var-args
-          (labels ((derive (type)
-                     (single-value-type
-                      (or
-                       (combination-derive-type-for-arg-types combination
-                                                              (loop for arg in args
-                                                                    collect (if (memq arg var-args)
-                                                                                type
-                                                                                arg)))
-                       (return-from set-type-of-combination))))
-                   (converges-p (initial-type)
-                     (let ((derived (derive initial-type)))
-                       (when derived
-                         ;; Does it converge to the same type again?
-                         (let* ((union (type-union derived initial-type))
-                                (again-derived (derive union)))
-                           (when (type= derived again-derived)
-                             union))))))
-            ;; Some functions preserve bounds, like LOGIOR
-            (or (converges-p initial-type)
-                ;; remove bounds or the types won't converge
-                (let ((simple (simplify-numeric-type initial-type)))
-                  (unless (eq simple initial-type)
-                    (converges-p simple))))))))))
+      (let* ((info (combination-fun-info combination))
+             (deriver (and info
+                           (fun-info-derive-type info)))
+             (args (combination-args combination))
+             (var-args))
+        (when deriver
+          (map-combination-args-and-types
+           (lambda (arg type lvars &optional annotation)
+             (declare (ignore lvars annotation))
+             (let ((arg-var (or (lvar-lambda-var arg)
+                                (let ((use (lvar-uses arg)))
+                                  (and (cast-p use)
+                                       (lvar-lambda-var (cast-value use)))))))
+               (when (eq arg-var var)
+                 (setf initial-type
+                       ;; Type derivers expect the right types
+                       (type-intersection initial-type type))
+                 (push arg var-args))))
+           combination)
+          (when (and var-args
+                     (neq initial-type *empty-type*))
+            (labels ((derive (type)
+                       (single-value-type
+                        (or
+                         (combination-derive-type-for-arg-types combination
+                                                                (loop for arg in args
+                                                                      collect (if (memq arg var-args)
+                                                                                  type
+                                                                                  arg)))
+                         (return-from set-type-of-combination))))
+                     (converges-p (initial-type)
+                       (let ((derived (derive initial-type)))
+                         (when derived
+                           ;; Does it converge to the same type again?
+                           (let* ((union (type-union derived initial-type))
+                                  (again-derived (derive union)))
+                             (when (type= derived again-derived)
+                               union))))))
+              ;; Some functions preserve bounds, like LOGIOR
+              (or (converges-p initial-type)
+                  ;; remove bounds or the types won't converge
+                  (let ((simple (simplify-numeric-type initial-type)))
+                    (unless (eq simple initial-type)
+                      (converges-p simple)))))))))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
 ;;; the union of the INITIAL-TYPE and the types of all the set
@@ -2259,7 +2262,6 @@
             (when (and (node-reoptimize set)
                        (not (node-to-be-deleted-p set)))
               (let ((old-type (node-derived-type set)))
-                (set-type-of-combination var set initial-type)
                 (unless (values-subtypep old-type type)
                   (derive-node-type set (make-single-value-type type))))
               (setf (node-reoptimize set) nil)))))
@@ -2943,7 +2945,9 @@
                         (and (ref-leaf use)
                              (constant-p (ref-leaf use))
                              (proper-list-p (constant-value (ref-leaf use))))))
-                     (almost-immediately-used-p list use))))
+                     (almost-immediately-used-p list use
+                                                ;; Nothing should be pushed onto the stack in between
+                                                :no-multiple-value-lvars t))))
              (and (listp use)
                   (every #'use-good-p use)))
            (flet ((transform (use)
@@ -3069,10 +3073,7 @@
                      (link-blocks (node-block use) next-block)
                      ;; At least one use is good, downgrade any possible
                      ;; type conflicts to style warnings.
-                     (setf (cast-silent-conflict cast)
-                           (if (cast-mismatch-from-inlined-p cast use)
-                               t
-                               :style-warning))
+                     (setf (cast-silent-conflict cast) :style-warning)
                      (when (and (return-p dest)
                                 (basic-combination-p use)
                                 (eq (basic-combination-kind use) :local))
@@ -3100,7 +3101,27 @@
                     (context (cast-context cast))
                     (context (if (local-call-context-p context)
                                  (local-call-context-var context)
-                                 context)))
+                                 context))
+                    (lvar (node-lvar cast))
+                    (bad-type value-type)
+                    bad-uses)
+               ;; Is the mismatch coming from some inlined function which has good uses?
+               (when (and lvar
+                          (eq (cast-silent-conflict cast) :style-warning)
+                          (block common
+                            (do-uses (bad-use value)
+                              (do-uses (good-use lvar)
+                                (unless (eq good-use cast)
+                                  (let ((common (common-inline-point bad-use good-use)))
+                                    (unless (and common
+                                                 (cast-mismatch-from-inlined-p cast common))
+                                      (push bad-use bad-uses))))))
+                            t))
+                 (cond (bad-uses
+                        (setf detail (lvar-uses-all-sources bad-uses)
+                              bad-type (reduce #'values-type-union bad-uses :key #'node-derived-type)))
+                       (t
+                        (setf (cast-silent-conflict cast) t))))
                (when (or (not (cast-silent-conflict cast))
                          (and (eq (cast-silent-conflict cast) :style-warning)
                               (not (cast-single-value-p cast))
@@ -3110,9 +3131,9 @@
                   (if (cast-single-value-p cast)
                       (lambda (dummy) `(list ,dummy))
                       (lambda (dummy) `(multiple-value-call #'list ,dummy)))))
+
                (filter-lvar
                 (cast-value cast)
-                ;; FIXME: Derived type.
                 (if (cast-silent-conflict cast)
                     (lambda (dummy)
                       (let ((dummy-sym (gensym)))
@@ -3120,7 +3141,7 @@
                            ,@(and (eq (cast-silent-conflict cast) :style-warning)
                                   `((%compile-time-type-style-warn ,dummy-sym
                                                                    ',(type-specifier atype)
-                                                                   ',(type-specifier value-type)
+                                                                   ',(type-specifier bad-type)
                                                                    ',detail
                                                                    ',(compile-time-type-error-context source-form)
                                                                    ',context)))

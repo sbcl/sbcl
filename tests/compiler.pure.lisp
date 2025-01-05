@@ -3556,7 +3556,8 @@
                             t)
                           (bar (x)
                             (typep x '(satisfies local-not-global-bug))))
-                   (bar arg))))))
+                   (bar arg)))
+              :allow-style-warnings t)))
     (assert (eq 'local-not-global-bug
                 (handler-case
                     (funcall fun 42)

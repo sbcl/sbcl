@@ -398,6 +398,10 @@
 
   (values))
 
+(declaim (inline lvar-single-value-p))
+(defun lvar-single-value-p (lvar)
+  (or (not lvar) (%lvar-single-value-p lvar)))
+
 ;;; Return true if LVAR destination is executed immediately after
 ;;; NODE. Cleanups are ignored.
 (defun immediately-used-p (lvar node &optional single-predecessor)
@@ -418,7 +422,8 @@
 ;;;
 ;;; Uninteresting nodes are nodes in the same block which are either
 ;;; REFs, ENCLOSEs, or external CASTs to the same destination.
-(defun almost-immediately-used-p (lvar node &key flushable)
+(defun almost-immediately-used-p (lvar node &key flushable
+                                                 no-multiple-value-lvars)
   (declare (type lvar lvar)
            (type node node))
   (unless (bind-p node)
@@ -433,35 +438,41 @@
               (setf node (ctran-next ctran))
               (if (eq node dest)
                   (return-from almost-immediately-used-p t)
-                  (typecase node
-                    (ref
-                     (go :next))
-                    (cast
-                     (when (or (and (memq (cast-type-check node) '(:external nil))
-                                    (eq dest (node-dest node)))
-                               (and flushable
-                                    (not (contains-hairy-type-p (cast-type-to-check node))))
-                               ;; If the types do not match then this
-                               ;; cast is not related to the LVAR and
-                               ;; wouldn't be affected if it's
-                               ;; executed out of order.
-                               (multiple-value-bind (res true)
-                                   (values-subtypep (node-derived-type node)
-                                                    (lvar-derived-type lvar))
-                                 (and (not res)
-                                      true)))
-                       (go :next)))
-                    (combination
-                     (when (and flushable
-                                (flushable-combination-p node))
+                  (let ((node-lvar (and (valued-node-p node)
+                                        (node-lvar node))))
+                    (when (and no-multiple-value-lvars
+                               node-lvar
+                               (not (lvar-single-value-p node-lvar)))
+                      (return-from almost-immediately-used-p))
+                    (typecase node
+                      (ref
                        (go :next))
-                     (let (fun)
-                       (when (and (eq (combination-kind node) :local)
-                                  (functional-kind-eq (setf fun (combination-lambda node)) let))
-                         (setf node (lambda-bind fun))
-                         (go :next))))
-                    ((or enclose entry)
-                     (go :next)))))
+                      (cast
+                       (when (or (and (memq (cast-type-check node) '(:external nil))
+                                      (eq dest (node-dest node)))
+                                 (and flushable
+                                      (not (contains-hairy-type-p (cast-type-to-check node))))
+                                 ;; If the types do not match then this
+                                 ;; cast is not related to the LVAR and
+                                 ;; wouldn't be affected if it's
+                                 ;; executed out of order.
+                                 (multiple-value-bind (res true)
+                                     (values-subtypep (node-derived-type node)
+                                                      (lvar-derived-type lvar))
+                                   (and (not res)
+                                        true)))
+                         (go :next)))
+                      (combination
+                       (when (and flushable
+                                  (flushable-combination-p node))
+                         (go :next))
+                       (let (fun)
+                         (when (and (eq (combination-kind node) :local)
+                                    (functional-kind-eq (setf fun (combination-lambda node)) let))
+                           (setf node (lambda-bind fun))
+                           (go :next))))
+                      ((or enclose entry)
+                       (go :next))))))
              (t
               ;; Loops shouldn't cause a problem, either it will
               ;; encounter a not "uninteresting" node, or the destination
@@ -652,7 +663,7 @@
             (find-dominators component))
           (dominates-p block1 block2)))))
 
-(defun set-slot-old-p (node nth-value)
+(defun set-slot-old-p (node nth-object nth-value)
   (flet ((pseudo-static-value-p (lvar)
            (block nil
              (map-all-uses
@@ -681,7 +692,7 @@
            (let ((args (combination-args node)))
              (when (lvar-fun-is (combination-fun node) '(%%primitive))
                (pop args))
-             (let* ((object-lvar (first args))
+             (let* ((object-lvar (nth nth-object args))
                     (value-lvar (nth nth-value args))
                     (allocator (principal-lvar-ref-use object-lvar t)))
                (labels ((born-before-p (node)
@@ -1092,8 +1103,7 @@
 (defun insert-dynamic-extent (call)
   (let* ((dynamic-extent (with-ir1-environment-from-node call
                            (make-dynamic-extent)))
-         (cleanup (make-cleanup :kind :dynamic-extent
-                                :mess-up dynamic-extent)))
+         (cleanup (make-cleanup :dynamic-extent dynamic-extent)))
     (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
     (insert-node-before call dynamic-extent)
     (setf (node-lexenv call)
@@ -1259,6 +1269,19 @@
                                       (node-source-path use)))))
         (list (node-source-form use)))))
 
+(defun lvar-uses-all-sources (uses)
+  (if (cdr uses)
+      (let ((forms  '())
+            (path   (node-source-path (first uses))))
+        (dolist (use uses (cons (if (find 'original-source-start path)
+                                    (find-original-source path)
+                                    "a hairy form")
+                                forms))
+          (pushnew (node-source-form use) forms)
+          (setf path (common-suffix path
+                                    (node-source-path use)))))
+      (list (node-source-form (car uses)))))
+
 ;;; Return the LAMBDA that is CTRAN's home, or NIL if there is none.
 (declaim (ftype (sfunction (ctran) (or clambda null))
                 ctran-home-lambda-or-null))
@@ -1288,9 +1311,6 @@
 (defun cast-single-value-p (cast)
   (not (values-type-p (cast-asserted-type cast))))
 
-(declaim (inline lvar-single-value-p))
-(defun lvar-single-value-p (lvar)
-  (or (not lvar) (%lvar-single-value-p lvar)))
 (defun %lvar-single-value-p (lvar)
   (let ((dest (lvar-dest lvar)))
     (typecase dest
@@ -1580,11 +1600,11 @@
         (ref-con (single-ref-block-p con))
         (ref-test (lvar-uses test)))
     (and (ref-p ref-test)
-         ref-alt
          ref-con
+         ref-alt
          (equal (block-succ alt) (block-succ con))
          (eq (ref-lvar ref-alt) (ref-lvar ref-con))
-         (eq (ref-leaf ref-con) (ref-leaf ref-test))
+         (same-ref-p ref-test ref-con)
          (and (constant-p (ref-leaf ref-alt))
               (null (constant-value (ref-leaf ref-alt))))
          (eq (node-enclosing-cleanup ref-alt)
@@ -2622,10 +2642,18 @@ is :ANY, the function name is not checked."
         (y-use (principal-lvar-use y)))
     (when (and (ref-p x-use)
                (ref-p y-use)
-               (eq (ref-leaf x-use) (ref-leaf y-use))
-               (or (constant-reference-p x-use)
-                   (refs-unchanged-p x-use y-use)))
+               (same-ref-p x-use y-use))
       y-use)))
+
+(defun same-ref-p (x y)
+  (declare (type ref x y))
+  (let ((leaf (ref-leaf x)))
+   (and (eq leaf (ref-leaf y))
+        (or (constant-reference-p x)
+            (refs-unchanged-p x y)
+            (and (lambda-var-p leaf)
+                 (setf (lambda-var-compute-same-refs leaf) t)
+                 nil)))))
 
 (defun refs-unchanged-p (ref1 ref2)
   (let ((same (ref-same-refs ref1)))
@@ -2968,11 +2996,11 @@ is :ANY, the function name is not checked."
                     (make-lvar-function-annotation
                      :type type
                      :context (shiftf context nil))))
-  (%make-cast :asserted-type type
-              :type-to-check (maybe-weaken-check type policy)
-              :value value
-              :derived-type (coerce-to-values type)
-              :context context))
+  (%make-cast type
+              (maybe-weaken-check type policy)
+              value
+              (coerce-to-values type)
+              context))
 
 (defun note-single-valuified-lvar (lvar)
   (declare (type (or lvar null) lvar))
@@ -3039,7 +3067,9 @@ is :ANY, the function name is not checked."
                               (fun-lexically-notinline-p name (node-lexenv use))))
                     (member name fun-names :test #'eq))))
          (or (not arg-count)
-             (= arg-count (length (combination-args use)))))))
+             (let ((length (length (combination-args use))))
+               (or (= arg-count length)
+                   (values nil length)))))))
 
 ;;; In (a (b lvar)) (lvar-matches-calls lvar '(b a)) would return T
 (defun lvar-matches-calls (lvar dest-fun-names)
@@ -3563,9 +3593,20 @@ is :ANY, the function name is not checked."
                   (eq pkg *cl-package*))))
            (t t)))))
 
-(defun cast-mismatch-from-inlined-p (cast node)
-  (let* ((path (node-source-path node))
-         (transformed (memq 'transformed path))
+(defun common-inline-point (node1 node2)
+  (let ((path1 (member-if (lambda (x)
+                            (memq x '(inlined transformed)))
+                          (node-source-path node1)))
+        (path2 (member-if (lambda (x)
+                            (memq x '(inlined transformed)))
+                          (node-source-path node2))))
+    (loop for path on path1
+          when (and (memq (car path) '(transformed inlined))
+                    (tailp path path2))
+          return path)))
+
+(defun cast-mismatch-from-inlined-p (cast path)
+  (let* ((transformed (memq 'transformed path))
          (inlined))
     (cond ((and transformed
                 (not (eq (memq 'transformed (node-source-path cast))
@@ -3587,12 +3628,13 @@ is :ANY, the function name is not checked."
          (deriver (and info
                        (fun-info-derive-type info))))
     (when deriver
-      (let ((mock (copy-structure combination)))
-        (setf (combination-args mock)
-              (loop for type in types
-                    collect (if (lvar-p type)
-                                type
-                                (let ((lvar (make-lvar)))
-                                  (setf (lvar-%derived-type lvar) type)
-                                  lvar))))
-        (funcall deriver mock)))))
+      (handler-bind ((warning #'muffle-warning))
+        (let ((mock (copy-structure combination)))
+          (setf (combination-args mock)
+                (loop for type in types
+                      collect (if (lvar-p type)
+                                  type
+                                  (let ((lvar (make-lvar)))
+                                    (setf (lvar-%derived-type lvar) type)
+                                    lvar))))
+          (funcall deriver mock))))))

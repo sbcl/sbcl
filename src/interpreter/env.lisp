@@ -1072,9 +1072,7 @@
         (payload (env-payload env)))
     (flet ((specialize (binding) ; = make a global var, not make less general
              (let ((sym (binding-symbol binding)))
-               (cons sym (sb-c::make-global-var :%source-name sym
-                                                :kind :special
-                                                :where-from :declared))))
+               (cons sym (sb-c::make-global-var :special sym :declared))))
            (macroize (name thing) (list* name 'sb-sys:macro thing))
            (fname (f) (second (fun-name f))))
       (multiple-value-bind (vars funs)
@@ -1095,7 +1093,7 @@
                          (macroize sym `(svref (load-time-value ,payload) ,i)))
                         (t
                          (let ((leaf (sb-c::make-lambda-var
-                                      :%source-name sym
+                                      sym
                                       :type (or (cdr binding) *universal-type*))))
                            (setf (gethash binding var-map) leaf)
                            (cons sym leaf)))))))
@@ -1148,8 +1146,8 @@
                      (null
                       (let ((defined-fun
                              (sb-c::make-defined-fun
-                              :%source-name fname
-                              :type (sb-int:global-ftype fname))))
+                              fname
+                              (sb-int:global-ftype fname))))
                         (setf (sb-c::defined-fun-inlinep defined-fun) inlinep)
                         (push (cons fname defined-fun) funs))))))))
             (ftype
@@ -1176,9 +1174,8 @@
                              (typecase thing
                                (cons x) ; symbol-macro
                                (sb-c::lambda-var thing)
-                               (sb-c::global-var (sb-c::make-lambda-var
-                                                  :specvar thing
-                                                  :%source-name (car x))))))
+                               (sb-c::global-var (sb-c::make-lambda-var (car x)
+                                                                        :specvar thing)))))
                          vars)
                         ;; And surely this is wrong...
                         funs)))))))

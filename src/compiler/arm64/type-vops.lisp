@@ -460,7 +460,7 @@
     NOT-TARGET))
 
 (define-vop (un/signed-byte-64-p-move-to-word signed-byte-64-p)
-  ;; Ideally, this would a single register but the rest of the stuff
+  ;; Ideally, this would use a single register but the rest of the stuff
   ;; depends on their storage class.
   (:results (rs :scs (signed-reg))
             (ru :scs (unsigned-reg)))
@@ -497,10 +497,11 @@
         (move ru rs)
         ;; If the second digit is zero then this is an unsigned-byte-64
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        (cond ((and (not not-p) not-p-unsigned)
+        (cond (not-p-unsigned
                (inst cbnz temp target-unsigned))
               (t
-               (inst cbz temp target-unsigned)))))
+               (inst cbz temp target-unsigned)))
+        (inst b unsigned-fall-through)))
     not-target))
 
 (define-vop (fixnump/unsigned)

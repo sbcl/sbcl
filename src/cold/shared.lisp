@@ -877,10 +877,10 @@
   #+unix "tools-for-build/perfecthash"
   #+win32 "tools-for-build/perfecthash.exe")
 
-#+sbcl (when (and (probe-file (perfect-hash-generator-program))
-                  (find-symbol "RUN-PROGRAM" "SB-EXT"))
-         (pushnew :use-host-hash-generator cl:*features*)
-         (setq *perfect-hash-generator-mode* :RECORD))
+#+(or sbcl ecl ccl clisp cmucl)
+(when (probe-file (perfect-hash-generator-program))
+  (pushnew :use-host-hash-generator cl:*features*)
+  (setq *perfect-hash-generator-mode* :RECORD))
 
 ;;; I want this to work using the host-native readtable if sb-cold:*xc-readtable*
 ;;; isn't established. The caller should bind *READTABLE* to ours if reading
@@ -922,58 +922,121 @@
           (error "hash generator duplicates: ~D" errors))))))
 (compile 'preload-perfect-hash-generator)
 
+#+use-host-hash-generator
+(defun run-perfecthash (input)
+  (with-output-to-string (result)
+    (flet (#+sbcl
+           (launch ()
+             (let ((process (sb-ext:run-program (perfect-hash-generator-program)
+                                                '()
+                                                :input :stream :output :stream
+                                                :wait nil
+                                                :allow-other-keys t
+                                                :use-posix-spawn t)))
+               (values (sb-ext:process-output process)
+                       (sb-ext:process-input process)
+                       process)))
+           #+sbcl
+           (wait (process)
+             (sb-ext:process-wait process)
+             (sb-ext:process-close process)
+             (unless (zerop (sb-ext:process-exit-code process))
+               (error "Error running perfecthash: exit code ~D"
+                      (sb-ext:process-exit-code process))))
+           #+cmu
+           (launch ()
+             (let ((process (ext:run-program (perfect-hash-generator-program)
+                                             '()
+                                             :input :stream :output :stream
+                                             :wait nil)))
+               (values (ext:process-output process)
+                       (ext:process-input process)
+                       process)))
+           #+cmu
+           (wait (process)
+             (ext:process-wait process)
+             (ext:process-close process)
+             (unless (zerop (ext:process-exit-code process))
+               (error "Error running perfecthash: exit code ~D"
+                      (ext:process-exit-code process))))
+           #+clisp
+           (launch ()
+             (multiple-value-bind (io-stream input-stream output-stream)
+                 (ext:run-program (perfect-hash-generator-program)
+                                  :input :stream :output :stream)
+               (declare (ignore io-stream))
+               (values input-stream output-stream nil)))
+           #+(or clisp ccl)
+           (wait (process)
+             process)
+           #+ecl
+           (launch ()
+             (let ((process
+                     (nth-value 2 (ext:run-program (perfect-hash-generator-program)
+                                                   ()
+                                                   :input :stream :output :stream
+                                                   :wait nil))))
+               (values (ext:external-process-output process)
+                       (ext:external-process-input process)
+                       process)))
+           #+ecl
+           (wait (process)
+             (multiple-value-bind (status code) (ext:external-process-wait process t)
+               (unless (and (eq status :exited)
+                            (zerop code))
+                 (error "Error running perfecthash: exit code ~D" code))))
+           #+ccl
+           (launch ()
+             (let ((process
+                     (ccl:run-program (perfect-hash-generator-program)
+                                      ()
+                                      :wait nil
+                                      :input :stream :output :stream)))
+               (values (ccl:external-process-output-stream process)
+                       (ccl:external-process-input-stream process)
+                       process))))
+      (multiple-value-bind (input-stream output-stream process) (launch)
+        (format output-stream "~{~X~%~}" (coerce input 'list))
+        (close output-stream)
+        (loop for char = (read-char input-stream nil)
+              while char
+              do (write-char char result))
+        (close input-stream)
+        (wait process)))))
+
+
 (defun emulate-generate-perfect-hash-sexpr (array identifier digest)
   (declare #-use-host-hash-generator (ignore identifier))
-  (let (computed)
-    (declare (ignorable computed))
-    ;; Entries are written to disk with hashes sorted in ascending order so that
-    ;; comparing as sets can be done using EQUALP.
-    ;; Sort nondestructively in case something else looks at the value as supplied.
-    (let* ((canonical-array (sort (copy-seq array) #'<))
-           (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
-                         :test #'equalp)))
-      (when match
-        (return-from emulate-generate-perfect-hash-sexpr (cddr match)))
-      (ecase *perfect-hash-generator-mode*
-        (:playback
-         (error "perfect hash file is missing a needed entry for ~x" array))
-        (:record
-         ;; This will only display anything when we didn't have the data,
-         ;; so it's actually not too "noisy" in a normal build.
-         #+use-host-hash-generator
-         (let ((output (make-string-output-stream))
-               (process
-                (sb-ext:run-program (perfect-hash-generator-program)
-                                    '("perfecthash")
-                                    ;; win32 misbehaves with :input string-stream
-                                    :input :stream :output :stream
-                                    :wait nil
-                                    :allow-other-keys t
-                                    :use-posix-spawn t)))
-           (format (sb-ext:process-input process) "~{~X~%~}" (coerce array 'list))
-           (close (sb-ext:process-input process))
-           (loop for char = (read-char (sb-ext:process-output process) nil)
-                 while char
-                 do (write-char char output))
-           (sb-ext:process-wait process)
-           (sb-ext:process-close process)
-           (unless (zerop (sb-ext:process-exit-code process))
-             (error "Error running perfecthash: exit code ~D"
-                    (sb-ext:process-exit-code process)))
-           (let* ((string (get-output-stream-string output))
-                  ;; don't need the final newline, it looks un-lispy in the file
-                  (l (length string)))
-             (assert (char= (char string (1- l)) #\newline))
-             (setq computed (subseq string 0 (1- l))))
-           (let ((*print-right-margin* 200) (*print-level* nil) (*print-length* nil))
-             (format t "~&Recording perfect hash:~%~S~%~X~%"
-                     identifier array))
-           (setf *perfect-hash-generator-memo*
-                 (nconc *perfect-hash-generator-memo*
-                        (list (list* (cons digest canonical-array)
-                                     identifier
-                                     computed))))
-           computed))))))
+  ;; Entries are written to disk with hashes sorted in ascending order so that
+  ;; comparing as sets can be done using EQUALP.
+  ;; Sort nondestructively in case something else looks at the value as supplied.
+  (let* ((canonical-array (sort (copy-seq array) #'<))
+         (match (assoc (cons digest canonical-array) *perfect-hash-generator-memo*
+                       :test #'equalp)))
+    (when match
+      (return-from emulate-generate-perfect-hash-sexpr (cddr match)))
+    (ecase *perfect-hash-generator-mode*
+      (:playback
+       (error "perfect hash file is missing a needed entry for ~x" array))
+      #+use-host-hash-generator
+      (:record
+       ;; This will only display anything when we didn't have the data,
+       ;; so it's actually not too "noisy" in a normal build.
+       (let ((string (run-perfecthash array))
+             computed)
+         (let* (;; don't need the final newline, it looks un-lispy in the file
+                (l (length string)))
+           (assert (char= (char string (1- l)) #\newline))
+           (setq computed (subseq string 0 (1- l))))
+         (let ((*print-right-margin* 200) (*print-level* nil) (*print-length* nil))
+           (format t "~&Recording perfect hash:~%~S~%~X~%"
+                   identifier array))
+         (setf *perfect-hash-generator-memo*
+               (nconc *perfect-hash-generator-memo*
+                      (list (list* (cons digest canonical-array)
+                                   identifier
+                                   computed))))
+         computed)))))
 
 ;;; Unlike xfloat-math which expresses universal truths, the perfect-hash file
 ;;; expresses facts about the behavior of a _particular_ SBCL revision.
@@ -1066,7 +1129,7 @@
       (let ((array (cdar entry)))
         (assert (not (gethash array uniqueness-checker)))
         (setf (gethash array uniqueness-checker) t))))
-  #+use-host-hash-generator
+  #+(and use-host-hash-generator sbcl)
   (when (eq *perfect-hash-generator-mode* :record)
     (save-perfect-hashfuns (perfect-hash-generator-journal :output)
                            *perfect-hash-generator-memo*))

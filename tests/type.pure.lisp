@@ -233,11 +233,11 @@
   (assert-tri-eq t   t (subtypep 'nil '(complex nil)))
   (assert-tri-eq t   t (subtypep '(complex nil) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (eql 0))))
-  (assert-tri-eq t   t (subtypep '(complex (eql 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (eql 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (integer 0 0))))
-  (assert-tri-eq t   t (subtypep '(complex (integer 0 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (integer 0 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'nil '(complex (rational 0 0))))
-  (assert-tri-eq t   t (subtypep '(complex (rational 0 0)) 'nil))
+  (assert-tri-eq nil t (subtypep '(complex (rational 0 0)) 'nil))
   (assert-tri-eq t   t (subtypep 'complex '(complex real)))
   (assert-tri-eq t   t (subtypep '(complex real) 'complex))
   (assert-tri-eq t   t (subtypep '(complex (eql 1)) '(complex (member 1 2))))
@@ -581,9 +581,6 @@
                         (sb-kernel:specifier-type '(not bad)))
                  sb-kernel:parse-unknown-type 2)) ; expect 2 signals
 
-(with-test (:name (typep :complex-integer))
-  (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
-
 (with-test (:name :typep-satisfies-boolean)
   (assert (eq (eval '(typep 1 '(satisfies eval))) t)))
 
@@ -595,8 +592,7 @@
           sb-kernel:type=
           sb-kernel:find-classoid
           sb-kernel:make-numeric-type
-          sb-kernel::numeric-types-adjacent
-          sb-kernel::numeric-types-intersect
+          sb-kernel:types-equal-or-intersect
           sb-kernel:*empty-type*))
 
 (with-test (:name :partition-array-into-simple/hairy)
@@ -734,15 +730,13 @@
     (dolist (y '(-0s0 0s0))
       (let ((a (specifier-type `(single-float -10s0 ,x)))
             (b (specifier-type `(single-float ,y 20s0))))
-        (assert (numeric-types-intersect a b)))
+        (assert (types-equal-or-intersect a b)))
       (let ((a (specifier-type `(single-float -10s0 (,x))))
             (b (specifier-type `(single-float ,y 20s0))))
-        (assert (not (numeric-types-intersect a b)))
-        (assert (numeric-types-adjacent a b)))
+        (assert (not (types-equal-or-intersect a b))))
       (let ((a (specifier-type `(single-float -10s0 ,x)))
             (b (specifier-type `(single-float (,y) 20s0))))
-        (assert (not (numeric-types-intersect a b)))
-        (assert (numeric-types-adjacent a b))))))
+        (assert (not (types-equal-or-intersect a b)))))))
 
 (with-test (:name :ctypep-function)
   (assert (not (sb-kernel:ctypep #'+ (eval '(sb-kernel:specifier-type '(function (list))))))))
@@ -902,7 +896,7 @@
    ((36757953510256822605) t)
    ((#C(1d0 1d0)) nil)
    ((#C(1 1)) t)
-   ((#C(1 #.(expt 2 300))) nil)))
+   ((#C(1 #.(expt 2 300))) t)))
 
 #+(or arm64 x86-64)
 (with-test (:name :structure-typep-fold)
@@ -1013,9 +1007,16 @@
   (assert (not (subtypep (opaque-identity '(function (&key (member t))))
                          (opaque-identity '(function (&key (eql t))))))))
 
-(with-test (:name :numeric-ranges)
-  (assert (sb-kernel:type=
-           (sb-kernel:type-union (sb-kernel:specifier-type '(or (integer * -1) (integer 11)))
-                                 (sb-kernel:specifier-type 'ratio))
-           (sb-kernel:type-difference (sb-kernel:specifier-type 'rational)
-                                      (sb-kernel:specifier-type '(integer 0 10))))))
+(with-test (:name :typep-rational-ratio)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p)
+         (typep p '(and (rational 1) (not integer))))
+    ((4/3) t)
+    ((-4/3) nil)
+    ((1) nil)
+    ((2) nil)))
+
+(with-test (:name :complex-type-of)
+  (assert (equal (type-of (opaque-identity #c(1 2)))
+                 '(complex rational))))

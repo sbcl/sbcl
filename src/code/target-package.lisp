@@ -2015,7 +2015,6 @@ PACKAGE."
   (%makunbound '*!initial-symbols*))      ; (so that it gets GCed)
 
 ;;; support for WITH-PACKAGE-ITERATOR
-
 (defun package-iter-step (iter)
   (declare (optimize speed))
   ;; Keeping in mind that (DO-SYMBOLS (s p) (EXPORT s p)) is a prevalent idiom among users,

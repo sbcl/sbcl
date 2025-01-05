@@ -2633,12 +2633,9 @@ register."
          (if (logbitp (1- n-word-bits) val)
              (logior val (ash -1 n-word-bits))
              val)))
-      (#.unsigned-reg-sc-number
+      ((#.unsigned-reg-sc-number #-(or x86 x86-64) #.non-descriptor-reg-sc-number)
        (with-escaped-value (val)
          val))
-      #-(or x86 x86-64)
-      (#.non-descriptor-reg-sc-number
-       (error "Local non-descriptor register access?"))
       #-(or x86 x86-64 arm64)
       (#.interior-reg-sc-number
        (error "Local interior register access?"))

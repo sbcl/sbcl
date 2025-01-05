@@ -645,126 +645,26 @@
                    :features faff-in-this-file)))))
     (values (nreverse results) freeform-bytes)))
 
-;; Setting this variable gives you a trace of fops as they are loaded and
-;; executed.
-(defvar *show-fops-p* nil)
-
-;;; Return byte, function, pushp, n-operands, arg1, arg2, arg3
-(defun decode-fop (fasl-input &aux (stream (%fasl-input-stream fasl-input)))
-  (with-fast-read-byte ((unsigned-byte 8) stream)
-    (flet ((read-varint ()
-             (let ((accumulator 0)
-                   (shift 0))
-               (declare (fixnum shift) (type word accumulator))
-               (loop
-                 (let ((octet (fast-read-byte)))
-                   (setq accumulator (logior accumulator (ash (logand octet #x7F) shift)))
-                   (incf shift 7)
-                   (unless (logbitp 7 octet) (return accumulator)))))))
-      (let ((byte (fast-read-byte)))
-        (if (< byte n-ordinary-fops)
-            (let ((n-operands (aref (car **fop-signatures**) byte)))
-              (values byte
-                      (svref **fop-funs** byte)
-                      (plusp (sbit (cdr **fop-signatures**) byte))
-                      n-operands
-                      (when (>= n-operands 1) (read-varint))
-                      (when (>= n-operands 2) (read-varint))
-                      (when (>= n-operands 3) (read-varint))))
-            (let* ((operand (logand byte #x7f))
-                   (nconses (logand operand #b1111)))
-              (aver (not (logtest #b1100000 operand)))
-              ;; Decode as per TERMINATE-[UN]DOTTED-LIST in src/compiler/dump
-              (values byte
-                      (if (logbitp 4 operand) #'fop-list* #'fop-list)
-                      t
-                      1
-                      (if (zerop nconses) (+ (read-varint) 16) nconses)
-                      nil
-                      nil)))))))
-
-(defstruct (fasl-group (:constructor !make-fasl-group (header-label)))
-  (header-label nil :read-only t)
-  (fun-names (sb-c::make-fun-name-hashset) :read-only t))
-
-(defvar *current-fasl-group*)
-;;;
-;;; a helper function for LOAD-AS-FASL
-;;;
-;;; Return true if we successfully load a group from the stream, or
-;;; NIL if EOF was encountered while trying to read from the stream.
-;;; Dispatch to the right function for each fop.
-(defun load-fasl-group (fasl-input)
-  (let ((stream (%fasl-input-stream fasl-input))
-        (header-label)
-        (trace *show-fops-p*))
-    (declare (inline !make-fasl-group))
-    (multiple-value-bind (results freeform-bytes) (check-fasl-header stream)
-      (unless results
-        (return-from load-fasl-group))
-      (let* ((signature
-              #.(sb-xc:make-array
-                 15
-                 :initial-contents
-                 ;; (see OPEN-FASL-OUTPUT in src/compiler/dump)
-                 (map 'list #'sb-xc:char-code "compiled from \"")))
-             (len 15) ; length of signature
-             (pos1 (search signature freeform-bytes))
-             (pos2 (and pos1 (position (char-code #\newline) freeform-bytes
-                                       :start (+ pos1 len)))))
-        (when (and pos1 pos2
-                   (= (aref freeform-bytes (1- pos2)) (char-code #\"))
-                   (loop for p from (+ pos1 len) below (1- pos2)
-                         always (standard-char-p (code-char (aref freeform-bytes p)))))
-          (setq header-label
-                (map 'string 'code-char
-                     (subseq freeform-bytes (+ pos1 len) (1- pos2)))))))
-    (let ((*current-fasl-group* (!make-fasl-group header-label)))
-      (catch 'fasl-group-end
-        (setf (svref (%fasl-input-table fasl-input) 0) 0)
-        (loop
-         (binding* ((pos (when trace (file-position stream)))
-                    ((byte function pushp n-operands arg1 arg2 arg3)
-                     (decode-fop fasl-input))
-                    (result
-                     (if (functionp function)
-                         (case n-operands
-                           (0 (funcall function fasl-input))
-                           (1 (funcall function fasl-input arg1))
-                           (2 (funcall function fasl-input arg1 arg2))
-                           (3 (funcall function fasl-input arg1 arg2 arg3)))
-                         (error "corrupt fasl file: FOP code #x~x" byte))))
-           (when pushp
-             (push-fop-stack result fasl-input))
-           (when trace
-             ;; show file pos prior to decoding the fop,
-             ;; table and stack ptrs *after* executing it
-             (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
-                     pos
-                     (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                     (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
-                     byte
-                     n-operands arg1 arg2 arg3)
-             (when (functionp function)
-               (format *trace-output* " ~35t~(~a~)" (%fun-name function))
-               (case (%fun-name function)
-                 (fop-push (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))
-                 (fop-word-integer (format *trace-output* " ~V,'0X" (* 2 sb-vm:n-word-bytes) result))
-                 (fop-byte-integer (format *trace-output* " ~2,'0X" result))
-                 (fop-integer (format *trace-output* " ~X" result)))))))))))
-
 (defun load-as-fasl (stream verbose print)
-  (when (zerop (file-length stream))
-    (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
+  ;; In general we issue too damn many I/O syscalls. This used to precheck for an empty fasl,
+  ;; via fstat() for no reason other than that the EOF condition would precede (thus suppress)
+  ;; MAYBE-ANNOUNCE-LOAD. To announce if and only if the file is non-empty, the announcement
+  ;; could be done in CHECK-FASL-HEADER, and we'd pass in a boolean flag saying whether this
+  ;; is the first iteration of the loop below, to announce exactly once per stream.
   (maybe-announce-load stream verbose)
-  (let ((fasl-input (make-fasl-input stream print)))
+  (let ((fasl-input (make-fasl-input stream print))
+        (empty t))
     (with-loader-package-names
       (unwind-protect
-           (loop while (load-fasl-group fasl-input))
+           (loop while (let ((success (load-fasl-group fasl-input)))
+                         (when success (setq empty nil))
+                         success))
         ;; Nuke the table and stack to avoid keeping garbage on
         ;; conservatively collected platforms.
         (nuke-fop-vector (%fasl-input-table fasl-input))
-        (nuke-fop-vector (%fasl-input-stack fasl-input)))))
+        (nuke-fop-vector (%fasl-input-stack fasl-input))))
+    (when empty
+      (error "attempt to load an empty FASL file:~%  ~S" (namestring stream))))
   t)
 
 
@@ -1342,6 +1242,133 @@
         (#x6f defstruct-description)
         (#x70 defstruct-slot-description)))
 
+;;; Return function, pushp, n-operands
+;;; OPERANDS array is filled in with the FOP code and up to 3 numeric values.
+;;; The extreme desire for speed in this function is due to it appearing
+;;; exceedingly high in a profile for such a simple thing where the LOAD is
+;;; of a fasl that overall takes about 2 seconds to load.
+(declaim (inline !decode-fop))
+(defun !decode-fop (fasl-input operands
+                   &aux (stream (%fasl-input-stream
+                                 (truly-the fasl-input fasl-input)))
+                        (operands (truly-the (simple-array fixnum (4)) operands))
+                        (operand-count-v
+                         (truly-the (simple-array (mod 4) (#.n-ordinary-fops))
+                                    (load-time-value (car **fop-signatures**))))
+                        (stackp-v
+                         (truly-the (simple-bit-vector #.n-ordinary-fops)
+                                    (load-time-value (cdr **fop-signatures**))))
+                        (func-v
+                         (truly-the (simple-vector #.n-ordinary-fops)
+                                    (load-time-value **fop-funs**))))
+  (with-fast-read-byte ((unsigned-byte 8) stream)
+    (flet ((read-varint ()
+             #-sb-xc-host (declare (optimize (sb-c::type-check 0)))
+             (let ((accumulator 0)
+                   (shift 0))
+               (declare (type (mod #.sb-vm:n-word-bits) shift)
+                        (type word accumulator))
+               (loop
+                 (let ((octet (fast-read-byte)))
+                   (setq accumulator (logior accumulator
+                                             (logand (ash (logand octet #x7F) shift)
+                                                     most-positive-word)))
+                   (unless (logbitp 7 octet) (return accumulator))
+                   (incf shift 7))))))
+      (let ((byte (fast-read-byte)))
+        (setf (aref operands 0) byte)
+        (if (< byte n-ordinary-fops)
+            (let ((n-operands (aref operand-count-v byte)))
+              (dotimes (i n-operands)
+                (setf (aref operands (1+ i)) (read-varint)))
+              (values (svref func-v byte) (plusp (sbit stackp-v byte)) n-operands))
+            (let* ((operand (logand byte #x7f))
+                   (nconses (logand operand #b1111)))
+              (aver (not (logtest #b1100000 operand)))
+              (setf (aref operands 1)
+                    (if (zerop nconses) (+ (read-varint) 16) nconses))
+              ;; Decode as per TERMINATE-[UN]DOTTED-LIST in src/compiler/dump
+              (values (if (logbitp 4 operand) #'fop-list* #'fop-list) t 1)))))))
+
+;; Setting this variable gives you a trace of fops as they are loaded and
+;; executed.
+(defvar *show-fops-p* nil)
+
+(defstruct (fasl-group (:constructor !make-fasl-group (header-label)))
+  (header-label nil :read-only t)
+  (fun-names (sb-c::make-fun-name-hashset) :read-only t))
+
+(defvar *current-fasl-group*)
+;;;
+;;; a helper function for LOAD-AS-FASL
+;;;
+;;; Return true if we successfully load a group from the stream, or
+;;; NIL if EOF was encountered while trying to read from the stream.
+;;; Dispatch to the right function for each fop.
+(defun load-fasl-group (fasl-input)
+  (let ((stream (%fasl-input-stream fasl-input))
+        (header-label)
+        (trace *show-fops-p*))
+    (declare (inline !make-fasl-group))
+    (multiple-value-bind (results freeform-bytes) (check-fasl-header stream)
+      (unless results
+        (return-from load-fasl-group))
+      (let* ((signature
+              #.(sb-xc:make-array
+                 15
+                 :initial-contents
+                 ;; (see OPEN-FASL-OUTPUT in src/compiler/dump)
+                 (map 'list #'sb-xc:char-code "compiled from \"")))
+             (len 15) ; length of signature
+             (pos1 (search signature freeform-bytes))
+             (pos2 (and pos1 (position (char-code #\newline) freeform-bytes
+                                       :start (+ pos1 len)))))
+        (when (and pos1 pos2
+                   (= (aref freeform-bytes (1- pos2)) (char-code #\"))
+                   (loop for p from (+ pos1 len) below (1- pos2)
+                         always (standard-char-p (code-char (aref freeform-bytes p)))))
+          (setq header-label
+                (map 'string 'code-char
+                     (subseq freeform-bytes (+ pos1 len) (1- pos2)))))))
+    (let ((*current-fasl-group* (!make-fasl-group header-label))
+          (operands (make-array 4 :element-type 'fixnum)))
+      (declare (dynamic-extent operands))
+      ;; 0th element of OPERANDS is the byte indicating the FOP.
+      ;; Next three elements are operands.
+      (symbol-macrolet ((byte (aref operands 0))
+                        (arg1 (aref operands 1))
+                        (arg2 (aref operands 2))
+                        (arg3 (aref operands 3)))
+      (catch 'fasl-group-end
+        (setf (svref (%fasl-input-table fasl-input) 0) 0)
+        (loop
+         (binding* ((pos (when trace (file-position stream)))
+                    ((function pushp n-operands) (!decode-fop fasl-input operands))
+                    (result
+                     (if (functionp function)
+                         (case n-operands
+                           (0 (funcall function fasl-input))
+                           (1 (funcall function fasl-input arg1))
+                           (2 (funcall function fasl-input arg1 arg2))
+                           (3 (funcall function fasl-input arg1 arg2 arg3)))
+                         (error "corrupt fasl file: FOP code #x~x" byte))))
+           (when pushp
+             (push-fop-stack result fasl-input))
+           (when trace
+             ;; show file pos prior to decoding the fop,
+             ;; table and stack ptrs *after* executing it
+             (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
+                     pos
+                     (svref (%fasl-input-table fasl-input) 0) ; table pointer
+                     (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
+                     byte n-operands arg1 arg2 arg3)
+             (when (functionp function)
+               (format *trace-output* " ~35t~(~a~)" (%fun-name function))
+               (case (%fun-name function)
+                 (fop-push (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))
+                 (fop-word-integer (format *trace-output* " ~V,'0X" (* 2 sb-vm:n-word-bytes) result))
+                 (fop-byte-integer (format *trace-output* " ~2,'0X" result))
+                 (fop-integer (format *trace-output* " ~X" result))))))))))))
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 
