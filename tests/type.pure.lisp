@@ -1016,3 +1016,7 @@
     ((-4/3) nil)
     ((1) nil)
     ((2) nil)))
+
+(with-test (:name :complex-type-of)
+  (assert (equal (type-of (opaque-identity #c(1 2)))
+                 '(complex rational))))

@@ -4877,9 +4877,7 @@ expansion happened."
                (values :real num num)))
       (make-numeric-type :class (etypecase num
                                   (integer (if (complexp x)
-                                               (if (integerp (imagpart x))
-                                                   'integer
-                                                   'rational)
+                                               'rational
                                                'integer))
                                   (rational 'rational)
                                   (float 'float))
