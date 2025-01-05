@@ -7447,10 +7447,12 @@
                                                                       ,(logxor c1 c2))
                                                             ,min)))
                                                   (t
-                                                   `(not (logtest (,@(if type-check
-                                                                         '(logand most-positive-word)
-                                                                         '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
-                                                                  ,(lognot (- max min)))))))
+                                                   (let ((mask (lognot (- max min))))
+                                                     `(not (logtest (,@(if (or type-check
+                                                                               (not (fixnump mask)))
+                                                                           '(logand most-positive-word)
+                                                                           '(mask-signed-field sb-vm:n-fixnum-bits)) (- ,value ,min))
+                                                                    ,mask))))))
                                         'or-eq-transform)))))))))))
 
 ;;; Prevent slow perfect hash finder from hogging time if time spent compiling
