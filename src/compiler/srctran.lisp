@@ -813,9 +813,9 @@
 
 ;;; Convert a numeric-type object to an interval object.
 (defun numeric-type->interval (x &optional integer)
-  (declare (type numeric-type x))
-  (let ((low (numeric-type-low x))
-        (high (numeric-type-high x)))
+  (declare (type numeric-union-type x))
+  (let ((low (numeric-union-type-low x))
+        (high (numeric-union-type-high x)))
     (make-interval :low (cond ((not integer)
                                low)
                               ((consp low)
@@ -841,7 +841,7 @@
 
 (defun type-approximate-interval (type &optional integer)
   (declare (type ctype type))
-  (let ((types (prepare-arg-for-derive-type type))
+  (let ((types (prepare-arg-for-derive-type type nil))
         (result nil)
         complex)
     (dolist (type types)
@@ -849,11 +849,11 @@
                     (member-type type
                      (convert-member-type type))
                     (intersection-type
-                     (find-if #'numeric-type-p
+                     (find-if #'numeric-union-type-p
                               (intersection-type-types type)))
                     (t
                      type))))
-        (unless (numeric-type-p type)
+        (unless (numeric-union-type-p type)
           (return-from type-approximate-interval (values nil nil)))
         (let ((interval (numeric-type->interval type integer)))
           (when (eq (numeric-type-complexp type) :complex)
@@ -1464,13 +1464,19 @@
 ;;; Take some type of lvar and massage it so that we get a list of the
 ;;; constituent types. If ARG is *EMPTY-TYPE*, return NIL to indicate
 ;;; failure.
-(defun prepare-arg-for-derive-type (arg)
+(defun prepare-arg-for-derive-type (arg &optional (flatten-numeric-union t))
   (flet ((listify (arg)
            (typecase arg
              (numeric-type
               (list arg))
-             ((or union-type numeric-union-type)
-              (sb-kernel::flatten-numeric-union-types arg))
+             (numeric-union-type
+              (if flatten-numeric-union
+                  (flatten-numeric-union-types arg)
+                  (list arg)))
+             (union-type
+              (if flatten-numeric-union
+                  (flatten-numeric-union-types arg)
+                  (union-type-types arg)))
              (list
               arg)
              (t
