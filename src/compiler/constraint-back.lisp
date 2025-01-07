@@ -38,10 +38,10 @@
                          (specifier-type '(and real (not (eql 0))))
                          (specifier-type 'real))))
       (cond ((csubtypep constraint (specifier-type 'rational))
-             (when alternative
+             (when (and alternative
+                        x-type)
                (cond ((and integer
                            (eq constraint (specifier-type 'integer)))
-
                       (cond ((csubtypep x-type (specifier-type 'integer))
                              (add-alt y (specifier-type '(not integer))))
                             ((csubtypep y-type (specifier-type 'integer))
