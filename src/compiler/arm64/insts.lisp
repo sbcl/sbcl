@@ -1612,12 +1612,30 @@
   (rn :field (byte 5 5) :type 'x-reg-sp)
   (rt :field (byte 5 0) :type 'reg))
 
-(defmacro def-store-exclusive (name o0 o1 o2 rs)
+#-sb-xc-host
+(defun print-stlxr/ldaxr-mnemonic (dchunk inst stream dstate)
+  (declare (ignore dstate))
+  ;; SIZE can't be constrained in the :PRINTER spec because there are two
+  ;; different values that should print the same. Also, we're printing the wrong
+  ;; size for 4 byte because 32-BIT-REGISTER-P tests bit index 31, but it's index 30
+  ;; that distinguishes those two cases. The 2-bit field would probably need to
+  ;; become two 1-bit fields to correct the disassembly.
+  (let ((suffix (case (ldb (byte 2 30) dchunk)
+                  (#b00 "B")
+                  (#b01 "H")
+                  (t ""))))
+    (when stream
+      (format stream "~A~A" (sb-disassem::inst-print-name inst) suffix))))
+
+(defmacro def-store-exclusive (name o0 o1 o2 rs
+                               &optional (size '(logior #b10 (reg-size rt))))
   `(define-instruction ,name (segment ,@(and rs '(rs)) rt rn)
-     (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 0))
-               '(:name :tab ,@(and rs '(rs ", ")) rt ", [" rn "]"))
+     ,@(unless (member name '(stlxrb stlxrh))
+         (let ((name (if (eq name 'stlxr) '#'print-stlxr/ldaxr-mnemonic :name)))
+           `((:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 0))
+                       '(,name :tab ,@(and rs '(rs ", ")) rt ", [" rn "]")))))
      (:emitter
-      (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
+      (emit-ldr-str-exclusive segment ,size
                               ,o2 0 ,o1
                               ,(if rs
                                    '(gpr-offset rs)
@@ -1629,14 +1647,18 @@
 
 (def-store-exclusive stxr 0 0 0 t)
 (def-store-exclusive stlxr 1 0 0 t)
+(def-store-exclusive stlxrb 1 0 0 t #b00)
+(def-store-exclusive stlxrh 1 0 0 t #b01)
 (def-store-exclusive stlr 1 0 1 nil)
 
-(defmacro def-load-exclusive (name o0 o1 o2)
+(defmacro def-load-exclusive (name o0 o1 o2 &optional (size '(logior #b10 (reg-size rt))))
   `(define-instruction ,name (segment rt rn)
-     (:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 1))
-               '(:name :tab rt ", [" rn "]"))
+     ,@(unless (member name '(ldaxrb ldaxrh))
+         (let ((name (if (eq name 'ldaxr) '#'print-stlxr/ldaxr-mnemonic :name)))
+           `((:printer ldr-str-exclusive ((o0 ,o0) (o1 ,o1) (o2 ,o2) (l 1))
+                       '(,name :tab rt ", [" rn "]")))))
      (:emitter
-      (emit-ldr-str-exclusive segment (logior #b10 (reg-size rt))
+      (emit-ldr-str-exclusive segment ,size
                               ,o2 1 ,o1
                               31
                               ,o0
@@ -1646,6 +1668,8 @@
 
 (def-load-exclusive ldxr 0 0 0)
 (def-load-exclusive ldaxr 1 0 0)
+(def-load-exclusive ldaxrb 1 0 0 #b00)
+(def-load-exclusive ldaxrh 1 0 0 #b01)
 (def-load-exclusive ldar 1 0 1)
 
 (define-instruction-format (cas 32)

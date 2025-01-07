@@ -148,6 +148,40 @@
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &key signed)
              `(progn
+                ,@(when (member ref-name '(sap-ref-8 sap-ref-16
+                                           sap-ref-32 sap-ref-64 signed-sap-ref-64
+                                           sap-ref-lispobj sap-ref-sap))
+                    (multiple-value-bind (load store)
+                        (case size
+                          (:byte  (values 'ldaxrb 'stlxrb))
+                          (:short (values 'ldaxrh 'stlxrh))
+                          (t      (values 'ldaxr  'stlxr)))
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs (,sc))
+                                 (newval :scs (,sc))
+                                 (sap :scs (sap-reg))
+                                 ;; This could accept an immediate 0 to avoid
+                                 ;; the initial ADD but I don't care to optimize it out.
+                                 (offset :scs (signed-reg)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:temporary (:sc unsigned-reg) addr)
+                          (:results (result :scs (,sc) :from :load))
+                          (:result-types ,type)
+                          (:generator 5
+                           (inst add addr sap offset)
+                           LOOP
+                           (inst ,load ,(if (eq size :word) '(32-bit-reg result) 'result) addr)
+                           (inst cmp ,(if (eq size :word) '(32-bit-reg result) 'result)
+                                     ,(if (eq size :word) '(32-bit-reg oldval) 'oldval))
+                           (inst b :ne EXIT)
+                           (inst ,store (32-bit-reg tmp-tn)
+                                 ,(if (eq size :word) '(32-bit-reg newval) 'newval) addr)
+                           (inst cbnz (32-bit-reg tmp-tn) LOOP)
+                           EXIT ; cargo-culted from WORD-INDEX-CAS
+                           (inst clrex)
+                           (inst dmb))))))
                 (define-vop (,ref-name)
                   (:translate ,ref-name)
                   (:policy :fast-safe)
