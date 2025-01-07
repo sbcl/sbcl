@@ -1465,43 +1465,40 @@
 ;;; constituent types. If ARG is *EMPTY-TYPE*, return NIL to indicate
 ;;; failure.
 (defun prepare-arg-for-derive-type (arg &optional (flatten-numeric-union t))
-  (flet ((listify (arg)
-           (typecase arg
-             (numeric-type
-              (list arg))
-             (numeric-union-type
-              (if flatten-numeric-union
-                  (flatten-numeric-union-types arg)
-                  (list arg)))
-             (union-type
-              (if flatten-numeric-union
-                  (flatten-numeric-union-types arg)
-                  (union-type-types arg)))
-             (list
-              arg)
-             (t
-              (list arg))))
-         (ignore-hairy-type (type)
-           (if (and (intersection-type-p type)
-                    (find-if #'hairy-type-p (intersection-type-types type)))
-               (find-if-not #'hairy-type-p (intersection-type-types type))
-               type)))
+  (labels ((split (arg)
+             (typecase arg
+               (numeric-type
+                (list arg))
+               (numeric-union-type
+                (if flatten-numeric-union
+                    (flatten-numeric-union-types arg)
+                    (list arg)))
+               (union-type
+                (mapcan #'split (union-type-types arg)))
+               (intersection-type
+                (if (find-if #'hairy-type-p (intersection-type-types arg))
+                    (split (find-if-not #'hairy-type-p (intersection-type-types arg)))
+                    (list arg)))
+               (list
+                (loop for a in arg
+                      append (split a)))
+               (t
+                (list arg)))))
     (unless (eq arg *empty-type*)
       ;; Make sure all args are some type of numeric-type. For member
       ;; types, convert the list of members into a union of equivalent
       ;; single-element member-type's.
       (let ((new-args nil))
-        (dolist (arg (listify arg))
-          (let ((arg (ignore-hairy-type arg)))
-            (if (member-type-p arg)
-                ;; Run down the list of members and convert to a list of
-                ;; member types.
-                (mapc-member-type-members
-                 (lambda (member)
-                   (push (if (numberp member) (make-eql-type member) *empty-type*)
-                         new-args))
-                 arg)
-                (push arg new-args))))
+        (dolist (arg (split arg))
+          (if (member-type-p arg)
+              ;; Run down the list of members and convert to a list of
+              ;; member types.
+              (mapc-member-type-members
+               (lambda (member)
+                 (push (if (numberp member) (make-eql-type member) *empty-type*)
+                       new-args))
+               arg)
+              (push arg new-args)))
         (unless (member *empty-type* new-args)
           new-args)))))
 
