@@ -1525,18 +1525,6 @@
 ;;; This is useful when we want a specifier that we can pass to TYPEP.
 (defconstant +unparse-fun-type-simplify+  2)
 
-;;; REMOVE
-(defmethod print-object ((ctype ctype) stream)
-  (let ((expr
-          (if (unknown-type-p ctype)
-              ;; Don't call the unparse method - it returns the instance itself
-              ;; which would infinitely recurse back into print-object
-              (unknown-type-specifier ctype)
-              (funcall (type-class-unparse (type-class ctype))
-                       +ctype-unparse-disambiguate+
-                       ctype))))
-    (format stream "#.(SPECIFIER-TYPE '~a)" expr)))
-#+nil
 (defmethod print-object ((ctype ctype) stream)
   (let ((expr
          (if (unknown-type-p ctype)
