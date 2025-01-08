@@ -615,7 +615,8 @@
         (format t "Double-width compare-and-swap NOT TESTED~%"))))
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
-                            :skipped-on (not (and :sb-thread (or :ppc64 :x86-64))))
+                            :fails-on :riscv ; unsigned-32-bit gets the wrong answer
+                            :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)
       (let ((sap (sb-sys:vector-sap data)))
@@ -640,8 +641,10 @@
           (test nil 64 #xdeadc0fefe00)
           (test t   64 most-negative-fixnum)
           (test nil 32 #xbabab00e)
-          #-ppc64 (test nil 16 #xfafa) ; gets "illegal instruction" if unimplemented
-          #-ppc64 (test nil 8 #xbb)
+          ;; on riscv I did not implement these sizes, and
+          ;; ppc64 might get "illegal instruction" depending on the particular CPU
+          #-(or riscv ppc64) (test nil 16 #xfafa)
+          #-(or riscv ppc64) (test nil 8 #xbb)
           )
         ;; SAP-REF-SAP
         (setf (aref data 0) 0)
@@ -661,7 +664,7 @@
           (assert (eq (sap-ref-lispobj sap 0) t)))))))
 
 (test-util:with-test (:name :cas-sap-ref-stress-test
-                            :skipped-on (not (and :sb-thread (or :ppc64 :x86-64))))
+                            :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word
                              :initial-element 0)))
     (sb-sys:with-pinned-objects (data)
