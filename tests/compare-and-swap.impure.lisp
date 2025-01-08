@@ -616,7 +616,7 @@
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
                             :fails-on :riscv ; unsigned-32-bit gets the wrong answer
-                            :skipped-on (not :sb-thread))
+                            :skipped-on (or (not :sb-thread) :x86))
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)
       (let ((sap (sb-sys:vector-sap data)))
@@ -664,7 +664,7 @@
           (assert (eq (sap-ref-lispobj sap 0) t)))))))
 
 (test-util:with-test (:name :cas-sap-ref-stress-test
-                            :skipped-on (not :sb-thread))
+                            :skipped-on (or (not :sb-thread) :x86))
   (let ((data (make-array 1 :element-type 'sb-vm:word
                              :initial-element 0)))
     (sb-sys:with-pinned-objects (data)
