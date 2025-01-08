@@ -144,9 +144,7 @@
                 ;; and in fact they're not present on gcc110.fsffrance.org
                 ;; You're supposed to use lwarx, stwcx. in those cases,
                 ;; which I don't feel like doing.
-                ,@(when (member ref-name '(sap-ref-8 sap-ref-16
-                                           sap-ref-32 sap-ref-64 signed-sap-ref-64
-                                           sap-ref-lispobj sap-ref-sap))
+                ,@(when (implements-cas-sap-ref ref-name)
                     (multiple-value-bind (load store)
                         (ecase size
                           (:byte  (values 'lbarx 'stbcx.))

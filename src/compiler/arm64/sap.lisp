@@ -148,9 +148,7 @@
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &key signed)
              `(progn
-                ,@(when (member ref-name '(sap-ref-8 sap-ref-16
-                                           sap-ref-32 sap-ref-64 signed-sap-ref-64
-                                           sap-ref-lispobj sap-ref-sap))
+                ,@(when (implements-cas-sap-ref ref-name)
                     (multiple-value-bind (load store)
                         (case size
                           (:byte  (values 'ldaxrb 'stlxrb))

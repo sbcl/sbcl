@@ -616,7 +616,7 @@
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
                             :fails-on :riscv ; unsigned-32-bit gets the wrong answer
-                            :skipped-on (or (not :sb-thread) :x86))
+                            :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word)))
     (sb-sys:with-pinned-objects (data)
       (let ((sap (sb-sys:vector-sap data)))
@@ -638,8 +638,8 @@
                         (let ((old (cas (,ref sap 0) ,init ,newval)))
                           (assert (eql old ,init)) ; actual old
                           (assert (eql (,ref sap 0) ,newval)))))) ; should have changed
-          (test nil 64 #xdeadc0fefe00)
-          (test t   64 most-negative-fixnum)
+          #+64-bit (test nil 64 #xdeadc0fefe00)
+          #+64-bit (test t   64 most-negative-fixnum)
           (test nil 32 #xbabab00e)
           ;; on riscv I did not implement these sizes, and
           ;; ppc64 might get "illegal instruction" depending on the particular CPU
@@ -664,7 +664,7 @@
           (assert (eq (sap-ref-lispobj sap 0) t)))))))
 
 (test-util:with-test (:name :cas-sap-ref-stress-test
-                            :skipped-on (or (not :sb-thread) :x86))
+                            :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word
                              :initial-element 0)))
     (sb-sys:with-pinned-objects (data)
