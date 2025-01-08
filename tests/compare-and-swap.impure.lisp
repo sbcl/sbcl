@@ -663,6 +663,19 @@
           (assert (eq old nil))
           (assert (eq (sap-ref-lispobj sap 0) t)))))))
 
+(test-util:with-test (:name :cas-sb16
+                      :skipped-on (or :interpreter
+                                      (not (or :arm64 :x86-64))))
+ (let ((a (make-array 1 :element-type '(signed-byte 16))))
+   (flet ((cas-sb16 (sap old new)
+           (cas (sb-sys:signed-sap-ref-16 sap 0) old new)))
+     (setf (aref a 0) -1000)
+     (loop for old from -1000 to 1000 do
+        (sb-sys:with-pinned-objects (a)
+          (let ((actual (cas-sb16 (sb-sys:vector-sap a) old (1+ old))))
+            (assert (= actual old))
+            (assert (= (aref a 0) (1+ old)))))))))
+
 (test-util:with-test (:name :cas-sap-ref-stress-test
                             :skipped-on (not :sb-thread))
   (let ((data (make-array 1 :element-type 'sb-vm:word

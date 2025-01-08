@@ -171,8 +171,16 @@
                            (inst add addr sap offset)
                            LOOP
                            (inst ,load ,(if (eq size :word) '(32-bit-reg result) 'result) addr)
-                           (inst cmp ,(if (eq size :word) '(32-bit-reg result) 'result)
-                                     ,(if (eq size :word) '(32-bit-reg oldval) 'oldval))
+                           ;; There is no instruction to perform signed load-acquire-exclusive,
+                           ;; Therefore the loaded value has to get sign-extend in order for CMP not to fail
+                           ;; on negatives. Alternatively there is (I think) a way to make the CMP
+                           ;; do the right thing without this, but one way or another, the result
+                           ;; requires sign-extension.
+                          ,@(when (and signed (neq size :long))
+                              (let ((bits (case size (:byte 8) (:short 16) (t 32))))
+                                `((inst sbfm result result 0 ,(1- bits)))))
+                           (inst cmp ,(if (eq size :long) 'result '(32-bit-reg result))
+                                     ,(if (eq size :long) 'oldval '(32-bit-reg oldval)))
                            (inst b :ne EXIT)
                            (inst ,store (32-bit-reg tmp-tn)
                                  ,(if (eq size :word) '(32-bit-reg newval) 'newval) addr)
