@@ -206,7 +206,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
            (setq value temp))))
   (inst mov size ea value))
 
-(defun emit-cas-sap-ref (size sap offset oldval newval result rax temp)
+(defun emit-cas-sap-ref (size signedp sap offset oldval newval result rax temp)
   (multiple-value-bind (disp index)
       (cond ((sc-is offset signed-reg)
              (values 0 offset))
@@ -220,8 +220,10 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
           ((not (location= oldval rax))
            (inst mov (if (eq size :qword) :qword :dword) rax oldval)))
     (inst cmpxchg size :lock (ea disp sap index) newval)
-    (unless (location= result rax)
-      (inst mov (if (eq size :qword) :qword :dword) result rax))))
+    (cond ((and signedp (neq size :qword)) ; MOVSX is required no matter what
+           (inst movsx `(,size :qword) result rax))
+          ((not (location= result rax))
+           (inst mov (if (eq size :qword) :qword :dword) result rax)))))
 
 ;;; TODO: these should be refactored so that there is only one vop for any given
 ;;; result storage class. In particular, sap-ref-{8,16,32} can all produce tagged-num.
@@ -244,9 +246,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                  size
                                  `(,size ,(if (eq ref-insn 'movzx) :dword :qword)))))
                `(progn
-                  ,@(when (member ref-name '(sap-ref-8 sap-ref-16 sap-ref-32 sap-ref-64
-                                             signed-sap-ref-64
-                                             sap-ref-lispobj sap-ref-sap))
+                  ,@(when (implements-cas-sap-ref ref-name)
                       `((define-vop (,(symbolicate "CAS-" ref-name))
                           (:translate (cas ,ref-name))
                           (:policy :fast-safe)
@@ -261,7 +261,8 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                        :from (:argument 0) :to :result) rax)
                           (:temporary (:sc unsigned-reg) temp)
                           (:generator 3
-                            (emit-cas-sap-ref ',size sap offset oldval newval result rax temp)))))
+                            (emit-cas-sap-ref ',size ,(eq sc 'signed-reg)
+                                              sap offset oldval newval result rax temp)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
