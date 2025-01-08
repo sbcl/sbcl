@@ -192,11 +192,6 @@
                    0
                    (ash 1 (aref %%simple-array-n-bits-shifts%% widetag))))
 
-(defun saetp-index-or-lose (element-type)
-  (or (position element-type sb-vm:*specialized-array-element-type-properties*
-                :key #'sb-vm:saetp-specifier :test #'equal)
-      (error "No saetp for ~S" element-type)))
-
 ;;; I don't understand why we didn't use this more often, instead of
 ;;; having introduced special cases. Oh well, what's done is done.
 ;;; At least you can grep for SAETP-N-PAD-ELEMENTS in the comments
