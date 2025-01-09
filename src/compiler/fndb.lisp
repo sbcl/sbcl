@@ -2171,6 +2171,11 @@
 (defknown (setf aref) (t (modifying array) &rest index) t ()
   :call-type-deriver (lambda (call trusted)
                        (array-call-type-deriver call trusted t)))
+(defknown (cas aref) (t t (modifying array) &rest index) t ()
+  ;; FIXME: pop the extra arg in front
+  ;; :call-type-deriver (lambda (call trusted)
+  ;;                   (array-call-type-deriver call trusted 'cas))
+  )
 (defknown %set-row-major-aref ((modifying array) index t) t ()
   :call-type-deriver (lambda (call trusted)
                        (array-call-type-deriver call trusted t t)))

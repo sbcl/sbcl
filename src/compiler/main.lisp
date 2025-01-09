@@ -1829,10 +1829,11 @@ returning its filename.
      (Experimental). If true, outputs the toplevel compile-time effects
      of this file into a separate .cfasl file."
   (binding*
-        ((output-file-pathname
-          ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
-          ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
-          (compile-file-pathname input-file (when output-file-p :output-file) output-file))
+        ((input-file (pathname input-file))
+         (output-file-pathname
+             ;; To avoid passing "" as OUTPUT-FILE when unsupplied, we exploit the fact
+             ;; that COMPILE-FILE-PATHNAME allows random &KEY args.
+             (compile-file-pathname input-file (when output-file-p :output-file) output-file))
          (fasl-output nil)
          (cfasl-pathname nil)
          (cfasl-output nil)
@@ -1850,7 +1851,8 @@ returning its filename.
          (*last-message-count* (list* 0 nil nil))
          (*last-error-context* nil)
          (*compiler-trace-output* nil)) ; might be modified below
-
+    (when (equal input-file output-file-pathname)
+      (error "INPUT-FILE and OUTPUT-FILE refer to the same file: ~s" input-file))
    (labels ((print-compile-end-note ()
               (compiler-mumble "~&; compilation ~:[finished in~;aborted after~] ~A~&"
                                abort-p

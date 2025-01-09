@@ -1009,6 +1009,40 @@ of specialized arrays is supported."
   (setf (row-major-aref array (apply #'%array-row-major-index array subscripts))
         new-value))
 
+#+(or x86-64 arm64)
+(defun (cas aref) (old new array &rest subscripts)
+  (let ((index (apply #'%array-row-major-index array subscripts)))
+    (if (not (simple-array-p array))
+        (bug "(CAS AREF) on non-simple arrays is unimplemented")
+        (with-array-data ((vec array) (start) (end))
+          (declare (ignore start end))
+          (if (simple-vector-p vec) ; N-dimensional array of T
+              (cas (svref vec index) old new)
+              (with-pinned-objects (vec)
+                (let ((sap (vector-sap vec)))
+                  (typecase vec
+                    ((simple-array (unsigned-byte 8) (*))
+                     (cas (sap-ref-8 sap index) old new))
+                    ((simple-array (signed-byte 8) (*))
+                     (cas (signed-sap-ref-8 sap index) old new))
+                    ((simple-array (unsigned-byte 16) (*))
+                     (cas (sap-ref-16 sap (ash index 1)) old new))
+                    ((simple-array (signed-byte 16) (*))
+                     (cas (signed-sap-ref-16 sap (ash index 1)) old new))
+                    ((simple-array (unsigned-byte 32) (*))
+                     (cas (sap-ref-32 sap (ash index 2)) old new))
+                    ((simple-array (signed-byte 32) (*))
+                     (cas (signed-sap-ref-32 sap (ash index 2)) old new))
+                    #+64-bit
+                    ((simple-array (unsigned-byte 64) (*))
+                     (cas (sap-ref-64 sap (ash index 3)) old new))
+                    #+64-bit
+                    ((simple-array (signed-byte 64) (*))
+                     (cas (signed-sap-ref-64 sap (ash index 3)) old new))
+                    (t
+                     (bug "(CAS AREF) is not implemented on ~/sb-impl:print-type-specifier/"
+                          (type-of array)))))))))))
+
 (defun row-major-aref (array index)
   "Return the element of array corresponding to the row-major index. This is
    SETFable."

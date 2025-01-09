@@ -178,6 +178,35 @@
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &key signed)
              `(progn
+                  ,@(when (member ref-name '(sap-ref-32 sap-ref-64 signed-sap-ref-64
+                                             sap-ref-lispobj sap-ref-sap))
+                    (multiple-value-bind (load store)
+                        (ecase size
+                          (:word  (values 'lr.w 'sc.w))
+                          (:dword (values 'lr.d 'sc.d)))
+                      ;; riscv baseline architecture does not have cmpxchg on 1-byte or 2-byte int.
+                      ;; There is an architectural extension that can do it
+                      ;; https://github.com/riscv/riscv-isa-manual/blob/main/src/zabha.adoc
+                      ;; I don't feel up to the task of emulating it in software.
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs (,sc))
+                                 (newval :scs (,sc))
+                                 (sap :scs (sap-reg))
+                                 (offset :scs (signed-reg)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:temporary (:sc unsigned-reg) addr temp)
+                          (:results (result :scs (,sc) :from :load))
+                          (:result-types ,type)
+                          (:generator 5
+                           (inst add addr sap offset)
+                           LOOP
+                           (inst ,load result addr :aq)
+                           (inst bne result oldval EXIT)
+                           (inst ,store temp newval addr :aq :rl)
+                           (inst bne temp zero-tn LOOP)
+                           EXIT)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)

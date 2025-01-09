@@ -142,6 +142,31 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
+(defun emit-cas-sap-ref (size signedp sap offset oldval newval result eax)
+  (move eax oldval)
+  (inst cmpxchg (make-ea size :base sap :index offset :scale 1)
+        (case size
+          ;; FIXME: These cases are *very* broken and I don't know how to
+          ;; make them do what I want. The underlying issue that not all GPRs
+          ;; have an adressable byte-sized and word-sized register. So this call
+          ;; to MAKE-RANDOM-TN can make something that doesn't match the low
+          ;; 8 or 16 bits of the full-sized register, apparently. The thing is,
+          ;; all we need is for the instruction emitter to emit the correct bits,
+          ;; because the source data are actually in the right place in the
+          ;; full register. Unfortunately, if I make no attempt to change the size
+          ;; of the source register to match the EA, we get an error in
+          ;; MATCHING-OPERAND-SIZE. It's entirely a problem in our x86 assembler.
+          ;; There is no syntax to do what this should do.
+          (:byte (make-random-tn :kind :normal :sc (sc-or-lose 'byte-reg)
+                                 :offset (tn-offset newval)))
+          (:word (make-random-tn :kind :normal :sc (sc-or-lose 'word-reg)
+                                 :offset (tn-offset newval)))
+          (t newval))
+        :lock)
+  (if (and signedp (neq size :dword))
+      (inst movsx result (ecase size (:byte al-tn) (:word ax-tn)))
+      (move result eax)))
+
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     sc
@@ -150,6 +175,21 @@
                                     &optional signed)
              (let ((temp-sc (symbolicate size "-REG")))
                `(progn
+                  ,@(when (implements-cas-sap-ref ref-name)
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs (,sc) :target eax)
+                                 (newval :scs (,sc))
+                                 (sap :scs (sap-reg))
+                                 (offset :scs (signed-reg)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:results (result :scs (,sc)))
+                          (:result-types ,type)
+                          (:temporary (:sc unsigned-reg :offset eax-offset
+                                       :from (:argument 0) :to :result) eax)
+                          (:generator 3
+                            (emit-cas-sap-ref ,size ,signed sap offset oldval newval result eax)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)

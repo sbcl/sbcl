@@ -1107,30 +1107,6 @@
     ;; Floats are just #(low high ...)
     (ranges #() :type simple-vector :hasher hash-ranges :test equalp)))
 
-;;; A single-range type. Similar to the old model.
-(deftype numeric-type () `(satisfies numeric-type-p))
-
-(defun numeric-type-p (x)
-  (typecase x
-    (numeric-union-type
-     (<= (length (numeric-union-type-ranges x)) 3))))
-
-(defun numeric-type-low (x)
-  (etypecase x
-    (numeric-union-type
-     (let ((ranges (numeric-union-type-ranges x)))
-       (ecase (length ranges)
-         (3 (aref ranges 1))
-         (2 (aref ranges 0)))))))
-
-(defun numeric-type-high (x)
-  (etypecase x
-    (numeric-union-type
-     (let ((ranges (numeric-union-type-ranges x)))
-       (ecase (length ranges)
-         (3 (aref ranges 2))
-         (2 (aref ranges 1)))))))
-
 (declaim (inline numeric-type-aspects))
 (defun numeric-type-aspects (x)
   (numeric-union-type-aspects x))
@@ -1139,6 +1115,38 @@
 (defun numeric-type-complexp (x) (numtype-aspects-complexp (numeric-type-aspects x)))
 (defun numeric-type-class (x) (numtype-aspects-class (numeric-type-aspects x)))
 (defun numeric-type-format (x) (numtype-aspects-precision (numeric-type-aspects x)))
+
+;;; A single-range type. Similar to the old model.
+(deftype numeric-type () `(satisfies numeric-type-p))
+
+(defun numeric-type-p (x)
+  (typecase x
+    (numeric-union-type
+     (<= (length (numeric-union-type-ranges x)) 3))))
+
+
+
+(defun numeric-type-low (x)
+  (let ((ranges (numeric-union-type-ranges x)))
+    (ecase (length ranges)
+      (3 (aref ranges 1))
+      (2 (aref ranges 0)))))
+
+(defun numeric-type-high (x)
+  (let ((ranges (numeric-union-type-ranges x)))
+    (ecase (length ranges)
+      (3 (aref ranges 2))
+      (2 (aref ranges 1)))))
+
+(defun numeric-union-type-low (x)
+  (let ((ranges (numeric-union-type-ranges x)))
+    (case (numeric-type-class x)
+      ((integer rational) (aref ranges 1))
+      (t (aref ranges 0)))))
+
+(defun numeric-union-type-high (x)
+  (let ((ranges (numeric-union-type-ranges x)))
+    (aref ranges (1- (length ranges)))))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (def-type-model (cons-type (:constructor* nil (car-type cdr-type)))
@@ -1517,18 +1525,6 @@
 ;;; This is useful when we want a specifier that we can pass to TYPEP.
 (defconstant +unparse-fun-type-simplify+  2)
 
-;;; REMOVE
-(defmethod print-object ((ctype ctype) stream)
-  (let ((expr
-          (if (unknown-type-p ctype)
-              ;; Don't call the unparse method - it returns the instance itself
-              ;; which would infinitely recurse back into print-object
-              (unknown-type-specifier ctype)
-              (funcall (type-class-unparse (type-class ctype))
-                       +ctype-unparse-disambiguate+
-                       ctype))))
-    (format stream "#.(SPECIFIER-TYPE '~a)" expr)))
-#+nil
 (defmethod print-object ((ctype ctype) stream)
   (let ((expr
          (if (unknown-type-p ctype)

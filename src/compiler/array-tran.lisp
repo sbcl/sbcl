@@ -2332,6 +2332,30 @@
        (t
         `(hairy-data-vector-set/check-bounds array index ,(the-unwild declared-element-ctype 'new-value)))))))
 
+(deftransform (cas aref) ((old new array index)
+                          (t t (or (simple-array (unsigned-byte 8) (*))
+                                   (simple-array (signed-byte 8) (*))
+                                   (simple-array (unsigned-byte 16) (*))
+                                   (simple-array (signed-byte 16) (*))
+                                   (simple-array (unsigned-byte 32) (*))
+                                   (simple-array (signed-byte 32) (*))
+                                   #+64-bit (simple-array (unsigned-byte 64) (*))
+                                   #+64-bit (simple-array (signed-byte 64) (*))
+                                   (simple-array t (*)))
+                             index))
+  (let ((et (array-type-specialized-element-type (lvar-type array))))
+    (if (eq et *universal-type*)
+        `(cas (svref array index) old new)
+        (let* ((saetp (find-saetp-by-ctype et))
+               (ref (if (eql (numeric-type-low et) 0) "SAP-REF-" "SIGNED-SAP-REF-"))
+               (bits (sb-vm::saetp-n-bits saetp))
+               (access (package-symbolicate #.(find-package "SB-SYS") ref bits))
+               (scale (ecase bits (8 0) (16 1) (32 2) (64 3))))
+          `(with-pinned-objects (array)
+             (cas (,access (vector-sap array)
+                           (ash (check-bound array (length array) index) ,scale))
+                  old new))))))
+
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.

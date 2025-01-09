@@ -601,6 +601,20 @@
                        (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2))))
                  dstate)))))))
 
+(defun print-stlxr/ldaxr-mnemonic (dchunk inst stream dstate)
+  (declare (ignore dstate))
+  ;; SIZE can't be constrained in the :PRINTER spec because there are two
+  ;; different values that should print the same. Also, we're printing the wrong
+  ;; size for 4 byte because 32-BIT-REGISTER-P tests bit index 31, but it's index 30
+  ;; that distinguishes those two cases. The 2-bit field would probably need to
+  ;; become two 1-bit fields to correct the disassembly.
+  (let ((suffix (case (ldb (byte 2 30) dchunk)
+                  (#b00 "B")
+                  (#b01 "H")
+                  (t ""))))
+    (when stream
+      (format stream "~A~A" (sb-disassem::inst-print-name inst) suffix))))
+
 (defun annotate-ldr-literal (value stream dstate)
   (declare (ignore stream))
   (let* ((value (* 4 value))

@@ -1844,7 +1844,7 @@ of PLACE: if the returned value is EQ to OLD, the swap was carried out.
 PLACE must be an CAS-able place. Built-in CAS-able places are accessor forms
 whose CAR is one of the following:
 
- CAR, CDR, FIRST, REST, SVREF, SYMBOL-PLIST, SYMBOL-VALUE, SVREF, SLOT-VALUE
+ CAR, CDR, FIRST, REST, SVREF, SYMBOL-PLIST, SYMBOL-VALUE, SLOT-VALUE
  SB-MOP:STANDARD-INSTANCE-ACCESS, SB-MOP:FUNCALLABLE-STANDARD-INSTANCE-ACCESS,
 
 or the name of a DEFSTRUCT created accessor for a slot whose storage type
