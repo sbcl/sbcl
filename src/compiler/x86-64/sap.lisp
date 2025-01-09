@@ -140,7 +140,26 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 /// and we store the shadow _before_ the app store."
 |#
 
-(defun emit-sap-ref (size insn modifier result ea node vop temp)
+(defun offset-needs-temp (offset)
+  (if (or (sc-is offset signed-reg)
+          (typep (tn-value offset) '(signed-byte 32)))
+      nil
+      t))
+
+(defun sap+offset-to-ea (sap offset temp)
+  (multiple-value-bind (disp index)
+      (cond ((sc-is offset signed-reg)
+             (values 0 offset))
+            ((typep (tn-value offset) '(signed-byte 32))
+             (values (tn-value offset) nil))
+            (t
+             ;; Seriously who uses immediate offsets exceeding an int32?
+             (aver temp)
+             (inst mov temp (tn-value offset))
+             (values 0 temp)))
+    (ea disp sap index)))
+
+(defun emit-sap-ref (size insn modifier result sap offset node vop temp)
   (declare (ignorable node size vop temp))
   (cond
    ;; MSAN as implemented can't correctly interact with the C sanitizer because
@@ -150,7 +169,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
    ;; a 1, 2, 4, or 8-byte load. Unfortunately that load could spuriously report
    ;; that it was uninitialized if only _part_ was uninitialized, but we didn't
    ;; want to examine the uninitialized bits. The problem is, it doesn't know that.
-   ;; Even though DEFINE-ALIEN-TYPE conveys the sematics of sub-byte fields, the
+   ;; Even though DEFINE-ALIEN-TYPE conveys the semantics of sub-byte fields, the
    ;; compiler is itself unable to extract partial bytes.
    ;; (You get "cannot extract 4-bit integers" for example)
    ;; So unfortunately, because the IR can't convey what we mean, we have to do
@@ -190,9 +209,11 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
         (inst byte (logior (ash (tn-offset result) 2) scale)))
       (emit-label good)))
    (t
-    (sb-assem:inst* insn modifier result ea))))
+    (let ((ea (sap+offset-to-ea sap offset temp)))
+      (sb-assem:inst* insn modifier result ea)))))
 
-(defun emit-sap-set (size ea value temp)
+(defun emit-sap-set (size sap offset value temp
+                          &aux (ea (sap+offset-to-ea sap offset temp)))
   #+linux
   (when (sb-c:msan-unpoison sb-c:*compilation*)
     (inst lea temp ea)
@@ -202,33 +223,27 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (cond ((plausible-signed-imm32-operand-p (tn-value value))
            (setq value (tn-value value)))
           (t
+           (aver (not (offset-needs-temp offset)))
            (inst mov temp (tn-value value))
            (setq value temp))))
   (inst mov size ea value))
 
 (defun emit-cas-sap-ref (size signedp sap offset oldval newval result rax temp)
-  (multiple-value-bind (disp index)
-      (cond ((sc-is offset signed-reg)
-             (values 0 offset))
-            ((typep (tn-value offset) '(signed-byte 32))
-             (values (tn-value offset) nil))
-            (t
-             (inst mov temp (tn-value offset))
-             (values 0 temp)))
+  (let ((ea (sap+offset-to-ea sap offset temp)))
     (cond ((sc-is oldval immediate constant)
            (inst mov rax (tn-value oldval)))
           ((not (location= oldval rax))
            (inst mov (if (eq size :qword) :qword :dword) rax oldval)))
-    (inst cmpxchg size :lock (ea disp sap index) newval)
+    (inst cmpxchg size :lock ea newval)
     (cond ((and signedp (neq size :qword)) ; MOVSX is required no matter what
            (inst movsx `(,size :qword) result rax))
           ((not (location= result rax))
            (inst mov (if (eq size :qword) :qword :dword) result rax)))))
 
-;;; TODO: these should be refactored so that there is only one vop for any given
+;;; Note: these could potentially be arranged to have only one vop per
 ;;; result storage class. In particular, sap-ref-{8,16,32} can all produce tagged-num.
 ;;; The vop can examine the node to see which function it translates
-;;; and select the appropriate modifier to movzx or movsx.
+;;; and select the appropriate modifier to movzx or movsx. I'm unsure if that's better.
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     ref-insn
@@ -267,32 +282,18 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:translate ,ref-name)
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg))
-                           (offset :scs (signed-reg)))
+                           (offset :scs (signed-reg immediate)))
                     (:arg-types system-area-pointer signed-num)
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:node-var node)
                     (:vop-var vop)
-                    ;; this temp has to be wired because the uninitialized-load-trap handler
-                    ;; looks in RAX to get the poisoned address.
-                    ;; We should have a different variant of this reffer for msan or no msan
-                    ;; to avoid wasting a register that is not needed.
-                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
+                    (:temporary (:sc unsigned-reg :offset rax-offset
+                                 :unused-if (and (not (sb-c:msan-unpoison sb-c:*compilation*))
+                                                 (not (offset-needs-temp offset))))
+                                temp)
                     (:generator 3 (emit-sap-ref ,size ',ref-insn
-                                                ',modifier result (ea sap offset) node vop temp)))
-                  (define-vop (,(symbolicate ref-name "-C"))
-                    (:translate ,ref-name)
-                    (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg)))
-                    (:arg-types system-area-pointer (:constant (signed-byte 32)))
-                    (:info offset)
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:node-var node)
-                    (:vop-var vop)
-                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
-                    (:generator 2 (emit-sap-ref ,size ',ref-insn
-                                                ',modifier result (ea offset sap) node vop temp)))
+                                                ',modifier result sap offset node vop temp)))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -300,19 +301,11 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                            (sap :scs (sap-reg))
                            (offset :scs (signed-reg)))
                     (:arg-types ,type system-area-pointer signed-num)
+                    ;; In theory TEMP could assist with loading either OFFSET or VALUE, but
+                    ;; there is an AVER that it doesn't actually get used for both.
                     (:temporary (:sc unsigned-reg) temp)
                     (:generator 5
-                      (emit-sap-set ,size (ea sap offset) value temp)))
-                  (define-vop (,(symbolicate set-name "-C"))
-                    (:translate ,set-name)
-                    (:policy :fast-safe)
-                    (:args (value :scs ,value-scs)
-                           (sap :scs (sap-reg)))
-                    (:arg-types ,type system-area-pointer (:constant (signed-byte 32)))
-                    (:info offset)
-                    (:temporary (:sc unsigned-reg) temp)
-                    (:generator 4
-                      (emit-sap-set ,size (ea offset sap) value temp)))))))
+                      (emit-sap-set ,size sap offset value temp)))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
     unsigned-reg positive-fixnum :byte)
@@ -344,36 +337,19 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                   (:translate ,ref-fun)
                   (:policy :fast-safe)
                   (:args (sap :scs (sap-reg))
-                         (offset :scs (signed-reg)))
+                         (offset :scs (signed-reg immediate)))
                   (:arg-types system-area-pointer signed-num)
                   (:results (result :scs (,res-sc)))
                   (:result-types ,res-type)
-                  (:generator 5 (inst ,insn result (ea sap offset))))
-                (define-vop (,(symbolicate ref-fun "-C"))
-                  (:translate ,ref-fun)
-                  (:policy :fast-safe)
-                  (:args (sap :scs (sap-reg)))
-                  (:arg-types system-area-pointer (:constant (signed-byte 32)))
-                  (:info offset)
-                  (:results (result :scs (,res-sc)))
-                  (:result-types ,res-type)
-                  (:generator 4 (inst ,insn result (ea offset sap))))
+                  (:generator 1 (inst ,insn result (sap+offset-to-ea sap offset nil))))
                 (define-vop (,set-fun)
                   (:translate ,set-fun)
                   (:policy :fast-safe)
                   (:args (value :scs (,res-sc immediate))
                          (sap :scs (sap-reg))
-                         (offset :scs (signed-reg)))
+                         (offset :scs (signed-reg immediate)))
                   (:arg-types ,res-type system-area-pointer signed-num)
-                  (:generator 5 (inst ,insn (ea sap offset) value)))
-                (define-vop (,(symbolicate set-fun "-C"))
-                  (:translate ,set-fun)
-                  (:policy :fast-safe)
-                  (:args (value :scs (,res-sc))
-                         (sap :scs (sap-reg)))
-                  (:arg-types ,res-type system-area-pointer (:constant (signed-byte 32)))
-                  (:info offset)
-                  (:generator 4 (inst ,insn (ea offset sap) value))))))
+                  (:generator 1 (inst ,insn (sap+offset-to-ea sap offset nil) value))))))
   (def-system-ref-and-set sap-ref-single single-reg single-float movss)
   (def-system-ref-and-set sap-ref-double double-reg double-float movsd))
 
