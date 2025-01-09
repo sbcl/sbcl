@@ -215,6 +215,8 @@
                           ((and (functional-p entry-fun)
                                 (fun-type-p (functional-type entry-fun)))
                            (functional-type entry-fun))
+                          ((and (intersection-type-p lvar-type)
+                                (find-if #'fun-type-p (intersection-type-types lvar-type))))
                           ((and (not (fun-type-p lvar-type))
                                 (lambda-p entry-fun)
                                 (functional-kind-eq entry-fun nil)
@@ -275,10 +277,13 @@
          (lvar-type (lvar-type lvar)))
     (if (ref-p use)
         (multiple-value-bind (type fun-name leaf asserted) (node-fun-type use defined-here asserted-type)
-          (let ((int (if (fun-type-p lvar-type)
-                         ;; save the cast type
-                         (type-intersection type lvar-type)
-                         type)))
+          (let* ((lvar-type (or (and (intersection-type-p lvar-type)
+                                     (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                lvar-type))
+                 (int (if (fun-type-p lvar-type)
+                          ;; save the cast type
+                          (type-intersection type lvar-type)
+                          type)))
             (values (if (neq int *empty-type*)
                         int
                         lvar-type)

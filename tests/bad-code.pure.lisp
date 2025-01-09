@@ -897,3 +897,21 @@
                       `(lambda ()
                          (make-array 10 :element-type 'single-float :initial-contents (list 10)))
                       :allow-warnings t))))
+
+(with-test (:name :fun-type-intersection)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (funcall (the (and x
+                                            (function (&optional t (mod 10)))) #'aref)
+                                  x 30))
+                      :allow-warnings t
+                      :allow-style-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (j)
+                         (funcall (the (and compiled-function
+                                            (function (&optional fixnum))) j)
+                                  'a))
+                      :allow-warnings t
+                      :allow-style-warnings t))))
