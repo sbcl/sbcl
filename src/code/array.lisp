@@ -1009,6 +1009,7 @@ of specialized arrays is supported."
   (setf (row-major-aref array (apply #'%array-row-major-index array subscripts))
         new-value))
 
+#+(or x86-64 arm64)
 (defun (cas aref) (old new array &rest subscripts)
   (let ((index (apply #'%array-row-major-index array subscripts)))
     (if (not (simple-array-p array))

@@ -146,6 +146,17 @@
   (move eax oldval)
   (inst cmpxchg (make-ea size :base sap :index offset :scale 1)
         (case size
+          ;; FIXME: These cases are *very* broken and I don't know how to
+          ;; make them do what I want. The underlying issue that not all GPRs
+          ;; have an adressable byte-sized and word-sized register. So this call
+          ;; to MAKE-RANDOM-TN can make something that doesn't match the low
+          ;; 8 or 16 bits of the full-sized register, apparently. The thing is,
+          ;; all we need is for the instruction emitter to emit the correct bits,
+          ;; because the source data are actually in the right place in the
+          ;; full register. Unfortunately, if I make no attempt to change the size
+          ;; of the source register to match the EA, we get an error in
+          ;; MATCHING-OPERAND-SIZE. It's entirely a problem in our x86 assembler.
+          ;; There is no syntax to do what this should do.
           (:byte (make-random-tn :kind :normal :sc (sc-or-lose 'byte-reg)
                                  :offset (tn-offset newval)))
           (:word (make-random-tn :kind :normal :sc (sc-or-lose 'word-reg)
