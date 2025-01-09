@@ -166,13 +166,6 @@
 ;;; This macro should be the way that all implementation independent
 ;;; information about functions is made known to the compiler.
 ;;;
-;;; FIXME: The comment above suggests that perhaps some of my added
-;;; FTYPE declarations are in poor taste. Should I change my
-;;; declarations, or change the comment, or what?
-;;;
-;;; FIXME: DEFKNOWN is needed only at build-the-system time. Figure
-;;; out some way to keep it from appearing in the target system.
-;;;
 ;;; Declare the function NAME to be a known function. We construct a
 ;;; type specifier for the function by wrapping (FUNCTION ...) around
 ;;; the ARG-TYPES and RESULT-TYPE. ATTRIBUTES is an unevaluated list
