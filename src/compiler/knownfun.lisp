@@ -551,43 +551,44 @@
          (type (lvar-fun-type fun))
          (policy (lexenv-policy (node-lexenv call)))
          (args (combination-args call)))
-    (when (fun-type-p type)
-      (aver (null (fun-type-optional type)))
-      (flet ((assert-type (arg type &optional set index)
-               (when (cond (index
-                            (assert-array-index-lvar-type arg type policy))
-                           (t
-                            (when set
-                              (add-annotation arg
-                                              (make-lvar-modified-annotation :caller (lvar-fun-name fun))))
-                            (assert-lvar-type arg type policy)))
-                 (unless trusted (reoptimize-lvar arg)))))
-        (let ((required (fun-type-required type)))
-          (when set
-            (assert-type (pop args)
-                         (pop required)))
+    (flet ((assert-type (arg type &optional set index)
+             (when (cond (index
+                          (assert-array-index-lvar-type arg type policy))
+                         (t
+                          (when set
+                            (add-annotation arg
+                                            (make-lvar-modified-annotation :caller (lvar-fun-name fun))))
+                          (assert-lvar-type arg type policy)))
+               (unless trusted (reoptimize-lvar arg)))))
+      (let ((required (fun-type-required type)))
+        (when set
           (assert-type (pop args)
-                       (if row-major-aref
-                           (pop required)
-                           (type-intersection
-                            (pop required)
-                            (let ((rank (length args)))
-                              (when (>= rank array-rank-limit)
-                                (setf (combination-kind call) :error)
-                                (compiler-warn "More subscripts for ~a (~a) than ~a (~a)"
-                                               (combination-fun-debug-name call)
-                                               rank
-                                               'array-rank-limit
-                                               array-rank-limit)
-                                (return-from array-call-type-deriver))
-                              (specifier-type `(array * ,rank)))))
-                       set)
-          (loop for type in required
-                do
-                (assert-type (pop args) type nil (or (not (and set row-major-aref))
-                                                     args)))
-          (loop for subscript in args
-                do (assert-type subscript (fun-type-rest type) nil t)))))))
+                       (pop required)))
+        (assert-type (pop args)
+                     (if row-major-aref
+                         (pop required)
+                         (type-intersection
+                          (pop required)
+                          (let ((rank (length args)))
+                            (when (>= rank array-rank-limit)
+                              (setf (combination-kind call) :error)
+                              (compiler-warn "More subscripts for ~a (~a) than ~a (~a)"
+                                             (combination-fun-debug-name call)
+                                             rank
+                                             'array-rank-limit
+                                             array-rank-limit)
+                              (return-from array-call-type-deriver))
+                            (make-array-type (make-list rank :initial-element '*)
+                                             :element-type *wild-type*))))
+                     set)
+        (loop for type in required
+              do
+              (assert-type (pop args) type nil (or (not (and set row-major-aref))
+                                                   args)))
+        (loop for type in (fun-type-optional type)
+              do (assert-type (pop args) type nil t))
+        (loop for subscript in args
+              do (assert-type subscript (fun-type-rest type) nil t))))))
 
 (defun append-call-type-deriver (call trusted)
   (let* ((policy (lexenv-policy (node-lexenv call)))
