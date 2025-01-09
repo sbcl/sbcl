@@ -552,6 +552,7 @@
          (policy (lexenv-policy (node-lexenv call)))
          (args (combination-args call)))
     (when (fun-type-p type)
+      (aver (null (fun-type-optional type)))
       (flet ((assert-type (arg type &optional set index)
                (when (cond (index
                             (assert-array-index-lvar-type arg type policy))
@@ -585,8 +586,6 @@
                 do
                 (assert-type (pop args) type nil (or (not (and set row-major-aref))
                                                      args)))
-          (loop for type in (fun-type-optional type)
-                do (assert-type (pop args) type nil t))
           (loop for subscript in args
                 do (assert-type subscript (fun-type-rest type) nil t)))))))
 
