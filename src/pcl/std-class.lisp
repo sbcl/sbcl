@@ -975,7 +975,8 @@
                          (let ((seen (list* class seen)))
                            (dolist (sub (class-direct-subclasses class))
                              (rec sub nil seen))))))
-               ;; Warn outside the world lock
+               ;; Warning at run-time is not nice, can it be done at compile-time?
+               #+nil
                (style-warn-about-duplicate-slots class))))
     (rec class finalizep)))
 
