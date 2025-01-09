@@ -142,6 +142,20 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
+(defun emit-cas-sap-ref (size signedp sap offset oldval newval result eax)
+  (move eax oldval)
+  (inst cmpxchg (make-ea size :base sap :index offset :scale 1)
+        (case size
+          (:byte (make-random-tn :kind :normal :sc (sc-or-lose 'byte-reg)
+                                 :offset (tn-offset newval)))
+          (:word (make-random-tn :kind :normal :sc (sc-or-lose 'word-reg)
+                                 :offset (tn-offset newval)))
+          (t newval))
+        :lock)
+  (if (and signedp (neq size :dword))
+      (inst movsx result (ecase size (:byte al-tn) (:word ax-tn)))
+      (move result eax)))
+
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     sc
@@ -164,16 +178,7 @@
                           (:temporary (:sc unsigned-reg :offset eax-offset
                                        :from (:argument 0) :to :result) eax)
                           (:generator 3
-                            (move eax oldval)
-                            (inst cmpxchg (make-ea ,size :base sap :index offset :scale 1)
-                                  ,(case size
-                                     (:byte '(make-random-tn :kind :normal :sc (sc-or-lose 'byte-reg)
-                                              :offset (tn-offset newval)))
-                                     (:word '(make-random-tn :kind :normal :sc (sc-or-lose 'word-reg)
-                                              :offset (tn-offset newval)))
-                                     (t 'newval))
-                                  :lock)
-                            (move result eax)))))
+                            (emit-cas-sap-ref ,size ,signed sap offset oldval newval result eax)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)

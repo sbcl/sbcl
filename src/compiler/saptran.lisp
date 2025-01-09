@@ -50,9 +50,9 @@
     ;; Other than arm64 and x86-64, the vops do not sign-extend, so the signed
     ;; variants are mostly omitted for now.
     (member fun '(sap-ref-8
-                  #+(or arm64 x86-64) signed-sap-ref-8
+                  #+(or arm64 x86 x86-64) signed-sap-ref-8
                   sap-ref-16
-                  #+(or arm64 x86-64) signed-sap-ref-16
+                  #+(or arm64 x86 x86-64) signed-sap-ref-16
                   sap-ref-32
                   #+(or (not 64-bit) arm64 x86-64) signed-sap-ref-32
                   #+64-bit sap-ref-64
