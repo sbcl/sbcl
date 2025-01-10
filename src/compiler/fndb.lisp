@@ -351,12 +351,8 @@
   :folder #'truncate)
 
 (defknown unary-truncate-double-float-to-bignum (double-float)
-    (values #+64-bit bignum #-64-bit integer
-            (and
-             #+(and 64-bit
-                    (not (or riscv ppc64))) ;; they can't survive cold-init
-             (eql 0d0)
-             double-float))
+    (values (and integer #+64-bit bignum)
+            (and double-float #+64-bit (eql 0d0)))
    (foldable movable flushable fixed-args)
   :folder #'truncate)
 
