@@ -1352,6 +1352,11 @@
 (defoptimizers ir2-hook (%member-key-eq %member-key) ((item list key) node)
   (check-sequence-test item list nil key node))
 
+(defoptimizers ir2-hook
+    (read-sequence write-sequence write-string)
+    ((sequence stream &key start end) node)
+  (check-sequence-ranges sequence start end node))
+
 (defun string-cmp-deriver (string1 string2 start1 end1 start2 end2 &optional equality)
   (flet ((dims (string start end)
            (let* ((type (lvar-type string))
