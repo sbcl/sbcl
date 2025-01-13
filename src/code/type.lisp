@@ -452,10 +452,67 @@
 
 ;;; The union or intersection of two FUNCTION types is FUNCTION.
 (define-type-method (function :simple-union2) (type1 type2)
-  (if (or (fun-designator-type-p type1)
-          (fun-designator-type-p type2))
-      (specifier-type 'function-designator)
-      (specifier-type 'function)))
+  (let ((designator (or (fun-designator-type-p type1)
+                        (fun-designator-type-p type2)))
+        (ftype (specifier-type 'function)))
+    (if (or (eq type1 ftype)
+            (eq type2 ftype))
+        (if designator
+            (specifier-type 'function-designator)
+            (specifier-type 'function))
+        (let ((rtype (values-type-union (fun-type-returns type1)
+                                        (fun-type-returns type2))))
+          (cond
+            ((fun-type-wild-args type1)
+             (make-fun-type :wild-args t
+                            :returns rtype
+                            :designator designator))
+            ((fun-type-wild-args type2)
+             (make-fun-type :wild-args t
+                            :returns rtype
+                            :designator designator))
+            (t
+             (multiple-value-bind (req opt rest)
+                 (args-type-op type1 type2 #'type-union #'min)
+               (let* ((keyp (or (fun-type-keyp type1)
+                                (fun-type-keyp type2)))
+                      (actually-keyp (and keyp
+                                          (= (sb-c::fun-type-positional-count type1)
+                                             (sb-c::fun-type-positional-count type2))))
+                      (rest (if (and keyp
+                                     (not actually-keyp))
+                                *universal-type*
+                                rest))
+                      (opt (if (and keyp
+                                    (not actually-keyp))
+                               (subseq opt 0 (- (min (sb-c::fun-type-positional-count type1)
+                                                     (sb-c::fun-type-positional-count type2))
+                                                (length req)))
+                               opt))
+                      (keys (when actually-keyp
+                              (let (keys)
+                                (loop for key1 in (fun-type-keywords type1)
+                                      for key2 = (find (key-info-name key1)
+                                                       (fun-type-keywords type2)
+                                                       :key #'key-info-name)
+                                      do (if key2
+                                             (push (make-key-info (key-info-name key1)
+                                                                  (type-union (key-info-type key1)
+                                                                              (key-info-type key2)))
+                                                   keys)
+                                             (push key1 keys)))
+                                (loop for key2 in (fun-type-keywords type2)
+                                      do (pushnew key2 keys :key #'key-info-name))
+                                keys))))
+                (make-fun-type :required req
+                               :optional opt
+                               :rest rest
+                               :allowp (or (fun-type-allowp type1)
+                                           (fun-type-allowp type2))
+                               :returns rtype
+                               :keyp actually-keyp
+                               :keywords keys
+                               :designator designator)))))))))
 
 (define-type-method (function :simple-intersection2) (type1 type2)
   (let ((ftype (specifier-type 'function)))
