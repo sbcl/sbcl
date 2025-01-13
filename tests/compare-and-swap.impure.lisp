@@ -730,3 +730,10 @@
           (cas (aref signed i j) 0 (incf sint))))
       (assert (equalp unsigned #2A((1 2 3) (4 5 6) (7 8 9))))
       (assert (equalp signed #2A((-4 -3 -2) (-1 0 1) (2 3 4)))))))
+
+(test-util:with-test (:name :cas-aref-float :skipped-on (not :x86-64))
+  (dolist (et '(single-float double-float))
+    (let ((a (make-array 4 :element-type et)))
+      (dotimes (i 4)
+        (cas (aref a i) (coerce 0 et) (coerce (1+ i) et)))
+      (assert (equalp a #(1d0 2d0 3d0 4d0))))))

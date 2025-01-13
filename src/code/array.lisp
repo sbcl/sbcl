@@ -1039,6 +1039,12 @@ of specialized arrays is supported."
                     #+64-bit
                     ((simple-array (signed-byte 64) (*))
                      (cas (signed-sap-ref-64 sap (ash index 3)) old new))
+                    #+x86-64
+                    ((simple-array single-float (*))
+                     (cas (sap-ref-single sap (ash index 2)) old new))
+                    #+x86-64
+                    ((simple-array double-float (*))
+                     (cas (sap-ref-double sap (ash index 3)) old new))
                     (t
                      (bug "(CAS AREF) is not implemented on ~/sb-impl:print-type-specifier/"
                           (type-of array)))))))))))

@@ -57,6 +57,8 @@
                   #+(or (not 64-bit) arm64 x86-64) signed-sap-ref-32
                   #+64-bit sap-ref-64
                   #+64-bit signed-sap-ref-64
+                  #+x86-64 sap-ref-single
+                  #+x86-64 sap-ref-double
                   sap-ref-sap sap-ref-lispobj))))
 
 (macrolet ((defsapref (fun value-type

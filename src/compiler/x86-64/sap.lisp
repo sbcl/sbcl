@@ -330,7 +330,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 
 ;;;; SAP-REF-SINGLE and SAP-REF-DOUBLE
 
-(macrolet ((def-system-ref-and-set (ref-fun res-sc res-type insn
+(macrolet ((def-system-ref-and-set (ref-fun res-sc res-type insn cas
                                             &aux (set-fun (symbolicate "%SET-" ref-fun)))
              `(progn
                 (define-vop (,ref-fun)
@@ -349,9 +349,32 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                          (sap :scs (sap-reg))
                          (offset :scs (signed-reg immediate)))
                   (:arg-types ,res-type system-area-pointer signed-num)
-                  (:generator 1 (inst ,insn (sap+offset-to-ea sap offset nil) value))))))
-  (def-system-ref-and-set sap-ref-single single-reg single-float movss)
-  (def-system-ref-and-set sap-ref-double double-reg double-float movsd))
+                  (:generator 1 (inst ,insn (sap+offset-to-ea sap offset nil) value)))
+                (define-vop (,(symbolicate "CAS-" ref-fun))
+                  (:translate (cas ,ref-fun))
+                  (:policy :fast-safe)
+                  ;; old and new could directly accept descriptor-reg
+                  ;; but I doubt that CAS on floats sees enough usage to care.
+                  (:args (oldval :scs (,res-sc))
+                         (newval :scs (,res-sc))
+                         (sap :scs (sap-reg))
+                         (offset :scs (signed-reg immediate)))
+                  (:arg-types ,res-type ,res-type system-area-pointer signed-num)
+                  (:results (result :scs (,res-sc)))
+                  (:result-types ,res-type)
+                  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+                  (:temporary (:sc unsigned-reg) newval-temp)
+                  (:generator 3 ,@cas)))))
+  (def-system-ref-and-set sap-ref-single single-reg single-float movss
+    ((inst movd rax oldval)
+     (inst movd newval-temp newval)
+     (inst cmpxchg :dword :lock (sap+offset-to-ea sap offset nil) newval-temp)
+     (inst movd result rax)))
+  (def-system-ref-and-set sap-ref-double double-reg double-float movsd
+    ((inst movq rax oldval)
+     (inst movq newval-temp newval)
+     (inst cmpxchg :lock (sap+offset-to-ea sap offset nil) newval-temp)
+     (inst movq result rax))))
 
 ;;; noise to convert normal lisp data objects into SAPs
 
