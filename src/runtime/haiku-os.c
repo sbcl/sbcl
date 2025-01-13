@@ -72,8 +72,3 @@ os_install_interrupt_handlers(void)
         ll_install_handler(SIGSEGV, sigsegv_handler);
     }
 }
-
-int pthread_getattr_np(pthread_t thread, pthread_attr_t *attr)
-{
-    lose("pthread_getattr_np unimplemented");
-}
