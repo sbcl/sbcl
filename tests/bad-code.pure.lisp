@@ -915,3 +915,13 @@
                                   'a))
                       :allow-warnings t
                       :allow-style-warnings t))))
+
+(with-test (:name :funcall-union)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x a)
+                         (funcall (ecase x
+                                    (0 #'+)
+                                    (1 #'-))
+                                  a 'b))
+                      :allow-warnings t))))
