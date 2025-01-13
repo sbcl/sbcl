@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.0:
+  * minor incompatible change: SBCL now reveals details of its COMPLEX
+    representations through UPGRADED-COMPLEX-PART-TYPE, rather than hiding
+    them.
+
 changes in sbcl-2.5.0 relative to sbcl-2.4.11:
   * platform support:
     ** improve support for the Haiku operating system.  (thanks to Al Hoang,
