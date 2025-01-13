@@ -924,4 +924,12 @@
                                     (0 #'+)
                                     (1 #'-))
                                   a 'b))
+                      :allow-warnings t)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x a)
+                         (funcall (case x
+                                    (0 #'+)
+                                    (1 #'-))
+                                  a 'b))
                       :allow-warnings t))))

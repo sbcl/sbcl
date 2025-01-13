@@ -295,16 +295,19 @@
              (loop for ref in use
                    do
                    (multiple-value-bind (type fun-name leaf asserted) (node-fun-type ref defined-here asserted-type)
-                     (declare (ignore fun-name leaf))
-                     (let* ((lvar-type (or (and (intersection-type-p lvar-type)
-                                                (find-if #'fun-type-p (intersection-type-types lvar-type)))
-                                           lvar-type))
-                            (int (if (fun-type-p lvar-type)
-                                     ;; save the cast type
-                                     (type-intersection type lvar-type)
-                                     type)))
-                       (setf all-asserted (and all-asserted asserted)
-                             union (type-union union int)))))
+                     (declare (ignore fun-name))
+                     (unless (and (global-var-p leaf)
+                                  (eq (global-var-kind leaf) :global-function)
+                                  (eq (global-var-%source-name leaf) nil))
+                       (let* ((lvar-type (or (and (intersection-type-p lvar-type)
+                                                  (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                             lvar-type))
+                              (int (if (fun-type-p lvar-type)
+                                       ;; save the cast type
+                                       (type-intersection type lvar-type)
+                                       type)))
+                         (setf all-asserted (and all-asserted asserted)
+                               union (type-union union int))))))
              (values union '.anonymous. nil all-asserted)))
           (t
            (values lvar-type
