@@ -66,6 +66,12 @@
   (assert-error (upgraded-complex-part-type 'some-undef-type))
   (assert (subtypep (upgraded-complex-part-type 'fixnum) 'real)))
 
+(with-test (:name (upgraded-complex-part-type nil))
+  (assert (type-evidently-= 'nil (upgraded-complex-part-type nil))))
+
+(with-test (:name (upgraded-complex-part-type (eql 0)))
+  (assert (subtypep '(eql 0) (upgraded-complex-part-type '(eql 0)))))
+
 ;;; Do reasonable things with undefined types, and with compound types
 ;;; built from undefined types.
 (with-test (:name (typep :undefined :compound))

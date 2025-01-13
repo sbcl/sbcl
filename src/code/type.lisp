@@ -2736,6 +2736,9 @@ expansion happened."
     (cond
       ((eq ctype *empty-type*)
        *empty-type*)
+      ;; this is the two types NIL and (EQL 0)
+      ((csubtypep ctype (sb-kernel:specifier-type '(eql 0)))
+       ctype)
       ((not (csubtypep ctype (specifier-type 'real)))
        (error "The component type for COMPLEX is not a subtype of REAL: ~S"
               ctype))
@@ -2765,8 +2768,9 @@ expansion happened."
                                                    (numeric-type-format component-type))
                             (numeric-union-type-ranges component-type))))
         (let ((ctype (upgraded-complex-part-ctype typespec context)))
-          (if (eq ctype *empty-type*)
-              ctype
+          ;; this is the two types NIL and (EQL 0)
+          (if (csubtypep ctype (sb-kernel:specifier-type '(eql 0)))
+              *empty-type*
               (etypecase ctype
                 (numeric-union-type
                  (complex1 ctype))
