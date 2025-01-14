@@ -1264,7 +1264,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; TODO: We could use a bytecode compiler here to produce smaller
 ;;; code. Same goes for top level code.
 (defun compile-load-time-value (form)
-  (let ((lambda (compile-load-time-stuff form t)))
+  (let* (*compiler-error-context*
+         (lambda (compile-load-time-stuff form t)))
     (values (fasl-dump-load-time-value-lambda lambda *compile-object*)
             (let ((type (leaf-type lambda)))
               (if (fun-type-p type)

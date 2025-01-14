@@ -899,7 +899,6 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 #endif
 
 void save_interrupt_context(struct thread *thread, os_context_t *context) {
-    
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
     int context_index =
@@ -997,8 +996,6 @@ void save_context_for_ldb(os_context_t *context) {
         fake_foreign_function_call(context);
     else
         save_interrupt_context(thread, context);
-    
-    
 }
 
 /* a handler for the signal caused by execution of a trap opcode
