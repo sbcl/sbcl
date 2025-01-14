@@ -1020,3 +1020,7 @@
 (with-test (:name :complex-type-of)
   (assert (equal (type-of (opaque-identity #c(1 2)))
                  '(complex rational))))
+
+(with-test (:name :complex-sub-real)
+  (assert (equal (sb-ext:typexpand-all '(or (complex rational) (complex single-float)))
+                 (sb-ext:typexpand-all '(complex (or rational single-float))))))

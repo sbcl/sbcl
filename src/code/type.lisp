@@ -2732,6 +2732,10 @@ expansion happened."
        (specifier-type 'double-float))
       ((csubtypep ctype (specifier-type 'float))
        (specifier-type 'float))
+      ((not (types-equal-or-intersect ctype (specifier-type 'double-float)))
+       (specifier-type '(or rational single-float)))
+      ((not (types-equal-or-intersect ctype (specifier-type 'single-float)))
+       (specifier-type '(or rational double-float)))
       (t
        (specifier-type 'real)))))
 
