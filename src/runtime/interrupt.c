@@ -2186,8 +2186,13 @@ handle_memory_fault_emulation_trap(os_context_t *context)
 #  else
     *os_context_sp_addr(context) = (os_context_register_t)sp;
 #  endif
-    fake_foreign_function_call(context);
+
 #endif /* C_STACK_IS_CONTROL_STACK */
+    int in_lisp = !foreign_function_call_active_p(get_sb_vm_thread());
+
+    if (in_lisp)
+        fake_foreign_function_call(context);
+
     /* On x86oids, we're in handle_memory_fault_emulation_trap().
      * On real computers, we're still in lisp_memory_fault_error(). */
 
@@ -2197,7 +2202,9 @@ handle_memory_fault_emulation_trap(os_context_t *context)
     DX_ALLOC_SAP(fault_address_sap, addr);
     funcall2(StaticSymbolFunction(MEMORY_FAULT_ERROR),
              context_sap, fault_address_sap);
-    undo_fake_foreign_function_call(context);
+
+    if (in_lisp)
+        undo_fake_foreign_function_call(context);
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
