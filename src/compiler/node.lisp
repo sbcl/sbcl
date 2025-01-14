@@ -410,8 +410,8 @@
 
 ;;; The LOOP structure holds information about a loop.
 (defstruct (cloop (:conc-name loop-)
-                  (:predicate loop-p)
-                  (:constructor make-loop (&key kind head tail))
+                  (:predicate nil)
+                  (:constructor make-loop (kind head &optional tail))
                   (:copier nil))
   ;; The kind of loop that this is.  These values are legal:
   ;;
@@ -427,7 +427,7 @@
   (kind (missing-arg) :type (member :outer :natural :strange))
   ;; The first and last blocks in the loop.  There may be more than one tail,
   ;; since there may be multiple back branches to the same head.
-  (head nil :type (or cblock null))
+  (head (missing-arg) :type cblock :read-only t)
   (tail nil :type list)
   ;; A list of all the blocks in this loop or its inferiors that have a
   ;; successor outside of the loop.
@@ -553,7 +553,7 @@
                       (:constructor make-component
                        (head tail &aux (last-block tail)
                                        (outer-loop
-                                        (make-loop :kind :outer :head head :tail (list tail))))))
+                                        (make-loop :outer head (list tail))))))
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.

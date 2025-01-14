@@ -188,8 +188,7 @@
 ;;; loop segment.
 (defun note-loop-head (head component)
   (declare (ignore component))
-  (let ((result (make-loop :head head
-                           :kind :natural))
+  (let ((result (make-loop :natural head))
         (number (block-number head)))
     (dolist (pred (block-pred head))
       (when (<= (block-number pred) number)
