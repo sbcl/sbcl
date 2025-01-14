@@ -1080,7 +1080,6 @@ signal_internal_error_or_lose(os_context_t *ctx,
 
     if ((long int)exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         lisp_memory_fault_warning(ctx, fault_address);
-        undo_fake_foreign_function_call(ctx);
     }
 
     if (internal_errors_enabled) {
