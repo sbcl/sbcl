@@ -2132,7 +2132,7 @@ or they must be declared locally notinline at each call site.~@:>"
                      ;; naming slots, so we don't have to compare by STRING= later?
                      ;; Probably not because other symbols could reference them.
                      (setq opt (rewrite opt () parse-optional-arg-spec pretty))
-                     (when rest (vars (car rest) pretty))
+                     (when rest (vars (car rest)))
                      (setq keys (rewrite keys (key) parse-key-arg-spec pretty))
                      (dolist (arg aux-vars)
                        (vars arg))

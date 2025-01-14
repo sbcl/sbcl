@@ -4,6 +4,9 @@ changes relative to sbcl-2.5.0:
   * minor incompatible change: SBCL now reveals details of its COMPLEX
     representations through UPGRADED-COMPLEX-PART-TYPE, rather than hiding
     them.
+  * bug fix: structure BOA constructors with &REST arguments no longer cause
+    structure slots named NIL or T to be unconditionally initialized with the
+    values NIL and T respectively.
 
 changes in sbcl-2.5.0 relative to sbcl-2.4.11:
   * platform support:
