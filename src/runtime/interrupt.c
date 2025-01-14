@@ -898,11 +898,36 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 }
 #endif
 
+void save_interrupt_context(struct thread *thread, os_context_t *context) {
+    
+    /* Do dynamic binding of the active interrupt context index
+     * and save the context in the context array. */
+    int context_index =
+        fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+
+    if (context_index >= MAX_INTERRUPTS)
+        lose("maximum interrupt nesting depth (%d) exceeded", MAX_INTERRUPTS);
+
+    bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
+                  make_fixnum(context_index + 1),thread);
+
+    nth_interrupt_context(context_index, thread) = context;
+}
+
+void drop_interrupt_context(struct thread *thread) {
+#ifdef LISP_FEATURE_SB_THREAD
+    // Never leave stale pointers in the signal context array
+    nth_interrupt_context(fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread)) - 1, thread) = NULL;
+#endif
+    /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
+    unbind(thread);
+}
+
 /* Stores the context for gc to scavenge and builds fake stack
  * frames. */
 void fake_foreign_function_call_noassert(os_context_t *context)
 {
-    int context_index;
+
     struct thread *thread = get_sb_vm_thread();
 
 #ifdef reg_BSP
@@ -918,18 +943,7 @@ void fake_foreign_function_call_noassert(os_context_t *context)
                   thread);
 #endif
 
-    /* Do dynamic binding of the active interrupt context index
-     * and save the context in the context array. */
-    context_index =
-        fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
-
-    if (context_index >= MAX_INTERRUPTS)
-        lose("maximum interrupt nesting depth (%d) exceeded", MAX_INTERRUPTS);
-
-    bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
-                  make_fixnum(context_index + 1),thread);
-
-    nth_interrupt_context(context_index, thread) = context;
+    save_interrupt_context(thread, context);
 
     build_fake_control_stack_frames(thread, context);
 
@@ -964,12 +978,7 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 
     foreign_function_call_active_p(thread) = 0;
 
-#ifdef LISP_FEATURE_SB_THREAD
-    // Never leave stale pointers in the signal context array
-    nth_interrupt_context(fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread)) - 1, thread) = NULL;
-#endif
-    /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
-    unbind(thread);
+    drop_interrupt_context(thread);
 
 #if defined(LISP_FEATURE_ARM)
     /* Restore our saved control stack pointer */
@@ -979,6 +988,17 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
                    thread);
     unbind(thread);
 #endif
+}
+
+void save_context_for_ldb(os_context_t *context) {
+    struct thread *thread = get_sb_vm_thread();
+
+    if(!foreign_function_call_active_p(thread))
+        fake_foreign_function_call(context);
+    else
+        save_interrupt_context(thread, context);
+    
+    
 }
 
 /* a handler for the signal caused by execution of a trap opcode
@@ -2032,7 +2052,7 @@ sigabrt_handler(int __attribute__((unused)) signal,
 {
     /* Save the interrupt context. No need to undo it, since lose()
      * shouldn't return. */
-    fake_foreign_function_call(context);
+    save_context_for_ldb(context);
     lose("SIGABRT received.");
 }
 
@@ -2101,10 +2121,9 @@ void lisp_memory_fault_warning(os_context_t *context, os_vm_address_t addr) {
                            addr, (void*)os_context_pc(context));
 #endif
         /* If we lose on corruption, provide LDB with debugging information. */
-        fake_foreign_function_call(context);
+        if (lose_on_corruption_p || gc_active_p)
+            save_context_for_ldb(context);
         maybe_lose();
-    } else {
-        fake_foreign_function_call(context);
     }
 }
 
@@ -2138,7 +2157,6 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
      * works as long as the on-stack side only pops items in its trap
      * handler. */
     extern void memory_fault_emulation_trap(void);
-    undo_fake_foreign_function_call(context);
     void **sp = (void **)*os_context_sp_addr(context);
     *--sp = (void *)os_context_pc(context);
     *--sp = addr;
