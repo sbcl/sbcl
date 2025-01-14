@@ -488,7 +488,7 @@
 (defun compute-fastrem-coefficient (d n fraction-bits)
   (multiple-value-bind (smallest-f c)
       (flet ((is-pow2 (n)
-               (declare (unsigned-byte n))
+               (declare (type unsigned-byte n))
                (let ((l (integer-length n)))
                  (= n (ash 1 (1- l))))))
         (if (is-pow2 d)

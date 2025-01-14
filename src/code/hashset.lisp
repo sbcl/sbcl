@@ -278,7 +278,7 @@
 ;;; Currently these hashsets can't represent 0 or NIL as a key per se]
 (defun hs-cells-occupancy (cells limit)
   (declare (type (or simple-vector weak-vector) cells)
-           (index limit))
+           (type index limit))
   (let ((count-live 0)
         (count-nil 0) ; GC smashes to NIL, so these are tombstones
         (count-0 0) ; cells are 0-initialized, so this indicates never used

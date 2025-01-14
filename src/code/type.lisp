@@ -3006,7 +3006,7 @@ expansion happened."
                 (do ((pairs pairs (cdr pairs)))
                     ((null pairs) (nreverse result))
                   (destructuring-bind (low . high) (car pairs)
-                    (declare (%char-code low high))
+                    (declare (type %char-code low high))
                     (loop for (low1 . high1) in (cdr pairs)
                           if (<= (the %char-code low1) (1+ high))
                           do (progn (setf high (max high (the %char-code high1)))

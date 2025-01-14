@@ -138,7 +138,7 @@
   ;; For each key in the smaller, count the elements missing from the larger.
   (if (hash-table-p data)
       (let ((missing 0))
-        (declare (index missing))
+        (declare (type index missing))
         (map-xset (lambda (x) (unless (gethash x data) (incf missing))) small)
         (cond ((= missing 0) large)
               (t
@@ -217,7 +217,7 @@
 (defun xset-elts-hash (xset)
   (let* ((c (xset-count xset))
          (h (mix c c)))
-    (declare (sb-xc:fixnum h))
+    (declare (type sb-xc:fixnum h))
     ;; Use modular addition as the hash mixer since it is commutative and associative,
     ;; and the low bits come out the same no matter the order of operations.
     (let ((hashes (xset-extra xset)))

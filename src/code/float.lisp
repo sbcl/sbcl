@@ -371,7 +371,7 @@
   "Return a floating-point number that has the same sign as
    FLOAT1 and, if FLOAT2 is given, has the same absolute value
    as FLOAT2."
-  (declare (float float1 float2) (explicit-check))
+  (declare (type float float1 float2) (explicit-check))
   (sb-xc:*
    (if (etypecase float1
          (single-float (minusp (single-float-bits float1)))
@@ -441,7 +441,7 @@
 ;;; Handle the single-float case of INTEGER-DECODE-FLOAT. If an infinity or
 ;;; NaN, error.
 (defun integer-decode-single-float (x)
-  (declare (single-float x))
+  (declare (type single-float x))
   (let* ((bits (single-float-bits x))
          (frac (ldb sb-vm:single-float-significand-byte bits))
          (sign (if (minusp bits) -1 1))
@@ -457,7 +457,7 @@
 
 ;;; like INTEGER-DECODE-SINGLE-FLOAT, only doubly so
 (defun integer-decode-double-float (x)
-  (declare (double-float x))
+  (declare (type double-float x))
   #-64-bit ; treat high and low bits separately until the end
   (let* ((hi (double-float-high-bits x))
          (sign (if (minusp hi) -1 1))
@@ -508,7 +508,7 @@
 ;;; error. For subnormals, we left-align the significant bits into a field
 ;;; that is FLOAT-DIGITS wide, and decrease the exponent.
 (defun decode-single-float (x)
-  (declare (single-float x))
+  (declare (type single-float x))
   (let* ((bits (single-float-bits x))
          (biased-exp (ldb sb-vm:single-float-exponent-byte bits)))
     (if (> biased-exp sb-vm:single-float-normal-exponent-max)
@@ -535,7 +535,7 @@
 ;;; but there is a consed bignum or two on 32-bit architectures.
 ;;; Consing for the sake of code clarity is worth it as far as I'm concerned.
 (defun decode-double-float (x)
-  (declare (double-float x))
+  (declare (type double-float x))
   (let* #+64-bit ((bits (double-float-bits x))
                   (biased-exp (ldb sb-vm:double-float-exponent-byte bits)))
         #-64-bit ((high (double-float-high-bits x))

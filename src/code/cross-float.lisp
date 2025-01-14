@@ -59,7 +59,7 @@
             (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x)))))
 
 (defun xfloat-coerce (object type)
-  (declare (number object))
+  (declare (type number object))
   (when (member type '(integer rational real))
     ;; This branch won't accept (coerce x 'real) if X is one of our
     ;; target-floats. We don't need that apparently.
