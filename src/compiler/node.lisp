@@ -551,7 +551,9 @@
 ;;;   component.
 (defstruct (component (:copier nil)
                       (:constructor make-component
-                       (head tail &aux (last-block tail))))
+                       (head tail &aux (last-block tail)
+                                       (outer-loop
+                                        (make-loop :kind :outer :head head :tail (list tail))))))
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -646,7 +648,7 @@
   (reanalyze-functionals nil :type list)
   (delete-blocks nil :type list)
   ;; The default LOOP in the component.
-  (outer-loop (make-loop :kind :outer :head head :tail (list tail)) :type cloop)
+  (outer-loop (missing-arg) :type cloop)
   (max-block-number 0 :type fixnum)
   (dominators-computed nil))
 
