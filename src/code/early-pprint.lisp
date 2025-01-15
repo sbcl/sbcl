@@ -120,17 +120,21 @@
                                     (cout #'pretty-out)
                                     (sout #'pretty-sout)
                                     (misc #'pretty-misc))
-                          (:constructor make-pretty-stream (target))
+                          (:constructor make-pretty-stream
+                                        (target
+                                         &aux
+                                         (line-length
+                                          (or *print-right-margin*
+                                              (sb-impl::line-length target)
+                                              default-line-length))
+                                         (buffer-start-column
+                                          (or (sb-impl::charpos target) 0))))
                           (:copier nil))
   ;; Where the output is going to finally go.
   (target (missing-arg) :type stream :read-only t)
   ;; Line length we should format to. Cached here so we don't have to keep
   ;; extracting it from the target stream.
-  (line-length (or *print-right-margin*
-                   (sb-impl::line-length target)
-                   default-line-length)
-               :type column
-               :read-only t)
+  (line-length (missing-arg) :type column :read-only t)
   ;; If non-nil, a function to call before performing OUT or SOUT
   (char-out-oneshot-hook nil :type (or null function))
   ;; A simple string holding all the text that has been output but not yet
@@ -149,7 +153,7 @@
   ;; The column the first character in the buffer will appear in. Normally
   ;; zero, but if we end up with a very long line with no breaks in it we
   ;; might have to output part of it. Then this will no longer be zero.
-  (buffer-start-column (or (sb-impl::charpos target) 0) :type column)
+  (buffer-start-column (missing-arg) :type column)
   ;; The line number we are currently on. Used for *PRINT-LINES*
   ;; abbreviations and to tell when sections have been split across
   ;; multiple lines.
