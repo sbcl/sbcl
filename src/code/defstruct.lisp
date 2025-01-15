@@ -45,8 +45,7 @@
          (if (functionp fun)
              (funcall fun ,@slot-vars)
              (funcall (setf (car cell)
-                            (%make-structure-instance-allocator ,dd ,slot-specs
-                                                                ',slot-vars))
+                            (%make-structure-instance-allocator ,dd ,slot-specs ',slot-vars))
                       ,@slot-vars)))))
 
 (sb-xc:defmacro %new-instance (layout size)
@@ -67,13 +66,15 @@
 (declaim (ftype (sfunction (defstruct-description list list) function)
                 %make-structure-instance-allocator))
 (defun %make-structure-instance-allocator (dd slot-specs slot-vars)
-  (values (compile nil
-                   `(lambda ,(loop for var in slot-vars
-                                   collect (if (consp var)
-                                               (third var)
-                                               var))
-                      (declare (optimize (sb-c:store-source-form 0)))
-                      (%make-structure-instance-macro ,dd ',slot-specs ,@slot-vars)))))
+  (let* ((args (make-gensym-list (length slot-vars)))
+         (vals (mapcar (lambda (v a) (if (typep v '(cons (member the the*)))
+                                         `(,(first v) ,(second v) ,a)
+                                         a))
+                       slot-vars args)))
+    (values (compile nil
+                     `(lambda ,args
+                        (declare (optimize (sb-c:store-source-form 0)))
+                        (%make-structure-instance-macro ,dd ',slot-specs ,@vals))))))
 
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
   (when slot-specs
