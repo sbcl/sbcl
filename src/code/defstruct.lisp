@@ -2103,7 +2103,13 @@ or they must be declared locally notinline at each call site.~@:>"
             (aux-vars name)
             (unless (typep binding '(cons t cons))
               (skipped-vars name))))
-        (macrolet ((rewrite (input key parse pretty)
+        (macrolet ((walk (input key parse)
+                     `(dolist (arg ,input)
+                        (multiple-value-bind (,@key var def sup-p) (,parse arg)
+                          (declare (ignore ,@key def))
+                          (vars var)
+                          (when sup-p (vars (car sup-p))))))
+                   (rewrite (input key parse pretty)
                      `(mapcar
                        (lambda (arg)
                          (multiple-value-bind (,@key var def sup-p) (,parse arg)
@@ -2111,8 +2117,6 @@ or they must be declared locally notinline at each call site.~@:>"
                            (rewrite-1 arg var sup-p ,pretty)))
                        ,input)))
           (labels ((rewrite-1 (arg var sup-p-var pretty)
-                     (vars var)
-                     (when sup-p-var (vars (car sup-p-var)))
                      (let* ((slot (unless (member var (aux-vars) :test #'string=)
                                     (find var (dd-slots dd)
                                           :key #'dsd-name :test #'string=)))
@@ -2129,21 +2133,26 @@ or they must be declared locally notinline at each call site.~@:>"
                              ,@sup-p-var)
                            arg)))        ; keep it as it was
                    (make-ll (opt rest keys aux-vars &optional pretty)
+                     (declare (ignore aux-vars))
                      ;; Can we substitute symbols that are not EQ to symbols
                      ;; naming slots, so we don't have to compare by STRING= later?
                      ;; Probably not because other symbols could reference them.
                      (setq opt (rewrite opt () parse-optional-arg-spec pretty))
-                     (when rest (vars (car rest)))
                      (setq keys (rewrite keys (key) parse-key-arg-spec pretty))
-                     (dolist (arg aux-vars)
-                       (vars arg))
                      (sb-c::make-lambda-list
                       llks nil req opt rest keys
                       ;; &AUX vars which do not initialize a slot are not mentioned
                       ;; in the lambda list, though it's not clear what to do if
                       ;; subsequent bindings refer to the deleted ones.
                       ;; And worse, what if it's SETQd - is that even legal?
-                      (remove-if (lambda (x) (not (typep x '(cons t cons)))) aux))))
+                      (remove-if (lambda (x) (not (typep x '(cons t cons)))) aux)))
+                   (walk-ll (opt rest keys aux-vars)
+                     (walk opt () parse-optional-arg-spec)
+                     (when rest (vars (car rest)))
+                     (walk keys (key) parse-key-arg-spec)
+                     (dolist (arg aux-vars)
+                       (vars arg))))
+            (walk-ll opt rest keys (aux-vars))
             `(,(make-ll opt rest keys (aux-vars))
               (declare (explicit-check)
                        (sb-c::lambda-list ,(make-ll opt rest keys (aux-vars) t)))
