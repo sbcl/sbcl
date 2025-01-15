@@ -78,7 +78,7 @@
   ;; and we're not using threads (yet).
   (inst .skip (* 68 n-word-bytes))
   (flet ((reg (offset sc)
-           (make-random-tn :kind :normal :sc (sc-or-lose sc) :offset offset)))
+           (make-random-tn (sc-or-lose sc) offset)))
     ;;  -8 = arg
     ;; -16 = caller's LR spill (for calling into me)
     ;; -24 = my LR spill (for calling out to C)

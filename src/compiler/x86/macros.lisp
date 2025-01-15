@@ -415,9 +415,7 @@
        (cond ((and (sc-is x any-reg descriptor-reg)
                    (or (= offset eax-offset) (= offset ebx-offset)
                        (= offset ecx-offset) (= offset edx-offset)))
-              (inst test (make-random-tn :kind :normal
-                                         :sc (sc-or-lose 'byte-reg)
-                                         :offset offset)
+              (inst test (make-random-tn (sc-or-lose 'byte-reg) offset)
                     y))
              ((sc-is x control-stack)
               (inst test (make-ea :byte :base ebp-tn

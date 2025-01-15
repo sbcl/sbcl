@@ -213,9 +213,7 @@
             (without-scheduling ()
               ;; Encode the RESULT-TN, SIZE, and TYPE in an OR instruction
               ;; which is never executed.
-              (inst or (make-random-tn :sc (sc-or-lose 'unsigned-reg)
-                                       :kind :normal
-                                       :offset (if (eq type 'list) 1 0))
+              (inst or (make-random-tn (sc-or-lose 'unsigned-reg) (if (eq type 'list) 1 0))
                     result-tn size)
               (emit-label FULL-ALLOC)
               ;; Trap into the C allocator

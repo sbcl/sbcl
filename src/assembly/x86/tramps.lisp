@@ -11,9 +11,7 @@
   (inst pop (make-ea :dword :base ebp-tn :disp 4))
   (error-call nil 'undefined-fun-error
               ;; We can't just use EAX-TN because the SC is wrong.
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset eax-offset)))
+              (make-random-tn (sc-or-lose 'descriptor-reg) eax-offset)))
 
 (define-assembly-routine
     (closure-tramp (:return-style :none))

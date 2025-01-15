@@ -401,9 +401,7 @@
                 ,@(map 'list
                        (lambda (reg-name)
                          `(define-load-time-global ,(symbolicate reg-name "-TN")
-                              (make-random-tn :kind :normal
-                                              :sc (sc-or-lose ',sc-name)
-                                              :offset ,(incf i))))
+                              (make-random-tn (sc-or-lose ',sc-name) ,(incf i))))
                        (symbol-value name-array))))
            (def-fpr-tns (sc-name &rest reg-names)
              (collect ((forms))
@@ -411,16 +409,14 @@
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
                    (forms `(define-load-time-global ,tn-name
-                               (make-random-tn :kind :normal
-                                               :sc (sc-or-lose ',sc-name)
-                                               :offset ,offset-name))))))))
+                               (make-random-tn (sc-or-lose ',sc-name) ,offset-name))))))))
   (def-gpr-tns unsigned-reg +qword-register-names+)
   ;; RIP is not an addressable register, but this global var acts as
   ;; a moniker for it in an effective address so that the EA structure
   ;; does not need to accept a symbol (such as :RIP) for the base reg.
   ;; Because there is no :OFFSET, unanticipated use will be caught.
   (define-load-time-global rip-tn
-      (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)))
+      (make-random-tn (sc-or-lose 'unsigned-reg) nil))
   (def-fpr-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))

@@ -149,9 +149,13 @@
                                       (and (consp x) (uninternable-p (car x))))
                                     (dd-constructors dd))))))
              (classoid-subclasses (find-classoid t)))
-    ;; PATHNAME is not a structure-classoid
-    (setf (sb-kernel:dd-constructors (sb-kernel:find-defstruct-description 'pathname))
-          nil)
+
+    (loop for type in '(pathname ;; PATHNAME is not a structure-classoid
+                        sb-c:storage-class
+                        sb-c:storage-base)
+          do
+          (setf (sb-kernel:dd-constructors (sb-kernel:find-defstruct-description type))
+                nil))
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
     ;; it worked. It should be an error if any uninternable symbols remain,
     ;; but at present there are about 7 symbols with referrers.

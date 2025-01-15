@@ -134,11 +134,11 @@
                          (clambda
                           (make-normal-tn *backend-t-primitive-type*)))))))
     (let ((res (make-ir2-environment
-                :closure ir2-environment-alist
-                :return-pc-pass #+fp-and-pc-standard-save
-                                old-pc
-                                #-fp-and-pc-standard-save
-                                (make-return-pc-passing-location (xep-p clambda)))))
+                ir2-environment-alist
+                #+fp-and-pc-standard-save
+                old-pc
+                #-fp-and-pc-standard-save
+                (make-return-pc-passing-location (xep-p clambda)))))
       (setf (environment-info lambda-environment) res)
       (setf (ir2-environment-old-fp res)
             #-fp-and-pc-standard-save
@@ -249,27 +249,20 @@
                    (not (eq (tail-set-type tails) *empty-type*)))
           (return-value-efficiency-note tails))
         (cond ((eq use-standard :unboxed)
-               (make-return-info :kind :unboxed
-                                 :count count
-                                 :primitive-types ptypes
-                                 :types types
-                                 :locations
+               (make-return-info :unboxed
+                                 count
+                                 ptypes
+                                 types
                                  (let ((state (sb-vm::make-fixed-call-args-state)))
                                    (loop for type in (if specialized-xep-type
                                                          (mapcar #'primitive-type (values-type-required specialized-xep-type))
                                                          ptypes)
                                          collect (sb-vm::fixed-call-arg-location type state)))))
               ((or (eq count :unknown) use-standard)
-               (make-return-info :kind :unknown
-                                 :count count
-                                 :primitive-types ptypes
-                                 :types types))
+               (make-return-info :unknown count ptypes types))
               (t
-               (make-return-info :kind :fixed
-                                 :count count
-                                 :primitive-types ptypes
-                                 :types types
-                                 :locations (mapcar #'make-normal-tn ptypes))))))))
+               (make-return-info :fixed count ptypes types
+                                 (mapcar #'make-normal-tn ptypes))))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
 (defun assign-return-locations (fun)
@@ -295,21 +288,21 @@
     (dolist (nlx (environment-nlx-info env))
       (setf (nlx-info-info nlx)
             (make-ir2-nlx-info
-             :home (when (member (cleanup-kind (nlx-info-cleanup nlx))
-                                 '(:block :tagbody))
-                     (if (nlx-info-safe-p nlx)
-                         (make-normal-tn *backend-t-primitive-type*)
-                         (make-stack-pointer-tn)))
-             :save-sp (unless (eq (cleanup-kind (nlx-info-cleanup nlx))
-                                  :unwind-protect)
-                        (make-nlx-sp-tn env))
-             :block-tn (environment-live-tn
-                        (make-normal-tn
-                         (primitive-type-or-lose
-                          (ecase (cleanup-kind (nlx-info-cleanup nlx))
-                            (:catch
-                                'catch-block)
-                            ((:unwind-protect :block :tagbody)
-                             'unwind-block))))
-                        env)))))
+             (when (member (cleanup-kind (nlx-info-cleanup nlx))
+                           '(:block :tagbody))
+               (if (nlx-info-safe-p nlx)
+                   (make-normal-tn *backend-t-primitive-type*)
+                   (make-stack-pointer-tn)))
+             (unless (eq (cleanup-kind (nlx-info-cleanup nlx))
+                         :unwind-protect)
+               (make-nlx-sp-tn env))
+             (environment-live-tn
+              (make-normal-tn
+               (primitive-type-or-lose
+                (ecase (cleanup-kind (nlx-info-cleanup nlx))
+                  (:catch
+                      'catch-block)
+                  ((:unwind-protect :block :tagbody)
+                   'unwind-block))))
+              env)))))
   (values))

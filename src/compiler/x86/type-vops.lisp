@@ -37,9 +37,7 @@
     (cond ((and (sc-is value any-reg descriptor-reg)
                 (or (= offset eax-offset) (= offset ebx-offset)
                     (= offset ecx-offset) (= offset edx-offset)))
-           (inst cmp (make-random-tn :kind :normal
-                                     :sc (sc-or-lose 'byte-reg)
-                                     :offset offset)
+           (inst cmp (make-random-tn (sc-or-lose 'byte-reg) offset)
                  immediate))
           (t
            (move eax-tn value)

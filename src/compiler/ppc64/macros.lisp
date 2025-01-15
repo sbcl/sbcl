@@ -205,7 +205,7 @@
          #+sigill-traps
          (let ((continue (gen-label)))
            (inst beq continue)
-           (inst mfmq (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg) :offset 1))
+           (inst mfmq (make-random-tn (sc-or-lose 'unsigned-reg) 1))
            (emit-label continue))
          #-sigill-traps
          (inst twi :ne ,flag-tn 0)))))

@@ -59,14 +59,10 @@
   (ecase style
     (:raw
      `((inst j
-             (make-random-tn :kind :normal
-                             :sc (sc-or-lose 'interior-reg)
-                             :offset lip-offset)
+             (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
              8)
        (inst nop)))
     (:full-call
-     `((lisp-return (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'descriptor-reg)
-                                    :offset lra-offset)
+     `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
                     :offset 2)))
     (:none)))

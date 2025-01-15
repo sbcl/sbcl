@@ -489,9 +489,7 @@
     ;; here because it would conflict with the existing NFP if there
     ;; is a number-stack frame in play, but we only use it prior to
     ;; actually setting up the "real" NFP.
-    (let ((result (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'any-reg)
-                                  :offset nfp-offset))
+    (let ((result (make-random-tn (sc-or-lose 'any-reg) nfp-offset))
           (delta (- (sb-allocated-size 'control-stack) fixed)))
       (assemble ()
         ;; Compute the end of the fixed stack frame (start of the MORE

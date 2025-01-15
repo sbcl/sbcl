@@ -59,9 +59,6 @@
      `((inst j lip-tn)
        (inst nop)))
     (:full-call
-     `((lisp-return (make-random-tn :kind :normal
-                                    :sc (sc-or-lose
-                                         'descriptor-reg)
-                                    :offset lra-offset)
+     `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
                     lip-tn :offset 2)))
     (:none)))

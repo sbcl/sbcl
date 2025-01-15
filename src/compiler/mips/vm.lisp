@@ -258,9 +258,7 @@
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
                  `(defparameter ,tn-sym
-                   (make-random-tn :kind :normal
-                    :sc (sc-or-lose ',sc)
-                    :offset ,offset-sym)))))
+                   (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
   (defregtn zero any-reg)
   (defregtn nargs any-reg)
 
@@ -342,9 +340,7 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+              (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))
 
 ;;; This is used by the debugger.

@@ -210,9 +210,7 @@
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
                  `(defparameter ,tn-sym
-                   (make-random-tn :kind :normal
-                    :sc (sc-or-lose ',sc)
-                    :offset ,offset-sym)))))
+                   (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
@@ -265,9 +263,7 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+              (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))
 
 ;;; This function is called by debug output routines that want a pretty name

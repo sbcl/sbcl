@@ -161,18 +161,14 @@
 ;;;; Complex float move functions
 
 (defun complex-single-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (tn-offset x)))
+  (make-random-tn (sc-or-lose 'single-reg) (tn-offset x)))
 (defun complex-single-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (+ (tn-offset x) 2)))
+  (make-random-tn (sc-or-lose 'single-reg) (+ (tn-offset x) 2)))
 
 (defun complex-double-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (tn-offset x)))
+  (make-random-tn (sc-or-lose 'double-reg) (tn-offset x)))
 (defun complex-double-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (+ (tn-offset x) 2)))
+  (make-random-tn (sc-or-lose 'double-reg) (+ (tn-offset x) 2)))
 
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))

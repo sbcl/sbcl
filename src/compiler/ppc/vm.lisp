@@ -238,9 +238,7 @@
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
                  `(defparameter ,tn-sym
-                   (make-random-tn :kind :normal
-                    :sc (sc-or-lose ',sc)
-                    :offset ,offset-sym)))))
+                   (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
   (defregtn zero any-reg)
   (defregtn lip interior-reg)
@@ -306,14 +304,11 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+              (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))
 
 (defparameter thread-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset thread-offset))
+  (make-random-tn (sc-or-lose 'unsigned-reg) thread-offset))
 
 (export 'single-value-return-byte-offset)
 

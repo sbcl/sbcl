@@ -7,10 +7,7 @@
 
 #+generational
 (flet ((reg (offset sc)
-         (make-random-tn
-          :kind :normal
-          :sc (sc-or-lose sc)
-          :offset offset))
+         (make-random-tn (sc-or-lose sc) offset))
        (reverse-pairs (list)
          (let (result)
            (loop for (a b) on list by #'cddr

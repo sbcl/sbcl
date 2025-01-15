@@ -164,10 +164,7 @@
           (return)))
     `(let ,(mapcar (lambda (reg)
                      `(,(reg-spec-name reg)
-                       (make-random-tn
-                        :kind :normal
-                        :sc (sc-or-lose ',(reg-spec-sc reg))
-                        :offset ,(reg-spec-offset reg))))
+                       (make-random-tn (sc-or-lose ',(reg-spec-sc reg)) ,(reg-spec-offset reg))))
                    regs)
        ,@(decls)
        (assemble (:code 'nil)

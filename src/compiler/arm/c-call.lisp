@@ -380,9 +380,7 @@
 #-sb-xc-host
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
   (flet ((make-tn (offset &optional (sc-name 'any-reg))
-           (make-random-tn :kind :normal
-                           :sc (sc-or-lose sc-name)
-                           :offset offset)))
+           (make-random-tn (sc-or-lose sc-name) offset)))
     (let* ((segment (make-segment))
            ;; How many arguments have been copied
            (arg-count 0)

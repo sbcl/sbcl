@@ -33,9 +33,7 @@
   #'equal)
 
 (defun make-reg-tn (offset &optional (sc 'any-reg))
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose sc)
-                  :offset offset))
+  (make-random-tn (sc-or-lose sc) offset))
 
 (defenum (:start 10)
   ca0-offset

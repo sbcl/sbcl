@@ -311,9 +311,7 @@
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
                    (forms `(defglobal ,tn-name
-                             (make-random-tn :kind :normal
-                                             :sc (sc-or-lose ',sc-name)
-                                             :offset ,offset-name))))))))
+                             (make-random-tn (sc-or-lose ',sc-name) ,offset-name))))))))
 
   (def-misc-reg-tns unsigned-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
@@ -330,9 +328,7 @@
 #|
 ;;; added by pw
 (defparameter fp-constant-tn
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'fp-constant)
-                  :offset 31))          ; Offset doesn't get used.
+  (make-random-tn (sc-or-lose 'fp-constant) 31))          ; Offset doesn't get used.
 |#
 
 ;;; If value can be represented as an immediate constant, then return

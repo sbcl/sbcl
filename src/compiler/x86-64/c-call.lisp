@@ -469,9 +469,7 @@
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
   (labels ((make-tn-maker (sc-name)
              (lambda (offset)
-               (make-random-tn :kind :normal
-                               :sc (sc-or-lose sc-name)
-                               :offset offset))))
+               (make-random-tn (sc-or-lose sc-name) offset))))
     (let* ((segment (make-segment))
            (rax rax-tn)
            #+win32 (rcx rcx-tn)

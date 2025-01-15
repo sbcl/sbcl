@@ -484,11 +484,9 @@
   #-darwin
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+             (make-random-tn (sc-or-lose 'any-reg) n))
            (make-fpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose
-                                                'double-reg) :offset
-                                                n)))
+             (make-random-tn (sc-or-lose 'double-reg) n)))
       (let* ((segment (make-segment)))
         (assemble (segment 'nil)
           ;; Copy args from registers or stack to new position
@@ -702,9 +700,9 @@
   #+darwin
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+             (make-random-tn (sc-or-lose 'any-reg) n))
            (make-fpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg) :offset n)))
+             (make-random-tn (sc-or-lose 'double-reg) n)))
       (let* ((segment (make-segment)))
         (assemble (segment)
           ;; To save our arguments, we follow the algorithm sketched in the

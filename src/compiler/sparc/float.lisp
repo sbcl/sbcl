@@ -41,12 +41,10 @@
     ((member :sparc-v9 *backend-subfeatures*)
      (inst ldqf reg base offset))
     (t
-     (let ((reg0 (make-random-tn :kind :normal
-                                 :sc (sc-or-lose 'double-reg)
-                                 :offset (tn-offset reg)))
-           (reg2 (make-random-tn :kind :normal
-                                 :sc (sc-or-lose 'double-reg)
-                                 :offset (+ 2 (tn-offset reg)))))
+     (let ((reg0 (make-random-tn (sc-or-lose 'double-reg)
+                                 (tn-offset reg)))
+           (reg2 (make-random-tn (sc-or-lose 'double-reg)
+                                 (+ 2 (tn-offset reg)))))
        (cond ((integerp offset)
               (inst lddf reg0 base offset)
               (inst lddf reg2 base (+ offset (* 2 n-word-bytes))))
@@ -71,12 +69,10 @@
     ((member :sparc-v9 *backend-subfeatures*)
      (inst stqf reg base offset))
     (t
-     (let ((reg0 (make-random-tn :kind :normal
-                                 :sc (sc-or-lose 'double-reg)
-                                 :offset (tn-offset reg)))
-           (reg2 (make-random-tn :kind :normal
-                                 :sc (sc-or-lose 'double-reg)
-                                 :offset (+ 2 (tn-offset reg)))))
+     (let ((reg0 (make-random-tn (sc-or-lose 'double-reg)
+                                 (tn-offset reg)))
+           (reg2 (make-random-tn (sc-or-lose 'double-reg)
+                                 (+ 2 (tn-offset reg)))))
        (cond ((integerp offset)
               (inst stdf reg0 base offset)
               (inst stdf reg2 base (+ offset (* 2 n-word-bytes))))
@@ -105,12 +101,10 @@
      (inst fmovd dst src))
     (t
      (dotimes (i 2)
-       (let ((dst (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ i (tn-offset dst))))
-             (src (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ i (tn-offset src)))))
+       (let ((dst (make-random-tn (sc-or-lose 'single-reg)
+                                  (+ i (tn-offset dst))))
+             (src (make-random-tn (sc-or-lose 'single-reg)
+                                  (+ i (tn-offset src)))))
          (inst fmovs dst src))))))
 
 ;;; Exploit the V9 long-float move instruction. This is conditional
@@ -121,12 +115,10 @@
      (inst fmovq dst src))
     (t
      (dotimes (i 4)
-       (let ((dst (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ i (tn-offset dst))))
-             (src (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ i (tn-offset src)))))
+       (let ((dst (make-random-tn (sc-or-lose 'single-reg)
+                                  (+ i (tn-offset dst))))
+             (src (make-random-tn (sc-or-lose 'single-reg)
+                                  (+ i (tn-offset src)))))
          (inst fmovs dst src))))))
 
 (macrolet ((frob (vop sc format)
@@ -259,27 +251,21 @@
 ;;;; Complex float move functions
 
 (defun complex-single-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (tn-offset x)))
+  (make-random-tn (sc-or-lose 'single-reg) (tn-offset x)))
 (defun complex-single-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
-                  :offset (1+ (tn-offset x))))
+  (make-random-tn (sc-or-lose 'single-reg) (1+ (tn-offset x))))
 
 (defun complex-double-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (tn-offset x)))
+  (make-random-tn (sc-or-lose 'double-reg) (tn-offset x)))
 (defun complex-double-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
-                  :offset (+ (tn-offset x) 2)))
+  (make-random-tn (sc-or-lose 'double-reg) (+ (tn-offset x) 2)))
 
 #+long-float
 (defun complex-long-reg-real-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
-                  :offset (tn-offset x)))
+  (make-random-tn (sc-or-lose 'long-reg) (tn-offset x)))
 #+long-float
 (defun complex-long-reg-imag-tn (x)
-  (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
-                  :offset (+ (tn-offset x) 4)))
+  (make-random-tn (sc-or-lose 'long-reg) (+ (tn-offset x) 4)))
 
 
 (define-move-fun (load-complex-single 2) (vop x y)
@@ -673,12 +659,8 @@
      ;; Negate the MS part of the numbers, then copy over the rest
      ;; of the bits.
      (inst fnegs dst src)
-     (let ((dst-odd (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'single-reg)
-                                    :offset (+ 1 (tn-offset dst))))
-           (src-odd (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'single-reg)
-                                    :offset (+ 1 (tn-offset src)))))
+     (let ((dst-odd (make-random-tn (sc-or-lose 'single-reg) (+ 1 (tn-offset dst))))
+           (src-odd (make-random-tn (sc-or-lose 'single-reg) (+ 1 (tn-offset src)))))
        (inst fmovs dst-odd src-odd)))))
 
 (defun abs-double-reg (dst src)
@@ -689,12 +671,8 @@
      ;; Abs the MS part of the numbers, then copy over the rest
      ;; of the bits.
      (inst fabss dst src)
-     (let ((dst-2 (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ 1 (tn-offset dst))))
-           (src-2 (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'single-reg)
-                                  :offset (+ 1 (tn-offset src)))))
+     (let ((dst-2 (make-random-tn (sc-or-lose 'single-reg) (+ 1 (tn-offset dst))))
+           (src-2 (make-random-tn (sc-or-lose 'single-reg) (+ 1 (tn-offset src)))))
        (inst fmovs dst-2 src-2)))))
 
 (define-vop (abs/double-float)
@@ -744,14 +722,8 @@
       (t
        (inst fabss y x)
        (dotimes (i 3)
-         (let ((y-odd (make-random-tn
-                       :kind :normal
-                       :sc (sc-or-lose 'single-reg)
-                       :offset (+ i 1 (tn-offset y))))
-               (x-odd (make-random-tn
-                       :kind :normal
-                       :sc (sc-or-lose 'single-reg)
-                       :offset (+ i 1 (tn-offset x)))))
+         (let ((y-odd (make-random-tn (sc-or-lose 'single-reg) (+ i 1 (tn-offset y))))
+               (x-odd (make-random-tn (sc-or-lose 'single-reg) (+ i 1 (tn-offset x)))))
            (inst fmovs y-odd x-odd)))))))
 
 #+long-float
@@ -773,14 +745,8 @@
       (t
        (inst fnegs y x)
        (dotimes (i 3)
-         (let ((y-odd (make-random-tn
-                       :kind :normal
-                       :sc (sc-or-lose 'single-reg)
-                       :offset (+ i 1 (tn-offset y))))
-               (x-odd (make-random-tn
-                       :kind :normal
-                       :sc (sc-or-lose 'single-reg)
-                       :offset (+ i 1 (tn-offset x)))))
+         (let ((y-odd (make-random-tn (sc-or-lose 'single-reg) (+ i 1 (tn-offset y))))
+               (x-odd (make-random-tn (sc-or-lose 'single-reg) (+ i 1 (tn-offset x)))))
            (inst fmovs y-odd x-odd)))))))
 
 
@@ -1139,9 +1105,7 @@
   (:generator 5
     (sc-case float
       (long-reg
-       (let ((float (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'double-reg)
-                                    :offset (tn-offset float))))
+       (let ((float (make-random-tn (sc-or-lose 'double-reg) (tn-offset float))))
          (inst stdf float (current-nfp-tn vop)
                (tn-byte-offset stack-temp)))
        (inst ld exp-bits (current-nfp-tn vop)
@@ -1167,9 +1131,7 @@
   (:generator 5
     (sc-case float
       (long-reg
-       (let ((float (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'double-reg)
-                                    :offset (tn-offset float))))
+       (let ((float (make-random-tn (sc-or-lose 'double-reg) (tn-offset float))))
          (inst stdf float (current-nfp-tn vop)
                (tn-byte-offset stack-temp)))
        (inst ld high-bits (current-nfp-tn vop)
@@ -1195,9 +1157,7 @@
   (:generator 5
     (sc-case float
       (long-reg
-       (let ((float (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'double-reg)
-                                    :offset (+ 2 (tn-offset float)))))
+       (let ((float (make-random-tn (sc-or-lose 'double-reg) (+ 2 (tn-offset float)))))
          (inst stdf float (current-nfp-tn vop)
                (tn-byte-offset stack-temp)))
        (inst ld mid-bits (current-nfp-tn vop)
@@ -1223,9 +1183,7 @@
   (:generator 5
     (sc-case float
       (long-reg
-       (let ((float (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'double-reg)
-                                    :offset (+ 2 (tn-offset float)))))
+       (let ((float (make-random-tn (sc-or-lose 'double-reg) (+ 2 (tn-offset float)))))
          (inst stdf float (current-nfp-tn vop)
                (tn-byte-offset stack-temp)))
        (inst ld lo-bits (current-nfp-tn vop)

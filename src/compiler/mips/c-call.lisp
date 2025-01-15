@@ -329,9 +329,9 @@
   "Cons up a piece of code which calls enter-alien-callback with INDEX
 and a pointer to the arguments."
   (flet ((make-gpr (n)
-           (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+           (make-random-tn (sc-or-lose 'any-reg) n))
          (make-fpr (n)
-           (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg) :offset n)))
+           (make-random-tn (sc-or-lose 'double-reg) n)))
     (let* ((segment (make-segment))
            (n-argument-words
              (mapcar (lambda (arg) (ceiling (alien-type-bits arg) n-word-bits))

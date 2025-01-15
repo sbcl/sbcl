@@ -2366,9 +2366,7 @@
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error
-                                       (make-random-tn :kind :normal
-                                                       :sc (sc-or-lose 'signed-reg)
-                                                       :offset (tn-offset r)))))
+                                       (make-random-tn (sc-or-lose 'signed-reg) (tn-offset r)))))
       (inst asr temp1 x 63)
       (inst asr temp2 y 63)
       (inst adds r x y)
@@ -2743,11 +2741,10 @@
                             nil)
                            (t
                             (setf amount-error
-                                  (make-random-tn :kind :normal
-                                                  :sc (sc-or-lose (if (typep amount 'word)
-                                                                      'unsigned-reg
-                                                                      'signed-reg))
-                                                  :offset (tn-offset tmp-tn)))
+                                  (make-random-tn (sc-or-lose (if (typep amount 'word)
+                                                                  'unsigned-reg
+                                                                  'signed-reg))
+                                                  (tn-offset tmp-tn)))
 
                             (lambda ()
                               (load-immediate-word amount-error amount)))))
@@ -2825,11 +2822,10 @@
                             nil)
                            (t
                             (setf amount-error
-                                  (make-random-tn :kind :normal
-                                                  :sc (sc-or-lose (if (typep amount 'word)
-                                                                      'unsigned-reg
-                                                                      'signed-reg))
-                                                  :offset (tn-offset tmp-tn)))
+                                  (make-random-tn (sc-or-lose (if (typep amount 'word)
+                                                                  'unsigned-reg
+                                                                  'signed-reg))
+                                                  (tn-offset tmp-tn)))
 
                             (lambda ()
                               (load-immediate-word amount-error amount)))))

@@ -222,9 +222,7 @@
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
                  `(defglobal ,tn-sym
-                   (make-random-tn :kind :normal
-                    :sc (sc-or-lose ',sc)
-                    :offset ,offset-sym)))))
+                   (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
   (defregtn null descriptor-reg)
   (defregtn lexenv descriptor-reg)
@@ -285,9 +283,7 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+              (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))
 
 ;;; This function is called by debug output routines that want a pretty name
@@ -317,9 +313,7 @@
   nil)
 
 (defun 32-bit-reg (tn)
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose '32-bit-reg)
-                  :offset (tn-offset tn)))
+  (make-random-tn (sc-or-lose '32-bit-reg) (tn-offset tn)))
 
 ;;; null-tn will be used for setting it, just check the lowtag
 #+sb-thread

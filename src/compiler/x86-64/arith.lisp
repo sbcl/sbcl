@@ -1431,11 +1431,10 @@
                             nil)
                            (t
                             (setf amount-error
-                                  (make-random-tn :kind :normal
-                                                  :sc (sc-or-lose (if (typep amount 'word)
-                                                                      'unsigned-reg
-                                                                      'signed-reg))
-                                                  :offset (tn-offset temp)))
+                                  (make-random-tn (sc-or-lose (if (typep amount 'word)
+                                                                  'unsigned-reg
+                                                                  'signed-reg))
+                                                  (tn-offset temp)))
 
                             (lambda ()
                               (inst mov temp amount)))))
@@ -1533,11 +1532,10 @@
                             nil)
                            (t
                             (setf amount-error
-                                  (make-random-tn :kind :normal
-                                                  :sc (sc-or-lose (if (typep amount 'word)
+                                  (make-random-tn (sc-or-lose (if (typep amount 'word)
                                                                       'unsigned-reg
                                                                       'signed-reg))
-                                                  :offset (tn-offset temp)))
+                                                  (tn-offset temp)))
 
                             (lambda ()
                               (inst mov temp amount)))))

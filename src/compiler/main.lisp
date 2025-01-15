@@ -318,9 +318,9 @@ Examples:
                    collect
                    (let ((size (sb-size sb)))
                      `(make-finite-sb
-                       :conflicts (make-array ,size :initial-element #())
-                       :always-live (make-array ,size :initial-element #*)
-                       :live-tns (make-array ,size :initial-element nil)))))))
+                       (make-array ,size :initial-element #())
+                       (make-array ,size :initial-element #*)
+                       (make-array ,size :initial-element nil)))))))
      (let ((*warnings-p* nil)
            (*failure-p* nil))
        (values (progn ,@body) *warnings-p* *failure-p*))))

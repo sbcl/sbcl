@@ -256,11 +256,9 @@
   ;;; callback wrapper.
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
+             (make-random-tn (sc-or-lose 'any-reg) n))
            (make-fpr (n)
-             (make-random-tn :kind :normal :sc (sc-or-lose
-                                                'double-reg) :offset
-                                                n)))
+             (make-random-tn (sc-or-lose 'double-reg) n)))
       (let* ((segment (make-segment))
              #+big-endian
              (function-descriptor-size 24))

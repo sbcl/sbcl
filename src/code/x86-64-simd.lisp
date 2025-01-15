@@ -149,9 +149,7 @@
                                     (ldb (byte size 0) ub))))
       result))
   (defun reg-in-sc (tn sc)
-    (make-random-tn :kind :normal
-                    :sc (sc-or-lose sc)
-                    :offset (tn-offset tn))))
+    (make-random-tn (sc-or-lose sc) (tn-offset tn))))
 
 (def-variant simd-nreverse8 :avx2 (result vector start end)
   (declare (optimize speed (safety 0)))

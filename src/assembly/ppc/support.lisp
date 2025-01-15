@@ -60,11 +60,7 @@
     (:raw
      `((inst blr)))
     (:full-call
-     `((lisp-return (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'descriptor-reg )
-                                    :offset lra-offset)
-                    (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'interior-reg )
-                                    :offset lip-offset)
+     `((lisp-return (make-random-tn (sc-or-lose 'descriptor-reg) lra-offset)
+                    (make-random-tn (sc-or-lose 'interior-reg) lip-offset)
                     :offset 2)))
     (:none)))

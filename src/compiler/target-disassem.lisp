@@ -2577,9 +2577,7 @@
     (if (= sc sb-vm:immediate-sc-number)
         (princ-to-string offset)
         (sb-c:location-print-name
-         (sb-c:make-random-tn :kind :normal
-                              :sc (svref sb-c:*backend-sc-numbers* sc)
-                              :offset offset)))))
+         (sb-c:make-random-tn (svref sb-c:*backend-sc-numbers* sc) offset)))))
 
 ;;; When called from an error break instruction's :DISASSEM-CONTROL (or
 ;;; :DISASSEM-PRINTER) function, will correctly deal with printing the

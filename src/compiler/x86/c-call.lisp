@@ -207,11 +207,10 @@
   (:ignore eax)
   (:generator 1
    (inst movsx res
-         (make-random-tn :kind :normal
-                         :sc (sc-or-lose (ecase size
-                                           (8 'byte-reg)
-                                           (16 'word-reg)))
-                         :offset (tn-offset val)))))
+         (make-random-tn (sc-or-lose (ecase size
+                                       (8 'byte-reg)
+                                       (16 'word-reg)))
+           (tn-offset val)))))
 
 #-sb-xc-host
 (defun sign-extend (x size)

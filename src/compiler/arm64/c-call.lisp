@@ -15,12 +15,16 @@
 
 (defconstant +max-register-args+ 8)
 
-(defstruct arg-state
+(defstruct (arg-state
+            (:copier nil)
+            (:predicate nil)
+            (:constructor make-arg-state ()))
   (num-register-args 0)
   (fp-registers 0)
   (stack-frame-size 0))
 
-(defstruct (result-state (:copier nil))
+(defstruct (result-state (:copier nil) (:predicate nil)
+                         (:constructor make-result-state ()))
   (num-results 0))
 
 (defun result-reg-offset (slot)
@@ -260,10 +264,7 @@
                                          (list #-immobile-space r9-offset ;; invoke-foreign-routine doesn't touch it
                                                r10-offset lexenv-offset))
               do (inst mov
-                       (make-random-tn
-                        :kind :normal
-                        :sc (sc-or-lose 'descriptor-reg)
-                        :offset reg)
+                       (make-random-tn (sc-or-lose 'descriptor-reg) reg)
                        0))
         ;; No longer OK to run GC except at safepoints.
         #+sb-safepoint
@@ -348,9 +349,7 @@
 #-sb-xc-host
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
   (flet ((make-tn (offset &optional (sc-name 'any-reg))
-           (make-random-tn :kind :normal
-                           :sc (sc-or-lose sc-name)
-                           :offset offset)))
+           (make-random-tn (sc-or-lose sc-name) offset)))
     (let* ((segment (make-segment))
            ;; How many arguments have been copied
            (arg-count 0)

@@ -43,9 +43,7 @@
       (inst str value (@ vector offset))))
 
   (defun reg-in-sc (tn sc)
-    (make-random-tn :kind :normal
-                    :sc (sc-or-lose sc)
-                    :offset (tn-offset tn))))
+    (make-random-tn (sc-or-lose sc) (tn-offset tn))))
 
 (defmacro simd-mask-32 (value)
   `(inline-vop

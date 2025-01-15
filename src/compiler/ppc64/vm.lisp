@@ -227,19 +227,15 @@
 ;;;; Make some random tns for important registers.
 
 (defparameter thread-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset thread-offset))
+  (make-random-tn (sc-or-lose 'unsigned-reg) thread-offset))
 (defparameter card-table-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset gc-card-table-offset))
+  (make-random-tn (sc-or-lose 'unsigned-reg) gc-card-table-offset))
 
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
                  `(defparameter ,tn-sym
-                   (make-random-tn :kind :normal
-                    :sc (sc-or-lose ',sc)
-                    :offset ,offset-sym)))))
+                   (make-random-tn (sc-or-lose ',sc) ,offset-sym)))))
 
   (defregtn lip interior-reg)
   (defregtn null descriptor-reg)
@@ -301,9 +297,7 @@
 ;;;
 (defparameter *register-arg-tns*
   (mapcar #'(lambda (n)
-              (make-random-tn :kind :normal
-                              :sc (sc-or-lose 'descriptor-reg)
-                              :offset n))
+              (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))
 
 (export 'single-value-return-byte-offset)
@@ -337,6 +331,4 @@
 ;;; See ld instruction for reference.
 ;;; See also the comments above DEFINE-INDEXER for some thoughts on how to
 ;;; regain the ability to subtract lowtags "for free".
-(defglobal temp-reg-tn (make-random-tn :kind :normal
-                                       :sc (sc-or-lose 'unsigned-reg)
-                                       :offset zero-offset))
+(defglobal temp-reg-tn (make-random-tn (sc-or-lose 'unsigned-reg) zero-offset))

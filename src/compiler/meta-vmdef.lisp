@@ -218,9 +218,7 @@
        (/show "doing !DEF-PRIMITIVE-TYPE" ,(string name))
        (assert (not (gethash ',name *backend-primitive-type-names*)))
        (setf (gethash ',name *backend-primitive-type-names*)
-             (make-primitive-type :name ',name
-                                  :scs ',scns
-                                  :specifier ',type))
+             (make-primitive-type ',name ',scns ',type))
        (/show0 "done with !DEF-PRIMITIVE-TYPE")
        ',name)))
 
