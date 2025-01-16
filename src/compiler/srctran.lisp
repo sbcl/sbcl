@@ -6674,8 +6674,8 @@
         symbol
         (give-up-ir1-transform))))
 
-(deftransform boundp ((symbol) ((constant-arg symbol)) * :policy (< safety 3))
-  (if (always-boundp (lvar-value symbol))
+(deftransform boundp ((symbol) ((constant-arg symbol)) * :policy (< safety 3) :node node)
+  (if (always-boundp (lvar-value symbol) node)
       t
       (give-up-ir1-transform)))
 

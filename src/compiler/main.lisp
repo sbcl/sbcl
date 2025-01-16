@@ -2096,12 +2096,14 @@ returning its filename.
                        :type (pick 'pathname-type *fasl-file-type*))))))
 
 ;;; FIXME: find a better place for this.
-(defun always-boundp (name)
-  (case (info :variable :always-bound name)
-    (:always-bound t)
-    ;; Compiling to fasl considers a symbol always-bound if its
-    ;; :always-bound info value is now T or will eventually be T.
-    (:eventually (producing-fasl-file))))
+(defun always-boundp (name node)
+  (if (policy node (= debug 3))
+      nil
+      (case (info :variable :always-bound name)
+        (:always-bound t)
+        ;; Compiling to fasl considers a symbol always-bound if its
+        ;; :always-bound info value is now T or will eventually be T.
+        (:eventually (producing-fasl-file)))))
 
 (defun default-gc-strategy ()
   ;; We can notionally cross-compile for a different GC if *FEATURES* override the runtime

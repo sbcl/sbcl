@@ -130,13 +130,13 @@
       ((:special :unknown)
        (aver (symbolp name))
        (let ((name-tn (emit-constant name)))
-         (if (or unsafe (always-boundp name))
+         (if (or unsafe (always-boundp name node))
              (vop fast-symbol-value node block name-tn res)
              (vop symbol-value node block name-tn res))))
       (:global
        (aver (symbolp name))
        (let ((name-tn (emit-constant name)))
-         (if (or unsafe (always-boundp name))
+         (if (or unsafe (always-boundp name node))
              (vop fast-symbol-global-value node block name-tn res)
              (vop symbol-global-value node block name-tn res))))
       (:global-function
