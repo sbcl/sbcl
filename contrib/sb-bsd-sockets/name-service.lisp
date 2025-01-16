@@ -90,28 +90,28 @@ weird stuff - see gethostbyname(3) for the details."
 
 #+sb-bsd-sockets-addrinfo
 (progn
-  (defun get-host-by-name (node)
-    "Returns a HOST-ENT instance for NODE or signals a NAME-SERVICE-ERROR.
+  (defun get-host-by-name (host-name)
+    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 
 Another HOST-ENT instance containing zero, one or more IPv6 addresses
 may be returned as a second return value.
 
-NODE may also be an IP address in dotted quad notation or some other
+HOST-NAME may also be an IP address in dotted quad notation or some other
 weird stuff - see getaddrinfo(3) for the details."
     (declare (optimize speed))
     (sb-alien:with-alien ((info (* sockint::addrinfo)))
       (addrinfo-error-case ("getaddrinfo"
                             (sb-sys:without-interrupts
                               (sockint::getaddrinfo
-                               node nil nil (sb-alien:addr info))))
+                               host-name nil nil (sb-alien:addr info))))
           (let ((host-ent4 (make-instance 'host-ent
-                                          :name node
+                                          :name host-name
                                           :type sockint::af-inet
                                           :aliases nil
                                           :addresses nil))
                 #-win32
                 (host-ent6 (make-instance 'host-ent
-                                          :name node
+                                          :name host-name
                                           :type sockint::af-inet6
                                           :aliases nil
                                           :addresses nil)))
