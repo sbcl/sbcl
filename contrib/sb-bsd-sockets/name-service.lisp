@@ -101,8 +101,9 @@ weird stuff - see getaddrinfo(3) for the details."
     (declare (optimize speed))
     (sb-alien:with-alien ((info (* sockint::addrinfo)))
       (addrinfo-error-case ("getaddrinfo"
-                            (sockint::getaddrinfo
-                             node nil nil (sb-alien:addr info)))
+                            (sb-sys:without-interrupts
+                              (sockint::getaddrinfo
+                               node nil nil (sb-alien:addr info))))
           (let ((host-ent4 (make-instance 'host-ent
                                           :name node
                                           :type sockint::af-inet

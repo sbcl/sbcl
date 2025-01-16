@@ -114,8 +114,16 @@ directly instantiated.")))
 
 (defmethod socket-connect ((socket socket) &rest peer)
   (with-socket-fd-and-addr (fd sockaddr size peer) socket
-    (socket-error-case ("connect" (sockint::connect fd sockaddr size))
-        socket)))
+    (cond ((= (sb-bsd-sockets-internal::connect fd sockaddr size) -1)
+           (let ((errno (socket-errno)))
+             (cond ((= errno sb-bsd-sockets-internal::eintr)
+                    (loop until (sb-unix:unix-simple-poll fd :output -1))
+                    (when (= (sockopt-error socket) -1)
+                      (socket-error "connect"))
+                    socket)
+                   (t
+                    (socket-error "connect" errno)))))
+          (t socket))))
 
 (defmethod socket-peername ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket

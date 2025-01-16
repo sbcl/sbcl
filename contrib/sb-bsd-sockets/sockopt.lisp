@@ -99,8 +99,9 @@ Code for options that not every system has should be conditionalised:
   sockopt-receive-low-water sockint::sol-socket sockint::so-rcvlowat)
 (define-socket-option-int
   sockopt-send-low-water sockint::sol-socket sockint::so-sndlowat)
-(define-socket-option-int
-  sockopt-type sockint::sol-socket sockint::so-type)
+(define-socket-option-int sockopt-type sockint::sol-socket sockint::so-type)
+(define-socket-option-int sockopt-error sockint::sol-socket sockint::so-error)
+
 (define-socket-option-int
   sockopt-send-buffer sockint::sol-socket sockint::so-sndbuf)
 (define-socket-option-int
