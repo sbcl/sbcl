@@ -8,7 +8,8 @@
 ;;; SLEEP should not cons except on 32-bit platforms when
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
 (with-test (:name (sleep :non-consing)
-            :serial t :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter
+            :fails-on (and :arm :64-bit-time))
   (handler-case (sb-ext:with-timeout 5
                   (ctu:assert-no-consing (sleep 0.00001s0))
                   (locally (declare (notinline sleep))

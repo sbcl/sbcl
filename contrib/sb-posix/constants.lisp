@@ -424,7 +424,8 @@
  ;; utime(), utimes()
  #-win32
  (:type suseconds-t ; OAOOM warning: similar kludge in tools-for-build
-        #+os-provides-suseconds-t "suseconds_t"
+        #+(and os-provides-suseconds-t 64-bit-time) "__suseconds64_t"
+        #+(and os-provides-suseconds-t (not 64-bit-time)) "suseconds_t"
         #-os-provides-suseconds-t "long")
 
  #-win32
@@ -436,7 +437,9 @@
  (:structure alien-timeval
              ("struct timeval"
               (time-t sec "time_t" "tv_sec")
-              (suseconds-t usec "suseconds_t" "tv_usec")))
+              (suseconds-t usec #+64-bit-time "__suseconds64_t"
+                                #-64-bit-time "suseconds_t"
+                                "tv_usec")))
 
  (:integer veof "VEOF" nil t)
  (:integer veol "VEOL" nil t)

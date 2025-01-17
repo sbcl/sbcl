@@ -1,4 +1,3 @@
-/* test to build and run so that we know if we have blksize_t */
 
 #include <sys/types.h>
 

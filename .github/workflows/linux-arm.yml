@@ -23,9 +23,9 @@ jobs:
         CC: arm-linux-gnueabihf-gcc
       run: ./make.sh --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=arm
 
-    # - name: test
-    #   env:
-    #     CC: arm-linux-gnueabihf-gcc
-    #   run: cd tests; ./run-tests.sh
+    - name: test
+      env:
+        CC: arm-linux-gnueabihf-gcc
+      run: cd tests; ./run-tests.sh
     - name: ansi-test
       run: cd tests; ./ansi-tests.sh

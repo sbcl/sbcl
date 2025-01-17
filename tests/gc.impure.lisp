@@ -422,7 +422,7 @@
                              #+win32
                              (alien-funcall (extern-alien "Sleep" (function void int))  300)
                              #-win32
-                             (alien-funcall (extern-alien "sb_nanosleep" (function void int int)) 0 300000000)
+                             (alien-funcall (extern-alien "sb_nanosleep" (function void sb-unix:time-t int)) 0 300000000)
                              (values a b c d e f g h i j k l m))))
          (thr (sb-thread:make-thread (lambda ()
                                        (let ((args #1=(list (LIST 'A) (LIST 'B) (LIST 'C)
