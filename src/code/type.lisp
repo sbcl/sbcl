@@ -544,14 +544,29 @@
                     (change-returns type1 rtype))
                    (t (multiple-value-bind (req opt rest)
                           (args-type-op type1 type2 #'type-intersection #'max)
-                        (make-fun-type :required req
-                                       :optional opt
-                                       :rest rest
-                                       ;; FIXME: :keys
-                                       :allowp (and (fun-type-allowp type1)
-                                                    (fun-type-allowp type2))
-                                       :returns rtype
-                                       :designator designator))))))))))
+                        (let ((keyp (and (fun-type-keyp type1)
+                                         (fun-type-keyp type2))))
+                         (make-fun-type :required req
+                                        :optional opt
+                                        :rest rest
+                                        :keyp keyp
+                                        :keywords
+                                        (when keyp
+                                          (let (keys)
+                                            (loop for key1 in (fun-type-keywords type1)
+                                                  for key2 = (find (key-info-name key1)
+                                                                   (fun-type-keywords type2)
+                                                                   :key #'key-info-name)
+                                                  do (when key2
+                                                       (push (make-key-info (key-info-name key1)
+                                                                            (type-intersection (key-info-type key1)
+                                                                                               (key-info-type key2)))
+                                                             keys)))
+                                            keys))
+                                        :allowp (and (fun-type-allowp type1)
+                                                     (fun-type-allowp type2))
+                                        :returns rtype
+                                        :designator designator)))))))))))
 
 ;;; The union or intersection of a subclass of FUNCTION with a
 ;;; FUNCTION type is somewhat complicated.
