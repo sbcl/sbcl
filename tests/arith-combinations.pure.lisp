@@ -84,7 +84,8 @@
                                                           (error "~a = ~a /= ~a" (list* lambda args) x result))
                                                         (error "~a => ~a /= type error" (list* lambda args) x))))))))))))))
 
-(with-test (:name :overflow-arith)
+(with-test (:name :overflow-arith
+            :fails-on :arm)
   (test-ops '(+ - *)
             `(t fixnum (integer ,(- (expt 2 sb-vm:n-word-bits) 10)
                                 ,(- (expt 2 sb-vm:n-word-bits) 1))

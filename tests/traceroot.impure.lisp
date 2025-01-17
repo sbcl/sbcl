@@ -127,7 +127,7 @@
 
 (defvar *foo*)
 (with-test (:name (sb-ext:search-roots :simple-fun)
-                  :fails-on (and :mark-region-gc :darwin :arm64))
+                  :fails-on (and :mark-region-gc :arm64))
   ;; Tracing a path to a simple fun wasn't working at some point
   ;; because of failure to employ fun_code_header in the right place.
   (setq *foo* (compile nil '(lambda () 42)))

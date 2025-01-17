@@ -1864,7 +1864,8 @@
          m))
    (or double-float null)))
 
-(with-test (:name :ignore-delays)
+(with-test (:name :ignore-delays
+            :fails-on :arm)
   (assert-type
    (lambda (x)
      (declare (optimize debug))

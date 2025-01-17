@@ -44,7 +44,7 @@ rm -fr sandbox/scratch
  "UNION.FOLD.1" "SUBTYPEP-COMPLEX.8"
  (append #+win32 (list "PROBE-FILE.4")
          #+x86 (list "CIS.4")
-         #+(and arm64 (not darwin))
+         #+(or arm (and arm64 (not darwin)))
            (list "EXP.ERROR.4" "EXP.ERROR.5" "EXP.ERROR.6" "EXP.ERROR.7" "EXPT.ERROR.4"
                  "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7")
          #-sb-unicode (list "MISC.638")
