@@ -121,6 +121,7 @@
            ;; answer, but this makes it so it does.
            (single-float #.(sxhash-single-float-xform 'obj))
            (double-float #.(sxhash-double-float-xform 'obj)))))
+    #+nil
     (push (cons obj answer) *sxhash-crosscheck*)
     answer))
 
