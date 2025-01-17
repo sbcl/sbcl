@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -marm -march=armv5t
+CFLAGS += -marm
 
 ASSEM_SRC = arm-assem.S
 ARCH_SRC = arm-arch.c
