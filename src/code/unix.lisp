@@ -61,17 +61,18 @@
     ;; called directly is listed explicitly, because there are also others
     ;; that might want to be wrapped even if they don't need to be,
     ;; like sb_opendir and sb_closedir. Why are those wrapped in fact?
-    #+netbsd x
-    #-netbsd (if (member x '("sb_getrusage" ; syscall*
-                             "sb_gettimeofday" ;syscall*
-                             "sb_select" ; int-syscall
-                             "sb_getitimer" ; syscall*
-                             "sb_setitimer" ; syscall*
-                             "sb_clock_gettime" ; alien-funcall
-                             "sb_utimes") ; posix
-                         :test #'string=)
-                 (subseq x 3)
-                 x)))
+    #+(or netbsd (not 64-bit)) x
+    #-(or netbsd (not 64-bit))
+    (if (member x '("sb_getrusage"      ; syscall*
+                    "sb_gettimeofday"   ;syscall*
+                    "sb_clock_gettime"  ; alien-funcall
+                    "sb_select"         ; int-syscall
+                    "sb_getitimer"      ; syscall*
+                    "sb_setitimer"      ; syscall*
+                    "sb_utimes")        ; posix
+                :test #'string=)
+        (subseq x 3)
+        x)))
 
 (defmacro syscall-type ((name return-type &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
@@ -1036,9 +1037,9 @@ the UNIX epoch (January 1st 1970.)"
           ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
           ;; BSD has something similar.
           #-avoid-clock-gettime
-          (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
-          #+avoid-clock-gettime
-          (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
+        (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
+        #+avoid-clock-gettime
+        (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
 
         #+64-bit ;; I know that my math is valid for 64-bit.
         (declare (optimize (sb-c::type-check 0)))
@@ -1049,21 +1050,21 @@ the UNIX epoch (January 1st 1970.)"
                (+ (the fixnum (* delta-sec internal-time-units-per-second))
                   (truncate delta-nsec nanoseconds-per-internal-time-unit))))
 
-  ;; There are two optimizations here that actually matter on 32-bit systems:
-  ;;  (1) subtract the epoch from seconds and milliseconds separately,
-  ;;  (2) avoid consing a new bignum if the result is unchanged.
-  ;;
-  ;; Thanks to James Anderson for the optimization hint.
-  ;;
-  ;; Yes, it is possible to a computation to be GET-INTERNAL-REAL-TIME
-  ;; bound.
-  ;;
-  ;; --NS 2007-04-05
+        ;; There are two optimizations here that actually matter on 32-bit systems:
+        ;;  (1) subtract the epoch from seconds and milliseconds separately,
+        ;;  (2) avoid consing a new bignum if the result is unchanged.
+        ;;
+        ;; Thanks to James Anderson for the optimization hint.
+        ;;
+        ;; Yes, it is possible to a computation to be GET-INTERNAL-REAL-TIME
+        ;; bound.
+        ;;
+        ;; --NS 2007-04-05
         #-64-bit
         (symbol-macrolet ((observed-sec
-                           (sb-thread::thread-observed-internal-real-time-delta-sec thr))
+                            (sb-thread::thread-observed-internal-real-time-delta-sec thr))
                           (observed-msec
-                           (sb-thread::thread-observed-internal-real-time-delta-millisec thr))
+                            (sb-thread::thread-observed-internal-real-time-delta-millisec thr))
                           (time (sb-thread::thread-internal-real-time thr)))
           (let* ((delta-sec (- c-sec (slot base 'tv-sec)))
                  ;; I inadvertently had too many THE casts in here, so I'd prefer
