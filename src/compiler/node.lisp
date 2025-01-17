@@ -1157,7 +1157,7 @@
 
 (defun pretty-print-functional (functional stream)
   (let ((name (functional-debug-name functional)))
-    (princ `(function
+    (prin1 `(function
              ,(if (typep name '(cons (member xep tl-xep)))
                   (cadr name)
                   name))

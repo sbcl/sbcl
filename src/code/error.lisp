@@ -206,11 +206,12 @@ specification."
         (let ((normal-return (make-symbol "normal-return"))
               (error-return  (make-symbol "error-return")))
           `(block ,error-return
-             (multiple-value-call (lambda ,@(cdr no-error-clause))
-               (block ,normal-return
-                 (return-from ,error-return
-                   (handler-case (return-from ,normal-return ,form)
-                     ,@(remove no-error-clause cases)))))))
+             (sb-c::with-source-form ,no-error-clause
+               (multiple-value-call (named-lambda (handler-case :no-error) ,@(cdr no-error-clause))
+                 (block ,normal-return
+                   (return-from ,error-return
+                     (handler-case (return-from ,normal-return ,form)
+                       ,@(remove no-error-clause cases))))))))
         (let* ((local-funs nil)
                (annotated-cases
                  (mapcar (lambda (case)
