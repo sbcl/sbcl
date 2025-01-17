@@ -298,11 +298,6 @@ void thread_in_lisp_raised(os_context_t *ctx);
 void thread_interrupted(os_context_t *ctx);
 extern void thread_register_gc_trigger();
 
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-void wake_thread(struct thread_instance*),
-     wake_thread_impl(struct thread_instance*);
-# endif
-
 #define csp_around_foreign_call(thread) *(((lispobj*)thread)-(1+THREAD_HEADER_SLOTS))
 
 static inline

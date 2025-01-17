@@ -878,7 +878,6 @@ void gc_start_the_world()
 }
 
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
 /* wake_thread(thread) -- ensure a thruption delivery to
  * `thread'. */
 
@@ -891,7 +890,7 @@ wake_thread_io(struct thread * thread)
     win32_maybe_interrupt_io(thread);
 }
 
-void wake_thread_impl(struct thread_instance *lispthread)
+static void wake_thread_impl(struct thread_instance *lispthread)
 {
     struct thread* thread = (void*)lispthread->uw_primitive_thread;
     wake_thread_io(thread);
@@ -920,7 +919,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
     return;
 }
 # else
-void wake_thread_impl(struct thread_instance *lispthread)
+static void wake_thread_impl(struct thread_instance *lispthread)
 {
     struct thread *thread = (void*)lispthread->uw_primitive_thread;
     struct thread *self = get_sb_vm_thread();
@@ -979,7 +978,61 @@ void wake_thread_impl(struct thread_instance *lispthread)
     thread_sigmask(SIG_SETMASK, &oldset, 0);
 }
 #endif /* !LISP_FEATURE_WIN32 */
-#endif /* LISP_FEATURE_SB_SAFEPOINT */
+
+/* If the thread id given does not belong to a running thread (it has
+ * exited or never even existed) pthread_kill _may_ fail with ESRCH,
+ * but it is also allowed to just segfault, see
+ * <http://udrepper.livejournal.com/16844.html>.
+ *
+ * Relying on thread ids can easily backfire since ids are recycled
+ * (NPTL recycles them extremely fast) so a signal can be sent to
+ * another process if the one it was sent to exited.
+ *
+ * For these reasons, we must make sure that the thread is still alive
+ * when the pthread_kill is called and return if the thread is
+ * exiting.
+ *
+ * Note (DFL, 2011-06-22): At the time of writing, this function is only
+ * used for INTERRUPT-THREAD, hence the wake_thread special-case for
+ * Windows is OK. */
+void wake_thread(struct thread_instance* lispthread)
+{
+#ifdef LISP_FEATURE_WIN32
+    /* META: why is this comment about safepoint builds mentioning
+     * gc_stop_the_world() ? Never the twain shall meet. */
+
+    /* Kludge (on safepoint builds): At the moment, this isn't just
+     * an optimization; rather it masks the fact that
+     * gc_stop_the_world() grabs the all_threads mutex without
+     * releasing it, and since we're not using recursive pthread
+     * mutexes, the pthread_mutex_lock() around the all_threads loop
+     * would go wrong.  Why are we running interruptions while
+     * stopping the world though?  Test case is (:ASYNC-UNWIND
+     * :SPECIALS), especially with s/10/100/ in both loops. */
+
+    /* Frequent special case: resignalling to self.  The idea is
+     * that leave_region safepoint will acknowledge the signal, so
+     * there is no need to take locks, roll thread to safepoint
+     * etc. */
+    struct thread* thread = (void*)lispthread->uw_primitive_thread;
+    if (thread == get_sb_vm_thread()) {
+        sb_pthr_kill(thread, 1); // can't fail
+        check_pending_thruptions(NULL);
+        return;
+    }
+    // block_deferrables + mutex_lock looks very unnecessary here,
+    // but without them, make-target-contrib hangs in bsd-sockets.
+    sigset_t oldset;
+    block_deferrable_signals(&oldset);
+    mutex_acquire(&all_threads_lock);
+    sb_pthr_kill(thread, 1); // can't fail
+    wake_thread_impl(lispthread);
+    mutex_release(&all_threads_lock);
+    thread_sigmask(SIG_SETMASK,&oldset,0);
+#else
+    wake_thread_impl(lispthread);
+#endif
+}
 
 void* os_get_csp(struct thread* th)
 {
