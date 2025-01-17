@@ -11,6 +11,9 @@
 
 (enable-test-parallelism)
 
+;;; Can't properly decode errors where the call stack is not pinned.
+#-(or arm64 mips ppc64 riscv x86 x86-64) (invoke-restart 'run-tests::skip-file)
+
 (defun test-ops (ops types arguments &key (result-types types) (b-arguments arguments))
   (flet ((normalize-type (type)
            (sb-kernel:type-specifier (sb-kernel:specifier-type type))))
@@ -84,8 +87,7 @@
                                                           (error "~a = ~a /= ~a" (list* lambda args) x result))
                                                         (error "~a => ~a /= type error" (list* lambda args) x))))))))))))))
 
-(with-test (:name :overflow-arith
-            :fails-on :arm)
+(with-test (:name :overflow-arith)
   (test-ops '(+ - *)
             `(t fixnum (integer ,(- (expt 2 sb-vm:n-word-bits) 10)
                                 ,(- (expt 2 sb-vm:n-word-bits) 1))
