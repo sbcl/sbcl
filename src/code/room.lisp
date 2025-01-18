@@ -674,7 +674,18 @@ We could try a few things to mitigate this:
                   ;; Include the space used for slot vector for PCL
                   ;; instances.
                   (logical-size
-                    (cond ((not (%pcl-instance-p obj))
+                    (cond ((hash-table-p obj)
+                           (let ((size size))
+                             (incf (truly-the word size) (primitive-object-size (sb-impl::hash-table-pairs obj)))
+                             (incf (truly-the word size) (primitive-object-size (sb-impl::hash-table-index-vector obj)))
+                             (let ((next (sb-impl::hash-table-next-vector obj))
+                                   (hash (sb-impl::hash-table-hash-vector obj)))
+                               (when (> (length next) 0)
+                                 (incf (truly-the word size) (primitive-object-size next)))
+                               (when hash
+                                 (incf (truly-the word size) (primitive-object-size hash))))
+                            size))
+                          ((not (%pcl-instance-p obj))
                            size)
                           ((funcallable-instance-p obj)
                            (let ((slots (%funcallable-instance-info obj 0)))
@@ -685,7 +696,7 @@ We could try a few things to mitigate this:
              (declare (type word logical-size))
              (incf total-bytes logical-size)
              (incf (the fixnum (car found)))
-             (incf (the fixnum (cdr found)) size)))))
+             (incf (the fixnum (cdr found)) logical-size)))))
      space)
     (let* ((sorted (sort (%hash-table-alist totals) #'> :key #'cddr))
            (interesting (if top-n
