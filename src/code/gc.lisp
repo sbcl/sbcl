@@ -65,6 +65,7 @@ and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
 
+(declaim (ftype (sfunction (t) sb-vm:word) primitive-object-size))
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (cond ((not (sb-vm:is-lisp-pointer (get-lisp-obj-address object))) 0)

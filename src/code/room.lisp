@@ -654,10 +654,11 @@ We could try a few things to mitigate this:
   (let ((totals (make-hash-table :test 'eq))
         (total-objects 0)
         (total-bytes 0))
-    (declare (unsigned-byte total-objects total-bytes))
+    (declare (type word total-objects total-bytes))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare (optimize (speed 3)))
+       (declare (optimize (speed 3))
+                (type word size))
        (when (or (eql type instance-widetag)
                  (eql type funcallable-instance-widetag))
          (incf total-objects)
@@ -670,9 +671,19 @@ We could try a few things to mitigate this:
                                 (return)
                                 (layout-classoid layout)))
                   (found (ensure-gethash classoid totals (cons 0 0)))
-                  (size size))
-             (declare (fixnum size))
-             (incf total-bytes size)
+                  ;; Include the space used for slot vector for PCL
+                  ;; instances.
+                  (logical-size
+                    (cond ((not (%pcl-instance-p obj))
+                           size)
+                          ((funcallable-instance-p obj)
+                           (let ((slots (%funcallable-instance-info obj 0)))
+                             (+ size (primitive-object-size slots))))
+                          (t
+                           (let ((slots (%instance-ref obj sb-vm:instance-data-start)))
+                             (+ size (primitive-object-size slots)))))))
+             (declare (type word logical-size))
+             (incf total-bytes logical-size)
              (incf (the fixnum (car found)))
              (incf (the fixnum (cdr found)) size)))))
      space)
@@ -701,14 +712,17 @@ We could try a few things to mitigate this:
       (flet ((type-usage (type objects bytes)
                (etypecase type
                  (string
-                  (format t "  ~V@<~A~> ~V:D bytes, ~V:D object~:P.~%"
-                          (1+ types-width) type bytes-width bytes
-                          objects-width objects))
+                  (format t "  ~V@<~A~>" (1+ types-width) type))
                  (classoid
-                  (format t "  ~V@<~/sb-ext:print-symbol-with-prefix/~> ~
-                             ~V:D bytes, ~V:D object~:P.~%"
-                          (1+ types-width) (classoid-name type) bytes-width bytes
-                          objects-width objects)))))
+                  (format t "  ~V@<~/sb-ext:print-symbol-with-prefix/~>"
+                          (1+ types-width) (classoid-name type))))
+               (format t " ~V:D bytes, ~V:D object~:P "
+                        bytes-width bytes objects-width objects)
+               (let ((avarage-size (/ bytes objects)))
+                 (if (ratiop avarage-size)
+                     (format t "(~,2F per object)" (float avarage-size))
+                     (format t "(~:D per object)" avarage-size)))
+               (format t ".~%")))
         (loop for (type . (objects . bytes)) in interesting
               do (incf printed-bytes bytes)
                  (incf printed-objects objects)
