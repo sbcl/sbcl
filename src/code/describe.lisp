@@ -575,123 +575,135 @@
              (format stream "~@:_Source file: ~A" namestring))))))))
 
 (defun describe-function (name function stream)
-  (let ((name (if function (%fun-name function) name)))
-    (if (not (or function (and (legal-fun-name-p name) (fboundp name))))
-        ;; Not defined, but possibly the type is declared, or we have
-        ;; compiled calls to it.
-        (when (legal-fun-name-p name)
-          (multiple-value-bind (from sure) (info :function :where-from name)
-            (when (or (eq :declared from) (and sure (eq :assumed from)))
-              (describe-block (stream "~A names an undefined function" name)
-                (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
-                        from (global-ftype name))))))
-        ;; Defined.
-        (multiple-value-bind (fun what lambda-list derived-type declared-type
-                              inline methods argument-precedence-order)
-            (cond ((and (not function) (symbolp name) (special-operator-p name))
-                   ;; The function in the symbol is irrelevant.
-                   ;; Use the def-ir1-translator function for source location.
-                   (let ((fun (info :function :ir1-convert name)))
-                     (values fun "a special operator" (%fun-lambda-list fun))))
-                  ((and (not function) (symbolp name) (macro-function name))
-                   (let ((fun (macro-function name)))
-                     (values fun "a macro" (%fun-lambda-list fun))))
-                  (t
-                   (let* ((fun (or function (fdefinition name)))
-                          (derived-type (and function
-                                             (%fun-ftype function)))
-                          (legal-name-p (legal-fun-name-p name))
-                          (ctype (and legal-name-p
-                                      (global-ftype name)))
-                          (type (and ctype (type-specifier ctype)))
-                          (from (and legal-name-p
-                                     (info :function :where-from name)))
-                          declared-type)
-                     (cond ((not type))
-                           ((eq from :declared)
-                            (setf declared-type type))
-                           ((and (not derived-type)
-                                 (member from '(:defined-method :defined)))
-                            (setf derived-type type)))
-                     (unless derived-type
-                       (setf derived-type (%fun-ftype fun)))
-                     (if (typep fun 'standard-generic-function)
-                         (values fun
-                                 "a generic function"
-                                 (sb-mop:generic-function-lambda-list fun)
-                                 derived-type
-                                 declared-type
-                                 nil
-                                 (or (sb-mop:generic-function-methods fun)
-                                     :none)
-                                 ;; Argument precedence order
-                                 ;; information is only interesting
-                                 ;; for two or more required
-                                 ;; parameters.
-                                 (let ((order (sb-mop:generic-function-argument-precedence-order
-                                               fun)))
-                                   (when (>= (length order) 2)
-                                     order)))
-                         (values fun
-                                 (if (compiled-function-p fun)
-                                     "a compiled function"
-                                     "an interpreted function")
-                                 (%fun-lambda-list fun)
-                                 derived-type
-                                 declared-type
-                                 (cons
-                                  (info :function :inlinep name)
-                                  (fun-name-inline-expansion name)))))))
-          (describe-block (stream (unless function "~A names ~A:") name what)
-            (describe-deprecation 'function name stream)
-            (describe-lambda-list lambda-list stream)
-            (when argument-precedence-order
-              (describe-argument-precedence-order argument-precedence-order stream))
-            (awhen (sb-c::fun-name-dx-args name)
-              (let* ((keys (member-if #'symbolp it))
-                     (positional (ldiff it keys)))
-                (format stream "~@:_Dynamic-extent arguments:~
+  (let* ((name (if function (%fun-name function) name))
+         (dd (info :function :source-transform name)))
+    (flet ((structures (stream)
+             (when (typep dd '(cons defstruct-description))
+               (let ((struct (dd-name (car dd))))
+                 (typecase (cdr dd)
+                   (defstruct-slot-description
+                    (format stream "~@:_An accessor for ~/sb-impl:print-type-specifier/" struct))
+                   ((member :constructor :predicate :copier)
+                    (format stream "~@:_A ~(~a~) for ~/sb-impl:print-type-specifier/" (cdr dd) struct)))))))
+     (if (not (or function (and (legal-fun-name-p name) (fboundp name))))
+         ;; Not defined, but possibly the type is declared, or we have
+         ;; compiled calls to it.
+         (when (legal-fun-name-p name)
+           (multiple-value-bind (from sure) (info :function :where-from name)
+             (when (or (eq :declared from) (and sure (eq :assumed from))
+                       (typep dd '(cons defstruct-description)))
+               (describe-block (stream "~A names an undefined function" name)
+                 (structures stream)
+                 (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
+                         from (global-ftype name))))))
+         ;; Defined.
+         (multiple-value-bind (fun what lambda-list derived-type declared-type
+                               inline methods argument-precedence-order)
+             (cond ((and (not function) (symbolp name) (special-operator-p name))
+                    ;; The function in the symbol is irrelevant.
+                    ;; Use the def-ir1-translator function for source location.
+                    (let ((fun (info :function :ir1-convert name)))
+                      (values fun "a special operator" (%fun-lambda-list fun))))
+                   ((and (not function) (symbolp name) (macro-function name))
+                    (let ((fun (macro-function name)))
+                      (values fun "a macro" (%fun-lambda-list fun))))
+                   (t
+                    (let* ((fun (or function (fdefinition name)))
+                           (derived-type (and function
+                                              (%fun-ftype function)))
+                           (legal-name-p (legal-fun-name-p name))
+                           (ctype (and legal-name-p
+                                       (global-ftype name)))
+                           (type (and ctype (type-specifier ctype)))
+                           (from (and legal-name-p
+                                      (info :function :where-from name)))
+                           declared-type)
+                      (cond ((not type))
+                            ((eq from :declared)
+                             (setf declared-type type))
+                            ((and (not derived-type)
+                                  (member from '(:defined-method :defined)))
+                             (setf derived-type type)))
+                      (unless derived-type
+                        (setf derived-type (%fun-ftype fun)))
+                      (if (typep fun 'standard-generic-function)
+                          (values fun
+                                  "a generic function"
+                                  (sb-mop:generic-function-lambda-list fun)
+                                  derived-type
+                                  declared-type
+                                  nil
+                                  (or (sb-mop:generic-function-methods fun)
+                                      :none)
+                                  ;; Argument precedence order
+                                  ;; information is only interesting
+                                  ;; for two or more required
+                                  ;; parameters.
+                                  (let ((order (sb-mop:generic-function-argument-precedence-order
+                                                fun)))
+                                    (when (>= (length order) 2)
+                                      order)))
+                          (values fun
+                                  (if (compiled-function-p fun)
+                                      "a compiled function"
+                                      "an interpreted function")
+                                  (%fun-lambda-list fun)
+                                  derived-type
+                                  declared-type
+                                  (cons
+                                   (info :function :inlinep name)
+                                   (fun-name-inline-expansion name)))))))
+           (describe-block (stream (unless function "~A names ~A:") name what)
+             (structures stream)
+             (describe-deprecation 'function name stream)
+             (describe-lambda-list lambda-list stream)
+             (when argument-precedence-order
+               (describe-argument-precedence-order argument-precedence-order stream))
+             (awhen (sb-c::fun-name-dx-args name)
+               (let* ((keys (member-if #'symbolp it))
+                      (positional (ldiff it keys)))
+                 (format stream "~@:_Dynamic-extent arguments:~
 ~@[ positional=~A~]~A~@[ keyword=~S~]"
-                        positional (if (and positional keys) "," "") keys)))
-            (when declared-type
-              (format stream "~@:_Declared type: ~
+                         positional (if (and positional keys) "," "") keys)))
+             (when declared-type
+               (format stream "~@:_Declared type: ~
                               ~/sb-impl:print-type-specifier/"
-                      declared-type))
-            (when (and derived-type
-                       (not (equal declared-type derived-type)))
-              (format stream "~@:_Derived type: ~
+                       declared-type))
+             (when (and derived-type
+                        (not (equal declared-type derived-type)))
+               (format stream "~@:_Derived type: ~
                               ~/sb-impl:print-type-specifier/"
-                      derived-type))
-            (describe-documentation name 'function stream)
-            (when (car inline)
-              (format stream "~@:_Inline proclamation: ~
+                       derived-type))
+             (describe-documentation name 'function stream)
+             (when (car inline)
+               (format stream "~@:_Inline proclamation: ~
                               ~A (~:[no ~;~]inline expansion available)"
-                      (car inline)
-                      (cdr inline)))
-            (awhen (info :function :info name)
-              (awhen (sb-c::decode-ir1-attributes (sb-c::fun-info-attributes it))
-                  (format stream "~@:_Known attributes: ~(~{~A~^, ~}~)" it)))
-            (when methods
-              (format stream "~@:_Method-combination: ~S"
-                      (sb-pcl::method-combination-type-name
-                       (sb-mop:generic-function-method-combination fun)))
-              (cond ((eq :none methods)
-                     (format stream "~@:_No methods."))
-                    (t
-                     (pprint-newline :mandatory stream)
-                     (pprint-logical-block (stream nil)
-                       (format stream "Methods:")
-                       (dolist (method methods)
-                         (pprint-indent :block 2 stream)
-                         (format stream "~@:_(~A ~{~S ~}~
+                       (car inline)
+                       (cdr inline)))
+             (awhen (info :function :info name)
+               (awhen (sb-c::decode-ir1-attributes (sb-c::fun-info-attributes it))
+                 (format stream "~@:_Known attributes: ~(~{~A~^, ~}~)" it)))
+             (when methods
+               (format stream "~@:_Method-combination: ~S"
+                       (sb-pcl::method-combination-type-name
+                        (sb-mop:generic-function-method-combination fun)))
+               (cond ((eq :none methods)
+                      (format stream "~@:_No methods."))
+                     (t
+                      (pprint-newline :mandatory stream)
+                      (pprint-logical-block (stream nil)
+                        (format stream "Methods:")
+                        (dolist (method methods)
+                          (pprint-indent :block 2 stream)
+                          (format stream "~@:_(~A ~{~S ~}~
                                          ~/sb-impl:print-lambda-list/)"
-                                 name
-                                 (method-qualifiers method)
-                                 (sb-pcl::unparse-specializers
-                                  fun (sb-mop:method-specializers method)))
-                         (pprint-indent :block 4 stream)
-                         (describe-documentation method t stream nil))))))
-            (describe-function-source fun stream)))))
+                                  name
+                                  (method-qualifiers method)
+                                  (sb-pcl::unparse-specializers
+                                   fun (sb-mop:method-specializers method)))
+                          (pprint-indent :block 4 stream)
+                          (describe-documentation method t stream nil))))))
+             (describe-function-source fun stream))))))
   (unless function
     (awhen (and (legal-fun-name-p name) (compiler-macro-function name))
       (describe-block (stream "~A has a compiler-macro:" name)
