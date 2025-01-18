@@ -11,15 +11,17 @@
 
 (in-package "SB-DISASSEM")
 
-(defstruct (storage-info (:copier nil))
-  (groups nil :type list)               ; alist of (name . location-group)
-  (debug-vars #() :type vector))
+(defstruct (storage-info (:copier nil)
+                         (:predicate nil)
+                         #-sb-xc-host :no-constructor-defun)
+  (groups nil :type list :read-only t)               ; alist of (name . location-group)
+  (debug-vars #() :type vector :read-only t))
 
 (defstruct (segment (:conc-name seg-)
                     (:constructor %make-segment)
                     (:copier nil))
   ;; the object that should be pinned when calling the sap-maker
-  (object nil)
+  (object nil :read-only t)
   (sap-maker (missing-arg) :type (function () system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
@@ -39,14 +41,14 @@
   ;; from the code header; it seems like an exercise in futility.
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
-  (code nil :type (or null code-component))
+  (code nil :type (or null code-component) :read-only t)
   ;; list of function and fdefn constants extracted from code header
   (code-callables :?)
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
-  (initial-offset 0 :type index)
+  (initial-offset 0 :type index :read-only t)
   (hooks nil :type list)
-  debug-fun)
+  (debug-fun nil :read-only t))
 
 ;;; All state during disassembly. We store some seemingly redundant
 ;;; information so that we can allow garbage collect during disassembly and
@@ -54,7 +56,8 @@
 (defstruct (disassem-state (:conc-name dstate-)
                            (:constructor %make-dstate
                                (alignment argument-column fun-hooks))
-                           (:copier nil))
+                           (:copier nil)
+                           #-sb-xc-host :no-constructor-defun)
   ;; to avoid buffer overrun at segment end, we might need to copy bytes
   ;; here first because we access memory in chunks larger than 1 byte.
   (scratch-buf 0 :type sb-vm:word)
@@ -73,7 +76,7 @@
   ;; No effect if the target disassembler does not implement the choice.
   (absolutize-jumps t)
   ;; what to align to in most cases
-  (alignment sb-vm:n-word-bytes :type alignment)
+  (alignment sb-vm:n-word-bytes :type alignment :read-only t)
   (byte-order sb-c:*backend-byte-order*
               :type (member :big-endian :little-endian))
   ;; current instruction as found in instruction space
@@ -105,7 +108,7 @@
   ;; same as LABELS slot data, but in a different form
   (label-hash (make-hash-table) :type hash-table)
   ;; list of function
-  (fun-hooks nil :type list)
+  (fun-hooks nil :type list :read-only t)
 
   ;; alist of (address . label-number), popped as it's used
   (cur-labels nil :type list)

@@ -40,16 +40,19 @@
 
 (defstruct (dxable-args (:constructor make-dxable-args (list))
                         (:predicate nil)
-                        (:copier nil))
+                        (:copier nil)
+                        #-sb-xc-host :no-constructor-defun)
   (list nil :read-only t))
 (defstruct (inlining-data (:include dxable-args)
                           (:constructor make-inlining-data (expansion list))
                           (:predicate nil)
-                          (:copier nil))
+                          (:copier nil)
+                          #-sb-xc-host :no-constructor-defun)
   (expansion nil :read-only t))
 (declaim (freeze-type dxable-args))
 
-(defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
+(defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil)
+                          (:constructor make-ir1-namespace ()))
   ;; FREE-VARS translates from the names of variables referenced
   ;; globally to the LEAF structures for them. FREE-FUNS is like
   ;; FREE-VARS, only it deals with function names.
@@ -210,8 +213,9 @@
                 #-sb-xc-host #'sxhash))
 
 (defstruct (compilation (:constructor make-compilation
-                                      (&key coverage-metadata msan-unpoison
-                                       block-compile entry-points compile-toplevel-object))
+                                      (&optional msan-unpoison
+                                                 coverage-metadata
+                                                 block-compile entry-points compile-toplevel-object))
                         (:copier nil)
                         (:predicate nil)
                         (:conc-name ""))
@@ -292,7 +296,7 @@
   ;; as ordinary calls not in the scope of a local or global notinline declaration.
   ;; Useful for finding functions that were supposed to have been converted
   ;; through some kind of transformation but were not.
-  (emitted-full-calls (make-hash-table :test 'equal))
+  (emitted-full-calls (make-hash-table :test 'equal) :read-only t)
   ;; hash-table of hash-tables:
   ;;  outer: GF-Name -> hash-table
   ;;  inner: (qualifiers . specializers) -> lambda-list

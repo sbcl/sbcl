@@ -114,7 +114,7 @@
 ;;; uninterned.
 ;;; Additionally, you can specify an arbitrary way to destroy
 ;;; random bootstrap stuff on per-package basis.
-(defun !unintern-init-only-stuff (&aux result)
+(defun !unintern-init-only-stuff ()
   (dolist (package (list-all-packages))
     (sb-int:awhen (find-symbol "!REMOVE-BOOTSTRAP-SYMBOLS" package)
       (funcall sb-int:it)))
@@ -190,7 +190,7 @@
     (setf (sb-c::vop-parse-body v) nil))
   ;; Used for inheriting from other VOPs, not needed in the target.
   (setf sb-c::*backend-parsed-vops* (make-hash-table))
-  result)
+  nil)
 
 
 ;;; Check for potentially bad format-control strings

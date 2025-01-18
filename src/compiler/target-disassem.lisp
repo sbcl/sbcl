@@ -1379,6 +1379,7 @@
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
+  (declare (inline %make-dstate))
   (let ((alignment sb-assem:+inst-alignment-bytes+)
         (arg-column
          (+ 2 ; for the leading "; " on each line
@@ -1653,7 +1654,8 @@
 ;;; Return a STORAGE-INFO struction describing the object-to-source
 ;;; variable mappings from DEBUG-FUN.
 (defun storage-info-for-debug-fun (debug-fun)
-  (declare (type sb-di:debug-fun debug-fun))
+  (declare (type sb-di:debug-fun debug-fun)
+           (inline make-storage-info))
   (let ((sc-vec sb-c:*backend-sc-numbers*)
         (groups nil)
         (debug-vars (sb-di::debug-fun-debug-vars debug-fun)))

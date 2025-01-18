@@ -153,7 +153,7 @@
 (defstruct (arg (:constructor %make-arg (name))
                 (:copier nil)
                 (:predicate nil))
-  (name nil :type symbol)
+  (name nil :type symbol :read-only t)
   (fields nil :type list)
 
   (value nil :type (or list integer))
@@ -167,13 +167,14 @@
 (defstruct (instruction-format (:conc-name format-)
                                (:constructor make-inst-format
                                              (name length default-printer args))
-                               (:copier nil))
-  (name nil)
-  (args nil :type list)
+                               (:copier nil)
+                               #-sb-xc-host :no-constructor-defun)
+  (name nil :read-only t)
+  (args nil :type list :read-only t)
 
-  (length 0 :type disassem-length)               ; in bytes
+  (length 0 :type disassem-length :read-only t)               ; in bytes
 
-  (default-printer nil :type list))
+  (default-printer nil :type list :read-only t))
 (declaim (freeze-type arg instruction-format))
 
 ;;; A FUNSTATE holds the state of any arguments used in a disassembly
@@ -338,6 +339,7 @@
                  arg-specs)))))
 
 (defun %def-inst-format (name inherit length printer &rest arg-specs)
+  (declare (inline make-inst-format))
   (let ((args (if inherit (copy-list (format-args (format-or-lose inherit)))))
         (seen))
     (dolist (arg-spec arg-specs)

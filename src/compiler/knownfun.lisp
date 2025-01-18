@@ -19,7 +19,9 @@
 ;;;; interfaces to defining macros
 
 ;;; an IR1 transform
-(defstruct (transform (:copier nil))
+(defstruct (transform (:copier nil)
+                      (:predicate nil)
+                      #-sb-xc-host :no-constructor-defun)
   ;; the function type which enables this transform.
   ;;
   ;; (Note that declaring this :TYPE FUN-TYPE probably wouldn't
@@ -62,6 +64,7 @@
 ;;; Argument order is: policy constraint, ftype constraint, consequent.
 ;;; (think "qualifiers + specializers -> method")
 (defun %deftransform (name policy type fun &optional (important :slightly))
+  (declare (inline make-transform))
   (let* ((ctype (specifier-type type))
          (info (fun-info-or-lose name))
          (transforms (fun-info-transforms info))

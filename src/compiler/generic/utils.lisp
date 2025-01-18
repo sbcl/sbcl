@@ -106,7 +106,10 @@
                       (nth n *register-arg-offsets*))
       (make-sc+offset control-stack-sc-number n)))
 
-(defstruct fixed-call-args-state
+(defstruct (fixed-call-args-state
+            (:copier nil)
+            (:predicate nil)
+            (:constructor make-fixed-call-args-state ()))
   (descriptors -1 :type fixnum)
   #-c-stack-is-control-stack
   (non-descriptors -1 :type fixnum)

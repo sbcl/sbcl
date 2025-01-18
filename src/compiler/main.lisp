@@ -1619,17 +1619,17 @@ necessary, since type inference may take arbitrarily long to converge.")
 
         (*compilation*
          (make-compilation
-          :coverage-metadata (cons (make-hash-table :test 'equal)
-                                   (make-hash-table :test 'equal))
           ;; Whether to emit msan unpoisoning code depends on the runtime
           ;; value of the feature, not "#+msan", because we can use the target
           ;; compiler to compile code for itself which isn't sanitized,
           ;; *or* code for another image which is sanitized.
           ;; And we can also cross-compile assuming msan.
-          :msan-unpoison (member :msan sb-xc:*features*)
-          :block-compile *block-compile-argument*
-          :entry-points *entry-points-argument*
-          :compile-toplevel-object cfasl))
+          (member :msan sb-xc:*features*)
+          (cons (make-hash-table :test 'equal)
+                (make-hash-table :test 'equal))
+          *block-compile-argument*
+          *entry-points-argument*
+          cfasl))
 
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)

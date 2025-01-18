@@ -553,7 +553,8 @@
                       (:constructor make-component
                        (head tail &aux (last-block tail)
                                        (outer-loop
-                                        (make-loop :outer head (list tail))))))
+                                        (make-loop :outer head (list tail)))))
+                      #-sb-xc-host :no-constructor-defun)
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -594,8 +595,8 @@
   ;; tail. Until environment analysis links NLX entry stubs to the
   ;; component head, every successor of the head is a function start
   ;; (i.e. begins with a BIND node.)
-  (head (missing-arg) :type cblock)
-  (tail (missing-arg) :type cblock)
+  (head (missing-arg) :type cblock :read-only t)
+  (tail (missing-arg) :type cblock :read-only t)
   ;; New blocks are inserted before this.
   (last-block (missing-arg) :type cblock)
   ;; This becomes a list of the CLAMBDA structures for all functions
@@ -707,7 +708,8 @@
 
 ;;; The ENVIRONMENT structure represents the result of environment analysis.
 (defstruct (environment (:copier nil)
-                        (:constructor make-environment (lambda)))
+                        (:constructor make-environment (lambda))
+                        #-sb-xc-host :no-constructor-defun)
   ;; the function that allocates this environment
   (lambda (missing-arg) :type clambda :read-only t)
   ;; a list of all the LAMBDA-VARs and NLX-INFOs needed from enclosing
@@ -757,7 +759,8 @@
 ;;; ENVIRONMENT-NLX-INFO.
 (defstruct (nlx-info
             (:copier nil)
-            (:constructor make-nlx-info (cleanup block)))
+            (:constructor make-nlx-info (cleanup block))
+            #-sb-xc-host :no-constructor-defun)
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
@@ -1323,7 +1326,8 @@
 (defstruct (optional-dispatch
             (:include functional) (:copier nil)
             (:constructor make-optional-dispatch
-                (arglist allowp keyp %source-name %debug-name source-path)))
+                (arglist allowp keyp %source-name %debug-name source-path))
+            #-sb-xc-host :no-constructor-defun)
   ;; the original parsed argument list, for anyone who cares
   (arglist nil :type list)
   ;; true if &ALLOW-OTHER-KEYS was supplied
@@ -1552,7 +1556,8 @@
 
 (defstruct (jump-table (:include multiple-successors-node)
                        (:constructor make-jump-table (index))
-                       (:copier nil))
+                       (:copier nil)
+                       #-sb-xc-host :no-constructor-defun)
   (index (missing-arg) :type lvar)
   (targets nil :type list))
 
@@ -1561,12 +1566,12 @@
   targets)
 
 (defstruct (cset (:include valued-node
-                           (derived-type (make-single-value-type
-                                          *universal-type*)))
+                           (derived-type (make-single-value-type *universal-type*)))
                  (:conc-name set-)
                  (:predicate set-p)
                  (:constructor make-set (var value))
-                 (:copier nil))
+                 (:copier nil)
+                 #-sb-xc-host :no-constructor-defun)
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
@@ -1643,7 +1648,8 @@
 ;;; receiving forms.
 (defstruct (mv-combination (:include basic-combination)
                            (:constructor make-mv-combination (fun))
-                           (:copier nil)))
+                           (:copier nil)
+                           #-sb-xc-host :no-constructor-defun))
 (defprinter (mv-combination)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar #'lvar-uses args)))
@@ -1667,7 +1673,8 @@
                     (:conc-name return-)
                     (:predicate return-p)
                     (:constructor make-return (result lambda))
-                    (:copier nil))
+                    (:copier nil)
+                    #-sb-xc-host :no-constructor-defun)
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
@@ -1688,7 +1695,8 @@
 (defstruct (cast (:include valued-node)
                  (:copier nil)
                  (:constructor %make-cast
-                     (asserted-type type-to-check value derived-type context)))
+                     (asserted-type type-to-check value derived-type context))
+                 #-sb-xc-host :no-constructor-defun)
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
   ;; an indication of what we have proven about how this type

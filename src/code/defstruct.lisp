@@ -365,12 +365,13 @@
          (*dsd-source-form* nil)
          ((inherits comparators) (parse-defstruct dd options slot-descriptions))
          (constructor-definitions
-          (mapcar (lambda (ctor)
-                    `(sb-c:xdefun ,(car ctor)
-                         :constructor
-                         nil
-                       ,@(structure-ctor-lambda-parts dd (cdr ctor))))
-                  (dd-constructors dd)))
+          (unless (find :no-constructor-defun options)
+            (mapcar (lambda (ctor)
+                      `(sb-c:xdefun ,(car ctor)
+                           :constructor
+                           nil
+                           ,@(structure-ctor-lambda-parts dd (cdr ctor))))
+                    (dd-constructors dd))))
          (print-method
           (when (dd-print-option dd)
             (let* ((x (make-symbol "OBJECT"))
@@ -728,6 +729,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
       (:pure
        (setf (dd-flags dd) (logior (logandc2 (dd-flags dd) +dd-pure+)
                                    (if arg +dd-pure+ 0))))
+      (:no-constructor-defun)
       (t
        (error "unknown DEFSTRUCT option:~%  ~S" option)))
     seen-options))
@@ -745,7 +747,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
                 (parse-1-dd-option
                  (cond ((consp option) option)
                        ((member option
-                                '(:conc-name :constructor :copier :predicate))
+                                '(:conc-name :constructor :copier :predicate :no-constructor-defun))
                         (list option))
                        (t
                         ;; FIXME: ugly message (defstruct (s :include) a)

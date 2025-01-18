@@ -255,6 +255,7 @@
         (setf (node-lexenv bind) *lexenv*)
 
         (let ((block (ctran-starts-block result-ctran)))
+          (declare (inline make-return))
           (let ((return (make-return result-lvar lambda))
                 (tail-set (make-tail-set (list lambda))))
             (setf (lambda-tail-set lambda) tail-set)
@@ -846,7 +847,8 @@
                                  &key post-binding-lexenv
                                  (source-name '.anonymous.)
                                  debug-name)
-  (declare (list body vars aux-vars aux-vals))
+  (declare (list body vars aux-vars aux-vals)
+           (inline make-optional-dispatch))
   (aver (or debug-name (neq '.anonymous. source-name)))
   (let ((res (make-optional-dispatch vars
                                      allowp
@@ -1356,6 +1358,7 @@
                                         (dxable-args
                                           (unless (keywordp extra-info)
                                             extra-info)))
+  (declare (inline make-dxable-args make-inlining-data))
   (cond (defstruct-snippet
          ;; In this case, NAME is a system-generated function. Warn if blowing away
          ;; a previously existing inline expansion coming from an ordinary DEFUN.

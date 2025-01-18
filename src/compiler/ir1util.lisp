@@ -1686,7 +1686,7 @@
 ;;; Make a component with no blocks in it. The BLOCK-FLAG is initially
 ;;; true in the head and tail blocks.
 (defun make-empty-component ()
-  #-sb-xc-host (declare (values component))
+  (declare (inline make-component))
   (let* ((head (make-block-key :start nil :component nil))
          (tail (make-block-key :start nil :component nil))
          (res (make-component head tail)))
@@ -2988,7 +2988,8 @@ is :ANY, the function name is not checked."
 (defun make-cast (value type policy &optional context)
   (declare (type lvar value)
            (type ctype type)
-           (type policy policy))
+           (type policy policy)
+           (inline %make-cast))
   (when (fun-type-p type)
     ;; FUN-TYPE will be weakined into FUNCTION,
     ;; but we still want to check the full type at compile time.

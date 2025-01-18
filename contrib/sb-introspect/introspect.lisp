@@ -274,15 +274,18 @@ If an unsupported TYPE is requested, the function will return NIL.
           (and converter
            (find-definition-source converter))))
        ((:function :generic-function)
-        (when (and (fboundp name)
-                   (or (consp name)
-                       (and
-                        (not (macro-function name))
-                        (not (special-operator-p name)))))
-          (let ((fun (real-fdefinition name)))
-            (when (eq (not (typep fun 'generic-function))
-                      (not (eq type :generic-function)))
-              (find-definition-source fun)))))
+        (if (fboundp name)
+            (when (and (or (consp name)
+                           (and
+                            (not (macro-function name))
+                            (not (special-operator-p name)))))
+              (let ((fun (real-fdefinition name)))
+                (when (eq (not (typep fun 'generic-function))
+                          (not (eq type :generic-function)))
+                  (find-definition-source fun))))
+            (let ((dd (info :function :source-transform name)))
+              (when (typep dd '(cons defstruct-description))
+                (find-definition-sources-by-name (dd-name (car dd)) :structure)))))
        ((:type)
         ;; Source locations for types are saved separately when the expander
         ;; is a closure without a good source-location.
@@ -692,20 +695,21 @@ or a method combination name."
                   ;; entry.
                   (setf (definition-source-form-number source-location)
                         xref-form-number)
-                  (let ((name (cond ((sb-c::transform-p name)
-                                     (let ((fun-name (%fun-name fun)))
-                                       (append (if (consp fun-name)
-                                                   fun-name
-                                                   (list fun-name))
-                                               (let* ((type (sb-c::transform-type name))
-                                                      (type-spec (type-specifier type)))
-                                                 (and (sb-kernel:fun-type-p type)
-                                                      (list (second type-spec)))))))
-                                    ((sb-c::vop-info-p name)
-                                     (list 'sb-c:define-vop
-                                           (sb-c::vop-info-name name)))
-                                    (t
-                                     name))))
+                  (let ((name (typecase name
+                                (sb-c::transform
+                                 (let ((fun-name (%fun-name fun)))
+                                   (append (if (consp fun-name)
+                                               fun-name
+                                               (list fun-name))
+                                           (let* ((type (sb-c::transform-type name))
+                                                  (type-spec (type-specifier type)))
+                                             (and (sb-kernel:fun-type-p type)
+                                                  (list (second type-spec)))))))
+                                (sb-c::vop-info
+                                 (list 'sb-c:define-vop
+                                       (sb-c::vop-info-name name)))
+                                (t
+                                 name))))
                     (push (cons name source-location) result)))))
             xrefs))))
       result)))

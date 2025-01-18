@@ -62,6 +62,7 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                    next result else))))
 
 (def-ir1-translator jump-table ((index &rest targets) start next result)
+  (declare (inline make-jump-table))
   (aver targets)
   (let* ((index-ctran (make-ctran))
          (index-lvar (make-lvar))
@@ -1254,7 +1255,8 @@ care."
 ;;; This should only need to be called in SETQ.
 (defun setq-var (start next result var value)
   (declare (type ctran start next) (type (or lvar null) result)
-           (type basic-var var))
+           (type basic-var var)
+           (inline make-set))
   (let ((dest-ctran (make-ctran))
         (dest-lvar (make-lvar))
         (type (or (lexenv-find var type-restrictions)
@@ -1492,6 +1494,7 @@ due to normal completion or a non-local exit such as THROW)."
 
 Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
 values from the first VALUES-FORM making up the first argument, etc."
+  (declare (inline make-mv-combination))
   (let* ((ctran (make-ctran))
          (fun-lvar (make-lvar))
          (node (if args
