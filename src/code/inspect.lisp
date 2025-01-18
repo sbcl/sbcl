@@ -45,18 +45,20 @@ evaluated expressions.
 " #'equal)
 
 (defun %inspect (*inspected* s)
-  (named-let redisplay () ; "LAMBDA, the ultimate GOTO":-|
-    (multiple-value-bind (description named-p elements)
-        (inspected-parts *inspected*)
-      (tty-display-inspected-parts description named-p elements s)
-      (named-let reread ()
-        (format s "~&> ")
-        (force-output)
-        (let* (;; newly-consed object for hermetic protection against
-               ;; mischievous input like #.*EOF-OBJECT*:
-               (eof (cons *eof-object* nil))
-               (command (read *standard-input* nil eof)))
-          (when (eq command eof)
+  (let ((*print-vector-length* 1000)
+        (*print-length* 100))
+   (named-let redisplay ()            ; "LAMBDA, the ultimate GOTO":-|
+     (multiple-value-bind (description named-p elements)
+         (inspected-parts *inspected*)
+       (tty-display-inspected-parts description named-p elements s)
+       (named-let reread ()
+         (format s "~&> ")
+         (force-output)
+         (let* (;; newly-consed object for hermetic protection against
+                ;; mischievous input like #.*EOF-OBJECT*:
+                (eof (cons *eof-object* nil))
+                (command (read *standard-input* nil eof)))
+           (when (eq command eof)
              ;; currently-undocumented feature: EOF is handled as Q.
              ;; If there's ever consensus that this is *the* right
              ;; thing to do (as opposed to e.g. handling it as U), we
@@ -64,45 +66,45 @@ evaluated expressions.
              ;; do this than to signal an error.
              (/show0 "THROWing QUIT-INSPECT for EOF")
              (throw 'quit-inspect nil))
-          (typecase command
-            (integer
-             (let ((elements-length (length elements)))
-               (cond ((< -1 command elements-length)
-                      (let* ((element (nth command elements))
-                             (value (if named-p (cdr element) element)))
-                        (cond ((eq value sb-pcl:+slot-unbound+)
-                               (format s "~%That slot is unbound.~%")
-                               (return-from %inspect (reread)))
-                              (t
-                               (%inspect value s)
-                               ;; If we ever return, then we should be
-                               ;; looking at *INSPECTED* again.
-                               (return-from %inspect (redisplay))))))
-                     ((zerop elements-length)
-                      (format s "~%The object contains nothing to inspect.~%")
-                      (return-from %inspect (reread)))
-                     (t
-                      (format s "~%Enter a valid index (~:[0-~W~;0~]).~%"
-                              (= elements-length 1) (1- elements-length))
-                      (return-from %inspect (reread))))))
-            (symbol
-             (case (find-symbol (symbol-name command) *keyword-package*)
-               ((:q :e)
-                (/show0 "THROWing QUIT-INSPECT for :Q or :E")
-                (throw 'quit-inspect nil))
-               (:u
-                (return-from %inspect))
-               (:r
-                (return-from %inspect (redisplay)))
-               ((:h :? :help)
-                (write-string +help-for-inspect+ s)
-                (return-from %inspect (reread)))
-               (t
-                (eval-for-inspect command s)
-                (return-from %inspect (reread)))))
-            (t
-             (eval-for-inspect command s)
-             (return-from %inspect (reread)))))))))
+           (typecase command
+             (integer
+              (let ((elements-length (length elements)))
+                (cond ((< -1 command elements-length)
+                       (let* ((element (nth command elements))
+                              (value (if named-p (cdr element) element)))
+                         (cond ((eq value sb-pcl:+slot-unbound+)
+                                (format s "~%That slot is unbound.~%")
+                                (return-from %inspect (reread)))
+                               (t
+                                (%inspect value s)
+                                ;; If we ever return, then we should be
+                                ;; looking at *INSPECTED* again.
+                                (return-from %inspect (redisplay))))))
+                      ((zerop elements-length)
+                       (format s "~%The object contains nothing to inspect.~%")
+                       (return-from %inspect (reread)))
+                      (t
+                       (format s "~%Enter a valid index (~:[0-~W~;0~]).~%"
+                               (= elements-length 1) (1- elements-length))
+                       (return-from %inspect (reread))))))
+             (symbol
+              (case (find-symbol (symbol-name command) *keyword-package*)
+                ((:q :e)
+                 (/show0 "THROWing QUIT-INSPECT for :Q or :E")
+                 (throw 'quit-inspect nil))
+                (:u
+                 (return-from %inspect))
+                (:r
+                 (return-from %inspect (redisplay)))
+                ((:h :? :help)
+                 (write-string +help-for-inspect+ s)
+                 (return-from %inspect (reread)))
+                (t
+                 (eval-for-inspect command s)
+                 (return-from %inspect (reread)))))
+             (t
+              (eval-for-inspect command s)
+              (return-from %inspect (reread))))))))))
 
 (defun eval-for-inspect (command stream)
   (let ((result-list (restart-case
