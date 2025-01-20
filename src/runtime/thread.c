@@ -1182,9 +1182,11 @@ uword_t create_lisp_thread(struct thread* th)
     struct extra_thread_data *data = thread_extra_data(th);
     data->blocked_signal_set = deferrable_sigset;
     // It's somewhat customary in the win32 API to start threads as suspended.
+    // Don't use STACK_SIZE_PARAM_IS_A_RESERVATION because
+    // dx-allocation accesses the stack non-linearly.
     th->os_thread =
       _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
-                     CREATE_SUSPENDED | STACK_SIZE_PARAM_IS_A_RESERVATION, &tid);
+                     CREATE_SUSPENDED, &tid);
     bool success = th->os_thread != 0;
     if (success) {
         th->os_kernel_tid = tid;
