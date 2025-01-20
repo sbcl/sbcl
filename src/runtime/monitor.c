@@ -56,7 +56,6 @@ extern void* tlsf_control;
  * The enter-the-ldb-monitor function is responsible for setting up
  * this stream. */
 static FILE *ldb_in = 0;
-static int ldb_in_fd = -1;
 
 typedef int cmd(char **ptr);
 
@@ -1048,7 +1047,6 @@ ldb_monitor(void)
 #else
         ldb_in = stdin;
 #endif
-        ldb_in_fd = fileno(ldb_in);
     }
 
     while (1) {
