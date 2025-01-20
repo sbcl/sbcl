@@ -70,7 +70,7 @@
             "Undefined ~:[~;variables~] ~:[~;types~]~
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-ALLOWLIST*?)~]"
             variables types functions))
-  (when (and (or warnp style-warnp) *fail-on-warnings* (not (target-featurep :win32)))
+  (when (and (or warnp style-warnp) *fail-on-warnings*)
     (cerror "Proceed anyway"
             "make-host-2 stopped due to unexpected ~A raised from the host." (or warnp style-warnp))))
 
