@@ -223,16 +223,17 @@ corruption_warning_and_maybe_lose(char *fmt, ...)
     maybe_lose();
 }
 
-void print_constant(os_context_t *context, int offset) {
+static void print_constant(os_context_t *context, int offset, FILE* ostream) {
     lispobj code = find_code(context);
     if (code != NIL) {
         struct code *codeptr = (struct code *)native_pointer(code);
-        putchar('\t');
+        putc('\t', ostream);
         if (offset >= code_header_words(codeptr)) {
-            printf("Constant offset %d out of bounds for the code object @ %p\n",
-                   offset, codeptr);
+            fprintf(ostream,
+                    "Constant offset %d out of bounds for the code object @ %p\n",
+                    offset, codeptr);
         } else {
-            struct iochannel io = {stdout, stdin};
+            struct iochannel io = {ostream, stdin};
             brief_print(codeptr->constants[offset -
                                            (offsetof(struct code, constants) >> WORD_SHIFT)],
                         &io);
@@ -277,23 +278,17 @@ void skip_internal_error (os_context_t *context) {
 
 }
 
-/* internal error handler for when the Lisp error system doesn't exist
- *
- * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
- * this'd require changes in a number of things like brief_print(..),
- * or I'd have changed it immediately.) */
-void describe_error_arg(os_context_t *context, int sc_number, int offset) {
+/* internal error handler for when the Lisp error system doesn't exist */
+void describe_error_arg(os_context_t *context, int sc_number, int offset, FILE* f)
 {
     int ch;
 
-    printf("    SC: %d, Offset: %d", sc_number, offset);
+    fprintf(f, "    SC: %d, Offset: %d", sc_number, offset);
     switch (sc_number) {
     case sc_AnyReg:
     case sc_DescriptorReg:
-        putchar('\t');
-        // This (and everything below) should probably use stderr as per
-        // the above comment, but do them all the same for now.
-        struct iochannel io = {stdout, stdin};
+        putc('\t', f);
+        struct iochannel io = {f, stdin};
         brief_print(*os_context_register_addr(context, offset), &io);
         break;
 
@@ -305,46 +300,46 @@ void describe_error_arg(os_context_t *context, int sc_number, int offset) {
         ch = ch & 0xff;
 #endif
         switch (ch) {
-        case '\n': printf("\t'\\n'\n"); break;
-        case '\b': printf("\t'\\b'\n"); break;
-        case '\t': printf("\t'\\t'\n"); break;
-        case '\r': printf("\t'\\r'\n"); break;
+        case '\n': fprintf(f, "\t'\\n'\n"); break;
+        case '\b': fprintf(f, "\t'\\b'\n"); break;
+        case '\t': fprintf(f, "\t'\\t'\n"); break;
+        case '\r': fprintf(f, "\t'\\r'\n"); break;
         default:
             if (ch < 32 || ch > 127)
-                printf("\\%03o", ch);
+                fprintf(f, "\\%03o", ch);
             else
-                printf("\t'%c'\n", ch);
+                fprintf(f, "\t'%c'\n", ch);
             break;
         }
         break;
     case sc_SapReg:
-        printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
+        fprintf(f, "\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
         break;
     case sc_SignedReg:
-        printf("\t%ld\n", (long) *os_context_register_addr(context, offset));
+        fprintf(f, "\t%ld\n", (long) *os_context_register_addr(context, offset));
         break;
     case sc_UnsignedReg:
-        printf("\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
+        fprintf(f, "\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
         break;
 #ifdef sc_SingleFloatReg
     case sc_SingleFloatReg:
-        printf("\t%g\n", *(float *)&context->sc_fpregs[offset]);
+        fprintf(f, "\t%g\n", *(float *)&context->sc_fpregs[offset]);
         break;
 #endif
 #ifdef sc_DoubleFloatReg
     case sc_DoubleFloatReg:
-        printf("\t%g\n", *(double *)&context->sc_fpregs[offset]);
+        fprintf(f, "\t%g\n", *(double *)&context->sc_fpregs[offset]);
         break;
 #endif
     case sc_Constant:
-        print_constant(context, offset);
+        print_constant(context, offset, f);
         break;
     default:
-        printf("\t???\n");
+        fprintf(f, "\t???\n");
         break;
     }
 }
-};
+
 void
 describe_internal_error(os_context_t *context)
 {
@@ -372,9 +367,10 @@ describe_internal_error(os_context_t *context)
         ptr++;
     }
     if (code > sizeof(internal_error_nargs)) {
-        printf("Unknown error code %d at %p\n", code, pc);
+        fprintf(stderr, "Unknown error code %d at %p\n", code, pc);
     }
-    printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
+    fprintf(stderr,
+            "Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
     count = internal_error_nargs[code];
 
 #ifdef LISP_FEATURE_ARM64
@@ -393,7 +389,7 @@ describe_internal_error(os_context_t *context)
         default:
             sc = sc_DescriptorReg;
         }
-        describe_error_arg(context, sc, first_offset);
+        describe_error_arg(context, sc, first_offset, stderr);
         count--;
     }
 #endif
@@ -401,6 +397,6 @@ describe_internal_error(os_context_t *context)
     for (position = 0; count > 0; --count) {
         int sc_and_offset = read_var_integer(ptr, &position);
         describe_error_arg(context, sc_and_offset_sc_number(sc_and_offset),
-                           sc_and_offset_offset(sc_and_offset));
+                           sc_and_offset_offset(sc_and_offset), stderr);
     }
 }
