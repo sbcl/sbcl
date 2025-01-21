@@ -4979,17 +4979,17 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     return state.nerrors;
 }
 
-void gc_show_pte(lispobj obj)
+void gc_show_pte(lispobj obj, FILE* f)
 {
     char marks[1+CARDS_PER_PAGE];
     page_index_t page = find_page_index((void*)obj);
     if (page>=0) {
-        printf("page %"PAGE_INDEX_FMT" base %p gen %d type %x ss %p used %x",
+        fprintf(f, "page %"PAGE_INDEX_FMT" base %p gen %d type %x ss %p used %x",
                page, page_address(page), page_table[page].gen, page_table[page].type,
                page_scan_start(page), page_bytes_used(page));
-        if (page_starts_contiguous_block_p(page)) printf(" startsblock");
-        if (page_ends_contiguous_block_p(page, page_table[page].gen)) printf(" endsblock");
-        printf(" (%s)\n", page_card_mark_string(page, marks));
+        if (page_starts_contiguous_block_p(page)) fprintf(f, " startsblock");
+        if (page_ends_contiguous_block_p(page, page_table[page].gen)) fprintf(f, " endsblock");
+        fprintf(f, " (%s)\n", page_card_mark_string(page, marks));
         return;
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -5001,7 +5001,7 @@ void gc_show_pte(lispobj obj)
         int i;
         for (i=0;i<8;++i) genstring[i] = (gens & (1<<i)) ? '0'+i : '-';
         genstring[8] = 0;
-        printf("page %d (v) base %p gens %s ss=%p%s\n",
+        fprintf(f, "page %d (v) base %p gens %s ss=%p%s\n",
                (int)page, text_page_address(page), genstring,
                text_page_scan_start(page),
                card_markedp((void*)obj)?"":" WP");
@@ -5009,14 +5009,14 @@ void gc_show_pte(lispobj obj)
     }
     page = find_fixedobj_page_index((void*)obj);
     if (page>=0) {
-        printf("page %d (f) align %d gens %x%s\n", (int)page,
+        fprintf(f, "page %d (f) align %d gens %x%s\n", (int)page,
                fixedobj_pages[page].attr.parts.obj_align,
                fixedobj_pages[page].attr.parts.gens_,
                card_markedp((void*)obj)?"": " WP");
         return;
     }
 #endif
-    printf("not in GC'ed space\n");
+    fprintf(f, "not in GC'ed space\n");
 }
 
 static int count_immobile_objects(__attribute__((unused)) int gen, int res[3])

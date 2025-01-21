@@ -705,9 +705,9 @@ static int hashtable_cmd(char **ptr)
 static int
 pte_cmd(char **ptr)
 {
-    extern void gc_show_pte(lispobj);
+    extern void gc_show_pte(lispobj,FILE*);
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj);
+    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj, stdout);
     return 0;
 }
 
