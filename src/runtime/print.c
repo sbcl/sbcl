@@ -120,24 +120,25 @@ static int max_length = 5;
 static bool dont_descend = 0, skip_newline = 0;
 static int cur_clock = 0;
 
-static void print_obj(char *prefix, lispobj obj);
+static void print_obj(char *prefix, lispobj obj, iochannel_t);
 
-#define NEWLINE_OR_RETURN if (continue_p(1)) newline(NULL); else return;
+#define IO (*io)
+#define NEWLINE_OR_RETURN if (continue_p(1,io)) newline(NULL,io->out); else return;
 
-static void indent(int in)
+static void indent(int n, FILE* f)
 {
     static char *spaces = "                                                                ";
 
-    while (in > 64) {
-        fputs(spaces, stdout);
-        in -= 64;
+    while (n > 64) {
+        fputs(spaces, f);
+        n -= 64;
     }
-    if (in != 0)
-        fputs(spaces + 64 - in, stdout);
+    if (n != 0)
+        fputs(spaces + 64 - n, f);
 }
 
 static jmp_buf ldb_print_nlx;
-static bool continue_p(bool newline)
+static bool continue_p(bool newline, iochannel_t io)
 {
     char buffer[256];
 
@@ -148,19 +149,19 @@ static bool continue_p(bool newline)
         if (skip_newline)
             skip_newline = 0;
         else
-            putchar('\n');
+            putc('\n', IO.out);
 
         if (cur_lines >= max_lines) {
-            printf("More? [y] ");
-            fflush(stdout);
+            fprintf(IO.out, "More? [y] ");
+            fflush(IO.out);
 
-            if (fgets(buffer, sizeof(buffer), stdin)) {
+            if (fgets(buffer, sizeof(buffer), IO.in)) {
                 if (buffer[0] == 'n' || buffer[0] == 'N')
                     longjmp(ldb_print_nlx, 1);
                 else
                     cur_lines = 0;
             } else {
-                printf("\nUnable to read response, assuming y.\n");
+                fprintf(IO.out, "\nUnable to read response, assuming y.\n");
                 cur_lines = 0;
             }
         }
@@ -169,19 +170,19 @@ static bool continue_p(bool newline)
     return 1;
 }
 
-static void newline(char *label)
+static void newline(char *label, FILE* f)
 {
     cur_lines++;
     if (label != NULL)
-        fputs(label, stdout);
-    putchar('\t');
-    indent(cur_depth * 2);
+        fputs(label, f);
+    putc('\t', f);
+    indent(cur_depth * 2, f);
 }
 
 
-static void print_unknown(lispobj obj)
+static void print_unknown(lispobj obj, iochannel_t io)
 {
-  printf("unknown object: %p", (void *)obj);
+    fprintf(IO.out, "unknown object: %p", (void *)obj);
 }
 
 #ifdef PRIdPTR
@@ -190,25 +191,25 @@ static void print_unknown(lispobj obj)
 # error "Your inttypes.h is lame"
 #endif
 
-static void brief_fixnum(lispobj obj)
+static void brief_fixnum(lispobj obj, iochannel_t io)
 {
     /* KLUDGE: Rather than update the tables in print_obj(), we
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
-    if (!fixnump(obj)) return print_unknown(obj);
-    printf("%"OBJ_FMTd, fixnum_value(obj));
+    if (!fixnump(obj)) return print_unknown(obj, io);
+    fprintf(IO.out, "%"OBJ_FMTd, fixnum_value(obj));
 }
 
-static void print_fixnum(lispobj obj)
+static void print_fixnum(lispobj obj, iochannel_t io)
 {
     /* KLUDGE: Rather than update the tables in print_obj(), we
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
-    if (!fixnump(obj)) return print_unknown(obj);
-    printf(": %"OBJ_FMTd, fixnum_value(obj));
+    if (!fixnump(obj)) return print_unknown(obj, io);
+    fprintf(IO.out, ": %"OBJ_FMTd, fixnum_value(obj));
 }
 
-static void brief_otherimm(lispobj obj)
+static void brief_otherimm(lispobj obj, iochannel_t io)
 {
     int type, c;
     char * charname = 0;
@@ -217,38 +218,38 @@ static void brief_otherimm(lispobj obj)
     switch (type) {
         case CHARACTER_WIDETAG:
             c = obj>>8; // no mask. show whatever's there
-            printf("#\\");
+            fprintf(IO.out, "#\\");
             switch (c) {
                 case '\0': charname = "Nul"; break;
                 case '\n': charname = "Newline"; break;
                 case '\b': charname = "Backspace"; break;
                 case '\177': charname = "Delete"; break;
                 default:
-                  if (c < 32) printf("^%c", c+64);
-                  else printf(c < 128 ? "%c" : "U+%X", c);
+                  if (c < 32) fprintf(IO.out, "^%c", c+64);
+                  else fprintf(IO.out, c < 128 ? "%c" : "U+%X", c);
             }
             if (charname)
-                fputs(charname, stdout);
+                fputs(charname, IO.out);
             break;
 
         case UNBOUND_MARKER_WIDETAG:
-            printf("<unbound marker>");
+            fprintf(IO.out, "<unbound marker>");
             break;
 
         default:
-            printf("%s", widetag_names[type >> 2]);
+            fprintf(IO.out, "%s", widetag_names[type >> 2]);
             break;
     }
 }
 
-static void print_otherimm(lispobj obj)
+static void print_otherimm(lispobj obj, iochannel_t io)
 {
-    printf(", %s", widetag_names[header_widetag(obj) >> 2]);
+    fprintf(IO.out, ", %s", widetag_names[header_widetag(obj) >> 2]);
 
     switch (header_widetag(obj)) {
     case CHARACTER_WIDETAG:
-        printf(": ");
-        brief_otherimm(obj);
+        fprintf(IO.out, ": ");
+        brief_otherimm(obj, io);
         break;
 
     case SAP_WIDETAG:
@@ -256,39 +257,39 @@ static void print_otherimm(lispobj obj)
         break;
 
     default:
-        printf(": data=%"OBJ_FMTX, (obj>>8));
+        fprintf(IO.out, ": data=%"OBJ_FMTX, (obj>>8));
         break;
     }
 }
 
-static void brief_list(lispobj obj)
+static void brief_list(lispobj obj, iochannel_t io)
 {
     int space = 0;
     int length = 0;
 
     if (obj == NIL)
-        printf("NIL");
+        fprintf(IO.out, "NIL");
     else {
-        putchar('(');
+        putc('(', IO.out);
         while (listp(obj)) {
             if (space)
-                putchar(' ');
+                putc(' ', IO.out);
             if (++length >= max_length) {
-                printf("...");
+                fprintf(IO.out, "...");
                 obj = NIL;
                 break;
             }
-            print_obj("", CONS(obj)->car);
+            print_obj("", CONS(obj)->car, io);
             obj = CONS(obj)->cdr;
             space = 1;
             if (obj == NIL)
                 break;
         }
         if (obj != NIL) {
-            printf(" . ");
-            print_obj("", obj);
+            fprintf(IO.out, " . ");
+            print_obj("", obj, io);
         }
-        putchar(')');
+        putc(')', IO.out);
     }
 }
 
@@ -308,13 +309,13 @@ void print_list_car_ptrs(lispobj obj, FILE* f)
 }
 
 
-static void print_list(lispobj obj)
+static void print_list(lispobj obj, iochannel_t io)
 {
     if (obj == NIL) {
-        printf(" (NIL)");
+        fprintf(IO.out, " (NIL)");
     } else {
-        print_obj("car: ", CONS(obj)->car);
-        print_obj("cdr: ", CONS(obj)->cdr);
+        print_obj("car: ", CONS(obj)->car, io);
+        print_obj("cdr: ", CONS(obj)->cdr, io);
     }
 }
 
@@ -333,7 +334,7 @@ char * simple_base_stringize(struct vector * string)
   return newstring;
 }
 
-static void brief_struct(lispobj obj)
+static void brief_struct(lispobj obj, iochannel_t io)
 {
     struct instance *instance = INSTANCE(obj);
     extern struct vector * instance_classoid_name(lispobj*);
@@ -342,11 +343,11 @@ static void brief_struct(lispobj obj)
     lispobj layout = instance_layout((lispobj*)instance);
     if ( classoid_name ) {
         char * namestring = simple_base_stringize(classoid_name);
-        printf("#<ptr to %"OBJ_FMTX" %s instance>", layout, namestring);
+        fprintf(IO.out, "#<ptr to %"OBJ_FMTX" %s instance>", layout, namestring);
         if ( namestring != (char*)classoid_name->data )
             free(namestring);
     } else {
-        printf("#<ptr to %"OBJ_FMTX" instance>", layout);
+        fprintf(IO.out, "#<ptr to %"OBJ_FMTX" instance>", layout);
     }
 }
 
@@ -376,20 +377,20 @@ static bool tagged_slot_p(struct layout *layout, int slot_index)
     return bitmap_logbitp(slot_index, get_layout_bitmap(layout));
 }
 
-static void print_struct(lispobj obj)
+static void print_struct(lispobj obj, iochannel_t io)
 {
     struct instance *instance = INSTANCE(obj);
     short int i;
     char buffer[16];
     lispobj layout = instance_layout(native_pointer(obj));
-    print_obj("type: ", layout);
+    print_obj("type: ", layout, io);
     for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
         sprintf(buffer, "slot %d: ", i);
         if (layout && tagged_slot_p(LAYOUT(layout), i)) {
-            print_obj(buffer, instance->slots[i]);
+            print_obj(buffer, instance->slots[i], io);
         } else {
-            newline(NULL);
-            printf("\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
+            newline(NULL, IO.out);
+            fprintf(IO.out, "\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
         }
     }
 }
@@ -427,7 +428,7 @@ void show_lstring(struct vector * string, int quotes, FILE *s)
   if (quotes) putc('"', s);
 }
 
-static void brief_fun_or_otherptr(lispobj obj)
+static void brief_fun_or_otherptr(lispobj obj, iochannel_t io)
 {
     lispobj *ptr, header;
     int type;
@@ -441,35 +442,35 @@ static void brief_fun_or_otherptr(lispobj obj)
             symbol = (struct symbol *)ptr;
             lispobj package = symbol_package(symbol);
             if (package == NIL)
-                printf("#:");
-            show_lstring(symbol_name(symbol), 0, stdout);
+                fprintf(IO.out, "#:");
+            show_lstring(symbol_name(symbol), 0, IO.out);
             break;
 
         case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
         case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-            show_lstring((struct vector*)ptr, 1, stdout);
+            show_lstring((struct vector*)ptr, 1, IO.out);
             break;
 
         default:
-            printf("#<ptr to ");
-            brief_otherimm(header);
+            fprintf(IO.out, "#<ptr to ");
+            brief_otherimm(header, io);
             if (type == FDEFN_WIDETAG) {  // Try to print name, if a symbol
                 // FIXME: more address validity checks perhaps?
                 lispobj name = ((struct fdefn*)ptr)->name;
                 if (lowtag_of(name) == OTHER_POINTER_LOWTAG
                     && widetag_of(native_pointer(name)) == SYMBOL_WIDETAG) {
-                  printf(" for ");
+                  fprintf(IO.out, " for ");
                   struct vector* str = symbol_name(SYMBOL(name));
-                  safely_show_lstring(str, 0, stdout);
+                  safely_show_lstring(str, 0, IO.out);
                 }
             }
-            putchar('>');
+            putc('>', IO.out);
     }
 }
 
-static void print_slots(char **slots, int count, lispobj *ptr)
+static void print_slots(char **slots, int count, lispobj *ptr, iochannel_t io)
 {
     while (count-- > 0) {
         if (*slots) {
@@ -477,16 +478,16 @@ static void print_slots(char **slots, int count, lispobj *ptr)
             lispobj word = *ptr;
             char* slot_name = *slots;
             if (N_WORD_BYTES == 8 && !strcmp(slot_name, "boxed_size: ")) word = word & 0xFFFFFFFF;
-            print_obj(slot_name, word);
+            print_obj(slot_name, word, io);
             slots++;
         } else {
-            print_obj("???: ", *ptr);
+            print_obj("???: ", *ptr, io);
         }
         ptr++;
     }
 }
 
-static void print_fun_or_otherptr(lispobj obj)
+static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 {
     lispobj *ptr;
     unsigned long header;
@@ -495,7 +496,7 @@ static void print_fun_or_otherptr(lispobj obj)
 
     ptr = native_pointer(obj);
     if (ptr == NULL) {
-        printf(" (NULL Pointer)");
+        fprintf(IO.out, " (NULL Pointer)");
         return;
     }
 
@@ -503,10 +504,10 @@ static void print_fun_or_otherptr(lispobj obj)
     count = HeaderValue(header);
     type = header_widetag(header);
 
-    print_obj("header: ", header);
+    print_obj("header: ", header, io);
     if (!other_immediate_lowtag_p(header)) {
         NEWLINE_OR_RETURN;
-        printf("(invalid header object)");
+        fprintf(IO.out, "(invalid header object)");
         return;
     }
 
@@ -515,9 +516,9 @@ static void print_fun_or_otherptr(lispobj obj)
         count &= 0x7fffff;
         ptr += count;
         NEWLINE_OR_RETURN;
-        printf("0x");
+        fprintf(IO.out, "0x");
         while (count-- > 0)
-            printf(
+            fprintf(IO.out,
 #if N_WORD_BITS == 32
                    "%08lx%s",
 #else
@@ -527,35 +528,35 @@ static void print_fun_or_otherptr(lispobj obj)
         break;
 
     case RATIO_WIDETAG:
-        print_slots(ratio_slots, count, ptr);
+        print_slots(ratio_slots, count, ptr, io);
         break;
 
     case COMPLEX_RATIONAL_WIDETAG:
-        print_slots(complex_slots, count, ptr);
+        print_slots(complex_slots, count, ptr, io);
         break;
 
     case SYMBOL_WIDETAG:
         // Only 1 byte of a symbol header conveys its size.
         // The other bytes may be freely used by the backend.
-        print_slots(symbol_slots, count & 0xFF, ptr);
+        print_slots(symbol_slots, count & 0xFF, ptr, io);
         struct symbol* sym = (void*)(ptr - 1);
-        if (symbol_function(sym) != NIL) print_obj("fun: ", symbol_function(sym));
+        if (symbol_function(sym) != NIL) print_obj("fun: ", symbol_function(sym), io);
 #ifdef LISP_FEATURE_SB_THREAD
         int tlsindex = tls_index_of(sym);
         struct thread*th = get_sb_vm_thread();
         if (th != 0 && tlsindex != 0) {
             lispobj v = *(lispobj*)(tlsindex + (char*)th);
-            print_obj("tlsval: ", v);
+            print_obj("tlsval: ", v, io);
         }
 #endif
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
         // print_obj doesn't understand raw words, so make it a fixnum
         int pkgid = symbol_package_id(sym) << N_FIXNUM_TAG_BITS;
-        print_obj("package_id: ", pkgid);
+        print_obj("package_id: ", pkgid, io);
 #endif
 #ifdef LISP_FEATURE_LINKAGE_SPACE
         int fname_index = symbol_linkage_index(sym);
-        printf("\nindex: %x linkage_table[index]: %p",
+        fprintf(IO.out, "\nindex: %x linkage_table[index]: %p",
                fname_index, (void*)linkage_space[fname_index]);
 #endif
         break;
@@ -563,18 +564,18 @@ static void print_fun_or_otherptr(lispobj obj)
 #if N_WORD_BITS == 32
     case SINGLE_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%g", ((struct single_float *)native_pointer(obj))->value);
+        fprintf(IO.out, "%g", ((struct single_float *)native_pointer(obj))->value);
         break;
 #endif
     case DOUBLE_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%g", ((struct double_float *)native_pointer(obj))->value);
+        fprintf(IO.out, "%g", ((struct double_float *)native_pointer(obj))->value);
         break;
 
 #ifdef LONG_FLOAT_WIDETAG
     case LONG_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%Lg", ((struct long_float *)native_pointer(obj))->value);
+        fprintf(IO.out, "%Lg", ((struct long_float *)native_pointer(obj))->value);
         break;
 #endif
 
@@ -582,15 +583,15 @@ static void print_fun_or_otherptr(lispobj obj)
     case COMPLEX_SINGLE_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
 #ifdef LISP_FEATURE_64_BIT
-        printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[0]);
+        fprintf(IO.out, "%g", ((struct complex_single_float *)native_pointer(obj))->data.data[0]);
 #else
-        printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
+        fprintf(IO.out, "%g", ((struct complex_single_float *)native_pointer(obj))->real);
 #endif
         NEWLINE_OR_RETURN;
 #ifdef LISP_FEATURE_64_BIT
-        printf("%g", ((struct complex_single_float *)native_pointer(obj))->data.data[1]);
+        fprintf(IO.out, "%g", ((struct complex_single_float *)native_pointer(obj))->data.data[1]);
 #else
-        printf("%g", ((struct complex_single_float *)native_pointer(obj))->imag);
+        fprintf(IO.out, "%g", ((struct complex_single_float *)native_pointer(obj))->imag);
 #endif
         break;
 #endif
@@ -598,18 +599,18 @@ static void print_fun_or_otherptr(lispobj obj)
 #ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
     case COMPLEX_DOUBLE_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%g", ((struct complex_double_float *)native_pointer(obj))->real);
+        fprintf(IO.out, "%g", ((struct complex_double_float *)native_pointer(obj))->real);
         NEWLINE_OR_RETURN;
-        printf("%g", ((struct complex_double_float *)native_pointer(obj))->imag);
+        fprintf(IO.out, "%g", ((struct complex_double_float *)native_pointer(obj))->imag);
         break;
 #endif
 
 #ifdef COMPLEX_LONG_FLOAT_WIDETAG
     case COMPLEX_LONG_FLOAT_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
+        fprintf(IO.out, "%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
         NEWLINE_OR_RETURN;
-        printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->imag);
+        fprintf(IO.out, "%Lg", ((struct complex_long_float *)native_pointer(obj))->imag);
         break;
 #endif
 
@@ -618,19 +619,19 @@ static void print_fun_or_otherptr(lispobj obj)
     case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
         NEWLINE_OR_RETURN;
-        show_lstring((struct vector*)native_pointer(obj), 1, stdout);
+        show_lstring((struct vector*)native_pointer(obj), 1, IO.out);
         break;
 
     case SIMPLE_VECTOR_WIDETAG:
         NEWLINE_OR_RETURN;
         {
         long length = vector_len(VECTOR(obj));
-        printf("length = %ld", length);
+        fprintf(IO.out, "length = %ld", length);
         ptr++;
         index = 0;
         while (length-- > 0) {
             sprintf(buffer, "%d: ", index++);
-            print_obj(buffer, *ptr++);
+            print_obj(buffer, *ptr++, io);
         }
         }
         break;
@@ -639,17 +640,17 @@ static void print_fun_or_otherptr(lispobj obj)
         NEWLINE_OR_RETURN;
         {
         long length = vector_len(VECTOR(obj));
-        printf("length = %ld : ", length);
+        fprintf(IO.out, "length = %ld : ", length);
         int bits_to_print = (length < N_WORD_BITS) ? length : N_WORD_BITS;
         uword_t word = ptr[1];
         int i;
         for(i=0; i<bits_to_print; ++i) {
-            putchar((word & 1) ? '1' : '0');
-            if ((i%8)==7) putchar('_');
+            putc((word & 1) ? '1' : '0', IO.out);
+            if ((i%8)==7) putc('_', IO.out);
             word >>= 1;
         }
-        if(bits_to_print < length) printf("...");
-        printf("\n");
+        if(bits_to_print < length) fprintf(IO.out, "...");
+        fprintf(IO.out, "\n");
         }
         break;
 
@@ -658,54 +659,54 @@ static void print_fun_or_otherptr(lispobj obj)
         count = code_header_words((struct code*)(ptr-1));
         for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
             sprintf(buffer, "f[%d]: ", fun_index);
-            print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));
+            print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG), io);
         });
-        print_slots(code_slots, count-1, ptr);
+        print_slots(code_slots, count-1, ptr, io);
         break;
 
     case SIMPLE_FUN_WIDETAG:
-        print_obj("code: ", fun_code_tagged(ptr-1));
+        print_obj("code: ", fun_code_tagged(ptr-1), io);
         print_slots(simple_fun_slots,
-                    sizeof simple_fun_slots/sizeof(char*)-1, ptr);
+                    sizeof simple_fun_slots/sizeof(char*)-1, ptr, io);
         break;
 
 #ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:
-        print_obj("code: ", obj - (count * N_WORD_BYTES));
+        print_obj("code: ", obj - (count * N_WORD_BYTES), io);
         break;
 #endif
 
     case CLOSURE_WIDETAG:
         print_slots(closure_slots,
-                    count & SHORT_HEADER_MAX_WORDS, ptr);
+                    count & SHORT_HEADER_MAX_WORDS, ptr, io);
         break;
 
     case FUNCALLABLE_INSTANCE_WIDETAG:
         print_slots(funcallable_instance_slots,
-                    count & SHORT_HEADER_MAX_WORDS, ptr);
+                    count & SHORT_HEADER_MAX_WORDS, ptr, io);
         break;
 
     case VALUE_CELL_WIDETAG:
-        print_slots(value_cell_slots, 1, ptr);
+        print_slots(value_cell_slots, 1, ptr, io);
         break;
 
     case SAP_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("%p", (void*)*ptr);
+        fprintf(IO.out, "%p", (void*)*ptr);
         break;
 
     case WEAK_POINTER_WIDETAG:
-        print_slots(weak_pointer_slots, 1, ptr);
+        print_slots(weak_pointer_slots, 1, ptr, io);
         break;
 
     case CHARACTER_WIDETAG:
     case UNBOUND_MARKER_WIDETAG:
         NEWLINE_OR_RETURN;
-        printf("pointer to an immediate?");
+        fprintf(IO.out, "pointer to an immediate?");
         break;
 
     case FDEFN_WIDETAG:
-        print_slots(fdefn_slots, 3, ptr);
+        print_slots(fdefn_slots, 3, ptr, io);
         break;
 
     // Make some vectors printable from C, for when all hell breaks lose
@@ -715,25 +716,25 @@ static void print_fun_or_otherptr(lispobj obj)
         long length = vector_len(VECTOR(obj));
         uint32_t * data = (uint32_t*)(ptr + 1);
         long i;
-        printf("#(");
+        fprintf(IO.out, "#(");
         for (i=0; i<length; ++i) {
-            printf("%s%d", i>0?" ":"", data[i]);
-            if(i==255 && length>256) { printf(" ..."); break; }
+            fprintf(IO.out, "%s%d", i>0?" ":"", data[i]);
+            if(i==255 && length>256) { fprintf(IO.out, " ..."); break; }
         }
-        printf(")");
+        fprintf(IO.out, ")");
         }
         break;
     default:
         NEWLINE_OR_RETURN;
         if (specialized_vector_widetag_p(type))
-            printf("length = %"OBJ_FMTd, vector_len(VECTOR(obj)));
+            fprintf(IO.out, "length = %"OBJ_FMTd, vector_len(VECTOR(obj)));
         else
-            printf("Unknown header object?");
+            fprintf(IO.out, "Unknown header object?");
         break;
     }
 }
 
-static void print_obj(char *prefix, lispobj obj)
+static void print_obj(char *prefix, lispobj obj, iochannel_t io)
 {
 #include "genesis/print.inc"
     int type = lowtag_of(obj);
@@ -741,7 +742,7 @@ static void print_obj(char *prefix, lispobj obj)
     char buffer[256];
     bool verbose = cur_depth < brief_depth;
 
-    if (!continue_p(verbose))
+    if (!continue_p(verbose, io))
         return;
 
     if (var != NULL && var_clock(var) == cur_clock)
@@ -753,18 +754,18 @@ static void print_obj(char *prefix, lispobj obj)
     if (var != NULL)
         var_setclock(var, cur_clock);
 
-    void (**fns)(lispobj) = NULL;
+    void (**fns)(lispobj,iochannel_t) = NULL;
     cur_depth++;
     if (verbose) {
         if (var != NULL) {
             sprintf(buffer, "$%s=", var_name(var));
-            newline(buffer);
+            newline(buffer, IO.out);
         }
         else
-            newline(NULL);
-        printf("%s0x%08lx: ", prefix, (unsigned long) obj);
+            newline(NULL, IO.out);
+        fprintf(IO.out, "%s0x%08lx: ", prefix, (unsigned long) obj);
         if (cur_depth < brief_depth) {
-            fputs(lowtag_names[type], stdout);
+            fputs(lowtag_names[type], IO.out);
             fns = print_fns;
         }
         else
@@ -772,19 +773,19 @@ static void print_obj(char *prefix, lispobj obj)
     }
     else {
         if (dont_descend)
-            printf("$%s", var_name(var));
+            fprintf(IO.out, "$%s", var_name(var));
         else {
             if (var != NULL)
-                printf("$%s=", var_name(var));
+                fprintf(IO.out, "$%s=", var_name(var));
             fns = brief_fns;
         }
     }
     if (!fns)
         ;
     else if (is_lisp_pointer(obj) && !gc_managed_addr_p(obj))
-        printf("(bad-address)");
+        fprintf(IO.out, "(bad-address)");
     else
-        (*fns[type])(obj);
+        (*fns[type])(obj, io);
     cur_depth--;
     dont_descend = 0;
 }
@@ -796,7 +797,7 @@ void reset_printer()
     dont_descend = 0;
 }
 
-void print(lispobj obj)
+void print_to_iochan(lispobj obj, iochannel_t io)
 {
     skip_newline = 1;
     cur_depth = 0;
@@ -804,12 +805,17 @@ void print(lispobj obj)
     max_lines = 20;
 
     if (!setjmp(ldb_print_nlx))
-        print_obj("", obj);
+        print_obj("", obj, io);
 
-    putchar('\n');
+    putc('\n', IO.out);
+}
+void print(lispobj obj) // This can be called from Lisp
+{
+    struct iochannel io = {stdout, stdin};
+    print_to_iochan(obj, &io);
 }
 
-void brief_print(lispobj obj)
+void brief_print(lispobj obj, iochannel_t io)
 {
     skip_newline = 1;
     cur_depth = 0;
@@ -817,8 +823,8 @@ void brief_print(lispobj obj)
     max_lines = 5000;
     cur_lines = 0;
 
-    print_obj("", obj);
-    putchar('\n');
+    print_obj("", obj, io);
+    putc('\n', IO.out);
 }
 
 // The following accessors, which take a valid native pointer as input

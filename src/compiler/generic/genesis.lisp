@@ -3337,7 +3337,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (aref a sb-vm:list-pointer-lowtag) (format nil "~a_list" flavor)
             (aref a sb-vm:fun-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor)
             (aref a sb-vm:other-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor))
-      (format out "static void (*~a_fns[])(lispobj obj) = {~
+      (format out "static void (*~a_fns[])(lispobj,iochannel_t) = {~
 ~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
 (defun write-cast-operator (operator-name c-type-name lowtag stream)

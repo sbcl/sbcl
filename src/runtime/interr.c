@@ -232,8 +232,10 @@ void print_constant(os_context_t *context, int offset) {
             printf("Constant offset %d out of bounds for the code object @ %p\n",
                    offset, codeptr);
         } else {
+            struct iochannel io = {stdout, stdin};
             brief_print(codeptr->constants[offset -
-                                           (offsetof(struct code, constants) >> WORD_SHIFT)]);
+                                           (offsetof(struct code, constants) >> WORD_SHIFT)],
+                        &io);
         }
     }
 }
@@ -289,7 +291,10 @@ void describe_error_arg(os_context_t *context, int sc_number, int offset) {
     case sc_AnyReg:
     case sc_DescriptorReg:
         putchar('\t');
-        brief_print(*os_context_register_addr(context, offset));
+        // This (and everything below) should probably use stderr as per
+        // the above comment, but do them all the same for now.
+        struct iochannel io = {stdout, stdin};
+        brief_print(*os_context_register_addr(context, offset), &io);
         break;
 
     case sc_CharacterReg:

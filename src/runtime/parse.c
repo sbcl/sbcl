@@ -169,32 +169,32 @@ int parse_number(char **ptr, int *output)
     return 0;
 }
 
-int parse_addr(char **ptr, bool safely, char **output)
+int parse_addr(char **ptr, bool safely, char **output, FILE* errstream)
 {
     char *token = parse_token(ptr);
     lispobj result;
 
     if (token == NULL) {
-        printf("expected an address\n");
+        fprintf(errstream, "expected an address\n");
         return 0;
     }
     if (token[0] == '$') {
         if (!lookup_variable(token+1, &result)) {
-            printf("unknown variable: ``%s''\n", token);
+            fprintf(errstream, "unknown variable: ``%s''\n", token);
             return 0;
         }
         result &= ~7; // LOWTAG_MASK maybe?
     } else {
         uword_t value;
         if (!string_to_long(token, &value)) {
-            printf("invalid number: ``%s''\n", token);
+            fprintf(errstream, "invalid number: ``%s''\n", token);
             return 0;
         }
         result = (value & ~3); // what is ~3 for - word alignment?
     }
 
     if (safely && !gc_managed_addr_p(result)) {
-        printf("invalid Lisp-level address: %p\n", (void *)result);
+        fprintf(errstream, "invalid Lisp-level address: %p\n", (void *)result);
         return 0;
     }
 

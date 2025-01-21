@@ -45,19 +45,7 @@
 #include "../../tlsf-bsd/tlsf/tlsf.h"
 extern void* tlsf_control;
 
-/* When we need to do command input, we use this stream, which is not
- * in general stdin, so that things will "work" (as well as being
- * thrown into ldb can be considered "working":-) even in a process
- * where standard input has been redirected to a file or pipe.
- *
- * (We could set up output to go to a special ldb_out stream for the
- * same reason, but there's been no pressure for that so far.)
- *
- * The enter-the-ldb-monitor function is responsible for setting up
- * this stream. */
-static FILE *ldb_in = 0;
-
-typedef int cmd(char **ptr);
+typedef int cmd(char **ptr,iochannel_t);
 
 struct crash_preamble {
     uword_t signature;
@@ -294,10 +282,10 @@ static void unsuspend_other_threads() {
     gc_start_the_world();
 }
 
-static int save_cmd(char **ptr) {
+static int save_cmd(char **ptr, iochannel_t io) {
     char *name  = parse_token(ptr);
     if (!name) {
-        fprintf(stderr, "Need filename\n");
+        fprintf(io->out, "Need filename\n");
         return 0;
     }
 #if (defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64) && defined LISP_FEATURE_SB_THREAD
@@ -305,11 +293,11 @@ static int save_cmd(char **ptr) {
     save_gc_crashdump(name, (lispobj*)__builtin_frame_address(0), 1);
     unsuspend_other_threads();
 #else
-    fprintf(stderr, "Unimplemented\n");
+    fprintf(io->out, "Unimplemented\n");
 #endif
     return 0;
 }
-static int gc_and_save_cmd(char **ptr) {
+static int gc_and_save_cmd(char **ptr, iochannel_t io) {
     /* The use-case for this is as follows: suppose you're testing a shiny new GC
      * on a large Lisp application, but gc_and_save crashes 1 time in 10.
      * How do you effectively debug that if merely getting to the point where you
@@ -321,7 +309,7 @@ static int gc_and_save_cmd(char **ptr) {
      * the Lisp heap again from scratch */
     char *name  = parse_token(ptr);
     if (!name) {
-        fprintf(stderr, "Need filename\n");
+        fprintf(io->out, "Need filename\n");
         return 0;
     }
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
@@ -331,9 +319,9 @@ static int gc_and_save_cmd(char **ptr) {
     gc_and_save(name, 0, 0, 0, 0, 0, 0); // never returns
     return 0;
 }
-void list_lisp_threads(int regions) {
+void list_lisp_threads(int regions, FILE* f) {
     struct thread* th;
-    fprintf(stderr, "(thread*,pthread,sb-vm:thread,name)\n");
+    fprintf(f, "(thread*,pthread,sb-vm:thread,name)\n");
     void* pthread;
     for_each_thread(th) {
         memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
@@ -342,9 +330,9 @@ void list_lisp_threads(int regions) {
         char* cname = NULL;
         // it's OK to call widetag_of on NIL but not NULL
         if (name && simple_base_string_p(name)) cname = vector_sap(name);
-        fprintf(stderr, "%p %p %p \"%s\"\n", th, pthread, (void*)i, cname);
+        fprintf(f, "%p %p %p \"%s\"\n", th, pthread, (void*)i, cname);
         if (regions) {
-#define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
+#define show_tlab(label, r) fprintf(f, "  %s @ %p: %p %p %p\n", label, \
          &th->r, th->r.start_addr, th->r.end_addr, th->r.free_pointer)
             show_tlab("usr cons ", cons_tlab);
             show_tlab("usr mix  ", mixed_tlab);
@@ -354,7 +342,7 @@ void list_lisp_threads(int regions) {
         }
     }
     if (regions) {
-#define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
+#define show_tlab(label, r) fprintf(f, "  %s @ %p: %p %p %p\n", label, \
          r, r->start_addr, r->end_addr, r->free_pointer)
         fprintf(stderr, "global regions:\n");
         show_tlab("mixed    ", mixed_region);
@@ -366,14 +354,14 @@ void list_lisp_threads(int regions) {
 #undef show_tlab
     }
 }
-static int threads_cmd(char **ptr) {
-    list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2));
+static int threads_cmd(char **ptr, iochannel_t io) {
+    list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2), io->out);
     return 0;
 }
 extern int heap_trace_verbose;
 extern int gc_pathfind_aux(lispobj*, lispobj, lispobj, lispobj, int);
 
-static int findpath_cmd(char **ptr) {
+static int findpath_cmd(char **ptr, iochannel_t io) {
     // prevent the path finder from seeing the object that results from parsing the command
     lispobj* stackptr = (lispobj*)&ptr;
     // overaligned for 32-bit but doesn't matter
@@ -404,14 +392,14 @@ static int findpath_cmd(char **ptr) {
         unsuspend_other_threads();
         lispobj path = result.data[0];
         if (listp(path)) {
-            fprintf(stderr, "Answer:\n");
+            fprintf(io->out, "Answer:\n");
             while (path != NIL) {
                 struct cons* pair = CONS(CONS(path)->car);
                 if (listp(pair->cdr)) {
                     // thread root - complicated to print
                 } else {
                     // otherwise, object and word index
-                    fprintf(stderr, " %"OBJ_FMTX" word %d\n",
+                    fprintf(io->out, " %"OBJ_FMTX" word %d\n",
                             pair->car, (int)pair->cdr);
                 }
                 path = CONS(path)->cdr;
@@ -421,14 +409,15 @@ static int findpath_cmd(char **ptr) {
     free(wp_mem);
     return 0;
 }
-static int verify_cmd(char __attribute__((unused)) **ptr) {
+static int verify_cmd(char __attribute__((unused)) **ptr,
+                      __attribute__((unused)) iochannel_t io) {
     gencgc_verbose = 1;
     suspend_other_threads();
     verify_heap(0, 0);
     unsuspend_other_threads();
     return 0;
 }
-static int gc_cmd(char **ptr) {
+static int gc_cmd(char **ptr, __attribute__((unused)) iochannel_t io) {
     int last_gen = 0;
     extern generation_index_t verify_gens;
     if (more_p(ptr)) parse_number(ptr, &last_gen);
@@ -442,7 +431,8 @@ static int gc_cmd(char **ptr) {
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-static int tlsf_cmd(__attribute__((unused)) char **ptr) {
+static int tlsf_cmd(__attribute__((unused)) char **ptr,
+                    __attribute__((unused)) iochannel_t io) {
     tlsf_dump_pool(tlsf_control, tlsf_mem_start, "/dev/tty");
 #ifdef TLSF_CONFIG_DEBUG
     tlsf_check(tlsf_control);
@@ -454,7 +444,7 @@ static int tlsf_cmd(__attribute__((unused)) char **ptr) {
 
 static struct cmd {
     char *cmd, *help;
-    int (*fn)(char **ptr);
+    int (*fn)(char **ptr,iochannel_t);
 } supported_cmds[] = {
     // Commands with no help string are all at-your-own-risk
     {"help", "Display this help information.", help_cmd},
@@ -501,8 +491,7 @@ static bool valid_widetag_p(unsigned char widetag) {
     // (i.e. is not CHARACTER_WIDETAG and not some other things)
     return other_immediate_lowtag_p(widetag);
 }
-static int NO_SANITIZE_MEMORY
-dump_cmd(char **ptr)
+static int NO_SANITIZE_MEMORY dump_cmd(char **ptr, iochannel_t io)
 {
     static char *lastaddr = 0;
     static int lastcount = 20;
@@ -521,13 +510,13 @@ dump_cmd(char **ptr)
               *ptr += 3;
             } else break;
         }
-        if (!parse_addr(ptr, !force, &addr)) return 0;
+        if (!parse_addr(ptr, !force, &addr, io->out)) return 0;
 
         if (more_p(ptr) && !parse_number(ptr, &count)) return 0;
     }
 
     if (count == 0) {
-        printf("COUNT must be non-zero.\n");
+        fprintf(io->out, "COUNT must be non-zero.\n");
         return 0;
     }
 
@@ -542,19 +531,19 @@ dump_cmd(char **ptr)
 
     bool aligned = ((uword_t)addr & LOWTAG_MASK) == 0;
     if (decode && (!aligned || displacement < 0)) {
-        printf("Sorry, can only decode if aligned and stepping forward\n");
+        fprintf(io->out, "Sorry, can only decode if aligned and stepping forward\n");
         decode = 0;
     }
     lispobj* next_object = decode ? (lispobj*)addr : 0;
 
     while (count-- > 0) {
-        printf("%p: ", (os_vm_address_t) addr);
+        fprintf(io->out, "%p: ", (os_vm_address_t) addr);
         if (force || gc_managed_addr_p((lispobj)addr)) {
             unsigned long *lptr = (unsigned long *)addr;
             unsigned char *cptr = (unsigned char *)addr;
 
 #if N_WORD_BYTES == 8
-            printf("0x%016lx | %c%c%c%c%c%c%c%c",
+            fprintf(io->out, "0x%016lx | %c%c%c%c%c%c%c%c",
                    lptr[0],
                    visible(cptr[0]), visible(cptr[1]),
                    visible(cptr[2]), visible(cptr[3]),
@@ -562,7 +551,7 @@ dump_cmd(char **ptr)
                    visible(cptr[6]), visible(cptr[7]));
 #else
             unsigned short *sptr = (unsigned short *)addr;
-            printf("0x%08lx   0x%04x 0x%04x   "
+            fprintf(io->out, "0x%08lx   0x%04x 0x%04x   "
                    "0x%02x 0x%02x 0x%02x 0x%02x    "
                    "%c%c"
                    "%c%c",
@@ -577,16 +566,16 @@ dump_cmd(char **ptr)
                 int gen;
                 if (is_lisp_pointer(ptr) && gc_managed_heap_space_p(ptr)
                     && (gen = gc_gen_of(ptr, 99)) != 99) { // say that static is 99
-                    if (gen != 99) printf(" | %d", gen);
+                    if (gen != 99) fprintf(io->out, " | %d", gen);
                 } else {
-                    printf("    "); // padding to make MR part line up
+                    fprintf(io->out, "    "); // padding to make MR part line up
                 }
             }
 #endif
 #ifdef LISP_FEATURE_MARK_REGION_GC
             if (aligned && find_page_index(addr) != -1) {
                 extern bool allocation_bit_marked(void*);
-                printf(" %c", allocation_bit_marked(addr) ? '*' : ' ');
+                fprintf(io->out, " %c", allocation_bit_marked(addr) ? '*' : ' ');
             }
 #endif
             if (decode && addr == (char*)next_object) {
@@ -595,7 +584,7 @@ dump_cmd(char **ptr)
                 // "no size function" would be worse than doing nothing
                 if (word != 0 && !is_lisp_pointer(word)
                     && valid_widetag_p(header_widetag(word))) {
-                    printf(" %s", widetag_names[header_widetag(word)>>2]);
+                    fprintf(io->out, " %s", widetag_names[header_widetag(word)>>2]);
                     next_object += headerobj_size2(next_object, word);
                 } else if (!is_header(word)) {
                     next_object += CONS_SIZE;
@@ -603,10 +592,10 @@ dump_cmd(char **ptr)
                     decode = 0;
                 }
             }
-            printf("\n");
+            putc('\n', io->out);
         }
         else
-            printf("invalid Lisp-level address\n");
+            fprintf(io->out, "invalid Lisp-level address\n");
 
         addr += displacement;
     }
@@ -615,11 +604,10 @@ dump_cmd(char **ptr)
     return 0;
 }
 
-static int
-print_cmd(char **ptr)
+static int print_cmd(char **ptr, iochannel_t io)
 {
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) print(obj);
+    if (parse_lispobj(ptr, &obj)) print_to_iochan(obj, io);
     return 0;
 }
 
@@ -691,55 +679,52 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
     return errors;
 }
 
-static int hashtable_cmd(char **ptr)
+static int hashtable_cmd(char **ptr, iochannel_t io)
 {
     lispobj obj;
     if (parse_lispobj(ptr, &obj)) {
         int errors = verify_lisp_hashtable((void*)native_pointer(obj),
-                                           stdout);
-        if (errors) fprintf(stderr, "Errors: %d\n", errors);
+                                           io->out);
+        if (errors) fprintf(io->out, "Errors: %d\n", errors);
     }
     return 0;
 }
 
-static int
-pte_cmd(char **ptr)
+static int pte_cmd(char **ptr, iochannel_t io)
 {
-    extern void gc_show_pte(lispobj,FILE*);
+    extern void gc_show_pte(lispobj, FILE*);
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj, stdout);
+    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj, io->out);
     return 0;
 }
 
-static int
-regs_cmd(char __attribute__((unused)) **ptr)
+static int regs_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 {
     struct thread __attribute__((unused)) *thread = get_sb_vm_thread();
 
-    printf("CSP\t=\t%p   ", access_control_stack_pointer(thread));
+    fprintf(io->out, "CSP\t=\t%p   ", access_control_stack_pointer(thread));
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-    printf("CFP\t=\t%p   ", access_control_frame_pointer(thread));
+    fprintf(io->out, "CFP\t=\t%p   ", access_control_frame_pointer(thread));
 #endif
 
 #ifdef reg_BSP
-    printf("BSP\t=\t%p\n", get_binding_stack_pointer(thread));
+    fprintf(io->out, "BSP\t=\t%p\n", get_binding_stack_pointer(thread));
 #else
     /* printf("BSP\t=\t%p\n", (void*)SymbolValue(BINDING_STACK_POINTER)); */
-    printf("\n");
+    fprintf(io->out, "\n");
 #endif
 
 #ifdef LISP_FEATURE_GENERATIONAL
     /* printf("DYNAMIC\t=\t%p\n", (void*)DYNAMIC_SPACE_START); */
 #else
-    printf("STATIC\t=\t%p   ", static_space_free_pointer);
-    printf("RDONLY\t=\t%p   ", read_only_space_free_pointer);
-    printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
+    fprintf(io->out, "STATIC\t=\t%p   ", static_space_free_pointer);
+    fprintf(io->out, "RDONLY\t=\t%p   ", read_only_space_free_pointer);
+    fprintf(io->out, "DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
 #endif
     return 0;
 }
 
-static int
-call_cmd(char **ptr)
+static int call_cmd(char **ptr, iochannel_t io)
 {
     lispobj thing;
     parse_lispobj(ptr, &thing);
@@ -754,26 +739,26 @@ call_cmd(char **ptr)
           case SYMBOL_WIDETAG:
               function = symbol_function((struct symbol*)obj);
               if (function == NIL) {
-                  printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
+                  fprintf(io->out, "Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
                   return 0;
               }
               break;
           case FDEFN_WIDETAG:
               function = FDEFN(thing)->fun;
               if (function == NIL) {
-                  printf("Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
+                  fprintf(io->out, "Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
                   return 0;
               }
               break;
           default:
-              printf("0x%08lx is not a function pointer, symbol, "
+              fprintf(io->out, "0x%08lx is not a function pointer, symbol, "
                      "or fdefn object.\n",
                      (long unsigned)thing);
               return 0;
         }
     }
     else if (lowtag_of(thing) != FUN_POINTER_LOWTAG) {
-        printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
+        fprintf(io->out, "0x%08lx is not a function pointer, symbol, or fdefn object.\n",
                (long unsigned)thing);
         return 0;
     }
@@ -783,7 +768,7 @@ call_cmd(char **ptr)
     numargs = 0;
     while (more_p(ptr)) {
         if (numargs >= 3) {
-            printf("too many arguments (no more than 3 supported)\n");
+            fprintf(io->out, "too many arguments (no more than 3 supported)\n");
             return 0;
         }
         parse_lispobj(ptr, &args[numargs++]);
@@ -806,104 +791,100 @@ call_cmd(char **ptr)
           lose("unsupported arg count made it past validity check?!");
     }
 
-    print(result);
+    print_to_iochan(result, io);
     return 0;
 }
 
 static int
-flush_cmd(char __attribute__((unused)) **ptr)
+flush_cmd(char __attribute__((unused)) **ptr, __attribute__((unused)) iochannel_t io)
 {
     flush_vars();
     return 0;
 }
 
-static int
-quit_cmd(char __attribute__((unused)) **ptr)
+static int quit_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 {
     char buf[10];
 
-    printf("Really quit? [y] ");
-    fflush(stdout);
-    if (fgets(buf, sizeof(buf), ldb_in)) {
+    fprintf(io->out, "Really quit? [y] ");
+    fflush(io->out);
+    if (fgets(buf, sizeof(buf), io->in)) {
         if (buf[0] == 'y' || buf[0] == 'Y' || buf[0] == '\n')
             exit(1);
     } else {
-        printf("\nUnable to read response, assuming y.\n");
+        fprintf(io->out, "\nUnable to read response, assuming y.\n");
         exit(1);
     }
     return 0;
 }
 
-static int
-help_cmd(char __attribute__((unused)) **ptr)
+static int help_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 {
     struct cmd *cmd;
 
     for (cmd = supported_cmds; cmd->cmd != NULL; cmd++)
         if (cmd->help != NULL)
-            printf("%s\t%s\n", cmd->cmd, cmd->help);
+            fprintf(io->out, "%s\t%s\n", cmd->cmd, cmd->help);
     return 0;
 }
 
 static int
-exit_cmd(char __attribute__((unused)) **ptr)
+exit_cmd(char __attribute__((unused)) **ptr, __attribute__((unused)) iochannel_t io)
 {
     return 1; // 'done' flag
 }
 
-static void
-print_context(os_context_t *context)
+static void print_context(os_context_t *context, iochannel_t io)
 {
     int i;
 
     for (i = 0; i < NREGS; i++) {
-        printf("%s:\t", lisp_register_names[i]);
-        brief_print((lispobj)(*os_context_register_addr(context,i)));
+        fprintf(io->out, "%s:\t", lisp_register_names[i]);
+        brief_print((lispobj)(*os_context_register_addr(context,i)), io);
 
     }
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_PPC)
-    printf("DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
-    printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
+    fprintf(io->out, "DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
+    fprintf(io->out, "DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
 #endif
 #ifndef REG_PC
-    printf("PC:\t\t  0x%08lx\n", (unsigned long)os_context_pc(context));
+    fprintf(io->out, "PC:\t\t  0x%08lx\n", (unsigned long)os_context_pc(context));
 #endif
 }
 
-static int
-print_context_cmd(char **ptr)
+static int print_context_cmd(char **ptr, iochannel_t io)
 {
     int free_ici;
     struct thread *thread = get_sb_vm_thread();
 
     free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
+    FILE* f = io->out;
     if (more_p(ptr)) {
         int index;
 
         if (!parse_number(ptr, &index)) return 0;
 
         if ((index >= 0) && (index < free_ici)) {
-            printf("There are %d interrupt contexts.\n", free_ici);
-            printf("printing context %d\n", index);
-            print_context(nth_interrupt_context(index, thread));
+            fprintf(f, "There are %d interrupt contexts.\n", free_ici);
+            fprintf(f, "printing context %d\n", index);
+            print_context(nth_interrupt_context(index, thread), io);
         } else {
             printf("There are %d interrupt contexts.\n", free_ici);
         }
     } else {
         if (free_ici == 0)
-            printf("There are no interrupt contexts.\n");
+            fprintf(f, "There are no interrupt contexts.\n");
         else {
-            printf("There are %d interrupt contexts.\n", free_ici);
-            printf("printing context %d\n", free_ici - 1);
-            print_context(nth_interrupt_context(free_ici - 1, thread));
+            fprintf(f, "There are %d interrupt contexts.\n", free_ici);
+            fprintf(f, "printing context %d\n", free_ici - 1);
+            print_context(nth_interrupt_context(free_ici - 1, thread), io);
         }
     }
     return 0;
 }
 
-static int
-backtrace_cmd(char **ptr)
+static int backtrace_cmd(char **ptr, iochannel_t io)
 {
     void lisp_backtrace(int frames);
     int n;
@@ -913,34 +894,33 @@ backtrace_cmd(char **ptr)
     } else
         n = 100;
 
-    printf("Backtrace:\n");
+    fprintf(io->out, "Backtrace:\n");
     lisp_backtrace(n);
     return 0;
 }
 
-static int search_cmd(char **ptr)
+static int search_cmd(char **ptr, iochannel_t io)
 {
     char *addr;
-    if (!parse_addr(ptr, 1, &addr)) return 0;
+    if (!parse_addr(ptr, 1, &addr, io->out)) return 0;
     lispobj *obj = search_all_gc_spaces((void*)addr);
     if(obj)
-        printf("#x%"OBJ_FMTX"\n", compute_lispobj(obj));
+        fprintf(io->out, "#x%"OBJ_FMTX"\n", compute_lispobj(obj));
     else
-        printf("Not found\n");
+        fprintf(io->out, "Not found\n");
     return 0;
 }
 
-static int
-catchers_cmd(char __attribute__((unused)) **ptr)
+static int catchers_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 {
     struct catch_block *catch = (struct catch_block *)
         read_TLS(CURRENT_CATCH_BLOCK, get_sb_vm_thread());
 
     if (catch == NULL)
-        printf("There are no active catchers!\n");
+        fprintf(io->out, "There are no active catchers!\n");
     else {
         while (catch != NULL) {
-            printf("%p:\n\tuwp  : %p\n\tfp   : %p\n\t"
+            fprintf(io->out, "%p:\n\tuwp  : %p\n\tfp   : %p\n\t"
                    "code : %p\n\tentry: %p\n\ttag: ",
                    catch,
                    catch->uwp,
@@ -951,7 +931,7 @@ catchers_cmd(char __attribute__((unused)) **ptr)
                    (void*)catch->code,
 #endif
                    (void*)(catch->entry_pc));
-            brief_print((lispobj)catch->tag);
+            brief_print((lispobj)catch->tag, io);
             catch = catch->previous_catch;
         }
     }
@@ -961,6 +941,7 @@ catchers_cmd(char __attribute__((unused)) **ptr)
 struct layout_collection {
     struct cons* list;
     int passno;
+    FILE* ostream;
 };
 static int count_layout_occurs(lispobj x, struct cons* list)
 {
@@ -993,7 +974,7 @@ static uword_t display_layouts(lispobj* where, lispobj* limit, uword_t arg)
                 struct vector* v = classoid_name((lispobj*)c);
                 char* name =
                   header_widetag(v->header)==SIMPLE_BASE_STRING_WIDETAG ? (char*)v->data : "?";
-                fprintf(stderr, "%c %p %16" OBJ_FMTX " %16" OBJ_FMTX " %p %" OBJ_FMTX " %s\n",
+                fprintf(lc->ostream, "%c %p %16" OBJ_FMTX " %16" OBJ_FMTX " %p %" OBJ_FMTX " %s\n",
                         count>1 ? '*' : ' ', l, l->clos_hash, l->uw_id_word0,
                         c, l->invalid, name);
 
@@ -1003,11 +984,12 @@ static uword_t display_layouts(lispobj* where, lispobj* limit, uword_t arg)
    return 0;
 }
 
-static int layouts_cmd(char __attribute__((unused)) **ptr)
+static int layouts_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 {
-    fprintf(stderr, "Dup, Layout, Hash, ID_Word, Classoid, Invalid, Name\n");
+    fprintf(io->out, "Dup, Layout, Hash, ID_Word, Classoid, Invalid, Name\n");
     struct layout_collection lc;
     lc.list = 0;
+    lc.ostream = io->out;
     for (lc.passno = 1; lc.passno <= 2; ++lc.passno) {
         walk_generation(display_layouts, -1, (uword_t)&lc);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -1032,27 +1014,25 @@ ldb_monitor(void)
     char buf[256];
     char *line, *ptr, *token;
     int ambig;
+    static struct iochannel io = {0,0};
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
     if (gc_active_p) printf("(GC in progress, oldspace=%d, newspace=%d)\n",
                             from_space, new_space);
     if (gc_activitylog_file) fflush(gc_activitylog_file);
-    if (!ldb_in) {
+    if (!io.out) {
+        io.out = stderr;
+        io.in = stdin;
 #ifndef LISP_FEATURE_WIN32
-        ldb_in = fopen("/dev/tty","r+");
-        if (ldb_in == NULL) {
-            perror("Error opening /dev/tty");
-            ldb_in = stdin;
-        }
-#else
-        ldb_in = stdin;
+        FILE* tty = fopen("/dev/tty","r+");
+        if (tty) io.out = io.in = tty; else perror("Error opening /dev/tty");
 #endif
     }
 
     while (1) {
-        printf("ldb> ");
-        fflush(stdout);
-        line = fgets(buf, sizeof(buf), ldb_in);
+        fprintf(io.out, "ldb> ");
+        fflush(io.out);
+        line = fgets(buf, sizeof(buf), io.in);
         if (line == NULL) {
             exit(1);
         }
@@ -1075,12 +1055,12 @@ ldb_monitor(void)
             }
         }
         if (ambig)
-            printf("``%s'' is ambiguous.\n", token);
+            fprintf(io.out, "``%s'' is ambiguous.\n", token);
         else if (found == NULL)
-            printf("unknown command: ``%s''\n", token);
+            fprintf(io.out, "unknown command: ``%s''\n", token);
         else {
             reset_printer();
-            int done = (*found->fn)(&ptr);
+            int done = (*found->fn)(&ptr, &io);
             if (done) return;
         }
     }
