@@ -318,9 +318,6 @@ void describe_error_arg(os_context_t *context, int sc_number, int offset) {
         }
         break;
     case sc_SapReg:
-#ifdef sc_WordPointerReg
-    case sc_WordPointerReg:
-#endif
         printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
         break;
     case sc_SignedReg:
