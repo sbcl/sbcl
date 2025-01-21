@@ -671,7 +671,7 @@ static void print_fun_or_otherptr(lispobj obj)
 
 #ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:
-        print_obj("code: ", obj - (count * 4));
+        print_obj("code: ", obj - (count * N_WORD_BYTES));
         break;
 #endif
 
