@@ -511,7 +511,7 @@
                                            (fun-type-allowp type2))
                                :returns rtype
                                :keyp actually-keyp
-                               :keywords keys
+                               :keywords (intern-key-infos keys)
                                :designator designator)))))))))
 
 (define-type-method (function :simple-intersection2) (type1 type2)
