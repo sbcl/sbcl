@@ -1026,3 +1026,12 @@
 (with-test (:name :complex-sub-real)
   (assert (equal (sb-ext:typexpand-all '(or (complex rational) (complex single-float)))
                  (sb-ext:typexpand-all '(complex (or rational single-float))))))
+
+
+(with-test (:name :typep-evaluate)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (block nil
+        (typep (return x) 't)))
+   ((10) 10)))

@@ -74,11 +74,14 @@
                 (unless (hash-table-p table)
                   (setq table (dump/restore-interesting-types 'read)))
                 (setf (gethash type table) t))))
-          (let ((exp (%source-transform-typep-simple object type)))
+          (let* ((object-sym (gensym))
+                 (exp (%source-transform-typep-simple object-sym type)))
             (if exp
                 (progn
                   (check-deprecated-type type)
-                  exp)
+                  `(let ((,object-sym ,object))
+                     (declare (ignorable ,object-sym))
+                     ,exp))
                 (values nil t)))))
       (values nil t)))
 
