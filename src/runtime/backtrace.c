@@ -759,16 +759,16 @@ int simple_fun_index_from_pc(struct code* code, char *pc)
     return -1;
 }
 
-static bool __attribute__((unused)) print_lisp_fun_name(char* pc)
+static bool __attribute__((unused)) print_lisp_fun_name(char* pc, FILE* f)
 {
   struct code* code;
   if (gc_managed_heap_space_p((uword_t)pc) &&
       (code = (void*)component_ptr_from_pc(pc)) != 0) {
       lispobj name = debug_function_name_from_pc(code, pc);
       if (name) {
-          fprintf(stderr, " %p [", pc);
-          print_entry_name(barrier_load(&name), stderr);
-          fprintf(stderr, "]\n");
+          fprintf(f, " %p [", pc);
+          print_entry_name(barrier_load(&name), f);
+          fprintf(f, "]\n");
           return 1;
       }
   }
@@ -791,6 +791,9 @@ int sb_unw_get_pc(void* a, void* b) { return unw_get_reg(a, UNW_TDEP_IP, b); }
 int sb_unw_get_proc_name(void* a, void* b, int c, unw_word_t* d) { return unw_get_proc_name(a, b, c, d); }
 int sb_unw_step(void* a) { return unw_step(a); }
 #else
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
+# include <ucontext.h>
+#endif
 int sbcl_have_libunwind() { return 0; }
 int get_sizeof_unw_context() { return 0; }
 int get_sizeof_unw_cursor() { return 0; }
@@ -801,25 +804,44 @@ int sb_unw_get_pc(void* a, void* b) { lose("unw_get_pc %p %p", a, b); }
 #endif
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
-static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};
-void libunwind_backtrace(struct thread *th, os_context_t *context)
+static sem_t bt_suspend_sem;
+static os_context_t *bt_suspension_context;
+void libunwind_backtrace(struct thread *th, FILE* f)
 {
-    fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
-#ifdef LISP_FEATURE_SB_THREAD
+    ucontext_t ucontext;
+    static int initialized;
+    if (th != get_sb_vm_thread()) {
+        if (!initialized) sem_init(&bt_suspend_sem, 0, 0);
+        initialized = 1;
+        gc_assert(bt_suspension_context == 0);
+        // TODO: combine stop-for-gc and stop-for-backtrace into one signal, informing
+        // the signaled thread of a reason. Backtrace should never defer suspension.
+        pthread_kill(th->os_thread, SIGXCPU);
+        sem_wait(&bt_suspend_sem);
+        gc_assert(bt_suspension_context != 0);
+    } else {
+#ifdef HAVE_LIBUNWIND
+        unw_getcontext(&ucontext);
+#else
+        getcontext(&ucontext);
+#endif
+        bt_suspension_context = &ucontext;
+    }
+    fprintf(f, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
     // the TLS area is not used if #-sb-thread. And if so, it must be "main thread"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->_name != NIL) {
-        fprintf(stderr, " (\"");
-        print_string(VECTOR(lispthread->_name), stderr);
-        fprintf(stderr, "\")");
+        fprintf(f, " (\"");
+        print_string(VECTOR(lispthread->_name), f);
+        fprintf(f, "\")");
     }
-    putc('\n', stderr);
+    putc('\n', f);
     // In case you get no backtrace whatsoever, maybe at least see where the
     // signal was received, probably in a function without the standard
     // frame pointer setup.
-    fprintf(stderr, " interrupted @ PC %p\n", (void*)OS_CONTEXT_PC(context));
+    fprintf(f, " interrupted @ PC %p\n", (void*)OS_CONTEXT_PC(bt_suspension_context));
     if (lispthread->waiting_for != NIL) {
-        fprintf(stderr, "waiting for %p", (void*)lispthread->waiting_for);
+        fprintf(f, "waiting for %p", (void*)lispthread->waiting_for);
         if (instancep(lispthread->waiting_for)) {
             // THREAD-WAITING-FOR can be a mutex or a waitqueue (if not a cons).
             // Accessing it as if it's a mutex works because both a waitqueue
@@ -828,37 +850,29 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
             // "Use this only if you know what you're doing"
             struct lispmutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
             if (lispmutex->name != NIL) {
-                fprintf(stderr, " (MUTEX:\"");
+                fprintf(f, " (MUTEX:\"");
                 print_string(VECTOR(lispmutex->name), stderr);
-                fprintf(stderr, "\")");
+                fprintf(f, "\")");
             }
         }
-        putc('\n', stderr);
+        putc('\n', f);
     }
-#endif
 #ifdef HAVE_LIBUNWIND
     char procname[100];
     unw_cursor_t cursor;
-    // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
-    // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
-    //  this routine is also safe to use from a signal handler."
-    if (context) {
-        unw_init_local(&cursor, context);
-    } else {
-        unw_context_t here;
-        unw_getcontext(&here);
-        unw_init_local(&cursor, &here);
-    }
+    unw_init_local(&cursor, bt_suspension_context);
+    // This thread performs the backtrace of the other thread, so it matters not
+    // whether libunwind functions are interrupt-safe (though they do claim to be)
     do {
         uword_t offset;
         char *pc;
         unw_get_reg(&cursor, UNW_TDEP_IP, (uword_t*)&pc);
-        if (print_lisp_fun_name(pc)) {
+        if (print_lisp_fun_name(pc, f)) {
             // printed
         } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
-            fprintf(stderr, " %p [%s]\n", pc, procname);
+            fprintf(f, " %p [%s]\n", pc, procname);
         } else {
-            fprintf(stderr, " %p ?\n", pc);
+            fprintf(f, " %p ?\n", pc);
         }
     } while (unw_step(&cursor));
 #else
@@ -866,46 +880,25 @@ void libunwind_backtrace(struct thread *th, os_context_t *context)
     // because we can't figure out how to get backwards past a signal frame.
     log_backtrace_from_fp(th, (void*)*os_context_fp_addr(context), 100, 0, stderr);
 #endif
+    bt_suspension_context = 0;
+    if (th != get_sb_vm_thread()) pthread_kill(th->os_thread, SIGXCPU);
 }
-void backtrace_lisp_threads(int __attribute__((unused)) signal,
-                                   siginfo_t __attribute__((unused)) *info,
-                                   os_context_t *context)
+__thread int suspended_for_bt;
+void suspend_for_backtrace(int signal, siginfo_t __attribute__((unused)) *info,
+                           os_context_t *context)
 {
-    struct thread* this_thread = get_sb_vm_thread();
-#ifdef LISP_FEATURE_SB_THREAD
-    if (backtrace_completion_pipe[1] >= 0) {
-        libunwind_backtrace(get_sb_vm_thread(), context);
-        write(backtrace_completion_pipe[1], context /* any random byte */, 1);
-        return;
+    if (suspended_for_bt) {
+        suspended_for_bt = 0;
+    } else {
+        gc_assert(!bt_suspension_context);
+        bt_suspension_context = context;
+        sem_post(&bt_suspend_sem);
+        suspended_for_bt = 1;
+        sigset_t mask;
+        sigfillset(&mask);
+        sigdelset(&mask, signal);
+        sigsuspend(&mask);
     }
-    struct thread *th;
-    int nthreads = 0;
-    for_each_thread(th) { ++nthreads; }
-    if (signal)
-        fprintf(stderr, "Caught backtrace-all signal in tid %d, %d threads\n",
-                (int)this_thread->os_kernel_tid, nthreads);
-    // Would be nice if we could forcibly stop all the other threads,
-    // but pthread_mutex_trylock is not safe to use in a signal handler.
-    if (nthreads > 1) {
-        pipe(backtrace_completion_pipe);
-    }
-    for_each_thread(th) {
-        if (th == this_thread)
-            libunwind_backtrace(th, context);
-        else {
-            char junk;
-            pthread_kill(th->os_thread, SIGXCPU);
-            read(backtrace_completion_pipe[0], &junk, 1);
-        }
-    }
-    if (nthreads > 1) {
-        close(backtrace_completion_pipe[1]);
-        close(backtrace_completion_pipe[0]);
-        backtrace_completion_pipe[0] = backtrace_completion_pipe[1] = -1;
-    }
-#else
-    libunwind_backtrace(this_thread, context);
-#endif
 }
 static int watchdog_pipe[2] = {-1,-1};
 static pthread_t watchdog_tid;
@@ -921,7 +914,8 @@ static void* watchdog_thread(void* arg) {
         if (nfds < 1) {
             // Ensure this message comes out in one piece even if nothing following it does.
             char msg[] = "Watchdog timer expired\n"; write(2, msg, sizeof msg-1);
-            backtrace_lisp_threads(0, 0, 0);
+            struct thread* th;
+            for_each_thread(th) { libunwind_backtrace(th, stderr); }
             _exit(1); // cause the test suite to exit with failure
         }
         if (!FD_ISSET(watchdog_pipe[0], &fds))

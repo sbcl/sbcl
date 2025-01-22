@@ -2083,8 +2083,8 @@ interrupt_init(void)
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     // Use this only if you know what you're doing
-    void backtrace_lisp_threads(int, siginfo_t*, os_context_t*);
-    ll_install_handler(SIGXCPU, backtrace_lisp_threads);
+    void suspend_for_backtrace(int, siginfo_t*, os_context_t*);
+    ll_install_handler(SIGXCPU, suspend_for_backtrace);
 #endif
 
 #ifndef LISP_FEATURE_WIN32

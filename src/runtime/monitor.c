@@ -266,7 +266,7 @@ void save_gc_crashdump(char *pathname,
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd, hashtable_cmd;
-static cmd backtrace_cmd, catchers_cmd;
+static cmd backtrace_cmd, threadbt_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
@@ -450,6 +450,7 @@ static struct cmd {
     {"help", "Display this help information.", help_cmd},
     {"?", "(an alias for help)", help_cmd},
     {"backtrace", "Backtrace up to N frames.", backtrace_cmd},
+    {"btthread", "Backtrace specified thread", threadbt_cmd},
     {"call", "Call FUNCTION with ARG1, ARG2, ...", call_cmd},
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
@@ -896,6 +897,52 @@ static int backtrace_cmd(char **ptr, iochannel_t io)
 
     fprintf(io->out, "Backtrace:\n");
     lisp_backtrace(n);
+    return 0;
+}
+
+/* Usage Example
+ * =============
+ * ldb> threads
+ * (thread*, pthread, sb-thread:thread, name)
+ * 0x7f1799000080 0x7f1798dff6c0 0x1000031ac0 "finalizer"
+ * 0x7f1799600080 0x7f1799972240 0x1000b60000 "main thread"
+ * ldb> btt 0x7f1799000080
+ * Lisp thread @ 0x7f1799000080, tid 2355966 ("finalizer")
+ *  interrupted @ PC 0x7f1799a2d1cc
+ *  0x7f1799a2d1cc [__nptl_death_event]
+ *  0x7f1799a2f930 [pthread_cond_wait]
+ *  0x55e29ccb1caf [finalizer_thread_wait]
+ *  0xb8006b3d11 [(LAMBDA () :IN SB-IMPL::FINALIZER-THREAD-START)]
+ *  0xb800725d1b [(FLET SB-UNIX::BODY :IN SB-THREAD::RUN)]
+ *  0xb800726474 [(FLET "WITHOUT-INTERRUPTS-BODY-" :IN SB-THREAD::RUN)]
+ *  0xb8007258cb [(FLET SB-UNIX::BODY :IN SB-THREAD::RUN)]
+ *  0xb80072663c [(FLET "WITHOUT-INTERRUPTS-BODY-" :IN SB-THREAD::RUN)]
+ *  0xb8007256a9 [SB-THREAD::RUN]
+ *  0x55e29cce6261 [call_into_lisp_]
+ *  0x55e29ccaac1a [funcall1]
+ *  0x55e29cccb978 [new_thread_trampoline]
+ *  0x7f1799a306c2 [pthread_condattr_setpshared]
+ *  0x7f1799aab128 [__clone]
+ */
+static int threadbt_cmd(char **ptr, iochannel_t io)
+{
+    char *addr = 0;
+    __attribute__((unused)) int all = 0;
+    if (!strcmp(*ptr, "all\n")) all = 1;
+    else if (!parse_addr(ptr, 1, &addr, io->out)) return 0;
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
+    extern void libunwind_backtrace(struct thread*, FILE*);
+    struct thread* th;
+    for_each_thread(th) {
+        if (all || (char*)th == addr) {
+            libunwind_backtrace(th, io->out);
+            if (!all) return 0;
+        }
+    }
+    if (!all) fprintf(io->out, "%p is not a thread\n", addr);
+#else
+    fprintf(io->out, "Unsupported\n");
+#endif
     return 0;
 }
 
