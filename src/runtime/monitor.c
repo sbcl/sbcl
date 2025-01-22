@@ -321,7 +321,7 @@ static int gc_and_save_cmd(char **ptr, iochannel_t io) {
 }
 void list_lisp_threads(int regions, FILE* f) {
     struct thread* th;
-    fprintf(f, "(thread*,pthread,sb-vm:thread,name)\n");
+    fprintf(f, "(thread*, pthread, sb-thread:thread, name)\n");
     void* pthread;
     for_each_thread(th) {
         memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
