@@ -928,7 +928,7 @@ static int threadbt_cmd(char **ptr, iochannel_t io)
 {
     char *addr = 0;
     __attribute__((unused)) int all = 0;
-    if (!strcmp(*ptr, "all\n")) all = 1;
+    if (!strncmp(*ptr, "all", 3)) all = 1;
     else if (!parse_addr(ptr, 1, &addr, io->out)) return 0;
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
     extern void libunwind_backtrace(struct thread*, FILE*);
@@ -1053,14 +1053,11 @@ static int layouts_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
     return 0;
 }
 
+static int monitor_loop(struct iochannel);
 extern FILE *gc_activitylog_file;
 void
 ldb_monitor(void)
 {
-    struct cmd *cmd, *found;
-    char buf[256];
-    char *line, *ptr, *token;
-    int ambig;
     static struct iochannel io = {0,0};
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
@@ -1076,12 +1073,21 @@ ldb_monitor(void)
 #endif
     }
 
+    if (!monitor_loop(io)) exit(1);
+}
+static int monitor_loop(struct iochannel io)
+{
+    struct cmd *cmd, *found;
+    char buf[256];
+    char *line, *ptr, *token;
+    int ambig;
+
     while (1) {
         fprintf(io.out, "ldb> ");
         fflush(io.out);
         line = fgets(buf, sizeof(buf), io.in);
         if (line == NULL) {
-            exit(1);
+            return 0;
         }
         ptr = line;
         if ((token = parse_token(&ptr)) == NULL)
@@ -1108,10 +1114,57 @@ ldb_monitor(void)
         else {
             reset_printer();
             int done = (*found->fn)(&ptr, &io);
-            if (done) return;
+            if (done) return 1;
         }
     }
 }
+
+#ifdef START_LDB_SERVICE_THREAD
+#include <sys/socket.h>
+#include <netinet/in.h>
+static int listener;
+int ldb_service_port;
+pthread_t ldb_service_thread;
+static void* ldb_service_main(__attribute__((unused)) void* arg) {
+    int peer;
+    FILE* stream = 0;
+    struct sockaddr_in sin;
+    socklen_t addrlen = sizeof sin;
+    while (1) {
+        peer = accept(listener, (struct sockaddr*)&sin, &addrlen);
+        if (peer < 0) {
+          fprintf(stderr, "ldb: accept() failed\n");
+          return 0;
+        }
+        stream = fdopen(peer, "r+");
+        setlinebuf(stream);
+        fprintf(stream, "LDB connected\n");
+        struct iochannel io = {stream, stream};
+        monitor_loop(io);
+        fclose(stream);
+    }
+    return 0;
+}
+void init_ldb_service()
+{
+    struct sockaddr_in sin;
+    memset(&sin, 0, sizeof sin);
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (bind(listener, (struct sockaddr*)&sin, sizeof sin)) {perror("bind");exit(1);}
+    socklen_t addrlen = sizeof sin;
+    if (listen(listener, 1)) {perror("listen");exit(1);}
+    pthread_attr_t thr_attr;
+    pthread_attr_init(&thr_attr);
+    pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&ldb_service_thread, &thr_attr, ldb_service_main, 0);
+    getsockname(listener, (struct sockaddr*)&sin, &addrlen);
+    ldb_service_port = ntohs(sin.sin_port);
+    fprintf(stderr, "NOTE: ldb service on port %d\n", ldb_service_port);
+    pthread_attr_destroy(&thr_attr);
+}
+#endif
 
 #ifdef STANDALONE_LDB
 void gc_stop_the_world() { } // do nothing
