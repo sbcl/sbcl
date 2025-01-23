@@ -5316,91 +5316,6 @@ expansion happened."
 
 (define-type-method (numeric-union :negate) (x) (make-negation-type x))
 
-;;; REMOVE
-(defun check-range (range &optional rational)
-  (when (>= (length range) 3)
-    (assert (zerop (count nil range :start 2
-                                    :end (1- (length range))))
-            (range) "~a" range))
-  (if rational
-      (when (> (length range) 0)
-        (let ((lows (make-hash-table :test #'equal))
-              (highs (make-hash-table :test #'equal)))
-          (loop for prev-run = nil then run
-                for prev-low = nil then low
-                for prev-high = nil then high
-                for i from 0 below (length range) by 3
-                for run = (aref range i)
-                for low = (aref range (+ i 1))
-                for high = (aref range (+ i 2))
-                do
-                (assert (not (shiftf (gethash low lows) low)))
-                (assert (not (shiftf (gethash high highs) high)))
-                (assert (not (and prev-run
-                                  (numberp low)
-                                  (eql prev-high low))))
-                (assert (eql run
-                             (collapse-rational-run run low high)))
-                (flet ((join-p (left-high left-run right-low right-run)
-                         (cond ((not right-low)
-                                t)
-                               ((not left-high)
-                                t)
-                               ((= (logior left-run right-run) range-integer-run)
-                                (sb-xc:<= right-low (1+ left-high)))
-                               ((let ((open-left-high (if (consp left-high)
-                                                          (car left-high)
-                                                          left-high))
-                                      (open-right-low (if (consp right-low)
-                                                          (car right-low)
-                                                          right-low)))
-                                  (if (and
-                                       (not (and (= right-run left-run range-ratio-run)
-                                                 (integerp open-right-low))) ;; can join (1) and (1) for ratios
-                                       (consp left-high)
-                                       (consp right-low))
-                                      (sb-xc:< open-right-low open-left-high)
-                                      (sb-xc:<= open-right-low open-left-high)))))))
-                  (when prev-run
-                    (assert (not (join-p prev-high prev-run low run))))
-                  (cond ((= run range-integer-run)
-                         (assert (not (and (eql prev-run range-integer-run)
-                                           (= prev-high (1- low)))))
-                         (assert (typep low '(or null integer)))
-                         (assert (typep high '(or null integer))))
-                        ((= run range-ratio-run)
-                         (assert (typep low '(or ratio list)))
-                         (assert (typep high '(or ratio list))))
-                        ((= run range-rational-run)
-                         (when (integerp low)
-                           (assert (not (equal low high))))
-                         (when (consp low)
-                           (assert (not (equal (car low) high))))
-                         (when (consp high)
-                           (assert (not (equal (car high) low)))))))
-                (when prev-run
-                  (assert (low-le-low-p prev-low low))))))
-      (when (> (length range) 0)
-        (let ((lows (make-hash-table :test #'equal))
-              (highs (make-hash-table :test #'equal)))
-          (loop for prev-low = nil then low
-                for prev-high = nil then high
-                for i from 0 below (length range) by 2
-                for low = (aref range i)
-                for high = (aref range (1+ i))
-                do
-                (assert (not (shiftf (gethash low lows) low)))
-                (assert (not (shiftf (gethash high highs) high)))
-                (assert (not (and (numberp low)
-                                  (eql prev-high low))))
-                (when (consp low)
-                  (assert (not (equal (car low) high))))
-                (when (consp high)
-                  (assert (not (equal (car high) low))))
-                (when (> i 0)
-                  (assert (low-le-low-p prev-low low)))))))
-  range)
-
 (defun flip-exclusion (x positive run)
   (if (= run range-integer-run)
       (if (integerp x)
@@ -5758,8 +5673,7 @@ expansion happened."
                               low2
                               (aref ranges2 (+ i2 2)))
                        (incf i2 3)))))))
-      (values (check-range (coerce (reverse result) 'vector) t)
-              mask))))
+      (values (coerce (reverse result) 'vector) mask))))
 
 (defun intersect-rational (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -5807,8 +5721,7 @@ expansion happened."
                                 (if (high-gt-high-p high2 high1)
                                     (incf i1 3)
                                     (incf i2 3))))))))))))
-    (values (check-range (coerce (reverse result) 'vector) t)
-            mask)))
+    (values (coerce (reverse result) 'vector) mask)))
 
 (defun difference-rational (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -5889,8 +5802,7 @@ expansion happened."
                                             (setf low (flip-exclusion high2 t run)))))))))
                       finally (store run low high)
                               (incf i1 3))))))
-      (values (check-range (coerce (reverse result) 'vector) t)
-              mask))))
+      (values (coerce (reverse result) 'vector) mask))))
 
 (defun subtype-rational (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -6019,7 +5931,7 @@ expansion happened."
                        (store low2
                               (aref ranges2 (1+ i2)))
                        (incf i2 2)))))))
-      (check-range (coerce (reverse result) 'vector)))))
+      (coerce (reverse result) 'vector))))
 
 (defun intersect-float (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -6051,7 +5963,7 @@ expansion happened."
                             (if (high-gt-high-p high2 high1)
                                 (incf i1 2)
                                 (incf i2 2)))))))))
-    (check-range (coerce (reverse result) 'vector))))
+    (coerce (reverse result) 'vector)))
 
 (defun difference-float (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
@@ -6101,7 +6013,7 @@ expansion happened."
                                                (setf low1 (flip-exclusion high2)))))))))
                            finally (store low1 high1)
                                    (incf i1 2))))))
-      (check-range (coerce (reverse result) 'vector)))))
+      (coerce (reverse result) 'vector))))
 
 (defun subtype-float (ranges1 ranges2)
   (declare (simple-vector ranges1 ranges2))
