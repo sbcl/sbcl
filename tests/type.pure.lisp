@@ -1036,8 +1036,10 @@
         (typep (return x) 't)))
    ((10) 10)))
 
-(with-test (:name :function-simple-union)
+(with-test (:name :function-simple-union/intersection)
   (let ((type (sb-kernel:specifier-type
                '(function (sequence &key (start integer) (end integer)) sequence))))
     (assert (eq type
-                (sb-kernel::function-simple-union2-type-method type type)))))
+                (sb-kernel::function-simple-union2-type-method type type)))
+    (assert (eq type
+                (sb-kernel::function-simple-intersection2-type-method type type)))))

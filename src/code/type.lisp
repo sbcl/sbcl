@@ -562,7 +562,7 @@
                                                                             (type-intersection (key-info-type key1)
                                                                                                (key-info-type key2)))
                                                              keys)))
-                                            keys))
+                                            (intern-key-infos keys)))
                                         :allowp (and (fun-type-allowp type1)
                                                      (fun-type-allowp type2))
                                         :returns rtype
