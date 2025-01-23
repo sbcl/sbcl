@@ -127,6 +127,7 @@
             ((and (csubtypep constraint (specifier-type 'float))
                   (progn
                     (when (and alternative
+                               x
                                (eq constraint (specifier-type 'float)))
                       (cond ((csubtypep x-type (specifier-type 'float))
                              (add-alt y (specifier-type '(not real))))
