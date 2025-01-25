@@ -256,8 +256,82 @@
   (value +sharp-equal-marker+))
 (declaim (freeze-type sharp-equal-wrapper))
 
+(defun sharp-equal-visit (tree processor visitor)
+  (declare (inline alloc-xset))
+  (dx-let ((circle-table (alloc-xset)))
+    (named-let recurse ((tree tree))
+      (when (and (sharp-equal-wrapper-p tree)
+                 (neq (sharp-equal-wrapper-value tree) +sharp-equal-marker+))
+        (return-from recurse (funcall visitor tree)))
+      ;; pick off types that never need to be sought in or added to the xset.
+      ;; (there are others, but these are common and quick to check)
+      (when (or (unbound-marker-p tree) (typep tree '(or number symbol)))
+        (return-from recurse (funcall visitor tree)))
+      (unless (xset-member-p tree circle-table)
+        (add-to-xset tree circle-table)
+        (dx-flet ((process (child setter)
+                    (funcall processor tree child #'recurse setter)))
+          (typecase tree
+            (cons
+             (process (car tree) (lambda (nv d) (setf (car d) nv)))
+             (process (cdr tree) (lambda (nv d) (setf (cdr d) nv))))
+            ((array t)
+             (with-array-data ((data tree) (start) (end))
+               (declare (fixnum start end))
+               (do ((i start (1+ i)))
+                   ((>= i end))
+                 (process (aref data i) (lambda (nv d)
+                                          (declare (ignore d))
+                                          (setf (aref data i) nv))))))
+            (instance
+             ;; Don't refer to the DD-SLOTS unless there is reason to,
+             ;; that is, unless some slot might be raw.
+             (if (sb-kernel::bitmap-all-taggedp (%instance-layout tree))
+                 (do ((len (%instance-length tree))
+                      (i sb-vm:instance-data-start (1+ i)))
+                     ((>= i len))
+                   (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv))))
+                 (let ((dd (layout-dd (%instance-layout tree))))
+                   (dolist (dsd (dd-slots dd))
+                     (when (eq (dsd-raw-type dsd) t)
+                       (let ((i (dsd-index dsd)))
+                         (process (%instance-ref tree i)
+                                  (lambda (nv d) (%instance-set d i nv)))))))))
+            (funcallable-instance
+             ;; ASSUMPTION: all funcallable instances have at least 1 slot
+             ;; accessible via FUNCALLABLE-INSTANCE-INFO.
+             ;; The only such objects with reader syntax are CLOS objects,
+             ;; and those have exactly 1 slot in the primitive object.
+             (process (%funcallable-instance-info tree 0)
+                      (lambda (nv d) (setf (%funcallable-instance-info d 0) nv)))))))
+      tree)))
+
 ;; This function is kind of like NSUBLIS, but checks for circularities and
 ;; substitutes in arrays and structures as well as lists.
+(defun circle-subst (tree)
+  (dx-flet ((process (parent child recursor setter)
+              (let ((new (funcall recursor child)))
+                (unless (eq child new)
+                  (funcall setter new parent))))
+            (visit (value)
+              (if (sharp-equal-wrapper-p value)
+                  (sharp-equal-wrapper-value value)
+                  value)))
+    (sharp-equal-visit tree #'process #'visit)))
+
+(defun contains-marker (tree)
+  (dx-flet ((process (parent child recursor setter)
+              (declare (ignore parent setter))
+              (funcall recursor child))
+            (visit (value)
+              (when (sharp-equal-wrapper-p value)
+                (return-from contains-marker t))))
+    (sharp-equal-visit tree #'process #'visit)
+    nil))
+
+;; This function is kind of like NSUBLIS, but checks for circularities and
+;; substitutes in arrays and structures as well as lists.
+#+nil
 (defun circle-subst (tree)
   (declare (inline alloc-xset))
   (dx-let ((circle-table (alloc-xset)))
