@@ -12,7 +12,8 @@
 ;;;; more information.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (load "compiler-test-util.lisp"))
+  (load "compiler-test-util.lisp")
+  (setf *print-circle* t))
 
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 (declaim (muffle-conditions compiler-note))
