@@ -159,7 +159,7 @@
         (when (and (atom (rest body))
                    (not (null (rest body))))
           (simple-reader-error stream "improper list for #S: ~S." body))
-        (apply (fdefinition default-constructor)
+        (let ((constructor-args
                (loop for tail on (rest body) by #'cddr
                      with slot-name = (and (consp tail) (car tail))
                      do (progn
@@ -191,7 +191,22 @@
                                   :format-arguments
                                   (list (car body) slot-name))))
                      collect (intern (string (car tail)) *keyword-package*)
-                     collect (cadr tail)))))))
+                     collect (cadr tail))))
+          (handler-bind ((type-error
+                          (lambda (c)
+                            (let ((context (sb-kernel::type-error-context c))
+                                  (datum (type-error-datum c)))
+                              (when (and (typep context '(cons (eql sb-kernel::struct-context)))
+                                         sb-kernel::*type-error-no-check-restart*
+                                         (contains-marker datum))
+                                (destructuring-bind (head dd-name . dsd-name) context
+                                  (declare (ignore head))
+                                  (let* ((dd (find-defstruct-description dd-name nil))
+                                         (dsd (and dd (find dsd-name (dd-slots dd) :key #'dsd-name)))
+                                         (boxedp (and dsd (eq (dsd-raw-type dsd) t))))
+                                    (when boxedp
+                                      (funcall sb-kernel::*type-error-no-check-restart* datum)))))))))
+            (apply (fdefinition default-constructor) constructor-args)))))))
 
 ;;;; reading numbers: the #B, #C, #O, #R, and #X readmacros
 
@@ -260,8 +275,7 @@
   (declare (inline alloc-xset))
   (dx-let ((circle-table (alloc-xset)))
     (named-let recurse ((tree tree))
-      (when (and (sharp-equal-wrapper-p tree)
-                 (neq (sharp-equal-wrapper-value tree) +sharp-equal-marker+))
+      (when (sharp-equal-wrapper-p tree)
         (return-from recurse (funcall visitor tree)))
       ;; pick off types that never need to be sought in or added to the xset.
       ;; (there are others, but these are common and quick to check)
@@ -269,8 +283,8 @@
         (return-from recurse (funcall visitor tree)))
       (unless (xset-member-p tree circle-table)
         (add-to-xset tree circle-table)
-        (dx-flet ((process (child setter)
-                    (funcall processor tree child #'recurse setter)))
+        (dx-flet ((process (child setter &optional typecheck)
+                    (funcall processor tree child #'recurse setter typecheck)))
           (typecase tree
             (cons
              (process (car tree) (lambda (nv d) (setf (car d) nv)))
@@ -284,19 +298,43 @@
                                           (declare (ignore d))
                                           (setf (aref data i) nv))))))
             (instance
-             ;; Don't refer to the DD-SLOTS unless there is reason to,
-             ;; that is, unless some slot might be raw.
-             (if (sb-kernel::bitmap-all-taggedp (%instance-layout tree))
-                 (do ((len (%instance-length tree))
-                      (i sb-vm:instance-data-start (1+ i)))
-                     ((>= i len))
-                   (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv))))
-                 (let ((dd (layout-dd (%instance-layout tree))))
-                   (dolist (dsd (dd-slots dd))
-                     (when (eq (dsd-raw-type dsd) t)
-                       (let ((i (dsd-index dsd)))
-                         (process (%instance-ref tree i)
-                                  (lambda (nv d) (%instance-set d i nv)))))))))
+             (let* ((layout (%instance-layout tree))
+                    (dd (layout-info layout)))
+               (cond
+                 ((typep dd 'defstruct-description)
+                  (dolist (dsd (dd-slots dd))
+                    (when (eq (dsd-raw-type dsd) t)
+                      (let ((i (dsd-index dsd))
+                            (type (dsd-type dsd)))
+                        ;; KLUDGE: checking for NOT CONTAINS-MARKER
+                        ;; here implies traversing the slot's value
+                        ;; twice if it does contain a circularity
+                        ;; marker.
+                        (if (or (eq type t) (not (contains-marker (%instance-ref tree i))))
+                            (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv)))
+                            (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv))
+                                     (lambda ()
+                                       (loop
+                                        (let ((v (%instance-ref tree i)))
+                                          (when (typep v type)
+                                            (return))
+                                          (restart-case
+                                              (error 'simple-type-error
+                                                     :format-control "while setting slot ~S of structure of class ~S, ~S is not of type ~S"
+                                                     :format-arguments (list (dsd-name dsd) (dd-name dd) v type)
+                                                     :datum v
+                                                     :expected-type type)
+                                            (use-value (value)
+                                              :report (lambda (stream)
+                                                        (format stream "Use specified value."))
+                                              :interactive read-evaluated-form
+                                              (%instance-set tree i value))))))))))))
+                 (t
+                  (aver (sb-kernel::bitmap-all-taggedp layout))
+                  (do ((len (%instance-length tree))
+                       (i sb-vm:instance-data-start (1+ i)))
+                      ((>= i len))
+                    (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv))))))))
             (funcallable-instance
              ;; ASSUMPTION: all funcallable instances have at least 1 slot
              ;; accessible via FUNCALLABLE-INSTANCE-INFO.
@@ -309,19 +347,25 @@
 ;; This function is kind of like NSUBLIS, but checks for circularities and
 ;; substitutes in arrays and structures as well as lists.
 (defun circle-subst (tree)
-  (dx-flet ((process (parent child recursor setter)
-              (let ((new (funcall recursor child)))
-                (unless (eq child new)
-                  (funcall setter new parent))))
-            (visit (value)
-              (if (sharp-equal-wrapper-p value)
-                  (sharp-equal-wrapper-value value)
-                  value)))
-    (sharp-equal-visit tree #'process #'visit)))
+  (dx-let ((typecheckers nil))
+    (dx-flet ((process (parent child recursor setter typecheck)
+                (let ((new (funcall recursor child)))
+                  (unless (eq child new)
+                    (funcall setter new parent))
+                  (when typecheck
+                    (push typecheck typecheckers))))
+              (visit (value)
+                (if (and (sharp-equal-wrapper-p value)
+                         (neq (sharp-equal-wrapper-value value) +sharp-equal-marker+))
+                    (sharp-equal-wrapper-value value)
+                    value)))
+      (prog1
+          (sharp-equal-visit tree #'process #'visit)
+        (mapcar #'funcall typecheckers)))))
 
 (defun contains-marker (tree)
-  (dx-flet ((process (parent child recursor setter)
-              (declare (ignore parent setter))
+  (dx-flet ((process (parent child recursor setter typechecker)
+              (declare (ignore parent setter typechecker))
               (funcall recursor child))
             (visit (value)
               (when (sharp-equal-wrapper-p value)

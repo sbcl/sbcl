@@ -547,7 +547,6 @@
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
 
  ("src/code/target-misc"       :not-host) ; dribble-stream, used by "save"
- ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
@@ -560,6 +559,8 @@
  ("src/code/gc"                :not-host)
 
  ("src/code/interr" :not-host)
+
+ ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
  ("src/code/target-load" :not-host) ; for *assembler-routines*, needed by target-disassem
 
