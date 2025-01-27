@@ -3359,6 +3359,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "INTERRUPT-THREAD"
            "INTERRUPT-THREAD-ERROR"
            "INTERRUPT-THREAD-ERROR-THREAD"
+           "*INTERRUPT-HANDLER*"
            "RETURN-FROM-THREAD"
            "ABORT-THREAD"
            "MAIN-THREAD-P"

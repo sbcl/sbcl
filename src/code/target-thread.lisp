@@ -2281,6 +2281,13 @@ subject to change."
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
+(defvar *interrupt-handler* nil
+  "A function which is called with the function argument to SB-THREAD:INTERRUPT-THREAD
+when the interrupt is ready to run.
+The default behavior is to use FUNCALL.")
+(declaim (type (or sb-kernel:function-designator null) *interrupt-handler*)
+         (sb-ext:always-bound *interrupt-handler*))
+
 ;;; Called from the signal handler.
 #-(or sb-safepoint win32)
 (defun run-interruption ()
@@ -2295,7 +2302,10 @@ subject to change."
     ;; FIXME: does this really respect the promised ordering of interruptions?
     ;; It looks backwards to raise first and run the popped function second.
     (when interruption
-      (funcall interruption))))
+      (without-interrupts (allow-with-interrupts
+                            (if *interrupt-handler*
+                                (funcall *interrupt-handler* interruption)
+                                (funcall interruption)))))))
 
 #+sb-safepoint
 (defun run-interruption (*current-internal-error-context*)
@@ -2303,7 +2313,7 @@ subject to change."
     (let ((interruption (with-deathlok (*current-thread*)
                           (pop (thread-interruptions *current-thread*)))))
       (when interruption
-        (funcall interruption)
+        (without-interrupts (allow-with-interrupts (funcall interruption)))
         ;; I tried implementing this function as an explicit LOOP, because
         ;; if we are currently processing the thruption queue, why not do
         ;; all of them in one go instead of one-by-one?
@@ -2405,12 +2415,7 @@ Short version: be careful out there."
   ;; O(N), but it does not hurt to slow interruptors down a
   ;; bit when the queue gets long.
   (setf (thread-interruptions thread)
-        (append (thread-interruptions thread)
-                ;; It seems to me that this junk should be in RUN-INTERRUPTION,
-                ;; but it doesn't really matter where it goes.
-                (list (lambda ()
-                        (barrier (:memory)) ; why???
-                        (without-interrupts (allow-with-interrupts (funcall function)))))))
+        (append (thread-interruptions thread) (list function)))
   ;; We use SIGURG because it satisfies a lot of requirements that
   ;; other people have thought about more than we have.
   ;; See https://golang.org/src/runtime/signal_unix.go where they describe
