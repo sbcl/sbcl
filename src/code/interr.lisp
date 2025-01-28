@@ -329,6 +329,8 @@
          :operation '/
          :operands (list number 0)))
 
+(defvar *type-error-no-check-restart* nil)
+
 (defun restart-type-error (type condition &optional pc-offset)
   (let ((tn-offset (car *current-internal-error-args*)))
     (labels ((retry-value (value)
@@ -340,7 +342,7 @@
                                         :context "while restarting a type error."))))
              (set-value (value)
                (sb-di::sub-set-debug-var-slot
-                nil tn-offset (retry-value value)
+                nil tn-offset value
                 *current-internal-error-context*)
                (when pc-offset
                  (sb-vm::incf-context-pc *current-internal-error-context*
@@ -352,8 +354,9 @@
                    :report (lambda (stream)
                              (format stream "Use specified value."))
                    :interactive read-evaluated-form
-                   (set-value value)))))
-      (try condition))))
+                   (set-value (retry-value value))))))
+      (let ((*type-error-no-check-restart* #'set-value))
+        (try condition)))))
 
 (defun object-not-type-error (object type &optional (context nil context-p))
   (if (invalid-array-p object)

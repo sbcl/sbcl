@@ -129,7 +129,7 @@
         (when (typep info '(cons defstruct-description (eql :constructor)))
           (let* ((dd (car info)) (spec (assq fun-name (dd-constructors dd))))
             (aver spec)
-            (setq answer `(lambda ,@(structure-ctor-lambda-parts dd (cdr spec))))))))
+            (setq answer `(lambda ,@(structure-ctor-lambda-parts dd (cdr spec) t)))))))
     (values answer winp)))
 (defun fun-name-dx-args (fun-name)
   (let ((answer (info :function :inlining-data fun-name)))

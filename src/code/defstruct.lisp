@@ -2053,9 +2053,10 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; BOA lambda list, or the symbol :DEFAULT), return the effective
 ;;; lambda list and the body of the lambda.
 (defun structure-ctor-lambda-parts
-    (dd args &aux (creator (ecase (dd-type dd)
-                             (structure #'instance-constructor-form)
-                             ((list vector) #'typed-constructor-form))))
+    (dd args &optional inline
+     &aux (creator (ecase (dd-type dd)
+                     (structure #'instance-constructor-form)
+                     ((list vector) #'typed-constructor-form))))
   (labels ((default-value (dsd &optional pretty)
              (let ((default (dsd-default dsd))
                    (type (dsd-type dsd))
@@ -2085,7 +2086,10 @@ or they must be declared locally notinline at each call site.~@:>"
         (return-from structure-ctor-lambda-parts
           `((&key ,@lambda-list)
             (declare (explicit-check)
-                     (sb-c::lambda-list (&key ,@(parse t))))
+                     (sb-c::lambda-list (&key ,@(parse t)))
+                     ;; #S with #n= depend on restartable type errors.
+                     ,@(unless inline
+                         `((optimize sb-c::compute-debug-fun))))
             ,(funcall creator dd
                       (mapcar (lambda (dsd arg)
                                 (let ((type (dsd-type dsd))
@@ -2093,7 +2097,9 @@ or they must be declared locally notinline at each call site.~@:>"
                                   (if (eq type t)
                                       var
                                       `(the* (,type :context
-                                              (struct-context ,(dd-name dd) . ,(dsd-name dsd)))
+                                              (struct-context ,(dd-name dd) . ,(dsd-name dsd))
+                                              ,@(unless inline ;; can't restart in user code due to value copying.
+                                                  '(:restart t)))
                                              ,var))))
                               (dd-slots dd) lambda-list))))))
     (destructuring-bind (llks &optional req opt rest keys aux) args
