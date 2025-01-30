@@ -398,9 +398,9 @@
                                                       (cdr context)
                                                       context)))))
               (cond ((typep context '(cons integer))
-                     (restart-type-error type condition (car context)))
+                     (restart-type-error expected-type condition (car context)))
                     ((eq context 'cerror)
-                     (restart-type-error type condition))
+                     (restart-type-error expected-type condition))
                     (t
                      (error condition))))))))
 
