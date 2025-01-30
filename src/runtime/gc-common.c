@@ -1786,13 +1786,14 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
         // Lisp might not have gotten around to pruning a chain
         // containing previously culled items.
         if (key == empty_symbol && value == empty_symbol) continue;
-        // If the pair doesn't have both halves empty,
-        // then it mustn't have either half empty.
-        // FIXME: this looks like a potential data race - do we definitely store
-        // the key and value before inserting into a chain? Probably.
-        gc_assert(key != empty_symbol);
-        gc_assert(value != empty_symbol);
+        /* There is one situation to be mildy cautious of: stopped for GC after key was stored but
+         * value was not. Such a pair must certainly be live regardless of the table weakness kind.
+         * This is assured due to WITH-WEAK-HASH-TABLE-ENTRY using WITH-PINNED-OBJECTS on KEY,
+         * and empty_symbol being an immediate object (always "live"). Therefore, we assert that
+         * both K and V were stored only if actually culling a pair from its bucket. */
         if (!alivep_test(key, value)) {
+            gc_assert(key != empty_symbol);
+            gc_assert(value != empty_symbol);
             if (debug_weak_ht)
                 fprintf(stderr, "<%"OBJ_FMTX",%"OBJ_FMTX"> is dead\n", key, value);
             gc_assert(hash_table->_count > 0);
