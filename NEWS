@@ -4,12 +4,43 @@ changes relative to sbcl-2.5.0:
   * minor incompatible change: SBCL now reveals details of its COMPLEX
     representations through UPGRADED-COMPLEX-PART-TYPE, rather than hiding
     them.
+  * minor incompatible change: the compiler will warn on the use of a
+    SATISFIES type with an undefined function.  (lp#576608, reported by Roman
+    Marynchak)
+  * minor incompatible change: memory usage reports now count the space taken
+    by the slot vector towards an instance's usage.
+  * platform support
+    ** fixes to the included version of ASDF, and to sockets functions, for
+       the Haiku operating system.  (thanks to Alexandru Popa)
+    ** add support for CAS (compare-and-swap) on SAPs for arm64, x86-64 and
+       (partially) RISC-V.  (lp#1894057, reported by Yukari Hafner)
+    ** the system is now consistent with 64-bit time_t on 32-bit platforms.
+       (lp#2063340, reported by Peter van Eynde)
+    ** restore building on 32-bit ARM with newer gcc versions.  (lp#1839783,
+       reported by Sébastien Villemot)
+  * CL portability fixes to the definitions of certain compiler structures,
+    detected by CLISP.  (lp#2064301, lp#2064312, thanks to Robert Brown)
   * bug fix: structure BOA constructors with &REST arguments no longer cause
     structure slots named NIL or T to be unconditionally initialized with the
     values NIL and T respectively.
   * bug fix: structure BOA constructors without values for some slots no
     longer cause compilation errors for initforms that are not a single
     variable.
+  * bug fix: sequence functions handle :TEST and :TEST-NOT both being given
+    uniformly.  (lp#309143)
+  * bug fix: the type system is better equipped to handle complicated unions
+    of numeric types.  (lp#308937, lp#1694839, lp#1734959, lp#2073544)
+  * bug fix: misoptimization of VALUES-LIST in the presence of intervening
+    stack operations.  (reported by haruhi.s)
+  * bug fix: apply the limit to inline expansions more selectively.
+    (lp#2092518, reported by Andrew Kravchuk)
+  * bug fix: compiler-detected type mismatches are reported even given the
+    presence of inlined functions.  (lp#2092613, reported by Vasily Postnicov)
+  * bug fix: improved type error detection for inlined array construction forms.
+    (lp#2092889, reported by Vasily Postnicov)
+  * bug fix: accesses to multidimensional arrays are now checked based on the
+    (internal) INSERT-ARRAY-BOUNDS-CHECKS declaration, as with one-dimensional
+    arrays.  (lp#2095155, thanks to Vasily Postnicov)
 
 changes in sbcl-2.5.0 relative to sbcl-2.4.11:
   * platform support:
