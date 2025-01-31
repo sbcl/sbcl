@@ -1285,11 +1285,6 @@ NOTE: This interface is experimental and subject to change."
               (normalize-deprecation-replacements replacement-spec))))
    nil))
 
-(defun setup-type-in-final-deprecation
-    (software version name replacement-spec)
-  (declare (ignore software version replacement-spec))
-  (%deftype name (constant-type-expander name t) nil))
-
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
 ;; those which pertain to the variables and those which don't.

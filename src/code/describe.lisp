@@ -733,18 +733,22 @@
   (let* ((kind (info :type :kind name))
          (fun (and kind (info :type :expander name)))
          (fun (if (listp fun) (car fun) fun)))
-    (when fun
-      (describe-block (stream "~A names a ~@[primitive~* ~]type-specifier:"
-                              name (eq kind :primitive))
-        (describe-deprecation 'type name stream)
-        (describe-documentation name 'type stream (eq t fun))
-        (when (functionp fun)
-          (describe-lambda-list (%fun-lambda-list fun) stream)
-          (multiple-value-bind (expansion ok)
-              (handler-case (typexpand-1 name)
-                (error () (values nil nil)))
-            (when ok
-              (format stream "~@:_Expansion: ~S" expansion))))))))
+    (cond (fun
+           (describe-block (stream "~A names a ~@[primitive~* ~]type-specifier:"
+                                   name (eq kind :primitive))
+             (describe-deprecation 'type name stream)
+             (describe-documentation name 'type stream (eq t fun))
+             (when (functionp fun)
+               (describe-lambda-list (%fun-lambda-list fun) stream)
+               (multiple-value-bind (expansion ok)
+                   (handler-case (typexpand-1 name)
+                     (error () (values nil nil)))
+                 (when ok
+                   (format stream "~@:_Expansion: ~S" expansion))))))
+          ((info :type :deprecated name)
+           (describe-block (stream "~A names a deprecated type" name)
+             (describe-deprecation 'type name stream)
+             (describe-documentation name 'type stream (eq t fun)))))))
 
 (defun describe-declaration (name stream)
   (let ((kind (cond

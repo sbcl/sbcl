@@ -77,11 +77,9 @@
           (let* ((object-sym (gensym))
                  (exp (%source-transform-typep-simple object-sym type)))
             (if exp
-                (progn
-                  (check-deprecated-type type)
-                  `(let ((,object-sym ,object))
-                     (declare (ignorable ,object-sym))
-                     ,exp))
+                `(let ((,object-sym ,object))
+                   (declare (ignorable ,object-sym))
+                   ,exp)
                 (values nil t)))))
       (values nil t)))
 
@@ -1325,9 +1323,10 @@
 (defun %source-transform-typep-simple (object type &optional ctype)
   (let ((ctype (or ctype
                    (handler-bind
-                       ((parse-unknown-type (lambda (c)
-                                              c
-                                              (return-from %source-transform-typep-simple))))
+                       (((or parse-unknown-type sb-kernel::parse-deprecated-type)
+                          (lambda (c)
+                            c
+                            (return-from %source-transform-typep-simple))))
                      (careful-specifier-type type)))))
    (when ctype
      (or

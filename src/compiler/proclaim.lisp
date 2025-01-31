@@ -459,9 +459,6 @@
             software version name replacement))
          (setf (info :variable :deprecated name) info))
         (type
-         (when (eq state :final)
-           (sb-impl::setup-type-in-final-deprecation
-            software version name replacement))
          (setf (info :type :deprecated name) info))))))
 
 (defun process-declaration-declaration (name form)
