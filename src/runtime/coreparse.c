@@ -559,7 +559,7 @@ static void relocate_heap(struct heap_adjust* adj)
     // Linkage space possibly needs altering even if all spaces were placed as requested
     int i, n = linkage_table_count;
     if (lisp_code_in_elf()) gc_assert(elf_linkage_space);
-    for (i=1; i<n; ++i) {
+    for (i=FIRST_USABLE_LINKAGE_ELT; i<n; ++i) {
         lispobj word = linkage_space[i];
         // low bit on means it references code-in-ELF, otherwise dynamic space
         if (word & 1) linkage_space[i] = word - 1 + TEXT_SPACE_START;

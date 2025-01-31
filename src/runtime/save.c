@@ -314,7 +314,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     /* The C runtime is theoretically position-independent so don't write out the address
      * of the unused entry sentinel. The affected elements needn't be restored on restart.
      * (Maybe add a renumbering pass in Lisp to ensure the table is 100% dense) */
-    for (i=0; i<linkage_table_count; ++i)
+    for (i=FIRST_USABLE_LINKAGE_ELT; i<linkage_table_count; ++i)
         if (linkage_space[i] == (uword_t)illegal_linkage_space_call)
             linkage_space[i] = 0;
     int nbytes = ALIGN_UP(linkage_table_count<<WORD_SHIFT, BACKEND_PAGE_BYTES);

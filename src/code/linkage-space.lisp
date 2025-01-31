@@ -75,7 +75,8 @@
   ;; via that linkage cell), immediately calls the freshly-compiled code, and crashes because
   ;; thread A hadn't assigned a callable object into the cell.
   (let ((index (fname-linkage-index fname)))
-    (when (/= 0 (sap-ref-word *linkage-table* (ash index word-shift)))
+    (when (and (/= 0 (sap-ref-word *linkage-table* (ash index word-shift)))
+               (/= index 0)) ; index 0 has a nonzero value in it, but it's not valid
       (return-from ensure-linkage-index index)))
   (or (with-system-mutex (*linkage-space-mutex*)
         (let ((index (fname-linkage-index fname)))

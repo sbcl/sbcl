@@ -1046,7 +1046,8 @@ static lispobj trans_bignum(lispobj object)
 lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     extern lispobj entrypoint_taggedptr(uword_t);
-    return entrypoint_taggedptr(linkage_space[fdefn_linkage_index(fdefn)]);
+    int index = fdefn_linkage_index(fdefn);
+    return index ? entrypoint_taggedptr(linkage_space[index]) : 0;
 #else
     lispobj raw_addr = (lispobj)fdefn->raw_addr;
     if (!raw_addr || points_to_asm_code_p(raw_addr))
