@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.0:
+changes in sbcl-2.5.1 relative to sbcl-2.5.0:
   * minor incompatible change: SBCL now reveals details of its COMPLEX
     representations through UPGRADED-COMPLEX-PART-TYPE, rather than hiding
     them.
