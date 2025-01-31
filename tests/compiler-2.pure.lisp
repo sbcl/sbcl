@@ -4597,3 +4597,13 @@
            (apply #'list b list)))
     ((t 1) '(1 2 3) :test #'equal)
     ((nil 1) '(1 1) :test #'equal)))
+
+(declaim (ftype (function (integer t)) setf-on-ftype))
+
+
+(with-test (:name :setf-on-ftype)
+  (assert-type
+   (sb-int:named-lambda setf-on-ftype (x j)
+     (setf x j)
+     (values x j))
+   (values integer integer &optional)))

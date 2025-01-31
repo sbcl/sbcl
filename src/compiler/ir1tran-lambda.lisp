@@ -1214,8 +1214,6 @@
 (defun assert-new-definition (var fun)
   (let* ((type (massage-global-definition-type (leaf-type var) fun))
          (for-real (eq (leaf-where-from var) :declared))
-         (name (leaf-source-name var))
-         (info (info :function :info name))
          (explicit-check (getf (functional-plist fun) 'explicit-check)))
     (assert-definition-type
      fun type
@@ -1227,9 +1225,6 @@
      ;; the mismatched data came from the same compilation unit, so we
      ;; can't do that. -- WHN 2001-02-11
      :lossage-fun #'compiler-style-warn
-     :unwinnage-fun (cond (info #'compiler-style-warn)
-                          (for-real #'compiler-notify)
-                          (t nil))
      :really-assert (if for-real
                         (explicit-check->really-assert explicit-check))
      :where (if for-real

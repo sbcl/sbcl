@@ -845,7 +845,6 @@ and no value was provided for it." name)))))))))))
 (defun assert-definition-type
     (functional type &key (really-assert t)
                           ((:lossage-fun *lossage-fun*) #'compiler-style-warn)
-                          unwinnage-fun
                           (where "previous declaration"))
   (declare (type functional functional)
            (type function *lossage-fun*)
@@ -879,20 +878,14 @@ and no value was provided for it." name)))))))))))
                                  'ftype-context)))
            (loop for var in vars
                  for type in types do
-                 (cond ((basic-var-sets var)
-                        (when (and unwinnage-fun
-                                   (not (csubtypep (leaf-type var) type)))
-                          (funcall unwinnage-fun
-                                   (sb-format:tokens
-                                      "Assignment to argument: ~S~%  ~
-                                       prevents use of assertion from function ~
-                                       type ~A:~% ~/sb-impl:print-type/~%")
-                                   (leaf-debug-name var) where type)))
-                       ((and (listp really-assert) ; (:NOT . ,vars)
+                 (cond ((and (listp really-assert) ; (:NOT . ,vars)
                              (member (lambda-var-%source-name var)
                                      (cdr really-assert)))) ; do nothing
                        (t
                         (setf (leaf-type var) type)
+                        (loop for set in (basic-var-sets var)
+                              do (assert-lvar-type (set-value set) type (lexenv-policy (functional-lexenv functional))
+                                                   'ftype-context))
                         (let ((s-type (make-single-value-type type)))
                           (dolist (ref (leaf-refs var))
                             (derive-node-type ref s-type))))))

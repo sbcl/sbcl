@@ -1323,7 +1323,6 @@
            (found
             (setf (leaf-type found) type)
             (assert-definition-type found type
-                                    :unwinnage-fun #'compiler-notify
                                     :where "FTYPE declaration"))
            (t
             (res (cons (find-lexically-apparent-fun
@@ -1874,7 +1873,6 @@ possible.")
          (let ((fun (defined-fun-functional var)))
            (when fun
              (assert-definition-type fun type
-                                     :unwinnage-fun #'compiler-notify
                                      :where "this declaration"))))))))
 
 (defun process-ftype-proclamation (spec names)
