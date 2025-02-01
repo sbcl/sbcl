@@ -878,14 +878,13 @@ and no value was provided for it." name)))))))))))
                                  'ftype-context)))
            (loop for var in vars
                  for type in types do
-                 (cond ((and (listp really-assert) ; (:NOT . ,vars)
+                 (cond ((basic-var-sets var)
+                        (setf (leaf-defined-type var) type))
+                       ((and (listp really-assert) ; (:NOT . ,vars)
                              (member (lambda-var-%source-name var)
                                      (cdr really-assert)))) ; do nothing
                        (t
                         (setf (leaf-type var) type)
-                        (loop for set in (basic-var-sets var)
-                              do (assert-lvar-type (set-value set) type (lexenv-policy (functional-lexenv functional))
-                                                   'ftype-context))
                         (let ((s-type (make-single-value-type type)))
                           (dolist (ref (leaf-refs var))
                             (derive-node-type ref s-type))))))

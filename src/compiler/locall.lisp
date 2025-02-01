@@ -49,7 +49,11 @@
            (name (or (and (lambda-var-arg-info var)
                           (arg-info-key (lambda-var-arg-info var)))
                      (lambda-var-%source-name var))))
-      (assert-lvar-type (car args) (leaf-type var) policy
+      (assert-lvar-type (car args)
+                        (if (eq (leaf-type var) *universal-type*)
+                            (leaf-defined-type var)
+                            (leaf-type var))
+                        policy
                         (if (functional-kind-eq fun optional)
                             (make-local-call-context fun name)
                             name))

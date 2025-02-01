@@ -4602,8 +4602,10 @@
 
 
 (with-test (:name :setf-on-ftype)
-  (assert-type
-   (sb-int:named-lambda setf-on-ftype (x j)
-     (setf x j)
-     (values x j))
-   (values integer integer &optional)))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(sb-int:named-lambda setf-on-ftype (x j)
+      (setf x j)
+      x)
+   ((nil 1) (condition 'type-error))
+   ((1 nil) nil)))
