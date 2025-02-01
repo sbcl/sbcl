@@ -1195,7 +1195,35 @@ care."
       (info :function :macro-function 'the*)
       (lambda (whole env)
         (declare (ignore env))
-        `(the ,(caadr whole) ,@(cddr whole)))
+        (destructuring-bind
+              (the* (type &key (restart nil rp) context &allow-other-keys) form)
+            whole
+          (declare (ignore the*))
+          (if (and rp restart)
+              (let* ((val (gensym "VAL"))
+                     (head (gensym "HEAD"))
+                     (ctype (careful-specifier-type type))
+                     (type (if (and ctype (fun-type-p ctype)) 'function type)))
+                `(let ((,val ,form))
+                   (if (typep ,val ',type)
+                       ,val
+                       (block nil
+                         (let ((sb-kernel::*type-error-no-check-restart*
+                                (lambda (value) (return value))))
+                           (tagbody
+                            ,head
+                              (restart-case
+                                  (error 'type-error :context ',context
+                                         :datum ,val :expected-type ',type)
+                                (use-value (value)
+                                  :report (lambda (stream)
+                                            (format stream "Use specified value."))
+                                  :interactive read-evaluated-form
+                                  (setq ,val value)))
+                              (when (typep ,val ',type)
+                                (return ,val))
+                              (go ,head)))))))
+              `(the ,(caadr whole) ,@(cddr whole)))))
       (info :function :macro-function 'with-source-form)
       (lambda (whole env)
         (declare (ignore env))
