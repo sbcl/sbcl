@@ -40,9 +40,14 @@
                                                                       (,op (truly-the (integer ,u-l ,u-h) u)
                                                                            (truly-the (integer ,s-l ,s-h) s))))))))))
     (loop for u from u-l to u-h
-          always (assert (sb-kernel:ctypep (loop for s from s-l to s-h
-                                                 minimize (funcall op u s))
-                                           type)))))
+          do (loop for s from s-l to s-h
+                   for r = (funcall op u s)
+                   do
+                   (assert (sb-kernel:ctypep (funcall op u s) type)
+                           () "(~a ~a ~a) =>  ~a /= ~a ~a"
+                           op u s r type `(lambda (u s)
+                                            (,op (truly-the (integer ,u-l ,u-h) u)
+                                                 (truly-the (integer ,s-l ,s-h) s))))))))
 
 (defun type-derivation1 (op l h)
   (let ((interval (sb-c::numeric-type->interval

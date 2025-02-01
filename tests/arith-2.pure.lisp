@@ -646,3 +646,17 @@
     ((most-negative-fixnum) nil)
     (((1+ most-negative-fixnum)) nil)
     (((1- most-positive-fixnum)) nil)))
+
+(with-test (:name :logior-derive-negative)
+  (assert-type
+   (lambda (x)
+     (declare (fixnum x))
+     (logior x 1))
+   (or (integer #.(1+ most-negative-fixnum) -1)
+       (integer 1 #.most-positive-fixnum)))
+  (assert-type
+   (lambda (x)
+     (declare (fixnum x))
+     (logior x 10))
+   (or (integer #.(+ most-negative-fixnum 10) -1)
+       (integer 10 #.most-positive-fixnum))))
