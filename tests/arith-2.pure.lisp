@@ -655,6 +655,13 @@
    (or (integer #.(1+ most-negative-fixnum) -1)
        (integer 1 #.most-positive-fixnum)))
   (assert-type
+   (lambda (x y)
+     (declare (fixnum x)
+              ((and (signed-byte 16) (not (eql 0))) y))
+     (logior y x))
+   (or (integer #.(1+ most-negative-fixnum) -1)
+       (integer 1 #.most-positive-fixnum)))
+  (assert-type
    (lambda (x)
      (declare (fixnum x))
      (logior x 10))

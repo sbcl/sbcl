@@ -262,6 +262,7 @@
                  ;; Add one to a negative low power of two bound if
                  ;; there are some bits set in the second parameter.
                  (if (or (>= a-low 0)
+                         (not b-high)
                          (<= b-low 0 b-high))
                      a-low
                      (let* ((length (integer-length a-low))
@@ -292,7 +293,9 @@
                                            `(integer ,y-low)))))
                 ((and x-low
                       (> x-low 0))
-                 (specifier-type `(or (integer ,(or y-low '*) -1)
+                 (specifier-type `(or (integer ,(if y-low
+                                                    (add-one y-low x-low x-high)
+                                                    '*) -1)
                                       ,(if (and y-high
                                                 x-len)
                                            (multiple-value-bind (low high)
