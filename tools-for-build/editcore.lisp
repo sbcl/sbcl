@@ -1968,7 +1968,9 @@
     (call-with-each-static-object
        (lambda (descriptor) (trace-obj #'visit descriptor old-spacemap))
        old-spacemap)
-    (dotimes (i (length linkage-cells))
+    ;; TODO: autogenerate "#define FIRST_USABLE_LINKAGE_ELT 1" from Lisp
+    (loop for i from 1 below (length linkage-cells)
+          do
       (let ((val (aref linkage-cells i)))
         (unless (= val 0)
           (let* ((function (fun-entry->descriptor val))
