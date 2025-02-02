@@ -2303,9 +2303,12 @@
        (case (global-var-kind leaf)
          (:global-function
           (let ((name (leaf-source-name leaf)))
-            (or (eq (sb-xc:symbol-package (fun-name-block-name name))
-                    *cl-package*)
-                (info :function :info name)))))))))
+            (or (eq (sb-xc:symbol-package (fun-name-block-name name)) *cl-package*)
+                (info :function :info name)
+                (and (not (fun-lexically-notinline-p name (node-lexenv ref)))
+                     (or
+                      (info :function :source-transform name)
+                      (eq (info :function :inlinep name) 'inline)))))))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's LVAR with the arg lvar.
