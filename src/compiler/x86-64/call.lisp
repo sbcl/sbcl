@@ -51,7 +51,7 @@
                          :linkage-cell))))
 
 (defun compute-linkage-cell (node name res)
-  (cond ((sb-c::code-immobile-p node)
+  (cond ((code-immobile-p node)
          (inst lea res (rip-relative-ea (linkage-cell-fixup name node))))
         (t
          (inst mov res (thread-slot-ea sb-vm::thread-linkage-table-slot))
@@ -901,7 +901,7 @@
   (cond (step-instrumenting
          ;; If step-instrumenting, then RAX points to the linkage table cell
          (inst* instruction (ea rax-tn)))
-        ((sb-c::code-immobile-p node)
+        ((code-immobile-p node)
          (inst* instruction (rip-relative-ea (linkage-cell-fixup name node))))
         (t
          ;; get the linkage table base into RAX
@@ -910,7 +910,7 @@
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)
-  (let ((relative-call (sb-c::code-immobile-p vop))
+  (let ((relative-call (code-immobile-p vop))
         (fun-ea (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
                     fun)))
     (case type

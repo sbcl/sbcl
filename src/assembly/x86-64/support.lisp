@@ -25,7 +25,7 @@
 
 (defun invoke-asm-routine (inst routine vop)
   (inst* (the (member jmp call) inst)
-         (if (or (null vop) (sb-c::code-immobile-p vop))
+         (if (or (null vop) (code-immobile-p vop))
              (make-fixup routine :assembly-routine)
              (ea (make-fixup routine :assembly-routine)))))
 
@@ -71,7 +71,7 @@
                    (:save 'fpr-save)
                    (:restore 'fpr-restore))))
     (if (or (not (boundp 'sb-c:*component-being-compiled*))
-            (sb-c::code-immobile-p sb-c:*component-being-compiled*))
+            (code-immobile-p sb-c:*component-being-compiled*))
         ;; direct call from asm routine or immobile code
         (inst call (make-fixup routine :assembly-routine))
         ;; indirect call from dynamic space

@@ -168,7 +168,7 @@
              (if (integerp size) 'enable-alloc-counter 'enable-sized-alloc-counter)))
         ;; This jump is always encoded as 5 bytes
         (inst call (if (or (not node) ; assembly routine
-                           (sb-c::code-immobile-p node))
+                           (code-immobile-p node))
                        (make-fixup helper :assembly-routine)
                        (uniquify-fixup helper))))
       (inst nop)

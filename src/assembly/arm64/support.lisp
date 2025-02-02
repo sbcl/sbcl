@@ -13,7 +13,7 @@
 
 (defun invoke-asm-routine (name reg &key tail)
   (cond ((or (not (boundp '*component-being-compiled*))
-             (sb-c::code-immobile-p *component-being-compiled*))
+             (code-immobile-p *component-being-compiled*))
          (if tail
              (inst b (make-fixup name :assembly-routine))
              (inst bl (make-fixup name :assembly-routine))))
@@ -25,13 +25,13 @@
 
 (defun load-asm-routine (reg name)
   (if (or (not (boundp '*component-being-compiled*))
-          (sb-c::code-immobile-p *component-being-compiled*))
+          (code-immobile-p *component-being-compiled*))
       (inst adr reg (make-fixup name :assembly-routine))
       (load-inline-constant reg `(:fixup ,name :assembly-routine))))
 
 (defun invoke-foreign-routine (name reg &key tail)
   (cond ((or (not (boundp '*component-being-compiled*))
-             (sb-c::code-immobile-p *component-being-compiled*))
+             (code-immobile-p *component-being-compiled*))
          (if tail
              (inst b (make-fixup name :foreign))
              (inst bl (make-fixup name :foreign))))
@@ -44,7 +44,7 @@
 (defun load-foreign-symbol (reg name &key dataref)
   (let ((kind (if dataref :foreign-dataref :foreign)))
     (if (or (not (boundp '*component-being-compiled*))
-            (sb-c::code-immobile-p *component-being-compiled*))
+            (code-immobile-p *component-being-compiled*))
         (if dataref
             (inst ldr reg (make-fixup name kind))
             (inst adr reg (make-fixup name kind)))

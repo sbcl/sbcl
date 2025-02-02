@@ -239,7 +239,7 @@
     #-immobile-space ; non-relocatable alien linkage table
     (inst mov res (make-fixup foreign-symbol :foreign))
     #+immobile-space ; relocatable alien linkage table
-    (cond ((sb-c::code-immobile-p vop)
+    (cond ((code-immobile-p vop)
            (inst lea res (rip-relative-ea (make-fixup foreign-symbol :foreign))))
           (t
            (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
@@ -258,7 +258,7 @@
     #-immobile-space ; non-relocatable alien linkage table
     (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))
     #+immobile-space ; relocatable alien linkage table
-    (cond ((sb-c::code-immobile-p vop)
+    (cond ((code-immobile-p vop)
            (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
           (t
            (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
@@ -394,7 +394,7 @@
                  fun
                  #-immobile-space (ea (make-fixup fun :foreign 8))
                  #+immobile-space
-                 (cond ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
+                 (cond ((code-immobile-p vop) (make-fixup fun :foreign))
                        (t
                         ;; Pick r10 as the lowest unused clobberable register.
                         ;; RAX has a designated purpose, and RBX is nonvolatile (not always
@@ -413,7 +413,7 @@
          ;; linkage table of the alien function to call. This informs UNDEFINED-ALIEN-TRAMP
          ;; which table cell was referenced, if undefined.
          #+immobile-space ; relocatable table
-         (cond ((sb-c::code-immobile-p vop)
+         (cond ((code-immobile-p vop)
                 (inst lea rbx (rip-relative-ea (make-fixup fun :foreign 8))))
                (t
                 (inst mov rbx (make-fixup fun :alien-code-linkage-index 8))

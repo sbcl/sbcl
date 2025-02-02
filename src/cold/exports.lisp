@@ -2617,6 +2617,7 @@ be submitted as a CDR")
            "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
            "CATCH-BLOCK" "UNWIND-BLOCK"
            "CLOSURE-INIT" "CLOSURE-REF" "CLOSURE-INIT-FROM-FP"
+           "CODE-IMMOBILE-P"
            "COMPARE-AND-SWAP-SLOT"
            "COMPILE-IN-LEXENV"
            "COMPILE-FILES" "COMPILE-FORM-TO-FILE"
