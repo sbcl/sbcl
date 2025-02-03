@@ -63,6 +63,7 @@
         *print-radix* nil
         *print-vector-length* nil
         *print-circle* nil
+        *print-circle-not-shared* nil
         *print-case* :upcase
         *print-array* t
         *print-gensym* t

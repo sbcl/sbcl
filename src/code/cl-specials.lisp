@@ -69,7 +69,8 @@
                 ;; extension/internal specials are also proclaimed early
                 ;; to benefit from always-bound and precomputed TLS index.
                 sb-kernel:*current-level-in-print*
-                sb-ext:*print-vector-length*)))
+                sb-ext:*print-vector-length*
+                sb-ext:*print-circle-not-shared*)))
     `(progn
        (declaim (special ,@list)
                 (sb-ext:always-bound ,@list))

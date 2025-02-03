@@ -30,13 +30,18 @@
   "How many levels should be printed before abbreviating with \"#\"?")
 (defvar *print-length* nil
   "How many elements at any level should be printed before abbreviating
-  with \"...\"?")
+with \"...\"?")
 (defvar *print-vector-length* nil
   "Like *PRINT-LENGTH* but works on strings and bit-vectors.
 Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 (defvar *print-circle* nil
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
-  circularity in particular) when printing?")
+circularity in particular) when printing?")
+
+(defvar *print-circle-not-shared* nil
+  "If this variable and *PRINT-CIRCLE* are both T only circular
+structures are printed with #n#.")
+
 (defvar *print-case* :upcase
   "What case should the printer should use default?")
 (defvar *print-array* t
@@ -86,7 +91,8 @@ variable: an unreadable object representing the error is printed instead.")
         (*read-suppress* nil)
         (*readtable* *standard-readtable*)
         (*suppress-print-errors* nil)
-        (*print-vector-length* nil))
+        (*print-vector-length* nil)
+        (*print-circle-not-shared* nil))
     (funcall function)))
 
 ;;;; routines to print objects
@@ -299,6 +305,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; entries get changed to the actual marker value when they are first
 ;;; printed.
 (defvar *circularity-hash-table* nil)
+(defvar *circularity-list* nil)
 
 ;;; When NIL, we are just looking for circularities. After we have
 ;;; found them all, this gets bound to 0. Then whenever we need a new
@@ -335,8 +342,12 @@ variable: an unreadable object representing the error is printed instead.")
     (return-from check-for-circularity nil))
   (let ((circularity-hash-table *circularity-hash-table*))
     (cond
+        (*print-circle-not-shared*
+         (let ((x (assoc object *circularity-list*)))
+           (and x
+                (>= (cdr x) 0))))
         ((null circularity-hash-table)
-          (values nil :initiate))
+            (values nil :initiate))
         ((null *circularity-counter*)
          (ecase (gethash object circularity-hash-table)
            ((nil)
@@ -441,6 +452,36 @@ variable: an unreadable object representing the error is printed instead.")
        (cond ((or (not *print-circle*)
                   (uniquely-identified-by-print-p ,object))
               (,body-name))
+             (*print-circle-not-shared*
+              (let ((,marker (assoc ,object *circularity-list* :test #'eq)))
+                (cond ((and ,marker
+                            (> (cdr ,marker) 0))
+                       (write-char #\# ,stream)
+                       (output-integer (cdr ,marker) ,stream 10 nil)
+                       (write-char #\# ,stream))
+                      ((and ,marker
+                            (eql (cdr ,marker) -1))
+                       (unless *circularity-counter*
+                         (setf (cdr ,marker) 0))
+                       (,body-name))
+                      (t
+                       ;; output-object will replace the -3
+                       (let ((*circularity-list* (acons ,object -3 *circularity-list*)))
+                         (output-object ,object *null-broadcast-stream*)
+                         (flet ((out ()
+                                  (let* ((entry (car *circularity-list*))
+                                         (n (cdr entry)))
+                                    (when (eql n 0)
+                                      (write-char #\# stream)
+                                      (output-integer (setf (cdr entry)
+                                                            (incf *circularity-counter*))
+                                                      stream 10 nil)
+                                      (write-char #\= stream))
+                                    (,body-name))))
+                           (if *circularity-counter*
+                               (out)
+                               (let ((*circularity-counter* 0))
+                                 (out)))))))))
              (*circularity-hash-table*
               (let ((,marker (check-for-circularity ,object t :logical-block)))
                 (if ,marker
@@ -547,16 +588,52 @@ variable: an unreadable object representing the error is printed instead.")
                           (make-hash-table :test 'eq)))
                      (check-it *null-broadcast-stream*)
                      (let ((*circularity-counter* 0))
-                       (check-it stream)))
+                       (check-it stream)
+                       (when *print-circle-not-shared*
+                         (remhash object *circularity-hash-table*))))
                    ;; otherwise
                    (if marker
                        (when (handle-circularity marker stream)
                          (handle-it stream))
-                       (handle-it stream))))))
+                       (handle-it stream)))))
+           (check-it-no-shared (stream)
+             (let ((circle (assoc object *circularity-list* :test #'eq)))
+               (if circle
+                   (let ((n (cdr circle)))
+                     (cond ((> n 0)
+                            (write-char #\# stream)
+                            (output-integer n stream 10 nil)
+                            (write-char #\# stream))
+                           ((= n 0))
+                           ((= n -3)
+                            (setf (cdr circle) -1)
+                            (handle-it stream))
+                           (t
+                            (setf (cdr circle) 0))))
+                   ;; -2 for with-circularity-detection, see the comment above CHECK-FOR-CIRCULARITY
+                   (let* ((entry (cons object -2))
+                          (*circularity-list* (cons entry *circularity-list*)))
+                     (let (*circularity-counter*)
+                       (handle-it *null-broadcast-stream*))
+                     (flet ((out ()
+                              (let ((n (cdr entry)))
+                                (when (eql n 0)
+                                  (write-char #\# stream)
+                                  (output-integer (setf (cdr entry)
+                                                        (incf *circularity-counter*))
+                                                  stream 10 nil)
+                                  (write-char #\= stream))
+                                (handle-it stream))))
+                       (if *circularity-counter*
+                           (out)
+                           (let ((*circularity-counter* 0))
+                             (out)))))))))
     (cond (;; Maybe we don't need to bother with circularity detection.
            (or (not *print-circle*)
                (uniquely-identified-by-print-p object))
            (handle-it stream))
+          (*print-circle-not-shared*
+           (check-it-no-shared stream))
           (;; If we have already started circularity detection, this
            ;; object might be a shared reference. If we have not, then
            ;; if it is a compound object it might contain a circular
