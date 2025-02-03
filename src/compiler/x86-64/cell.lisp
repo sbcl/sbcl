@@ -127,6 +127,7 @@
 (defun symbol-tls-index-ea (symbol)
   (ea (make-fixup (tn-value symbol) :immobile-symbol (- 4 other-pointer-lowtag))))
 
+;; oof, this is confusing, considering that SYMBOL-VALUE-SLOT-EA also exists
 (defun get-symbol-value-slot-ea (ea-tn symbol)
   (if (sc-is symbol immediate)
       (inst mov ea-tn (make-fixup (tn-value symbol) :immobile-symbol
@@ -396,23 +397,50 @@
       (:variant nil)
       (:variant-cost 5))
 
-    ;; TODO: this vop doesn't see that when (INFO :VARIABLE :KIND) = :GLOBAL
-    ;; there is no need to check the TLS. Probably this is better handled in IR1
-    ;; rather than IR2. It would need a new GLOBAL-BOUNDP function.
-    ;; On the other hand, how many users know that you can declaim
-    ;; a variable GLOBAL without using DEFGLOBAL ?
     (define-vop (boundp)
       (:translate boundp)
       (:policy :fast-safe)
-      (:args (object :scs (descriptor-reg)))
+      (:args (symbol :scs (descriptor-reg constant immediate)))
+      (:node-var node)
       (:conditional :ne)
       (:temporary (:sc unsigned-reg) temp)
       (:generator 9
-        (inst mov :dword temp (tls-index-of object))
-        (inst mov :qword temp (thread-tls-ea temp))
-        (inst cmp :qword temp no-tls-value-marker)
-        (inst cmov :dword :e temp (symbol-value-slot-ea object))
-        (inst cmp :byte temp unbound-marker-widetag))))
+       (cond
+         ((sc-is symbol descriptor-reg)
+          (inst mov :dword temp (tls-index-of symbol))
+          (inst mov :qword temp (thread-tls-ea temp))
+          (inst cmp :qword temp no-tls-value-marker)
+          (inst cmov :dword :e temp (symbol-value-slot-ea symbol))
+          (inst cmp :byte temp unbound-marker-widetag))
+         ((symbol-always-has-tls-value-p symbol node)
+          ;; check only the TLS
+          (inst cmp :byte (thread-tls-ea (load-time-tls-offset (tn-value symbol)))
+                unbound-marker-widetag))
+         ((eq (info :variable :kind (tn-value symbol)) :global)
+          ;; Call should have been elided in IR1 if always bound.
+          ;; (what about ':EVENTUALLY and compiling to memory- is is always bound yet?)
+          (aver (neq (info :variable :always-bound (tn-value symbol)) :always-bound))
+          (inst cmp :byte (cond ((sc-is symbol constant)
+                                 (inst mov temp symbol)
+                                 (object-slot-ea temp symbol-value-slot other-pointer-lowtag))
+                                (t
+                                 (symbol-slot-ea (tn-value symbol) symbol-value-slot)))
+                unbound-marker-widetag))
+         (t
+          ;; For a known symbol that is not known to be either aways global or thread-local,
+          ;; wire in a TLS index. It's unlikely that TLS will be exhausted by doing this, in contrast
+          ;; to emit-symeval, where it is inadvisable to waste hundreds of TLS slots by eagerly
+          ;; giving a symbol a fixed index just because the compiler observed a reference.
+          (inst mov :qword temp (thread-tls-ea (load-time-tls-offset (tn-value symbol))))
+          (inst cmp :qword temp no-tls-value-marker)
+          (if (sc-is symbol immediate)
+              (inst cmov :dword :e temp (symbol-slot-ea (tn-value symbol) symbol-value-slot))
+              (assemble ()
+               (inst jmp :ne THREAD-LOCAL)
+               (inst mov temp symbol)
+               (inst mov :dword temp (object-slot-ea temp symbol-value-slot other-pointer-lowtag))
+               THREAD-LOCAL))
+          (inst cmp :byte temp unbound-marker-widetag))))))
 
 ) ; END OF MACROLET
 
