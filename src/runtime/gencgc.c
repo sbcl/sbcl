@@ -4360,6 +4360,11 @@ void zero_all_free_ranges() /* called only by gc_and_save() */
         char* start = page_address(i);
         char* page_end = start + GENCGC_PAGE_BYTES;
         start += page_bytes_used(i);
+
+#ifdef LISP_FEATURE_WIN32
+        if(!page_bytes_used(i))
+            os_commit_memory(page_address(i), npage_bytes(1));
+#endif
         memset(start, 0, page_end-start);
     }
 #ifndef LISP_FEATURE_SB_THREAD

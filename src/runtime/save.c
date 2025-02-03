@@ -159,12 +159,6 @@ static long write_bytes(FILE *file, char *addr, size_t bytes,
 {
     ftell_type here, data;
 
-#ifdef LISP_FEATURE_WIN32
-    // I can't see how we'd ever attempt writing from uncommitted memory,
-    // but this is better than was was previously here (a "touch" loop over all pages)
-    os_commit_memory(addr, bytes);
-#endif
-
     fflush(file);
     here = FTELL(file);
     FSEEK(file, 0, SEEK_END);

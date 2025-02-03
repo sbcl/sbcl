@@ -1040,7 +1040,7 @@ handle_access_violation(os_context_t *ctx,
     /* dynamic space */
     page_index_t page = find_page_index(fault_address);
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    if (page >= 0) lose("should not get access violation in dynamic space");
+    if (page >= 0) lose("should not get access violation in dynamic space %p", fault_address);
 #else
     if (page != -1 && !PAGE_WRITEPROTECTED_P(page)) {
         os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
