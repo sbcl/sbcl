@@ -362,6 +362,7 @@ with bits from the corresponding position in the new value."
 
 (in-package "SB-VM")
 
+(declaim (inline blt-copier-for-widetag))
 (defun blt-copier-for-widetag (x)
   (declare ((mod 256) x))
   (aref (load-time-value
