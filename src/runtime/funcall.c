@@ -125,3 +125,32 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     return call_into_lisp(function, args, 3);
 }
 #endif
+
+#if (!defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_X86_64))
+#if (defined(LISP_FEATURE_ARM64) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_X86))
+lispobj
+callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2)
+{
+    lispobj args[3];
+    args[0] = arg0;
+    args[1] = arg1;
+    args[2] = arg2;
+    return call_into_lisp(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), args, 3);
+}
+#else
+lispobj
+callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2)
+{
+    lispobj **stack_pointer
+        = &access_control_stack_pointer(get_sb_vm_thread());
+    lispobj *args = *stack_pointer;
+
+    *stack_pointer += 3;
+    args[0] = arg0;
+    args[1] = arg1;
+    args[2] = arg2;
+
+    return call_into_lisp(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), args, 3);
+}
+#endif
+#endif

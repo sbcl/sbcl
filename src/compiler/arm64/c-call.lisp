@@ -359,7 +359,6 @@
            (r1-tn (make-tn 1))
            (r2-tn (make-tn 2))
            (r3-tn (make-tn 3))
-           (r4-tn (make-tn 4))
            (temp-tn (make-tn 9))
            (nsp-save-tn (make-tn 10))
            (gprs (loop for i below 8
@@ -436,23 +435,18 @@
                    (incf arg-count))
                   (t
                    (bug "Unknown alien type: ~S" type)))))
-        ;; arg0 to FUNCALL3 (function)
-        (load-immediate-word r0-tn (static-fdefn-fun-addr 'enter-alien-callback))
-        (loadw r0-tn r0-tn)
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-        (inst mov r1-tn (fixnumize index))
+        (inst mov r0-tn (fixnumize index))
         ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-        (inst mov-sp r2-tn nsp-tn)
+        (inst mov-sp r1-tn nsp-tn)
         ;; add room on stack for return value
         (inst sub nsp-tn nsp-tn (* n-word-bytes 2))
         ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-        (inst mov-sp r3-tn nsp-tn)
+        (inst mov-sp r2-tn nsp-tn)
 
         ;; Call
-        (load-immediate-word r4-tn (foreign-symbol-address
-                                    #-sb-thread "funcall3"
-                                    #+sb-thread "callback_wrapper_trampoline"))
-        (inst blr r4-tn)
+        (load-immediate-word r3-tn (foreign-symbol-address "callback_wrapper_trampoline"))
+        (inst blr r3-tn)
 
         ;; Result now on top of stack, put it in the right register
         (cond

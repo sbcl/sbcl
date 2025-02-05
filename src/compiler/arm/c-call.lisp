@@ -390,7 +390,6 @@
            (r1-tn (make-tn 1))
            (r2-tn (make-tn 2))
            (r3-tn (make-tn 3))
-           (r4-tn (make-tn 4))
            (temp-tn (make-tn 5))
            (nsp-save-tn (make-tn 6))
            #-arm-softfp
@@ -496,21 +495,18 @@
                    (incf arg-count 1))
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
-        ;; arg0 to FUNCALL3 (function)
-        (load-immediate-word r0-tn (static-fdefn-fun-addr 'enter-alien-callback))
-        (loadw r0-tn r0-tn)
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-        (inst mov r1-tn (fixnumize index))
+        (inst mov r0-tn (fixnumize index))
         ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-        (inst mov r2-tn nsp-tn)
+        (inst mov r1-tn nsp-tn)
         ;; add room on stack for return value
         (inst sub nsp-tn nsp-tn 8)
         ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-        (inst mov r3-tn nsp-tn)
+        (inst mov r2-tn nsp-tn)
 
         ;; Call
-        (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
-        (inst blx r4-tn)
+        (load-immediate-word r3-tn (foreign-symbol-address "callback_wrapper_trampoline"))
+        (inst blx r3-tn)
 
         ;; Result now on top of stack, put it in the right register
         (cond

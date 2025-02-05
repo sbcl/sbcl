@@ -407,17 +407,8 @@ pointer to the arguments."
               (inst push eax)                       ; arg1
               (inst push (ash index 2))             ; arg0
 
-              #+sb-thread
-              (progn
-                (inst mov eax (foreign-symbol-address "callback_wrapper_trampoline"))
-                (inst call eax))
-
-              #-sb-thread
-              (progn
-                (inst push (make-ea :dword ; function
-                                    :disp (static-fdefn-fun-addr 'enter-alien-callback)))
-                (inst mov  eax (foreign-symbol-address "funcall3"))
-                (inst call eax))
+              (inst mov eax (foreign-symbol-address "callback_wrapper_trampoline"))
+              (inst call eax)
 
               ;; now put the result into the right register
               (cond

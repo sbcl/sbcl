@@ -880,17 +880,7 @@ extern void funcall_alien_callback(lispobj arg1, lispobj arg2, lispobj arg0,
 /* This function's address is assigned into a static symbol's value slot,
  * so it has to look like a fixnum. lp#1991485 */
 void __attribute__((aligned(8)))
-callback_wrapper_trampoline(
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    /* On the x86oid backends, the assembly wrapper happens to not pass
-     * in ENTER_ALIEN_CALLBACK explicitly for safepoints.  However, the
-     * platforms with precise GC are tricky enough already, and I want
-     * to minimize the read-time conditionals.  For those platforms, I'm
-     * only replacing funcall3 with callback_wrapper_trampoline while
-     * keeping the arguments unchanged. --DFL */
-    lispobj __attribute__((__unused__)) fun,
-#endif
-    lispobj arg0, lispobj arg1, lispobj arg2)
+callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2)
 {
     struct thread* th = get_sb_vm_thread();
     if (!th) {                  /* callback invoked in non-lisp thread */

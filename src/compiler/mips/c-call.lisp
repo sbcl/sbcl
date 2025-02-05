@@ -411,12 +411,12 @@ and a pointer to the arguments."
                       (bug "Unknown alien floating point type: ~S" type))))))
         (assemble (segment 'nil)
           (mapc #'save-arg argument-types n-argument-words)
-          ;; funcall3 (enter-alien-callback, index, args, return-area)
+          ;; callback_wrapper_trampoline (index, args, return-area)
           ;;
           ;; INDEX is fixnumized, ARGS and RETURN-AREA don't need to be
           ;; because they're word-aligned. Kinda gross, but hey ...
-          (destructuring-bind (v0 v1 a0 a1 a2 a3 t9 gp sp ra)
-              (mapcar #'make-gpr '(2 3 4 5 6 7 25 28 29 31))
+          (destructuring-bind (v0 v1 a0 a1 a2 t9 gp sp ra)
+              (mapcar #'make-gpr '(2 3 4 5 6 25 28 29 31))
             ;; Allocate stack frame.
             (inst subu sp n-frame-bytes)
 
@@ -425,13 +425,11 @@ and a pointer to the arguments."
             (inst sw ra sp (- n-frame-bytes n-word-bytes))
 
             ;; Setup the args and make the call.
-            (inst li a0 (static-fdefn-fun-addr 'enter-alien-callback))
-            (inst lw a0 a0)
-            (inst li t9 (foreign-symbol-address "funcall3"))
-            (inst li a1 (fixnumize index))
-            (inst addu a2 sp n-frame-bytes)
+            (inst li t9 (foreign-symbol-address "callback_wrapper_trampoline"))
+            (inst li a0 (fixnumize index))
+            (inst addu a1 sp n-frame-bytes)
             (inst jal t9)
-            (inst addu a3 sp n-callee-register-args-bytes)
+            (inst addu a2 sp n-callee-register-args-bytes)
 
             ;; We're back! Restore GP.
             (inst lw gp sp (- n-frame-bytes (* 2 n-word-bytes)))
