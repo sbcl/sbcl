@@ -195,12 +195,12 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
         (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits)
         (error "Unsupported callback argument type: ~A" type))))
 
-(defun enter-alien-callback (index return arguments)
+(defun enter-alien-callback (index arguments return)
   (funcall (truly-the function
                       (svref (sb-kernel:%array-data *alien-callback-trampolines*)
                              index))
-           return
-           arguments))
+           arguments
+           return))
 
 ;;;; interface (not public, yet) for alien callbacks
 
