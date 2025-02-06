@@ -509,7 +509,10 @@ NOTE: This interface is experimental and subject to change."
 (defun drop-all-hash-caches ()
   #+sb-xc-host (values-specifier-type-cache-clear) ; it's not like the rest
   (dolist (name *cache-vector-symbols*)
-    (set name nil)))
+    ;; We really don't need to call ABOUT-TO-MODIFY-SYMBOL-VALUE 18 times
+    ;; just to clear the caches.
+    #-sb-xc-host (%set-symbol-global-value name nil)
+    #+sb-xc-host (set name nil)))
 
 (defmacro sb-int-package () (find-package "SB-INT"))
 
