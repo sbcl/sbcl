@@ -1271,6 +1271,7 @@
                                     (list old-type type var-name))))
                                 (bound-var
                                  (setf (leaf-type bound-var) int
+                                       (leaf-defined-type bound-var) int
                                        (leaf-where-from bound-var) :declared))
                                 (t
                                  (restr (cons var int)))))))

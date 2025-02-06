@@ -4608,4 +4608,10 @@
       (setf x j)
       x)
    ((nil 1) (condition 'type-error))
-   ((1 nil) nil)))
+   ((1 nil) nil))
+  (assert-type
+   (sb-int:named-lambda setf-on-ftype (x j)
+     (when j
+       (incf x))
+     x)
+   integer))

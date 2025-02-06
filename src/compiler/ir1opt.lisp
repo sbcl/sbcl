@@ -2278,11 +2278,14 @@
   (let ((var (set-var node)))
     (when (and (lambda-var-p var) (leaf-refs var))
       (let ((home (lambda-var-home var)))
-        (when (functional-kind-eq home let)
-          (let* ((initial-value (let-var-initial-value var))
-                 (initial-type (lvar-type initial-value)))
-            (setf (lvar-reoptimize initial-value) nil)
-            (propagate-from-sets var initial-type))))))
+        (let ((initial-type
+                (cond ((functional-kind-eq home let)
+                       (let ((initial-value (let-var-initial-value var)))
+                         (setf (lvar-reoptimize initial-value) nil)
+                         (lvar-type initial-value)))
+                      (t
+                       (leaf-defined-type var)))))
+          (propagate-from-sets var initial-type)))))
   (derive-node-type node (make-single-value-type
                           (lvar-type (set-value node))))
   (setf (node-reoptimize node) nil)
