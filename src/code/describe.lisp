@@ -100,6 +100,7 @@
   (let ((stream (out-stream-from-designator stream-designator))
         (*print-right-margin* (or *print-right-margin* 72))
         (*print-circle* t)
+        (*print-circle-not-shared* t)
         (*print-pretty* t)
         (*suppress-print-errors*
          (if (subtypep 'serious-condition *suppress-print-errors*)
