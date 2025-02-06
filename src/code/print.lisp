@@ -453,7 +453,7 @@ variable: an unreadable object representing the error is printed instead.")
               (,body-name))
              (*print-circle-not-shared*
               (let ((,marker (assoc ,object *circularity-list* :test #'eq)))
-                (cond ((listp (cdr ,marker))
+                (cond ((consp (cdr ,marker))
                        (setf (cdr ,marker) (cadr ,marker))
                        (,body-name))
                       ((and ,marker
