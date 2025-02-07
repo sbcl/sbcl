@@ -581,6 +581,19 @@
 (defun g (n) (make-array (the integer n) :initial-element #\z))
 (defun f (a n) (with-arena (a) (g n)))
 
+(defun test-read-line ()
+  (let ((stream
+         (make-string-input-stream (format nil "this is line1 and it should be long enough to ~
+ require doubling at least once in ansi-stream-read-line so ok then ~
+ here are some more characters for you because why not~%line2"))))
+    (let* ((a (sb-vm::new-arena 1048576))
+           (string (sb-vm:with-arena (a) (read-line stream))))
+      string)))
+
+(test-util:with-test (:name :read-line)
+  (test-read-line)
+  (assert (null (c-find-heap->arena))))
+
 (defvar *vect* (f *another-arena* 10))
 (setf (aref *vect* 3) "foo")
 
@@ -705,16 +718,3 @@
            (sb-thread:join-thread thread)
            (assert (heap-allocated-p (sb-thread:thread-name thread))))
       (destroy-arena arena))))
-
-(defun test-read-line ()
-  (let ((stream
-         (make-string-input-stream (format nil "this is line1 and it should be long enough to ~
- require doubling at least once in ansi-stream-read-line so ok then ~
- here are some more characters for you because why not~%line2"))))
-    (let* ((a (sb-vm::new-arena 1048576))
-           (string (sb-vm:with-arena (a) (read-line stream))))
-      string)))
-
-(test-util:with-test (:name :read-line)
-  (test-read-line)
-  (assert (null (c-find-heap->arena))))
