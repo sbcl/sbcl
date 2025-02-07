@@ -928,4 +928,11 @@
                        (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                        (array-row-major-index array i j))
                      nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     '(lambda (v)
+                       (declare ((simple-array t (4 4)) v))
+                       (aref v 3 2))
+                     nil))
              0)))

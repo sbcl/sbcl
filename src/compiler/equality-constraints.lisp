@@ -637,7 +637,7 @@
       (setf (combination-info node) 'array-in-bounds-p)))
   :give-up)
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t) * :node node)
+(deftransform %check-bound ((array dimension index) (simple-array t t) * :node node)
   (if (or (eq (combination-info node) 'array-in-bounds-p)
           (let ((index (type-approximate-interval (lvar-type index)))
                 (dim (type-approximate-interval (lvar-type dimension))))
