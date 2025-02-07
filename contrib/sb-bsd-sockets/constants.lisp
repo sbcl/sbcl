@@ -48,6 +48,7 @@
  #+linux (:integer tcp-keepidle "TCP_KEEPIDLE"
                    "Seconds between the last data packet sent and the first keepalive probe.")
  #+linux (:integer tcp-keepintvl "TCP_KEEPINTVL" "Seconds between keepalive probes.")
+ #+linux (:integer tcp-user-timeout "TCP_USER_TIMEOUT" "Timeout for unacknowledged transmitted data (milliseconds).")
  (:integer so-oobinline "SO_OOBINLINE"
            "Put out-of-band data into the normal input queue when received")
  #+linux

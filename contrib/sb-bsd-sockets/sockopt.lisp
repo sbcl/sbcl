@@ -119,6 +119,9 @@ Code for options that not every system has should be conditionalised:
 (define-socket-option-int
   sockopt-tcp-keepintvl :tcp sockint::tcp-keepintvl :linux
   "Available only on Linux.")
+(define-socket-option-int
+  sockopt-tcp-user-timeout :tcp sockint::tcp-user-timeout :linux
+  "Available only on Linux.")
 
 ;;; boolean options are integers really
 
