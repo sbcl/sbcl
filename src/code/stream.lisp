@@ -342,6 +342,7 @@
 
 (declaim (inline ansi-stream-read-line))
 (defun ansi-stream-read-line (stream eof-error-p eof-value)
+  (declare (sb-c::tlab :system))
   (if (ansi-stream-cin-buffer stream)
       ;; Stream has a fast-read-char buffer. Copy large chunks directly
       ;; out of the buffer.
