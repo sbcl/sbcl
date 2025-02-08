@@ -443,7 +443,7 @@
 ;;; There are 2 symbol flag bits. The placement restrictions on these stipulate:
 ;;; - no conflict with the generation number (byte 3, low 4 bits)
 ;;; - avoid #+permgen use of byte 3 bit 7 as the "remembered" bit
-;;; - prefer that the uint32_t package ID be naturally aligned if it matters.
+;;; - prefer that the uint16_t package ID be naturally aligned if it matters.
 ;;; Given the above:
 ;;; - for x864: byte indices 1 and 2 for the package, byte index 3 for flags so that
 ;;;   the generation byte can stay where it is

@@ -709,10 +709,13 @@
            (inst cmp :word (ea (- 1 other-pointer-lowtag) value)
                  sb-impl::+package-id-keyword+))
           (t
-           (inst lea temp (ea (- other-pointer-lowtag) value))
-           (inst test :byte temp lowtag-mask)
-           (inst jmp :ne out)
-           (inst mov :dword temp (ea temp))
+           (cond ((other-pointer-tn-ref-p args t)
+                  (inst mov :dword temp (object-slot-ea value 0 other-pointer-lowtag)))
+                 (t
+                  (inst lea temp (ea (- other-pointer-lowtag) value))
+                  (inst test :byte temp lowtag-mask)
+                  (inst jmp :ne out)
+                  (inst mov :dword temp (ea temp))))
            (inst shl :dword temp 8) ; zeroize flag/generation bits
            (inst cmp :dword temp
                  (ash (logior (ash sb-impl::+package-id-keyword+ 8) symbol-widetag) 8))))
