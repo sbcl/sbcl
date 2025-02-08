@@ -536,9 +536,7 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         break;
 
     case SYMBOL_WIDETAG:
-        // Only 1 byte of a symbol header conveys its size.
-        // The other bytes may be freely used by the backend.
-        print_slots(symbol_slots, count & 0xFF, ptr, io);
+        print_slots(symbol_slots, SYMBOL_SIZE, ptr, io);
         struct symbol* sym = (void*)(ptr - 1);
         if (symbol_function(sym) != NIL) print_obj("fun: ", symbol_function(sym), io);
 #ifdef LISP_FEATURE_SB_THREAD
