@@ -315,7 +315,6 @@ distinct from the global value. Can also be SETF."
                    (aref *id->package* id)))))
 
 (defun %set-symbol-package (symbol package)
-  (declare (type symbol symbol))
   (let* ((new-id (cond ((not package) +package-id-none+)
                        ((package-id package))
                        (t +package-id-overflow+)))
@@ -346,8 +345,6 @@ distinct from the global value. Can also be SETF."
 ;;; All symbols go into immobile space if #+immobile-symbols is enabled,
 ;;; but not if disabled. The win with immobile space that is that all symbols
 ;;; can be considered static from an addressing viewpoint, but GC'able.
-;;; (After codegen learns how, provided that defrag becomes smart enough
-;;; to fixup machine code so that defrag remains meaningful)
 ;;;
 ;;; However, with immobile space being limited in size, you might not want
 ;;; symbols in there. In particular, if an application uses symbols as data

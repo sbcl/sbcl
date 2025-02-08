@@ -2079,7 +2079,7 @@
 (defknown %with-array-data/fp (array index (or index null))
   (values (simple-array * (*)) index index index)
   (foldable flushable no-verify-arg-count))
-(defknown %set-symbol-package (symbol t) t ())
+(defknown %set-symbol-package ((and symbol (not null)) (or package null)) t ())
 (defknown (%coerce-callable-to-fun %coerce-callable-for-call)
     (function-designator)
     function (flushable no-verify-arg-count))
@@ -2185,7 +2185,7 @@
 (defknown (setf sbit) (bit (modifying (simple-array bit)) &rest index) bit ())
 (defknown %charset ((modifying string) index character) character ())
 (defknown %scharset ((modifying simple-string) index character) character ())
-(defknown %set-symbol-value (symbol t) t ())
+(defknown %set-symbol-value ((and symbol (not null)) t) t ())
 (defknown (setf symbol-function) (function symbol) function ())
 ;; Does this really need a type deriver? It's inline, and returns its 1st arg,
 ;; i.e. we know exactly what object it returns, which is more precise than
