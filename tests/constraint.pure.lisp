@@ -1624,6 +1624,12 @@
          (error "")))
    (and sequence (not null) (or (not array) (vector t))))
   (assert-type
+   (lambda (y)
+     (if (position #\a y :test-not #'char=)
+         y
+         (error "")))
+   (and sequence (not null)))
+  (assert-type
    (lambda (x y)
      (declare (simple-array y))
      (if (find x y :key #'car)

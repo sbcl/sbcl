@@ -1031,8 +1031,8 @@
     type))
 
 (defun sequence-type-from-item (item-type)
-  (if (and item-type
-           (types-equal-or-intersect item-type (specifier-type '(or number character))))
+  (if (or (not item-type)
+          (types-equal-or-intersect item-type (specifier-type '(or number character))))
       (specifier-type '(not null))
       (specifier-type '(and (not null) (or (not array) (vector t))))))
 
