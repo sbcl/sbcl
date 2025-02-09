@@ -210,8 +210,8 @@
                                        (* (function int)) unsigned-int
                                        unsigned-int unsigned-int unsigned-int))
                (alien-sap
-                (sb-alien::alien-callback (function unsigned-int)
-                                          #'(lambda () (go up))))
+                (sb-alien::alien-lambda unsigned-int ()
+                  (go up)))
                0 0 0 0)
             up
               (funcall 0))

@@ -22,11 +22,11 @@
 
 ;;; simple callback for a function
 
-(defun thunk ()
+(define-alien-callable thunk c-string ()
   (write-string "hi"))
 
 (defvar *thunk*
-  (sb-alien::alien-callback (function c-string) #'thunk))
+  (alien-callable-function 'thunk))
 
 (with-test (:name (:callback :c-string)
             ;; The whole file is broken, report one test
@@ -43,11 +43,11 @@
 
 ;;; simple callback for a symbol
 
-(defun add-two-ints (arg1 arg2)
+(define-alien-callable add-two-ints int ((arg1 int) (arg2 int))
   (+ arg1 arg2))
 
 (defvar *add-two-ints*
-  (sb-alien::alien-callback (function int int int) 'add-two-ints))
+  (alien-callable-function 'add-two-ints))
 
 (assert (= (alien-funcall *add-two-ints* 555 444444) 444999))
 
@@ -135,10 +135,10 @@
 
 ;;; tests for integer-width problems in callback result handling
 
-(defvar *add-two-ints*
-  (sb-alien::alien-callback (function int int int) #'+))
+(define-alien-callable add-two-shorts short ((arg1 short) (arg2 short))
+  (+ arg1 arg2))
 (defvar *add-two-shorts*
-  (sb-alien::alien-callback (function short short short) #'+))
+  (alien-callable-function 'add-two-shorts))
 
 ;;; The original test cases here were what are now (:int-result
 ;;; :sign-extension) and (:int-result :underflow-detection), the latter
@@ -161,19 +161,24 @@
 ;;; tests for handling 64-bit arguments - this was causing problems on
 ;;; ppc - CLH, 2005-12-01
 
+(define-alien-callable add-two-long-longs (integer 64)
+    ((arg1 (integer 64)) (arg2 (integer 64)))
+  (+ arg1 arg2))
+
 (defvar *add-two-long-longs*
-  (sb-alien::alien-callback
-   (function (integer 64) (integer 64) (integer 64)) 'add-two-ints))
+  (alien-callable-function 'add-two-long-longs))
 (with-test (:name :long-long-callback-arg)
   (assert (= (alien-funcall *add-two-long-longs*
                             (ash 1 60)
                             (- (ash 1 59)))
              (ash 1 59))))
 
+(define-alien-callable add-two-unsigned-long-longs (unsigned 64)
+    ((arg1 (unsigned 64)) (arg2 (unsigned 64)))
+  (+ arg1 arg2))
+
 (defvar *add-two-unsigned-long-longs*
-  (sb-alien::alien-callback
-   (function (unsigned 64) (unsigned 64) (unsigned 64))
-   'add-two-ints))
+  (alien-callable-function 'add-two-unsigned-long-longs))
 (with-test (:name :unsigned-long-long-callback-arg)
   (assert (= (alien-funcall *add-two-unsigned-long-longs*
                             (ash 1 62)
@@ -212,17 +217,22 @@
        collect (car (rassoc (string-downcase g) *type-abbreviations* :test #'equal)))))
 
 (defmacro define-callback-adder (&rest types)
-  (let ((fname (format nil "*add-~{~A~^-~}*"
-                       (mapcar
-                        #'(lambda (x)
-                            (cdr (assoc x *type-abbreviations*)))
+  (let* ((fname (format nil "*add-~{~A~^-~}*"
                         (mapcar
-                         #'(lambda (y) (find-symbol (string-upcase y) 'sb-alien))
-                         (cdr types))))))
+                         #'(lambda (x)
+                             (cdr (assoc x *type-abbreviations*)))
+                         (mapcar
+                          #'(lambda (y) (find-symbol (string-upcase y) 'sb-alien))
+                          (cdr types)))))
+         (arg-types (cdr types))
+         (args (sb-int:make-gensym-list (length arg-types)))
+         (typed-lambda-list (mapcar (lambda (type arg)
+                                      (list arg type))
+                                    arg-types args)))
     `(progn
-      (defparameter ,(intern
-                      (string-upcase fname))
-        (sb-alien::alien-callback (function ,@types) '+)))))
+       (defvar ,(intern (string-upcase fname))
+         (sb-alien::alien-lambda ,(car types) ,typed-lambda-list
+           (+ ,@args))))))
 
 (with-test (:name :define-2-int-callback)
   (define-callback-adder int int int))

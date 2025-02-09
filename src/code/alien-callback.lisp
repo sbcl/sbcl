@@ -12,12 +12,9 @@
 
 (in-package "SB-ALIEN")
 
-;;; ALIEN-CALLBACK is supposed to be external in SB-ALIEN-INTERNALS,
-;;; but the export gets lost (as this is now a warm-loaded file), and
-;;; then 'chill' gets a conflict with SB-ALIEN over it.
+;;; These are supposed to be external in SB-ALIEN, but the export gets
+;;; lost (as this is now a warm-loaded file).
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (export (intern "ALIEN-CALLBACK" "SB-ALIEN-INTERNALS")
-          "SB-ALIEN-INTERNALS")
   (export (intern "DEFINE-ALIEN-CALLABLE" "SB-ALIEN")
           "SB-ALIEN")
   (export (intern "ALIEN-CALLABLE-FUNCTION" "SB-ALIEN")
@@ -27,50 +24,35 @@
 ;;;;
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
 
-(defvar *alien-callback-info* nil
-  "Maps SAPs to corresponding CALLBACK-INFO structures: contains all the
-information we need to manipulate callbacks after their creation. Used for
-changing the lisp-side function they point to, invalidation, etc.")
+(define-load-time-global *alien-callback-saps*
+  (make-array 32 :fill-pointer 0 :adjustable t
+                 :initial-element nil)
+  "An array of all callback SAPs indexed by their order of creation.")
 
-(defstruct (callback-info
-            (:predicate nil)
-            (:copier nil))
-  (specifier nil :read-only t)
-  function ; NULL if invalid
-  (wrapper nil :read-only t)
-  index)
+(defun alien-callback-index (alien)
+  (position (alien-sap alien) *alien-callback-saps* :test #'sap=))
 
-(defun callback-info-key (info)
-  (cons (callback-info-specifier info) (callback-info-function info)))
-
-(defun alien-callback-info (alien)
-  (cdr (assoc (alien-sap alien) *alien-callback-info* :test #'sap=)))
-
-(define-load-time-global *alien-callbacks* (make-hash-table :test #'equal)
-  "Cache of existing callback SAPs, indexed with (SPECIFER . FUNCTION). Used for
-memoization: we don't create new callbacks if one pointing to the correct
-function with the same specifier already exists.")
-
-(define-load-time-global *alien-callback-wrappers* (make-hash-table :test #'equal)
-  "Cache of existing lisp wrappers, indexed with SPECIFER. Used for memoization:
-we don't create new wrappers if one for the same specifier already exists.")
+(define-load-time-global *alien-callbacks* (make-hash-table :test #'eq)
+  "Cache of existing callback SAPs, indexed by FUNCTION. Used for
+memoization: we don't create new callbacks if one pointing to the same
+function already exists.")
 
 (defun invalid-alien-callback (&rest arguments)
   (declare (ignore arguments))
   (error "Invalid alien callback called."))
 
-(define-load-time-global *alien-callback-trampolines*
+(define-load-time-global *alien-callback-functions*
     (make-array 32 :fill-pointer 0 :adjustable t
                 :initial-element #'invalid-alien-callback)
-  "Lisp trampoline store: assembler wrappers contain indexes to this, and
-ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
+  "Lisp function store: assembler wrappers contain indexes to this, and
+ENTER-ALIEN-CALLBACK pulls the corresponding function out and calls it.")
 
-(defun %alien-callback-sap (specifier result-type argument-types function wrapper
+(defun %alien-callback-sap (result-type argument-types function
                             &optional call-type)
   (declare #-x86 (ignore call-type))
   (ensure-gethash
-   (list specifier function) *alien-callbacks*
-   (let* ((index (fill-pointer *alien-callback-trampolines*))
+   function *alien-callbacks*
+   (let* ((index (fill-pointer *alien-callback-functions*))
           ;; Aside from the INDEX this is known at
           ;; compile-time, which could be utilized by
           ;; having the two-stage assembler tramp &
@@ -89,32 +71,17 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
                                 argument-types))
                  8)
                 0))))
-     (vector-push-extend
-      (alien-callback-lisp-trampoline wrapper function)
-      *alien-callback-trampolines*)
+     (vector-push-extend function *alien-callback-functions*)
      ;; Assembler-wrapper is static, so sap-taking is safe.
      (let ((sap (vector-sap assembler-wrapper)))
-       (push (cons sap (make-callback-info :specifier specifier
-                                           :function function
-                                           :wrapper wrapper
-                                           :index index))
-             *alien-callback-info*)
+       (vector-push-extend sap *alien-callback-saps*)
        sap))))
 
-(defun alien-callback-lisp-trampoline (wrapper function)
-  (declare (function wrapper) (optimize speed))
-  (lambda (args-pointer result-pointer)
-    (funcall wrapper args-pointer result-pointer function)))
-
-(defun alien-callback-lisp-wrapper-lambda (specifier result-type argument-types env)
-  (let* ((arguments (make-gensym-list (length argument-types)))
-         (argument-names arguments)
-         (argument-specs (cddr specifier)))
-    `(lambda (args-pointer result-pointer function)
-       ;; KLUDGE: the SAP shouldn't be consed but they are, don't
-       ;; bother anyone about that sad fact
-       (declare (muffle-conditions compiler-note)
-                (optimize speed))
+(defun alien-callback-lambda-expression (specifier arguments body result-type env)
+  (let ((argument-names arguments)
+        (argument-specs (cddr specifier)))
+    `(lambda (args-pointer result-pointer)
+       (declare (optimize speed))
        (let ((args-sap (descriptor-sap args-pointer))
              (res-sap (descriptor-sap result-pointer)))
          (declare (ignorable args-sap res-sap))
@@ -136,30 +103,31 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
                  do (incf offset (+ (alien-callback-argument-bytes spec env)
                                     (or alignment 0))))
            ,(flet ((store (spec real-type)
-                          (if spec
-                              `(setf (deref (sap-alien res-sap (* ,spec)))
-                                     ,(if real-type
-                                          `(the ,real-type
-                                             (funcall function ,@arguments))
-                                          `(funcall function ,@arguments)))
-                              `(funcall function ,@arguments))))
-                  (cond ((alien-void-type-p result-type)
-                         (store nil nil))
-                        ((alien-integer-type-p result-type)
-                         ;; Integer types should be padded out to a full
-                         ;; register width, to comply with most ABI calling
-                         ;; conventions, but should be typechecked on the
-                         ;; declared type width, hence the following:
-                         (if (alien-integer-type-signed result-type)
-                             (store `(signed
-                                      ,(alien-type-word-aligned-bits result-type))
-                                    `(signed-byte ,(alien-type-bits result-type)))
-                             (store
-                              `(unsigned
-                                ,(alien-type-word-aligned-bits result-type))
-                              `(unsigned-byte ,(alien-type-bits result-type)))))
-                        (t
-                         (store (unparse-alien-type result-type) nil))))))
+                     (if spec
+                         `(setf (deref (sap-alien res-sap (* ,spec)))
+                                ,(if real-type
+                                     `(the ,real-type
+                                           (progn
+                                             ,@body))
+                                     `(progn ,@body)))
+                         `(progn ,@body))))
+              (cond ((alien-void-type-p result-type)
+                     (store nil nil))
+                    ((alien-integer-type-p result-type)
+                     ;; Integer types should be padded out to a full
+                     ;; register width, to comply with most ABI calling
+                     ;; conventions, but should be typechecked on the
+                     ;; declared type width, hence the following:
+                     (if (alien-integer-type-signed result-type)
+                         (store `(signed
+                                  ,(alien-type-word-aligned-bits result-type))
+                                `(signed-byte ,(alien-type-bits result-type)))
+                         (store
+                          `(unsigned
+                            ,(alien-type-word-aligned-bits result-type))
+                          `(unsigned-byte ,(alien-type-bits result-type)))))
+                    (t
+                     (store (unparse-alien-type result-type) nil))))))
        (values))))
 
 (defun parse-callback-specification (result-type lambda-list)
@@ -196,76 +164,54 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
         (error "Unsupported callback argument type: ~A" type))))
 
 (defun enter-alien-callback (index arguments return)
+  (declare (optimize (safety 0) speed))
   (funcall (truly-the function
-                      (svref (sb-kernel:%array-data *alien-callback-trampolines*)
+                      (svref (sb-kernel:%array-data *alien-callback-functions*)
                              index))
            arguments
            return))
 
 ;;;; interface (not public, yet) for alien callbacks
 
-(defmacro alien-callback (specifier function &environment env)
-  "Returns an alien-value of alien ftype SPECIFIER, that can be passed to
-an alien function as a pointer to the FUNCTION. If a callback for the given
-SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
-one."
-  ;; Pull out as much work as is convenient to macro-expansion time, specifically
-  ;; everything that can be done given just the SPECIFIER and ENV.
-  (multiple-value-bind (result-type argument-types call-type)
-      (parse-alien-ftype specifier env)
-    `(%sap-alien
-      (%alien-callback-sap ',specifier ',result-type ',argument-types
-                           ,function
-                           (ensure-gethash
-                            ',specifier *alien-callback-wrappers*
-                            ,(alien-callback-lisp-wrapper-lambda
-                              specifier result-type argument-types env))
-                           ,call-type)
-      ',(parse-alien-type specifier env))))
-
 (defun alien-callback-p (alien)
   "Returns true if the alien is associated with a lisp-side callback,
 and a secondary return value of true if the callback is still valid."
-  (let ((info (alien-callback-info alien)))
-    (when info
-      (values t (and (callback-info-function info) t)))))
+  (let ((index (alien-callback-index alien)))
+    (when index
+      (values t (not (eq (aref *alien-callback-functions* index)
+                         #'invalid-alien-callback))))))
 
 (defun alien-callback-function (alien)
-  "Returns the lisp function designator associated with the callback."
-  (let ((info (alien-callback-info alien)))
-    (when info
-      (callback-info-function info))))
+  "Returns the Lisp function associated with the callback."
+  (let ((index (alien-callback-index alien)))
+    (when index
+      (aref *alien-callback-functions* index))))
 
 (defun (setf alien-callback-function) (function alien)
-  "Changes the lisp function designated by the callback."
-  (let ((info (alien-callback-info alien)))
-    (unless info
+  "Changes the Lisp function designated by the callback."
+  (let ((index (alien-callback-index alien)))
+    (unless index
       (error "Not an alien callback: ~S" alien))
     ;; sap cache
-    (let ((key (callback-info-key info)))
-      (remhash key *alien-callbacks*)
-      (setf (gethash key *alien-callbacks*) (alien-sap alien)))
-    ;; trampoline
-    (setf (aref *alien-callback-trampolines* (callback-info-index info))
-          (alien-callback-lisp-trampoline (callback-info-wrapper info) function))
-    ;; metadata
-    (setf (callback-info-function info) function)
+    (let ((function (aref *alien-callback-functions* index)))
+      (remhash function *alien-callbacks*)
+      (setf (gethash function *alien-callbacks*) (alien-sap alien)))
+    (setf (aref *alien-callback-functions* index) function)
     function))
 
 (defun invalidate-alien-callback (alien)
   "Invalidates the callback designated by the alien, if any, allowing the
 associated lisp function to be GC'd, and causing further calls to the same
 callback to signal an error."
-  (let ((info (alien-callback-info alien)))
-    (when (and info (callback-info-function info))
-      ;; sap cache
-      (remhash (callback-info-key info) *alien-callbacks*)
-      ;; trampoline
-      (setf (aref *alien-callback-trampolines* (callback-info-index info))
-            #'invalid-alien-callback)
-      ;; metadata
-      (setf (callback-info-function info) nil)
-      t)))
+  (let ((index (alien-callback-index alien)))
+    (when index
+      (let ((function (aref *alien-callback-functions* index)))
+        (unless (eq function #'invalid-alien-callback)
+          ;; sap cache
+          (remhash function *alien-callbacks*)
+          (setf (aref *alien-callback-functions* index)
+                #'invalid-alien-callback)
+          t)))))
 
 ;;; FIXME: This call assembles a new callback for every closure,
 ;;; which sucks hugely. ...not that I can think of an obvious
@@ -274,10 +220,21 @@ callback to signal an error."
 ;;;
 ;;; For lambdas that result in simple-funs we get the callback from
 ;;; the cache on subsequent calls.
-(defmacro alien-lambda (result-type typed-lambda-list &body forms)
+(defmacro alien-lambda (result-type typed-lambda-list &body body
+                                                      &environment env)
   (multiple-value-bind (specifier lambda-list)
       (parse-callback-specification result-type typed-lambda-list)
-    `(alien-callback ,specifier (lambda ,lambda-list ,@forms))))
+    (multiple-value-bind (result-type argument-types call-type)
+        (parse-alien-ftype specifier env)
+      (let ((lambda-expression
+              (alien-callback-lambda-expression
+               specifier lambda-list
+               body result-type env)))
+        `(%sap-alien
+          (%alien-callback-sap ',result-type ',argument-types
+                               ,lambda-expression
+                               ,call-type)
+          ',(parse-alien-type specifier env))))))
 
 ;;;; Alien callables
 
