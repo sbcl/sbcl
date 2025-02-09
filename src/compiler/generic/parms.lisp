@@ -224,7 +224,6 @@
     *immobile-codeblob-vector* ; for pseudo-static-generation
     *dynspace-codeblob-tree*
     *linkage-name-map*
-    *elf-linkage-cell-modified*
     sb-impl::**finalizer-store**
     sb-impl::*finalizer-rehashlist*
     sb-impl::*finalizers-triggered*

@@ -3565,10 +3565,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
         heap_scavenge(o, object_size(o)+o);
     }
 #endif
-#ifdef LISP_FEATURE_LINKAGE_SPACE
-    extern void scavenge_elf_linkage_space();
-    scavenge_elf_linkage_space();
-#endif
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
     // TODO: use an explicit remembered set of modified objects in this range
     if (TEXT_SPACE_START) heap_scavenge((lispobj*)TEXT_SPACE_START, text_space_highwatermark);

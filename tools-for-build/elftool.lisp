@@ -473,11 +473,11 @@
 
 (defun write-preamble (output n-lisp-linkage-words)
   #+linkage-space (format output
-          "  .local fntbl
- .comm fntbl,~D,8
- .globl lisp_function_linkage_table
- .equiv lisp_function_linkage_table, fntbl~%"
-              (* n-lisp-linkage-words n-word-bytes))
+                          " .globl lisp_fun_linkage_space
+ .bss~% .align 8~% .size lisp_fun_linkage_space, ~D
+lisp_fun_linkage_space: .zero ~:*~D
+ .equiv fntbl, lisp_fun_linkage_space~%"
+              (ash 1 (+ sb-vm:n-linkage-index-bits sb-vm:word-shift)))
 
   (format output " .text~% .file \"sbcl.core\"
 ~:[~; .macro .size sym size # ignore
@@ -892,7 +892,7 @@
                                       ; symbol table -- ^ ^ -- for which section
              (:note ".note.GNU-stack" ,+sht-progbits+ 0 0 0 1  0)))
          (extern-c-symbols
-          '("lisp_code_start" #+linkage-space "lisp_function_linkage_table"))
+          '("lisp_code_start" #+linkage-space "lisp_fun_linkage_space"))
          (string-table
           (string-table (append extern-c-symbols (map 'list #'second sections))))
          (strings (cdr string-table))

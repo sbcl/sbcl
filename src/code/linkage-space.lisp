@@ -17,13 +17,11 @@
 
 (define-symbol-macro *linkage-table* (extern-alien "linkage_space" system-area-pointer))
 (define-symbol-macro *next-fname-index* (extern-alien "linkage_table_count" int))
-(define-alien-variable elf-linkage-space system-area-pointer)
-(define-alien-variable elf-linkage-table-count int)
 
 (define-load-time-global *linkage-space-mutex* (sb-thread:make-mutex))
 (declaim (type sb-thread:mutex *linkage-space-mutex*))
-(defglobal *elf-linkage-cell-modified* nil)
-(declaim (type (or null simple-bit-vector) *elf-linkage-cell-modified*))
+(defglobal *linkage-cell-modified* nil)
+(declaim (type (or null simple-bit-vector) *linkage-cell-modified*))
 
 ;;; A weak mapping from linkage index to name, represented as a simple-vector
 ;;; of weak vectors so that we don't reallocate the whole thing when growing.
@@ -124,16 +122,15 @@
       (let ((index (fname-linkage-index fname)))
         (if (= index 0)
             (%primitive set-fname-fun fname function (int-sap 0) 0)
-            (let ((bits *elf-linkage-cell-modified*))
-              (when (plusp elf-linkage-table-count)
+            (let ((bits *linkage-cell-modified*)
+                  (initial-count (extern-alien "initial_linkage_table_count" int)))
+              (when (plusp initial-count)
                 (when (null bits)
-                  (setf bits (make-array elf-linkage-table-count :element-type 'bit
-                                                                 :initial-element 0)
-                        *elf-linkage-cell-modified* bits))
+                  (setf bits (make-array initial-count :element-type 'bit :initial-element 0)
+                        *linkage-cell-modified* bits))
                 (when (and (< index (length bits)) (= (sbit bits index) 0))
                   ;; Undo direct linkage in any code object that calls the entrypoint
-                  ;; currently in this linkage cell. This also tells GC to treat the
-                  ;; ELF copy of the cell as a static root.
+                  ;; currently in this linkage cell.
                   (let ((fun (sap-ref-word *linkage-table* (ash index word-shift))))
                     ;; Don't scan all code if FUN couldn't have been direct-linked
                     (when (and (>= fun text-space-start)
@@ -144,9 +141,6 @@
               (let ((simply-callable (ensure-simplistic function fname)))
                 (with-pinned-objects (simply-callable)
                   (multiple-value-bind (entrypoint cell) (entry-addr index simply-callable)
-                    (when (< index elf-linkage-table-count)
-                      (setf (sap-ref-word elf-linkage-space (ash index word-shift))
-                            entrypoint))
                     (%primitive set-fname-fun fname function cell entrypoint)))))))))
   function)
 ) ; end MACROLET
@@ -160,7 +154,6 @@
            (cond ((eq mode :index) value)
                  ((eq mode :rel) (ash value (- word-shift)))
                  ((in-range-p *linkage-table* *next-fname-index*))
-                 ((in-range-p elf-linkage-space elf-linkage-table-count))
                  (t (return-from linkage-addr->name nil)))))
       (declare (linkage-index index))
       (multiple-value-bind (hi lo) (floor index linkage-smallvec-elts)

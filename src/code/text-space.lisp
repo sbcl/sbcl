@@ -126,7 +126,7 @@
                (let ((disp (truly-the (signed-byte 32) (near-jump-displacement chunk dstate))))
                  (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
                    (let ((sap (int-sap (dstate-cur-addr dstate)))
-                         (cell (sap+ sb-vm::elf-linkage-space (ash index word-shift))))
+                         (cell (sap+ sb-vm::*linkage-table* (ash index word-shift))))
                      (declare (ignorable cell))
                      #+immobile-space
                      (cond ((eq inst jmp)

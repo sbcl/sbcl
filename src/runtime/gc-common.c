@@ -3506,37 +3506,6 @@ void illegal_linkage_space_call() {
     lose("jumped via obsolete linkage entry");
 }
 
-void scavenge_elf_linkage_space()
-{
-    // ELF space linkage cells, if present, are roots for GC.
-    lispobj modified_vector = SYMBOL(ELF_LINKAGE_CELL_MODIFIED)->value;
-    if (modified_vector == NIL) return;
-    struct vector* v = VECTOR(modified_vector);
-    uword_t* bits = v->data;
-    unsigned int nbits = vector_len(v);
-    unsigned int nwords = (nbits + N_WORD_BITS-1)/N_WORD_BITS;
-    unsigned int wordindex;
-    int ind_major = 0, ind_minor;
-    for (wordindex = 0; wordindex < nwords; ++wordindex, ind_major += N_WORD_BITS) {
-        uword_t word = bits[wordindex];
-        for ( ind_minor = 0 ; word != 0 ; word >>= 1, ++ind_minor ) {
-            // Unmodified cells can be ignored
-            if (!(word & 1)) continue;
-            int linkage_index = ind_major + ind_minor;
-            lispobj entrypoint = elf_linkage_space[linkage_index];
-            /* Entrypoint can't become illegal_linkage_space_call because only
-             * the cells associated with the non-ELF linkage space get swept
-             * (i.e. smashed in the manner of weak objects). */
-            if (!entrypoint) continue;
-            lispobj taggedptr = fun_taggedptr_from_self(entrypoint);
-            lispobj new = taggedptr;
-            scav1(&new, new);
-            if (new != taggedptr)
-                elf_linkage_space[linkage_index] = new + (entrypoint - taggedptr);
-        }
-    }
-}
-
 void sweep_linkage_space()
 {
     // Erase linkage cells whose name got NILed in the weak vector clearing pass

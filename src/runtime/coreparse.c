@@ -550,22 +550,18 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
 }
 
-uword_t* elf_linkage_space;
-int elf_linkage_table_count;
+int initial_linkage_table_count;
 static void relocate_heap(struct heap_adjust* adj)
 {
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     {
     // Linkage space possibly needs altering even if all spaces were placed as requested
     int i, n = linkage_table_count;
-    if (lisp_code_in_elf()) gc_assert(elf_linkage_space);
     for (i=FIRST_USABLE_LINKAGE_ELT; i<n; ++i) {
         lispobj word = linkage_space[i];
         // low bit on means it references code-in-ELF, otherwise dynamic space
         if (word & 1) linkage_space[i] = word - 1 + TEXT_SPACE_START;
         adjust_word_at(linkage_space+i, adj); // this is for ordinary space-relocation if needed
-        // And finally, if there is code-in-ELF, copy the entry
-        if (elf_linkage_space) elf_linkage_space[i] = linkage_space[i];
     }
     }
 #endif
@@ -926,13 +922,23 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     if (linkage_table_count) {
-        if (linkage_space == 0)
-            linkage_space = (void*)os_allocate(LISP_LINKAGE_SPACE_SIZE);
-        load_core_bytes(fd, file_offset+
-                        (1 + linkage_table_data_page) * os_vm_page_size,
-                        (char*)linkage_space,
-                        ALIGN_UP(linkage_table_count*N_WORD_BYTES, os_vm_page_size),
-                        0);
+        // Only #-immobile-space should allocate linkage space now,
+        // because otherwise it must be contiguous with text space.
+        if (linkage_space == 0) linkage_space = (void*)os_allocate(LISP_LINKAGE_SPACE_SIZE);
+        off_t filepos = file_offset + (1 + linkage_table_data_page) * os_vm_page_size;
+        gc_assert(os_reported_page_size);
+        // Linkage space is only 8-byte-aligned in an ELF core. It doesn't need more than that.
+        if (PTR_IS_ALIGNED(linkage_space, os_reported_page_size)) {
+            load_core_bytes(fd, filepos, (char*)linkage_space,
+                            ALIGN_UP(linkage_table_count*N_WORD_BYTES, os_vm_page_size),
+                            0);
+        } else {
+            off_t old = lseek(fd, 0, SEEK_CUR);
+            lseek(fd, filepos, SEEK_SET);
+            size_t nread = read(fd, linkage_space, linkage_table_count*N_WORD_BYTES);
+            gc_assert((int)nread == linkage_table_count*N_WORD_BYTES);
+            lseek(fd, old, SEEK_SET);
+        }
     }
 #endif
 
@@ -1455,8 +1461,12 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         case LISP_LINKAGE_SPACE_CORE_ENTRY_TYPE_CODE:
             linkage_table_count = ptr[0];
             linkage_table_data_page = ptr[1];
-            if ((elf_linkage_space = (uword_t*)ptr[2]) != 0)
-                elf_linkage_table_count = linkage_table_count;
+            linkage_space = (lispobj*)(ptr[2]);
+            /* If the core header's pointer to linkage space is initialized to a location
+             * within the file, then we also want to remember how many linkage cells were
+             * filled in. This is to know whether to call SB-VM::UNBYPASS-LINKAGE when setting
+             * any particular cell. Leave this 0 if the space pointer is null */
+            if (linkage_space) initial_linkage_table_count = linkage_table_count;
             break;
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
             // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
