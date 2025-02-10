@@ -403,6 +403,12 @@
                       '(lambda (x)
                         (the integer (if x 10 t)))
                       :allow-style-warnings t)))
+  (assert (nth-value 3
+                     (checked-compile
+                      '(lambda (c)
+                        (the integer
+                         (if c (map nil #'1+ c) 1)))
+                      :allow-style-warnings t)))
   (checked-compile
    '(lambda (x)
      (the integer (if x 10))))
@@ -413,7 +419,11 @@
                                           #\c
                                           (return nil))))
                              (j c)
-                             (j m)))))))
+                             (j m))))))
+  (checked-compile
+   '(lambda (c)
+     (the integer
+      (or (position c "AB") (position c "CD"))))))
 
 (with-test (:name :constant-modification-local-function)
   (assert (= (length (nth-value 2
