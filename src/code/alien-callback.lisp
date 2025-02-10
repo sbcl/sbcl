@@ -80,55 +80,58 @@ ENTER-ALIEN-CALLBACK pulls the corresponding function out and calls it.")
 (defun alien-callback-lambda-expression (specifier arguments body result-type env)
   (let ((argument-names arguments)
         (argument-specs (cddr specifier)))
-    `(lambda (args-pointer result-pointer)
-       (declare (optimize speed))
-       (let ((args-sap (descriptor-sap args-pointer))
-             (res-sap (descriptor-sap result-pointer)))
-         (declare (ignorable args-sap res-sap))
-         (let
-             ,(loop
-                 with offset = 0
-                for spec in argument-specs
-                 ;; KLUDGE: At least one platform requires additional
-                 ;; alignment beyond a single machine word for certain
-                 ;; arguments.  Accept an additional delta (for the
-                 ;; alignment) to apply to subsequent arguments to
-                 ;; account for the alignment gaps as a secondary
-                 ;; value, so that we don't have to update unaffected
-                 ;; backends.
-                 for (accessor-form alignment)
-                   = (multiple-value-list
-                      (alien-callback-accessor-form spec 'args-sap offset))
-                 collect `(,(pop argument-names) ,accessor-form)
-                 do (incf offset (+ (alien-callback-argument-bytes spec env)
-                                    (or alignment 0))))
-           ,(flet ((store (spec real-type)
-                     (if spec
-                         `(setf (deref (sap-alien res-sap (* ,spec)))
-                                ,(if real-type
-                                     `(the ,real-type
-                                           (progn
-                                             ,@body))
-                                     `(progn ,@body)))
-                         `(progn ,@body))))
-              (cond ((alien-void-type-p result-type)
-                     (store nil nil))
-                    ((alien-integer-type-p result-type)
-                     ;; Integer types should be padded out to a full
-                     ;; register width, to comply with most ABI calling
-                     ;; conventions, but should be typechecked on the
-                     ;; declared type width, hence the following:
-                     (if (alien-integer-type-signed result-type)
-                         (store `(signed
-                                  ,(alien-type-word-aligned-bits result-type))
-                                `(signed-byte ,(alien-type-bits result-type)))
-                         (store
-                          `(unsigned
-                            ,(alien-type-word-aligned-bits result-type))
-                          `(unsigned-byte ,(alien-type-bits result-type)))))
-                    (t
-                     (store (unparse-alien-type result-type) nil))))))
-       (values))))
+    (multiple-value-bind (body declarations doc) (parse-body body t)
+      `(lambda (args-pointer result-pointer)
+         ,@(and doc (list doc))
+         (declare (optimize speed))
+         (let ((args-sap (descriptor-sap args-pointer))
+               (res-sap (descriptor-sap result-pointer)))
+           (declare (ignorable args-sap res-sap))
+           (let
+               ,(loop
+                  with offset = 0
+                  for spec in argument-specs
+                  ;; KLUDGE: At least one platform requires additional
+                  ;; alignment beyond a single machine word for certain
+                  ;; arguments.  Accept an additional delta (for the
+                  ;; alignment) to apply to subsequent arguments to
+                  ;; account for the alignment gaps as a secondary
+                  ;; value, so that we don't have to update unaffected
+                  ;; backends.
+                  for (accessor-form alignment)
+                  = (multiple-value-list
+                     (alien-callback-accessor-form spec 'args-sap offset))
+                  collect `(,(pop argument-names) ,accessor-form)
+                  do (incf offset (+ (alien-callback-argument-bytes spec env)
+                                     (or alignment 0))))
+             ,@declarations
+             ,(flet ((store (spec real-type)
+                       (if spec
+                           `(setf (deref (sap-alien res-sap (* ,spec)))
+                                  ,(if real-type
+                                       `(the ,real-type
+                                             (progn
+                                               ,@body))
+                                       `(progn ,@body)))
+                           `(progn ,@body))))
+                (cond ((alien-void-type-p result-type)
+                       (store nil nil))
+                      ((alien-integer-type-p result-type)
+                       ;; Integer types should be padded out to a full
+                       ;; register width, to comply with most ABI calling
+                       ;; conventions, but should be typechecked on the
+                       ;; declared type width, hence the following:
+                       (if (alien-integer-type-signed result-type)
+                           (store `(signed
+                                    ,(alien-type-word-aligned-bits result-type))
+                                  `(signed-byte ,(alien-type-bits result-type)))
+                           (store
+                            `(unsigned
+                              ,(alien-type-word-aligned-bits result-type))
+                            `(unsigned-byte ,(alien-type-bits result-type)))))
+                      (t
+                       (store (unparse-alien-type result-type) nil))))))
+         (values)))))
 
 (defun parse-callback-specification (result-type lambda-list)
   (values
