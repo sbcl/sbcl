@@ -500,8 +500,8 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         return;
     }
 
+    count = object_size(ptr) - 1;
     header = *ptr++;
-    count = HeaderValue(header);
     type = header_widetag(header);
 
     print_obj("header: ", header, io);
@@ -513,7 +513,6 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 
     switch (type) {
     case BIGNUM_WIDETAG:
-        count &= 0x7fffff;
         ptr += count;
         NEWLINE_OR_RETURN;
         fprintf(IO.out, "0x");
@@ -536,7 +535,7 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         break;
 
     case SYMBOL_WIDETAG:
-        print_slots(symbol_slots, SYMBOL_SIZE, ptr, io);
+        print_slots(symbol_slots, count, ptr, io);
         struct symbol* sym = (void*)(ptr - 1);
         if (symbol_function(sym) != NIL) print_obj("fun: ", symbol_function(sym), io);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -675,13 +674,11 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 #endif
 
     case CLOSURE_WIDETAG:
-        print_slots(closure_slots,
-                    count & SHORT_HEADER_MAX_WORDS, ptr, io);
+        print_slots(closure_slots, count, ptr, io);
         break;
 
     case FUNCALLABLE_INSTANCE_WIDETAG:
-        print_slots(funcallable_instance_slots,
-                    count & SHORT_HEADER_MAX_WORDS, ptr, io);
+        print_slots(funcallable_instance_slots, count, ptr, io);
         break;
 
     case VALUE_CELL_WIDETAG:
@@ -704,7 +701,7 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         break;
 
     case FDEFN_WIDETAG:
-        print_slots(fdefn_slots, 3, ptr, io);
+        print_slots(fdefn_slots, count, ptr, io);
         break;
 
     // Make some vectors printable from C, for when all hell breaks lose
