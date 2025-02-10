@@ -479,6 +479,17 @@
                         (values-list args)))
                  (multiple-value-call #'values-type-check ,dummy)))))))))
 
+(defun cast-ignore-nil-use (use)
+  (flet ((ref (use)
+           (and (ref-p use)
+                (constant-p (ref-leaf use))
+                (null (constant-value (ref-leaf use))))))
+    (or (ref use)
+        (and (exit-p use)
+             (do-uses (use (exit-value use) t)
+               (unless (ref use)
+                 (return)))))))
+
 ;;; Check all possible arguments of CAST and emit type warnings for
 ;;; those with type errors. If the value of USE is being used for a
 ;;; variable binding, we figure out which one for source context. If
@@ -492,9 +503,7 @@
          bad)
     (do-uses (use value)
       (unless (or (values-types-equal-or-intersect (node-derived-type use) atype)
-                  (and (ref-p use)
-                       (constant-p (ref-leaf use))
-                       (null (constant-value (ref-leaf use)))))
+                  (cast-ignore-nil-use use))
         (push use bad)))
     (loop for use in bad
           for path = (source-path-before-transforms use)

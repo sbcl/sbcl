@@ -3116,9 +3116,7 @@
                           (eq (cast-silent-conflict cast) :style-warning)
                           (block common
                             (do-uses (bad-use value)
-                              (unless (and (ref-p bad-use)
-                                           (constant-p (ref-leaf bad-use))
-                                           (null (constant-value (ref-leaf bad-use))))
+                              (unless (cast-ignore-nil-use bad-use)
                                 (do-uses (good-use lvar)
                                   (unless (eq good-use cast)
                                     (let ((common (common-inline-point bad-use good-use)))
