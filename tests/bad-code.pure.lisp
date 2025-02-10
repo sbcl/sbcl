@@ -398,11 +398,9 @@
                       :allow-warnings t))))
 
 (with-test (:name :uses-with-bad-types)
-  (assert (nth-value 3
-                     (checked-compile
-                      '(lambda (x)
-                        (the integer (if x 10)))
-                      :allow-style-warnings t))))
+  (checked-compile
+   '(lambda (x)
+     (the integer (if x 10)))))
 
 (with-test (:name :constant-modification-local-function)
   (assert (= (length (nth-value 2
