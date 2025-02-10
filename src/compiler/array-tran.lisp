@@ -24,7 +24,8 @@
         element-type-specifier)))
 
 (defun upgraded-element-type-specifier (lvar)
-  (type-specifier (array-type-upgraded-element-type (lvar-type lvar))))
+  (type-specifier (array-type-upgraded-element-type (type-intersection (lvar-type lvar)
+                                                                       (specifier-type 'array)))))
 
 ;;; Array access functions return an object from the array, hence its type is
 ;;; going to be the array upgraded element type. Secondary return value is the

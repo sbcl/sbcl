@@ -2658,7 +2658,7 @@
 ;;; expansion, so we factor out the condition into this function.
 (defun check-inlineability-of-find-position-if (sequence from-end)
   (let ((ctype (lvar-type sequence)))
-    (cond ((csubtypep ctype (specifier-type 'vector))
+    (cond ((csubtypep ctype (specifier-type '(or null vector)))
            ;; It's not worth trying to inline vector code unless we
            ;; know a fair amount about it at compile time.
            (upgraded-element-type-specifier-or-give-up sequence)
@@ -2944,7 +2944,7 @@
                                        from-end start end key))
 
 (deftransform %find-position ((item sequence from-end start end key test)
-                              (t vector t t t function function)
+                              (t (or null vector) t t t function function)
                               *
                               :node node)
   "expand inline"
@@ -2957,11 +2957,13 @@
          ;; These have compact inline expansion
          (and (or (not key)
                   (lvar-fun-is key '(identity)))
-              (let* ((element-type (array-type-upgraded-element-type (lvar-type sequence)))
+              (let* ((sequence-type (type-intersection (lvar-type sequence)
+                                                       (specifier-type 'array)))
+                     (element-type (array-type-upgraded-element-type sequence-type))
                      (et-specifier (type-specifier element-type))
                      (test (lvar-fun-name* test))
                      (item (lvar-type item))
-                     (simple (csubtypep (lvar-type sequence) (specifier-type 'simple-array))))
+                     (simple (csubtypep sequence-type (specifier-type 'simple-array))))
                 (when (and (neq element-type *wild-type*)
                            (case et-specifier
                              ((double-float single-float)
@@ -3070,8 +3072,9 @@
       (give-up-ir1-transform))
     ;; Delay to prefer the string and bit-vector transforms
     (delay-ir1-transform node :constraint)
-    '(%find-position-vector-macro item sequence
-      from-end start end key test)))
+    `(when sequence
+       (%find-position-vector-macro item sequence
+                                    from-end start end key test))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t string t t t function function)
