@@ -1393,7 +1393,9 @@ NOTE: This interface is experimental and subject to change."
 ;; slightly more abstract and yet at the same time more concrete to say
 ;; "memoized-function-caches". "hash-caches" is pretty nonspecific.
 #.(if *profile-hash-cache*
-'(defun show-hash-cache-statistics ()
+'(progn
+(export 'show-hash-cache-statistics) ; protect from tree-shaker
+(defun show-hash-cache-statistics ()
   (flet ((cache-stats (symbol)
            (let* ((name (string symbol))
                   (statistics (package-symbolicate (sb-int-package) symbol "-STATS"))
@@ -1423,7 +1425,7 @@ NOTE: This interface is experimental and subject to change."
                   (if (plusp (length cache))
                       (* 100 (/ (count-if-not #'fixnump cache)
                                 (length cache))))
-                  short-name))))))
+                  short-name)))))))
 
 ;;; some commonly-occurring CONSTANTLY forms
 (macrolet ((def-constantly-fun (name constant-expr)

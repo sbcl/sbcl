@@ -1264,14 +1264,9 @@
 
 (!defun-from-collected-cold-init-forms !format-directives-init)
 
-(defvar sb-int::**tokenize-control-string-cache-vector**-stats) ; might not be DEFVARed
 (defun sb-impl::!format-cold-init ()
   (!late-format-init)
-  (!format-directives-init)
-  ;; cold-init requires these assignments if hash-cache profiling is enabled
-  (setq **tokenize-control-string-cache-vector** (make-array 128 :initial-element 0))
-  (setq sb-int::**tokenize-control-string-cache-vector**-stats
-        (make-array 3 :initial-element 0 :element-type 'fixnum)))
+  (!format-directives-init))
 
 (push '("SB-FORMAT"
         def-format-directive def-complex-format-directive
