@@ -164,3 +164,15 @@
       `(lambda (a)
          (coerce a 'array))
     ((#(1)) #(1) :test #'equalp)))
+
+(with-test (:name :coerce-vector-no-warnings)
+  (checked-compile '(lambda (x)
+                     (typecase x
+                       (vector 1)
+                       (t
+                        (coerce x '(vector t))))))
+  (checked-compile '(lambda (x)
+                     (typecase x
+                       ((vector t) 1)
+                       (t
+                        (coerce x '(vector t)))))))

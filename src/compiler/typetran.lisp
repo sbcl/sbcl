@@ -1642,7 +1642,7 @@
                        (neq (array-type-specialized-element-type tspec) *empty-type*)
                        (consp (array-type-dimensions tspec)))
                   (values tspec
-                          (source-transform-array-typep 'x tspec)
+                          `(typep x ',(type-specifier tspec))
                           (car (array-type-dimensions tspec))
                           (let ((et (array-type-specialized-element-type tspec)))
                             (unless (or (eq et *universal-type*) ; don't need
