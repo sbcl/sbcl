@@ -16,10 +16,6 @@
 
 (use-package :sb-alien)
 
-;;; Callbacks are not part of the exported interface yet -- when they are this can
-;;; go away.
-(import 'sb-alien::alien-lambda)
-
 ;;; XXX XXX this should change to use run-compiler.sh, now that we have it
 (defun run-compiler ()
   (let ((proc (run-program "gcc" '("win32-stack-unwind.c" "-shared"
@@ -33,23 +29,15 @@
 
 (load-shared-object (truename "win32-stack-unwind.dll"))
 
-
-(defvar *current-test-callback*)
-
-(defparameter *test-callback-thunk*
-  (sb-alien::alien-callback
-   (function void)
-   #'(lambda () (funcall *current-test-callback*))))
-
 (defun establish-return-frame (callback)
   "Establish an SEH frame for use as a target with PERFORM-TEST-UNWIND and invoke CALLBACK via FUNCALL"
   ;; We don't use a LET here because we don't want to accidentally
   ;; correct a blown binding stack pointer just yet.
-  (setf *current-test-callback* callback)
-  (alien-funcall (extern-alien "establish_return_frame"
-                               (function void (* (function void))))
-                 (alien-sap *test-callback-thunk*))
-  (makunbound '*current-test-callback*)
+  (with-alien-callable ((test void ()
+                          (funcall callback)))
+    (alien-funcall (extern-alien "establish_return_frame"
+                                 (function void (* (function void))))
+                   (alien-sap test)))
   (values))
 
 (defun perform-test-unwind ()

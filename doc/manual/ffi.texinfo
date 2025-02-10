@@ -1043,6 +1043,13 @@ so that we can, for example, pass the callable value to C as a callback.
 
 @include fun-sb-alien-alien-callable-function.texinfo
 
+The @code{with-alien-callable} macro wraps Lisp code and establishes
+local C foreign functions which can be called with the C calling
+convention. This macro is handy for passing callbacks which close over
+Lisp values into C.
+
+@include macro-sb-alien-with-alien-callable.texinfo
+
 Note that the garbage collector moves objects, and won't be able to fix
 up any references in C variables.  There are three mechanisms for coping
 with this:

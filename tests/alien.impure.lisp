@@ -204,15 +204,15 @@
    (eq :ok
        (handler-case
            (tagbody
-              (alien-funcall
-               (extern-alien "CallWindowProcW"
-                             (function unsigned-int
-                                       (* (function int)) unsigned-int
-                                       unsigned-int unsigned-int unsigned-int))
-               (alien-sap
-                (sb-alien::alien-lambda unsigned-int ()
-                  (go up)))
-               0 0 0 0)
+              (with-alien-callable ((callback unsigned-int ()
+                                      (go up)))
+                (alien-funcall
+                 (extern-alien "CallWindowProcW"
+                               (function unsigned-int
+                                         (* (function int)) unsigned-int
+                                         unsigned-int unsigned-int unsigned-int))
+                 callback
+                 0 0 0 0))
             up
               (funcall 0))
          (error ()

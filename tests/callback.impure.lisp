@@ -108,24 +108,32 @@
 
 (defvar *old-foo* (alien-callable-function 'foo))
 
-(multiple-value-bind (p valid) (sb-alien::alien-callback-p *old-foo*)
-  (assert p)
-  (assert valid))
+(assert (sb-alien::alien-callback-p *old-foo*))
 
 (assert (= 13 (alien-funcall *old-foo*)))
 
 (define-alien-callable foo int ()
   26)
 
-(multiple-value-bind (p valid) (sb-alien::alien-callback-p *old-foo*)
-  (assert p)
-  (assert (not valid)))
+;; Compatible redefinition just updates the underlying pointer.
+(assert (eq *old-foo* (alien-callable-function 'foo)))
+
+(assert (sb-alien::alien-callback-p *old-foo*))
+
+(assert (= 26 (alien-funcall *old-foo*)))
+(assert (= 26 (alien-funcall (alien-callable-function 'foo))))
+
+(handler-bind ((error (lambda (c)
+                        (declare (ignore c))
+                        (continue))))
+  (define-alien-callable foo c-string ()
+    "blah"))
 
 (multiple-value-bind (res err)
     (ignore-errors (alien-funcall *old-foo*))
   (assert (and (not res) (typep err 'error))))
 
-(assert (= 26 (alien-funcall (alien-callable-function 'foo))))
+(assert (string= "blah" (alien-funcall (alien-callable-function 'foo))))
 
 ;;; callbacks with void return values
 
@@ -228,11 +236,14 @@
          (args (sb-int:make-gensym-list (length arg-types)))
          (typed-lambda-list (mapcar (lambda (type arg)
                                       (list arg type))
-                                    arg-types args)))
+                                    arg-types args))
+         (name (gensym "CALLBACK-ADDER-")))
     `(progn
+       (define-alien-callable ,name
+           ,(car types) ,typed-lambda-list
+         (+ ,@args))
        (defvar ,(intern (string-upcase fname))
-         (sb-alien::alien-lambda ,(car types) ,typed-lambda-list
-           (+ ,@args))))))
+         (alien-callable-function ',name)))))
 
 (with-test (:name :define-2-int-callback)
   (define-callback-adder int int int))
@@ -453,3 +464,30 @@
   (define-callback-adder unsigned-long-long int int int int int unsigned-long-long))
 (with-test (:name :call-int-int-int-int-int-ulonglong-callback)
   (assert (= (alien-funcall *add-i-i-i-i-i-ull* 0 0 0 0 1 #x200000003) #x200000004)))
+
+(with-test (:name :with-alien-callable)
+  (with-alien-callable ((callable int ((x int) (y int))
+                          (+ x y)))
+    (assert (= (alien-funcall callable 1 2) 3))))
+
+(with-test (:name :with-alien-callable-invalidated)
+  (let (escape)
+    (with-alien-callable ((callable int ((x int) (y int))
+                            (+ x y)))
+      (setq escape callable)
+      (assert (= (alien-funcall callable 1 2) 3))
+      (assert (= (alien-funcall escape 2 3) 5)))
+    (multiple-value-bind (res err)
+        (ignore-errors (alien-funcall escape 2 3))
+      (assert (and (not res) (typep err 'error))))))
+
+(with-test (:name :with-alien-callable.closure)
+  ;; Ensure the same sap is reused.
+  (let (sap)
+    (dotimes (i 9)
+      (with-alien-callable ((callable int ((x int) (y int))
+                              (+ x y i)))
+        (unless sap
+          (setq sap (alien-sap callable)))
+        (assert (sb-sys:sap= sap (alien-sap callable)))
+        (assert (= (alien-funcall callable 1 2) (+ 3 i)))))))

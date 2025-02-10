@@ -13,10 +13,6 @@
 
 (use-package :sb-alien)
 
-;;; Callbacks are not part of the exported interface yet -- when they are this can
-;;; go away.
-(import 'sb-alien::alien-lambda)
-
 (defun run (program &rest arguments)
   (let* ((stringstream (make-string-output-stream))
          (proc (run-program program arguments
@@ -74,8 +70,9 @@
 #+alien-callbacks
 (with-test (:name :callback)
   (assert (= *good-offset*
-             (trampoline (alien-lambda int ()
-                           (stack-alignment-offset *required-alignment*))))))
+             (with-alien-callable ((callback int ()
+                                     (stack-alignment-offset *required-alignment*)))
+               (trampoline callback)))))
 
 (ignore-errors (delete-file *exename*))
 (ignore-errors (delete-file *soname*))
