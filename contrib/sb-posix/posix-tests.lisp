@@ -636,7 +636,7 @@
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getgrnam "almost-certainly-does-not-exist")
                          nil)
-      (t (cond) cond))
+      (t (cond) (princ-to-string cond)))
   nil)
 
 #-(or android win32 (not sb-thread))
