@@ -491,7 +491,10 @@
          (atype (cast-asserted-type cast))
          bad)
     (do-uses (use value)
-      (unless (values-types-equal-or-intersect (node-derived-type use) atype)
+      (unless (or (values-types-equal-or-intersect (node-derived-type use) atype)
+                  (and (ref-p use)
+                       (constant-p (ref-leaf use))
+                       (null (constant-value (ref-leaf use)))))
         (push use bad)))
     (loop for use in bad
           for path = (source-path-before-transforms use)

@@ -3116,12 +3116,15 @@
                           (eq (cast-silent-conflict cast) :style-warning)
                           (block common
                             (do-uses (bad-use value)
-                              (do-uses (good-use lvar)
-                                (unless (eq good-use cast)
-                                  (let ((common (common-inline-point bad-use good-use)))
-                                    (unless (and common
-                                                 (cast-mismatch-from-inlined-p cast common))
-                                      (push bad-use bad-uses))))))
+                              (unless (and (ref-p bad-use)
+                                           (constant-p (ref-leaf bad-use))
+                                           (null (constant-value (ref-leaf bad-use))))
+                                (do-uses (good-use lvar)
+                                  (unless (eq good-use cast)
+                                    (let ((common (common-inline-point bad-use good-use)))
+                                      (unless (and common
+                                                   (cast-mismatch-from-inlined-p cast common))
+                                        (push bad-use bad-uses)))))))
                             t))
                  (cond (bad-uses
                         (setf detail (lvar-uses-all-sources bad-uses)
