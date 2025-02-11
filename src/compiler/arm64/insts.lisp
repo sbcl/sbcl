@@ -2605,9 +2605,9 @@
                              (encode-fp-immediate rn)
                              0
                              (fpr-offset rd)))
-         ((or (sc-is rd complex-double-reg complex-single-reg)
-              (sc-is rn complex-double-reg complex-single-reg))
-          (break "Implement"))
+         ((or (sc-is rd complex-double-reg)
+              (sc-is rn complex-double-reg))
+          (bug "Implement"))
          ((and (fp-register-p rd)
                (fp-register-p rn))
           (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
