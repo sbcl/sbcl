@@ -568,12 +568,6 @@
     (multiple-value-bind (res rem) (,op number divisor)
       (values (float res (if (floatp rem) rem 1.0)) rem))))
 
-;;; Declare these guys inline to let them get optimized a little.
-;;; ROUND and FROUND are not declared inline since they seem too
-;;; obscure and too big to inline-expand by default. Also, this gives
-;;; the compiler a chance to pick off the unary float case.
-(declaim (inline fceiling ffloor ftruncate))
-
 #-round-float
 (defun fround (number &optional (divisor 1))
   "Same as ROUND, but returns first value as a float."

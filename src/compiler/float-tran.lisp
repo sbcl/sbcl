@@ -1988,27 +1988,34 @@
     (def round-single single-float "f")
     (def round-double double-float)))
 
-#+round-float
-(deftransform fround ((number &optional divisor) (double-float &optional t))
-  (if (or (not divisor)
-          (and (constant-lvar-p divisor)
-               (= (lvar-value divisor) 1)))
-      `(let ((res (round-double number :round)))
-         (values res (- number res)))
-      `(let* ((divisor (%double-float divisor))
-              (res (round-double (/ number (%double-float divisor)) :round)))
-         (values res (- number (* res divisor))))))
+(macrolet ((def (name mode type)
+             `(deftransform ,name ((number &optional divisor) (,type &optional (or null ,type)))
+                (if (or (not divisor)
+                        (and (constant-lvar-p divisor)
+                             (= (lvar-value divisor) 1)))
+                    `(let* ((res (,',(case type
+                                       (double-float 'sb-kernel:round-double)
+                                       (single-float 'sb-kernel:round-single))
+                                  number
+                                  ,,mode)))
+                       (values res (- number res)))
+                    `(let* ((res (,',(case type
+                                       (double-float 'sb-kernel:round-double)
+                                       (single-float 'sb-kernel:round-single))
+                                  (/ number divisor)
+                                  ,,mode)))
+                       (values res (- number (* res divisor))))))))
+  (def ffloor :floor double-float)
+  (def fceiling :ceiling double-float)
+  (def ftruncate :truncate double-float)
+  #+round-float
+  (def fround :round double-float)
 
-#+round-float
-(deftransform fround ((number &optional divisor) (single-float &optional (or null single-float rational)))
-  (if (or (not divisor)
-          (and (constant-lvar-p divisor)
-               (= (lvar-value divisor) 1)))
-      `(let ((res (round-single number :round)))
-         (values res (- number res)))
-      `(let* ((divisor (%single-float divisor))
-              (res (round-single (/ number divisor) :round)))
-         (values res (- number (* res divisor))))))
+  (def ffloor :floor single-float)
+  (def fceiling :ceiling single-float)
+  (def ftruncate :truncate single-float)
+  #+round-float
+  (def fround :round single-float))
 
 ;;;; TESTS
 
