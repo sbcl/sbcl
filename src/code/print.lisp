@@ -305,7 +305,6 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; entries get changed to the actual marker value when they are first
 ;;; printed.
 (defvar *circularity-hash-table* nil)
-(defvar *circularity-list* nil)
 
 ;;; When NIL, we are just looking for circularities. After we have
 ;;; found them all, this gets bound to 0. Then whenever we need a new
@@ -342,9 +341,6 @@ variable: an unreadable object representing the error is printed instead.")
     (return-from check-for-circularity nil))
   (let ((circularity-hash-table *circularity-hash-table*))
     (cond
-        (*print-circle-not-shared*
-         (and (assoc object *circularity-list*)
-              t))
         ((null circularity-hash-table)
             (values nil :initiate))
         ((null *circularity-counter*)
@@ -451,44 +447,23 @@ variable: an unreadable object representing the error is printed instead.")
        (cond ((or (not *print-circle*)
                   (uniquely-identified-by-print-p ,object))
               (,body-name))
-             (*print-circle-not-shared*
-              (let ((,marker (assoc ,object *circularity-list* :test #'eq)))
-                (cond ((consp (cdr ,marker))
-                       (setf (cdr ,marker) (cadr ,marker))
-                       (,body-name))
-                      ((and ,marker
-                            (> (cdr ,marker) 0))
-                       (write-char #\# ,stream)
-                       (output-integer (cdr ,marker) ,stream 10 nil)
-                       (write-char #\# ,stream))
-                      (,marker
-                       (incf (cdr ,marker))
-                       (,body-name))
-                      (t
-                       ;; output-object will replace the -3
-                       (let ((*circularity-list* (acons ,object -3 *circularity-list*)))
-                         (let ((*circularity-counter*))
-                           (output-object ,object *null-broadcast-stream*))
-                         (flet ((out ()
-                                  (let* ((entry (car *circularity-list*))
-                                         (n (cdr entry)))
-                                    (when (eql n 0)
-                                      (write-char #\# stream)
-                                      (setf n (incf *circularity-counter*)
-                                            (cdr entry) (list n))
-                                      (output-integer n stream 10 nil)
-                                      (write-char #\= stream))
-                                    (,body-name))))
-                           (if *circularity-counter*
-                               (out)
-                               (let ((*circularity-counter* 0))
-                                 (out)))))))))
              (*circularity-hash-table*
               (let ((,marker (check-for-circularity ,object t :logical-block)))
-                (if ,marker
-                    (when (handle-circularity ,marker ,stream)
-                      (,body-name))
-                    (,body-name))))
+                (cond (,marker
+                       (when (handle-circularity ,marker ,stream)
+                         (,body-name)))
+                      (t
+                       (,body-name)
+                       (when (and *print-circle-not-shared*
+                                  (eql (gethash ,object *circularity-hash-table*) :logical-block))
+                         (if (listp ,object)
+                             (let ((list ,object))
+                               (loop until (or (atom list)
+                                               (not (memq (gethash list *circularity-hash-table*) '(t :logical-block))))
+                                     do
+                                     (remhash list *circularity-hash-table*)
+                                     (pop list)))
+                             (remhash ,object *circularity-hash-table*)))))))
              (t
               (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
                 (output-object ,object *null-broadcast-stream*)
@@ -582,61 +557,32 @@ variable: an unreadable object representing the error is printed instead.")
                    (print-it stream))
                  (print-it stream)))
            (check-it (stream)
-             (multiple-value-bind (marker initiate)
-                 (check-for-circularity object t)
-               (if (eq initiate :initiate)
-                   (let ((*circularity-hash-table*
-                          (make-hash-table :test 'eq)))
-                     (check-it *null-broadcast-stream*)
-                     (let ((*circularity-counter* 0))
-                       (check-it stream)
-                       (when *print-circle-not-shared*
-                         (remhash object *circularity-hash-table*))))
-                   ;; otherwise
-                   (if marker
-                       (when (handle-circularity marker stream)
-                         (handle-it stream))
-                       (handle-it stream)))))
-           (check-it-no-shared (stream)
-             (let ((circle (assoc object *circularity-list* :test #'eq)))
-               (if circle
-                   (let ((n (cdr circle)))
-                     (when (listp n)
-                       (setf n (setf (cdr circle) (car n))))
-                     (cond ((> n 0)
-                               (write-char #\# stream)
-                               (output-integer n stream 10 nil)
-                               (write-char #\# stream))
-                           ((= n 0))
-                           ((= n -3)
-                            (setf (cdr circle) -2)
-                            (handle-it stream))
-                           (t
-                            (setf (cdr circle) 0))))
-                   ;; -2 for with-circularity-detection, see the comment above CHECK-FOR-CIRCULARITY
-                   (let* ((entry (cons object -2))
-                          (*circularity-list* (cons entry *circularity-list*)))
-                     (let (*circularity-counter*)
-                       (handle-it *null-broadcast-stream*))
-                     (flet ((out ()
-                              (let ((n (cdr entry)))
-                                (when (eql n 0)
-                                  (setf n (incf *circularity-counter*)
-                                        (cdr entry) (list n))
-                                  (write-char #\# stream)
-                                  (output-integer n stream 10 nil)
-                                  (write-char #\= stream))
-                                (handle-it stream))))
-                       (if *circularity-counter*
-                           (out)
-                           (let ((*circularity-counter* 0))
-                             (out)))))))))
+             (multiple-value-bind (marker initiate) (check-for-circularity object t)
+               (cond ((eq initiate :initiate)
+                      (let ((*circularity-hash-table*
+                              (make-hash-table :test 'eq)))
+                        (check-it *null-broadcast-stream*)
+                        (let ((*circularity-counter* 0))
+                          (check-it stream))))
+                     (marker
+                      (when (handle-circularity marker stream)
+                        (handle-it stream)))
+                     (t
+                      (handle-it stream)
+                      (when (and *print-circle-not-shared*
+                                 (memq (gethash object *circularity-hash-table*) '(t :logical-block)))
+                        (if (listp object)
+                            (let ((list object))
+                              (loop until (or (atom list)
+                                              (not (memq (gethash list *circularity-hash-table*) '(t :logical-block))))
+                                    do
+                                    (remhash list *circularity-hash-table*)
+                                    (pop list)))
+                            (remhash object *circularity-hash-table*))))))))
     (cond (;; Maybe we don't need to bother with circularity detection.
            (or (not *print-circle*)
                (uniquely-identified-by-print-p object))
            (handle-it stream))
-          (*print-circle-not-shared*
-           (check-it-no-shared stream))
           (;; If we have already started circularity detection, this
            ;; object might be a shared reference. If we have not, then
            ;; if it is a compound object it might contain a circular
