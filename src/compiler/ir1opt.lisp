@@ -1428,7 +1428,12 @@
                   (let* ((*inline-expansions*
                            (register-inline-expansion leaf call))
                          (res (ir1-convert-inline-expansion leaf inlinep)))
-                    (setf (defined-fun-functional leaf) res)
+                    (when (or (eq inlinep 'maybe-inline)
+                              (policy call
+                                  (or (< speed space)
+                                      (< speed compilation-speed))))
+                      ;; Expand once
+                      (setf (defined-fun-functional leaf) res))
                     (change-ref-leaf ref res)
                     (unless ir1-converting-not-optimizing-p
                       (locall-analyze-component *current-component*))))

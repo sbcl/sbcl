@@ -1299,7 +1299,7 @@
 
 ;;; Convert a lambda for global inline expansion.
 ;;;
-;;; Unless a INLINE function, we temporarily clobber the inline
+;;; Unless an INLINE function, we temporarily clobber the inline
 ;;; expansion. This prevents recursive inline expansion of
 ;;; opportunistic pseudo-inlines.
 (defun ir1-convert-inline-expansion (var inlinep)
@@ -1309,26 +1309,10 @@
       (setf (defined-fun-inline-expansion var) nil))
     (let* ((name (leaf-source-name var))
            (fun (ir1-convert-inline-lambda var-expansion
-                                           :source-name name))
-           (info (info :function :info name)))
+                                           :source-name name)))
       (setf (functional-inlinep fun) inlinep)
       (assert-new-definition var fun)
       (setf (defined-fun-inline-expansion var) var-expansion)
-      ;;
-      ;; If definitely not an interpreter stub, then substitute for any
-      ;; old references.
-      (unless (or (eq (defined-fun-inlinep var) 'notinline)
-                  (not (block-compile *compilation*))
-                  (and info
-                       (or (fun-info-transforms info)
-                           (fun-info-templates info)
-                           (fun-info-ir2-convert info))))
-        (substitute-leaf fun var)
-        ;; If in a simple environment, then we can allow backward
-        ;; references to this function from following top-level
-        ;; forms.
-        (when (simple-lexical-environment-p *lexenv*)
-          (setf (defined-fun-functional var) fun)))
       fun)))
 
 
