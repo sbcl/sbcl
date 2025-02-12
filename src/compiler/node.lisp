@@ -700,7 +700,10 @@
   (mess-up nil :type (or node null))
   ;; a list of all the NLX-INFO structures whose NLX-INFO-CLEANUP is
   ;; this cleanup.
-  (nlx-info nil :type list))
+  (nlx-info nil :type list)
+  ;; Lexenv entries for the BLOCK special form, to be fixed up when
+  ;; deleting blocks to allow inlining to find it again.
+  (block nil))
 (defprinter (cleanup :identity t)
   kind
   mess-up

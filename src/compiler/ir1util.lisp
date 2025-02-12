@@ -2351,6 +2351,13 @@
                           (block-end-cleanup block)))
                 (unlink-blocks block next)
                 (dolist (pred (block-pred block))
+                  (let ((cleanup (block-end-cleanup pred)))
+                    ;; Allow return-from inside late inlined functions to find the new block.
+                    (when cleanup
+                      (let ((block-entry (cleanup-block cleanup))
+                            (start (block-start block)))
+                        (when (eql (second block-entry) start)
+                          (setf (second block-entry) (block-start next))))))
                   (change-block-successor pred block next))
                 (when (block-delete-p block)
                   (let ((component (block-component block)))

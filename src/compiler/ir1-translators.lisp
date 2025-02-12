@@ -165,6 +165,7 @@ RETURN-FROM can be used to exit the form."
     (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
                                   :cleanup cleanup)))
+      (setf (cleanup-block cleanup) env-entry)
       (ir1-convert-progn-body dummy next result forms))))
 
 ;;; We make NEXT start a block just so that it will have a block

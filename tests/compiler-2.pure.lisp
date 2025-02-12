@@ -4615,3 +4615,15 @@
        (incf x))
      x)
    integer))
+
+(with-test (:name :late-inline-return-from)
+  (checked-compile `(lambda (r)
+                      ((lambda ()
+                         (block nil
+                           (flet ((f ()
+                                    (or (funcall r)
+                                        (return))))
+                             (declare (inline f))
+                             (when (f)
+                               (f)))))))
+                   :allow-notes nil))
