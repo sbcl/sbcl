@@ -131,7 +131,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding function out and calls it.")
                             `(unsigned-byte ,(alien-type-bits result-type)))))
                       (t
                        (store (unparse-alien-type result-type) nil))))))
-         (values)))))
+         0))))
 
 (defun parse-callback-specification (result-type lambda-list)
   (values
