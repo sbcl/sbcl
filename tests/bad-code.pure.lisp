@@ -423,7 +423,14 @@
   (checked-compile
    '(lambda (c)
      (the integer
-      (or (position c "AB") (position c "CD"))))))
+      (or (position c "AB") (position c "CD")))))
+  (checked-compile
+   '(lambda (x)
+     (multiple-value-bind (a b) (if x
+                                    (values nil 2)
+                                    (values 2 3))
+       (declare (integer a))
+       (list a b)))))
 
 (with-test (:name :constant-modification-local-function)
   (assert (= (length (nth-value 2

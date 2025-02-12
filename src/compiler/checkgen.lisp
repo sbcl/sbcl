@@ -479,16 +479,27 @@
                         (values-list args)))
                  (multiple-value-call #'values-type-check ,dummy)))))))))
 
-(defun cast-ignore-nil-use (use)
-  (flet ((ref (use)
-           (and (ref-p use)
-                (constant-p (ref-leaf use))
-                (null (constant-value (ref-leaf use))))))
+(defun cast-ignore-nil-use (use type)
+  (labels ((ref (use)
+             (and (ref-p use)
+                  (constant-p (ref-leaf use))
+                  (null (constant-value (ref-leaf use)))))
+           (refs (lvar)
+             (do-uses (use lvar t)
+               (unless (ref use)
+                 (return)))))
     (or (ref use)
         (and (exit-p use)
-             (do-uses (use (exit-value use) t)
-               (unless (ref use)
-                 (return)))))))
+             (refs (exit-value use)))
+        (and (combination-is use '(values))
+             (let ((new-type (make-values-type
+                              (loop for arg in (combination-args use)
+                                    for arg-type = (lvar-type arg)
+                                    collect (if (and (eq arg-type (specifier-type 'null))
+                                                     (refs arg))
+                                                *universal-type*
+                                                arg-type)))))
+               (values-types-equal-or-intersect new-type type))))))
 
 ;;; Check all possible arguments of CAST and emit type warnings for
 ;;; those with type errors. If the value of USE is being used for a
@@ -503,7 +514,7 @@
          bad)
     (do-uses (use value)
       (unless (or (values-types-equal-or-intersect (node-derived-type use) atype)
-                  (cast-ignore-nil-use use))
+                  (cast-ignore-nil-use use atype))
         (push use bad)))
     (loop for use in bad
           for path = (source-path-before-transforms use)
