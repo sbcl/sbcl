@@ -111,14 +111,14 @@ Code for options that not every system has should be conditionalised:
   "Available only on Linux.")
 
 (define-socket-option-int
-  sockopt-tcp-keepcnt :tcp sockint::tcp-keepcnt :linux
-  "Available only on Linux.")
+  sockopt-tcp-keepcnt :tcp sockint::tcp-keepcnt (or :linux (and :bsd (not :openbsd)))
+  "Available only on Linux, BSD (except OpenBSD).")
 (define-socket-option-int
-  sockopt-tcp-keepidle :tcp sockint::tcp-keepidle :linux
-  "Available only on Linux.")
+  sockopt-tcp-keepidle :tcp sockint::tcp-keepidle (or :linux (and :bsd (not (or :openbsd :darwin))))
+  "Available only on Linux, BSD (except OpenBSD, Darwin).")
 (define-socket-option-int
-  sockopt-tcp-keepintvl :tcp sockint::tcp-keepintvl :linux
-  "Available only on Linux.")
+  sockopt-tcp-keepintvl :tcp sockint::tcp-keepintvl (or :linux (and :bsd (not :openbsd)))
+  "Available only on Linux, BSD (except OpenBSD).")
 (define-socket-option-int
   sockopt-tcp-user-timeout :tcp sockint::tcp-user-timeout :linux
   "Available only on Linux.")
