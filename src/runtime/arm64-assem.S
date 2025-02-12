@@ -243,12 +243,12 @@ no_args:
         // Return value
         mov     x0, reg_R0
 
-	ENTER_PA
-
 // Save the lisp stack and frame pointers.
 #ifdef LISP_FEATURE_SB_THREAD
 	stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
+	ENTER_PA
+
 	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
 	str	reg_CFP, [reg_NFP]
 	ldr	reg_OCFP, =GNAME(current_control_stack_pointer)
@@ -257,9 +257,9 @@ no_args:
 	// Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =GNAME(foreign_function_call_active)
 	str     reg_OCFP, [reg_OCFP]
-#endif
 
         LEAVE_PA
+#endif
 
 	// Restore saved registers.
 
