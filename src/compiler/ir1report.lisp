@@ -209,7 +209,6 @@
          (when (comma-p form)
            (setf form (comma-expr form)))
          (when (atom form)
-            (aver (null current))
             (return))
           (let ((head (first form)))
             (when (symbolp head)
