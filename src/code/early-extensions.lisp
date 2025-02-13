@@ -511,7 +511,7 @@ NOTE: This interface is experimental and subject to change."
   (dolist (name *cache-vector-symbols*)
     ;; We really don't need to call ABOUT-TO-MODIFY-SYMBOL-VALUE 18 times
     ;; just to clear the caches.
-    #-sb-xc-host (%set-symbol-global-value name nil)
+    #-sb-xc-host (%primitive %set-symbol-global-value name nil)
     #+sb-xc-host (set name nil)))
 
 (defmacro sb-int-package () (find-package "SB-INT"))
@@ -524,9 +524,8 @@ NOTE: This interface is experimental and subject to change."
     ;; It took me a while to figure out why infinite recursion could occur
     ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
     (macrolet ((set! (symbol value)
-                 `(#+sb-xc-host set
-                   #-sb-xc-host sb-kernel:%set-symbol-global-value
-                   ,symbol ,value))
+                 #-sb-xc-host `(%primitive %set-symbol-global-value ,symbol ,value)
+                 #+sb-xc-host `(set ,symbol ,value))
                (reset-stats ()
                  ;; If statistics gathering is not not compiled-in,
                  ;; no sense in setting a symbol that is never used.
@@ -546,7 +545,8 @@ NOTE: This interface is experimental and subject to change."
       (sb-thread:barrier (:write)
         (reset-stats)
         (setq cache (make-array size :initial-element 0)))
-      (set! symbol cache))))
+      (set! symbol cache)
+      cache)))
 
 ;; At present we make a new vector every time a line is re-written,
 ;; to make it thread-safe and interrupt-safe. A multi-word compare-and-swap

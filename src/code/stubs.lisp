@@ -191,6 +191,10 @@
   (def %simd-pack-256-2)
   (def %simd-pack-256-3))
 
+(defun %set-symbol-global-value (symbol value)
+  (declare (type (and symbol (not null)) symbol))
+  (%primitive %set-symbol-global-value symbol value))
+
 (defun spin-loop-hint ()
   "Hints the processor that the current thread is spin-looping."
   (spin-loop-hint))

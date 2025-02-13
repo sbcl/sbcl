@@ -123,8 +123,6 @@
 ;;; not only symbols. The value is reliable only if the object is a symbol.
 (defknown hash-as-if-symbol-name (t) symbol-name-hash (flushable movable always-translatable))
 
-(defknown %set-symbol-global-value ((and (not null) symbol) t)
-  t ())
 (defknown %set-symbol-hash ((and (not null) symbol) hash-code)
   t ())
 

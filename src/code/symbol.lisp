@@ -49,7 +49,8 @@ distinct from the global value. Can also be SETF."
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)
-  (%set-symbol-global-value symbol new-value))
+  (%primitive %set-symbol-global-value symbol new-value)
+  new-value)
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)

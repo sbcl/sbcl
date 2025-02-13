@@ -125,7 +125,7 @@
                              (- (ash symbol-name-slot word-shift) other-pointer-lowtag))
             name))
     (%primitive set-slot symbol nil 'make-symbol symbol-info-slot other-pointer-lowtag)
-    (%set-symbol-global-value symbol (make-unbound-marker))
+    (%primitive %set-symbol-global-value symbol (make-unbound-marker))
     symbol))
 
 ) ; end PROGN

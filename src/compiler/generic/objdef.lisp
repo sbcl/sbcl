@@ -382,8 +382,7 @@ during backtrace.
   ;; This improves the code for CASE and ECASE over symbols
   ;; regardless of whether the object being tested is known to be a symbol.
   (hash :set-trans %set-symbol-hash)
-  (value :init :unbound
-         :set-trans %set-symbol-global-value)
+  (value :init :unbound)
   ;; Symbols either store an fdefn or a function. The better way is a function.
   ;; This slot *MUST* coincide with the FDEFN-FUN slot. (This is AVERed)
   ;; The slot name is "FDEFN" even it holds a function. This makes some C code
@@ -411,7 +410,7 @@ during backtrace.
 #+(and 64-bit relocatable-static-space)
 (define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
   (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
-  (value :init :unbound :set-trans %set-symbol-global-value)
+  (value :init :unbound)
   (info :ref-trans symbol-%info :ref-known (flushable)
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
@@ -425,7 +424,7 @@ during backtrace.
   ;; have to work for NIL-as-cons, so they have to be NIL and NIL, which have to
   ;; also be the correct value when reading the slot of NIL-as-symbol.
   (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
-  (value :init :unbound :set-trans %set-symbol-global-value)
+  (value :init :unbound)
   (info :ref-trans symbol-%info :ref-known (flushable)
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)

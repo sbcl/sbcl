@@ -40,6 +40,7 @@
   (:vop-var vop)
   (:temporary (:sc unsigned-reg) val-temp)
   (:gc-barrier 0 1 0)
+  (:ignore name)
   (:generator 1
     (cond #+ubsan
           ((and (eql offset sb-vm:array-fill-pointer-slot) ; half-sized slot
@@ -59,10 +60,7 @@
              (emit-code-page-gengc-barrier object val-temp)
              (emit-store (object-slot-ea object offset lowtag) value val-temp)))
           (t
-           (when barrier
-            (if (eq name '%set-symbol-global-value)
-                (emit-symbol-write-barrier vop object val-temp (vop-nth-arg 1 vop))
-                (emit-gengc-barrier object nil val-temp t)))
+           (when barrier (emit-gengc-barrier object nil val-temp t))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
 (defun add-symbol-to-remset (vop symbol)
