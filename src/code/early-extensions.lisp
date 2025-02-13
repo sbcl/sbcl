@@ -226,47 +226,52 @@
         (dx ())
         (ignores ()))
     (dolist (spec collections)
-      (destructuring-bind (name &optional initial-value (collector nil collectorp)
-                                &aux (n-value (copy-symbol name)))
-          spec
-        (push `(,n-value ,(if (or initial-value collectorp)
-                              initial-value
-                              `(#-sb-xc-host unaligned-dx-cons
-                                #+sb-xc-host list
-                                nil)))
-              binds)
-        (let ((macro-body
-               (cond
-                 (collectorp
-                   ``(progn
-                       ,@(mapcar (lambda (x)
-                                   `(setq ,',n-value (,',collector ,x ,',n-value)))
-                                 args)
-                       ,',n-value))
-                 ((not initial-value)
-                  ;; Use a dummy cons to skip the test for TAIL being NIL with each
-                  ;; inserted item.
-                  (push n-value dx)
-                  (let ((n-tail (gensymify* name "-TAIL")))
-                    (push n-tail ignores)
-                    (push `(,n-tail ,n-value) binds)
-                    `(if args
-                         `(progn
+      (destructuring-bind (name &optional initial-value (collector nil collectorp)) spec
+        (multiple-value-bind (name append-tail)
+            (if (consp name)
+                (values (first name) (second name))
+                (values name nil))
+          (let ((n-value (copy-symbol name)))
+            (push `(,n-value ,(if (or initial-value collectorp)
+                                  initial-value
+                                  `(#-sb-xc-host unaligned-dx-cons
+                                    #+sb-xc-host list
+                                    nil)))
+                  binds)
+            (let* ((n-tail (gensymify* name "-TAIL"))
+                   (macro-body
+                     (cond
+                       (collectorp
+                        ``(progn
                             ,@(mapcar (lambda (x)
-                                        `(setf ,',n-tail (setf (cdr ,',n-tail)
-                                                               (list ,x))))
-                                      args))
-                         `(cdr ,',n-value))))
-                 ;; collecting a list given a list to start with.
-                 ;; It's possible to use the "fancy" strategy to avoid testing for NIL
-                 ;; at each step but I choose not to.  The initializer would have to be
-                 ;; (cons nil initial-value). It's unimportant.
-                 (initial-value
-                  (let ((n-tail (gensymify* name "-TAIL")))
-                    (push n-tail ignores)
-                    (push `(,n-tail (last ,n-value)) binds)
-                    `(collect-list-expander ',n-value ',n-tail args))))))
-          (push `(,name (&rest args) ,macro-body) macros))))
+                                        `(setq ,',n-value (,',collector ,x ,',n-value)))
+                                      args)
+                            ,',n-value))
+                       ((not initial-value)
+                        ;; Use a dummy cons to skip the test for TAIL being NIL with each
+                        ;; inserted item.
+                        (push n-value dx)
+                        (push n-tail ignores)
+                        (push `(,n-tail ,n-value) binds)
+                        `(if args
+                             `(progn
+                                ,@(mapcar (lambda (x)
+                                            `(setf ,',n-tail (setf (cdr ,',n-tail)
+                                                                   (list ,x))))
+                                          args))
+                             `(cdr ,',n-value)))
+                       ;; collecting a list given a list to start with.
+                       ;; It's possible to use the "fancy" strategy to avoid testing for NIL
+                       ;; at each step but I choose not to.  The initializer would have to be
+                       ;; (cons nil initial-value). It's unimportant.
+                       (initial-value
+                        (let ((n-tail (gensymify* name "-TAIL")))
+                          (push n-tail ignores)
+                          (push `(,n-tail (last ,n-value)) binds)
+                          `(collect-list-expander ',n-value ',n-tail args))))))
+              (push `(,name (&rest args) ,macro-body) macros)
+              (when append-tail
+                (push `(,append-tail (x) `(setf (cdr ,',n-tail) ,x)) macros)))))))
     `(macrolet ,macros
        (let* ,(nreverse binds)
          ,@(if dx `((declare (dynamic-extent ,@dx))))

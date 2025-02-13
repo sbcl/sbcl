@@ -1999,49 +1999,89 @@ many elements are copied."
 ;;; LIST-REMOVE-MACRO does not include (removes) each element that satisfies
 ;;; the predicate.
 (defmacro list-remove-macro (pred reverse?)
-  `(let* ((sequence ,(if reverse?
-                         '(reverse (the list sequence))
-                         'sequence))
-          (%start ,(if reverse? '(- length end) 'start))
-          (%end ,(if reverse? '(- length start) 'end))
-          (splice (list nil))
-          (tail (and (/= %end length)
-                     (nthcdr %end sequence)))
-          (results ,(if reverse?
-                          ;; It's already copied by REVERSE, so it can
-                          ;; be modified here
-                          `(if (plusp %start)
-                               (let* ((tail (nthcdr (1- %start) sequence))
-                                      (remaining (cdr tail)))
-                                 (setf (cdr tail) nil)
-                                 (prog1 splice
-                                   (rplacd splice sequence)
-                                   (setf splice tail
-                                         sequence remaining)))
-                               splice)
-                          `(do ((index 0 (1+ index))
-                                (before-start splice))
-                               ((= index (the fixnum %start)) before-start)
-                             (declare (fixnum index))
-                             (setf splice
-                                   (cdr (rplacd splice (list (pop sequence)))))))))
-     (declare (dynamic-extent splice))
-     (do ((this-element)
-          (number-zapped 0))
-         ((cond ((eq tail sequence)
-                 (rplacd splice tail)
-                 t)
-                ((= number-zapped count)
-                 (rplacd splice sequence)
-                 t))
-          ,(if reverse?
-               '(nreverse (the list (cdr results)))
-               '(cdr results)))
-       (declare (index number-zapped))
-       (setf this-element (pop sequence))
-       (if ,pred
-           (incf number-zapped)
-           (setf splice (cdr (rplacd splice (list this-element))))))))
+  (if reverse?
+      `(let* ((sequence (reverse (the list sequence)))
+              (%start (- length end))
+              (%end (- length start))
+              (splice (list nil))
+              (tail (and (/= %end length)
+                         (nthcdr %end sequence)))
+              (results ;; It's already copied by REVERSE, so it can
+                       ;; be modified here
+                       (if (plusp %start)
+                           (let* ((tail (nthcdr (1- %start) sequence))
+                                  (remaining (cdr tail)))
+                             (setf (cdr tail) nil)
+                             (prog1 splice
+                               (rplacd splice sequence)
+                               (setf splice tail
+                                     sequence remaining)))
+                           splice)))
+         (declare (dynamic-extent splice))
+         (do ((this-element)
+              (number-zapped 0))
+             ((cond ((eq tail sequence)
+                     (rplacd splice tail)
+                     t)
+                    ((= number-zapped count)
+                     (rplacd splice sequence)
+                     t))
+              (nreverse (the list (cdr results))))
+           (declare (index number-zapped))
+           (setf this-element (pop sequence))
+           (if ,pred
+               (incf number-zapped)
+               (setf splice (cdr (rplacd splice (list this-element)))))))
+      `(let ((save sequence)
+             (list (nthcdr start sequence)))
+         (collect (((result append-tail)))
+           (if (eq count (1- most-positive-fixnum))
+               (if (/= end length)
+                   (loop for i from start below end
+                         do (let ((current list)
+                                  (this-element (pop list)))
+                              (cond (,pred
+                                     (loop for x on save
+                                           until (eq x current)
+                                           do (result (car x)))
+                                     (setf save list)))))
+                   (loop while list
+                         do (let ((current list)
+                                  (this-element (pop list)))
+                              (cond (,pred
+                                     (loop for x on save
+                                           until (eq x current)
+                                           do (result (car x)))
+                                     (setf save list))))))
+               (let ((number-zapped 0))
+                 (declare (index number-zapped))
+                 (if (/= end length)
+                     (loop for i from start below end
+                           while (< number-zapped count)
+                           do (let ((current list)
+                                    (this-element (pop list)))
+                                (cond (,pred
+                                       (incf number-zapped)
+                                       (loop for x on save
+                                             until (eq x current)
+                                             do (result (car x)))
+                                       (setf save list)))))
+                     (loop while (and list
+                                      (< number-zapped count))
+                           do (let ((current list)
+                                    (this-element (pop list)))
+                                (cond (,pred
+                                       (incf number-zapped)
+                                       (loop for x on save
+                                             until (eq x current)
+                                             do (result (car x)))
+                                       (setf save list))))))))
+           (let ((result (result)))
+             (cond (result
+                    (append-tail save)
+                    result)
+                   (t
+                    save)))))))
 
 (defmacro list-remove (pred)
   `(list-remove-macro ,pred nil))
