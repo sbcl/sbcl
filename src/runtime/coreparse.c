@@ -935,7 +935,8 @@ process_directory(int count, struct ndir_entry *entry,
         } else {
             off_t old = lseek(fd, 0, SEEK_CUR);
             lseek(fd, filepos, SEEK_SET);
-            size_t nread = read(fd, linkage_space, linkage_table_count*N_WORD_BYTES);
+            __attribute__((unused)) size_t nread
+                = read(fd, linkage_space, linkage_table_count*N_WORD_BYTES);
             gc_assert((int)nread == linkage_table_count*N_WORD_BYTES);
             lseek(fd, old, SEEK_SET);
         }
