@@ -87,22 +87,18 @@
                               slot-name operator class-name condition))))))
 
 (defun maybe-reparse-specifier (type)
-  (when (unknown-type-p type)
-    (let* ((spec (unknown-type-specifier type))
-           (name (if (consp spec)
-                     (car spec)
-                     spec)))
-      (when (info :type :kind name)
-        (let ((new-type (specifier-type spec)))
-          (unless (unknown-type-p new-type)
-            new-type))))))
+  (if (contains-unknown-type-p type)
+      (handler-case (specifier-type (type-specifier type))
+        (parse-unknown-type ()
+          type))
+      type))
 
 ;;; Evil macro.
 (defmacro maybe-reparse-specifier! (type)
   (aver (symbolp type))
   (with-unique-names (new-type)
     `(let ((,new-type (maybe-reparse-specifier ,type)))
-       (when ,new-type
+       (unless (eq ,new-type ,type)
          (setf ,type ,new-type)
          t))))
 

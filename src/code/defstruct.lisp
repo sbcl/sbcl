@@ -2047,7 +2047,7 @@ or they must be declared locally notinline at each call site.~@:>"
                  `(function (,type ,dd-name) (values ,type &optional))  ; writer
                  `(function (,dd-name) (values ,type &optional))))))))) ; reader
      (t
-      type))))
+      (sb-kernel::maybe-reparse-specifier type)))))
 
 ;;; Given a DD and a constructor spec (a cons of name and pre-parsed
 ;;; BOA lambda list, or the symbol :DEFAULT), return the effective
