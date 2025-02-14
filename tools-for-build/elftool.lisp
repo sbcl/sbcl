@@ -472,6 +472,7 @@
 (defconstant core-align #+x86-64 4096 #+arm64 65536)
 
 (defun write-preamble (output n-lisp-linkage-words)
+  (declare (ignore n-lisp-linkage-words))
   #+linkage-space (format output
                           " .globl lisp_fun_linkage_space
  .bss~% .align 8~% .size lisp_fun_linkage_space, ~D
