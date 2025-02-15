@@ -258,7 +258,7 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                 long request = oversized ? nbytes : (sword_t)a->uw_growth_amount;
                 if (a->uw_length + request > a->uw_size_limit) { // limit reached
                     ARENA_MUTEX_RELEASE(a);
-                     lose("Fatal: won't add arena %s block. Arena %p length=%lx request=%lx max=%lx",
+                     lose("Fatal: won't add arena %s block. Arena %p length=%#lx request=%#lx max=%#lx",
                           oversized ? "huge-object" : "extension", a,
                          (long)a->uw_length, (long)request, (long)a->uw_size_limit);
                 }
