@@ -417,7 +417,9 @@
          ((eq (info :variable :kind (tn-value symbol)) :global)
           ;; Call should have been elided in IR1 if always bound.
           ;; (what about ':EVENTUALLY and compiling to memory- is is always bound yet?)
-          (aver (neq (info :variable :always-bound (tn-value symbol)) :always-bound))
+          ;; Difficulty: this has to be aware of the policy decision
+          ;; that inhibits the BOUNDP transform.
+          ;; (aver (neq (info :variable :always-bound (tn-value symbol)) :always-bound))
           (inst cmp :byte (cond ((sc-is symbol constant)
                                  (inst mov temp symbol)
                                  (object-slot-ea temp symbol-value-slot other-pointer-lowtag))
