@@ -325,7 +325,7 @@
                  (let ((value (symbol-value name)))
                    (make-constant value (ctype-of value) name)))
                 (t
-                 (make-global-var kind name where-from type)))))))
+                 (make-global-var kind name where-from (sb-kernel::maybe-reparse-specifier type))))))))
 
 ;;; Return T if and only if OBJ's nature as an externalizable thing renders
 ;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
