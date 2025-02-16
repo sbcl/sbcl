@@ -757,18 +757,14 @@ and no value was provided for it." name)))))))))))
         (dolist (arg arglist)
           (cond
             ((lambda-var-arg-info arg)
-             (let* ((info (lambda-var-arg-info arg))
-                    (default-p (arg-info-default-p info)))
+             (let* ((info (lambda-var-arg-info arg)))
                (ecase (arg-info-kind info)
                  (:keyword
                   (let* ((key (arg-info-key info))
                          (kinfo (find key keys :key #'key-info-name)))
                     (cond
                       (kinfo
-                       (res (if default-p
-                                (key-info-type kinfo)
-                                (type-union (key-info-type kinfo)
-                                            (specifier-type 'null)))))
+                       (res (key-info-type kinfo)))
                       (t
                        (note-lossage
                         "Defining a ~S keyword not present in ~A."
@@ -778,12 +774,8 @@ and no value was provided for it." name)))))))))))
                  (:optional
                   ;; We can exhaust TYPE-OPTIONAL when the type was
                   ;; simplified as described above.
-                  (res (let ((type (or (pop type-optional)
-                                       *universal-type*)))
-                         (if default-p
-                             type
-                             (type-union type
-                                         (specifier-type 'null))))))
+                  (res (or (pop type-optional)
+                           *universal-type*)))
                  (:rest
                   (when (fun-type-rest type)
                     (res (specifier-type 'list))))
@@ -882,12 +874,18 @@ and no value was provided for it." name)))))))))))
                                  policy
                                  'ftype-context)))
            (loop for var in vars
+                 for arg-info = (lambda-var-arg-info var)
                  for type in types do
-                 (cond ((basic-var-sets var)
-                        (setf (leaf-defined-type var) type))
-                       ((and (listp really-assert) ; (:NOT . ,vars)
+                 (cond ((and (listp really-assert) ; (:NOT . ,vars)
                              (member (lambda-var-%source-name var)
                                      (cdr really-assert)))) ; do nothing
+                       ((or (basic-var-sets var)
+                            ;; optional args have to account for
+                            ;; default values and will be checked
+                            ;; elswhere.
+                            (and arg-info
+                                 (memq (arg-info-kind arg-info) '(:keyword :optional))))
+                        (setf (leaf-defined-type var) type))
                        (t
                         (setf (leaf-type var) type)
                         (let ((s-type (make-single-value-type type)))

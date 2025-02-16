@@ -4627,3 +4627,32 @@
                              (when (f)
                                (f)))))))
                    :allow-notes nil))
+
+(declaim (ftype (function (&key (:a fixnum)) t) ftype-test-key)
+         (ftype (function (&optional fixnum) t) ftype-test-opt))
+(defun ftype-test-key (&key (a nil))
+  a)
+(defun ftype-test-opt (&optional (a nil))
+  a)
+
+(with-test (:name :ftype-optional)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (ftype-test-opt))
+   (() nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (ftype-test-key))
+   (() nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (ftype-test-key :a a))
+   ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (ftype-test-opt a))
+   ((nil) (condition 'type-error))))

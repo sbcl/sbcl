@@ -41,7 +41,7 @@ rm -fr sandbox/scratch
  "PRINT.BACKQUOTE.RANDOM.4" "PRINT.BACKQUOTE.RANDOM.5" "PROCLAIM.ERROR.7"
  "SHIFTF.7"
  "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
- "UNION.FOLD.1" "SUBTYPEP-COMPLEX.8"
+ "UNION.FOLD.1" "SUBTYPEP-COMPLEX.8" "FORMAT./.17"
  (append #+win32 (list "PROBE-FILE.4")
          #+x86 (list "CIS.4")
          #+(or arm (and arm64 (not darwin)))
