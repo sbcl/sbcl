@@ -210,3 +210,21 @@
       (funcall x 10)))
   (defun component-xep-references.4 ()
     (component-xep-references-mi 1)))
+
+(declaim (ftype (function (&key (:a fixnum)) t) compiledftype-test-key)
+         (ftype (function (&optional fixnum) t) compiledftype-test-opt))
+
+(defun compiledftype-test-key (&key a)
+  a)
+(defun compiledftype-test-opt (&optional (a nil))
+  a)
+
+(with-test (:name :ftype-optional)
+  (assert (type-specifiers-equal
+           (caddr
+            (sb-kernel:%simple-fun-type #'compiledftype-test-key))
+           '(values (or null fixnum) &optional)))
+  (assert (type-specifiers-equal
+           (caddr
+            (sb-kernel:%simple-fun-type #'compiledftype-test-opt))
+           '(values (or null fixnum) &optional))))

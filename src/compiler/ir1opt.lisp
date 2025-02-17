@@ -2517,72 +2517,73 @@
 ;;; If the function has an XEP, then we don't do anything, since we
 ;;; won't discover anything.
 ;;;
-;;; If the function is an optional-entry-point, we will just make sure
-;;; &REST lists are known to be lists. Doing the regular rigamarole
-;;; can erroneously propagate too strict types into refs: see
-;;; BUG-655203-REGRESSION in tests/compiler.pure.lisp.
-;;;
+
 ;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
 ;;; corresponding to changed arguments in CALL, since the only use in
 ;;; IR1 optimization of the REOPTIMIZE flag for local call args is
 ;;; right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
-  (unless (functional-entry-fun fun)
-    (if (and (lambda-optional-dispatch fun)
-             (not (functional-kind-eq (lambda-optional-dispatch fun) deleted)))
-        ;; We can still make sure &REST is known to be a list.
-        (loop for var in (lambda-vars fun)
-              do (let ((info (lambda-var-arg-info var)))
-                   (when (and info (eq :rest (arg-info-kind info)))
-                     (propagate-from-sets var (specifier-type 'list)))))
-        ;; The normal case.
-        (let* ((vars (lambda-vars fun))
-               (union (mapcar (lambda (arg var)
-                                (when (and arg
-                                           (lvar-reoptimize arg)
-                                           (null (basic-var-sets var)))
-                                  (list (lvar-type arg))))
-                              (basic-combination-args call)
-                              vars))
-               (this-ref (lvar-use (basic-combination-fun call))))
+  (unless (or (functional-entry-fun fun)
+              (and (lambda-optional-dispatch fun)
+                   (let ((entry (functional-entry-fun (lambda-optional-dispatch fun))))
+                     ;; If no references can turn this into a local
+                     ;; call then optional dispacthes can propagate
+                     ;; their default args.
+                     (when (and entry
+                                (not (loop for ref in (leaf-refs entry)
+                                           always (combination-is (node-dest ref) '(sb-impl::%defun)))))
+                       ;; We can still make sure &REST is known to be a list.
+                       (loop for var in (lambda-vars fun)
+                             do (let ((info (lambda-var-arg-info var)))
+                                  (when (and info (eq :rest (arg-info-kind info)))
+                                    (propagate-from-sets var (specifier-type 'list)))))
+                       t))))
+    (let* ((vars (lambda-vars fun))
+           (union (mapcar (lambda (arg var)
+                            (when (and arg
+                                       (lvar-reoptimize arg)
+                                       (null (basic-var-sets var)))
+                              (list (lvar-type arg))))
+                          (basic-combination-args call)
+                          vars))
+           (this-ref (lvar-use (basic-combination-fun call))))
 
-          (dolist (arg (basic-combination-args call))
-            (when arg
-              (setf (lvar-reoptimize arg) nil)))
+      (dolist (arg (basic-combination-args call))
+        (when arg
+          (setf (lvar-reoptimize arg) nil)))
+      (dolist (ref (leaf-refs fun))
+        (let ((dest (node-dest ref)))
+          (unless (or (eq ref this-ref) (not dest))
+            (setq union
+                  (mapcar (lambda (this-arg old)
+                            (when old
+                              (setf (lvar-reoptimize this-arg) nil)
+                              (cons (lvar-type this-arg) old)))
+                          (basic-combination-args dest)
+                          union)))))
 
-          (dolist (ref (leaf-refs fun))
-            (let ((dest (node-dest ref)))
-              (unless (or (eq ref this-ref) (not dest))
-                (setq union
-                      (mapcar (lambda (this-arg old)
-                                (when old
-                                  (setf (lvar-reoptimize this-arg) nil)
-                                  (cons (lvar-type this-arg) old)))
-                              (basic-combination-args dest)
-                              union)))))
+      (loop for var in vars
+            and type in union
+            when type do (propagate-to-refs var (sb-kernel::%type-union type)))
 
-          (loop for var in vars
-                and type in union
-                when type do (propagate-to-refs var (sb-kernel::%type-union type)))
-
-          ;; It's possible to discover new inline calls which may have
-          ;; incompatible argument types, so don't allow reuse of this
-          ;; functional during future inline expansion to prevent
-          ;; spurious type conflicts.
-          (let ((defined-fun (and (functional-inline-expanded fun)
-                                  (gethash (leaf-%source-name fun)
-                                           (free-funs *ir1-namespace*)))))
-            (when (defined-fun-p defined-fun)
-              (do ((args (basic-combination-args call) (cdr args))
-                   (vars vars (cdr vars)))
-                  ((null args))
-                (let ((arg (car args))
-                      (var (car vars)))
-                  (unless (and arg
-                               (eq (leaf-type var) *universal-type*))
-                    (setf (defined-fun-functional defined-fun) nil)
-                    (return)))))))))
+      ;; It's possible to discover new inline calls which may have
+      ;; incompatible argument types, so don't allow reuse of this
+      ;; functional during future inline expansion to prevent
+      ;; spurious type conflicts.
+      (let ((defined-fun (and (functional-inline-expanded fun)
+                              (gethash (leaf-%source-name fun)
+                                       (free-funs *ir1-namespace*)))))
+        (when (defined-fun-p defined-fun)
+          (do ((args (basic-combination-args call) (cdr args))
+               (vars vars (cdr vars)))
+              ((null args))
+            (let ((arg (car args))
+                  (var (car vars)))
+              (unless (and arg
+                           (eq (leaf-type var) *universal-type*))
+                (setf (defined-fun-functional defined-fun) nil)
+                (return))))))))
 
   (values))
 
