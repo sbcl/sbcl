@@ -37,7 +37,7 @@
 (defun fname-linkage-index (fname)
   (etypecase fname
     ((and symbol (not null))
-     (ldb (byte n-linkage-index-bits 0)
+     (ldb (byte n-linkage-index-bits symbol-linkage-index-pos)
           (with-pinned-objects (fname)
             (#+big-endian sap-ref-word #+little-endian sap-ref-32
              (int-sap (get-lisp-obj-address fname))
@@ -107,7 +107,11 @@
                   (let ((simply-callable (ensure-simplistic (fdefn-fun fname) fname)))
                     (with-pinned-objects (simply-callable)
                       (multiple-value-bind (entrypoint cell) (entry-addr index simply-callable)
-                        (%primitive set-fname-linkage-index fname index cell entrypoint))))
+                        ;; SYMBOL-LINKAGE-INDEX-POS is 3 so do the vop a favor and shift
+                        ;; the index into position. FDEFNs can do without a pre-shift.
+                        (let ((index
+                               (if (symbolp fname) (ash index symbol-linkage-index-pos) index)))
+                          (%primitive set-fname-linkage-index fname index cell entrypoint)))))
                   index)))))
       (bug "No more linkage table cells available. Rebuild SBCL with a larger table size")))
 

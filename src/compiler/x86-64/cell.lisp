@@ -525,7 +525,8 @@
     (inst mov :dword (ea (- 4 other-pointer-lowtag) object) index)
     (inst jmp CELL-SET)
     SYMBOL
-    (inst or :dword (object-slot-ea object symbol-hash-slot other-pointer-lowtag) index)
+    (inst or :dword :lock
+          (object-slot-ea object symbol-hash-slot other-pointer-lowtag) index)
     CELL-SET
     (inst mov (ea linkage-cell) linkage-val)))
 (define-vop (set-fname-fun)

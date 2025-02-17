@@ -424,8 +424,8 @@
        (defconstant n-symbol-hash-discard-bits
          (let ((precision (+ 32 n-symbol-hash-prng-bits))) ; total N bits
            (- 64 precision)))
-       ;; Allow .5 million global names, expandable to 4 million (22 bits)
        (defconstant n-linkage-index-bits (or #+linkage-space 19 0))
+       (defconstant symbol-linkage-index-pos 3) ; low 3 bits are reserved
        (defconstant-eqx sb-impl::symbol-hash-prng-byte
          (byte n-symbol-hash-prng-bits (- 32 n-symbol-hash-prng-bits))
          #'equal))

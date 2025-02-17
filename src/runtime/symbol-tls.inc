@@ -108,7 +108,7 @@ static inline unsigned int fdefn_linkage_index(struct fdefn* f) {
 static inline unsigned int symbol_linkage_index(struct symbol* s) {
     // never look at NIL's hash slot's low bits
     if ((uword_t)s == (STATIC_SPACE_START + NIL_SYMBOL_SLOTS_OFFSET)) return 0;
-    return s->hash & ((1<<N_LINKAGE_INDEX_BITS)-1);
+    return (s->hash >> WORD_SHIFT) & ((1<<N_LINKAGE_INDEX_BITS)-1);
 }
 
 static lispobj __attribute__((unused)) symbol_function(struct symbol* s) {

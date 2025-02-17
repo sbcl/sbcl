@@ -1207,7 +1207,12 @@ core and return a descriptor to it."
     (if (zerop (descriptor-bits fun)) *nil-descriptor* fun)))
 
 #+linkage-space
-(progn
+(macrolet ((index-word-and-byte-posn (x)
+             `(ecase (descriptor-widetag ,x)
+                (,sb-vm:symbol-widetag
+                 (values sb-vm:symbol-hash-slot sb-vm::symbol-linkage-index-pos))
+                (,sb-vm:fdefn-widetag
+                 (values 0 32)))))
 (defvar *fname-table*
   (make-array 6000 :initial-element 0 :fill-pointer 1 :adjustable nil))
 
@@ -1222,23 +1227,19 @@ core and return a descriptor to it."
 (defun fname-linkage-index (fname) ; modeled on the code in 'src/code/linkage-space'
   (let ((des (coerce-to-cold-fname fname)))
     (cond ((cold-null des) 0)
-          ((= (descriptor-widetag des) sb-vm:fdefn-widetag)
-           ;; upper 32 bits of object header
-           (ldb (byte sb-vm:n-linkage-index-bits 32) (read-bits-wordindexed des 0)))
-          (t
-           (ldb (byte sb-vm:n-linkage-index-bits 0)
-                (read-bits-wordindexed des sb-vm:symbol-hash-slot))))))
+          (t (multiple-value-bind (wordindex byte-pos) (index-word-and-byte-posn des)
+               (ldb (byte sb-vm:n-linkage-index-bits byte-pos)
+                    (read-bits-wordindexed des wordindex)))))))
 
 (defun ensure-linkage-index (fname)
   (let* ((des (coerce-to-cold-fname fname))
          (index (fname-linkage-index des)))
     (when (zerop index)
       (setq index (vector-push-extend des *fname-table*))
-      (if (= (descriptor-widetag des) sb-vm:fdefn-widetag)
-          (let ((header (read-bits-wordindexed des 0))) ; store to fdefn header
-            (write-wordindexed/raw des 0 (logior (ash index 32) header)))
-          (let ((hash (read-bits-wordindexed des sb-vm:symbol-hash-slot)))
-            (write-wordindexed/raw des sb-vm:symbol-hash-slot (logior hash index))))
+      (multiple-value-bind (wordindex byte-pos) (index-word-and-byte-posn des)
+        (let* ((oldbits (read-bits-wordindexed des wordindex))
+               (newbits (logior oldbits (ash index byte-pos))))
+          (write-wordindexed/raw des wordindex newbits)))
       (assert (= (fname-linkage-index fname) index)))
     index)))
 
