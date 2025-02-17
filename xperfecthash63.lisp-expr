@@ -63,6 +63,9 @@
 (#(0 27168950 92FE1EC2 CF5ABDAB F28A2060)
  "(:BYTE :WORD :DWORD :QWORD NIL)"
  "(  (& (+ (>> val 1) (>> val 25)) 7))")
+(#(0 2AFFE954 35870C8A 67514124 C9EACDAD)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ (>> val 2) (>> val 11)) 7))")
 (#(0 2AFFE954 35870C8A C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "(  (& (>> val 2) 3) )")
@@ -187,6 +190,9 @@
   (let ((b (>> val 29)))
    (let ((a (& val #x7)))
     (^ a (aref tab b))))))")
+(#(2 2AFFE954 35870C8A 67514124 C9EACDAD)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ val (>> val 6)) 7))")
 (#(2 2AFFE954 35870C8A C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "(  (& (>> val 2) 3) )")
@@ -321,6 +327,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
+(#(3 2AFFE954 35870C8A 67514124 C9EACDAD)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ (>> val 1) (>> val 26)) 7))")
 (#(3 2AFFE954 35870C8A C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "(  (& val 3) )")
@@ -1475,6 +1484,9 @@
   (let ((b (& (>> val 10) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(2AFFE954 35870C8A 67514124 B02153B3 C9EACDAD)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ (>> val 1) (>> val 16)) 7))")
 (#(2AFFE954 35870C8A B02153B3 C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "(  (& val 3) )")
@@ -2043,8 +2055,5 @@
 (#(B02153B3 C49039A2 DB6D6FD7 E487643D F5B1443E)
  "(SIMPLE-VECTOR VECTOR CONS LIST NIL)"
  "(  (& (+ (>> val 1) (>> val 4)) 7))")
-(#(3 2AFFE954 35870C8A 67514124 C9EACDAD)
- "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
- "(  (& (+ (>> val 1) (>> val 26)) 7))")
 )
 ;; EOF

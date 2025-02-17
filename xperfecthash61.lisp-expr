@@ -73,6 +73,9 @@
   (let ((b (& val #x7)))
    (let ((a (>> val 29)))
     (^ a (aref tab b))))))")
+(#(0 2AFFE954 35870C8A 67514124 C9EACDAD)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ (>> val 2) (>> val 11)) 7))")
 (#(0 2AFFE954 35870C8A C9EACDAD)
  "(:UNSPECIFIC :WILD :NEWEST NIL)"
  "(  (& (>> val 2) 3) )")

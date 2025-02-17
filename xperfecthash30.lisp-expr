@@ -1413,6 +1413,9 @@
   (let ((b (& val #xf)))
    (let ((a (>> (<< val 7) 28)))
     (^ a (aref tab b))))))")
+(#(7514124 9EACDAD AFFE954 102153B3 15870C8A)
+ "(:NEWEST :UNC :WILD :UNSPECIFIC NIL)"
+ "(  (& (+ (>> val 1) (>> val 16)) 7))")
 (#(7514124 9EACDAD 102153B3 15870C8A)
  "(:UNC :WILD :UNSPECIFIC NIL)"
  "(  (& val 3) )")
