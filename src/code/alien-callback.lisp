@@ -28,13 +28,13 @@
 ;;;;
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
 
-(define-load-time-global *alien-callback-saps*
+(define-load-time-global *alien-callbacks*
   (make-array 32 :fill-pointer 0 :adjustable t
                  :initial-element nil)
-  "An array of all callback SAPs indexed by their order of creation.")
+  "An array of all callback aliens indexed by their order of creation.")
 
 (defun alien-callback-index (alien)
-  (position (alien-sap alien) *alien-callback-saps* :test #'sap=))
+  (position alien *alien-callbacks* :test #'eq))
 
 (defun invalid-alien-callback (&rest arguments)
   (declare (ignore arguments))
@@ -43,21 +43,19 @@
 (define-load-time-global *alien-callback-functions*
     (make-array 32 :fill-pointer 0 :adjustable t
                 :initial-element #'invalid-alien-callback)
-  "An array of Lisp callback functions associated to SAPs of the same index.")
+  "An array of Lisp callback functions associated to aliens of the same index.")
 
 (define-load-time-global *free-alien-callback-indices*
     (make-hash-table :test #'equal)
   "A cache of free alien callback indices keyed by type specifier.")
 
-(defun %alien-callback-alien (alien-fun-type function)
-  (let* ((specifier (unparse-alien-type alien-fun-type))
-         (free-indices (gethash specifier *free-alien-callback-indices*)))
+(defun %alien-callback-alien (alien-fun-type specifier function)
+  (let ((free-indices (gethash specifier *free-alien-callback-indices*)))
     (cond
       (free-indices
        (let ((index (pop (gethash specifier *free-alien-callback-indices*))))
          (setf (aref *alien-callback-functions* index) function)
-         (%sap-alien (aref *alien-callback-saps* index)
-                     alien-fun-type)))
+         (aref *alien-callbacks* index)))
       (t
        (let* ((index (fill-pointer *alien-callback-functions*))
               (argument-types (alien-fun-type-arg-types alien-fun-type))
@@ -83,9 +81,10 @@
                      0))))
          (vector-push-extend function *alien-callback-functions*)
          ;; Assembler-wrapper is static, so sap-taking is safe.
-         (let ((sap (vector-sap assembler-wrapper)))
-           (vector-push-extend sap *alien-callback-saps*)
-           (%sap-alien sap alien-fun-type)))))))
+         (let ((alien (%sap-alien (vector-sap assembler-wrapper)
+                                  alien-fun-type)))
+           (vector-push-extend alien *alien-callbacks*)
+           alien))))))
 
 (defun alien-type-word-aligned-bits (type)
   (align-offset (alien-type-bits type) sb-vm:n-word-bits))
@@ -113,9 +112,8 @@
 
 ;;; Invalidate the alien function ALIEN allocated by Lisp and allow
 ;;; its entry point to be reused by other callables of the same type.
-(defun free-alien-callable (alien)
-  (let* ((specifier (unparse-alien-type (alien-value-type alien)))
-         (index (alien-callback-index alien)))
+(defun free-alien-callable (alien specifier)
+  (let ((index (alien-callback-index alien)))
     (unless index
       (error "Trying to free a callable alien ~A not allocated by Lisp." alien))
     (when (member index (gethash specifier *free-alien-callback-indices*))
@@ -215,12 +213,12 @@
   (setf (documentation (alien-callable-function name) doc-type)
         new-value))
 
-(defun %define-alien-callable (name function alien-fun-type)
+(defun %define-alien-callable (name function alien-fun-type specifier)
   (declare (type symbol name)
            (type function function))
   (flet ((register-new-callable ()
            (setf (gethash name *alien-callables*)
-                 (%alien-callback-alien alien-fun-type function))))
+                 (%alien-callback-alien alien-fun-type specifier function))))
     (let ((existing (alien-callable-function name)))
       (if existing
           (let ((old-type (alien-value-type existing)))
@@ -237,9 +235,11 @@ Attempt to redefine alien callable with incompatible return type.
    Old type was: ~A
     New type is: ~A" old-type alien-fun-type))
                          (c (format nil "~
-Create new alien callable (old alien callable gets freed).")))
+Create new alien callable (old alien callable gets freed)."))
+                         (existing-specifier (unparse-alien-type
+                                              (alien-value-type existing))))
                      (cerror c e)
-                     (free-alien-callable existing)
+                     (free-alien-callable existing existing-specifier)
                      (register-new-callable)))))
           (register-new-callable)))))
 
@@ -262,11 +262,13 @@ redefinition of callable functions."
   (multiple-value-bind (lisp-name alien-name)
       (pick-lisp-and-alien-names name)
     (declare (ignore alien-name))
-    `(%define-alien-callable
-      ',lisp-name
-      (alien-lambda ,result-type ,typed-lambda-list
-        ,@body)
-      ',(parse-alien-fun-type result-type typed-lambda-list env))))
+    (let ((fun-type (parse-alien-fun-type result-type typed-lambda-list env)))
+      `(%define-alien-callable
+        ',lisp-name
+        (alien-lambda ,result-type ,typed-lambda-list
+          ,@body)
+        ',fun-type
+        ',(unparse-alien-type fun-type)))))
 
 (defmacro with-alien-callable (definitions
                                &body body
@@ -282,15 +284,17 @@ redefinition of callable functions."
     (dolist (definition definitions)
       (destructuring-bind (name result-type typed-lambda-list &body body)
           definition
-        (let ((fun-type (parse-alien-fun-type result-type
-                                              typed-lambda-list
-                                              env)))
+        (let* ((fun-type (parse-alien-fun-type result-type
+                                               typed-lambda-list
+                                               env))
+               (specifier (unparse-alien-type fun-type)))
           (bindings `(,name (%alien-callback-alien
                              ',fun-type
+                             ',specifier
                              (alien-lambda ,result-type ,typed-lambda-list
                                ,@body))))
           (declarations `(declare ((alien ,fun-type) ,name)))
-          (cleanup `(free-alien-callable ,name)))))
+          (cleanup `(free-alien-callable ,name ',specifier)))))
     `(let ,(bindings)
        ,@(declarations)
        (unwind-protect (progn ,@body)
@@ -308,7 +312,7 @@ callable designated by the alien."
     (declare (ignore alien-name))
     (let ((alien (alien-callable-function lisp-name)))
       (when alien
-        (free-alien-callable alien)))
+        (free-alien-callable alien (unparse-alien-type (alien-value-type alien)))))
     (remhash lisp-name *alien-callables*)))
 
 (defun initialize-alien-callable-symbol (name)
