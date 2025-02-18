@@ -1255,15 +1255,22 @@
        (let ((fun (bind-lambda node)))
          (functional-kind-case fun
            (let
-            (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
-                  for var in (lambda-vars fun)
-                  and val in (combination-args call)
-                  when (and val (lambda-var-constraints var))
-                  do (let ((type (lvar-type val)))
-                       (when (type-for-constraints-p type)
-                         (conset-add-constraint gen 'typep var type nil)))
-                     (maybe-add-eql-var-var-constraint var val gen)
-                     (add-var-result-constraints var val gen)))
+               (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
+                     for var in (lambda-vars fun)
+                     and val in (combination-args call)
+                     when (and val (lambda-var-constraints var))
+                     do (let ((type (lvar-type val)))
+                          (when (type-for-constraints-p type)
+                            (conset-add-constraint gen 'typep var type nil)))
+                        (maybe-add-eql-var-var-constraint var val gen)
+                        (add-var-result-constraints var val gen)))
+           ((nil)
+            (loop for var in (lambda-vars fun)
+                  for type = (leaf-defined-type var)
+                  do
+                  (when (and (lambda-var-constraints var)
+                             (type-for-constraints-p type))
+                    (conset-add-constraint gen 'typep var type nil))))
            (mv-let
             (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
       (ref

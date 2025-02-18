@@ -2544,13 +2544,11 @@
                                       (propagate-from-sets var (specifier-type 'list)))))
                          t)))))
     (let* ((vars (lambda-vars fun))
-           (union (mapcar (lambda (arg var)
+           (union (mapcar (lambda (arg)
                             (when (and arg
-                                       (lvar-reoptimize arg)
-                                       (null (basic-var-sets var)))
+                                       (lvar-reoptimize arg))
                               (list (lvar-type arg))))
-                          (basic-combination-args call)
-                          vars))
+                          (basic-combination-args call)))
            (this-ref (lvar-use (basic-combination-fun call))))
 
       (dolist (arg (basic-combination-args call))
@@ -2569,7 +2567,11 @@
 
       (loop for var in vars
             and type in union
-            when type do (propagate-to-refs var (sb-kernel::%type-union type)))
+            when type do
+            (let ((type (sb-kernel::%type-union type)))
+              (if (basic-var-sets var)
+                  (setf (leaf-defined-type var) type)
+                  (propagate-to-refs var type))))
 
       ;; It's possible to discover new inline calls which may have
       ;; incompatible argument types, so don't allow reuse of this
