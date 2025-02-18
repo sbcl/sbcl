@@ -127,8 +127,17 @@
    `(function ,result-type ,@(mapcar #'second typed-lambda-list))
    env))
 
+;;; Needed for old versions of CFFI.
 (defmacro alien-lambda (result-type typed-lambda-list &body body
                                                       &environment env)
+  (let ((fun-type (parse-alien-fun-type result-type typed-lambda-list env)))
+    `(%alien-callback-alien ',fun-type
+                            ',(unparse-alien-type fun-type)
+                            (alien-lambda2 ,result-type ,typed-lambda-list
+                              ,@body))))
+
+(defmacro alien-lambda2 (result-type typed-lambda-list &body body
+                                                       &environment env)
   (let* ((result-type
            (alien-fun-type-result-type
             (parse-alien-fun-type result-type typed-lambda-list env)))
@@ -265,7 +274,7 @@ redefinition of callable functions."
     (let ((fun-type (parse-alien-fun-type result-type typed-lambda-list env)))
       `(%define-alien-callable
         ',lisp-name
-        (alien-lambda ,result-type ,typed-lambda-list
+        (alien-lambda2 ,result-type ,typed-lambda-list
           ,@body)
         ',fun-type
         ',(unparse-alien-type fun-type)))))
@@ -291,7 +300,7 @@ redefinition of callable functions."
           (bindings `(,name (%alien-callback-alien
                              ',fun-type
                              ',specifier
-                             (alien-lambda ,result-type ,typed-lambda-list
+                             (alien-lambda2 ,result-type ,typed-lambda-list
                                ,@body))))
           (declarations `(declare ((alien ,fun-type) ,name)))
           (cleanup `(free-alien-callable ,name ',specifier)))))
