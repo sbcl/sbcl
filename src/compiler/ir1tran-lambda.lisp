@@ -1215,6 +1215,8 @@
   (let* ((type (massage-global-definition-type (leaf-type var) fun))
          (for-real (eq (leaf-where-from var) :declared))
          (explicit-check (getf (functional-plist fun) 'explicit-check)))
+    (when for-real
+      (setf (leaf-defined-type fun) type))
     (assert-definition-type
      fun type
      ;; KLUDGE: Common Lisp is such a dynamic language that in general

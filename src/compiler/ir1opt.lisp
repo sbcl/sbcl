@@ -2525,20 +2525,24 @@
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
   (unless (or (functional-entry-fun fun)
-              (and (lambda-optional-dispatch fun)
-                   (let ((entry (functional-entry-fun (lambda-optional-dispatch fun))))
-                     ;; If no references can turn this into a local
-                     ;; call then optional dispacthes can propagate
-                     ;; their default args.
-                     (when (and entry
-                                (not (loop for ref in (leaf-refs entry)
-                                           always (combination-is (node-dest ref) '(sb-impl::%defun)))))
-                       ;; We can still make sure &REST is known to be a list.
-                       (loop for var in (lambda-vars fun)
-                             do (let ((info (lambda-var-arg-info var)))
-                                  (when (and info (eq :rest (arg-info-kind info)))
-                                    (propagate-from-sets var (specifier-type 'list)))))
-                       t))))
+              (let ((optional (lambda-optional-dispatch fun)))
+                (and optional
+                     (not (functional-kind-eq optional deleted))
+                     (let ((entry (functional-entry-fun optional)))
+                       ;; If no references can turn this into a local
+                       ;; call then optional dispacthes can propagate
+                       ;; their default args.
+                       (unless (or (not entry)
+                                   (and
+                                    (fun-type-p (leaf-defined-type optional))
+                                    (loop for ref in (leaf-refs entry)
+                                          always (combination-is (node-dest ref) '(sb-impl::%defun)))))
+                         ;; We can still make sure &REST is known to be a list.
+                         (loop for var in (lambda-vars fun)
+                               do (let ((info (lambda-var-arg-info var)))
+                                    (when (and info (eq :rest (arg-info-kind info)))
+                                      (propagate-from-sets var (specifier-type 'list)))))
+                         t)))))
     (let* ((vars (lambda-vars fun))
            (union (mapcar (lambda (arg var)
                             (when (and arg
