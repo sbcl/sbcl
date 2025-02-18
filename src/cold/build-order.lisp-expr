@@ -441,6 +441,7 @@
  ("src/compiler/{arch}/subprim")
  ("src/compiler/{arch}/debug")
  ("src/compiler/{arch}/cell")
+ #+(and x86-64 sb-thread) ("src/compiler/{arch}/tls")
  ("src/compiler/{arch}/call")
  ("src/compiler/{arch}/nlx")
  ("src/compiler/generic/late-nlx")

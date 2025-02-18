@@ -85,14 +85,6 @@
 (defmacro load-symbol (reg symbol)
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
-;; Return the effective address of the value slot of static SYMBOL.
-(defun static-symbol-value-ea (symbol &optional (byte 0))
-   (ea (+ nil-value
-          (static-symbol-offset symbol)
-          (ash symbol-value-slot word-shift)
-          byte
-          (- other-pointer-lowtag))))
-
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
   ;; Whether index is an an integer or a register, the EA constructor

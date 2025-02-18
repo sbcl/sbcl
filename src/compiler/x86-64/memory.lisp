@@ -148,22 +148,6 @@
       (inst neg result)))
     (inst xadd :lock (object-slot-ea object offset lowtag) result)))
 
-(define-vop (atomic-inc-symbol-global-value cell-xadd)
-  (:translate %atomic-inc-symbol-global-value)
-  ;; The function which this vop translates will not
-  ;; be used unless the variable is proclaimed as fixnum.
-  ;; All stores are checked in a safe policy, so this
-  ;; vop is safe because it increments a known fixnum.
-  (:policy :fast-safe)
-  (:arg-types * tagged-num)
-  (:variant symbol-value-slot other-pointer-lowtag))
-
-(define-vop (atomic-dec-symbol-global-value cell-xsub)
-  (:translate %atomic-dec-symbol-global-value)
-  (:policy :fast-safe)
-  (:arg-types * tagged-num)
-  (:variant symbol-value-slot other-pointer-lowtag))
-
 (macrolet
     ((def-atomic (fun-name inherit slot)
        `(progn
