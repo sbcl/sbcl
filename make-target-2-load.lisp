@@ -449,7 +449,8 @@ Please check that all strings which were not recognizable to the compiler
            (search "-OFFSET" (string symbol))
            (search "-TN" (string symbol))))
       (#.(find-package "SB-ALIEN")
-       (or (eq accessibility :external) (eq symbol 'sb-alien::alien-callback-p)))
+       (or (eq accessibility :external) (member symbol '(sb-alien::alien-callback-p
+                                                         sb-alien::alien-lambda))))
       (#.(mapcar 'find-package
                  '("SB-ASSEM" "SB-BROTHERTREE" "SB-DISASSEM" "SB-FORMAT"
                    "SB-IMPL" "SB-KERNEL" "SB-MOP" "SB-PCL" "SB-PRETTY" "SB-PROFILE"
