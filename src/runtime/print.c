@@ -490,8 +490,7 @@ static void print_slots(char **slots, int count, lispobj *ptr, iochannel_t io)
 static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
 {
     lispobj *ptr;
-    unsigned long header;
-    int count, type, index;
+    int index;
     char buffer[16];
 
     ptr = native_pointer(obj);
@@ -500,9 +499,11 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         return;
     }
 
-    count = object_size(ptr) - 1;
-    header = *ptr++;
-    type = header_widetag(header);
+    lispobj header = *ptr;
+    unsigned char type = header_widetag(header);
+    // recall that object_size deliberately croaks on simple-funs
+    int count = (type != SIMPLE_FUN_WIDETAG) ? (object_size(ptr) - 1) : 0;
+    ++ptr;
 
     print_obj("header: ", header, io);
     if (!other_immediate_lowtag_p(header)) {
@@ -661,11 +662,16 @@ static void print_fun_or_otherptr(lispobj obj, iochannel_t io)
         print_slots(code_slots, count-1, ptr, io);
         break;
 
-    case SIMPLE_FUN_WIDETAG:
-        print_obj("code: ", fun_code_tagged(ptr-1), io);
+    case SIMPLE_FUN_WIDETAG: {
+        struct simple_fun* fun = (void*)native_pointer(obj);
+        struct code* code = fun_code_header(fun);
+        print_obj("code: ", make_lispobj(code,OTHER_POINTER_LOWTAG), io);
         print_slots(simple_fun_slots,
                     sizeof simple_fun_slots/sizeof(char*)-1, ptr, io);
+        lispobj name = debug_function_name_from_pc(code, (char*)(2 + (lispobj*)fun));
+        print_obj("name: ", name, io);
         break;
+    }
 
 #ifdef RETURN_PC_WIDETAG
     case RETURN_PC_WIDETAG:

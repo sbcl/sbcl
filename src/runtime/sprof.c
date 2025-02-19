@@ -302,9 +302,6 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
     return len;
 }
 
-extern lispobj
-debug_function_name_from_pc (struct code* code, void *pc);
-
 static int gather_trace_from_frame(struct thread* thread, uword_t* fp,
                                    struct trace* trace, int limit)
 {

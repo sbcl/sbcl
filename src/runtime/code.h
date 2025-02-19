@@ -91,13 +91,7 @@ static inline unsigned int code_serialno(struct code* code) {
 #endif
 }
 
-static inline unsigned int code_n_named_calls(struct code* code) {
-#ifdef LISP_FEATURE_64_BIT
-    return code->boxed_size >> 32;
-#else
-    return 0;
-#endif
-}
+extern lispobj debug_function_name_from_pc (struct code* code, void *pc);
 
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions
