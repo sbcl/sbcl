@@ -2343,14 +2343,16 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
            "STRING>=*" "STRING>*" "STRING=*" "STRING<=*"
            "STRING<*" "STRING/=*" "%SVSET"
-           "SIMPLE-BASE-STRING=" #+sb-unicode "SIMPLE-CHARACTER-STRING="
-                                 "%SP-STRING-COMPARE" "%SP-STRING="
-                                 "%SETNTH" "%SETELT"
-                                 "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
-                                 "%SET-FDEFINITION" "%SCHARSET"
-                                 "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
-                                 "%WITH-OUTPUT-TO-STRING"
-                                 "INLINE-VOP")
+           "SIMPLE-BASE-STRING="
+           #+sb-unicode "SIMPLE-CHARACTER-STRING="
+           "%SP-STRING-COMPARE" "%SP-STRING="
+           "%SETNTH" "%SETELT"
+           "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
+           "%SET-FDEFINITION" "%SCHARSET"
+           "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
+           "%WITH-OUTPUT-TO-STRING"
+           "INLINE-VOP"
+           "WRAP-IF")
   #+sb-simd-pack
   (:export "SIMD-PACK"
            "SIMD-PACK-P"

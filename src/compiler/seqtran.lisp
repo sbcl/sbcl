@@ -2948,133 +2948,138 @@
                               *
                               :node node)
   "expand inline"
+  (when (eq (lvar-type sequence) (specifier-type 'null))
+    (give-up-ir1-transform))
   (check-inlineability-of-find-position-if sequence from-end)
   (when (check-sequence-ranges sequence start end node :warn nil)
     (give-up-ir1-transform))
-  (block nil
-    (unless
-        (or
-         ;; These have compact inline expansion
-         (and (or (not key)
-                  (lvar-fun-is key '(identity)))
-              (let* ((sequence-type (type-intersection (lvar-type sequence)
-                                                       (specifier-type 'array)))
-                     (element-type (array-type-upgraded-element-type sequence-type))
-                     (et-specifier (type-specifier element-type))
-                     (test (lvar-fun-name* test))
-                     (item (lvar-type item))
-                     (simple (csubtypep sequence-type (specifier-type 'simple-array))))
-                (when (and (neq element-type *wild-type*)
-                           (case et-specifier
-                             ((double-float single-float)
-                              (and (csubtypep item element-type)
-                                   (memq test '(= eql equal equalp))))
-                             ((t)
-                              (eq test 'eq))
-                             (character
-                              (or (memq test '(eq eql equal char=))
-                                  (and (eq test 'char-equal)
-                                       (or (csubtypep item (specifier-type 'base-char))
-                                           (and (constant-lvar-p sequence)
-                                                (every (lambda (x) (typep x 'base-char))
-                                                       (lvar-value sequence)))))))
-                             (base-char
-                              (memq test '(eq eql equal char= char-equal)))
-                             (t
-                              (and (csubtypep element-type (specifier-type 'integer))
-                                   (or
-                                    (and (memq test '(= equalp))
-                                         (csubtypep item element-type))
-                                    (memq test '(eq eql equal)))))))
-                  (cond #+(or arm64 x86-64)
-                        ((and (member et-specifier '(base-char character
-                                                     (unsigned-byte 8)
-                                                     (signed-byte 8)
-                                                     (unsigned-byte 32)
-                                                     (signed-byte 32))
-                                      :test #'equal)
-                              (constant-lvar-p from-end)
-                              (neq test 'char-equal)
-                              (not (and (eq test 'char=)
-                                        (not (csubtypep item (specifier-type 'character))))))
-                         (flet ((gen (end &optional offset)
-                                  (multiple-value-bind (size test value)
-                                      (cond
-                                        ((eq et-specifier 'character)
-                                         (values #+sb-unicode 32  #-sb-unicode 8
-                                                 '(characterp item)
-                                                 '(char-code (truly-the character item))))
-                                        #+sb-unicode
-                                        ((eq et-specifier 'base-char)
-                                         (values 8 '(base-char-p item)
-                                                 '(char-code (truly-the base-char item))))
-                                        ((equal et-specifier '(unsigned-byte 8))
-                                         (values 8 '(typep item '(unsigned-byte 8))
-                                                 '(truly-the (unsigned-byte 8) item)))
-                                        ((equal et-specifier '(signed-byte 8))
-                                         (values 8 '(typep item '(signed-byte 8))
-                                                 '(truly-the (unsigned-byte 8)
-                                                   (ldb (byte 8 0)
-                                                    (truly-the (signed-byte 8) item)))))
-                                        ((equal et-specifier '(unsigned-byte 32))
-                                         (values 32 '(typep item '(unsigned-byte 32))
-                                                 '(truly-the (unsigned-byte 32) item)))
-                                        ((equal et-specifier '(signed-byte 32))
-                                         (values 32 '(typep item '(signed-byte 32))
-                                                 '(truly-the (unsigned-byte 32)
-                                                   (ldb (byte 32 0)
-                                                    (truly-the (signed-byte 32) item))))))
-                                    `(let ((pos (and ,test
-                                                     (,(if (= size 8)
-                                                           (if (lvar-value from-end)
-                                                               'sb-vm::simd-position8-from-end
-                                                               'sb-vm::simd-position8)
-                                                           (if (lvar-value from-end)
-                                                               'sb-vm::simd-position32-from-end
-                                                               'sb-vm::simd-position32))
-                                                      ,value
-                                                      sequence start ,end))))
-                                       (truly-the ,(node-derived-type node)
-                                                  (if pos
-                                                      (values item ,(if offset
-                                                                        `(- pos offset)
-                                                                        `pos))
-                                                      (values nil nil)))))))
-                           (cond (simple
-                                  (delay-ir1-transform node :constraint)
-                                  (return
-                                    (if (policy node (zerop insert-array-bounds-checks))
-                                        (gen '(or end (length sequence)))
-                                        `
-                                        (let* ((length (length sequence))
-                                               (end (or end length)))
-                                          (unless
-                                              (<= 0 start end length)
-                                            (sequence-bounding-indices-bad-error sequence start end))
-                                          ,(gen 'end)))))
-                                 ((policy node (> speed space))
-                                  (delay-ir1-transform node :constraint)
-                                  (return
-                                    `(with-array-data ((sequence sequence  :offset-var offset)
-                                                       (start start)
-                                                       (end end)
-                                                       :check-fill-pointer t)
-                                       ,(gen 'end 'offset)))))))
-                        ((and simple
-                              (or
-                               (policy node (zerop insert-array-bounds-checks))
-                               (and (constant-lvar-p start)
-                                    (eql (lvar-value start) 0)
-                                    (constant-lvar-p end)
-                                    (null (lvar-value end)))))
-                         t)))))
-         (policy node (> speed space)))
-      (give-up-ir1-transform))
-    ;; Delay to prefer the string and bit-vector transforms
-    (delay-ir1-transform node :constraint)
-    `(when sequence
-       (%find-position-vector-macro item sequence
-                                    from-end start end key test))))
+  (let ((null-p (types-equal-or-intersect (lvar-type sequence)
+                                          (specifier-type 'null))))
+    (wrap-if
+     null-p
+     '(if sequence)
+     (block nil
+       (unless
+           (or
+            ;; These have compact inline expansion
+            (and (or (not key)
+                     (lvar-fun-is key '(identity)))
+                 (let* ((sequence-type (type-intersection (lvar-type sequence)
+                                                          (specifier-type 'array)))
+                        (element-type (array-type-upgraded-element-type sequence-type))
+                        (et-specifier (type-specifier element-type))
+                        (test (lvar-fun-name* test))
+                        (item (lvar-type item))
+                        (simple (csubtypep sequence-type (specifier-type 'simple-array))))
+                   (when (and (neq element-type *wild-type*)
+                              (case et-specifier
+                                ((double-float single-float)
+                                 (and (csubtypep item element-type)
+                                      (memq test '(= eql equal equalp))))
+                                ((t)
+                                 (eq test 'eq))
+                                (character
+                                 (or (memq test '(eq eql equal char=))
+                                     (and (eq test 'char-equal)
+                                          (or (csubtypep item (specifier-type 'base-char))
+                                              (and (constant-lvar-p sequence)
+                                                   (every (lambda (x) (typep x 'base-char))
+                                                          (lvar-value sequence)))))))
+                                (base-char
+                                 (memq test '(eq eql equal char= char-equal)))
+                                (t
+                                 (and (csubtypep element-type (specifier-type 'integer))
+                                      (or
+                                       (and (memq test '(= equalp))
+                                            (csubtypep item element-type))
+                                       (memq test '(eq eql equal)))))))
+                     (cond #+(or arm64 x86-64)
+                           ((and (member et-specifier '(base-char character
+                                                        (unsigned-byte 8)
+                                                        (signed-byte 8)
+                                                        (unsigned-byte 32)
+                                                        (signed-byte 32))
+                                         :test #'equal)
+                                 (constant-lvar-p from-end)
+                                 (neq test 'char-equal)
+                                 (not (and (eq test 'char=)
+                                           (not (csubtypep item (specifier-type 'character))))))
+                            (flet ((gen (end &optional offset)
+                                     (multiple-value-bind (size test value)
+                                         (cond
+                                           ((eq et-specifier 'character)
+                                            (values #+sb-unicode 32  #-sb-unicode 8
+                                                    '(characterp item)
+                                                    '(char-code (truly-the character item))))
+                                           #+sb-unicode
+                                           ((eq et-specifier 'base-char)
+                                            (values 8 '(base-char-p item)
+                                                    '(char-code (truly-the base-char item))))
+                                           ((equal et-specifier '(unsigned-byte 8))
+                                            (values 8 '(typep item '(unsigned-byte 8))
+                                                    '(truly-the (unsigned-byte 8) item)))
+                                           ((equal et-specifier '(signed-byte 8))
+                                            (values 8 '(typep item '(signed-byte 8))
+                                                    '(truly-the (unsigned-byte 8)
+                                                      (ldb (byte 8 0)
+                                                       (truly-the (signed-byte 8) item)))))
+                                           ((equal et-specifier '(unsigned-byte 32))
+                                            (values 32 '(typep item '(unsigned-byte 32))
+                                                    '(truly-the (unsigned-byte 32) item)))
+                                           ((equal et-specifier '(signed-byte 32))
+                                            (values 32 '(typep item '(signed-byte 32))
+                                                    '(truly-the (unsigned-byte 32)
+                                                      (ldb (byte 32 0)
+                                                       (truly-the (signed-byte 32) item))))))
+                                       `(let ((pos (and ,test
+                                                        (,(if (= size 8)
+                                                              (if (lvar-value from-end)
+                                                                  'sb-vm::simd-position8-from-end
+                                                                  'sb-vm::simd-position8)
+                                                              (if (lvar-value from-end)
+                                                                  'sb-vm::simd-position32-from-end
+                                                                  'sb-vm::simd-position32))
+                                                         ,value
+                                                         sequence start ,end))))
+                                          (truly-the ,(node-derived-type node)
+                                                     (if pos
+                                                         (values item ,(if offset
+                                                                           `(- pos offset)
+                                                                           `pos))
+                                                         (values nil nil)))))))
+                              (cond (simple
+                                     (delay-ir1-transform node :constraint)
+                                     (return
+                                       (if (policy node (zerop insert-array-bounds-checks))
+                                           (gen '(or end (length sequence)))
+                                           `(let* ((length (length sequence))
+                                                   (end (or end length)))
+                                              (unless
+                                                  (<= 0 start end length)
+                                                (sequence-bounding-indices-bad-error sequence start end))
+                                              ,(gen 'end)))))
+                                    ((policy node (> speed space))
+                                     (delay-ir1-transform node :constraint)
+                                     (return
+                                       `(with-array-data ((sequence sequence  :offset-var offset)
+                                                          (start start)
+                                                          (end end)
+                                                          :check-fill-pointer t)
+                                          ,(gen 'end 'offset)))))))
+                           ((and simple
+                                 (or
+                                  (policy node (zerop insert-array-bounds-checks))
+                                  (and (constant-lvar-p start)
+                                       (eql (lvar-value start) 0)
+                                       (constant-lvar-p end)
+                                       (null (lvar-value end)))))
+                            t)))))
+            (policy node (> speed space)))
+         (give-up-ir1-transform))
+       ;; Delay to prefer the string and bit-vector transforms
+       (delay-ir1-transform node :constraint)
+       `(%find-position-vector-macro item sequence
+                                     from-end start end key test)))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
                               (t string t t t function function)
