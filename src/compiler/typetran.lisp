@@ -74,13 +74,8 @@
                 (unless (hash-table-p table)
                   (setq table (dump/restore-interesting-types 'read)))
                 (setf (gethash type table) t))))
-          (let* ((object-sym (gensym))
-                 (exp (%source-transform-typep-simple object-sym type)))
-            (if exp
-                `(let ((,object-sym ,object))
-                   (declare (ignorable ,object-sym))
-                   ,exp)
-                (values nil t)))))
+          (or (%source-transform-typep-simple object type)
+              (values nil t))))
       (values nil t)))
 
 (deftransform typep ((object type &optional env) * * :node node)
@@ -97,7 +92,7 @@
               ((not (types-equal-or-intersect object-type ctype))
                nil)
               (t
-               (%source-transform-typep 'object object type ctype node)))
+               (transform-typep 'object object type ctype node)))
       (check-deprecated-type type))))
 
 (sb-xc:deftype other-pointer ()
@@ -1320,6 +1315,7 @@
 
 ;;; Transform to backend predicates without delaying, they have their
 ;;; own optimizers and are visible to constraints.
+;;; Should evaluate OBJECT once.
 (defun %source-transform-typep-simple (object type &optional ctype)
   (let ((ctype (or ctype
                    (handler-bind
@@ -1330,10 +1326,8 @@
                      (careful-specifier-type type)))))
    (when ctype
      (or
-      ;; It's purely a waste of compiler resources to wait for IR1 to
-      ;; see these 2 edge cases that can be decided right now.
-      (cond ((eq ctype *universal-type*) t)
-            ((eq ctype *empty-type*) nil))
+      (cond ((eq ctype *universal-type*) `(progn ,object t))
+            ((eq ctype *empty-type*) `(progn ,object nil)))
       (and (not (intersection-type-p ctype))
            (multiple-value-bind (constantp value) (type-singleton-p ctype)
              (and constantp
@@ -1365,7 +1359,7 @@
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
 ;;; when, so we ignore policy and always do them.
-(defun %source-transform-typep (object object-lvar type ctype node)
+(defun transform-typep (object object-lvar type ctype node)
   (or
    (%source-transform-typep-simple object type ctype)
    (progn
@@ -1385,7 +1379,7 @@
         `(if (member ,object ',(member-type-members ctype)) t))
        (args-type
         (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-        (return-from %source-transform-typep (values nil t)))
+        (return-from transform-typep (values nil t)))
        (classoid
         `(%instance-typep ,object ',type))
        (array-type
