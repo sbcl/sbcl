@@ -4192,6 +4192,13 @@
                                (test-fixnum lo hi)
                                (inst cmp x (imm hi))
                                (inst jmp (if not-p :g :le) target))
+                              ((and (> lo 0)
+                                    (= (logcount (+ hi (fixnumize 1))) 1)
+                                    (>= hi lowest-bignum-address))
+                               (inst test x (imm (lognot hi)))
+                               (inst jmp :ne (if not-p target skip))
+                               (inst cmp x (imm lo))
+                               (inst jmp (if not-p :l :ge) target))
                               (t
                                (if (= lo 0)
                                    (setf temp x)
