@@ -691,11 +691,8 @@
 (define-vop (non-null-symbol-p type-predicate)
   (:translate non-null-symbol-p)
   (:generator 7
-    (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'null))
-      (inst cmp value null-tn)
-      (inst b :eq (if not-p target drop-thru)))
-    (test-type value temp target not-p (symbol-widetag) :value-tn-ref args)
-    drop-thru))
+    (test-type value temp target not-p (symbol-widetag) :value-tn-ref args
+               :nil-in-other-pointers nil)))
 
 (define-vop (consp type-predicate)
   (:translate consp)
