@@ -802,7 +802,17 @@
                          (multiple-value-bind (widetags more)
                              (sb-kernel::widetags-from-union-type negated)
                            (cond ((not more)
-                                  `(%other-pointer-subtype-p ,object ',(set-difference base-tags widetags))))))))
+                                  `(%other-pointer-subtype-p ,object ',(set-difference base-tags widetags)))))))
+                  (test (types negated)
+                    `(and ,@(and types
+                                 `((typep ,object
+                                          '(and ,@(mapcar #'type-specifier types)))))
+                          (not
+                           (typep ,object
+                                  '(or ,@(mapcar (lambda (x) (if (ctype-p x)
+                                                                 (type-specifier x)
+                                                                 x))
+                                          negated)))))))
              (cond
                ;; (and array (not vector))
                ((and (eq (car types) (specifier-type 'array))
@@ -816,13 +826,19 @@
                ((and (eq (car types) (specifier-type 'vector))
                      (not (cdr types))
                      (widetag-test sb-vm::+vector-widetags+)))
+               ;; Extract (and symbol (not null))
+               ((and (memq (specifier-type 'symbol) types)
+                     (let* ((mtype (find-if #'member-type-p negated))
+                            (members (when mtype (member-type-members mtype))))
+                       (when (member nil members)
+                         `(and (non-null-symbol-p ,object)
+                               ,(test (delq1 (specifier-type 'symbol) types)
+                                  (append (delq1 mtype negated)
+                                          (let ((rem (remove nil members)))
+                                            (when rem
+                                              `((member ,@rem)))))))))))
                (t
-                `(and ,@(and types
-                             `((typep ,object
-                                      '(and ,@(mapcar #'type-specifier types)))))
-                      (not
-                       (typep ,object
-                              '(or ,@(mapcar #'type-specifier negated)))))))))
+                (test types negated)))))
           (t
            `(and ,@(mapcar (lambda (x)
                              `(typep ,object ',(type-specifier x)))
