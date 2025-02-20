@@ -738,21 +738,22 @@ invoked. In that case it will store into PLACE and start over."
         (type (let ((ctype (sb-c::careful-specifier-type type)))
                 (if ctype
                     (type-specifier ctype)
-                    type))))
+                    type)))
+        (value (gensym)))
     (if (symbolp expanded)
-        `(unless (typep ,place ',type)
-           (setf ,place
-                 ,(if type-string
-                      `(check-type-error-trap '(,place . ,type) ,place (the string ,type-string))
-                      `(check-type-error-trap ',place ,place ',type)))
-           nil)
-        (let ((value (gensym)))
-          `(do ((,value ,place ,place))
-               ((typep ,value ',type))
+        `(let ((,value (the* (,type :use-annotations t) ,place)))
+           (unless (typep ,value ',type)
              (setf ,place
-                   (check-type-error ',place ,value ',type
-                                     ,@(and type-string
-                                            `(,type-string)))))))))
+                   ,(if type-string
+                        `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
+                        `(check-type-error-trap ',place ,value ',type)))
+             nil))
+        `(do ((,value (the* (,type :use-annotations t) ,place) ,place))
+             ((typep ,value ',type))
+           (setf ,place
+                 (check-type-error ',place ,value ',type
+                                   ,@(and type-string
+                                          `(,type-string))))))))
 
 ;;;; DEFINE-SYMBOL-MACRO
 

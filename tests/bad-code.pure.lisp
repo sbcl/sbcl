@@ -961,3 +961,11 @@
                                     (1 #'-))
                                   a 'b))
                       :allow-warnings t))))
+
+(with-test (:name :check-type-compile-time)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda ()
+                         (let ((x 10))
+                           (check-type x list)))
+                      :allow-warnings t))))
