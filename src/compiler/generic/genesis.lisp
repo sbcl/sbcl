@@ -1148,17 +1148,17 @@ core and return a descriptor to it."
       ;; arm64 can't use immobile symbols
       #+(and immobile-space x86-64) '*immobile-fixedobj*
       '*dynamic*))
-(defun assign-symbol-hash (descriptor wordindex name)
+(defun compute-symhash (name descriptor)
   ;; "why not just call sb-c::symbol-name-hash?" you ask? because: no symbol.
-  (let ((name-hash (sb-c::calc-symbol-name-hash name (length name))))
-    (let* ((salt (sb-impl::murmur3-fmix-word (descriptor-bits descriptor)))
-           (prng-byte sb-impl::symbol-hash-prng-byte)
-           ;; 64-bit: Low 4 bytes to high 4 bytes of slot
-           ;; 32-bit: name-hash to high 29 bits
-           ;; plus salt the hash any way you want as long as the build is reproducible.
-           (name-hash-pos (+ (byte-size prng-byte) (byte-position prng-byte)))
-           (hash (logior (ash name-hash name-hash-pos) (mask-field prng-byte salt))))
-      (write-wordindexed/raw descriptor wordindex hash))))
+  (let ((name-hash (sb-c::calc-symbol-name-hash name (length name)))
+        (salt (sb-impl::murmur3-fmix-word (descriptor-bits descriptor)))
+        (prng-byte sb-impl::symbol-hash-prng-byte))
+    ;; 64-bit: Low 4 bytes to high 4 bytes of slot
+    ;; 32-bit: name-hash to high 29 bits
+    ;; plus salt the hash any way you want as long as the build is reproducible.
+    (logior (ash name-hash (+ (byte-size prng-byte) (byte-position prng-byte)))
+            (mask-field prng-byte salt)
+            #+x86-64 #b111)))
 
 (defun set-symbol-pkgid (symbol pkg &optional (nil-slots-magic 0))
   (let ((wordindex (+ #-64-bit sb-vm:symbol-package-id-slot nil-slots-magic)))
@@ -1181,7 +1181,7 @@ core and return a descriptor to it."
              (pkg-id (if cold-package
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+)))
-        (assign-symbol-hash symbol sb-vm:symbol-hash-slot name)
+        (write-wordindexed/raw symbol sb-vm:symbol-hash-slot (compute-symhash name symbol))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
         (set-symbol-pkgid symbol pkg-id)
@@ -1839,7 +1839,7 @@ core and return a descriptor to it."
                 (bvref-word (descriptor-mem des) nil-cons-cdr-offs) sb-vm:nil-value))
         ;; Assign HASH if and only if NIL's hash is address-insensitive
         #+(or relocatable-static-space (not 64-bit))
-        (assign-symbol-hash des (+ 1 sb-vm:symbol-hash-slot) "NIL")
+        (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (compute-symhash "NIL" des))
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (set-symbol-pkgid des sb-impl::+package-id-lisp+ 1)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
