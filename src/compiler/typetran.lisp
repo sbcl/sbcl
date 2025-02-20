@@ -809,7 +809,7 @@
                      (not (cdr types))
                      (if (and (eq (car negated) (specifier-type 'vector))
                               (not (cdr negated)))
-                         `(%other-pointer-subtype-p ,object ',(set-difference sb-vm::+array-widetags+ sb-vm::+vector-widetags+))
+                         `(%other-pointer-subtype-p ,object '(,sb-vm:simple-array-widetag ,sb-vm:complex-array-widetag))
                          #+nil
                          (widetag-test sb-vm::+array-widetags+))))
                #+nil
