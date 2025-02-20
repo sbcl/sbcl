@@ -706,6 +706,12 @@
                        '(or ,@(mapcar #'type-specifier
                                (remove mtype types))
                          (member ,@(remove nil members))))))
+          ;; The same as above but for all symbols
+          ((and (find (specifier-type 'symbol) types)
+                (find-if #'cons-type-p types))
+           `(or (symbolp ,object)
+                (typep ,object
+                       '(or ,@(mapcar #'type-specifier (remove (specifier-type 'symbol) types))))))
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
           ((source-transform-union-numeric-typep object types))
