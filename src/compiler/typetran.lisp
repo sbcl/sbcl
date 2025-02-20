@@ -796,12 +796,33 @@
                 (t
                  (push type types))))
     (cond (negated
-           `(and ,@(and types
-                        `((typep ,object
-                                 '(and ,@(mapcar #'type-specifier types)))))
-                 (not
-                  (typep ,object
-                         '(or ,@(mapcar #'type-specifier negated))))))
+           (flet (#+nil ;; not always more compact
+                  (widetag-test (base-tags)
+                    (and (every #'array-type-p negated)
+                         (multiple-value-bind (widetags more)
+                             (sb-kernel::widetags-from-union-type negated)
+                           (cond ((not more)
+                                  `(%other-pointer-subtype-p ,object ',(set-difference base-tags widetags))))))))
+             (cond
+               ;; (and array (not vector))
+               ((and (eq (car types) (specifier-type 'array))
+                     (not (cdr types))
+                     (if (and (eq (car negated) (specifier-type 'vector))
+                              (not (cdr negated)))
+                         `(%other-pointer-subtype-p ,object ',(set-difference sb-vm::+array-widetags+ sb-vm::+vector-widetags+))
+                         #+nil
+                         (widetag-test sb-vm::+array-widetags+))))
+               #+nil
+               ((and (eq (car types) (specifier-type 'vector))
+                     (not (cdr types))
+                     (widetag-test sb-vm::+vector-widetags+)))
+               (t
+                `(and ,@(and types
+                             `((typep ,object
+                                      '(and ,@(mapcar #'type-specifier types)))))
+                      (not
+                       (typep ,object
+                              '(or ,@(mapcar #'type-specifier negated)))))))))
           (t
            `(and ,@(mapcar (lambda (x)
                              `(typep ,object ',(type-specifier x)))
