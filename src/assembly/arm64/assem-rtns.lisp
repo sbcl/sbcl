@@ -407,6 +407,7 @@
 
   (inst blr lr))
 
+#-sb-assembling
 (define-vop ()
   (:translate %continue-unwind)
   (:policy :fast-safe)

@@ -293,6 +293,7 @@
 
 ;;; Simply return and enter the loop in UNWIND instead of calling
 ;;; UNWIND directly
+#-sb-assembling
 (define-vop ()
   (:translate %continue-unwind)
   (:policy :fast-safe)

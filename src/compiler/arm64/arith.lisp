@@ -2166,38 +2166,6 @@
       (inst cmp high (asr r 63))
       (inst b :ne error))))
 
-(define-vop (overflow*-fixnum)
-  (:translate overflow*)
-  (:args (x :scs (any-reg))
-         (y :scs (signed-reg immediate)))
-  (:arg-types tagged-num tagged-num)
-  (:info type)
-  (:temporary (:sc signed-reg) high)
-  (:results (r :scs (any-reg) :from :load))
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (let* ((*location-context* (unless (eq type 'fixnum)
-                                 type))
-           (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
-      (let ((value (and (sc-is y immediate)
-                        (tn-value y))))
-        (cond ((and value
-                    (plusp value)
-                    (= (logcount value) 1))
-               (let ((shift (1- (integer-length value))))
-                 (inst lsl r x shift)
-                 (inst asr high x (- 64 shift))))
-              (t
-               (when value
-                 (load-immediate-word high value)
-                 (setf y high))
-               (inst mul r x y)
-               (inst smulh high x y))))
-      (inst cmp high (asr r 63))
-      (inst b :ne error))))
-
 (define-vop (overflow*-signed=>unsigned)
   (:translate overflow*)
   (:args (x :scs (signed-reg))
