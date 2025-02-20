@@ -2957,7 +2957,7 @@
                                           (specifier-type 'null))))
     (wrap-if
      null-p
-     '(if sequence)
+     '(if (not sequence) (values nil nil))
      (block nil
        (unless
            (or
