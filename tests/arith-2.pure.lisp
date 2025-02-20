@@ -667,3 +667,15 @@
      (logior x 10))
    (or (integer #.(+ most-negative-fixnum 10) -1)
        (integer 10 #.most-positive-fixnum))))
+
+(with-test (:name :range<=low-address)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (typep a '(integer 1 13)))
+    ((0.0) nil)
+    ((0) nil)
+    ((1) t)
+    ((6) t)
+    ((13) t)
+    ((14) nil)))

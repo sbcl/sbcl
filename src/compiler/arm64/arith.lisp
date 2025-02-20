@@ -3314,7 +3314,8 @@
                                               (load-immediate-word tmp-tn diff))
                                           (setf loaded tmp-tn))
                                         (cond
-                                          ((< diff lowest-bignum-address)
+                                          ((and (< -1 lo lowest-bignum-address)
+                                                (< -1 hi lowest-bignum-address))
                                            (inst cmp temp loaded))
                                           (tbz-label
                                            (inst tbnz* x 0 (if branch-not
