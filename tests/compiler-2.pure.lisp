@@ -4626,7 +4626,7 @@
                              (declare (inline f))
                              (when (f)
                                (f)))))))
-                   :allow-notes nil))
+                   :allow-notes 'code-deletion-note))
 
 (declaim (ftype (function (&key (:a fixnum)) t) ftype-test-key)
          (ftype (function (&optional fixnum) t) ftype-test-opt))

@@ -969,3 +969,11 @@
                          (let ((x 10))
                            (check-type x list)))
                       :allow-warnings t))))
+
+(with-test (:name :code-deletion-macros)
+  (assert
+   (nth-value 4
+              (checked-compile `(lambda ()
+                                  (when nil
+                                    (setf * 10)))
+                               :allow-notes 'code-deletion-note))))

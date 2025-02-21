@@ -877,6 +877,8 @@
   ;; happens with lexically-defined (MACROLET) macros here, anyway?
   (ecase (info :function :kind fun)
     (:macro
+     (when (eq (car *current-path*) 'original-source-start)
+       (setf (ctran-source-path start) *current-path*))
      (ir1-convert start next result
                   (careful-expand-macro (info :function :macro-function fun)
                                         form))
