@@ -152,7 +152,6 @@
 ;;; reference, otherwise we annotate for a single value.
 (defun annotate-fun-lvar (lvar &optional (delay t))
   (declare (type lvar lvar))
-  (aver (not (lvar-dynamic-extent lvar)))
   (let* ((tn-ptype (primitive-type (lvar-type lvar)))
          (info (make-ir2-lvar tn-ptype)))
     (setf (lvar-info lvar) info)

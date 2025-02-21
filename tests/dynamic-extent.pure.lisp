@@ -2216,3 +2216,31 @@
      (let ((x (make-list 100000 :initial-element 1)))
        (declare (dynamic-extent x))
        (reduce #'+ x)))))
+
+(with-test (:name :dynamic-extent-constantly-function-branch)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (x)
+       (let ((function (if x
+                           (constantly x)
+                           (constantly t))))
+         (declare (dynamic-extent function))
+         (funcall function)))
+     ((1) 1)
+     ((nil) t))))
+
+(with-test (:name :dynamic-extent-function-branch)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (x)
+       (let ((function (if x
+                           (lambda () x)
+                           (lambda () t))))
+         (declare (dynamic-extent function))
+         (when x
+           (assert (sb-ext:stack-allocated-p function)))
+         (funcall function)))
+     ((1) 1)
+     ((nil) t))))
