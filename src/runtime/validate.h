@@ -93,7 +93,11 @@
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-extern void allocate_lisp_dynamic_space(bool);
+#ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
+extern void ensure_undefined_alien(void);
+#else
+#define ensure_undefined_alien() {}
+#endif
 extern bool allocate_hardwired_spaces(bool);
 
 extern void

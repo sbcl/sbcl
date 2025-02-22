@@ -64,8 +64,7 @@ int os_reported_page_size;
 #include <sysinfoapi.h>
 #endif
 
-static void
-ensure_undefined_alien(void) {
+void sb_query_os_page_size() {
 #ifdef LISP_FEATURE_WIN32
     SYSTEM_INFO info;
     GetSystemInfo(&info);
@@ -73,6 +72,10 @@ ensure_undefined_alien(void) {
 #else
     os_reported_page_size = getpagesize();
 #endif
+}
+
+void ensure_undefined_alien(void) {
+    // Address of undefined_alien is unimportant so leave it until last to allocate
     os_vm_address_t start =
         os_alloc_gc_space(0, MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size);
     if (start) {
@@ -115,20 +118,6 @@ bool allocate_hardwired_spaces(bool hard_failp)
         exit(1);
     }
     return 1;
-}
-
-void
-allocate_lisp_dynamic_space(bool did_preinit)
-{
-    // Small spaces can be allocated after large spaces are.
-    // The above code is only utilized when heap relocation is disabled.
-    // And when so, failure to allocate dynamic space is fatal.
-    if (!did_preinit)
-      allocate_hardwired_spaces(1);
-
-#ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
-    ensure_undefined_alien();
-#endif
 }
 
 static inline void

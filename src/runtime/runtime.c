@@ -635,6 +635,8 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     lispobj initial_function;
     struct memsize_options memsize_options;
     memsize_options.present_in_core = 0;
+    extern void sb_query_os_page_size();
+    sb_query_os_page_size();
 
     bool have_hardwired_spaces = os_preinit(argv, envp);
 
@@ -695,7 +697,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     // FIXME: if the 'have' flag is 0 and you've disabled disabling of ASLR
     // then we haven't done an exec(), nor unmapped the mappings that were obtained
     // already obtained (if any) so it is unhelpful to try again here.
-    allocate_lisp_dynamic_space(have_hardwired_spaces);
+    if (!have_hardwired_spaces) allocate_hardwired_spaces(1);
     gc_init();
 
     /* If no core file was specified, look for one. */
@@ -763,6 +765,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     if (!options.disable_lossage_handler_p)
         enable_lossage_handler();
 
+    ensure_undefined_alien();
     os_link_runtime();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #ifdef CALLBACK_WRAPPER_TRAMPOLINE // not defined if #-sb-thread

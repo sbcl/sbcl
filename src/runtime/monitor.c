@@ -1442,7 +1442,9 @@ int main(int argc, char *argv[], char **envp)
         return 1;
     }
     bool have_hardwired_spaces = os_preinit(argv, envp);
-    allocate_lisp_dynamic_space(have_hardwired_spaces);
+    // Unlike in ordinary startup where we might try to call personality()
+    // to disable ASLR, this can't proceed if the preinit fails.
+    if (!have_hardwired_spaces) lose("failed to preinit");
     load_gc_crashdump(argv[1]);
     calc_asm_routine_bounds();
     gencgc_verbose = 1;
