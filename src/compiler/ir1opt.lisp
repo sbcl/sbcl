@@ -883,6 +883,8 @@
                                        (node-derived-type consequent-ref)
                                        (node-derived-type (block-start-node alternative)))
                                       :from-scratch t))
+                  ;; Avoid code deletion notes
+                  (setf (ctran-source-path (block-start alternative)) nil)
                   alternative))))
     (cond (victim
            (kill-if-branch-1 node test block victim))

@@ -976,4 +976,8 @@
               (checked-compile `(lambda ()
                                   (when nil
                                     (setf * 10)))
-                               :allow-notes 'code-deletion-note))))
+                               :allow-notes 'code-deletion-note)))
+  (checked-compile `(lambda (x)
+                      (unless x
+                        (or)))
+                   :allow-notes nil))
