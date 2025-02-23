@@ -265,8 +265,7 @@
   (makunbound '*!cold-toplevels*) ; so it gets GC'd
 
   ;; Need the static-space replica of the assembly routine jump vector
-  ;; filled in, and the static space vector of static fdefns.
-  ;; This matters only for code that gets compiled to dynamic space,
+  ;; filled in. This matters only for code that gets compiled to dynamic space,
   ;; so it's OK that it occurs somewhat late in cold-init.
   #+x86-64 (sb-vm::validate-asm-routine-vector)
 
