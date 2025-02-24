@@ -164,7 +164,7 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             memsize_options->thread_control_stack_size = optarray[3];
             memsize_options->thread_tls_bytes = optarray[4];
             /* If size is RUNTIME_OPTIONS_WORDS+1 then it accepts memsize options at runtime */
-            memsize_options->present_in_core = optarray[1] == RUNTIME_OPTIONS_WORDS ? 1 : 2; 
+            memsize_options->present_in_core = optarray[1] == RUNTIME_OPTIONS_WORDS ? 1 : 2;
         }
     }
 lose:
