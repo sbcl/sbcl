@@ -31,8 +31,6 @@
 
 (defun establish-return-frame (callback)
   "Establish an SEH frame for use as a target with PERFORM-TEST-UNWIND and invoke CALLBACK via FUNCALL"
-  ;; We don't use a LET here because we don't want to accidentally
-  ;; correct a blown binding stack pointer just yet.
   (with-alien-callable ((test void ()
                           (funcall callback)))
     (alien-funcall (extern-alien "establish_return_frame"
