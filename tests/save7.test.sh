@@ -23,7 +23,13 @@ if [ $? -ne 0 ]; then
 fi
 echo "::: Success"
 
-echo "::: Running :ALWAYS-ACCEPT-MEMORY-SIZES"
+run_sbcl_with_args --noinform --control-stack-size 384KB --dynamic-space-size 260MB \
+    --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
+  (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options :accept-runtime-options)
+EOF
+chmod u+x "$tmpcore"
+
+echo "::: Running :ACCEPT-MEMORY-SIZES"
 # next, check that tmpcore will accept memory size options.
 # Use --control-stack-size for the test, since we don't know the valid range
 # of dynamic space size for the OS/arch.

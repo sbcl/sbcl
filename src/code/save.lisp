@@ -129,6 +129,8 @@ The following &KEY arguments are defined:
      the standalone executable, and restored when the executable is
      run. This also inhibits normal runtime option processing, causing
      all command line arguments to be passed to the toplevel.
+     If :ACCEPT-RUNTIME-OPTIONS then --dynamic-space-size and
+     --control-stack-size are still processed by the runtime.
      Meaningless if :EXECUTABLE is NIL.
 
   :CALLABLE-EXPORTS
@@ -255,7 +257,10 @@ sufficiently motivated to do lengthy fixes."
           (gc-and-save name
                        (foreign-bool executable)
                        (foreign-bool purify)
-                       (foreign-bool save-runtime-options)
+                       (case save-runtime-options
+                         (:accept-runtime-options 2)
+                         ((nil) 0)
+                         (t 1))
                        (foreign-bool compression)
                        (or compression 0)
                        #+win32 (ecase application-type (:console 0) (:gui 1))

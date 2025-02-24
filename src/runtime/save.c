@@ -48,20 +48,25 @@
 
 /* write_memsize_options uses a simple serialization scheme that
  * consists of one word of magic, one word indicating the size of the
- * core entry, and one word per struct field. */
+ * core entry, and one word per struct field.
+ * options == 2 => accept memsize options at runtime.
+ * options == 1 => don't accept them
+*/
 static void
-write_memsize_options(FILE *file)
+write_memsize_options(FILE *file, int options)
 {
-    core_entry_elt_t optarray[RUNTIME_OPTIONS_WORDS] = {
+    size_t size = 5 + options -1;
+    core_entry_elt_t optarray[] = {
       RUNTIME_OPTIONS_MAGIC,
-      5, // number of words in this core header entry
+      size, // number of words in this core header entry
       dynamic_space_size,
       thread_control_stack_size,
-      dynamic_values_bytes
+      dynamic_values_bytes,
+      0
     };
 
-    if (RUNTIME_OPTIONS_WORDS !=
-        fwrite(optarray, sizeof(core_entry_elt_t), RUNTIME_OPTIONS_WORDS, file)) {
+    if (size !=
+        fwrite(optarray, sizeof(core_entry_elt_t), size, file)) {
         perror("Error writing runtime options to file");
     }
 }
@@ -253,7 +258,7 @@ static void unwind_binding_stack(struct thread* th)
 
 bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
-                        bool save_runtime_options,
+                        int save_runtime_options,
                         int core_compression_level)
 {
     bool verbose = !lisp_startup_options.noinform;
@@ -273,7 +278,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
      * all command-line arguments are available to Lisp in SB-EXT:*POSIX-ARGV*.
      * Otherwise command-line processing is performed as normal */
     if (save_runtime_options)
-        write_memsize_options(file);
+        write_memsize_options(file, save_runtime_options);
 
     int stringlen = strlen((const char *)build_id);
     int string_words = ALIGN_UP(stringlen, sizeof (core_entry_elt_t))
@@ -721,7 +726,7 @@ extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
  */
 void
 gc_and_save(char *filename, bool prepend_runtime, bool purify,
-            bool save_runtime_options, bool compressed,
+            int save_runtime_options, bool compressed,
             int compression_level, int application_type)
 {
     // FIXME: Instead of disabling purify for static space relocation,
