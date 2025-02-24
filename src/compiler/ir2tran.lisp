@@ -1103,7 +1103,7 @@
            (let ((name (uncross (lvar-fun-name lvar t))))
              ;; Always pass name as a literal symbol or list if #+linkage-space,
              ;; otherwise do so only if the fdefn is static.
-             (values (if (or #+linkage-space t (sb-vm::static-fdefn-offset name))
+             (values (if (or #+linkage-space t (static-fdefn-p name))
                          name
                          (make-load-time-constant-tn :fdefinition name))
                      name)))

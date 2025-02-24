@@ -19,10 +19,20 @@
 (defconstant-eqx +all-static-fdefns+
     #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)
 
+(locally
+#+sb-xc (declare (notinline position))
+;;; There are no static fdefns with linkage-space, but this predicate tests the nature
+;;; of the function, not the fdefn, e.g. could it be called from an assembly routine.
+;;; Also static-ness imparts changed behavior in LTN-ANALYZE-KNOWN-CALL and FUN-LVAR-TN.
+;;; Clearly it's asking about the function, but rev 34ef6951 claimed that static-fun-offset
+;;; was the wrong name for what is essentially the basis of the test so if that's wrong,
+;;; I don't know what else to name it.
+(defun sb-c::static-fdefn-p (name)
+  (if (position name +all-static-fdefns+) t nil))
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
+#-linkage-space
 (defun static-fdefn-offset (name)
-  #+sb-xc (declare (notinline position))
   (let ((static-fun-index (position name +all-static-fdefns+)))
     (and static-fun-index
          (+ (* (length +static-symbols+) (pad-data-block symbol-size))
@@ -32,4 +42,4 @@
             (* (1+ (logior (1+ instance-data-start) 1)) n-word-bytes)
             (- list-pointer-lowtag)
             (* static-fun-index (pad-data-block fdefn-size))
-            other-pointer-lowtag))))
+            other-pointer-lowtag)))))

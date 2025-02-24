@@ -958,7 +958,7 @@
                     (name (lvar-fun-name (combination-fun call))))
                 (and (leaf-has-source-name-p funleaf)
                      (eq name (leaf-source-name funleaf))
-                     (not (sb-vm::static-fdefn-offset name))
+                     (not (static-fdefn-p name))
                      (let ((info (basic-combination-fun-info call)))
                        (not (or (fun-info-ir2-convert info)
                                 (ir1-attributep (fun-info-attributes info)
