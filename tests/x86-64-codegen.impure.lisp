@@ -14,11 +14,6 @@
 (load "compiler-test-util.lisp")
 (import 'ctu:disassembly-lines)
 
-;;; This trivial function failed to compile due to rev 88d078fe
-(defun foo (&key k)
-  (make-list (reduce #'max (mapcar #'length k))))
-(compile 'foo)
-
 (with-test (:name :lowtag-test-elision)
   ;; This tests a certain behavior that while "undefined" should at least not
   ;; be fatal. This is important for things like hash-table :TEST where we might
@@ -29,7 +24,8 @@
   (let ((f (compile nil
                     '(lambda (x)
                       (typecase x
-                        ((or character number list sb-kernel:instance function) 1)
+                        ((or character number list sb-kernel:instance function)
+                         nil)
                         ;; After eliminating the preceding cases, the compiler knows
                         ;; that the only remaining pointer type is OTHER-POINTER,
                         ;; so it just tries to read the widetag.
@@ -43,7 +39,7 @@
     (assert (> a sb-vm:static-space-start))))
 
 (sb-vm::define-vop (tryme)
-    (:generator 1 (sb-assem:inst mov :byte (sb-vm::ea :gs sb-vm::rax-tn) 0)))
+  (:generator 1 (sb-assem:inst mov :byte (sb-vm::ea :gs sb-vm::rax-tn) 0)))
 (with-test (:name :try-gs-segment)
   (assert (loop for line in (disassembly-lines
                              (compile nil
@@ -1345,7 +1341,7 @@
               (checked-compile
                `(lambda (x)
                   (declare (optimize (sb-c::verify-arg-count 0)))
-                  (if (sb-kernel:non-null-symbol-p x) 'zook (foo)))))
+                  (if (sb-kernel:non-null-symbol-p x) 'zook (eval x)))))
              1)))
 
 (with-test (:name :disassemble-instance-type-test

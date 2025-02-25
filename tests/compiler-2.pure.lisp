@@ -4666,3 +4666,9 @@
            (caddr
             (sb-kernel:%simple-fun-type #'ftype-test-opt))
            '(values (or null fixnum) &optional))))
+
+;;; This trivial function failed to compile due to rev 88d078fe
+(with-test (:name :make-list-reduce)
+  (checked-compile
+   `(lambda (&key k)
+      (make-list (reduce #'max (mapcar #'length k))))))

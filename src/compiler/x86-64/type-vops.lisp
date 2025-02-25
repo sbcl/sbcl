@@ -161,34 +161,39 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-
-      (cond ((not load-widetag))
-            ((and value-tn-ref
-                  (eq lowtag other-pointer-lowtag)
-                  (other-pointer-tn-ref-p value-tn-ref t immediate-tested))) ; best case: lowtag is right
-            ((and value-tn-ref
-                  ;; If HEADERS contains a range, then list pointers have to be
-                  ;; disallowed - consider a list whose CAR has a fixnum that
-                  ;; spuriously matches the range test.
-                  (if (some #'listp headers)
-                      (headered-object-pointer-tn-ref-p value-tn-ref)
-                      (pointer-tn-ref-p value-tn-ref)))
-             ;; Emit one fewer conditional jump than the general case,
-             (inst mov temp value)
-             (inst and temp (lognot lowtag-mask))
-             (if (ea-p widetag-tn)
-                 (setq widetag-tn (ea temp))
-                 (setq untagged (ea temp))))
-            (t
-             ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
-             ;; an untagged ptr to VALUE if the lowtag test passes.
-             (setq untagged (ea temp))
-             (when (ea-p widetag-tn)
-               (setq widetag-tn untagged))
-             (when compute-temp
-               (%lea-for-lowtag-test temp value lowtag :qword))
-             (inst test :byte temp lowtag-mask)
-             (inst jmp :nz when-false)))
+      (when (and load-widetag
+                 ; best case: lowtag is right
+                 (not (and value-tn-ref
+                           (eq lowtag other-pointer-lowtag)
+                           (other-pointer-tn-ref-p value-tn-ref t immediate-tested))))
+        (multiple-value-bind (bit set) (tn-ref-lowtag-bit lowtag value-tn-ref
+                                                          t immediate-tested)
+          (cond (bit
+                 (inst test :byte value (ash 1 bit))
+                 (inst jmp (if (eq set 0) :nz :z) when-false))
+                ((and value-tn-ref
+                      ;; If HEADERS contains a range, then list pointers have to be
+                      ;; disallowed - consider a list whose CAR has a fixnum that
+                      ;; spuriously matches the range test.
+                      (if (some #'listp headers)
+                          (headered-object-pointer-tn-ref-p value-tn-ref)
+                          (pointer-tn-ref-p value-tn-ref)))
+                 ;; Emit one fewer conditional jump than the general case,
+                 (inst mov temp value)
+                 (inst and temp (lognot lowtag-mask))
+                 (if (ea-p widetag-tn)
+                     (setq widetag-tn (ea temp))
+                     (setq untagged (ea temp))))
+                (t
+                 ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
+                 ;; an untagged ptr to VALUE if the lowtag test passes.
+                 (setq untagged (ea temp))
+                 (when (ea-p widetag-tn)
+                   (setq widetag-tn untagged))
+                 (when compute-temp
+                   (%lea-for-lowtag-test temp value lowtag :qword))
+                 (inst test :byte temp lowtag-mask)
+                 (inst jmp :nz when-false)))))
 
       (when (and load-widetag
                  (eq widetag-tn temp))
@@ -543,11 +548,20 @@
 (macrolet ((define (name lowtag)
              `(define-vop (,name pointerp)
                 (:translate ,name)
+                (:arg-refs value-ref)
+                (:vop-var vop)
                 (:generator 2
-                  (if (location= temp value)
-                      (inst sub :dword value ,lowtag)
-                      (inst lea :dword temp (ea (- ,lowtag) value)))
-                  (inst test :byte temp lowtag-mask)))))
+                  (multiple-value-bind (bit set) (tn-ref-lowtag-bit ,lowtag value-ref)
+                    (cond
+                      (bit
+                       (inst test :byte value (ash 1 bit))
+                       (when (eq set 1)
+                         (change-vop-flags vop '(:nz))))
+                      (t
+                       (if (location= temp value)
+                           (inst sub :dword value ,lowtag)
+                           (inst lea :dword temp (ea (- ,lowtag) value)))
+                       (inst test :byte temp lowtag-mask))))))))
   (define functionp fun-pointer-lowtag)
   (define listp list-pointer-lowtag)
   (define %instancep instance-pointer-lowtag)
