@@ -70,15 +70,20 @@
     (case n-fixnum-tag-bits
      (1
       (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
-      (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
-                                      (specifier-type 'fixnum))
-        (inst test :byte temp 1)
-        (inst jmp :nz (if not-p drop-through target))) ; inverted
-      (when (or (/= immediate single-float-widetag)
-                (types-equal-or-intersect (tn-ref-type value-tn-ref)
-                                          (specifier-type 'single-float)))
-        (inst cmp :byte temp (- immediate other-pointer-lowtag))
-        (inst jmp :e (if not-p drop-through target)))
+      (cond ((and (eq immediate single-float-widetag)
+                  (number-or-other-pointer-tn-ref-p value-tn-ref))
+             (inst test :byte temp lowtag-mask)
+             (inst jmp :nz (if not-p drop-through target)))
+            (t
+             (when (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                             (specifier-type 'fixnum))
+               (inst test :byte temp 1)
+               (inst jmp :nz (if not-p drop-through target))) ; inverted
+             (when (or (/= immediate single-float-widetag)
+                       (types-equal-or-intersect (tn-ref-type value-tn-ref)
+                                                 (specifier-type 'single-float)))
+               (inst cmp :byte temp (- immediate other-pointer-lowtag))
+               (inst jmp :e (if not-p drop-through target)))))
 
       (%test-headers value temp target not-p nil headers
                      :drop-through drop-through :compute-temp nil

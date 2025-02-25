@@ -236,7 +236,15 @@
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (if permit-nil
-                 (specifier-type '(or cons . #1=(#+64-bit single-float function cons instance character)))
+                 (specifier-type '(or cons . #1=(#+64-bit single-float function instance character)))
+                 (specifier-type '(or list . #1#)))))))
+
+(defun number-or-other-pointer-tn-ref-p (tn-ref &optional permit-nil)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (not (types-equal-or-intersect
+             (tn-ref-type tn-ref)
+             (if permit-nil
+                 (specifier-type '(or cons . #1=(function instance character)))
                  (specifier-type '(or list . #1#)))))))
 
 ;;; Can LOWTAG be distinguished from other tn lowtags by testing a single bit?
