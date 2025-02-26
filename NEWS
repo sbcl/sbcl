@@ -1,5 +1,37 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.1:
+  * minor incompatible change: in some instances when the compiler cannot
+    prove that a NIL-valued branch is unreachable, where NIL is not compatible
+    with the expected type, a type warning will no longer be issued.
+  * enhancement: type errors in structure constructors are now restartable,
+    with a USE-VALUE restart provided.
+  * platform support
+    ** on Windows, make sure to commit memory after zeroing.  (lp#2097197,
+       reported by _3b)
+    ** on Linux, add the TCP_USER_TIMEOUT constant to SB-BSD-SOCKETS.  (thanks
+       to Mihai Bazon)
+    ** on *BSD, make TCP_KEEPCNT, TCP_KEEPIDLE and TCP_KEEPINTVL available
+       where the OS supports it.
+    ** on x86-64, optimize BOUNDP for known-global symbols.
+    ** on x86-64, optimize KEYWORDP for some arguments.
+    ** on arm64, don't trigger an assertion when using FMOV on complex
+       single-float registers.
+    ** on arm64, improve type checking for (AND SYMBOL (NOT NULL)).
+  * bug fix: using structure read macros with shared structure markers no
+    longer signals type errors when the shared structure is in a slot with a
+    type.  (lp#308936)
+  * bug fix: non-conforming user macros which modify their source no longer
+    trigger internal errors.  (lp#1371719, reported by _3b)
+  * bug fix: the combination of CONSTANTLY and DYNAMIC-EXTENT declarations no
+    longer causes an internal compiler error.  (lp#2059950, reported by
+    bohonghuang)
+  * bug fix: treat inlined functions analogously to constants in the compiler.
+    (lp#2095560, reported by Vasiliy Postnicov)
+  * optimization: elide bounds-checking for multidimensional arrays with known
+    dimensions.  (reported by aeth)
+  * optimization: alien callbacks are generally less heavyweight.
+
 changes in sbcl-2.5.1 relative to sbcl-2.5.0:
   * minor incompatible change: SBCL now reveals details of its COMPLEX
     representations through UPGRADED-COMPLEX-PART-TYPE, rather than hiding
