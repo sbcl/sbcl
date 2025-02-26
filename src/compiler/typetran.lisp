@@ -107,6 +107,46 @@
 (defun type-not-other-pointer-p (type)
   (csubtypep type (specifier-type '(not other-pointer))))
 
+(defun type-other-pointer-widetags (type)
+  (let ((type (type-intersection type (specifier-type 'other-pointer))))
+    (macrolet ((expand ()
+                 `(cond ,@(loop for classoid in sb-kernel::*builtin-classoids*
+                                when
+                                (destructuring-bind (name &key codes &allow-other-keys) classoid
+                                  (let ((ctype (specifier-type name)))
+                                   (when (and codes
+                                              (csubtypep ctype (specifier-type 'other-pointer))
+                                              (not (csubtypep ctype (specifier-type '(or complex array)))))
+                                     `((eq type (specifier-type ',name))
+                                       ',codes))))
+                                collect it)
+                        ((eq type (specifier-type 'array))
+                         ',sb-vm::+array-widetags+)
+                        ((eq type (specifier-type 'simple-array))
+                         ',sb-vm::+simple-array-widetags+)
+                        ((eq type (specifier-type '(simple-array * (*))))
+                         ',sb-vm::+simple-rank-1-array-widetags+)
+                        ((eq type (specifier-type 'vector))
+                         ',sb-vm::+vector-widetags+)
+                        ((eq type (specifier-type 'string))
+                         ',sb-vm::+string-widetags+)
+                        ((eq type (specifier-type '(and rational other-pointer)))
+                         '(,sb-vm:bignum-widetag ,sb-vm:ratio-widetag))
+                        ((eq type (specifier-type '(and real other-pointer)))
+                         '(,sb-vm:bignum-widetag
+                           #-64-bit ,sb-vm:single-float-widetag
+                           ,sb-vm:double-float-widetag
+                           ,sb-vm:ratio-widetag))
+                        ((eq type (specifier-type '(and number other-pointer)))
+                         '(,sb-vm:bignum-widetag
+                           #-64-bit ,sb-vm:single-float-widetag
+                           ,sb-vm:double-float-widetag
+                           ,sb-vm:ratio-widetag
+                           ,sb-vm:complex-rational-widetag
+                           ,sb-vm:complex-single-float-widetag
+                           ,sb-vm:complex-double-float-widetag)))))
+      (expand))))
+
 ;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
 ;;; GIVE-UP-IR1-TRANSFORM.
