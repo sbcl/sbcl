@@ -6,9 +6,15 @@ changes relative to sbcl-2.5.1:
     with the expected type, a type warning will no longer be issued.
   * enhancement: type errors in structure constructors are now restartable,
     with a USE-VALUE restart provided.
+  * enhancement: CHECK-TYPE warns about type conflicts at compile-time.
+  * enhancement: FTYPE declarations for functions which set their parameters
+    are checked.
+  * enhancement: new print control variable SB-EXT:*PRINT-CIRCLE-NOT-SHARED*,
+    when used in conjunction with *PRINT-CIRCLE*, prints #1# only for
+    circularities and not simple sharing.
   * platform support
-    ** on Windows, make sure to commit memory after zeroing.  (lp#2097197,
-       reported by _3b)
+    ** on Windows, make sure to commit memory after zeroing during
+       save-lisp-and-die. (lp#2097197, reported by _3b)
     ** on Linux, add the TCP_USER_TIMEOUT constant to SB-BSD-SOCKETS.  (thanks
        to Mihai Bazon)
     ** on *BSD, make TCP_KEEPCNT, TCP_KEEPIDLE and TCP_KEEPINTVL available
@@ -28,9 +34,13 @@ changes relative to sbcl-2.5.1:
     bohonghuang)
   * bug fix: treat inlined functions analogously to constants in the compiler.
     (lp#2095560, reported by Vasiliy Postnicov)
+  * bug fix: FTYPE declarations for &optional and &key arguments do not
+    include default values when checking types.
   * optimization: elide bounds-checking for multidimensional arrays with known
     dimensions.  (reported by aeth)
   * optimization: alien callbacks are generally less heavyweight.
+  * optimization: REMOVE shares the tail of the input list when there's
+    nothing to remove.
 
 changes in sbcl-2.5.1 relative to sbcl-2.5.0:
   * minor incompatible change: SBCL now reveals details of its COMPLEX
