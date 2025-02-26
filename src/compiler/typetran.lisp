@@ -225,6 +225,8 @@
                  (cond ((and pred
                              ;; Testing for fixnum is usually the cheapest
                              (or (eq pred 'fixnump)
+                                 (and (eq type (specifier-type 'instance))
+                                      (eq pred 'null))
                                  (memory-type-test-p type)))
                         `(not (,pred object)))
                        ((and (memory-type-test-p type)
@@ -1204,6 +1206,8 @@
        (compiler-error "can't compile TYPEP of anonymous or undefined ~
                         class:~%  ~S"
                        class))
+      ((eq class (type-intersection otype (specifier-type 'instance)))
+       `(%instancep object))
       (t
        ;; Delay the type transform to give type propagation a chance.
        (delay-ir1-transform node :constraint)
