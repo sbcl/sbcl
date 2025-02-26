@@ -444,7 +444,8 @@
                                 (specifier-type '(simple-array * (*))))
                finally (return (sb-kernel::%type-union types)))))
       (t
-       (when final
+       (when (or final
+                 (csubtypep type (specifier-type 'simple-array)))
          (specifier-type '(simple-array * (*))))))))
 
 (defoptimizer (array-storage-vector derive-type) ((array))
@@ -484,8 +485,8 @@
     (if (array-header-p array)
         (values (%array-data array) index)
         (values array index))
-    (%check-bound array (length data) index)
-    (values array index)))
+    (%check-bound array (vector-length data) index)
+    (values data index)))
 
 ;;; Only use %data-vector-and-index if element-type is known. Always
 ;;; using %data-vector-and-index will not help if a call to

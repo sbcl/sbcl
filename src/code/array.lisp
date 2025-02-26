@@ -787,21 +787,22 @@ of specialized arrays is supported."
                 (defun ,slow-accessor-name (array index ,@extra-params)
                   (declare (optimize speed (safety 0))
                            (array array))
-                  (if (not (%array-displaced-p array))
-                      ;; The reasonably quick path of non-displaced complex
-                      ;; arrays.
-                      (let ((array (%array-data array)))
-                        (%ref ,accessor-getter ,extra-params))
-                      ;; The real slow path.
-                      (with-array-data
-                          ((array array)
-                           (index (locally
-                                      (declare (optimize (speed 1) (safety 1)))
-                                    (,@check-bounds index)))
-                           (end)
-                           :force-inline t)
-                        (declare (ignore end))
-                        (%ref ,accessor-getter ,extra-params)))))))
+                  (let ((index (locally
+                                   (declare (optimize (speed 1) (safety 1)))
+                                 (,@check-bounds index))))
+                   (if (not (%array-displaced-p array))
+                       ;; The reasonably quick path of non-displaced complex
+                       ;; arrays.
+                       (let ((array (%array-data array)))
+                         (%ref ,accessor-getter ,extra-params))
+                       ;; The real slow path.
+                       (with-array-data
+                           ((array array)
+                            (index index)
+                            (end)
+                            :force-inline t)
+                         (declare (ignore end))
+                         (%ref ,accessor-getter ,extra-params))))))))
   (define hairy-data-vector-ref slow-hairy-data-vector-ref
     %find-data-vector-reffer
     nil (progn))
@@ -811,11 +812,11 @@ of specialized arrays is supported."
   (define hairy-data-vector-ref/check-bounds
       slow-hairy-data-vector-ref/check-bounds
     !find-data-vector-reffer/check-bounds
-    nil (check-bound array (%array-dimension array 0)))
+    nil (check-bound array (%array-available-elements array)))
   (define hairy-data-vector-set/check-bounds
       slow-hairy-data-vector-set/check-bounds
     !find-data-vector-setter/check-bounds
-    (new-value) (check-bound array (%array-dimension array 0))))
+    (new-value) (check-bound array (%array-available-elements array))))
 
 (defun hairy-ref-error (array index &optional new-value)
   (declare (ignore index new-value)

@@ -2384,7 +2384,7 @@
                    (not (csubtypep type (specifier-type 'simple-string))))
               (not (null (conservative-array-type-complexp type))))
       (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
-    `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-dimension array 0) 'index index))))
+    `(hairy-data-vector-ref array ,(check-bound-code 'array '(array-total-size array) 'index index))))
 
 (deftransform hairy-data-vector-set/check-bounds ((array index new-value) (simple-array t t))
   (let* ((type (lvar-type array))
@@ -2396,20 +2396,19 @@
             `(hairy-data-vector-set/check-bounds (the simple-vector array) index new-value)
             (give-up-ir1-transform "Upgraded element type of array is not known at compile time."))
         `(hairy-data-vector-set array
-                                ,(check-bound-code 'array '(array-dimension array 0) 'index index)
+                                ,(check-bound-code 'array '(array-total-size array) 'index index)
                                 new-value))))
 
 
-;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
-;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
-;;; array total size.
-(deftransform row-major-aref ((array index))
-  `(hairy-data-vector-ref array
-                          ,(check-bound-code 'array '(array-total-size array) 'index index)))
-(deftransform %set-row-major-aref ((array index new-value))
-  `(hairy-data-vector-set array
-                          ,(check-bound-code 'array '(array-total-size array) 'index index)
-                          new-value))
+;;; Just convert into a HAIRY-DATA-VECTOR-REF/SET
+(deftransform row-major-aref ((array index) * * :node node)
+  (if (policy node (zerop insert-array-bounds-checks))
+      `(hairy-data-vector-ref array index)
+      `(hairy-data-vector-ref/check-bounds array index)))
+(deftransform %set-row-major-aref ((array index new-value) * * :node node)
+  (if (policy node (zerop insert-array-bounds-checks))
+      `(hairy-data-vector-set array index new-value)
+      `(hairy-data-vector-set/check-bounds array index new-value)))
 
 ;;;; bit-vector array operation canonicalization
 ;;;;
@@ -2453,13 +2452,13 @@
 
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
-  (let ((type (lvar-type array))
-        (array-type (specifier-type 'array)))
-    (cond ((or (not (types-equal-or-intersect type array-type))
+  (let ((type (lvar-type array)))
+    (cond ((or (not (types-equal-or-intersect type (specifier-type 'array)))
                (csubtypep type (specifier-type '(simple-array * (*)))))
            (specifier-type 'null))
-          ((and (csubtypep type array-type)
-                (not (types-equal-or-intersect type (specifier-type 'simple-array))))
+          ((and (csubtypep type (specifier-type 'array))
+                (or (not (types-equal-or-intersect type (specifier-type 'vector)))
+                    (not (types-equal-or-intersect type (specifier-type 'simple-array)))))
            (specifier-type '(eql t)))
           ((not (array-type-p type))
            ;; FIXME: use analogue of ARRAY-TYPE-DIMENSIONS-OR-GIVE-UP
