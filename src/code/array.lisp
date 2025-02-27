@@ -762,8 +762,9 @@ of specialized arrays is supported."
 
 (macrolet ((%ref (accessor-getter extra-params &optional vector-check)
              `(sb-c::%funcall-no-nargs (,accessor-getter array ,vector-check) array index ,@extra-params))
-           (define (accessor-name slow-accessor-name accessor-getter
-                                  extra-params check-bounds)
+           (define (accessor-name slow-accessor-name
+                                  accessor-getter extra-params check-bounds
+                                  &optional (slow-accessor-getter accessor-getter))
              `(progn
                 (defun ,accessor-name (array index ,@extra-params)
                   (declare (explicit-check))
@@ -794,7 +795,7 @@ of specialized arrays is supported."
                        ;; The reasonably quick path of non-displaced complex
                        ;; arrays.
                        (let ((array (%array-data array)))
-                         (%ref ,accessor-getter ,extra-params))
+                         (%ref ,slow-accessor-getter ,extra-params))
                        ;; The real slow path.
                        (with-array-data
                            ((array array)
@@ -802,7 +803,7 @@ of specialized arrays is supported."
                             (end)
                             :force-inline t)
                          (declare (ignore end))
-                         (%ref ,accessor-getter ,extra-params))))))))
+                         (%ref ,slow-accessor-getter ,extra-params))))))))
   (define hairy-data-vector-ref slow-hairy-data-vector-ref
     %find-data-vector-reffer
     nil (progn))
@@ -812,11 +813,11 @@ of specialized arrays is supported."
   (define hairy-data-vector-ref/check-bounds
       slow-hairy-data-vector-ref/check-bounds
     !find-data-vector-reffer/check-bounds
-    nil (check-bound array (%array-available-elements array)))
+    nil (check-bound array (%array-available-elements array)) %find-data-vector-reffer)
   (define hairy-data-vector-set/check-bounds
       slow-hairy-data-vector-set/check-bounds
     !find-data-vector-setter/check-bounds
-    (new-value) (check-bound array (%array-available-elements array))))
+    (new-value) (check-bound array (%array-available-elements array)) !find-data-vector-setter))
 
 (defun hairy-ref-error (array index &optional new-value)
   (declare (ignore index new-value)
