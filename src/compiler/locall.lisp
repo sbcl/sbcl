@@ -69,7 +69,10 @@
                                (let ((leaf (ref-leaf use)))
                                  (when (lambda-var-p leaf)
                                    (loop for set in (lambda-var-sets leaf)
-                                         do (assert-lvar-type (set-value set) type policy name))))))
+                                         for home = (node-home-lambda set)
+                                         when (and home (lambda-optional-dispatch home))
+                                         do
+                                         (assert-lvar-type (set-value set) type policy name))))))
                            arg)
              (return))))
         (assert-lvar-type arg
