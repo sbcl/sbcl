@@ -68,11 +68,15 @@
                              (when (ref-p use)
                                (let ((leaf (ref-leaf use)))
                                  (when (lambda-var-p leaf)
-                                   (loop for set in (lambda-var-sets leaf)
-                                         for home = (node-home-lambda set)
-                                         when (and home (lambda-optional-dispatch home))
-                                         do
-                                         (assert-lvar-type (set-value set) type policy name))))))
+                                   (let ((home (lambda-home (lambda-var-home leaf))))
+                                     (when (and
+                                            (and home
+                                                 (lambda-optional-dispatch home))
+                                            (memq var
+                                                  (optional-dispatch-arglist (lambda-optional-dispatch home))))
+                                       (loop for set in (lambda-var-sets leaf)
+                                             do
+                                             (assert-lvar-type (set-value set) type policy name))))))))
                            arg)
              (return))))
         (assert-lvar-type arg
