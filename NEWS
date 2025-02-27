@@ -36,6 +36,8 @@ changes relative to sbcl-2.5.1:
     (lp#2095560, reported by Vasiliy Postnicov)
   * bug fix: FTYPE declarations for &optional and &key arguments do not
     include default values when checking types.
+  * bug fix: Storing coverage data no longer leads to miscompilations allowing
+    reachability of unreachable code.  (lp#2092451, reported by mrkissinger)
   * optimization: elide bounds-checking for multidimensional arrays with known
     dimensions.  (reported by aeth)
   * optimization: alien callbacks are generally less heavyweight.
