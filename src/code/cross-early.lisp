@@ -287,3 +287,6 @@
                                 et)))))
         (t
          (cl:coerce object type))))
+
+(defun simple-rank-1-array-*-p (x)
+  (typep x '(simple-array * (*))))

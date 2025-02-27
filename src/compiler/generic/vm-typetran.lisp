@@ -95,6 +95,8 @@
 (define-type-predicate simple-base-string-p simple-base-string)
 #+sb-unicode (define-type-predicate simple-character-string-p
                   (simple-array character (*)))
+(define-type-predicate simple-rank-1-array-*-p (simple-array * (*)))
+
 (define-type-predicate system-area-pointer-p system-area-pointer)
 
 (when-vop-existsp (:translate signed-byte-8-p)
