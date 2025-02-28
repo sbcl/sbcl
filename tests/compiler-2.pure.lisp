@@ -4629,13 +4629,19 @@
                    :allow-notes 'code-deletion-note))
 
 (declaim (ftype (function (&key (:a fixnum)) t) ftype-test-key)
-         (ftype (function (&optional fixnum) t) ftype-test-opt))
+         (ftype (function (&optional fixnum) t) ftype-test-opt)
+         (ftype (function (&optional fixnum &key (:b integer)) t) ftype-test-opt-key))
 (defun ftype-test-key (&key (a nil))
   a)
 (defun ftype-test-opt (&optional (a nil))
   a)
+(defun ftype-test-opt-key (&optional (a nil) &key (b nil))
+  (declare (muffle-conditions style-warning))
+  (values a b))
+
 (compile 'ftype-test-key)
 (compile 'ftype-test-opt)
+(compile 'ftype-test-opt-key)
 
 (with-test (:name :ftype-optional)
   (checked-compile-and-assert
@@ -4658,6 +4664,16 @@
    `(lambda (a)
       (ftype-test-opt a))
    ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+    ()
+   `(lambda (a)
+      (ftype-test-opt-key a))
+   ((nil) (condition 'type-error)))
+  (checked-compile-and-assert
+    ()
+   `(lambda (a b)
+      (ftype-test-opt-key a :b b))
+   ((0 nil) (condition 'type-error)))
   (assert (type-specifiers-equal
            (caddr
             (sb-kernel:%simple-fun-type #'ftype-test-key))

@@ -882,7 +882,7 @@ and no value was provided for it." name)))))))))))
                        ((or (basic-var-sets var)
                             ;; optional args have to account for
                             ;; default values and will be checked
-                            ;; elswhere.
+                            ;; elsewhere.
                             (and arg-info
                                  (memq (arg-info-kind arg-info) '(:keyword :optional))))
                         (setf (leaf-defined-type var) type))

@@ -24,7 +24,9 @@
           (component-kind component) :initial)
     (let* ((fun (let ((*allow-instrumenting* t))
                   (ir1-convert-lambdalike form
-                                          :source-name source-name)))
+                                          :source-name source-name
+                                          :ftype (and name
+                                                      (global-ftype name)))))
            ;; Convert the XEP using the policy of the real function. Otherwise
            ;; the wrong policy will be used for deciding whether to type-check
            ;; the parameters of the real function (via CONVERT-CALL /

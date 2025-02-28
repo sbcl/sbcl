@@ -60,24 +60,7 @@
           ;; ftypes are for calls and not definitions.
           (case (and arg-info
                      (arg-info-kind arg-info))
-            (:optional (return))
-            (:keyword
-             ;; ;; KLUDGE: keywords are converted before
-             ;; ;; leaf-defined-type is computed:
-             (map-all-uses (lambda (use)
-                             (when (ref-p use)
-                               (let ((leaf (ref-leaf use)))
-                                 (when (lambda-var-p leaf)
-                                   (let ((home (lambda-home (lambda-var-home leaf))))
-                                     (when (and
-                                            (and home
-                                                 (lambda-optional-dispatch home))
-                                            (memq var
-                                                  (optional-dispatch-arglist (lambda-optional-dispatch home))))
-                                       (loop for set in (lambda-var-sets leaf)
-                                             do
-                                             (assert-lvar-type (set-value set) type policy name))))))))
-                           arg)
+            ((:optional :keyword)
              (return))))
         (assert-lvar-type arg
                           type
@@ -283,7 +266,7 @@
                                  ,(if (= max n)
                                       `(multiple-value-bind (,n-context ,n-count)
                                            (%more-arg-context ,n-supplied ,max)
-                                         (%funcall ,more ,@temps ,n-context ,n-count))
+                                         (%funcall ,more ,@(make-args n) ,n-context ,n-count))
                                       ;; The &rest var is unused, call the main entry point directly
                                       `(%funcall ,ep
                                                  ,@(loop for supplied-p = nil
