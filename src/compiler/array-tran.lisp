@@ -1937,21 +1937,14 @@
 (defoptimizer (vector-length derive-type) ((vector))
   (vector-length-type (lvar-conservative-type vector)))
 
-;;; Again, if we can tell the results from the type, just use it.
-;;; Otherwise, if we know the rank, convert into a computation based
-;;; on array-dimension or %array-available-elements
-(deftransform array-total-size ((array) (array))
-  (let* ((array-type (lvar-type array))
-         (dims (array-type-dimensions-or-give-up array-type)))
-    (unless (listp dims)
-      (give-up-ir1-transform "can't tell the rank at compile time"))
-    (cond ((not (memq '* dims))
-           (reduce #'* dims))
-          ((not (cdr dims))
-           ;; A vector, can't use LENGTH since this ignores the fill-pointer
-           `(truly-the index (array-dimension array 0)))
-          (t
-           `(%array-available-elements array)))))
+(define-source-transform array-total-size (array)
+  `(let ((array ,array))
+     (cond ((typep array '(simple-array * (*)))
+            (length array))
+           ((arrayp array)
+            (%array-available-elements array))
+           (t
+            (%type-check-error/c array 'object-not-array-error nil)))))
 
 (unless-vop-existsp (:translate test-header-data-bit)
   (define-source-transform test-header-data-bit (array mask)

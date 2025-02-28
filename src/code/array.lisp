@@ -1150,12 +1150,7 @@ of specialized arrays is supported."
 (defun array-total-size (array)
   "Return the total number of elements in the Array."
   (declare (explicit-check))
-  (cond ((array-header-p array)
-         (%array-available-elements array))
-        ((typep array 'vector)
-         (length array))
-        (t
-         (sb-c::%type-check-error/c array 'object-not-array-error nil))))
+  (array-total-size array))
 
 (defun array-displacement (array)
   "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-offset
