@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.1:
+changes in sbcl-2.5.2 relative to sbcl-2.5.1:
   * minor incompatible change: in some instances when the compiler cannot
     prove that a NIL-valued branch is unreachable, where NIL is not compatible
     with the expected type, a type warning will no longer be issued.
