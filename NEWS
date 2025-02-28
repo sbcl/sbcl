@@ -4,6 +4,11 @@ changes relative to sbcl-2.5.1:
   * minor incompatible change: in some instances when the compiler cannot
     prove that a NIL-valued branch is unreachable, where NIL is not compatible
     with the expected type, a type warning will no longer be issued.
+  * minor incompatible change: the compiler will more strictly treat type
+    declarations for &OPTIONAL and &KEY arguments in FTYPE declarations, no
+    longer effectively adding an implicit (OR ... <default>) type when the
+    function itself has a default value not matching the declared type for
+    that argument.
   * enhancement: type errors in structure constructors are now restartable,
     with a USE-VALUE restart provided.
   * enhancement: CHECK-TYPE warns about type conflicts at compile-time.

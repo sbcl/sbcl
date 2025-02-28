@@ -1428,7 +1428,7 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
 (declaim (ftype (sfunction (semaphore &key
                                       (:n (integer 1))
                                       (:timeout (or null (real (0))))
-                                      (:notification semaphore-notification))
+                                      (:notification (or null semaphore-notification)))
                            (or null (integer 0)))
                 wait-on-semaphore))
 (defun wait-on-semaphore (semaphore &key (n 1) timeout notification)
