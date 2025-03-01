@@ -583,7 +583,7 @@ static void relocate_heap(struct heap_adjust* adj)
     // itself.
     adjust_pointers((void*)(NIL - LIST_POINTER_LOWTAG), 1, adj);
 #endif
-    fix_space(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, adj);
+    fix_space((uword_t)NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, adj);
     fix_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_PERMGEN
     fix_space(PERMGEN_SPACE_START, permgen_space_free_pointer, adj);

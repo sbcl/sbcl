@@ -927,7 +927,7 @@ void mr_trace_bump_range(lispobj* start, lispobj *end) {
 extern lispobj lisp_init_function;
 static void trace_static_roots() {
   source_object = native_pointer(NIL) - 1;
-  trace_other_object((lispobj*)NIL_SYMBOL_SLOTS_START);
+  trace_other_object(NIL_SYMBOL_SLOTS_START);
   mr_trace_bump_range((lispobj*)STATIC_SPACE_OBJECTS_START,
                       static_space_free_pointer);
 #ifdef LISP_FEATURE_PERMGEN

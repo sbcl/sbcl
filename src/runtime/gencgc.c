@@ -3554,7 +3554,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     }
 
     if (GC_LOGGING) fprintf(gc_activitylog(), "begin scavenge static roots\n");
-    heap_scavenge((lispobj*)NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END);
+    heap_scavenge(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 #ifdef LISP_FEATURE_PERMGEN
     // Remembered objects below the core permgen end, and all objects above it, are roots.
@@ -4961,7 +4961,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr, " [static]");
     // Just don't worry about NIL, it's seldom the problem
-    // if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
+    // if (verify(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
     if (verify(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &state, 0)) goto out;
     if (verbose)
         fprintf(stderr, " [permgen]");

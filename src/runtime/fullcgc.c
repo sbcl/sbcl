@@ -282,7 +282,7 @@ void execute_full_mark_phase()
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
 #endif
-    trace_object((lispobj*)NIL_SYMBOL_SLOTS_START);
+    trace_object(NIL_SYMBOL_SLOTS_START);
     scav_static_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
     scav_static_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer);
 #ifndef LISP_FEATURE_IMMOBILE_SPACE

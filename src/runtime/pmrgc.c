@@ -1996,7 +1996,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr, " [static]");
     // Just don't worry about NIL, it's seldom the problem
-    // if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
+    // if (verify(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
     if (verify(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &state, 0)) goto out;
     if (verbose)
         fprintf(stderr, " [permgen]");
