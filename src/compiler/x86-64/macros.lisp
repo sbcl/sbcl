@@ -83,7 +83,7 @@
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
-  `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
+  `(inst mov ,reg (+ nil-value ,(static-symbol-offset symbol))))
 
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
