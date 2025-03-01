@@ -470,3 +470,11 @@
                                   (optimize speed))
                          (+ a b)))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :consecutive-casts)
+  (assert (= (count 'sb-c::%type-check-error/c
+                    (ir-calls
+                     `(lambda (x)
+                        (the fixnum (the integer x))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
