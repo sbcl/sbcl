@@ -161,110 +161,114 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (when (and load-widetag
-                 ; best case: lowtag is right
-                 (not (and value-tn-ref
+      (flet ((test-lowtag (target not-p)
+               (cond ((not load-widetag)
+                      nil)
+                     ((and value-tn-ref
                            (eq lowtag other-pointer-lowtag)
-                           (other-pointer-tn-ref-p value-tn-ref t immediate-tested))))
-        (multiple-value-bind (bit set) (tn-ref-lowtag-bit lowtag value-tn-ref
-                                                          t immediate-tested)
-          (cond (bit
-                 (inst test :byte value (ash 1 bit))
-                 (inst jmp (if (eq set 0) :nz :z) when-false))
-                ((and value-tn-ref
-                      ;; If HEADERS contains a range, then list pointers have to be
-                      ;; disallowed - consider a list whose CAR has a fixnum that
-                      ;; spuriously matches the range test.
-                      (if (some #'listp headers)
-                          (headered-object-pointer-tn-ref-p value-tn-ref)
-                          (pointer-tn-ref-p value-tn-ref)))
-                 ;; Emit one fewer conditional jump than the general case,
-                 (inst mov temp value)
-                 (inst and temp (lognot lowtag-mask))
-                 (if (ea-p widetag-tn)
-                     (setq widetag-tn (ea temp))
-                     (setq untagged (ea temp))))
-                (t
-                 ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
-                 ;; an untagged ptr to VALUE if the lowtag test passes.
-                 (setq untagged (ea temp))
-                 (when (ea-p widetag-tn)
-                   (setq widetag-tn untagged))
-                 (when compute-temp
-                   (%lea-for-lowtag-test temp value lowtag :qword))
-                 (inst test :byte temp lowtag-mask)
-                 (inst jmp :nz when-false)))))
-
-      (when (and load-widetag
-                 (eq widetag-tn temp))
-        (inst mov :dword temp (or untagged (ea (- lowtag) value))))
-      (dolist (widetag except)
-        (inst cmp :byte temp widetag)
-        (inst jmp :e when-false))
-
-      (cond
-        ((and value-tn-ref
-              ;; Is testing only the lowtag enough?
-              (eq lowtag other-pointer-lowtag)
-              (let ((widetags (sb-c::type-other-pointer-widetags (tn-ref-type value-tn-ref))))
-                (when widetags
-                  (loop for widetag in widetags
-                        always
-                        (loop for header in headers
-                              thereis (if (consp header)
-                                          (<= (car header) widetag (cdr header))
-                                          (eql widetag header))))))))
-        ((and (fixnump first)
-              (fixnump second)
-              (not (cddr headers))
-              (= (logcount (logxor first second)) 1))
-         ;; Two widetags differing at one bit. Use one cmp and branch.
-         ;; Start by ORing in the bit that they differ on.
-         (let ((diff-bit (logxor first second)))
-           (aver (not (ea-p widetag-tn))) ; can't clobber a header
-           (inst or :byte widetag-tn diff-bit)
-           (inst cmp :byte widetag-tn (logior first diff-bit))
-           (if not-p (inst jmp :ne target) (inst jmp :eq target))))
-        (t
-         ;; Compared to x86 we additionally optimize the cases of a
-         ;; range starting with BIGNUM-WIDETAG (= min widetag)
-         ;; or ending with COMPLEX-ARRAY-WIDETAG (= max widetag)
-         (do ((remaining headers (cdr remaining)))
-             ((null remaining))
-           (let ((header (car remaining))
-                 (last (null (cdr remaining))))
-             (cond
-               ((and (eql header simple-array-widetag)
-                     value-tn-ref
-                     (csubtypep (tn-ref-type value-tn-ref) (specifier-type 'string))))
-               ((atom header)
-                (inst cmp :byte widetag-tn header)
-                (if last
-                    (inst jmp equal target)
-                    (inst jmp :e when-true)))
-               (t
-                (let ((start (car header))
-                      (end (cdr header)))
-                  (cond
-                    ((= start bignum-widetag)
-                     (inst cmp :byte widetag-tn end)
-                     (if last
-                         (inst jmp less-or-equal target)
-                         (inst jmp :be when-true)))
-                    ((= end complex-array-widetag)
-                     (inst cmp :byte widetag-tn start)
-                     (if last
-                         (inst jmp greater-or-equal target)
-                         (inst jmp :b when-false)))
-                    ((not last)
-                     (inst cmp :byte temp start)
-                     (inst jmp :b when-false)
-                     (inst cmp :byte temp end)
-                     (inst jmp :be when-true))
-                    (t
-                     (inst sub :byte temp start)
-                     (inst cmp :byte temp (- end start))
-                     (inst jmp less-or-equal target))))))))))
+                           (other-pointer-tn-ref-p value-tn-ref t immediate-tested))
+                      nil) ; best case: lowtag is right
+                     ((and value-tn-ref
+                           ;; If HEADERS contains a range, then list pointers have to be
+                           ;; disallowed - consider a list whose CAR has a fixnum that
+                           ;; spuriously matches the range test.
+                           (if (some #'listp headers)
+                               (headered-object-pointer-tn-ref-p value-tn-ref)
+                               (pointer-tn-ref-p value-tn-ref)))
+                      ;; Emit one fewer conditional jump than the general case,
+                      (inst mov temp value)
+                      (inst and temp (lognot lowtag-mask))
+                      (if (ea-p widetag-tn)
+                          (setq widetag-tn (ea temp))
+                          (setq untagged (ea temp)))
+                      nil)
+                     (t
+                      ;; Regardless of whether :COMPUTE-TEMP is T or NIL, it will hold
+                      ;; an untagged ptr to VALUE if the lowtag test passes.
+                      (setq untagged (ea temp))
+                      (when (ea-p widetag-tn)
+                        (setq widetag-tn untagged))
+                      (when compute-temp
+                        (%lea-for-lowtag-test temp value lowtag :qword))
+                      (inst test :byte temp lowtag-mask)
+                      (inst jmp (if not-p :nz :z) target)
+                      t))))
+        (cond
+              ((and value-tn-ref
+                    (not except)
+                    ;; Is testing only the lowtag enough?
+                    (eq lowtag other-pointer-lowtag)
+                    (let ((widetags (sb-c::type-other-pointer-widetags (tn-ref-type value-tn-ref))))
+                      (when widetags
+                        (loop for widetag in widetags
+                              always
+                              (loop for header in headers
+                                    thereis (if (consp header)
+                                                (<= (car header) widetag (cdr header))
+                                                (eql widetag header)))))))
+               (or (test-lowtag target not-p)
+                   (unless not-p
+                     (inst jmp target))))
+              (t
+               (test-lowtag when-false t)
+               (when (and load-widetag
+                          (eq widetag-tn temp))
+                 (inst mov :dword temp (or untagged (ea (- lowtag) value))))
+               (dolist (widetag except)
+                 (inst cmp :byte temp widetag)
+                 (inst jmp :e when-false))
+               (cond
+                 ((and (fixnump first)
+                       (fixnump second)
+                       (not (cddr headers))
+                       (= (logcount (logxor first second)) 1))
+                  ;; Two widetags differing at one bit. Use one cmp and branch.
+                  ;; Start by ORing in the bit that they differ on.
+                  (let ((diff-bit (logxor first second)))
+                    (aver (not (ea-p widetag-tn))) ; can't clobber a header
+                    (inst or :byte widetag-tn diff-bit)
+                    (inst cmp :byte widetag-tn (logior first diff-bit))
+                    (if not-p (inst jmp :ne target) (inst jmp :eq target))))
+                 (t
+                  ;; Compared to x86 we additionally optimize the cases of a
+                  ;; range starting with BIGNUM-WIDETAG (= min widetag)
+                  ;; or ending with COMPLEX-ARRAY-WIDETAG (= max widetag)
+                  (do ((remaining headers (cdr remaining)))
+                      ((null remaining))
+                    (let ((header (car remaining))
+                          (last (null (cdr remaining))))
+                      (cond
+                        ((and (eql header simple-array-widetag)
+                              value-tn-ref
+                              (csubtypep (tn-ref-type value-tn-ref) (specifier-type 'string))))
+                        ((atom header)
+                         (inst cmp :byte widetag-tn header)
+                         (if last
+                             (inst jmp equal target)
+                             (inst jmp :e when-true)))
+                        (t
+                         (let ((start (car header))
+                               (end (cdr header)))
+                           (cond
+                             ((= start bignum-widetag)
+                              (inst cmp :byte widetag-tn end)
+                              (if last
+                                  (inst jmp less-or-equal target)
+                                  (inst jmp :be when-true)))
+                             ((= end complex-array-widetag)
+                              (inst cmp :byte widetag-tn start)
+                              (if last
+                                  (inst jmp greater-or-equal target)
+                                  (inst jmp :b when-false)))
+                             ((not last)
+                              (inst cmp :byte temp start)
+                              (inst jmp :b when-false)
+                              (inst cmp :byte temp end)
+                              (inst jmp :be when-true))
+                             (t
+                              (inst sub :byte temp start)
+                              (inst cmp :byte temp (- end start))
+                              (inst jmp less-or-equal target)))))))))))))
 
       (emit-label drop-through))))
 
