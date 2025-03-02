@@ -3388,6 +3388,27 @@ expansion happened."
            :element-type result-eltype
            :specialized-element-type result-stype))))))
 
+(defun array-type-force-specialized (type)
+  (typecase type
+    (array-type
+     (let* ((dims (array-type-dimensions type))
+            (complexp (array-type-complexp type))
+            (eltype (array-type-element-type type))
+            (stype (array-type-specialized-element-type type)))
+       (if (eq stype eltype)
+           type
+           (make-array-type dims
+                            :complexp complexp
+                            :element-type stype
+                            :specialized-element-type stype))))
+    (union-type
+     (%type-union (mapcar #'array-type-force-specialized (union-type-types type))))
+    (intersection-type
+     (%type-intersection (mapcar #'array-type-force-specialized (intersection-type-types type))))
+    (negation-type
+     (type-negation (array-type-force-specialized (negation-type-type type))))
+    (t type)))
+
 (defun array-intersection (type1 type2 use-specialized)
   (if (array-types-intersect type1 type2)
       (let* ((dims1 (array-type-dimensions type1))
@@ -4333,16 +4354,19 @@ expansion happened."
          (type= type2 (specifier-type 'function-designator)))
         (t
          (multiple-value-bind (sub-value sub-certain?)
-             (type= type1
-                    (%type-union
-                     ;; Upgrading rules do not work with intersections
-                     (if (and (array-type-p type1)
-                              (not (contains-unknown-type-p (array-type-element-type type1))))
-                         (mapcar (lambda (x)
-                                   (if (array-type-p x)
-                                       (array-intersection type1 x t)
-                                       (type-intersection type1 x)))
-                                 (union-type-types type2))
+             (if (and (array-type-p type1)
+                      (not (contains-unknown-type-p (array-type-element-type type1))))
+                 ;; Upgrading rules do not work with intersections
+                 (let ((type1 (array-type-force-specialized type1)))
+                   (type= type1
+                          (%type-union
+                           (mapcar (lambda (x)
+                                     (if (array-type-p x)
+                                         (array-intersection type1 x t)
+                                         (type-intersection type1 (array-type-force-specialized x))))
+                                   (union-type-types type2)))))
+                 (type= type1
+                        (%type-union
                          (mapcar (lambda (x)
                                    (type-intersection type1 x))
                                  (union-type-types type2)))))

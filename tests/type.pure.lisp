@@ -1045,7 +1045,13 @@
                 (sb-kernel::function-simple-intersection2-type-method type type)))))
 
 (with-test (:name :array-canonical-difference)
-  (assert (sb-kernel:type=
+  (assert (eql
            (sb-kernel:specifier-type '(and (simple-array * (10)) (not string)))
            (sb-kernel:specifier-type '(and (simple-array * (10)) (not (simple-string 10))))))
+  (assert (type= (sb-kernel:specifier-type '(or (simple-array fixnum) (not simple-array)))
+               (sb-kernel:specifier-type '(or (array fixnum) (not simple-array)))))
+  (assert (type= (sb-kernel:specifier-type '(or (simple-array (mod 3)) (not simple-array)))
+                 (sb-kernel:specifier-type '(or (array (mod 3)) (not simple-array)))))
+  (assert (subtypep '(or (array (mod 3)) (not simple-array))
+                    '(or (simple-array (mod 3)) (not simple-array))))
   (assert (subtypep '(not (or (not simple-array) simple-string)) '(not string))))
