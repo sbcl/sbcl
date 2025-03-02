@@ -3389,25 +3389,47 @@ expansion happened."
            :specialized-element-type result-stype))))))
 
 (defun array-type-force-specialized (type)
-  (typecase type
-    (array-type
-     (let* ((dims (array-type-dimensions type))
-            (complexp (array-type-complexp type))
-            (eltype (array-type-element-type type))
-            (stype (array-type-specialized-element-type type)))
-       (if (eq stype eltype)
-           type
-           (make-array-type dims
-                            :complexp complexp
-                            :element-type stype
-                            :specialized-element-type stype))))
-    (union-type
-     (%type-union (mapcar #'array-type-force-specialized (union-type-types type))))
-    (intersection-type
-     (%type-intersection (mapcar #'array-type-force-specialized (intersection-type-types type))))
-    (negation-type
-     (type-negation (array-type-force-specialized (negation-type-type type))))
-    (t type)))
+  (flet ((compound (type)
+           (let (any-new)
+             (values
+              (mapcar (lambda (x)
+                        (multiple-value-bind (type new)
+                            (array-type-force-specialized x)
+                          (when new
+                            (setf any-new t))
+                          type))
+                      (compound-type-types type))
+              any-new))))
+    (typecase type
+      (array-type
+       (let* ((dims (array-type-dimensions type))
+              (complexp (array-type-complexp type))
+              (eltype (array-type-element-type type))
+              (stype (array-type-specialized-element-type type)))
+         (if (eq stype eltype)
+             (values type nil)
+             (values (make-array-type dims
+                                      :complexp complexp
+                                      :element-type stype
+                                      :specialized-element-type stype)
+                     t))))
+      (union-type
+       (multiple-value-bind (types new) (compound type)
+         (if new
+             (values (%type-union types) t)
+             (values type nil))))
+      (intersection-type
+       (multiple-value-bind (types new) (compound type)
+         (if new
+             (values (%type-intersection types) t)
+             (values type nil))))
+      (negation-type
+       (multiple-value-bind (new-type new) (array-type-force-specialized (negation-type-type type))
+         (if new
+             (values (type-negation new-type) t)
+             (values type nil))))
+      (t
+       (values type nil)))))
 
 (defun array-intersection (type1 type2 use-specialized)
   (if (array-types-intersect type1 type2)
