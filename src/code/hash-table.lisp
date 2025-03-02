@@ -90,7 +90,7 @@
    ;; HASH-FUN-STATE easily fits into a fixnum, but having it unboxed
    ;; as a signed word allows EQ-HASH/SMALL in EQ-HASH/COMMON to be
    ;; compiled a bit more tightly.
-   :type (signed-byte #.sb-vm:n-word-bits))
+   :type sb-vm:signed-word)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
