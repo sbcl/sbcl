@@ -2707,11 +2707,22 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; Methods that are qualified or are specialized on more than
     ;; one argument do not work on start-up, since our start-up
     ;; implementation of method dispatch is single dispatch only.
-    (when (and (null qualifiers)
-               (= 1 (count-if-not (lambda (x) (eq x t)) (host-object-from-core specializers))))
-      (push (list (cold-car specializers) fn)
-            (cdr (or (assoc name *cold-methods*)
-                     (car (push (list name) *cold-methods*))))))))
+    (cond ((and (null qualifiers)
+                (= (do ((n 0) (list specializers (cold-cdr list)))
+                       ((cold-null list) n)
+                     (unless (descriptor= (cold-car list) *t-descriptor*) (incf n)))
+                   1))
+           (push (list (cold-car specializers) fn)
+                 (cdr (or (assoc name *cold-methods*)
+                          (car (push (list name) *cold-methods*))))))
+          (t
+           ;; I think it's a bit suspicious that genesis can just ignore some stuff
+           ;; that was compiled into the cold core.
+           #+nil
+           (format t "~&Skipping fop-mset ~S ~:S ~S~%"
+                   (host-object-from-core name)
+                   (host-object-from-core qualifiers)
+                   (host-object-from-core specializers))))))
 
 ;;; Order all initial methods so that the first one whose guard
 ;;; returns T is the most specific method. LAYOUT-DEPTHOID is a valid
