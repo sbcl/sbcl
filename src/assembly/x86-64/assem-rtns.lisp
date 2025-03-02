@@ -383,15 +383,15 @@
   (with-registers-preserved (lisp :except rdx)
     (call-static-fun 'update-object-layout 1)))
 
-(define-assembly-routine (sb-impl::install-hash-table-lock
+(define-assembly-routine (sb-impl:install-hash-table-lock
                           (:policy :fast-safe)
-                          (:translate sb-impl::install-hash-table-lock)
+                          (:translate sb-impl:install-hash-table-lock)
                           (:return-style :raw))
     ((:arg x (descriptor-reg) rdx-offset)
      (:res r (descriptor-reg) rdx-offset))
   (progn x r)
   (with-registers-preserved (lisp :except rdx)
-    (call-static-fun 'sb-impl::install-hash-table-lock 1)))
+    (call-static-fun 'sb-impl:install-hash-table-lock 1)))
 
 (define-assembly-routine
     (return-values-list (:return-style :none))

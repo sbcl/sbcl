@@ -2457,6 +2457,7 @@ be submitted as a CDR")
            "TOKEN-DELIMITERP" "WHITESPACE[2]P" "WITH-READ-BUFFER"
            ;; other
 
+           "INSTALL-HASH-TABLE-LOCK"
            "%MAKUNBOUND")
   (:use "CL" "SB-ALIEN" "SB-BIGNUM" "SB-EXT"
         "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
