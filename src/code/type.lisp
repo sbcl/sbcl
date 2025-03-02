@@ -2487,6 +2487,11 @@ expansion happened."
     (cond
       ((csubtypep not1 not2) type2)
       ((csubtypep not2 not1) type1)
+      ((and (numeric-union-type-p not1)
+            (numeric-union-type-p not2))
+       (let ((union (type-union not1 not2)))
+         (when (numeric-union-type-p union)
+           (make-negation-type union))))
       ;; Why no analagous clause to the disjoint in the SIMPLE-UNION2
       ;; method, below?  The clause would read
       ;;
