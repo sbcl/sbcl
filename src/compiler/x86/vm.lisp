@@ -417,7 +417,7 @@
                                         ; related to signal context stuff
 
 ;;; This is used by the debugger.
-(defconstant single-value-return-byte-offset 2)
+(defconstant single-value-return-byte-offset 0)
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
