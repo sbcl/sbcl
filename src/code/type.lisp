@@ -3423,6 +3423,62 @@ expansion happened."
 (define-type-method (array :simple-intersection2) (type1 type2)
   (array-intersection type1 type2 nil))
 
+;;; Turn (and (simple-array t) (not vector)) into
+;;; (and (simple-array t) (not simple-vector))
+(define-type-method (array :complex-intersection2) (type1 type2)
+  (or
+   (block nil
+     (when (negation-type-p type1)
+       (let ((not-type1 (negation-type-type type1)))
+         (when (array-type-p not-type1)
+           (let ((complexp (array-type-complexp type2))
+                 (dim (array-type-dimensions type2))
+                 (et (array-type-element-type type2))
+                 (sp-et (array-type-specialized-element-type type2))
+                 (not-complexp (array-type-complexp not-type1))
+                 (not-dim (array-type-dimensions not-type1))
+                 (not-et (array-type-element-type not-type1))
+                 (not-sp-et (array-type-specialized-element-type not-type1))
+                 (new-complexp 0)
+                 new-dim
+                 new-et
+                 new-sp-et)
+             (when (and (neq complexp :maybe)
+                        (eq not-complexp :maybe))
+               (setf new-complexp complexp))
+             (when (neq dim '*)
+               (cond ((eq not-dim '*)
+                      (setf new-dim dim))
+                     ((not (= (length dim)
+                              (length not-dim)))
+                      (return))
+                     ((or (equal dim not-dim)
+                          (not (find '* dim :test-not #'eq))))
+                     (t
+                      (setf new-dim
+                            (loop for d in dim
+                                  for not-d in not-dim
+                                  collect (if (and (neq d '*)
+                                                   (eq not-d '*))
+                                              d
+                                              not-d))))))
+             (when (and (neq et *wild-type*)
+                        (eq not-et *wild-type*))
+               (setf new-et et))
+             (when (and (neq sp-et *wild-type*)
+                        (eq not-sp-et *wild-type*))
+               (setf new-sp-et sp-et))
+             (when (or new-dim new-et new-sp-et
+                       (not (eql new-complexp 0)))
+               (type-difference type2
+                                (make-array-type (or new-dim not-dim)
+                                                 :element-type (or new-et not-et)
+                                                 :specialized-element-type (or new-sp-et not-sp-et)
+                                                 :complexp (if (eql new-complexp 0)
+                                                               not-complexp
+                                                               new-complexp)))))))))
+   :call-other-method))
+
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
 (defun canonical-array-dimensions (dims)

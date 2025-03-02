@@ -1043,3 +1043,9 @@
                 (sb-kernel::function-simple-union2-type-method type type)))
     (assert (eq type
                 (sb-kernel::function-simple-intersection2-type-method type type)))))
+
+(with-test (:name :array-canonical-difference)
+  (assert (sb-kernel:type=
+           (sb-kernel:specifier-type '(and (simple-array * (10)) (not string)))
+           (sb-kernel:specifier-type '(and (simple-array * (10)) (not (simple-string 10))))))
+  (assert (subtypep '(not (or (not simple-array) simple-string)) '(not string))))
