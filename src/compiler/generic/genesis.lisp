@@ -674,6 +674,7 @@
 
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
+(defvar *t-descriptor*)
 (defvar *lflist-tail-atom*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
@@ -1891,6 +1892,7 @@ core and return a descriptor to it."
 
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
+    (setq *t-descriptor* t-symbol)
     (cold-set t-symbol t-symbol))
 
   ;; Establish the value of SB-VM:FUNCTION-LAYOUT and **PRIMITIVE-OBJECT-LAYOUTS**
@@ -3820,16 +3822,20 @@ III. initially undefined function references (alphabetically):
               (descriptor-fixnum (read-slot pkg :id)))))
 
   (format t "~%~|~%VII. symbols (numerically):~2%")
-  (mapc (lambda (cell)
-          (let* ((addr (car cell))
-                 (host-sym (cdr cell))
-                 (val
-                  (unless (or (keywordp host-sym) (null host-sym))
-                    (read-bits-wordindexed (cold-intern host-sym)
-                                           sb-vm:symbol-value-slot))))
-            (format t "~X: ~S~@[ = ~X~]~%" addr host-sym
-                    (unless (eql val sb-vm:unbound-marker-widetag) val))))
-        (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
+  (let ((mapping (sort (%hash-table-alist *cold-symbols*) #'< :key #'car)))
+    (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell))) mapping)
+    (format t "~2&Preassigned symbols:~%")
+    (collect ((assigned))
+      (dolist (cell mapping)
+        (let ((host-sym (cdr cell)))
+          (unless (or (keywordp host-sym) (null host-sym) (eq host-sym t))
+            (let ((val (read-bits-wordindexed
+                        (make-random-descriptor (car cell)) sb-vm:symbol-value-slot)))
+              (unless (eql val sb-vm:unbound-marker-widetag)
+                (assigned (cons host-sym val)))))))
+      (let ((max (reduce #'max (assigned) :key (lambda (x) (length (string (car x)))))))
+        (dolist (x (assigned))
+          (format t " ~VA = #x~X~%" max (car x) (cdr x))))))
 
   (format t "~%~|~%VIII. parsed type specifiers:~2%")
   (format t "                        [Hash]~%")
@@ -4468,18 +4474,17 @@ static inline uword_t word_has_stickymark(uword_t word) {
 ;;; then we can produce a host object even if it is not a faithful rendition.
 (defun host-object-from-core (descriptor &optional (strictp t))
   (named-let recurse ((x descriptor))
-    (when (symbolp x)
-      (return-from recurse x))
-    (when (cold-null x)
-      (return-from recurse nil))
-    (when (is-fixnum-lowtag (descriptor-lowtag x))
-      (return-from recurse (descriptor-fixnum x)))
-    #+64-bit
-    (when (is-other-immediate-lowtag (descriptor-lowtag x))
-      (ecase (logand (descriptor-bits x) sb-vm:widetag-mask)
-       (#.sb-vm:single-float-widetag
-        (return-from recurse
-         (unsigned-bits-to-single-float (ash (descriptor-bits x) -32))))))
+    (cond ((symbolp x) (return-from recurse x))
+          ((is-fixnum-lowtag (descriptor-lowtag x))
+           (return-from recurse (descriptor-fixnum x)))
+          ((descriptor= x *t-descriptor*) (return-from recurse t))
+          ((cold-null x) (return-from recurse nil))
+          #+64-bit
+          ((is-other-immediate-lowtag (descriptor-lowtag x))
+           (ecase (logand (descriptor-bits x) sb-vm:widetag-mask)
+             (#.sb-vm:single-float-widetag
+              (return-from recurse
+                (unsigned-bits-to-single-float (ash (descriptor-bits x) -32)))))))
     (ecase (descriptor-lowtag x)
       (#.sb-vm:instance-pointer-lowtag
        (if strictp (error "Can't invert INSTANCE type") "#<instance>"))
