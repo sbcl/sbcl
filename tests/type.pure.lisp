@@ -1061,7 +1061,11 @@
                     '(or (and (array t) (not simple-array)) (simple-array integer))))
   (assert (subtypep '(array (integer 15 27))
                     '(or (and (array (integer 15 27)) (not simple-array))
-                      (simple-array (integer 17 30))))))
+                      (simple-array (integer 17 30)))))
+  (assert (sb-kernel:type= (sb-kernel:specifier-type '(and (not (simple-array t)) (not (and (array t) (not simple-array)))))
+                           (sb-kernel:specifier-type '(not (array t)))))
+  (assert (subtypep '(and (not simple-array) (not (and (array t) (not simple-array))))
+                    '(and (not simple-array) (not (array t))))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql

@@ -2492,6 +2492,38 @@ expansion happened."
        (let ((union (type-union not1 not2)))
          (when (numeric-union-type-p union)
            (make-negation-type union))))
+
+      ((and (array-type-p not1)
+            (array-type-p not2))
+       (flet ((try (type1 type2 not1)
+                (when (not (array-type-complexp type1))
+
+                  (when (array-type-complexp type2)
+                    (let ((not-simple
+                            (make-array-type (array-type-dimensions type1)
+                                             :element-type (array-type-element-type type1)
+                                             :specialized-element-type (array-type-specialized-element-type type1))))
+                      (when (csubtypep type2 not-simple)
+                        (cond ((eql (array-type-complexp type2) t)
+                               ;; (and (not (simple-array t))
+                               ;;      (not (and (array t) (not simple-array))))
+                               ;; => (not (array t))
+                               (let ((u (type-union type1
+                                                    (make-array-type (array-type-dimensions type2)
+                                                                     :element-type (array-type-element-type type2)
+                                                                     :specialized-element-type (array-type-specialized-element-type type2)))))
+                                 (when (array-type-p u)
+                                   (make-negation-type u))))
+                              ((eql (array-type-complexp type2) :maybe)
+                               ;; Make it canonical
+                               (type-intersection not1
+                                                  (make-negation-type
+                                                   (make-array-type (array-type-dimensions type2)
+                                                                    :complexp t
+                                                                    :element-type (array-type-element-type type2)
+                                                                    :specialized-element-type (array-type-specialized-element-type type2))))))))))))
+         (or (try not1 not2 type1)
+             (try not2 not1 type2))))
       ;; Why no analagous clause to the disjoint in the SIMPLE-UNION2
       ;; method, below?  The clause would read
       ;;
