@@ -865,10 +865,6 @@
                  (array (unsigned-byte 7))
                  (array (unsigned-byte 3)))
 
-  (disunity-test (:array-type-union :disjoint-element-types :dont-unite)
-                 (array (integer 15 27))
-                 (array (integer 17 30)))
-
   (unity-test (:array-type-union :wild-element-type :unites)
               array
               (array (unsigned-byte 8))

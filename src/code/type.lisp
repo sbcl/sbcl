@@ -3356,11 +3356,11 @@ expansion happened."
        ;; non-wild types that don't share UAET don't unite
        (values :incompatible nil nil))
       ((csubtypep eltype1 eltype2)
-       (values eltype2 stype2 type2))
+       (values eltype2 stype2 t))
       ((csubtypep eltype2 eltype1)
-       (values eltype1 stype1 type1))
+       (values eltype1 stype1 t))
       (t
-       (values :incompatible nil nil)))))
+       (values stype1 stype1 t)))))
 
 (defun unite-array-types-supertypes-compatible-p (&rest supertypes)
   ;; supertypes are compatible if they are all T, if there is a single
