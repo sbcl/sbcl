@@ -3516,9 +3516,13 @@ expansion happened."
              (when (and (neq et *wild-type*)
                         (eq not-et *wild-type*))
                (setf new-et et))
-             (when (and (neq sp-et *wild-type*)
-                        (eq not-sp-et *wild-type*))
-               (setf new-sp-et sp-et))
+             (cond ((and (neq sp-et *wild-type*)
+                         (eq not-sp-et *wild-type*))
+                    (setf new-sp-et sp-et))
+                   ((and (eql sp-et not-sp-et)
+                         (not (eql et not-et))
+                         (not (contains-unknown-type-p not-et)))
+                    (setf new-et et)))
              (when (or new-dim new-et new-sp-et
                        (not (eql new-complexp 0)))
                (type-difference type2

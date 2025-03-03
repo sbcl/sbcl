@@ -1054,7 +1054,9 @@
                  (sb-kernel:specifier-type '(or (array (mod 3)) (not simple-array)))))
   (assert (subtypep '(or (array (mod 3)) (not simple-array))
                     '(or (simple-array (mod 3)) (not simple-array))))
-  (assert (subtypep '(not (or (not simple-array) simple-string)) '(not string))))
+  (assert (subtypep '(not (or (not simple-array) simple-string)) '(not string)))
+  (assert (subtypep '(and (array symbol) (not (and (array t) (not simple-array))))
+                    '(simple-array symbol))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql
