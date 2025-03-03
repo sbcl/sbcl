@@ -2481,6 +2481,12 @@ expansion happened."
       (values nil nil)
       (values nil t)))
 
+(defun change-array-type-complexp (type complexp)
+  (make-array-type (array-type-dimensions type)
+                   :complexp complexp
+                   :element-type (array-type-element-type type)
+                   :specialized-element-type (array-type-specialized-element-type type)))
+
 (define-type-method (negation :simple-intersection2) (type1 type2)
   (let ((not1 (negation-type-type type1))
         (not2 (negation-type-type type2)))
@@ -2492,36 +2498,26 @@ expansion happened."
        (let ((union (type-union not1 not2)))
          (when (numeric-union-type-p union)
            (make-negation-type union))))
-
       ((and (array-type-p not1)
             (array-type-p not2))
        (flet ((try (type1 type2 not1)
-                (when (not (array-type-complexp type1))
-
-                  (when (array-type-complexp type2)
-                    (let ((not-simple
-                            (make-array-type (array-type-dimensions type1)
-                                             :element-type (array-type-element-type type1)
-                                             :specialized-element-type (array-type-specialized-element-type type1))))
-                      (when (csubtypep type2 not-simple)
-                        (cond ((eql (array-type-complexp type2) t)
-                               ;; (and (not (simple-array t))
-                               ;;      (not (and (array t) (not simple-array))))
-                               ;; => (not (array t))
-                               (let ((u (type-union type1
-                                                    (make-array-type (array-type-dimensions type2)
-                                                                     :element-type (array-type-element-type type2)
-                                                                     :specialized-element-type (array-type-specialized-element-type type2)))))
-                                 (when (array-type-p u)
-                                   (make-negation-type u))))
-                              ((eql (array-type-complexp type2) :maybe)
-                               ;; Make it canonical
-                               (type-intersection not1
-                                                  (make-negation-type
-                                                   (make-array-type (array-type-dimensions type2)
-                                                                    :complexp t
-                                                                    :element-type (array-type-element-type type2)
-                                                                    :specialized-element-type (array-type-specialized-element-type type2))))))))))))
+                (when (and (not (array-type-complexp type1))
+                           (array-type-complexp type2))
+                  (let ((not-simple (change-array-type-complexp type1 :maybe)))
+                    (when (csubtypep type2 not-simple)
+                      (cond ((eql (array-type-complexp type2) t)
+                             ;; (and (not (simple-array t))
+                             ;;      (not (and (array t) (not simple-array))))
+                             ;; => (not (array t))
+                             (let ((u (type-union type1
+                                                  (change-array-type-complexp type2 :maybe))))
+                               (when (array-type-p u)
+                                 (make-negation-type u))))
+                            ((eql (array-type-complexp type2) :maybe)
+                             ;; Make it canonical
+                             (type-intersection not1
+                                                (make-negation-type
+                                                 (change-array-type-complexp type2 t))))))))))
          (or (try not1 not2 type1)
              (try not2 not1 type2))))
       ;; Why no analagous clause to the disjoint in the SIMPLE-UNION2
@@ -3565,6 +3561,26 @@ expansion happened."
                                                                not-complexp
                                                                new-complexp)))))))))
    :call-other-method))
+
+(define-type-method (array :complex-union2) (type1 type2)
+  (when (negation-type-p type1)
+    (let ((not-type1 (negation-type-type type1)))
+      (when (array-type-p not-type1)
+        (cond ((and (eq (array-type-complexp not-type1) :maybe)
+                    (eq (array-type-complexp type2) t)
+                    (csubtypep type2 not-type1))
+               ;; (or (not (array t)) (and (array t) (not simple-array)))
+               ;; => (not (simple-array t))
+               (make-negation-type
+                (change-array-type-complexp type2 nil)))
+              ((and (eq (array-type-complexp not-type1) :maybe)
+                    (eq (array-type-complexp type2) t)
+                    (csubtypep not-type1
+                               (change-array-type-complexp type2 :maybe)))
+               ;; (or (not (vector * 10)) (and vector (not simple-array)))
+               ;; => (not (simple-array * (10)))
+               (make-negation-type
+                (change-array-type-complexp not-type1 nil))))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
