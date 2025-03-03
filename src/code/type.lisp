@@ -3501,15 +3501,18 @@ expansion happened."
                               (length not-dim)))
                       (return))
                      ((or (equal dim not-dim)
-                          (not (find '* dim :test-not #'eq))))
+                          (not (find '* dim :test-not #'eq))
+                          (not (find '* not-dim))))
                      (t
-                      (setf new-dim
-                            (loop for d in dim
-                                  for not-d in not-dim
-                                  collect (if (and (neq d '*)
-                                                   (eq not-d '*))
-                                              d
-                                              not-d))))))
+                      (let ((maybe-new-dim
+                              (loop for d in dim
+                                    for not-d in not-dim
+                                    collect (if (and (neq d '*)
+                                                     (eq not-d '*))
+                                                d
+                                                not-d))))
+                        (unless (equal maybe-new-dim not-dim)
+                          (setf new-dim maybe-new-dim))))))
              (when (and (neq et *wild-type*)
                         (eq not-et *wild-type*))
                (setf new-et et))
