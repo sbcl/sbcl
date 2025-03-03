@@ -555,10 +555,6 @@ Experimental: interface subject to change."
     (let ((addr (get-lisp-obj-address x)))
       (and (sb-vm:is-lisp-pointer addr)
            (cases)))))
-
-;;; Internal use only. FIXME: I think this duplicates code that exists
-;;; somewhere else which I could not find.
-(defun lisp-space-p (sap &aux (addr (sap-int sap))) (cases))
 ) ; end MACROLET
 
 (define-condition memory-fault-error (system-condition error) ()
