@@ -2290,9 +2290,11 @@
                        (let ((initial-value (let-var-initial-value var)))
                          (setf (lvar-reoptimize initial-value) nil)
                          (lvar-type initial-value)))
-                      (t
+                      ((and (eq (leaf-type var) *universal-type*)
+                            (neq (leaf-defined-type var) *universal-type*))
                        (leaf-defined-type var)))))
-          (propagate-from-sets var initial-type)))))
+          (when initial-type
+            (propagate-from-sets var initial-type))))))
   (derive-node-type node (make-single-value-type
                           (lvar-type (set-value node))))
   (setf (node-reoptimize node) nil)
