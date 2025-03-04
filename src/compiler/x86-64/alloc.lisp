@@ -328,52 +328,48 @@
 
 ;;;; CONS, ACONS, LIST and LIST*
 
-(defun init-list (prev-constant tn list slot lowtag temp zeroed)
-  ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
-  ;; but other other GC strategies might.
-  (let* ((immediate-value)
-         (reg
-          (sc-case tn
-           (constant
-           ;; a CONSTANT sc does not imply that we have a compile-time constant-
-           ;; it could be load-time in which case it does not satisfy constant-tn-p.
-            (unless (and (constant-tn-p tn) (eql prev-constant (tn-value tn)))
-              (setf prev-constant (if (constant-tn-p tn) (tn-value tn) temp))
-              (move temp tn))
-            temp)
-           (immediate
-            (if (eql prev-constant (setf immediate-value (tn-value tn)))
-                temp
-                ;; Note1:
-                ;; 1. "-if-immediate" is slighty misleading since it _is_ immediate.
-                ;; 2. This unfortunately treats STOREW* as a leaky abstraction
-                ;;    because we have to know exactly what it rejects up front
-                ;;    rather than asking it whether it can emit a single instruction
-                ;;    that will do the trick.
-                (let ((bits (encode-value-if-immediate tn)))
-                  (when (and zeroed (typep bits '(unsigned-byte 31)))
-                    (storew* bits list slot lowtag zeroed)
-                    (return-from init-list prev-constant)) ; Return our "in/out" arg
-                  bits)))
-           (control-stack
-            (setf prev-constant temp) ;; a non-eq initial value
-            (move temp tn)
-            temp)
-           (t
-            tn))))
-    ;; STOREW returns TEMP if and only if it stored using it.
-    ;; (Perhaps not the clearest idiom.)
-    (when (eq (storew reg list slot lowtag temp) temp)
-      (setf prev-constant immediate-value)))
-  prev-constant) ; Return our "in/out" arg
-
-(macrolet ((pop-arg (ref)
-             `(prog1 (tn-ref-tn ,ref) (setf ,ref (tn-ref-across ,ref))))
-           (store-slot (arg list slot &optional (lowtag list-pointer-lowtag))
-             ;; PREV-CONSTANT is akin to a pass-by-reference arg to the function which
-             ;; used to be all inside this macro.
-             `(setq prev-constant
-                    (init-list prev-constant ,arg ,list ,slot ,lowtag temp zeroed))))
+;;; General remark on the optimization for storing partial words when the heap is prezeroed:
+;;; It's not terribly important. Gencgc does not prezero cons pages, and the work-in-progress
+;;; concurrent collector prefills pages with -1 (an illegal pattern) so that a valid cons
+;;; cell can always be recognized without scanning an array of bits to decide which cells
+;;; were actually allocated. Mark-region GC does prezero, but perhaps it need not.
+(defun init-list (alloc temp result word-indices inits)
+  (declare (simple-vector word-indices) (dynamic-extent inits))
+  (let* ((n (length word-indices))
+         ;; SCOREBOARD tracks that the Ith element of INITS is done
+         (scoreboard (make-array n :element-type 'bit :initial-element 0)))
+    (aver (= n (length inits)))
+    (do ((i 0 (1+ i)))
+        ((>= i n))
+      (let ((tn (pop inits)))
+        (unless (= (sbit scoreboard i) 1) ; ignore if already did this
+          (setf (sbit scoreboard i) 1)
+          (let* ((imm (when (sc-is tn immediate) (encode-value-if-immediate tn)))
+                 ;; When ENCODE-VALUE-IF-IMMEDIATE returns a fixup
+                 ;; it is promised to fit in (SIGNED-BYTE 32)
+                 (must-load (or (sc-is tn constant control-stack)
+                                (and imm (not (typep imm '(or (signed-byte 32) fixup))))))
+                 (repeats (memq tn inits))
+                 (load (or must-load (and imm repeats)))
+                 (val (or imm tn)))
+            (let ((operand (cond (load
+                                  ;; MOVE only wants TNs
+                                  (if (tn-p val) (move temp val) (inst mov temp val))
+                                  temp)
+                                 (t val))))
+              (storew operand alloc (svref word-indices i) 0)
+              ;; This loop is helpful only if the source was not already in a register
+              (when (and repeats load)
+                ;; Scoreboard indices of remaining elements of INITS are numbered from (1+ I)
+                (loop for j from (1+ i)
+                      for init in inits
+                      when (eq init tn)
+                      do (storew operand alloc (svref word-indices j) 0)
+                         (setf (sbit scoreboard j) 1)))))))))
+  (when result
+    (if (location= alloc result)
+        (inst or :byte alloc list-pointer-lowtag)
+        (inst lea result (ea list-pointer-lowtag alloc)))))
 
 (define-vop (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
@@ -387,68 +383,73 @@
   (:vop-var vop)
   (:node-var node)
   (:generator 10
-    (cond
-      ((node-stack-allocate-p node)
-       (unless (aligned-stack-p)
-         (inst and rsp-tn (lognot lowtag-mask)))
-       (cond ((and (sc-is car immediate) (sc-is cdr immediate)
-                   (typep (encode-value-if-immediate car) '(signed-byte 8))
-                   (typep (encode-value-if-immediate cdr) '(signed-byte 8)))
-              ;; (CONS 0 0) takes just 4 bytes to encode the PUSHes (for example)
-              (inst push (encode-value-if-immediate cdr))
-              (inst push (encode-value-if-immediate car)))
-             ((and (sc-is car immediate) (sc-is cdr immediate)
-                   (eql (encode-value-if-immediate car) (encode-value-if-immediate cdr)))
-              (inst mov alloc (encode-value-if-immediate cdr))
-              (inst push alloc)
-              (inst push alloc))
-             (t
-              (list-ctor-push-elt cdr alloc)
-              (list-ctor-push-elt car alloc)))
-       (inst lea result (ea list-pointer-lowtag rsp-tn)))
-      (t
-       (let ((nbytes (* cons-size n-word-bytes))
-             (zeroed (target-heap-prezeroed-p))
-             (prev-constant temp)) ;; a non-eq initial value
+    (let ((car-val (encode-value-if-immediate car))
+          (car-regp (sc-is car any-reg descriptor-reg))
+          (nbytes (* cons-size n-word-bytes)))
+      ;; If consing two occurrences of the same value then load into a register unless:
+      ;;  - already in a register, OR
+      ;;  - PUSHing an imm8, in which case PUSH encodes to exactly 2 bytes
+      ;; The second of the above two criteria pertains only to stack-allocation.
+      ;; Memory operands are legal for PUSH, therefore CONSTANT and CONTROL-STACK
+      ;; don't technically require a temp. However, I believe that one memory load
+      ;; is better than two PUSH instructions using memory as the source operand.
+      ;;
+      ;; Possible TODO: C compilers seem to like xmm registers when storing adjacent
+      ;; words, even to the extent that it requires a MOVAPS to get the words into
+      ;; a register, rather than just storing immediates. We'd have to be especially
+      ;; careful with arrangement in the boxed header to make this possible.
+      (cond
+        ((node-stack-allocate-p node)
+         (unless (aligned-stack-p)
+           (inst and rsp-tn (lognot lowtag-mask)))
+         (cond ((eq car cdr)
+                (let ((operand (if (or car-regp (typep car-val '(signed-byte 8)))
+                                   car-val
+                                   (progn (inst mov alloc car-val) alloc))))
+                  (inst push operand)
+                  (inst push operand)))
+               (t (list-ctor-push-elt cdr alloc)
+                  (list-ctor-push-elt car alloc)))
+         (inst lea result (ea list-pointer-lowtag rsp-tn)))
+        (t
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
-           (store-slot car alloc cons-car-slot 0)
-           (store-slot cdr alloc cons-cdr-slot 0)
-           (if (location= alloc result)
-               (inst or :byte alloc list-pointer-lowtag)
-               (inst lea result (ea list-pointer-lowtag alloc)))))))))
+           (init-list alloc temp result `#(,cons-car-slot ,cons-cdr-slot)
+                      (list car cdr))))))))
 
+;;; In terms of minimizing memory loads (CONSTANT operand) or 4-byte immediate
+;;; (immediate symbol operand) there are 4 possible patterns reusing a value
+;;; none of which are very likely:
+;;;   ((a . a) . a)
+;;;   ((a . a) . b)
+;;;   ((a . b) . a)
+;;;   ((a . b) . b)
+;;; INIT-LIST can figure out if any of the above patterns match the args.
+;;;
+;;; Also: Since alists tend to be persistent storage structures, there is probably
+;;; not a lot of benefit to ACONS recognizing DX, though it couldn't hurt to have it,
+;;; perhaps to temporarily add a key to a mapping.
 (define-vop (acons)
   (:args (key :scs (any-reg descriptor-reg constant immediate control-stack))
          (val :scs (any-reg descriptor-reg constant immediate control-stack))
          (tail :scs (any-reg descriptor-reg constant immediate control-stack)))
-  (:temporary (:sc unsigned-reg :to (:result 0)) alloc)
-  (:temporary (:sc unsigned-reg :to (:result 0) :target result) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
+  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
   (:results (result :scs (descriptor-reg)))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:translate acons)
   (:policy :fast-safe)
   (:generator 10
-    (let ((nbytes (* cons-size 2 n-word-bytes))
-          (zeroed (target-heap-prezeroed-p))
-          (prev-constant temp))
+    (let ((nbytes (* cons-size 2 n-word-bytes)))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
         (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
-        (store-slot tail alloc cons-cdr-slot 0)
+        ;; the outer cons is at the lower address
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
-        (store-slot temp alloc cons-car-slot 0)
-        (setf prev-constant temp)
-        (let ((pair temp) (temp alloc)) ; give STORE-SLOT the ALLOC as its TEMP
-          (store-slot key pair cons-car-slot)
-          (store-slot val pair cons-cdr-slot))
-        ;; ALLOC could have been clobbered by using it as a temp for
-        ;; loading a constant.
-        (if (location= temp result)
-            (inst sub result 16) ; TEMP is ALLOC+16+lowtag, so just subtract 16
-            (inst lea result (ea (- 16) temp)))))))
+        (storew temp alloc cons-car-slot 0)
+        (init-list alloc temp result #(1 2 3) (list tail key val))))))
 
 ;;; CONS-2 is similar to ACONS, except that instead of producing
 ;;;  ((X . Y) . Z) it produces (X Y . Z)
@@ -469,6 +470,7 @@
       ((node-stack-allocate-p node)
        (unless (aligned-stack-p)
          (inst and rsp-tn (lognot lowtag-mask)))
+       ;; TODO: avoid reload of constants just like for single DX CONS
        (list-ctor-push-elt cddr alloc)
        (list-ctor-push-elt cadr alloc)
        (inst lea alloc (ea list-pointer-lowtag rsp-tn))
@@ -476,25 +478,18 @@
        (list-ctor-push-elt car alloc)
        (inst lea result (ea list-pointer-lowtag rsp-tn)))
       (t
-       (let ((nbytes (* cons-size 2 n-word-bytes))
-             (zeroed (target-heap-prezeroed-p))
-             (prev-constant temp))
+       (let ((nbytes (* cons-size 2 n-word-bytes)))
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
-           (store-slot car alloc cons-car-slot 0)
-           (store-slot cadr alloc (+ 2 cons-car-slot) 0)
-           (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
            (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
-           (store-slot temp alloc cons-cdr-slot 0)
-           (if (location= alloc result)
-               (inst or :byte alloc list-pointer-lowtag)
-               (inst lea result (ea list-pointer-lowtag alloc)))))))))
+           (storew temp alloc cons-cdr-slot 0)
+           (init-list alloc temp result #(0 2 3) (list car cadr cddr))))))))
 
 (define-vop (list)
   (:args (things :more t :scs (descriptor-reg any-reg constant immediate)))
-  (:temporary (:sc unsigned-reg) ptr temp)
-  (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
+  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
@@ -503,25 +498,32 @@
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
     (let* ((stack-allocate-p (node-stack-allocate-p node))
            (size (* (pad-data-block cons-size) cons-cells))
-           (zeroed (and (not stack-allocate-p) (target-heap-prezeroed-p)))
-           (prev-constant temp))
-      (unless stack-allocate-p
-        (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
-      (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
-        (if stack-allocate-p
-            (stack-allocation size list-pointer-lowtag res)
-            (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
-        (move ptr res)
-        (dotimes (i (1- cons-cells))
-          (store-slot (pop-arg things) ptr cons-car-slot)
-          (inst add ptr (pad-data-block cons-size))
-          (storew ptr ptr (- cons-cdr-slot cons-size) list-pointer-lowtag))
-        (store-slot (pop-arg things) ptr cons-car-slot list-pointer-lowtag)
-        (if star
-            (store-slot (pop-arg things) ptr cons-cdr-slot list-pointer-lowtag)
-            (storew* nil-value ptr cons-cdr-slot list-pointer-lowtag zeroed))))
-    (aver (null things))
-    (move result res))))
+           (indices (make-array (1+ cons-cells))))
+      (collect ((items))
+        (macrolet ((pop-thing ()
+                     '(prog1 (tn-ref-tn things) (setf things (tn-ref-across things)))))
+          (dotimes (i cons-cells)
+            (setf (aref indices i) (ash i 1))
+            (items (pop-thing)))
+          (setf (aref indices cons-cells) (1+ (ash (1- cons-cells) 1)))
+          (items (if star (pop-thing) (make-constant-tn (sb-c::find-constant nil)))))
+        (aver (null things))
+        (unless stack-allocate-p
+          (instrument-alloc +cons-primtype+ size node (list temp alloc) thread-tn))
+        (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
+          (if stack-allocate-p
+              (stack-allocation size 0 alloc)
+              (allocation +cons-primtype+ size 0 alloc node temp thread-tn))
+          (init-list alloc temp nil indices (items))
+          ;; Stitch the cons cells together
+          (dotimes (i (1- cons-cells))
+            (case i
+              (0 (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc)))
+              (t (inst add temp 16)))
+            (inst mov (ea (- -8 list-pointer-lowtag) temp) temp))
+          (if (location= alloc result)
+              (inst or :byte alloc list-pointer-lowtag)
+              (inst lea result (ea list-pointer-lowtag alloc))))))))
 
 (define-vop ()
   (:translate unaligned-dx-cons)

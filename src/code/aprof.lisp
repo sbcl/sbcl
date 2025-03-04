@@ -297,7 +297,7 @@
                         (cmp :qword ?end :tlab-limit)
                         (jmp :a ?_)
                         (mov :qword :tlab-freeptr ?end)
-                        (:repeat (:or (mov . ignore) (lea . ignore)))
+                        (:repeat (:or (mov . ignore) (add . ignore) (lea . ignore)))
                         (:or (or ?free ?lowtag)
                              (lea :qword ?result (ea ?lowtag ?free))))))
 
