@@ -333,7 +333,7 @@
 ;;; concurrent collector prefills pages with -1 (an illegal pattern) so that a valid cons
 ;;; cell can always be recognized without scanning an array of bits to decide which cells
 ;;; were actually allocated. Mark-region GC does prezero, but perhaps it need not.
-(defun init-list (alloc temp result word-indices inits)
+(defun init-list (alloc temp result word-indices inits &optional dx)
   (declare (simple-vector word-indices) (dynamic-extent inits))
   (let* ((n (length word-indices))
          ;; SCOREBOARD tracks that the Ith element of INITS is done
@@ -357,7 +357,13 @@
                                   (if (tn-p val) (move temp val) (inst mov temp val))
                                   temp)
                                  (t val))))
-              (storew operand alloc (svref word-indices i) 0)
+              (let ((slot (svref word-indices i)))
+                (if (and imm (not load) (not dx) (target-heap-prezeroed-p))
+                    ;; This makes :smaller-than-qword-cons-slot-init pass
+                    ;; but as the comment above says, it's probably not worth
+                    ;; the small amount of clutter this adds to the logic.
+                    (storew* imm alloc slot 0 t)
+                    (storew operand alloc slot 0)))
               ;; This loop is helpful only if the source was not already in a register
               (when (and repeats load)
                 ;; Scoreboard indices of remaining elements of INITS are numbered from (1+ I)
@@ -514,7 +520,7 @@
           (if stack-allocate-p
               (stack-allocation size 0 alloc)
               (allocation +cons-primtype+ size 0 alloc node temp thread-tn))
-          (init-list alloc temp nil indices (items))
+          (init-list alloc temp nil indices (items) stack-allocate-p)
           ;; Stitch the cons cells together
           (dotimes (i (1- cons-cells))
             (case i
