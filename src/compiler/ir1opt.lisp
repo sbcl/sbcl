@@ -1531,6 +1531,7 @@
              (declare (ignorable name asserted))
              (validate-call-type call type leaf nil
                                  (or asserted
+                                     (policy call (zerop type-check))
                                      #+sb-xc-host t
                                      ;; Trust types coming from the system structures
                                      (let ((source (lvar-uses fun-lvar)))
