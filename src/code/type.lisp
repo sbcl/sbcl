@@ -2588,9 +2588,14 @@ expansion happened."
     (cond
       ((csubtypep not1 not2) type1)
       ((csubtypep not2 not1) type2)
-      ((eq (type-intersection not1 not2) *empty-type*)
-       *universal-type*)
-      (t nil))))
+      ((let ((int (type-intersection not1 not2)))
+         (cond ((eq int *empty-type*)
+                *universal-type*)
+               ;; (or (not vector) (not (array t)))
+               ;; =>
+               ;; (not (vector t))
+               ((array-type-p int)
+                (make-negation-type int))))))))
 
 (define-type-method (negation :complex-union2) (type1 type2)
   (cond
