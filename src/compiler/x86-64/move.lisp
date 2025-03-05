@@ -19,7 +19,7 @@
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
    (any-reg descriptor-reg))
-  (move-immediate y (encode-value-if-immediate x)))
+  (move-immediate y (immediate-tn-repr x)))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))

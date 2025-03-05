@@ -59,7 +59,6 @@
   (:args (vals :more t :scs (descriptor-reg any-reg immediate constant)))
   (:results (start :from :load) (count))
   (:info nvals)
-  (:temporary (:scs (descriptor-reg)) temp)
   (:vop-var vop)
   (:generator 20
     (unless (eq (tn-kind start) :unused)
@@ -67,15 +66,10 @@
     (do ((tn-ref vals (tn-ref-across tn-ref)))
         ((null tn-ref))
       (let ((tn (tn-ref-tn tn-ref)))
-        (inst push (sc-case tn
-                     (constant
-                      (load-constant vop tn temp)
-                      temp)
-                     (t
-                      (let ((value (encode-value-if-immediate tn)))
-                        (if (integerp value)
-                            (constantize value)
-                            value)))))))
+        (inst push (let ((value (encode-value-if-immediate tn)))
+                     (if (integerp value)
+                         (constantize value)
+                         value)))))
     (unless (eq (tn-kind count) :unused)
       (inst mov count (fixnumize nvals)))))
 
