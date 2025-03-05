@@ -4049,29 +4049,6 @@ expansion happened."
         ((and (not (intersection-type-p type1))
               (%intersection-complex-subtypep-arg1 type2 type1))
          type1)
-        ;; KLUDGE: This special (and somewhat hairy) magic is required
-        ;; to deal with the RATIONAL/INTEGER special case.  The UNION
-        ;; of (INTEGER * -1) and (AND (RATIONAL * -1/2) (NOT INTEGER))
-        ;; should be (RATIONAL * -1/2) -- CSR, 2003-02-28
-        ((and (csubtypep type2 (specifier-type 'ratio))
-              (numeric-type-p type1)
-              (csubtypep type1 (specifier-type 'integer))
-              (csubtypep type2
-                         (make-numeric-type
-                          :class 'rational
-                          :complexp :real
-                          :low (if (null (numeric-type-low type1))
-                                   nil
-                                   (list (1- (numeric-type-low type1))))
-                          :high (if (null (numeric-type-high type1))
-                                    nil
-                                    (list (1+ (numeric-type-high type1)))))))
-         (let* ((intersected (intersection-type-types type2))
-                (remaining   (remove (specifier-type '(not integer))
-                                     intersected
-                                     :test #'type=)))
-           (and (not (equal intersected remaining))
-                (type-union type1 (%type-intersection remaining)))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))
