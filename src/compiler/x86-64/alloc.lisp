@@ -320,11 +320,20 @@
         (funcall init)))))
 
 (defun list-ctor-push-elt (x scratch)
-  (inst push (if (sc-is x immediate)
-                 (let ((bits (encode-value-if-immediate x)))
-                   (or (plausible-signed-imm32-operand-p bits)
-                       (progn (inst mov scratch bits) scratch)))
-                 x)))
+  (multiple-value-bind (operand oversized)
+      (if (sc-is x immediate)
+          (let ((bits (immediate-tn-repr x)))
+            (values bits (typep bits '(and integer (not (signed-byte 32))))))
+          (values x nil))
+    (inst push (cond ((not oversized) operand)
+                     ((typep operand '(unsigned-byte 32))
+                      ;; Do a 32-bit move to register, then push as 64 bits.
+                      ;; A raw constant would need 8 bytes plus a 6-byte PUSH
+                      ;; instruction, but this way encodes to 6 bytes in total.
+                      (inst mov :dword scratch operand)
+                      scratch)
+                     (t
+                      (constantize operand))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
 
@@ -352,8 +361,8 @@
       (let ((tn (pop inits)))
         (unless (= (sbit scoreboard i) 1) ; ignore if already did this
           (setf (sbit scoreboard i) 1)
-          (let* ((imm (when (sc-is tn immediate) (encode-value-if-immediate tn)))
-                 ;; When ENCODE-VALUE-IF-IMMEDIATE returns a fixup
+          (let* ((imm (when (sc-is tn immediate) (immediate-tn-repr tn)))
+                 ;; When IMMEDIATE-TN-REPR returns a fixup
                  ;; it is promised to fit in (SIGNED-BYTE 32)
                  (must-load (or (sc-is tn constant control-stack)
                                 (and imm (not (typep imm '(or (signed-byte 32) fixup))))))
@@ -1022,7 +1031,7 @@
   (:node-var node)
   (:generator 10
     (let ((data (if (sc-is value immediate)
-                    (let ((bits (encode-value-if-immediate value)))
+                    (let ((bits (immediate-tn-repr value)))
                       (if (integerp bits)
                           (constantize bits)
                           bits)) ; could be a fixup

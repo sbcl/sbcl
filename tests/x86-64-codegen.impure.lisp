@@ -1354,3 +1354,12 @@
            thereis (and (search "CMP DWORD PTR" line)
                         (search "#<LAYOUT" line)
                         (search "for SB-THREAD:MUTEX" line))))))
+
+(with-test (:name :dx-list-push-imm :skipped-on (not :immobile-space))
+  (let ((lines
+         (disassembly-lines
+          (compile nil '(lambda (f)
+                         (sb-int:dx-let ((x (list :foo))) (funcall f x)))))))
+    (assert
+     (loop for line in lines
+           thereis (and (search "PUSH #x" line) (search "':FOO" line))))))

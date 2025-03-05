@@ -500,31 +500,37 @@
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
 
+;;; Return the bits (descriptor or raw as specified) representing the CPU's
+;;; view of TN which is in the IMMEDIATE storage class. If the bits can only
+;;; be determined at load time, as with immobile layouts and symbols,
+;;; then return an absolute fixup which will get replaced by the bits.
+(defun immediate-tn-repr (tn &optional (tag t))
+  (let ((val (tn-value tn)))
+    (etypecase val
+      (integer  (if tag (fixnumize val) val))
+      (symbol   (if (static-symbol-p val)
+                    (+ nil-value (static-symbol-offset val))
+                    (make-fixup val :immobile-symbol)))
+      #+(or immobile-space permgen)
+      (layout (make-fixup val :layout))
+      (character (if tag
+                     (logior (ash (char-code val) n-widetag-bits)
+                             character-widetag)
+                     (char-code val)))
+      (single-float
+       (let ((bits (single-float-bits val)))
+         (if tag
+             (dpb bits (byte 32 32) single-float-widetag)
+             bits)))
+      (structure-object
+       (if (eq val sb-lockless:+tail+)
+           (progn (aver tag) (+ static-space-start lockfree-list-tail-value-offset))
+           (bug "immediate structure-object ~S" val))))))
+
+;;; Return the bits of TN's representation if it has immediate SC,
+;;; otherwise return TN exactly as-is.
 (defun encode-value-if-immediate (tn &optional (tag t))
-  (if (sc-is tn immediate)
-      (let ((val (tn-value tn)))
-        (etypecase val
-          (integer  (if tag (fixnumize val) val))
-          (symbol   (if (static-symbol-p val)
-                        (+ nil-value (static-symbol-offset val))
-                        (make-fixup val :immobile-symbol)))
-          #+(or immobile-space permgen)
-          (layout
-           (make-fixup val :layout))
-          (character (if tag
-                         (logior (ash (char-code val) n-widetag-bits)
-                                 character-widetag)
-                         (char-code val)))
-          (single-float
-           (let ((bits (single-float-bits val)))
-             (if tag
-                 (dpb bits (byte 32 32) single-float-widetag)
-                 bits)))
-          (structure-object
-           (if (eq val sb-lockless:+tail+)
-               (progn (aver tag) (+ static-space-start lockfree-list-tail-value-offset))
-               (bug "immediate structure-object ~S" val)))))
-      tn))
+  (if (sc-is tn immediate) (immediate-tn-repr tn tag) tn))
 
 ;;;; miscellaneous function call parameters
 
