@@ -328,6 +328,14 @@
 
 ;;;; CONS, ACONS, LIST and LIST*
 
+(defun consing-singleton-nil-p (car cdr)
+  (and (eq car cdr) (sc-is car immediate) (null (tn-value car))))
+
+(defun finish-list (alloc result)
+  (if (location= alloc result)
+      (inst or :byte alloc list-pointer-lowtag)
+      (inst lea result (ea list-pointer-lowtag alloc))))
+
 ;;; General remark on the optimization for storing partial words when the heap is prezeroed:
 ;;; It's not terribly important. Gencgc does not prezero cons pages, and the work-in-progress
 ;;; concurrent collector prefills pages with -1 (an illegal pattern) so that a valid cons
@@ -373,9 +381,7 @@
                       do (storew operand alloc (svref word-indices j) 0)
                          (setf (sbit scoreboard j) 1)))))))))
   (when result
-    (if (location= alloc result)
-        (inst or :byte alloc list-pointer-lowtag)
-        (inst lea result (ea list-pointer-lowtag alloc)))))
+    (finish-list alloc result)))
 
 (define-vop (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
@@ -384,6 +390,8 @@
   (:temporary (:sc unsigned-reg :to (:result 0)
                :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
               temp)
+  (:temporary (:unused-if (not (consing-singleton-nil-p car cdr)) :sc sse-reg)
+              xmmtemp)
   (:results (result :scs (descriptor-reg)))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:vop-var vop)
@@ -391,6 +399,7 @@
   (:generator 10
     (let ((car-val (encode-value-if-immediate car))
           (car-regp (sc-is car any-reg descriptor-reg))
+          (list-nil-p (consing-singleton-nil-p car cdr))
           (nbytes (* cons-size n-word-bytes)))
       ;; If consing two occurrences of the same value then load into a register unless:
       ;;  - already in a register, OR
@@ -399,16 +408,16 @@
       ;; Memory operands are legal for PUSH, therefore CONSTANT and CONTROL-STACK
       ;; don't technically require a temp. However, I believe that one memory load
       ;; is better than two PUSH instructions using memory as the source operand.
-      ;;
-      ;; Possible TODO: C compilers seem to like xmm registers when storing adjacent
-      ;; words, even to the extent that it requires a MOVAPS to get the words into
-      ;; a register, rather than just storing immediates. We'd have to be especially
-      ;; careful with arrangement in the boxed header to make this possible.
+      (when list-nil-p
+        (inst movaps xmmtemp (ea (- nil-value list-pointer-lowtag)))) ; prefetch
       (cond
         ((node-stack-allocate-p node)
          (unless (aligned-stack-p)
            (inst and rsp-tn (lognot lowtag-mask)))
-         (cond ((eq car cdr)
+         (cond (list-nil-p
+                (inst sub rsp-tn 16)
+                (inst movaps (ea rsp-tn) xmmtemp))
+               ((eq car cdr)
                 (let ((operand (if (or car-regp (typep car-val '(signed-byte 8)))
                                    car-val
                                    (progn (inst mov alloc car-val) alloc))))
@@ -421,8 +430,12 @@
          (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
          (pseudo-atomic (:thread-tn thread-tn)
            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
-           (init-list alloc temp result `#(,cons-car-slot ,cons-cdr-slot)
-                      (list car cdr))))))))
+           (cond (list-nil-p
+                  (inst movaps (ea alloc) xmmtemp)
+                  (finish-list alloc result))
+                 (t
+                  (init-list alloc temp result `#(,cons-car-slot ,cons-cdr-slot)
+                             (list car cdr))))))))))
 
 ;;; In terms of minimizing memory loads (CONSTANT operand) or 4-byte immediate
 ;;; (immediate symbol operand) there are 4 possible patterns reusing a value
@@ -527,9 +540,7 @@
               (0 (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc)))
               (t (inst add temp 16)))
             (inst mov (ea (- -8 list-pointer-lowtag) temp) temp))
-          (if (location= alloc result)
-              (inst or :byte alloc list-pointer-lowtag)
-              (inst lea result (ea list-pointer-lowtag alloc))))))))
+          (finish-list alloc result))))))
 
 (define-vop ()
   (:translate unaligned-dx-cons)
