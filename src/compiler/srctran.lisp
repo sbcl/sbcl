@@ -2097,8 +2097,6 @@
   (let* ((rem-type (rem-result-type number-type divisor-type))
          (number-interval (numeric-type->interval number-type))
          (divisor-interval (numeric-type->interval divisor-type)))
-    ;;(declare (type (member '(integer rational float)) rem-type))
-    ;; We have real numbers now.
     (cond ((eq rem-type 'integer)
            ;; Since the remainder type is INTEGER, both args are
            ;; INTEGERs.
@@ -2114,7 +2112,7 @@
                         (eql (interval-low divisor-interval) 1))
                    (values number-interval nil)
                    (values (interval-div number-interval
-                                         divisor-interval)))
+                                         divisor-interval) t))
              (let* ((*conservative-quotient-bound* conservative)
                     (quot (truncate-quotient-bound quot)))
                (specifier-type `(integer ,(or (interval-low quot) '*)
