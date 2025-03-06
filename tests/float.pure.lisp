@@ -864,3 +864,13 @@
       `(lambda (x)
          (tan (the (single-float -1.5707964 1.5707964) x)))
     ((1.5707964) -2.2877332e7)))
+
+(with-test (:name :truncate-float-derive-type)
+  (assert-type (lambda (p)
+                 #1=(declare ((rational (10126179022772429283) (10126179022772429285)) p))
+                 (values (truncate p 2d0)))
+               (eql 5063089511386214400))
+  (assert-type (lambda (p)
+                 #1#
+                 (values (ftruncate p 2d0)))
+               (eql 5.063089511386214d18)))
