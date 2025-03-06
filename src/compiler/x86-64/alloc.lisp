@@ -1024,37 +1024,29 @@
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
-  (:args (value :scs (descriptor-reg any-reg immediate constant) :to :result))
+  (:args (value :scs (descriptor-reg any-reg) :to :result
+                :load-if (or (and (sc-is value immediate)
+                                  (let ((bits (immediate-tn-repr value)))
+                                    (typep bits '(and integer (not (signed-byte 32))))))
+                             (sc-is value constant control-stack))))
   (:results (result :scs (descriptor-reg) :from :eval))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
-    (let ((data (if (sc-is value immediate)
-                    (let ((bits (immediate-tn-repr value)))
-                      (if (integerp bits)
-                          (constantize bits)
-                          bits)) ; could be a fixup
-                    value)))
+    (let ((value (encode-value-if-immediate value)))
       (cond (stack-allocate-p
              ;; No regression test got here. Therefore I think there's no such thing as a
              ;; dynamic-extent value cell. It makes sense that there isn't: DX closures
              ;; would just reference their frame, wouldn't they?
              (inst and rsp-tn (lognot lowtag-mask)) ; align
-             (inst push data)
+             (inst push value)
              (inst push (compute-object-header value-cell-size value-cell-widetag))
              (inst lea result (ea other-pointer-lowtag rsp-tn)))
             (t
              (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
               (lambda ()
-                (if (sc-case value
-                     (immediate
-                      (unless (integerp data) (inst push data) t))
-                     (constant
-                      (inst push value) t)
-                     (t nil))
-                    (inst pop (object-slot-ea result value-cell-value-slot other-pointer-lowtag))
-                    (storew data result value-cell-value-slot other-pointer-lowtag)))))))))
+                (storew value result value-cell-value-slot other-pointer-lowtag))))))))
 
 ;;;; automatic allocators for primitive objects
 
