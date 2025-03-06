@@ -145,14 +145,14 @@
         (setf not-p (not not-p)))
       (flet ((load-immediate (dst constant-tn
                               &optional (sc-reg dst))
-               (let ((encode (encode-value-if-immediate constant-tn
-                                                        (sc-is sc-reg any-reg descriptor-reg))))
-                 (if (typep encode '(unsigned-byte 31))
+               (let ((bits (immediate-tn-repr constant-tn
+                                              (sc-is sc-reg any-reg descriptor-reg))))
+                 (if (typep bits '(unsigned-byte 31))
                      (unless size
                        (setf size :dword))
                      (setf size :qword))
                  ;; Can't use ZEROIZE, since XOR will affect the flags.
-                 (inst mov dst encode))))
+                 (inst mov dst bits))))
         (cond ((null (rest flags))
                (cond ((sc-is else immediate)
                       (load-immediate res else))

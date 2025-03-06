@@ -71,7 +71,7 @@
               temp)
   (:generator 0
     (if (sc-is x immediate)
-        (move-immediate y (encode-value-if-immediate x) temp)
+        (move-immediate y (immediate-tn-repr x) temp)
         (move y x))))
 
 (define-move-vop move :move

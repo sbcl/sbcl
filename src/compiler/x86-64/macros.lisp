@@ -62,11 +62,12 @@
                    :qword))
          (ea (ea (- (* slot n-word-bytes) lowtag) ptr)))
     (aver (eq size :qword))
-    (cond ((and (integerp value)
-                (not (typep value '(signed-byte 32))))
+    (cond ((typep value '(and integer (not (signed-byte 32))))
            (cond (temp
                   (inst mov temp value)
                   (inst mov ea temp)
+                  ;; uhh, why does this clause return TEMP but the
+                  ;; T clause returns nothing in particular?
                   temp)
                  (t
                   (bug "need temp reg for STOREW of oversized immediate operand"))))
