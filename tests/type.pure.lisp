@@ -1094,3 +1094,7 @@
   (assert (eql (specifier-type '(or (and standard-object sb-kernel:extended-sequence)
                                  (and standard-object (not sb-kernel:extended-sequence))))
                (specifier-type 'standard-object))))
+
+(with-test (:name :cons-intersection)
+  (assert (eql (specifier-type '(and (cons (not array) atom) (cons (not integer) (not integer))))
+               (specifier-type '(cons (and (not array) (not integer)) (and atom (not integer)))))))
