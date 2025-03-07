@@ -37,7 +37,7 @@
              `(thread-tls-ea (load-time-tls-offset ,sym)))
            (load-oldval ()
              `(if (sc-is old immediate)
-                  (inst mov rax (immediate-tn-repr old))
+                  (move-immediate rax (immediate-tn-repr old))
                   (move rax old))))
 
 (define-vop (%cas-symbol-global-value)

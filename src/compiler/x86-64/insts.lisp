@@ -3363,8 +3363,13 @@
                                 collect (prog1 (ldb (byte 8 0) val)
                                           (setf val (ash val -8))))))))))
 
+(defconstant +card-table-disp+ 41) ; voodoo
+(defun sb-vm::card-table-byte (index)
+  (ea +card-table-disp+ sb-vm::gc-card-table-reg-tn index))
+
 ;;; Return an address which when _dereferenced_ will return ADDR
-(defun sb-vm::asm-routine-indirect-address (addr)
+(defun sb-vm::asm-routine-indirect-address (addr &optional nil-relative)
+  (declare (ignorable nil-relative))
   (let ((i (sb-fasl::asm-routine-index-from-addr addr)))
     (declare (ignorable i))
     #-immobile-space (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*)
@@ -3376,8 +3381,16 @@
     (or
      ;; Accounting for the jump-table-count as the first unboxed word in
      ;; code-instructions, subtract 1 from I to get the correct vector element.
-     #-sb-xc-host (sap-int (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
-                                 (ash (1- i) word-shift)))
+     #-sb-xc-host
+     (let ((sap (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
+                      (ash (1- i) word-shift))))
+       (if nil-relative
+           (let ((nil-addr (- static-space-end +card-table-disp+)))
+;; (format t "~&addr ~x contains ~x, should go to ~x~%" sap (sap-ref-word sap 0) addr)
+             ;; bit-cast as unsigned to satisfy sap-ref-32.
+             ;; the CPU interprets as signed
+             (ldb (byte 32 0) (- (sap-int sap) nil-addr)))
+           (sap-int sap)))
      (error "unreachable"))))
 
 ;;; This gets called by LOAD to resolve newly positioned objects
@@ -3402,7 +3415,7 @@
                   #+immobile-space (:rel32 (+ sb-vm::lisp-linkage-space-addr index))
                   (:abs32 index))))
              (:assembly-routine
-              (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value) value))
+              (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value t) value))
              ((:alien-code-linkage-index :alien-data-linkage-index)
               (* value alien-linkage-table-entry-size))
              (:layout-id ; layout IDs are signed quantities on x86-64

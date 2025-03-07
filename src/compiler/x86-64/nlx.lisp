@@ -124,7 +124,7 @@
     (cond ((zerop nvals))
           ((= nvals 1)
            (let ((no-values (gen-label)))
-             (inst mov (tn-ref-tn values) nil-value)
+             (inst mov (tn-ref-tn values) null-tn)
              (inst test rcx-tn rcx-tn)
              (inst jmp :z no-values)
              (loadw (tn-ref-tn values) start -1)
@@ -158,7 +158,7 @@
                    (emit-label (car default))
                    (when (cddr default)
                      (inst push rdx-tn))
-                   (inst mov (second default) nil-value))
+                   (inst mov (second default) null-tn))
                  (inst jmp defaulting-done))))))
     (inst mov rsp-tn sp)))
 

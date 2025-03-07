@@ -350,7 +350,7 @@
                      (2nd-tn (tn-ref-tn 2nd-tn-ref))
                      (2nd-tn-live (neq (tn-kind 2nd-tn) :unused)))
                 (when 2nd-tn-live
-                  (inst mov 2nd-tn nil-value))
+                  (inst mov 2nd-tn null-tn))
                 (when (> nvals 2)
                   (loop
                     for tn-ref = (tn-ref-across 2nd-tn-ref)
@@ -359,7 +359,7 @@
                     unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
                     do
                     (inst mov :dword (tn-ref-tn tn-ref)
-                          (if 2nd-tn-live 2nd-tn nil-value)))))
+                          (if 2nd-tn-live 2nd-tn null-tn)))))
               (inst mov rbx rsp-tn)
               regs-defaulted))
 
@@ -397,9 +397,8 @@
                        (inst jmp :nc default-stack-slots))
                       (t
                        (inst jmp :c regs-defaulted)
-                       (loop for null = nil-value then (car used-registers)
-                             for reg in used-registers
-                             do (inst mov :dword reg null))
+                       (loop for reg in used-registers
+                             do (inst mov reg null-tn))
                        (inst jmp done)))
                 REGS-DEFAULTED
                 (do ((i register-arg-count (1+ i))
@@ -432,13 +431,12 @@
                       (when (or (not trust)
                                 (<= min-values 1))
                         (emit-label default-stack-slots)
-                        (loop for null = nil-value then (car used-registers)
-                              for reg in used-registers
-                              do (inst mov :dword reg null))
+                        (loop for reg in used-registers
+                              do (inst mov reg null-tn))
                         (move rbx rsp-tn))
                       (dolist (default defaults)
                         (emit-label (car default))
-                        (inst mov (cdr default) nil-value))
+                        (inst mov (cdr default) null-tn))
                       (inst jmp defaulting-done)))))))))))))
 
 ;;;; unknown values receiving
@@ -1036,7 +1034,7 @@
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
              (first (first arg-tns)))
-        (inst mov first nil-value)
+        (inst mov first null-tn)
         (dolist (tn (cdr arg-tns))
           (inst mov tn first))))
     ;; Set the multiple value return flag.
@@ -1295,7 +1293,7 @@
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 3
-    (inst mov value nil-value)
+    (inst mov value null-tn)
     (inst cmp count (fixnumize index))
     (inst jmp :be done)
     (inst mov value (ea (- (* index n-word-bytes)) object))
@@ -1343,7 +1341,7 @@
 |#
     (move rcx count :dword)
     ;; Setup for the CDR of the last cons (or the entire result) being NIL.
-    (inst mov result nil-value)
+    (inst mov result null-tn)
     (cond ((not (member :allocation-size-histogram sb-xc:*features*))
            (inst jrcxz DONE))
           (t ; jumps too far for JRCXZ sometimes

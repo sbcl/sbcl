@@ -81,6 +81,11 @@
   (any-reg descriptor-reg))
 
 (defun move-immediate (target val &optional tmp-tn zeroed)
+  (when (nil-relative-p val)
+    (let ((dst (if (gpr-tn-p target) target tmp-tn)))
+      (inst lea dst (ea (nil-relative-disp val) null-tn))
+      (when (eq dst tmp-tn) (inst mov target tmp-tn)))
+    (return-from move-immediate target))
   ;; Try to emit the smallest immediate operand if the destination word
   ;; is already zeroed. Otherwise a :qword.
   (cond
@@ -137,7 +142,7 @@
       (sc-case y
         ((any-reg descriptor-reg)
          (if (sc-is x immediate)
-             (if (eql val 0) (zeroize y) (inst mov y val))
+             (if (eql val 0) (zeroize y) (move-immediate y val))
              (move y x)))
         ((control-stack)
          (if (= (tn-offset fp) rsp-offset)

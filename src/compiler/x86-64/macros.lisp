@@ -62,15 +62,18 @@
                    :qword))
          (ea (ea (- (* slot n-word-bytes) lowtag) ptr)))
     (aver (eq size :qword))
-    (cond ((typep value '(and integer (not (signed-byte 32))))
+    (cond ((or (typep value '(and integer (not (signed-byte 32))))
+               (nil-relative-p value))
            (cond (temp
-                  (inst mov temp value)
+                  (if (nil-relative-p value)
+                      (move-immediate temp value)
+                      (inst mov temp value))
                   (inst mov ea temp)
                   ;; uhh, why does this clause return TEMP but the
                   ;; T clause returns nothing in particular?
                   temp)
                  (t
-                  (bug "need temp reg for STOREW of oversized immediate operand"))))
+                  (bug "need temp reg for STOREW of immediate operand"))))
           (t
            (inst mov :qword ea value)))))
 
@@ -84,7 +87,8 @@
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
-  `(inst mov ,reg (+ nil-value ,(static-symbol-offset symbol))))
+  (cond (symbol `(inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn)))
+        (t `(inst mov ,reg null-tn))))
 
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA

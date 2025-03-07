@@ -18,7 +18,7 @@ os_alloc_gc_space(int __attribute__((unused)) space_id,
     os_vm_address_t actual;
 
 #ifdef MAP_32BIT
-    if (attributes & ALLOCATE_LOW)
+    if ((attributes & ALLOCATE_LOW) && space_id != STATIC_CORE_SPACE_ID)
         flags |= MAP_32BIT;
 #endif
     actual = sbcl_mmap(addr, len, protection, flags, -1, 0);

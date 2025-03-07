@@ -1263,7 +1263,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst lea byte-array (ea start byte-array*))
       (inst add end byte-array*)
@@ -1326,7 +1326,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst lea byte-array (ea start byte-array*))
       (inst add end byte-array*)
@@ -1401,7 +1401,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst lea byte-array (ea end byte-array*))
       (inst add start byte-array*)
@@ -1464,7 +1464,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst lea byte-array (ea end byte-array*))
       (inst add start byte-array*)
@@ -1540,7 +1540,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
       (inst shl end 1)
       (inst lea 32-bit-array (ea 32-bit-array* start 2))
 
@@ -1602,7 +1602,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
       (inst shl end 1)
       (inst lea 32-bit-array (ea 32-bit-array* start 2))
 
@@ -1678,7 +1678,7 @@
                  ((bytes complex-double-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst shl start 1)
       (inst lea 32-bit-array (ea 32-bit-array* end 2))
@@ -1740,7 +1740,7 @@
                  ((bytes int-avx2-reg))
                  ((search)))
         ((res descriptor-reg t :from :load))
-      (inst mov res nil-value)
+      (inst mov res null-tn)
 
       (inst shl start 1)
       (inst lea 32-bit-array (ea 32-bit-array* end 2))

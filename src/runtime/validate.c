@@ -87,6 +87,9 @@ void ensure_undefined_alien(void) {
 
 bool allocate_hardwired_spaces(bool hard_failp)
 {
+    int num_gc_cards = dynamic_space_size / GENCGC_CARD_BYTES;
+    int card_table_bytes = ALIGN_UP(num_gc_cards, 4096);
+
     struct {
         uword_t start;
         unsigned size;
@@ -96,7 +99,13 @@ bool allocate_hardwired_spaces(bool hard_failp)
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
         { ALIEN_LINKAGE_SPACE_START, ALIEN_LINKAGE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID },
 #endif
+#if 1// !(defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_HIGH_STATIC_SPACE_ADDRESS)
+        { STATIC_SPACE_START,
+          STATIC_SPACE_SIZE + card_table_bytes,
+          STATIC_CORE_SPACE_ID },
+#else
         { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
+#endif
 #ifdef LISP_FEATURE_DARWIN_JIT
         { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, STATIC_CODE_CORE_SPACE_ID },
 #endif

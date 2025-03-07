@@ -168,6 +168,9 @@
 
 ;;;; comparison
 
+(eval-when (:compile-toplevel)
+  (assert (minusp (static-symbol-offset t))))
+
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
              `(define-assembly-routine (,name
                                         (:translate ,translate)
@@ -188,12 +191,12 @@
 
                 DO-STATIC-FUN
                 (call-static-fun ',static-fn 2)
-                ;; HACK: We depend on NIL having the lowest address of all
-                ;; static symbols (including T)
+                ;; X which now holds T or NIL corresponding to the answer.
+                ;; We need to return it in the correct flag bit.
+                ;; ASSUMPTION: address of T is less than address of NIL.
                 ,@(ecase test
-                    (:l `((inst mov y (1+ nil-value))
-                          (inst cmp y x)))
-                    (:g `((inst cmp x (1+ nil-value))))))))
+                    (:l `((inst cmp x null-tn)))
+                    (:g `((inst cmp null-tn x)))))))
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
@@ -216,7 +219,8 @@
 
   DO-STATIC-FUN
   (call-static-fun 'two-arg-= 2)
-  (inst cmp x (+ nil-value (static-symbol-offset t))))
+  (inst sub x null-tn)
+  (inst cmp x (static-symbol-offset t)))
 
 #+sb-assembling
 (define-assembly-routine (logcount)

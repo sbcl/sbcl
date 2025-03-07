@@ -34,13 +34,22 @@
 
 ;;;; routines for dealing with static symbols
 
-;;; the byte offset of the static symbol SYMBOL
+;;; the distance in bytes from tagged NIL to tagged static symbol SYMBOL
 (defun static-symbol-offset (symbol)
   (if symbol
-      ;; This predicate returns a generalized boolean, integer indicating truth
-      ;; and also the index, or T if the argument is NIL, or NIL if non-static.
+      ;; STATIC-SYMBOL-P returns a generalized boolean: an integer indicating
+      ;; the index, or T if the argument is NIL, or NIL if non-static.
       (let ((posn (static-symbol-p symbol)))
         (unless posn (error "~S is not a static symbol." symbol))
+        #+x86-64
+        (if (eq symbol t)
+            nil-t-offset
+            (let ((this (+ static-space-start
+                           #x100
+                           (* (1- posn) (pad-data-block symbol-size))
+                           other-pointer-lowtag)))
+              (- this nil-value)))
+        #-x86-64
         (+ (* posn (pad-data-block symbol-size))
            (pad-data-block (1- symbol-size))
            other-pointer-lowtag

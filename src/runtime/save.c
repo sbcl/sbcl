@@ -256,6 +256,15 @@ static void unwind_binding_stack(struct thread* th)
     if (verbose) printf("done]\n");
 }
 
+static void write_static_space_trailer(FILE *file)
+{
+    lispobj* ptr = (lispobj*)static_space_trailer_start;
+    int n_trailer_words = (lispobj*)STATIC_SPACE_END - ptr;
+    write_lispobj(STATIC_SPACE_TRAILER_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(2+n_trailer_words, file); // +2 for the entry itself
+    for ( ; (uword_t)ptr < STATIC_SPACE_END; ++ptr) write_lispobj(*ptr, file);
+}
+
 bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
                         int save_runtime_options,
@@ -329,6 +338,9 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                     nbytes, core_start_pos, COMPRESSION_LEVEL_NONE);
     write_lispobj(data_page, file);
     write_lispobj(0, file); // address of ELF-based linkage entries
+#endif
+#ifdef LISP_FEATURE_X86_64
+    write_static_space_trailer(file);
 #endif
 
     write_lispobj(DIRECTORY_CORE_ENTRY_TYPE_CODE, file);

@@ -583,6 +583,9 @@ static void relocate_heap(struct heap_adjust* adj)
     // itself.
     adjust_pointers((void*)(NIL - LIST_POINTER_LOWTAG), 1, adj);
 #endif
+#ifdef T_SYMBOL_SLOTS_START
+    fix_space((uword_t)T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, adj);
+#endif
     fix_space((uword_t)NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, adj);
     fix_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_PERMGEN
@@ -919,6 +922,12 @@ process_directory(int count, struct ndir_entry *entry,
                entry->nwords, corespace_checksum((void*)addr, entry->nwords));
 #endif
 
+#if 0
+        if (id==STATIC_CORE_SPACE_ID) {
+          fprintf(stderr, "dump of static space:\n");
+          for(lispobj* ptr=addr; ptr<(lispobj*)static_space_free_pointer; ++ptr) fprintf(stderr, "%p: %lx\n", ptr, *ptr);
+        }
+#endif
     }
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
@@ -1058,6 +1067,8 @@ bool gc_allocate_ptes()
     void* result = os_alloc_gc_space(0, MOVABLE, 0,
                                      ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
     gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
+#elif defined LISP_FEATURE_X86_64
+    gc_card_mark = (void*)STATIC_SPACE_END;
 #elif defined LISP_FEATURE_PPC64
     unsigned char* mem = checked_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
     gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
@@ -1470,6 +1481,14 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
              * any particular cell. Leave this 0 if the space pointer is null */
             if (linkage_space) initial_linkage_table_count = linkage_table_count;
             break;
+        case STATIC_SPACE_TRAILER_CORE_ENTRY_TYPE_CODE: {
+            int nwords = remaining_len;
+            lispobj* base = (lispobj*)
+              ((STATIC_SPACE_START+STATIC_SPACE_SIZE) - (nwords<<WORD_SHIFT));
+            static_space_trailer_start = base;
+            memcpy(base, ptr, nwords<<WORD_SHIFT);
+            break;
+        }
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
             // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
             gc_load_corefile_ptes(ptr[0], ptr[1], ptr[2],

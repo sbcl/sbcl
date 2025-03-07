@@ -47,7 +47,7 @@
                 (or (eq name 'make-array)
                     (equal name '(setf %array-fill-pointer))))
            (when (eq name 'make-array) ; nullify the creating PC location
-             (inst mov :qword (object-slot-ea object 1 lowtag) nil-value))
+             (inst mov :qword (object-slot-ea object 1 lowtag) null-tn))
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           #-soft-card-marks
@@ -108,11 +108,11 @@
 
 ;; Return the effective address of the value slot of static SYMBOL.
 (defun static-symbol-value-ea (symbol &optional (byte 0))
-   (ea (+ nil-value
-          (static-symbol-offset symbol)
-          (ash symbol-value-slot word-shift)
-          byte
-          (- other-pointer-lowtag))))
+  (ea (+ (static-symbol-offset symbol)
+         (ash symbol-value-slot word-shift)
+         byte
+         (- other-pointer-lowtag))
+      null-tn))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -187,7 +187,7 @@
     (:generator 15
       (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop))
       (if (sc-is old immediate)
-          (inst mov rax (encode-value-if-immediate old))
+          (move-immediate rax (immediate-tn-repr old))
           (move rax old))
       (inst cmpxchg :lock (object-slot-ea symbol symbol-value-slot other-pointer-lowtag) new)
       (unless (policy node (= safety 0))
@@ -311,7 +311,7 @@
   (:generator 2
     (loadw result fdefn fdefn-fun-slot other-pointer-lowtag)
     (inst test :dword result result)
-    (inst cmov :z result (ea (- nil-value list-pointer-lowtag)))))
+    (inst cmov :z result null-tn)))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)

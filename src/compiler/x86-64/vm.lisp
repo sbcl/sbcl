@@ -84,7 +84,14 @@
 ;;; It will seldom be used with a constant displacement.
 (define-symbol-macro card-table-reg 12)
 (define-symbol-macro gc-card-table-reg-tn r12-tn)
+(define-symbol-macro null-tn r12-tn)
 (define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))
+
+(defconstant nil-t-offset ; this + null-tn = tagged pointer to T
+  (+ (- list-pointer-lowtag)
+     -16 ; NIL's symbol header and before it an unused word
+     -48 ; symbol size
+     other-pointer-lowtag))
 
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
@@ -500,6 +507,18 @@
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
 
+(defstruct (nil-relative (:constructor nil-relative (disp))
+                             (:copier nil))
+  (disp 0 :read-only t))
+
+(defconstant lockfree-list-tail-offset-from-nil
+  (let ((this (+ static-space-start
+                 #x100
+                 ;; T is not in the lowest part of static space
+                 (* (1- (length +static-symbols+)) (pad-data-block symbol-size))
+                 instance-pointer-lowtag)))
+    (- this nil-value)))
+
 ;;; Return the bits (descriptor or raw as specified) representing the CPU's
 ;;; view of TN which is in the IMMEDIATE storage class. If the bits can only
 ;;; be determined at load time, as with immobile layouts and symbols,
@@ -508,9 +527,9 @@
   (let ((val (tn-value tn)))
     (etypecase val
       (integer  (if tag (fixnumize val) val))
-      (symbol   (if (static-symbol-p val)
-                    (+ nil-value (static-symbol-offset val))
-                    (make-fixup val :immobile-symbol)))
+      (symbol (cond ((not val) null-tn)
+                    ((static-symbol-p val) (nil-relative (static-symbol-offset val)))
+                    (t (make-fixup val :immobile-symbol))))
       #+(or immobile-space permgen)
       (layout (make-fixup val :layout))
       (character (if tag
@@ -524,7 +543,7 @@
              bits)))
       (structure-object
        (if (eq val sb-lockless:+tail+)
-           (progn (aver tag) (+ static-space-start lockfree-list-tail-value-offset))
+           (progn (aver tag) (nil-relative lockfree-list-tail-offset-from-nil))
            (bug "immediate structure-object ~S" val))))))
 
 ;;; Return the bits of TN's representation if it has immediate SC,

@@ -13,10 +13,10 @@
 (in-package "SB-VM")
 
 (defun symbol-slot-ea (symbol slot)
-  (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
-             (if (static-symbol-p symbol)
-                 (+ nil-value (static-symbol-offset symbol) offset)
-                 (make-fixup symbol :immobile-symbol offset)))))
+  (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
+    (if (static-symbol-p symbol)
+        (ea (+ (static-symbol-offset symbol) offset) null-tn)
+        (ea (make-fixup symbol :immobile-symbol offset)))))
 
 ;;; TODOs:
 ;;; 1. Sometimes people write constructors like
@@ -55,7 +55,7 @@
            ;; I'd like to measure to see if using a register is actually better.
            ;; If all threads store 0, it might be easier on the CPU's store buffer.
            ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
-           (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
+           (inst mov :byte (card-table-byte scratch-reg) CARD-MARKED))
           #+debug-gc-barriers
           (t
            (flet ((encode (x)
@@ -84,7 +84,7 @@
   (inst mov scratch-reg object)
   (inst shr scratch-reg gencgc-card-shift)
   (inst and :dword scratch-reg card-index-mask)
-  (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
+  (inst mov :byte (card-table-byte scratch-reg) CARD-MARKED))
 
 (defun emit-store (ea value val-temp &optional (tag-immediate t))
   (sc-case value
@@ -97,8 +97,11 @@
                          bits)
                     (plausible-signed-imm32-operand-p bits))
                 (inst mov :qword ea it))
+               ((tn-p bits) (inst mov ea bits)) ; null-tn
                (t
-                (inst mov val-temp bits)
+                (if (nil-relative-p bits)
+                    (move-immediate val-temp bits)
+                    (inst mov val-temp bits))
                 (inst mov ea val-temp)))))
    (constant
       (inst mov val-temp value)

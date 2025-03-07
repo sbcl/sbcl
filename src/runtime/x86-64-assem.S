@@ -72,6 +72,7 @@
 
 #define CARD_TABLE_REG %r12
 #define THREAD_BASE_REG %r13
+#define CARD_TABLE_DISP $41
 
 #ifdef LISP_FEATURE_WIN32
 #define CARG1 %rcx
@@ -194,6 +195,7 @@ Lzero:
 	mov	%rsp,%rbp	# The current sp marks start of new frame.
 Lcall:
 	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
+	sub	CARD_TABLE_DISP, CARD_TABLE_REG
 	call	*CLOSURE_FUN_OFFSET(%rax)
 
 	/* If the function returned multiple values, the carry flag will be set.
@@ -254,6 +256,7 @@ GNAME(funcall_alien_callback):
 	push	%rbp		# fp in save location S1
         mov	%rsp,%rbp
 	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
+	sub	CARD_TABLE_DISP, CARD_TABLE_REG
 	LOAD_PIC_VAR(linkage_space, %rax)
 	call	*(8*ENTER_ALIEN_CALLBACK_fname_index)(%rax)
 

@@ -508,6 +508,15 @@
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
 
+    (when (and disp (eq base-reg sb-vm::card-table-reg) (not index-reg))
+      (let* ((ptr (sap+ (sb-vm::read-r12) disp))
+             (contents (sap-ref-word ptr 0))
+             (name (sb-disassem::find-assembler-routine contents)))
+        (when name
+          (return-from print-mem-ref
+            (note (lambda (s) (format s "[#~x] = #~x ; ~a" (sap-int ptr) contents name))
+                  dstate)))))
+
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
                         (header-n-words (code-header-words code-header)))

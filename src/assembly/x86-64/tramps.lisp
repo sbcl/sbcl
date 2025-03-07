@@ -239,7 +239,7 @@
       (inst mov rax object)
       (inst shr rax gencgc-card-shift)
       (inst and :dword rax card-index-mask)
-      (inst mov :byte (ea gc-card-table-reg-tn rax) CARD-MARKED)
+      (inst mov :byte (card-table-byte rax) CARD-MARKED)
       STORE
       (inst mov rdi object)
       (inst mov rdx word-index)

@@ -41,7 +41,7 @@
   (inst lea :dword count (ea -3 item)) ; same as POINTERP (see type-vops)
   (inst test :byte count #b11)
   (inst jmp :nz DONE-CARD-MARKING)
-  (inst cmp item nil-value)
+  (inst cmp item null-tn)
   (inst jmp :e DONE-CARD-MARKING)
 
   (let ((disp (- (ash vector-data-offset word-shift) other-pointer-lowtag))
@@ -56,7 +56,8 @@
     (inst and :dword card-index card-index-mask)
     (inst and :dword end-card-index card-index-mask)
     (emit-label LOOP)
-    (inst mov :byte (ea gc-card-table-reg-tn card-index) CARD-MARKED) ; mark one card
+    ;; mark one card
+    (inst mov :byte (card-table-byte card-index) CARD-MARKED)
     (inst cmp card-index end-card-index)
     (inst jmp :e DONE-CARD-MARKING)
     (inst inc :dword card-index)
@@ -287,7 +288,7 @@
       (loadw temp array array-elements-slot other-pointer-lowtag)
       (inst cmp temp offset)
       (inst jmp :ne SKIP)
-      (inst mov offset nil-value)
+      (inst mov offset null-tn)
       (inst ret)
 
       SKIP

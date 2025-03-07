@@ -59,6 +59,8 @@
   (:args (vals :more t :scs (descriptor-reg any-reg immediate constant)))
   (:results (start :from :load) (count))
   (:info nvals)
+  ;; This temp could be elided if there is no nil-relative immediate in vals
+  (:temporary (:scs (descriptor-reg)) temp)
   (:vop-var vop)
   (:generator 20
     (unless (eq (tn-kind start) :unused)
@@ -67,9 +69,9 @@
         ((null tn-ref))
       (let ((tn (tn-ref-tn tn-ref)))
         (inst push (let ((value (encode-value-if-immediate tn)))
-                     (if (integerp value)
-                         (constantize value)
-                         value)))))
+                     (cond ((integerp value) (constantize value))
+                           ((nil-relative-p value) (move-immediate temp value))
+                           (t value))))))
     (unless (eq (tn-kind count) :unused)
       (inst mov count (fixnumize nvals)))))
 
@@ -96,7 +98,7 @@
                (not (csubtypep (tn-ref-type arg-ref) (specifier-type 'list))))
       (inst jmp type-check))
     LOOP
-    (inst cmp list nil-value)
+    (inst cmp list null-tn)
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)

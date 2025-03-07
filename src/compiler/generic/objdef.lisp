@@ -703,7 +703,12 @@ during backtrace.
 ) ; end PROGN
 
 ;;; The offset of NIL in static space, including the tag.
-(defconstant nil-value-offset
+#+x86-64
+(defconstant nil-value-offset ; at the end of static space
+  (let ((space-size (- static-space-end static-space-start)))
+    (+ space-size (* -6 8) list-pointer-lowtag)))
+#-x86-64
+(defconstant nil-value-offset ; at the beginning of static space
   (+ ;; Make space for the different regions, if they exist.
      ;; If you change this, then also change zero_all_free_ranges() in
      ;; gencgc.
@@ -721,7 +726,9 @@ during backtrace.
 ;;; The definitions below want to use ALIGN-UP, which is not defined
 ;;; in time to put these in early-objdef, but it turns out that we don't
 ;;; need them there.
-(#-relocatable-static-space defconstant #+relocatable-static-space define-symbol-macro nil-value (+ static-space-start nil-value-offset))
+(#+relocatable-static-space define-symbol-macro
+ #-relocatable-static-space defconstant
+ nil-value (+ static-space-start nil-value-offset))
 
 #+sb-xc-host (defun get-nil-taggedptr () nil-value)
 
@@ -776,10 +783,13 @@ during backtrace.
 ;;; Or: go to NIL's header word, subtract 1 word, and add in the physical
 ;;; size of NIL in bytes that we report for primitive-object-size.
 (defconstant static-space-objects-offset
-  (+ nil-symbol-slots-offset
-     (ash (1- sizeof-nil-in-words) word-shift)))
+  #+x86-64 #x100 ; super easy
+  #-x86-64 (+ nil-symbol-slots-offset
+              (ash (1- sizeof-nil-in-words) word-shift)))
 
 (defconstant lockfree-list-tail-value-offset
   (+ static-space-objects-offset
-     (* (length +static-symbols+) (ash (align-up symbol-size 2) word-shift))
+     ;; for x86-64 the symbol T is in the static space trailer
+     (* (+ (length +static-symbols+) #+x86-64 -1)
+        (ash (align-up symbol-size 2) word-shift))
      instance-pointer-lowtag))

@@ -416,17 +416,9 @@
 ;;; Sign bit and fixnum tag bit.
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
-(defconstant non-negative-fixnum-mask-constant-wired-address
-  (+ static-space-start (* 12 n-word-bytes)))
-;; the preceding constant is embedded in an array,
-;; the header of which must not overlap the static alloc regions
-#-sb-thread
-(aver (>= (- non-negative-fixnum-mask-constant-wired-address (* 2 n-word-bytes))
-          (+ static-space-start
-             (max boxed-region-offset
-                  cons-region-offset
-                  mixed-region-offset)
-             (* 3 n-word-bytes))))
+;; this number resides at the word preceding NIL's symbol-header
+(defun non-negative-fixnum-mask-ea ()
+  (ea (- (ash 5 word-shift) list-pointer-lowtag) null-tn))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
@@ -459,7 +451,7 @@
                           (inst test :byte value fixnum-tag-mask)
                           (inst jmp :z yep))
                          (t ;; Is it a fixnum with the sign bit clear?
-                          (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+                          (inst test (non-negative-fixnum-mask-ea) value)
                           (inst jmp :z yep))))
                  (%lea-for-lowtag-test temp value other-pointer-lowtag)
                  (inst test :byte temp lowtag-mask)
@@ -511,7 +503,7 @@
                    (inst test :byte value fixnum-tag-mask)
                    (inst jmp :z yep))
                   (t ;; Is it a fixnum with the sign bit clear?
-                   (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+                   (inst test (non-negative-fixnum-mask-ea) value)
                    (inst jmp :z yep))))
           (cond ((fixnum-or-other-pointer-tn-ref-p args t)
                  (when (and fixnum-p
@@ -705,7 +697,7 @@
           (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
           (inst test :byte temp lowtag-mask)
           (inst jmp :e compare-widetag)
-          (inst cmp value nil-value)
+          (inst cmp value null-tn)
           (inst jmp out)
           compare-widetag
           (inst cmp :byte (ea temp) symbol-widetag)))
@@ -759,7 +751,7 @@
   (:translate consp)
   (:generator 8
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
-      (inst cmp value nil-value)
+      (inst cmp value null-tn)
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))
@@ -1040,11 +1032,15 @@
   (:result-types unsigned-num)
   (:generator 1
     (when null-label
+      ;; Since the comparison against a register, not an imm8 or imm32 any more,
+      ;; there is probably no reason to distinguish the two cases here.
+      ;; The only conceivable reason would be if null-tn were in a low register
+      ;; then it's theoretically possible that a REX prefix could be avoided.
       (if (types-equal-or-intersect
            (type-difference (tn-ref-type value-ref) (specifier-type 'null))
            (specifier-type 'cons))
-          (inst cmp value nil-value)
-          (inst cmp :byte value (logand nil-value #xff)))
+          (inst cmp value null-tn)
+          (inst cmp :byte value null-tn)) ; was: (logand nil-value #xff)
       (inst jmp :e null-label))
     (cond ((other-pointer-tn-ref-p value-ref t)
            (if zero-extend

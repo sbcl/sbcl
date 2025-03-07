@@ -1636,6 +1636,8 @@
             ;; tends to be a more convenient interface.
             (prog1 mnemonic (setq mnemonic (the symbol (pop operands)))))))
         (action (gethash mnemonic *inst-encoder*)))
+    (when (find-if 'sb-vm::nil-relative-p operands) ; XXX remove
+      (error "can't have nil-relative operand without an LEA"))
     (unless action ; try canonicalizing again
       (setq mnemonic (find-symbol (string mnemonic)
                                   *backend-instruction-set-package*)

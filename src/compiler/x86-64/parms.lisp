@@ -75,19 +75,24 @@
 
 ;;;; description of the target address space
 
-;;; where to put the different spaces.
+;;; Static space:
+;;;
+;;;    start                                                end
+;;;    +-------- STATIC SPACE --|--------|-------+---------+-----+---- GC card table ...
+;;;    |                        | safept | asm   | popular |     |
+;;;    | other                  | page   | code  | consts  | NIL |
+;;;    | static                 | if     | jmp   |         |     |
+;;;    | data                   | needed | table |         |     |
+;;;    +------------------------*--------*-------+---------+-----+
+;;;             ^ freeptr                ^ page boundary
 
-;;; Currently the read-only and static spaces must be located in low
-;;; memory (certainly under the 4GB limit, very probably under 2GB
-;;; limit). This is due to the inability of using immediate values of
-;;; more than 32 bits (31 bits if you take sign extension into
-;;; account) in any other instructions except MOV. Removing this limit
-;;; would be possible, but probably not worth the time and code bloat
-;;; it would cause. -- JES, 2005-12-11
+;;;   R12 (GC-card-table-reg) = NIL
+;;;   R12 + 64 - lowtag_of(NIL) = GC cards
 
 #+(or linux darwin)
 (gc-space-setup #x50000000
                      :read-only-space-size 0
+                     :static-space-start #x7e000000 ; #xE0000000 ;
                      :fixedobj-space-size #.(* 60 1024 1024)
                      :text-space-size #.(* 160 1024 1024)
                      :text-space-start #xB800000000
@@ -169,8 +174,7 @@
     ;; (There is no register that points to a known address when entering the callback)
     ;; A static symbol works well for this, and is sensible considering that
     ;; the assembled wrappers also reside in static space.
-    #+(and sb-thread immobile-space) callback-wrapper-trampoline
-    *cpu-feature-bits*)
+    #+(and sb-thread immobile-space) callback-wrapper-trampoline)
   #'equalp)
 
 ;; No static-fdefns are actually needed, but #() here causes the
