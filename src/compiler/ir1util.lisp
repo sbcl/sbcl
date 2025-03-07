@@ -658,10 +658,7 @@
                  (setf node1 0))
                 ((eq node node2)
                  (return (eq node1 0)))))
-        (let ((component (block-component block1)))
-          (unless (component-dominators-computed component)
-            (find-dominators component))
-          (dominates-p block1 block2)))))
+        (dominates-p block1 block2))))
 
 (defun set-slot-old-p (node nth-object nth-value)
   (flet ((pseudo-static-value-p (lvar)

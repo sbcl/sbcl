@@ -651,8 +651,8 @@
                   (no-op-node (make-exit))
                   (new-2block (make-ir2-block block))
                   (vop-next (vop-next vop)))
-             (setf (block-number block)
-                   (incf (component-max-block-number (block-component block))))
+             (setf (component-renumber-p (block-component block))
+                   t)
              (link-node-to-previous-ctran no-op-node start)
              (setf (block-info block) new-2block)
              (add-to-emit-order new-2block (ir2-block-prev 2block))
@@ -692,8 +692,8 @@
                   (no-op-node (make-exit))
                   (new-2block (make-ir2-block new-block))
                   (vop-prev (vop-prev vop)))
-             (setf (block-number new-block)
-                   (incf (component-max-block-number (block-component new-block))))
+             (setf (component-renumber-p (block-component block))
+                   t)
              (link-node-to-previous-ctran no-op-node start)
              (setf (block-info new-block) new-2block)
              (add-to-emit-order new-2block 2block)
@@ -1037,6 +1037,14 @@
 
     (do-ir2-blocks (block component)
       (emit-moves-and-coercions block))
+
+    (when (component-renumber-p component)
+      (let ((num 0))
+        (do-ir2-blocks (2block component)
+          (let ((block (ir2-block-block 2block)))
+            (when (block-start block)
+              (setf (block-number block) num)
+              (incf num))))))
 
     #+arm64
     (choose-zero-tn (ir2-component-constant-tns 2comp))

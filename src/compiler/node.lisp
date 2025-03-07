@@ -650,8 +650,7 @@
   (delete-blocks nil :type list)
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
-  (max-block-number 0 :type fixnum)
-  (dominators-computed nil))
+  (renumber-p nil))
 
 (defprinter (component :identity t)
   name

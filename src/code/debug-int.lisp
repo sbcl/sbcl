@@ -265,6 +265,8 @@
 ;;; DEBUG-BLOCKs.
 (defstruct (debug-block (:constructor nil)
                         (:copier nil))
+  ;; Code-locations where execution continues after this block.
+  (successors nil :type list)
   ;; This indicates whether the block is a special glob of code shared
   ;; by various functions and tucked away elsewhere in a component.
   ;; This kind of block has no start code-location. This slot is in
@@ -274,10 +276,17 @@
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-block-fun-name obj) str)))
 
+(setf (documentation 'debug-block-successors 'function)
+  "Returns the list of possible code-locations where execution may continue
+   when the basic-block represented by debug-block completes its execution.")
+
 (setf (documentation 'debug-block-elsewhere-p 'function)
   "Return whether debug-block represents elsewhere code.")
 
 (defstruct (compiled-debug-block (:include debug-block)
+                                 (:constructor
+                                  make-compiled-debug-block
+                                  (code-locations successors elsewhere-p))
                                  (:copier nil))
   ;; code-location information for the block
   (code-locations #() :type simple-vector))
@@ -485,7 +494,7 @@
 (defstruct (compiled-code-location
             (:include code-location)
             (:constructor make-known-code-location
-                (pc debug-fun %debug-block %tlf-offset %form-number
+                (pc debug-fun %tlf-offset %form-number
                  %live-set kind step-info context &aux (%unknown-p nil)))
             (:constructor make-compiled-code-location (pc debug-fun))
             (:copier nil))
@@ -1775,6 +1784,48 @@ register."
 
 ;;;; unpacking variable and basic block data
 
+(defvar *parsing-buffer*
+  (make-array 20 :adjustable t :fill-pointer t))
+(defvar *other-parsing-buffer*
+  (make-array 20 :adjustable t :fill-pointer t))
+;;; PARSE-DEBUG-BLOCKS and PARSE-DEBUG-VARS
+;;; use this to unpack binary encoded information. It returns the
+;;; values returned by the last form in body.
+;;;
+;;; This binds buffer-var to *parsing-buffer*, makes sure it starts at
+;;; element zero, and makes sure if we unwind, we nil out any set
+;;; elements for GC purposes.
+;;;
+;;; This also binds other-var to *other-parsing-buffer* when it is
+;;; supplied, making sure it starts at element zero and that we nil
+;;; out any elements if we unwind.
+;;;
+;;; This defines the local macro RESULT that takes a buffer, copies
+;;; its elements to a resulting simple-vector, nil's out elements, and
+;;; restarts the buffer at element zero. RESULT returns the
+;;; simple-vector.
+(eval-when (:compile-toplevel :execute)
+(sb-xc:defmacro with-parsing-buffer ((buffer-var &optional other-var)
+                                     &body body)
+  (let ((len (gensym))
+        (res (gensym)))
+    `(unwind-protect
+         (let ((,buffer-var *parsing-buffer*)
+               ,@(if other-var `((,other-var *other-parsing-buffer*))))
+           (setf (fill-pointer ,buffer-var) 0)
+           ,@(if other-var `((setf (fill-pointer ,other-var) 0)))
+           (macrolet ((result (buf)
+                        `(let* ((,',len (length ,buf))
+                                (,',res (make-array ,',len)))
+                           (replace ,',res ,buf :end1 ,',len :end2 ,',len)
+                           (fill ,buf nil :end ,',len)
+                           (setf (fill-pointer ,buf) 0)
+                           ,',res)))
+             ,@body))
+     (fill *parsing-buffer* nil)
+     ,@(if other-var `((fill *other-parsing-buffer* nil))))))
+) ; EVAL-WHEN
+
 ;;; The argument is a debug internals structure. This returns the
 ;;; DEBUG-BLOCKs for DEBUG-FUN, regardless of whether we have unpacked
 ;;; them yet. It signals a NO-DEBUG-BLOCKS condition if it can't
@@ -1802,89 +1853,98 @@ register."
 
 ;;; This does some of the work of PARSE-DEBUG-BLOCKS.
 (defun parse-compiled-debug-blocks (debug-fun)
-  (macrolet ((aref+ (a i) `(prog1 (aref ,a ,i) (incf ,i))))
-    (let* ((var-count (length (debug-fun-debug-vars debug-fun)))
-           (compiler-debug-fun (compiled-debug-fun-compiler-debug-fun
-                                debug-fun))
-           (blocks
-             (let ((blocks (sb-c::compiled-debug-fun-blocks compiler-debug-fun)))
-               (if (null blocks)
-                   (return-from parse-compiled-debug-blocks nil)
-                   blocks)))
-           ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
-           ;; element size of the packed binary representation of the
-           ;; blocks data.
-           (live-set-len (ceiling var-count 8))
-           (tlf-number (sb-c::compiled-debug-fun-tlf-number compiler-debug-fun))
-           (elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc compiler-debug-fun))
-           elsewhere-p
-           (len (length blocks))
-           (i 0)
-           (last-pc 0)
-           result-blocks
-           (block (make-compiled-debug-block))
-           locations
-           prev-live
-           prev-form-number)
-      (flet ((new-block ()
-               (when locations
-                 (setf (compiled-debug-block-code-locations block)
-                       (coerce (nreverse (shiftf locations nil))
-                               'simple-vector)
-                       (compiled-debug-block-elsewhere-p block)
-                       elsewhere-p)
-                 (push block result-blocks)
-                 (setf block (make-compiled-debug-block)))))
-        (loop
-         (when (>= i len)
-           (new-block)
-           (return))
-         (let* ((flags (aref+ blocks i))
-                (kind (svref sb-c::+compiled-code-location-kinds+
-                             (ldb (byte 3 0) flags)))
-                (pc (+ last-pc
-                       (sb-c:read-var-integerf blocks i)))
-                (tlf-offset (or tlf-number
-                                (sb-c::read-var-integerf blocks i)))
-                (equal-live (logtest sb-c::compiled-code-location-equal-live flags))
-                (form-number
-                  (cond ((logtest sb-c::compiled-code-location-zero-form-number flags)
-                         0)
-                        ((and equal-live
-                              (logtest sb-c::compiled-code-location-live flags))
-                         prev-form-number)
-                        (t
-                         (setf prev-form-number
-                               (sb-c:read-var-integerf blocks i)))))
-                (live-set
-                  (cond (equal-live
-                         prev-live)
-                        ((logtest sb-c::compiled-code-location-live flags)
-                         (setf prev-live
-                               (sb-c:read-packed-bit-vector live-set-len blocks i)))
-                        (t
-                         (make-array (* live-set-len 8) :element-type 'bit))))
-                (step-info
-                  (if (logtest sb-c::compiled-code-location-stepping flags)
-                      (sb-c:read-var-string blocks i)
-                      ""))
-                (context
-                  (and (logtest sb-c::compiled-code-location-context flags)
-                       (compact-vector-ref (sb-c::compiled-debug-info-contexts
-                                            (%code-debug-info (compiled-debug-fun-component debug-fun)))
-                                           (sb-c:read-var-integerf blocks i)))))
-           (when (or (memq kind '(:block-start :non-local-entry))
-                     (and (not elsewhere-p)
-                          (> pc elsewhere-pc)
-                          (setf elsewhere-p t)))
-             (new-block))
-           (push (make-known-code-location
-                  pc debug-fun block tlf-offset
-                  form-number live-set kind
-                  step-info context)
-                 locations)
-           (setf last-pc pc))))
-      (coerce (nreverse result-blocks) 'simple-vector))))
+  (let* ((var-count (length (debug-fun-debug-vars debug-fun)))
+         (compiler-debug-fun (compiled-debug-fun-compiler-debug-fun
+                              debug-fun))
+         (blocks
+           (let ((blocks (sb-c::compiled-debug-fun-blocks compiler-debug-fun)))
+             (if (null blocks)
+                 (return-from parse-compiled-debug-blocks nil)
+                 blocks)))
+         ;; KLUDGE: 8 is a hard-wired constant in the compiler for the
+         ;; element size of the packed binary representation of the
+         ;; blocks data.
+         (live-set-len (ceiling var-count 8))
+         (tlf-number (sb-c::compiled-debug-fun-tlf-number compiler-debug-fun)))
+    (unless blocks
+      (return-from parse-compiled-debug-blocks nil))
+    (macrolet ((aref+ (a i) `(prog1 (aref ,a ,i) (incf ,i))))
+      (with-parsing-buffer (blocks-buffer locations-buffer)
+        (let ((i 0)
+              (len (length blocks))
+              (last-pc 0)
+              prev-form-number
+              prev-live)
+          (loop
+            (when (>= i len) (return))
+            (let ((succ-and-flags (sb-c::read-var-integerf blocks i))
+                  (successors nil))
+              (declare (list successors))
+              (dotimes (k (ash succ-and-flags
+                               (- sb-c::compiled-debug-block-nsucc-shift)))
+                (push (sb-c::read-var-integerf blocks i) successors))
+              (let* ((locations
+                       (dotimes (k (sb-c:read-var-integerf blocks i)
+                                   (result locations-buffer))
+                         (let* ((flags (aref+ blocks i))
+                                (kind (svref sb-c::+compiled-code-location-kinds+
+                                             (ldb sb-c::compiled-code-location-kind-byte
+                                                  flags)))
+                                (pc (+ last-pc
+                                       (sb-c:read-var-integerf blocks i)))
+                                (tlf-offset (or tlf-number
+                                                (sb-c:read-var-integerf blocks i)))
+                                (equal-live (logtest sb-c::compiled-code-location-equal-live flags))
+                                (form-number
+                                  (cond ((logtest sb-c::compiled-code-location-zero-form-number flags)
+                                         0)
+                                        ((and equal-live
+                                              (logtest sb-c::compiled-code-location-live flags))
+                                         prev-form-number)
+                                        (t
+                                         (setf prev-form-number
+                                               (sb-c:read-var-integerf blocks i)))))
+                                (live-set
+                                  (cond (equal-live
+                                         prev-live)
+                                        ((logtest sb-c::compiled-code-location-live flags)
+                                         (setf prev-live
+                                               (sb-c:read-packed-bit-vector live-set-len blocks i)))
+                                        (t
+                                         (make-array (* live-set-len 8) :element-type 'bit))))
+                                (step-info
+                                  (if (logtest sb-c::compiled-code-location-stepping flags)
+                                      (sb-c:read-var-string blocks i)
+                                      ""))
+                                (context
+                                  (and (logtest sb-c::compiled-code-location-context flags)
+                                       (compact-vector-ref (sb-c::compiled-debug-info-contexts
+                                                            (%code-debug-info (compiled-debug-fun-component debug-fun)))
+                                                           (sb-c:read-var-integerf blocks i)))))
+                           (vector-push-extend (make-known-code-location
+                                                pc debug-fun tlf-offset
+                                                form-number live-set kind
+                                                step-info context)
+                                               locations-buffer)
+                           (setf last-pc pc))))
+                     (block (make-compiled-debug-block
+                             locations successors
+                             (not (zerop (logand
+                                          sb-c::compiled-debug-block-elsewhere-p
+                                          succ-and-flags))))))
+                (vector-push-extend block blocks-buffer)
+                (dotimes (k (length locations))
+                  (setf (code-location-%debug-block (svref locations k))
+                        block))))))
+        (let ((res (result blocks-buffer)))
+          (declare (simple-vector res))
+          (dotimes (i (length res))
+            (let* ((block (svref res i))
+                   (succs nil))
+              (dolist (ele (debug-block-successors block))
+                (push (svref res ele) succs))
+              (setf (debug-block-successors block) succs)))
+          res)))))
 
 ;;; VARS is the parsed variables for a minimal debug function. We need
 ;;; to assign names of the form ARG-NNN. We must pad with leading

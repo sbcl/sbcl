@@ -436,12 +436,12 @@ necessary, since type inference may take arbitrarily long to converge.")
   (when (component-reanalyze component)
     (maybe-mumble "DFO")
     (loop
-     (find-dfo component)
+      (find-dfo component)
       (unless (component-reanalyze component)
         (maybe-mumble " ")
         (return))
-      (maybe-mumble "."))
-    t))
+      (maybe-mumble ".")))
+  (values))
 
 (defvar *ir1-transforms-after-constraints*)
 (defvar *ir1-transforms-after-ir1-phases*)
@@ -574,10 +574,9 @@ necessary, since type inference may take arbitrarily long to converge.")
   (maybe-mumble "IR2Tran ")
   (entry-analyze component)
 
-    ;; For on-demand recalculation of dominators, the previously
-    ;; computed results may be stale.
-
-  (clear-dominators component)
+  ;; Recompute dominators for GC store barriers. Must be done before
+  ;; IR2-convert renumbers blocks according to forward emit order.
+  (find-dominators component)
 
   (ir2-convert component)
 

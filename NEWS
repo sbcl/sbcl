@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.2:
+  * enhancement: CMU CL style breakpoint debugger commands have now been
+    added. Included is a stepper based on breakpoints requiring no extra
+    instrumentation. However, it still has less functionality than the
+    existing single stepper. See the new debugger manual section titled
+    "Breakpoint Commands" for more information on the new commands.
+
 changes in sbcl-2.5.2 relative to sbcl-2.5.1:
   * minor incompatible change: in some instances when the compiler cannot
     prove that a NIL-valued branch is unreachable, where NIL is not compatible

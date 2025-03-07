@@ -16,6 +16,7 @@ the debugger, single-stepper and @code{trace}, and the effect of
 * Debugger Policy Control::
 * Exiting Commands::
 * Information Commands::
+* Breakpoint Commands::
 * Function Tracing::
 * Single Stepping::
 * Enabling and Disabling the Debugger::
@@ -933,140 +934,142 @@ Displays all the frames from the current to the bottom. Only shows
 @code{*debug-print-variable-alist*}.
 @end deffn
 
-@c The new instrumentation based single stepper doesn't support
-@c the following commands, but BREAKPOINT at least should be
-@c resurrectable via (TRACE FOO :BREAK T).
+@node  Breakpoint Commands, , Information Commands, Debugger
+@comment  node-name,  next,  previous,  up
+@section Breakpoint Commands
+@cindex Breakpoints
 
-@c @cindex Breakpoints
+SBCL supports setting of breakpoints inside compiled functions and
+stepping of compiled code.  Breakpoints can only be set at known
+locations (@pxref{Unknown Locations and Interrupts}), so these
+commands are largely useless unless the @code{debug} optimize quality
+is at least @code{2} (@pxref{Debugger Policy Control}).  These
+commands manipulate breakpoints:
 
-@c SBCL supports setting of breakpoints inside compiled functions and
-@c stepping of compiled code.  Breakpoints can only be set at known
-@c locations (@pxref{Unknown Locations and Interrupts}), so these
-@c commands are largely useless unless the @code{debug} optimize quality
-@c is at least @code{2} (@pxref{Debugger Policy Control}).  These
-@c commands manipulate breakpoints:
+@deffn {Debugger Command} breakpoint @var{location} [@var{option} @var{value}]*
+Set a breakpoint in some function.  @var{location} may be an integer
+code location number (as displayed by @command{list-locations}) or a
+keyword.  The keyword can be used to indicate setting a breakpoint at
+the function start (@code{:start}, @code{:s}) or function end
+(@code{:end}, @code{:e}).  The @command{breakpoint} command has
+@code{:condition}, @code{:break}, @code{:print} and @code{:function}
+options which work similarly to the @code{trace} options.
+@end deffn
 
-@c @deffn {Debugger Command} breakpoint @var{location} [@var{option} @var{value}]*
-@c Set a breakpoint in some function.  @var{location} may be an integer
-@c code location number (as displayed by @command{list-locations}) or a
-@c keyword.  The keyword can be used to indicate setting a breakpoint at
-@c the function start (@code{:start}, @code{:s}) or function end
-@c (@code{:end}, @code{:e}).  The @command{breakpoint} command has
-@c @code{:condition}, @code{:break}, @code{:print} and @code{:function}
-@c options which work similarly to the @code{trace} options.
-@c @end deffn
+@deffn {Debugger Command} list-locations [@var{function}]
+@deffnx {Debugger Command} ll  [@var{function}]
+List all the code locations in the current frame's function, or in
+@var{function} if it is supplied.  The display format is the code
+location number, a colon and then the source form for that location:
 
-@c @deffn {Debugger Command} list-locations [@var{function}]
-@c @deffnx {Debugger Command} ll  [@var{function}]
-@c List all the code locations in the current frame's function, or in
-@c @var{function} if it is supplied.  The display format is the code
-@c location number, a colon and then the source form for that location:
+@example
+3: (1- N)
+@end example
 
-@c @example
-@c 3: (1- N)
-@c @end example
+If consecutive locations have the same source, then a numeric range
+like @code{3-5:} will be printed.  For example, a default function
+call has a known location both immediately before and after the call,
+which would result in two code locations with the same source.  The
+listed function becomes the new default function for breakpoint
+setting (via the @command{breakpoint}) command.
+@end deffn
 
-@c If consecutive locations have the same source, then a numeric range
-@c like @code{3-5:} will be printed.  For example, a default function
-@c call has a known location both immediately before and after the call,
-@c which would result in two code locations with the same source.  The
-@c listed function becomes the new default function for breakpoint
-@c setting (via the @command{breakpoint}) command.
-@c @end deffn
+@deffn {Debugger Command} list-breakpoints
+@deffnx {Debugger Command} lb
+List all currently active breakpoints with their breakpoint number.
+@end deffn
 
-@c @deffn {Debugger Command} list-breakpoints
-@c @deffnx {Debugger Command} lb
-@c List all currently active breakpoints with their breakpoint number.
-@c @end deffn
+@deffn {Debugger Command} delete-breakpoint [@var{number}]
+@deffnx {Debugger Command} db  [@var{number}]
+Delete a breakpoint specified by its breakpoint number.  If no number
+is specified, delete all breakpoints.
+@end deffn
 
-@c @deffn {Debugger Command} delete-breakpoint [@var{number}]
-@c @deffnx {Debugger Command} db  [@var{number}]
-@c Delete a breakpoint specified by its breakpoint number.  If no number
-@c is specified, delete all breakpoints.
-@c @end deffn
+@menu
+* Breakpoint Example::
+@end menu
 
-@c @menu
-@c * Breakpoint Example::
-@c @end menu
+@node  Breakpoint Example,  , Breakpoint Commands, Breakpoint Commands
+@comment  node-name,  next,  previous,  up
+@subsection Breakpoint Example
 
-@c @node  Breakpoint Example,  , Breakpoint Commands, Breakpoint Commands
-@c @comment  node-name,  next,  previous,  up
-@c @subsection Breakpoint Example
+Consider this definition of the factorial function:
 
-@c Consider this definition of the factorial function:
+@lisp
+(defun ! (n)
+  (if (zerop n)
+      1
+      (* n (! (1- n)))))
+@end lisp
 
-@c @lisp
-@c (defun ! (n)
-@c   (if (zerop n)
-@c       1
-@c       (* n (! (1- n)))))
-@c @end lisp
+This debugger session demonstrates the use of breakpoints:
 
-@c This debugger session demonstrates the use of breakpoints:
+@example
+* (break)  ; invoke debugger
 
-@c @example
-@c * (break)  ; invoke debugger
+debugger invoked on a SIMPLE-CONDITION in thread 11184: break
 
-@c debugger invoked on a SIMPLE-CONDITION in thread 11184: break
+restarts (invokable by number or by possibly-abbreviated name):
+  0: [CONTINUE] Return from BREAK.
+  1: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
+  2: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
+("varargs entry for top level local call BREAK" "break")
+0] ll #'!
 
-@c restarts (invokable by number or by possibly-abbreviated name):
-@c   0: [CONTINUE] Return from BREAK.
-@c   1: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
-@c   2: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
-@c ("varargs entry for top level local call BREAK" "break")
-@c 0] ll #'!
+0-1: (SB-INT:NAMED-LAMBDA ! (N) (BLOCK ! (IF (ZEROP N) 1 (* N (! #)))))
+2: (BLOCK ! (IF (ZEROP N) 1 (* N (! (1- N)))))
+3: (ZEROP N)
+4: (* N (! (1- N)))
+5: (1- N)
+6: (! (1- N))
+7-8: (* N (! (1- N)))
+9-10: (IF (ZEROP N) 1 (* N (! (1- N))))
+0] br 4
 
-@c 0-1: (SB-INT:NAMED-LAMBDA ! (N) (BLOCK ! (IF (ZEROP N) 1 (* N (! #)))))
-@c 2: (BLOCK ! (IF (ZEROP N) 1 (* N (! (1- N)))))
-@c 3: (ZEROP N)
-@c 4: (* N (! (1- N)))
-@c 5: (1- N)
-@c 6: (! (1- N))
-@c 7-8: (* N (! (1- N)))
-@c 9-10: (IF (ZEROP N) 1 (* N (! (1- N))))
-@c 0] br 4
+(* N (! (1- N)))
+1: 4 in !
+added
+0] toplevel
 
-@c (* N (! (1- N)))
-@c 1: 4 in !
-@c added
-@c 0] toplevel
+> (! 10) ; Call the function
 
-@c FIXME: SBCL errored out, and not in the expected way ... Copying the
-@c output verbatim from the CMUCL manual for now.
+*Breakpoint hit*
 
-@c common-lisp-user> (! 10) ; Call the function
+Restarts:
+  0: [CONTINUE] Return from BREAK.
+  1: [ABORT   ] Return to Top-Level.
 
-@c *Breakpoint hit*
+Debug  (type H for help)
 
-@c Restarts:
-@c   0: [CONTINUE] Return from BREAK.
-@c   1: [ABORT   ] Return to Top-Level.
+(! 10) ; We are now in first call (arg 10) before the multiply
+Source: (* N (! (1- N)))
+3] step*
 
-@c Debug  (type H for help)
+*Step*
 
-@c (! 10) ; We are now in first call (arg 10) before the multiply
-@c Source: (* N (! (1- N)))
-@c 3] st
+(! 10) ; We have finished evaluation of (1- n)
+Source: (1- N)
+3] step*
 
-@c *Step*
+*Breakpoint hit*
 
-@c (! 10) ; We have finished evaluation of (1- n)
-@c Source: (1- N)
-@c 3] st
+Restarts:
+  0: [CONTINUE] Return from BREAK.
+  1: [ABORT   ] Return to Top-Level.
 
-@c *Breakpoint hit*
+Debug  (type H for help)
 
-@c Restarts:
-@c   0: [CONTINUE] Return from BREAK.
-@c   1: [ABORT   ] Return to Top-Level.
+(! 9) ; We hit the breakpoint in the recursive call
+Source: (* N (! (1- N)))
+3]
+@end example
 
-@c Debug  (type H for help)
-
-@c (! 9) ; We hit the breakpoint in the recursive call
-@c Source: (* N (! (1- N)))
-@c 3]
-@c @end example
-
+Note: The @command{step*} command differs from the single stepping
+commands in that it also functions in compiled code which has not been
+compiled with stepping instrumentation. It simply steps to the next
+compiled code location. In the future, this form of stepping may be
+improved enough to subsume the instrumentation based stepping commands,
+which have much higher overhead.
 
 @node  Function Tracing
 @comment  node-name,  next,  previous,  up

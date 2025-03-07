@@ -796,7 +796,7 @@
 (defun sets-equalp (a b) (and (subsetp a b) (subsetp b a)))
 (deftest find-callees
     (sets-equalp (sb-introspect:find-function-callees #'sb-c::find-dominators)
-                 (list #'sb-c::dfo-as-needed #'sb-c::number-blocks))
+                 (list #'sb-c::dfo-as-needed))
   t)
 (deftest find-callers
     (let ((callers (sb-introspect:find-function-callers #'sb-c::dfo-as-needed)))

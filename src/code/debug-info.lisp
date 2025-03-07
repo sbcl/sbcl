@@ -44,6 +44,9 @@
 ;;;;
 ;;;;    Compiled debug blocks are in a packed binary representation in the
 ;;;; DEBUG-FUN-BLOCKS:
+;;;;    number of successors + bit flags
+;;;;    elsewhere-p
+;;;;    ...ordinal number of each successor in the function's block vector...
 ;;;;    number of locations in this block
 ;;;;    kind of first location (single byte)
 ;;;;    delta from previous PC (or from 0 if first location in function.)
@@ -53,6 +56,10 @@
 ;;;;    ...more <kind, delta, top level form offset, form-number, live-set>
 ;;;;       tuples...
 
+(defconstant-eqx compiled-debug-block-nsucc-shift 1 #'equalp)
+(defconstant compiled-debug-block-elsewhere-p #b1)
+
+(defconstant-eqx compiled-code-location-kind-byte (byte 3 0) #'equalp)
 (defconstant-eqx +compiled-code-location-kinds+
     #(:unknown-return :known-return :internal-error :non-local-exit
       :block-start :call-site :single-value-return :non-local-entry)
@@ -61,7 +68,7 @@
 (eval-when (:compile-toplevel)
   (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 3)))
 
-;;; Location flags, encoded in the low 4 bits of loction kind byte
+;;; Location flags, encoded in the low 4 bits of location kind byte
 (defconstant compiled-code-location-stepping         (ash #b00001 3))
 (defconstant compiled-code-location-context          (ash #b00010 3))
 (defconstant compiled-code-location-live             (ash #b00100 3))

@@ -48,12 +48,6 @@
           (aver cleanup)
           (block-flag (node-block (cleanup-mess-up cleanup)))))))
 
-(defun number-blocks (component)
-  (let ((num 0))
-    (declare (fixnum num))
-    (do-blocks-backwards (block component :both)
-      (setf (block-number block) (incf num)))))
-
 ;;; Find the DFO for a component, deleting any unreached blocks and
 ;;; merging any other components we reach. We repeatedly iterate over
 ;;; the entry points, since new ones may show up during the walk.
@@ -429,7 +423,11 @@
           (delete-component initial-component))))
 
     ;; When we are done, we assign DFNs.
-    (mapc #'number-blocks (components))
+    (dolist (component (components))
+      (let ((num 0))
+        (declare (fixnum num))
+        (do-blocks-backwards (block component :both)
+          (setf (block-number block) (incf num)))))
 
     ;; Pull out top-level-ish code.
     (separate-toplevelish-components (components))))

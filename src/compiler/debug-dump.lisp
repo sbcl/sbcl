@@ -324,10 +324,12 @@
 ;;; Dump out the number of locations and the locations for Block.
 (defun dump-block-locations (block locations tlf-num var-locs)
   (declare (type cblock block) (list locations))
-  (unless (and locations
-               (eq (location-info-kind (first locations))
-                   :non-local-entry))
+  (if (and locations
+           (eq (location-info-kind (first locations))
+               :non-local-entry))
+      (write-var-integer (length locations) *byte-buffer*)
       (let ((2block (block-info block)))
+        (write-var-integer (+ (length locations) 1) *byte-buffer*)
         (dump-1-location (block-start-node block)
                          2block :block-start tlf-num
                          (ir2-block-%label 2block)
@@ -338,8 +340,37 @@
     (dump-location-from-info loc tlf-num var-locs))
   (values))
 
+;;; Dump the successors of Block, being careful not to fly into space
+;;; on weird successors.
+(defun dump-block-successors (block env)
+  (declare (type cblock block) (type environment env))
+  (let* ((tail (component-tail (block-component block)))
+         (succ (block-succ block))
+         (valid-succ
+          (if (and succ
+                   (or (eq (car succ) tail)
+                       (not (eq (block-environment (car succ)) env))))
+              ()
+              succ))
+         (byte-buffer *byte-buffer*))
+    (write-var-integer (ash (length valid-succ) compiled-debug-block-nsucc-shift)
+                       byte-buffer)
+    (let ((base (block-number
+                 (node-block
+                  (lambda-bind (environment-lambda env))))))
+      (dolist (b valid-succ)
+        (write-var-integer
+         (the index (- (block-number b) base))
+         byte-buffer))))
+  (values))
+
 ;;; Return a vector and an integer (or null) suitable for use as the
-;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN.
+;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN. This requires two
+;;; passes to compute:
+;;; -- Scan all blocks, dumping the header and successors followed
+;;;    by all the non-elsewhere locations.
+;;; -- Dump the elsewhere block header and all the elsewhere
+;;;    locations (if any.)
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let ((*previous-location* 0)
@@ -347,30 +378,35 @@
         *previous-form-number*
         (tlf-num (find-tlf-number fun))
         (env (lambda-environment fun))
-        (byte-buffer *byte-buffer*)
-        prev-block
-        locations
-        elsewhere-locations)
+        (prev-locs nil)
+        (prev-block nil)
+        (byte-buffer *byte-buffer*))
     (setf (fill-pointer byte-buffer) 0)
-    (do-environment-ir2-blocks (2block env)
-      (let ((block (ir2-block-block 2block)))
-        (when (eq (block-info block) 2block)
-          (when prev-block
-            (dump-block-locations prev-block (nreverse (shiftf locations nil))
-                                  tlf-num var-locs))
-          (setf prev-block block)))
-      (dolist (loc (ir2-block-locations 2block))
-        (if (label-elsewhere-p (location-info-label loc)
-                               (location-info-kind loc))
-            (push loc elsewhere-locations)
-            (push loc locations))))
+    (collect ((elsewhere))
+      (do-environment-ir2-blocks (2block env)
+        (let ((block (ir2-block-block 2block)))
+          (when (eq (block-info block) 2block)
+            (when prev-block
+              (dump-block-locations prev-block prev-locs tlf-num var-locs))
+            (setf prev-block block  prev-locs ())
+            (dump-block-successors block env)))
 
-    (dump-block-locations prev-block (nreverse locations)
-                          tlf-num var-locs)
+        (collect ((here prev-locs))
+          (dolist (loc (ir2-block-locations 2block))
+            (if (label-elsewhere-p (location-info-label loc)
+                                   (location-info-kind loc))
+                (elsewhere loc)
+                (here loc)))
+          (setq prev-locs (here))))
 
-    (when elsewhere-locations
-      (dolist (loc (nreverse elsewhere-locations))
-        (dump-location-from-info loc tlf-num var-locs)))
+      (dump-block-locations prev-block prev-locs tlf-num var-locs)
+
+      (when (elsewhere)
+        (vector-push-extend compiled-debug-block-elsewhere-p byte-buffer)
+        (write-var-integer (length (elsewhere)) byte-buffer)
+        (dolist (loc (elsewhere))
+          (dump-location-from-info loc tlf-num var-locs))))
+
     (values (coerce byte-buffer '(simple-array (unsigned-byte 8) (*))) tlf-num)))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from

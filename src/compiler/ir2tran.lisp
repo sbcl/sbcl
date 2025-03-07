@@ -2408,8 +2408,7 @@
                              (policy first-node (/= insert-safepoints 0)))
                     (vop sb-vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
-            (incf num))))
-      (setf (component-max-block-number component) num)))
+            (incf num))))))
   (values))
 
 ;;; If necessary, emit a terminal unconditional branch to go to the

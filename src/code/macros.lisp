@@ -1380,6 +1380,13 @@ invoked. In that case it will store into PLACE and start over."
                 (setq ,abortp nil))
            (when ,stream
              (close ,stream :abort ,abortp)))))))
+
+(sb-xc:defmacro sb-debug::with-debug-io-syntax (() &body body)
+  (let ((thunk (gensym "THUNK")))
+    `(dx-flet ((,thunk ()
+                 ,@body))
+       (sb-debug::funcall-with-debug-io-syntax #',thunk))))
+
 
 ;;;; Iteration macros:
 

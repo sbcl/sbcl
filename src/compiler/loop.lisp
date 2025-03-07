@@ -23,8 +23,7 @@
   (let ((head (loop-head (component-outer-loop component)))
         changed)
     (setf (block-dominator head) head)
-    (unless (dfo-as-needed component)
-      (number-blocks component))
+    (dfo-as-needed component)
     (labels ((intersect (block1 block2)
                (cond ((eq block1 block2) block1)
                      ((< (block-number block1) (block-number block2))
@@ -44,13 +43,11 @@
              (setf (block-dominator block) dom)
              (setq changed t))))
        (unless changed (return))))
-    (setf (block-dominator head) nil)
-    (setf (component-dominators-computed component) t)))
+    (setf (block-dominator head) nil)))
 
 (defun clear-dominators (component)
   (do-blocks (block component)
-    (setf (block-dominator block) nil))
-  (setf (component-dominators-computed component) nil))
+    (setf (block-dominator block) nil)))
 
 ;;; DOMINATES-P  --  Internal
 ;;;
