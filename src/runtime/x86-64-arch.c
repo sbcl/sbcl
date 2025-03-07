@@ -138,6 +138,8 @@ void untune_asm_routines_for_microarch(void)
     asm_routine_poke(VECTOR_FILL_T, vector_fill_offset_to_poke,
                      0xEB); // Change JL to JMP
     SetSymbolValue(CPU_FEATURE_BITS, 0, 0);
+    // ensure no random value lingering in static space on image save
+    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = 0;
 }
 
 #ifndef _WIN64
