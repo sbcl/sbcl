@@ -2598,11 +2598,24 @@ expansion happened."
                 (make-negation-type int))))))))
 
 (define-type-method (negation :complex-union2) (type1 type2)
-  (cond
-    ((csubtypep (negation-type-type type2) type1) *universal-type*)
-    ((eq (type-intersection type1 (negation-type-type type2)) *empty-type*)
-     type2)
-    (t nil)))
+  (let ((not-type2 (negation-type-type type2)))
+   (cond
+     ((csubtypep not-type2 type1) *universal-type*)
+     ((eq (type-intersection type1 not-type2) *empty-type*)
+      type2)
+     ;; (or (and stream standard-object) (not standard-object))
+     ;; =>
+     ;; (or stream (not standard-object))
+     ((and (classoid-p not-type2)
+           (intersection-type-p type1)
+           (memq not-type2 (intersection-type-types type1)))
+      (let ((new (remove not-type2 (intersection-type-types type1))))
+        (type-union (if (cdr new)
+                        (%type-intersection new)
+                        (car new))
+                    type2)))
+     (t
+      nil))))
 
 (define-type-method (negation :simple-=) (type1 type2)
   (type= (negation-type-type type1) (negation-type-type type2)))
@@ -4049,6 +4062,31 @@ expansion happened."
         ((and (not (intersection-type-p type1))
               (%intersection-complex-subtypep-arg1 type2 type1))
          type1)
+        ;; (or (and stream standard-object) (and (not stream) standard-object)
+        ;; => standard-object
+        ((and (intersection-type-p type1)
+              (let (rem1
+                    rem2)
+                (and (loop for typea in (intersection-type-types type1)
+                           when (or (classoid-p typea)
+                                    (and (negation-type-p typea)
+                                         (classoid-p (negation-type-type typea))))
+                           do
+                           (let ((match (loop for typeb in (intersection-type-types type2)
+                                              when (if (classoid-p typeb)
+                                                       (and (negation-type-p typea)
+                                                            (eq typeb (negation-type-type typea)))
+                                                       (and (negation-type-p typeb)
+                                                            (eq (negation-type-p typeb) typea)))
+                                              return typeb)))
+                             (when match
+                               (setf rem1 typea
+                                     rem2 match)
+                               (return t))))
+                     (let ((new-type1 (%type-intersection (remove rem1 (intersection-type-types type1))))
+                           (new-type2 (%type-intersection (remove rem2 (intersection-type-types type2)))))
+                       (when (eq new-type1 new-type2)
+                         new-type1))))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))

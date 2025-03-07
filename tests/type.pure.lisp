@@ -1083,3 +1083,11 @@
   (assert (eql
            (sb-kernel:specifier-type '(and (not (eql 1)) (not (eql 0))))
            (sb-kernel:specifier-type '(not bit)))))
+
+(with-test (:name :class-canonical-difference)
+  (assert (eql
+           (specifier-type '(or (and stream standard-object) (and (not stream) standard-object)))
+           (specifier-type 'standard-object)))
+  (assert (eql
+           (sb-kernel:specifier-type '(or (and stream standard-object) (not standard-object)))
+           (sb-kernel:specifier-type '(or stream (not standard-object))))))
