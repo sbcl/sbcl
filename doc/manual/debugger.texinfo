@@ -985,6 +985,11 @@ Delete a breakpoint specified by its breakpoint number.  If no number
 is specified, delete all breakpoints.
 @end deffn
 
+@deffn {Debugger Command} step*
+Step to the next possible breakpoint location in the current function.
+This always steps over function calls, instead of stepping into them
+@end deffn
+
 @menu
 * Breakpoint Example::
 @end menu
