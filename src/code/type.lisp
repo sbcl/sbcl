@@ -4095,6 +4095,17 @@ expansion happened."
                             (new-type2 (%type-intersection (remove rem2 (intersection-type-types type2)))))
                         (when (eq new-type1 new-type2)
                           new-type1)))))))
+        ;; (or (and (not integer) (not vector) (not (array t))) vector)
+        ;; =>
+        ;; (or (and (not integer) (not (array t))) vector)
+        ((and (not (intersection-type-p type1))
+              (loop for type in (intersection-type-types type2)
+                    when (cond ((negation-type-p type)
+                                (eq (negation-type-type type) type1))
+                               ((negation-type-p type1)
+                                (eq (negation-type-type type1) type)))
+                    return (type-union type1
+                                       (%type-intersection (remove type (intersection-type-types type2)))))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))
