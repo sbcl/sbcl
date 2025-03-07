@@ -57,6 +57,11 @@
   (inst mov y x))
 
 ;;;; the MOVE VOP
+(defun is-operand-immediate (val)
+  (typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup)))
+(defun cpu-immediate-tn-p (tn)
+  (is-operand-immediate (immediate-tn-repr tn)))
+
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
             :load-if (not (location= x y))))
@@ -64,10 +69,7 @@
                :load-if
                (not (location= x y))))
   (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)
-               :unused-if (or (not (sc-is x immediate))
-                              (typep (encode-value-if-immediate x)
-                                     '(or (signed-byte 32)
-                                          #+(or immobile-space permgen) fixup))))
+               :unused-if (or (not (sc-is x immediate)) (cpu-immediate-tn-p x)))
               temp)
   (:generator 0
     (if (sc-is x immediate)
@@ -128,9 +130,7 @@
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:temporary (:sc unsigned-reg
-               :unused-if (or (not (sc-is x immediate))
-                              (typep (encode-value-if-immediate x)
-                                     '(signed-byte 32))))
+               :unused-if (or (not (sc-is x immediate)) (cpu-immediate-tn-p x)))
               val-temp) ; for oversized immediate operand
   (:generator 0
     (let ((val (encode-value-if-immediate x)))
