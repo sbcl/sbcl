@@ -1090,4 +1090,7 @@
            (specifier-type 'standard-object)))
   (assert (eql
            (sb-kernel:specifier-type '(or (and stream standard-object) (not standard-object)))
-           (sb-kernel:specifier-type '(or stream (not standard-object))))))
+           (sb-kernel:specifier-type '(or stream (not standard-object)))))
+  (assert (eql (specifier-type '(or (and standard-object sb-kernel:extended-sequence)
+                                 (and standard-object (not sb-kernel:extended-sequence))))
+               (specifier-type 'standard-object))))
