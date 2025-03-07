@@ -213,8 +213,7 @@ void coalesce_similar_objects()
 
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
     coalesce_range((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, arg);
-    lispobj* the_symbol_nil = (lispobj*)(NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES);
-    coalesce_range(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + the_symbol_nil, arg);
+    coalesce_range(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, arg);
     coalesce_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, arg);
     if (PERMGEN_SPACE_START)
         coalesce_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, arg);
