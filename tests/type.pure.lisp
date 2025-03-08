@@ -1081,7 +1081,9 @@
   (assert (eql (sb-kernel:specifier-type '(or (and (not integer) (not vector) (not (array t))) vector (array t)))
                (sb-kernel:specifier-type '(not integer))))
   (assert (eql (sb-kernel:specifier-type '(or (and (not integer) (not vector) (not (array t))) vector))
-               (sb-kernel:specifier-type '(or (and (not integer) (not (array t))) vector)))))
+               (sb-kernel:specifier-type '(or (and (not integer) (not (array t))) vector))))
+  (assert (not (subtypep '(not simple-bit-vector)
+                         '(or (not (array bit)) (and bit-vector (not simple-array)))))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql

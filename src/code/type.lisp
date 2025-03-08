@@ -3590,6 +3590,8 @@ expansion happened."
         (cond ((and (eq (array-type-complexp not-type1) :maybe)
                     (eq (array-type-complexp type2) t)
                     (neq (array-type-specialized-element-type not-type1) *wild-type*)
+                    (equal (array-type-dimensions not-type1)
+                           (array-type-dimensions type2))
                     (csubtypep type2 not-type1))
                ;; (or (not (array t)) (and (array t) (not simple-array)))
                ;; => (not (simple-array t))
