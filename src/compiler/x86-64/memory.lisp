@@ -209,13 +209,13 @@
           ;; to select byte 1 of the header word.
           (ash 1 (- stable-hash-required-flag 8)))))
 
-(defmacro compute-splat-bits (value)
+(defun compute-splat-bits (value)
   ;; :SAFE-DEFAULT means any unspecific value that is safely a default.
   ;; Heap allocation uses 0 since that costs nothing.
   ;; If the user wanted a specific value, it could have been explicitly given.
-  `(if (typep ,value 'sb-vm:word)
-       ,value
-       (case ,value
+  (if (typep value 'sb-vm:word)
+       value
+       (case value
          (:unbound (unbound-marker-bits))
          ((nil) (bug "Should not see SPLAT NIL"))
          (t #+ubsan unwritten-vector-element-marker
@@ -224,6 +224,9 @@
 ;;; This logic was formerly in ALLOCATE-VECTOR-ON-STACK.
 ;;; Choosing amongst 3 vops gets potentially better register allocation
 ;;; by not wasting registers in the cases that don't use them.
+;;; (Actually now that :UNUSED-IF is an option, these can probably
+;;; all be combined into one vop which can indicate which temps aren't
+;;; used. When these vops were first written, it wasn't an option)
 (define-vop (splat-word)
   (:policy :fast-safe)
   (:translate splat)
@@ -233,29 +236,33 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 1
    (progn words) ; don't put it in :ignore, which gets inherited
-   (inst mov :qword
-         (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
-         (compute-splat-bits value))
+   (let ((bits (compute-splat-bits value)))
+     (when (integerp bits)
+       ;; it's gonna get treated as simm32 by the CPU, so it had better be
+       (aver (plausible-signed-imm32-operand-p bits)))
+     (inst mov :qword
+           (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
+           bits))
    (move result vector)))
 
 (define-vop (splat-small splat-word)
   (:arg-types * (:constant (integer 2 10)) (:constant t))
-  (:temporary (:sc complex-double-reg) zero)
+  (:temporary (:sc complex-double-reg) pattern)
   (:generator 5
    (let ((bits (compute-splat-bits value)))
-     (if (= bits 0)
-         (inst xorpd zero zero)
-         (inst movdqa zero
-               (register-inline-constant :oword (logior (ash bits 64) bits)))))
+     (cond ((= bits nil-value)
+            (inst movaps pattern (ea (- nil-value list-pointer-lowtag))))
+           ((/= bits 0) (inst movddup pattern (register-inline-constant :qword bits)))
+           (t (inst xorps pattern pattern))))
    (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                         vector)))
-     (multiple-value-bind (double single) (truncate words 2)
-       (dotimes (i double)
-         (inst movapd data-addr zero)
+     (multiple-value-bind (quo rem) (truncate words 2)
+       (dotimes (i quo)
+         (inst movaps data-addr pattern) ; 1 byte shorter encoding than movapd
          (setf data-addr (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
                              (ea-base data-addr))))
-       (unless (zerop single)
-         (inst movaps data-addr zero))))
+       (unless (zerop rem)
+         (inst movsd data-addr pattern))))
    (move result vector)))
 
 (define-vop (splat-any splat-word)

@@ -87,3 +87,11 @@
                                         :element-type 'base-char)))
            (find #\null v :test #'char/=)))
     ((40) nil)))
+
+(defun g (a)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (loop for i from 0 below 6 collect (svref a i)))
+(compile 'g)
+(defun f () (g (make-array 5 :initial-element nil)))
+(with-test (:name :splat-no-overrun)
+  (assert (equal (f) '(nil nil nil nil nil 0))))
