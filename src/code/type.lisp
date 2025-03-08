@@ -3141,26 +3141,7 @@ expansion happened."
                  t))))
 
 (define-type-method (array :negate) (type)
-  ;; FIXME (and hint to PFD): we're vulnerable here to attacks of the
-  ;; form "are (AND ARRAY (NOT (ARRAY T))) and (OR (ARRAY BIT) (ARRAY
-  ;; NIL) (ARRAY CHAR) ...) equivalent?" -- CSR, 2003-12-10
-  ;; A symptom of the aforementioned is that the following are not TYPE=
-  ;;   (AND (VECTOR T) (NOT SIMPLE-ARRAY)) ; an ARRAY-TYPE
-  ;;   (AND (VECTOR T) (NOT SIMPLE-VECTOR)) ; an INTERSECTION-TYPE
-  ;; even though (VECTOR T) makes it so that the (NOT) clause in each can
-  ;; only provide one additional bit of information: that the vector
-  ;; is complex as opposed to simple. The rank and element-type are fixed.
-  (if (and (eq (array-type-dimensions type) '*)
-           (eq (array-type-complexp type) 't)
-           (eq (array-type-element-type type) *wild-type*))
-      ;; (NOT <hairy-array>) = either SIMPLE-ARRAY or (NOT ARRAY).
-      ;; This is deliberately asymmetric - trying to say that NOT simple-array
-      ;; equals hairy-array leads to infinite recursion.
-      (type-union (make-array-type '* :complexp nil
-                                   :element-type *wild-type*)
-                  (make-negation-type
-                         (make-array-type '* :element-type *wild-type*)))
-      (make-negation-type type)))
+  (make-negation-type type))
 
 (define-type-method (array :unparse) (flags type)
   (let* ((dims (array-type-dimensions type))
@@ -3587,7 +3568,15 @@ expansion happened."
   (when (negation-type-p type1)
     (let ((not-type1 (negation-type-type type1)))
       (when (array-type-p not-type1)
-        (cond ((and (eq (array-type-complexp not-type1) :maybe)
+        (cond ((and
+                (not (array-type-complexp type2))
+                (eq (array-type-complexp not-type1) :maybe)
+                (csubtypep not-type1 (change-array-type-complexp type2 :maybe)))
+               ;; (or (not base-string) simple-base-string)
+               ;; => (not (and base-string (not simple-array)))
+               (make-negation-type
+                (change-array-type-complexp not-type1 t)))
+              ((and (eq (array-type-complexp not-type1) :maybe)
                     (eq (array-type-complexp type2) t)
                     (neq (array-type-specialized-element-type not-type1) *wild-type*)
                     (equal (array-type-dimensions not-type1)
