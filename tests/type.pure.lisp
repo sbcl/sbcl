@@ -1107,4 +1107,6 @@
 
 (with-test (:name :cons-intersection)
   (assert (eql (specifier-type '(and (cons (not array) atom) (cons (not integer) (not integer))))
-               (specifier-type '(cons (and (not array) (not integer)) (and atom (not integer)))))))
+               (specifier-type '(cons (and (not array) (not integer)) (and atom (not integer))))))
+  (assert (eql (specifier-type '(or (and (not integer) (not stream) (not standard-object)) (and (not stream) standard-object)))
+               (specifier-type '(and (not integer) (not stream))))))
