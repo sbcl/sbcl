@@ -26,16 +26,16 @@
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options))
   (ecase style
-    ((:raw :none)
-     (values
-      `((inst call (make-fixup ',name :assembly-routine)))
-      nil))
-    ((:full-call :full-call-no-return)
+    ((:raw :full-call :full-call-no-return)
      (values
       `((note-this-location ,vop :call-site)
         (inst call (make-fixup ',name :assembly-routine))
         (note-this-location ,vop :single-value-return))
-      '((:save-p :compute-only))))))
+      (if (eql style :raw) nil '((:save-p :compute-only)))))
+    (:none
+     (values
+      `((inst call (make-fixup ',name :assembly-routine)))
+      nil))))
 
 (defun generate-return-sequence (style)
   (ecase style
