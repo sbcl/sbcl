@@ -779,47 +779,55 @@
       (declare (ignore object))
       (assert (not valid-p)))))
 
+;; A hack to get around non-buffering input io with string streams.
+(defvar *ok-p*)
+
 (defun test-debugger (control form &rest targets)
   (let ((out (make-string-output-stream))
-        (oops t))
-    (unwind-protect
-         (progn
-           (with-simple-restart (debugger-test-done! "Debugger Test Done!")
-             (let* ((*debug-io* (make-two-way-stream
-                                 (make-string-input-stream control)
-                                 (make-broadcast-stream out #+nil *standard-output*)))
-                    ;; Initial announcement goes to *ERROR-OUTPUT*
-                    (*error-output* *debug-io*)
-                    (*invoke-debugger-hook* nil))
-               (handler-bind ((error #'invoke-debugger))
-                 (eval form))))
-           (setf oops nil))
-      (when oops
-        (error "Uncontrolled unwind from debugger test.")))
-    ;; For sanity's sake this is outside the *debug-io* rebinding -- otherwise
-    ;; it could swallow our asserts!
-    (with-input-from-string (s (get-output-stream-string out))
-      (loop for line = (read-line s nil)
-            while line
-            do (assert targets nil "Line = ~a" line)
-               #+nil
-               (format *error-output* "Got: ~A~%" line)
-               (let ((match (pop targets)))
-                 (if (eq '* match)
-                     ;; Whatever, till the next line matches.
-                     (let ((text (pop targets)))
-                       #+nil
-                       (format *error-output* "Looking for: ~A~%" text)
-                       (unless (search text line)
-                         (push text targets)
-                         (push match targets)))
-                     (unless (search match line)
-                       (format *error-output* "~&Wanted: ~S~%   Got: ~S~%" match line)
-                       (setf oops t))))))
+        (oops t)
+        (*ok-p* nil))
+    (tagbody
+       (unwind-protect
+            (progn
+              (with-simple-restart (debugger-test-done! "Debugger Test Done!")
+                (let* ((*debug-io* (make-two-way-stream
+                                    (make-string-input-stream control)
+                                    (make-broadcast-stream out #+nil *standard-output*)))
+                       ;; Initial announcement goes to *ERROR-OUTPUT*
+                       (*error-output* *debug-io*)
+                       (*invoke-debugger-hook* nil))
+                  (handler-bind ((error #'invoke-debugger))
+                    (eval form))))
+              (setf oops nil))
+         (when oops
+           (when *ok-p*
+             (go :continue))
+           (error "Uncontrolled unwind from debugger test.")))
+       ;; For sanity's sake this is outside the *debug-io* rebinding -- otherwise
+       ;; it could swallow our asserts!
+       :continue
+       (with-input-from-string (s (get-output-stream-string out))
+         (loop for line = (read-line s nil)
+               while line
+               do (assert targets nil "Line = ~a" line)
+                  #+nil
+                  (format *error-output* "Got: ~A~%" line)
+                  (let ((match (pop targets)))
+                    (if (eq '* match)
+                        ;; Whatever, till the next line matches.
+                        (let ((text (pop targets)))
+                          #+nil
+                          (format *error-output* "Looking for: ~A~%" text)
+                          (unless (search text line)
+                            (push text targets)
+                            (push match targets)))
+                        (unless (search match line)
+                          (format *error-output* "~&Wanted: ~S~%   Got: ~S~%" match line)
+                          (setf oops t)))))))
     ;; Check that we saw everything we wanted
     (when targets
       (error "Missed: ~S" targets))
-    (assert (not oops))))
+    (assert (or (not oops) *ok-p*))))
 
 (with-test (:name (:debugger :source 1))
   (test-debugger
@@ -879,6 +887,82 @@
    "undefined function"
    '*
    "1]"))
+
+(defun ! (n)
+  (declare (optimize (debug 2)))
+  (if (zerop n)
+      1
+      (* n (! (1- n)))))
+
+(with-test (:name (:debugger :list-locations)
+            ;; FIXME: these platforms don't have a generic-* routine,
+            ;; causing the exact location numbers to be different.
+            :fails-on (or :arm :arm64 :riscv))
+  (test-debugger
+   "ll #'!
+    debugger-test-done!"
+   '(break)
+   '*
+   "debugger invoked"
+   '*
+   "0]"
+   "0: (DEFUN ! (N)"
+   "     (DECLARE (OPTIMIZE (DEBUG 2)))"
+   "     (IF (ZEROP N)"
+   "         1"
+   "         (* N (! (1- N)))))"
+   "1: (ZEROP N)"
+   "2: (* N (! (1- N)))"
+   "3: (1- N)"
+   "4: (! (1- N))"
+   "5: (* N (! (1- N)))"
+   "6: (DEFUN ! (N)"
+   "     (DECLARE (OPTIMIZE (DEBUG 2)))"
+   "     (IF (ZEROP N)"
+   "         1"
+   "         (* N (! (1- N)))))"
+   "0]"))
+
+(with-test (:name (:debugger :breakpoint-and-step)
+                  . #.*breakpoint-tracing-expectations*)
+  (test-debugger
+   "ll #'!
+    br #.(progn (setq *ok-p* t) 2)"
+   '(break)
+   '*
+   "debugger invoked"
+   '*
+   "(* N (! (1- N)))"
+   '*
+   "(* N (! (1- N)))"
+   '*
+   "(* N (! (1- N)))"
+   '*
+   "(* N (! (1- N)))"
+   '*
+   "1: 2 in !"
+   "added"
+   "0]")
+  (test-debugger
+   "step* 1
+    step* 1
+    debugger-test-done!"
+   `(! 10)
+   '*
+   "*Breakpoint hit*"
+   '*
+   "(! 10)"
+   "   source: (* N (! (1- N)))"
+   "0]"
+   "(! 10)"
+   "   source: (1- N)"
+   "0]"
+   '*
+   "*Breakpoint hit*"
+   '*
+   "(! 9)"
+   "   source: (* N (! (1- N)))"
+   "0]"))
 
 (with-test (:name (disassemble :high-debug-eval))
   (eval `(defun this-will-be-disassembled (x)
