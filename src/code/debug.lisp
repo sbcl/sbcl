@@ -253,17 +253,17 @@ Other commands:
         (bp-number (breakpoint-info-breakpoint-number breakpoint-info)))
     (case (sb-di:breakpoint-kind (breakpoint-info-breakpoint breakpoint-info))
       (:code-location
-       (print (code-location-source-form place 0))
-       (format t
+       (print (code-location-source-form place 0) *debug-io*)
+       (format *debug-io*
                "~&~S: ~S in ~S"
                bp-number
                (breakpoint-info-code-location-selector breakpoint-info)
                (sb-di:debug-fun-name (sb-di:code-location-debug-fun place))))
       (:fun-start
-       (format t "~&~S: FUN-START in ~S" bp-number
+       (format *debug-io* "~&~S: FUN-START in ~S" bp-number
                (sb-di:debug-fun-name place)))
       (:fun-end
-       (format t "~&~S: FUN-END in ~S" bp-number
+       (format *debug-io* "~&~S: FUN-END in ~S" bp-number
                (sb-di:debug-fun-name place))))))
 
 
@@ -388,13 +388,13 @@ Other commands:
                (build-string
                 (with-output-to-string (*standard-output*)
                   (when fun-end-cookie
-                    (format t "~%Return values: ~S" return-vals))
+                    (format *debug-io* "~%Return values: ~S" return-vals))
                   (when condition
                     (when (breakpoint-info-print bp-hit-info)
-                      (format t "~%")
+                      (format *debug-io* "~%")
                       (print-frame-call current-frame *debug-io*))
                     (dolist (print (breakpoint-info-print bp-hit-info))
-                      (format t "~& ~S = ~S" (rest print)
+                      (format *debug-io* "~& ~S = ~S" (rest print)
                               (funcall (first print) current-frame))))))))
       (when bp-hit-info
         (setf break (funcall (breakpoint-info-break bp-hit-info)
@@ -411,7 +411,7 @@ Other commands:
              (break string))
             ((and bp-hit-info step-hit-info)
              (print-common-info)
-             (format t "~A" string)
+             (format *debug-io* "~A" string)
              (decf *number-of-steps*)
              (set-step-breakpoint current-frame))
             ((and step-hit-info (= 1 *number-of-steps*))
@@ -427,7 +427,7 @@ Other commands:
              (print-common-info)
              (if break
                  (break string)
-                 (format t "~A" string)))
+                 (format *debug-io* "~A" string)))
             (t
              (break "unknown breakpoint"))))))
 
@@ -438,9 +438,7 @@ Other commands:
   (cond
    ((sb-di:debug-block-elsewhere-p (sb-di:code-location-debug-block
                                     (sb-di:frame-code-location frame)))
-    ;; FIXME: FORMAT T is used for error output here and elsewhere in
-    ;; the debug code.
-    (format t "cannot step, in elsewhere code~%"))
+    (format *debug-io* "cannot step, in elsewhere code~%"))
    (t
     (let* ((code-location (sb-di:frame-code-location frame))
            (next-code-locations (next-code-locations code-location)))
@@ -2127,9 +2125,9 @@ forms that explicitly control this kind of evaluation.")
                  (sb-di:debug-fun-start-location
                   *default-breakpoint-debug-fun*) continue-at)))
       (when (or active here)
-        (format t "::FUN-START ")
-        (when active (format t " *Active*"))
-        (when here (format t " *Continue here*"))))
+        (format *debug-io* "::FUN-START ")
+        (when active (format *debug-io* " *Active*"))
+        (when here (format *debug-io* " *Continue here*"))))
 
     (let ((prev-location nil)
           (prev-num 0)
@@ -2138,15 +2136,15 @@ forms that explicitly control this kind of evaluation.")
                (when prev-location
                  (let ((this-num (1- this-num)))
                    (if (= prev-num this-num)
-                       (format t "~&~W: " prev-num)
-                       (format t "~&~W-~W: " prev-num this-num)))
-                 (print (code-location-source-form prev-location 0))
+                       (format *debug-io* "~&~W: " prev-num)
+                       (format *debug-io* "~&~W-~W: " prev-num this-num)))
+                 (prin1 (code-location-source-form prev-location 0) *debug-io*)
                  (when *print-location-kind*
-                   (format t "~S " (sb-di:code-location-kind prev-location)))
+                   (format *debug-io* "~S " (sb-di:code-location-kind prev-location)))
                  (when (location-in-list prev-location *breakpoints*)
-                   (format t " *Active*"))
+                   (format *debug-io* " *Active*"))
                  (when (sb-di:code-location= prev-location continue-at)
-                   (format t " *Continue here*")))))
+                   (format *debug-io* " *Continue here*")))))
 
         (dolist (code-location *possible-breakpoints*)
           (when (or *print-location-kind*
@@ -2169,7 +2167,7 @@ forms that explicitly control this kind of evaluation.")
     (when (location-in-list *default-breakpoint-debug-fun*
                             *breakpoints*
                             :fun-end)
-      (format t "~&::FUN-END *Active* "))))
+      (format *debug-io* "~&::FUN-END *Active* "))))
 
 (!def-debug-command-alias "LL" "LIST-LOCATIONS")
 
@@ -2266,10 +2264,10 @@ forms that explicitly control this kind of evaluation.")
           (sb-di:deactivate-breakpoint (breakpoint-info-breakpoint
                                         old-bp-info))
           (setf *breakpoints* (remove old-bp-info *breakpoints*))
-          (format t "previous breakpoint removed~%"))
+          (format *debug-io* "previous breakpoint removed~%"))
         (push new-bp-info *breakpoints*))
       (print-breakpoint-info (first *breakpoints*))
-      (format t "~&added"))))
+      (format *debug-io* "~&added"))))
 
 (!def-debug-command-alias "BP" "BREAKPOINT")
 
@@ -2291,13 +2289,13 @@ forms that explicitly control this kind of evaluation.")
     (cond (bp-info
            (sb-di:delete-breakpoint (breakpoint-info-breakpoint bp-info))
            (setf *breakpoints* (remove bp-info *breakpoints*))
-           (format t "breakpoint ~S removed~%" index))
-          (index (format t "The breakpoint doesn't exist."))
+           (format *debug-io* "breakpoint ~S removed~%" index))
+          (index (format *debug-io* "The breakpoint doesn't exist."))
           (t
            (dolist (ele *breakpoints*)
              (sb-di:delete-breakpoint (breakpoint-info-breakpoint ele)))
            (setf *breakpoints* nil)
-           (format t "all breakpoints deleted~%")))))
+           (format *debug-io* "all breakpoints deleted~%")))))
 
 (!def-debug-command-alias "DBP" "DELETE-BREAKPOINT")
 
@@ -2521,7 +2519,7 @@ forms that explicitly control this kind of evaluation.")
     (loop
      (let ((tag (sap-ref-lispobj sap (ash sb-vm:catch-block-tag-slot sb-vm:word-shift)))
            (link (sap-ref-sap sap (ash sb-vm:catch-block-previous-catch-slot sb-vm:word-shift))))
-       (format t "~S ~A~%" tag link)
+       (format *debug-io* "~S ~A~%" tag link)
        (setq sap link)
        (if (= (sap-int sap) 0) (return))))))
 
