@@ -983,7 +983,9 @@ standard Lisp readtable when NIL."
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
-  (simple-reader-error stream "unmatched close parenthesis"))
+  (with-simple-restart (continue "Ignore it")
+    (simple-reader-error stream "unmatched close parenthesis"))
+  (values))
 
 ;;; Read from the stream up to the next delimiter. Leave the resulting
 ;;; token in *READ-BUFFER*, and return three values:
