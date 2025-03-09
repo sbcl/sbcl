@@ -961,7 +961,8 @@
                        "undefined function"))
                      (:foreign-function
                       (make-bogus-debug-fun
-                       (foreign-function-backtrace-name ra)))
+                       (foreign-function-backtrace-name #-(or arm64 riscv) ra
+                                                        #+(or arm64 riscv) (int-sap (get-lisp-obj-address ra)))))
                      ((nil)
                       (make-bogus-debug-fun
                        "bogus stack frame"))
