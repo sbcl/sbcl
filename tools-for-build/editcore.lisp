@@ -1008,8 +1008,7 @@
     (let* ((sizeof-corefile-pte (+ n-word-bytes 2))
            (pte-bytes (align-up (* sizeof-corefile-pte n-ptes) n-word-bytes)))
       (dolist (word (list  page-table-core-entry-type-code
-                           6 ; = number of words in this core header entry
-                           (core-header-card-mask-nbits parsed-header)
+                           5 ; = number of words in this core header entry
                            n-ptes (+ (* n-ptes *bitmap-bytes-per-page*) pte-bytes)
                            page-count))
         (setf (%vector-raw-bits core-header (incf offset)) word)))
