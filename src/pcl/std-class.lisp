@@ -497,6 +497,7 @@
          (dolist (superclass direct-superclasses)
            (unless (validate-superclass class superclass)
              (invalid-superclass class superclass)))
+         (check-superclass-cycle class direct-superclasses)
          (setf (slot-value class 'direct-superclasses) direct-superclasses))
         (t
          (setq direct-superclasses (slot-value class 'direct-superclasses))))
@@ -604,6 +605,7 @@
         (make-instance 'class-eq-specializer :class class)))
 
 (defmethod reinitialize-instance :before ((class slot-class) &key direct-superclasses)
+  (check-superclass-cycle class direct-superclasses)
   (dolist (old-super (set-difference (class-direct-superclasses class) direct-superclasses))
     (remove-direct-subclass old-super class))
   (remove-slot-accessors class (class-direct-slots class)))
@@ -951,6 +953,14 @@
         class)
       (some #'class-has-a-forward-referenced-superclass-p
             (class-direct-superclasses class))))
+
+(defun check-superclass-cycle (class new-superclasses)
+  (loop for superclass in new-superclasses
+        do (when (eq class superclass)
+             (error "~@<Specified class ~S as a superclass of ~
+                       itself.~@:>"
+                    class))
+           (check-superclass-cycle class (class-direct-superclasses superclass))))
 
 ;;; This is called by :after shared-initialize whenever a class is initialized
 ;;; or reinitialized. The class may or may not be finalized.

@@ -2824,3 +2824,14 @@
                      (lambda (c) (use-value 2 c))))
       (setf (setf-slot-value-restart-a instance) 'y))
     (assert (eql (setf-slot-value-restart-a instance) 2))))
+
+(with-test (:name :super-class-cycle-forward-referenced)
+  (defclass super-class-cycle-forward-referenced-a (super-class-cycle-forward-referenced-b) ())
+  (assert (handler-case
+              (not (defclass super-class-cycle-forward-referenced-b
+                       (super-class-cycle-forward-referenced-a)
+                     ()))
+            (error (c)
+              c)))
+  (assert (null (sb-mop:class-direct-subclasses (find-class 'super-class-cycle-forward-referenced-a))))
+  (defclass super-class-cycle-forward-referenced-b () ()))
