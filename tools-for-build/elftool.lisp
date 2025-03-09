@@ -1193,7 +1193,7 @@ lisp_fun_linkage_space: .zero ~:*~D
           (case id
             (#.build-id-core-entry-type-code
              (when verbose
-               (incf ptr 2)
+               (incf ptr 3)
                (let ((string (make-string (%vector-raw-bits core-header ptr)
                                           :element-type 'base-char)))
                  (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
@@ -1231,10 +1231,10 @@ lisp_fun_linkage_space: .zero ~:*~D
                  (push (cons data-page (* npages +backend-page-bytes+)) copy-actions)
                  (incf original-total-npages npages))))
             (#.page-table-core-entry-type-code
-             (aver (= len 4))
-             (symbol-macrolet ((n-ptes (%vector-raw-bits core-header (+ ptr 1)))
-                               (nbytes (%vector-raw-bits core-header (+ ptr 2)))
-                               (data-page (%vector-raw-bits core-header (+ ptr 3))))
+             (aver (= len 3))
+             (symbol-macrolet ((n-ptes (%vector-raw-bits core-header (+ ptr 0)))
+                               (nbytes (%vector-raw-bits core-header (+ ptr 1)))
+                               (data-page (%vector-raw-bits core-header (+ ptr 2))))
                (aver (= data-page original-total-npages))
                (aver (= (ceiling (space-nwords
                                   (find dynamic-core-space-id space-list :key #'space-id))

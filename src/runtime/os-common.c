@@ -424,7 +424,15 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
 #if defined LISP_FEATURE_SOFT_CARD_MARKS && !defined LISP_FEATURE_DARWIN_JIT
     // dynamic space should not have protections manipulated
-    if (find_page_index(address) >= 0)
+    /* KLUDGE: this assertion is correct, but was actually passing for the wrong reason
+     * some of the time! It passed because page_table_pages was 0 early in the sequence
+     * of parsing a core header. Therefore no unsigned int could satisfy the test
+     * "index < page_table_pages". However, now that page_table_pages is computed
+     * in compute_card_table_size() which occurs as soon as the BUILD_ID is read,
+     * we run the risk that until DYNAMIC_SPACE_START is set correctly,
+     * any pointer could spuriously satisfy the test. And for ELF cores, dynamic space
+     * is set only after text space is parsed, which is too late apparently */
+    if (DYNAMIC_SPACE_START != 0 && find_page_index(address) >= 0)
         lose("unexpected call to os_protect with software card marks");
 #endif
     if (sbcl_mprotect(address, length, prot) < 0) {
