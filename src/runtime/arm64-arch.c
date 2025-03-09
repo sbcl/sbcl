@@ -62,19 +62,50 @@ void arch_clear_pseudo_atomic_interrupted(struct thread *thread) {
 
 unsigned int arch_install_breakpoint(void *pc)
 {
-    /* FIXME: Implement. */
+    THREAD_JIT_WP(0);
+    unsigned int *ptr = (unsigned int *)pc;
+    unsigned int result = *ptr;
 
-    return 0;
+    *ptr = (0x6a1 << 21) | (trap_Breakpoint << 5);
+
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
+    THREAD_JIT_WP(1);
+
+    return result;
 }
 
 void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
-    /* FIXME: Implement. */
+    THREAD_JIT_WP(0);
+    *(unsigned int *) pc = orig_inst;
+
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
+    THREAD_JIT_WP(1);
 }
+
+static unsigned int *skipped_break_addr, displaced_after_inst;
+static sigset_t orig_sigmask;
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    /* FIXME: Implement. */
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
+    unsigned int *next_pc;
+
+    orig_sigmask = *os_context_sigmask_addr(context);
+    sigaddset_blockable(os_context_sigmask_addr(context));
+
+    /* Put the original instruction back. */
+    arch_remove_breakpoint(pc, orig_inst);
+    skipped_break_addr = pc;
+
+    /* Figure out where it goes. */
+    next_pc = pc + 1;
+    displaced_after_inst = *next_pc;
+    THREAD_JIT_WP(0);
+    *next_pc = (0x6a1 << 21) | (trap_AfterBreakpoint << 5);
+
+    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
+    THREAD_JIT_WP(1);
 }
 
 void
@@ -87,6 +118,15 @@ void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
     OS_CONTEXT_PC(context) = (uword_t) handle_fun_end_breakpoint(context);
+}
+
+void
+arch_handle_after_breakpoint(os_context_t *context)
+{
+    arch_install_breakpoint(skipped_break_addr);
+    skipped_break_addr = NULL;
+    arch_remove_breakpoint((unsigned int *)OS_CONTEXT_PC(context), displaced_after_inst);
+    *os_context_sigmask_addr(context) = orig_sigmask;
 }
 
 void

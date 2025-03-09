@@ -889,15 +889,14 @@
    "1]"))
 
 (defun ! (n)
-  (declare (optimize (debug 2)))
+  (declare (optimize debug))
   (if (zerop n)
       1
       (* n (! (1- n)))))
 
 (with-test (:name (:debugger :list-locations)
-            ;; FIXME: these platforms don't have a generic-* routine,
-            ;; causing the exact location numbers to be different.
-            :fails-on (or :arm :arm64 :riscv))
+            ;; there's an extra location on arm for some reason.
+            :fails-on :arm)
   (test-debugger
    "ll #'!
     debugger-test-done!"
@@ -907,7 +906,7 @@
    '*
    "0]"
    "0: (DEFUN ! (N)"
-   "     (DECLARE (OPTIMIZE (DEBUG 2)))"
+   "     (DECLARE (OPTIMIZE DEBUG))"
    "     (IF (ZEROP N)"
    "         1"
    "         (* N (! (1- N)))))"
@@ -917,14 +916,14 @@
    "4: (! (1- N))"
    "5: (* N (! (1- N)))"
    "6: (DEFUN ! (N)"
-   "     (DECLARE (OPTIMIZE (DEBUG 2)))"
+   "     (DECLARE (OPTIMIZE DEBUG))"
    "     (IF (ZEROP N)"
    "         1"
    "         (* N (! (1- N)))))"
    "0]"))
 
 (with-test (:name (:debugger :breakpoint-and-step)
-                  . #.*breakpoint-tracing-expectations*)
+            :fails-on (:or :arm :riscv))
   (test-debugger
    "ll #'!
     br #.(progn (setq *ok-p* t) 2)"
