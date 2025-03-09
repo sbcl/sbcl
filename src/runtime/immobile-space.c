@@ -2009,9 +2009,17 @@ static void defrag_immobile_space(bool verbose)
             for ( ; reloc_index < end_reloc_index ; reloc_index += 2) {
                 int offset = immobile_space_relocs[reloc_index];
                 char* inst_addr = (char*)code + offset;
-                __attribute__((unused)) lispobj obj = immobile_space_relocs[reloc_index+1];
-                gc_assert(obj == 0 || obj == NIL);
-                // Adjust the displacement by (old - new). Jump target can't move.
+                // Either this code _or_ the referenced code can move but not both.
+                // For this component, adjust by the displacement by (old - new).
+                // If the jump target moved, adjust by its (new - old).
+                // The target object can be a simple-fun or asm routine.
+                int target_adjust = 0;
+                lispobj obj = immobile_space_relocs[reloc_index+1];
+                if (obj) {
+                    lispobj *npobj = native_pointer(obj);
+                    if (forwarding_pointer_p(npobj))
+                        target_adjust = forwarding_pointer_value(npobj) - obj;
+                }
                 // If the instruction to fix has moved, then adjust for
                 // its new address, and perform the fixup in tempspace.
                 // Otherwise perform the fixup where the instruction is now.
@@ -2020,7 +2028,9 @@ static void defrag_immobile_space(bool verbose)
                     immobile_space_p((lispobj)inst_addr) ?
                     (char*)tempspace_addr(inst_addr - code + load_addr) : inst_addr;
                 UNALIGNED_STORE32(fixup_loc,
-                                  UNALIGNED_LOAD32(fixup_loc) + (code - load_addr));
+                                  UNALIGNED_LOAD32(fixup_loc)
+                                  + target_adjust + (code - load_addr));
+
             }
         }
 #endif

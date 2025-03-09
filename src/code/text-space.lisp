@@ -18,7 +18,7 @@
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
-    (flet ((scan-function (code sap length extra-offset predicate)
+    (flet ((scan-function (is-asm code sap length extra-offset predicate)
              ;; Extra offset is the amount to add to the offset supplied in the
              ;; lambda to compute the instruction offset relative to the code base.
              ;; Defrag has already stuffed in forwarding pointers when it reads
@@ -26,13 +26,14 @@
              (scan-relative-operands
               code (sap-int sap) length dstate seg
               (lambda (offset operand inst)
-                (declare (ignore operand inst))
+                (declare (ignore inst))
                 ;; We used to have movable objects pointing to other movable objects,
-                ;; and during defrag, either or both could move.  This no longer occurs,
-                ;; so pass 0 as the pointed-to object.
-                (let ()
+                ;; and during defrag, *both* could move.  That is no longer the case,
+                ;; however asm code is allowed to point at a simple-fun entrypoint.
+                (let ((referent (cond (is-asm (+ operand (- 16) sb-vm:fun-pointer-lowtag))
+                                      (t 0))))
                   (vector-push-extend (+ offset extra-offset) relocs)
-                  (vector-push-extend 0 relocs)))
+                  (vector-push-extend referent relocs)))
                predicate))
            (finish-component (code start-relocs-index)
              (when (> (fill-pointer relocs) start-relocs-index)
@@ -45,7 +46,7 @@
         ;; The whole thing can be disassembled in one stroke since inter-routine
         ;; gaps are encoded as NOPs.
         (multiple-value-bind (start end) (sb-fasl::calc-asm-routine-bounds)
-          (scan-function code
+          (scan-function t code
                          (sap+ (code-instructions code) start)
                          (- end start)
                          ;; extra offset = header words + start
@@ -55,8 +56,8 @@
                          #'immobile-space-addr-p))
         (finish-component code relocs-index))
 
-      ;; Immobile space - code components can jump to immobile space,
-      ;; read-only space, and C runtime routines.
+      ;; Immobile space - code components can jump to immobile space
+      ;; and C runtime routines (is the latter really true?)
       (map-allocated-objects
        (lambda (code type size)
          (declare (ignore size))
@@ -66,7 +67,7 @@
                ;; simple-funs must be individually scanned to skip over header words
                (let* ((fun (%code-entry-point code i))
                       (sap (simple-fun-entry-sap fun)))
-                 (scan-function code sap
+                 (scan-function nil code sap
                                 (%simple-fun-text-len fun i)
                                 ;; Compute the offset from the base of the code
                                 (+ (ash (code-header-words code) word-shift)

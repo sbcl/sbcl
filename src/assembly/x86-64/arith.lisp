@@ -13,11 +13,19 @@
 
 #-sb-assembling ; avoid redefinition warning
 (macrolet ((static-fun-addr (name)
-             #+immobile-code `(rip-relative-ea (make-fixup ,name :linkage-cell))
              #-immobile-code
              `(progn
                 (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
-                (ea (make-fixup ,name :linkage-cell) rax-tn))))
+                (ea (make-fixup ,name :linkage-cell) rax-tn))
+             ;; Caution: this looks like it jumps to the linkage cell's address,
+             ;; and that is indeed what it would do if it were not for the fact that
+             ;; genesis recognizes that this isn't right, and instead does what you mean.
+             ;; i.e. genesis resolves a :LINKAGE-CELL fixup differently in asm code.
+             ;; Though a new fixup flavor would be technically correct, it would not
+             ;; be generally usable after self-build because we don't have direct jumps
+             ;; between simple-funs. (However, editcore can and will cause it to occur)
+             #+immobile-code `(make-fixup ,name :linkage-cell)))
+
 (defun both-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst or :dword temp y)

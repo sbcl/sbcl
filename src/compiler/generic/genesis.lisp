@@ -2349,6 +2349,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
+(defvar *asm-deferred-fixups*) ; similar to preceding, but in asm code
 
 (defun code-jump-table-words (code)
   (ldb (byte 14 0) (read-bits-wordindexed code (code-header-words code))))
@@ -2835,6 +2836,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
     des))
 
 (defun resolve-deferred-known-funs ()
+  (let* ((asm-code *assembler-routines*)
+         (insts (code-instructions asm-code)))
+    (dolist (fixup *asm-deferred-fixups*)
+      (destructuring-bind (offset name) (cdr fixup) ; car is fixup flavor, ignored
+        (let* ((f (cold-symbol-function name))
+               (ep (+ (descriptor-bits f) (- sb-vm:fun-pointer-lowtag) 16))
+               (rel32 (- ep (sap-int (sap+ insts (+ offset 4))))))
+          (setf (signed-sap-ref-32 insts offset) rel32)))))
   (dolist (item *deferred-known-fun-refs*)
     (let ((fun (cold-symbol-function (car item)))
           (place (cdr item)))
@@ -2889,7 +2898,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
       ;; We used to combine them with some magic in genesis.
       (setq *asm-routine-alist* (sort table #'< :key #'cdr)))
     (let ((stack (%fasl-input-stack (fasl-input))))
-      (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts) n-fixup-elts))
+      (setf *asm-deferred-fixups*
+            (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts)
+                          n-fixup-elts t)))
     #+(or x86 x86-64) ; fill in the indirect call table
     (let ((base (code-header-words asm-code))
           (index 0))
@@ -2918,11 +2929,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (values))
 
 ;;; Target variant of this is defined in 'target-load'
-(defun apply-fixups (code-obj fixups index count
+(defun apply-fixups (code-obj fixups index count &optional asm-code
                      &aux (end (1- (+ index count)))
                           (retained-fixups (svref fixups index))
+                          deferred-fixups
                           callees)
-  (declare (ignorable callees))
+  (declare (ignorable callees asm-code))
   (incf index)
   (binding* ((alloc-points (svref fixups index) :exit-if-null))
     (cold-set 'sb-c::*!cold-allocation-patch-point*
@@ -2939,7 +2951,16 @@ Legal values for OFFSET are -4, -8, -12, ..."
                 (when (and (descriptor-p name)
                            (= (descriptor-widetag name) sb-vm:simple-base-string-widetag))
                   (base-string-from-core name))))
-      (cold-fixup
+      (cond
+        #+(and x86-64 immobile-space)
+        ((and asm-code (eq flavor :linkage-cell))
+         ;; asm routines that call Lisp can jump directly to a simple-fun entrypoint,
+         ;; bypassing the linkage table. The function's address is not known yet though.
+         ;; Loading all asm code first makes resolving lisp-to-asm calls simpler,
+         ;; at the expense of asm-to-lisp resolution being deferred.
+         (push (list kind offset name) deferred-fixups))
+        (t
+         (cold-fixup
            code-obj offset
            (ecase flavor
              #+linkage-space
@@ -2966,14 +2987,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
               ;; but an uninterned symbol is a descriptor.
               (descriptor-bits (if (symbolp name) (cold-intern name) name)))
              (:symbol-value (descriptor-bits (cold-symbol-value name))))
-           kind flavor)))
+           kind flavor)))))
   (write-wordindexed code-obj sb-vm::code-fixups-slot
                      #+linkage-space
                      (number-to-core
                       (sb-c::join-varint-streams (sb-c:pack-code-fixup-locs callees)
                                                  (host-object-from-core retained-fixups)))
                      #-linkage-space retained-fixups)
-  code-obj)
+  deferred-fixups)
 
 ;;;; sanity checking space layouts
 
