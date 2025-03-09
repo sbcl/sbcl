@@ -3492,7 +3492,10 @@ expansion happened."
                                           specialized-element-type)
                                          ((eq eltype1 *wild-type*) eltype2)
                                          ((eq eltype2 *wild-type*) eltype1)
-                                         (t (type-intersection eltype1 eltype2)))
+                                         (t (let ((int (type-intersection eltype1 eltype2)))
+                                              (if (eq int *empty-type*)
+                                                  *universal-type*
+                                                  int))))
                          :specialized-element-type specialized-element-type))
       *empty-type*))
 

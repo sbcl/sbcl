@@ -1087,7 +1087,9 @@
   (assert (eql (specifier-type '(not (and (array t) (not simple-array))))
                (specifier-type '(or (not (array t)) simple-array))))
   (assert (eql (specifier-type '(not (and base-string (not simple-array))))
-               (specifier-type '(or (not base-string) simple-base-string)))))
+               (specifier-type '(or (not base-string) simple-base-string))))
+  (assert (eql (specifier-type '(and (array cons) (array number)))
+               (specifier-type '(array t)))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql
