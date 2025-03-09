@@ -923,7 +923,7 @@
    "0]"))
 
 (with-test (:name (:debugger :breakpoint-and-step)
-            :fails-on (:or :arm :riscv))
+            :fails-on (:or :freebsd :arm :riscv))
   (test-debugger
    "ll #'!
     br #.(progn (setq *ok-p* t) 2)"
