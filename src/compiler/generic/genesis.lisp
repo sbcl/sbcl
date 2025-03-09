@@ -4035,8 +4035,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
     (file-position core-file posn)
     (write-words core-file
                  page-table-core-entry-type-code
-                 6 ; = number of words in this core header entry
-                 sb-vm::gencgc-card-table-index-nbits
+                 5 ; = number of words in this core header entry
                  n-ptes (+ (* n-ptes bitmap-bytes-per-page) pte-bytes) data-page)))
 
 ;;; Create a core file created from the cold loaded image. (This is
@@ -4070,8 +4069,9 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
         ;; the GC this was build for, the address of NIL, the length of the
         ;; ID string, then base string chars + maybe padding.
         (write-words core-file build-id-core-entry-type-code
-                     (+ 5 nwords) ; 5 = fixed overhead including this word
+                     (+ 6 nwords) ; 6 = fixed overhead including this word
                      (gc-strategy-id)
+                     sb-vm::gencgc-card-table-index-nbits
                      (or #-relocatable-static-space sb-vm:nil-value 0)
                      (length build-id))
         (dovector (char build-id) (write-byte (char-code char) core-file))

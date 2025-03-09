@@ -969,13 +969,66 @@ static void sanity_check_loaded_core(lispobj);
 /** routines for loading a core using the heap organization of gencgc
  ** or other GC that is compatible with it **/
 
-bool gc_allocate_ptes()
+/* The size of the GC card table depends not only on the current dynamic-space-size
+ * but also the size from the image that produced this core, due to the fact that the
+ * card marking barrier instructions which maintain the table wire in the table size
+ * mask as an immediate operand. To correct a discrepancy, we might have to patch code.
+ * Ideally the saved core's dynamic-space size matches the current size
+ * but if not, there are two possibilities:
+ * (1) saved size was smaller (larger size was requested now) -
+ *     card marking instructions are patched to use a wider bitmask.
+ * (2) saved size was larger (smaller size was requested now) -
+ *     do not patch the instructions, but simply oversize the card table
+ *     so that it corresponds with the saved mask.
+ *
+ * An additional consideration is that in order to allocate static space adjacent
+ * to the card table (assuming that benefits Lisp codegen), we would like to
+ * perform a single mmap() spanning both ranges of memory. Therefore the card table
+ * size must be known before parsing the core directory and PTEs */
+static bool compute_card_table_size(int saved_card_mask_nbits)
 {
+    gc_card_table_nbits = saved_card_mask_nbits;
+
     /* Compute the number of pages needed for the dynamic space.
      * Dynamic space size should be aligned on page size. */
     page_table_pages = dynamic_space_size/GENCGC_PAGE_BYTES;
     gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
 
+    // The card table size is a power of 2 at *least* as large
+    // as the number of cards. These are the default values.
+    int nbits = 13;
+    long num_gc_cards = 1L << nbits;
+
+    // Sure there's a fancier way to round up to a power-of-2
+    // but this is executed exactly once, so KISS.
+    while (num_gc_cards / CARDS_PER_PAGE < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+
+    // 2 Gigacards should suffice for now. That would span 2TiB of memory
+    // using 1Kb card size, or more if larger card size.
+    if (nbits > 31)
+        lose("dynamic space too large");
+
+    // If the space size is less than or equal to the number of cards
+    // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
+    // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
+    int patch_card_index_mask_fixups = 0;
+    if (nbits > gc_card_table_nbits) {
+        gc_card_table_nbits = nbits;
+        // The value needed based on dynamic space size exceeds the value that the
+        // core was compiled for, so we need to patch all code blobs.
+        patch_card_index_mask_fixups = 1;
+    }
+    // Regardless of the mask implied by space size, it has to be gc_card_table_nbits wide
+    // even if that is excessive - when the core is restarted using a _smaller_ dynamic space
+    // size than saved at - otherwise lisp could overrun the mark table.
+    num_gc_cards = 1L << gc_card_table_nbits;
+
+    gc_card_table_mask =  num_gc_cards - 1;
+    return patch_card_index_mask_fixups;
+}
+
+void gc_allocate_ptes()
+{
     /* Assert that a cons whose car has MOST-POSITIVE-WORD
      * can not be considered a valid cons, which is to say, even though
      * MOST-POSITIVE-WORD seems to satisfy is_lisp_pointer(),
@@ -1021,36 +1074,7 @@ bool gc_allocate_ptes()
     page_execp = calloc(page_table_pages, 1);
 #endif
 
-    // The card table size is a power of 2 at *least* as large
-    // as the number of cards. These are the default values.
-    int nbits = 13;
-    long num_gc_cards = 1L << nbits;
-
-    // Sure there's a fancier way to round up to a power-of-2
-    // but this is executed exactly once, so KISS.
-    while (num_gc_cards / CARDS_PER_PAGE < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
-
-    // 2 Gigacards should suffice for now. That would span 2TiB of memory
-    // using 1Kb card size, or more if larger card size.
-    if (nbits > 31)
-        lose("dynamic space too large");
-
-    // If the space size is less than or equal to the number of cards
-    // that 'gc_card_table_nbits' cover, we're fine. Otherwise, problem.
-    // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
-    int patch_card_index_mask_fixups = 0;
-    if (nbits > gc_card_table_nbits) {
-        gc_card_table_nbits = nbits;
-        // The value needed based on dynamic space size exceeds the value that the
-        // core was compiled for, so we need to patch all code blobs.
-        patch_card_index_mask_fixups = 1;
-    }
-    // Regardless of the mask implied by space size, it has to be gc_card_table_nbits wide
-    // even if that is excessive - when the core is restarted using a _smaller_ dynamic space
-    // size than saved at - otherwise lisp could overrun the mark table.
-    num_gc_cards = 1L << gc_card_table_nbits;
-
-    gc_card_table_mask =  num_gc_cards - 1;
+    long num_gc_cards = 1 + gc_card_table_mask;
 #if defined LISP_FEATURE_SB_SAFEPOINT && defined LISP_FEATURE_X86_64
     /* The card table is hardware-page-aligned. Preceding it and occupying a whole
      * "backend page" - which by the way is overkill - is the global safepoint trap page.
@@ -1100,7 +1124,6 @@ bool gc_allocate_ptes()
     gc_init_region(unboxed_region);
     gc_init_region(code_region);
     gc_init_region(cons_region);
-    return patch_card_index_mask_fixups;
 }
 
 extern void gcbarrier_patch_code(void*, int);
@@ -1157,19 +1180,18 @@ void darwin_jit_code_pages_kludge () {
 
 /* Read corefile ptes from 'fd' which has already been positioned
  * and store into the page table */
-void gc_load_corefile_ptes(int card_table_nbits,
-                           core_entry_elt_t n_ptes,
+void gc_load_corefile_ptes(core_entry_elt_t n_ptes,
                            __attribute__((unused)) core_entry_elt_t total_bytes,
                            os_vm_offset_t offset, int fd,
                            __attribute__((unused)) struct coreparse_space *spaces,
-                           struct heap_adjust *adj)
+                           struct heap_adjust *adj,
+                           bool patchp)
 {
     if (next_free_page != n_ptes)
         lose("n_PTEs=%"PAGE_INDEX_FMT" but expected %"PAGE_INDEX_FMT,
              (int)n_ptes, next_free_page);
 
-    gc_card_table_nbits = card_table_nbits;
-    bool patchp = gc_allocate_ptes();
+    gc_allocate_ptes();
 
     if (LSEEK(fd, offset, SEEK_SET) != offset) lose("failed seek");
 
@@ -1410,6 +1432,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     struct coreparse_space* spaces =
       init_coreparse_spaces(sizeof defined_spaces/sizeof (struct coreparse_space),
                             defined_spaces);
+    bool patch_card_marking_instructions = 0;
 
 #ifdef DEBUG_COREPARSE
     fprintf(stderr, "core header:\n");
@@ -1428,8 +1451,9 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
         switch (val) {
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
-            /* The first 2 data words are the GC strategy identifier and address of NIL.
-             * The latter is mainly of interest to 'editcore' since NIL is #defined
+            /* The first 3 data words are the GC strategy identifier, the card table mask
+             * width in bits, and the address of NIL.
+             * NIL's address is mainly of interest to 'editcore' since NIL is either #defined
              * in static-symbols.h (or else is relocatable).
              * We may want to support one of several enhancements (in increasing
              * order of difficulty):
@@ -1446,8 +1470,10 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             if (ptr[0] != GC_STRATEGY_ID)
                 lose("GC strategy mismatch: runtime uses %d, core built for %d",
                      GC_STRATEGY_ID, (int)ptr[0]);
-            stringlen = ptr[2];
-            ptr += 3; remaining_len -= 3;
+            patch_card_marking_instructions = compute_card_table_size(ptr[1]);
+            // ptr[2] (address of NIL) can be ignored
+            stringlen = ptr[3];
+            ptr += 4; remaining_len -= 4;
             gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);
             if (stringlen != (sizeof build_id-1) || memcmp(ptr, build_id, stringlen))
                 lose("core was built for runtime \"%.*s\" but this is \"%s\"",
@@ -1471,10 +1497,10 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             if (linkage_space) initial_linkage_table_count = linkage_table_count;
             break;
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
-            // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
-            gc_load_corefile_ptes(ptr[0], ptr[1], ptr[2],
-                                  file_offset + (ptr[3] + 1) * os_vm_page_size, fd,
-                                  spaces, &adj);
+            // elements = n-ptes, nbytes, data-page
+            gc_load_corefile_ptes(ptr[0], ptr[1],
+                                  file_offset + (ptr[2] + 1) * os_vm_page_size, fd,
+                                  spaces, &adj, patch_card_marking_instructions);
             break;
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
             initial_function = adjust_word(&adj, (lispobj)*ptr);

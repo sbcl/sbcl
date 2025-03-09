@@ -284,16 +284,17 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     int string_words = ALIGN_UP(stringlen, sizeof (core_entry_elt_t))
         / sizeof (core_entry_elt_t);
     int pad = string_words * sizeof (core_entry_elt_t) - stringlen;
-    /* Write 5 word entry header: a word for entry-type-code, the length in words,
-     * the GC enum, the address of NIL, and the string length */
+    /* Write 6 word entry header: a word for entry-type-code, the length in words,
+     * the GC enum, card table bit width, address of NIL, and string length */
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(5 + string_words, file);
+    write_lispobj(6 + string_words, file);
 #ifdef LISP_FEATURE_GENCGC
     write_lispobj(1, file);
 #endif
 #ifdef LISP_FEATURE_MARK_REGION_GC
     write_lispobj(2, file);
 #endif
+    write_lispobj(gc_card_table_nbits, file);
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
     write_lispobj(0, file);
 #else
@@ -421,8 +422,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #endif
         gc_store_corefile_ptes((struct corefile_pte*)(data + bitmapsize));
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
-        write_lispobj(6, file); // number of words in this core header entry
-        write_lispobj(gc_card_table_nbits, file);
+        write_lispobj(5, file); // number of words in this core header entry
         write_lispobj(next_free_page, file);
         write_lispobj(aligned_size, file);
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
