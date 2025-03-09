@@ -2594,7 +2594,8 @@ expansion happened."
                ;; (or (not vector) (not (array t)))
                ;; =>
                ;; (not (vector t))
-               ((array-type-p int)
+               ((or (array-type-p int)
+                    (numeric-union-type-p int))
                 (make-negation-type int))))))))
 
 (define-type-method (negation :complex-union2) (type1 type2)

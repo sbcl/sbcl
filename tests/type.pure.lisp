@@ -1092,7 +1092,9 @@
 (with-test (:name :intersection-not-numeric)
   (assert (eql
            (specifier-type '(and (not (eql 1)) (not (eql 0))))
-           (specifier-type '(not bit)))))
+           (specifier-type '(not bit))))
+  (assert (eql (specifier-type '(or (not integer) (not (rational 1 10))))
+               (specifier-type '(not (integer 1 10))))))
 
 (with-test (:name :class-canonical-difference)
   (assert (eql
