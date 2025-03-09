@@ -643,6 +643,16 @@
                  (word (int-sap pc)))))))
       (unless (= base-ptr 0) (%make-lisp-obj (logior base-ptr other-pointer-lowtag))))))
 
+#+(or arm64 riscv)
+(defun compute-lra-data-from-pc (pc)
+  (declare (type integer pc))
+  (let* ((pc-sap (int-sap (ash pc n-fixnum-tag-bits)))
+         (code (code-header-from-pc pc-sap)))
+    (values (if code
+                (sap- pc-sap (code-instructions code))
+                nil)
+            code)))
+
 ;;;; (OR X86 X86-64) support
 
 #+(or x86 x86-64)
@@ -923,52 +933,14 @@
                                                         escaped)
                                  (if up-frame (1+ (frame-number up-frame)) 0)
                                  escaped))))))
-#+(or arm64 riscv)
+
+#+(or x86 x86-64 arm64 riscv)
 (defun compute-calling-frame (caller ra up-frame &optional savedp)
-  (declare (type system-area-pointer caller)
-           (ignore savedp))
+  (declare (type system-area-pointer caller #-(or arm64 riscv) ra))
   (when (control-stack-pointer-valid-p caller)
-    (multiple-value-bind (code pc-offset escaped)
-        (if ra
-            (let* ((ra-sap (int-sap (ash ra n-fixnum-tag-bits)))
-                   (code (code-header-from-pc ra-sap)))
-              (values code
-                      (if code
-                          (sap- ra-sap (code-instructions code))
-                          0)))
-            (find-escaped-frame caller))
-      (if (and (code-component-p code)
-               (eq (%code-debug-info code) :bpt-lra))
-          (let ((real-lra (code-header-ref code real-lra-slot)))
-            (compute-calling-frame caller real-lra up-frame))
-          (let ((d-fun (case code
-                         (:undefined-function
-                          (make-bogus-debug-fun
-                           "undefined function"))
-                         (:foreign-function
-                          (make-bogus-debug-fun
-                           (foreign-function-backtrace-name
-                            (int-sap (get-lisp-obj-address ra)))))
-                         ((nil)
-                          (make-bogus-debug-fun
-                           "bogus stack frame"))
-                         (t
-                          (debug-fun-from-pc code pc-offset escaped)))))
-            (make-compiled-frame caller up-frame d-fun
-                                 (code-location-from-pc d-fun pc-offset
-                                                        escaped)
-                                 (if up-frame (1+ (frame-number up-frame)) 0)
-                                 escaped))))))
-#+(or x86 x86-64)
-(defun compute-calling-frame (caller ra up-frame &optional savedp)
-  (declare (type system-area-pointer caller ra))
-  (/noshow0 "entering COMPUTE-CALLING-FRAME")
-  (when (control-stack-pointer-valid-p caller)
-    (/noshow0 "in WHEN")
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped off-stack)
         (find-escaped-frame caller)
-      (/noshow0 "at COND")
       (cond (code
              ;; If it's escaped it may be a function end breakpoint trap.
              (when (and (code-component-p code)
@@ -995,7 +967,6 @@
                        "bogus stack frame"))
                      (t
                       (debug-fun-from-pc code pc-offset escaped)))))
-        (/noshow0 "returning MAKE-COMPILED-FRAME from COMPUTE-CALLING-FRAME")
         (make-compiled-frame caller up-frame d-fun
                              (code-location-from-pc d-fun pc-offset
                                                     escaped)
@@ -3906,11 +3877,11 @@ register."
 ;;; state of the program, not merely a return PC location.
 ;;; (I tried changing this to DEFUN-CACHED, which failed a regression test)
 (defun make-bpt-lra (real-lra)
-  (declare (type #-(or x86 x86-64 arm64 riscv) lra #+(or x86 x86-64 arm64 riscv) system-area-pointer real-lra))
+  (declare (type #-(or x86 x86-64 arm64 riscv) lra
+                 #+(or arm64 riscv) fixnum
+                 #+(or x86 x86-64) system-area-pointer real-lra))
   real-lra
-  #+arm64 (error "Breakpoints do not work on ARM64")
-  #+riscv (error "Breakpoints don't work on RISC-V")
-  #-(or arm64 riscv)
+  #+(or arm64 riscv) (error "Breakpoints not supported on this platform.")
   (macrolet ((symbol-addr (name)
                `(find-dynamic-foreign-symbol-address ,name))
              (trap-offset ()
@@ -3933,7 +3904,7 @@ register."
                  2))))
       (setf (%code-debug-info code-object) :bpt-lra)
       (with-pinned-objects (code-object)
-        #+(or x86 x86-64 arm64)
+        #+(or x86 x86-64 arm64 riscv)
         (let ((instructions   ; Don't touch the jump table prefix word
                 (sap+ (code-instructions code-object) n-word-bytes)))
           (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
@@ -3946,7 +3917,7 @@ register."
             ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the trapping
             ;; opcode, for which we have to account for the jump table prefix word.
             (values instructions code-object (+ (trap-offset) n-word-bytes))))
-        #-(or x86 x86-64 arm64)
+        #-(or x86 x86-64 arm64 riscv)
         (let* ((lra-header-addr
                  ;; Skip over the jump table prefix, and align properly for LRA header
                  (sap+ (code-instructions code-object) (* 2 n-word-bytes)))
