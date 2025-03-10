@@ -1158,11 +1158,16 @@ void init_ldb_service()
     pthread_attr_t thr_attr;
     pthread_attr_init(&thr_attr);
     pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    pthread_sigmask(SIG_BLOCK, &mask, &oldmask);
     pthread_create(&ldb_service_thread, &thr_attr, ldb_service_main, 0);
     getsockname(listener, (struct sockaddr*)&sin, &addrlen);
     ldb_service_port = ntohs(sin.sin_port);
     fprintf(stderr, "NOTE: ldb service on port %d\n", ldb_service_port);
     pthread_attr_destroy(&thr_attr);
+    pthread_sigmask(SIG_SETMASK, &oldmask, 0);
 }
 #endif
 
