@@ -522,15 +522,15 @@
 ;;; different values, because this slot is relative to the object base
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant bpt-lra-boxed-nwords
-  ;; * For non-x86: a single boxed constant holds the true LRA.
+  ;; * For backends with LRA: a single boxed constant holds the true LRA.
   ;;   Additionally, MIPS gets a boxed slot for the cookie
   ;;   that formerly went in a weak hash-table.
-  ;; * For x86[-64]: one boxed constant holds the code object to which
+  ;; * For backends without LRA: one boxed constant holds the code object to which
   ;;   to return, one holds the displacement into that object,
   ;;   and one holds the cookie
-  (+ code-constants-offset 2 #+(or x86-64 x86) 1))
+  (+ code-constants-offset 2 #+(or x86-64 x86 arm64 riscv) 1))
 (defconstant real-lra-slot code-constants-offset)
-(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64) 1))
+(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64 arm64 riscv) 1))
 
 (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -1128,6 +1128,9 @@
               (setf pc-offset 0))))
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
+          #+(or riscv arm64)
+          (values code pc-offset context)
+          #-(or riscv arm64)
           (if (eq (%code-debug-info code) :bpt-lra)
               (let ((real-lra (code-header-ref code real-lra-slot)))
                 (values (lra-code-header real-lra)
@@ -3881,8 +3884,6 @@ register."
   (declare (type #-(or x86 x86-64 arm64 riscv) lra
                  #+(or arm64 riscv) fixnum
                  #+(or x86 x86-64) system-area-pointer real-lra))
-  real-lra
-  #+(or arm64 riscv) (error "Breakpoints not supported on this platform.")
   (macrolet ((symbol-addr (name)
                `(find-dynamic-foreign-symbol-address ,name))
              (trap-offset ()
@@ -3911,13 +3912,21 @@ register."
           (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
             (setf (code-header-ref code-object real-lra-slot) code
                   (code-header-ref code-object (1+ real-lra-slot)) offset)
+            #-darwin-jit
             (system-area-ub8-copy (int-sap src-start) 0 instructions 0 length)
+            #+darwin-jit
+            (sb-vm::jit-memcpy instructions (int-sap src-start) length)
+            #-(or x86 x86-64)
+            (sanctify-for-execution code-object)
             ;; CODE-OBJECT is implicitly pinned after leaving WITH-PINNED-OBJECTS
             ;; (and would be pinned even if the W-P-O were deleted), so we're OK
             ;; to return a SAP to the instructions.
             ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the trapping
             ;; opcode, for which we have to account for the jump table prefix word.
-            (values instructions code-object (+ (trap-offset) n-word-bytes))))
+            (values #+(or x86 x86-64) instructions
+                    #+(or arm64 riscv) (%make-lisp-obj (sap-int instructions))
+                    code-object
+                    (+ (trap-offset) n-word-bytes))))
         #-(or x86 x86-64 arm64 riscv)
         (let* ((lra-header-addr
                  ;; Skip over the jump table prefix, and align properly for LRA header

@@ -165,7 +165,7 @@
   (def symbol-package-id)
   (def symbol-hash)
   (def symbol-%info) ; primitive reader always needs a stub
-  #-(or x86 x86-64) (def lra-code-header)
+  #-(or x86 x86-64 arm64 riscv) (def lra-code-header)
   (def %make-lisp-obj)
   (def get-lisp-obj-address)
   #+x86-64

@@ -365,17 +365,42 @@ GNAME(call_into_c):
 	SIZE(call_into_c)
 #endif
 
-        // FIXME-ARM: The following is random garbage, to make
-        // code/debug-int compile. To get the debugger working, this
-        // needs to be implemented.
         .align 2
         .global GNAME(fun_end_breakpoint_guts)
         TYPE(fun_end_breakpoint_guts)
 GNAME(fun_end_breakpoint_guts):
-	.global	GNAME(fun_end_breakpoint_trap)
-	TYPE(fun_end_breakpoint_trap)
+        /* Multiple Value return */
+        b.eq multiple_value_return
+        /* Single value return: The eventual return will now use the
+           multiple values return convention but with a return values
+           count of one. */
+
+        /* Multiple values are stored relative to reg_OCFP, which we
+           set to be the current top-of-stack. */
+        mov reg_OCFP, reg_CSP
+
+        /* Reserve a save location for the one value we have. */
+        add reg_CSP, reg_CSP, N_WORD_BYTES
+
+        /* Record the number of values we have as a FIXNUM. */
+        mov reg_NARGS, (1 << N_FIXNUM_TAG_BITS)
+
+        /* Blank the remaining arg-passing registers. */
+        mov reg_R1, reg_NULL
+        mov reg_R2, reg_NULL
+        mov reg_R3, reg_NULL
+
+multiple_value_return:
+
+        .global	GNAME(fun_end_breakpoint_trap)
+        TYPE(fun_end_breakpoint_trap)
+        /* The actual magic trap. */
 GNAME(fun_end_breakpoint_trap):
-        b      GNAME(fun_end_breakpoint_trap)
+        brk trap_FunEndBreakpoint
+
+        /* Finally, the debugger needs to know where the end of the
+        fun_end_breakpoint_guts are, so that it may calculate its size
+        in order to populate out a suitably-sized code object. */
         .global GNAME(fun_end_breakpoint_end)
 GNAME(fun_end_breakpoint_end):
 

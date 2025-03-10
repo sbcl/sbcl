@@ -138,7 +138,7 @@
                                       (declare (ignore f stuff))))))
 
 (defparameter *breakpoint-tracing-expectations*
-  '(:fails-on (or :arm :arm64)
+  '(:fails-on :arm
     :broken-on (or :freebsd :ppc :ppc64)))
 
 ;;; bug 379
@@ -468,7 +468,6 @@
              (flet ((body () 42))
                (body))))))
 
-#-(or ppc ppc64)
 (with-test (:name (trace :compiler-macro :redefined)
                   . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((compiler-macro fn-with-cmac)
@@ -568,7 +567,6 @@
                (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
                  (fact x)))))))
 
-#-(or ppc ppc64)
 (with-test (:name (trace :macro :redefined)
                   . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces (macro-fact
