@@ -189,6 +189,27 @@
                             (namestring directory))))
     (unless (eq (pathname-host filename) sb-impl::*physical-host*)
       (return-from check-manifest))
+    ;; This special case fixes a new glitch that may occur in debug.impure.lisp.
+    ;; The call sequence in question is:
+    ;;  0xb800b72fbd [RUN-TESTS::CHECK-MANIFEST]
+    ;;  0xb800b77a8b [(LAMBDA (RUN-TESTS::F RUN-TESTS::FILENAME &REST RUN-TESTS::ARGS &KEY :DIRECTION &ALLOW-OTHER-KEYS) :IN RUN-TESTS::PURE-RUNNER)]
+    ;;  0xb800754aba [SB-DI::GET-FILE-TOPLEVEL-FORM]
+    ;;  0xb80075475e [SB-DI::GET-TOPLEVEL-FORM]
+    ;;  0xb800799dca [SB-DEBUG::CODE-LOCATION-SOURCE-FORM]
+    ;;  0xb80079a4cb [SB-DEBUG::LIST-LOCATIONS-DEBUG-COMMAND]
+    ;;  0xb800795597 [SB-DEBUG::DEBUG-LOOP-FUN]
+    ;; It's trying to find something about the file being loaded, but the pathname
+    ;; given to OPEN is STRING/= to *LOAD-PATHNAME*. We should allow it, obviously.
+    ;; Unfortunately if the input-manifest.lisp-expr file itself is missing, then the
+    ;; informational message "Assumed valid input file" is written to *ERROR-OUTPUT*.
+    ;; And that extra output corrupts the running test because the very thing
+    ;; the test asserts on is the contents of *ERROR-OUTPUT*.
+    ;; [why, you may wonder, can the input manifest file be missing? Because the tool
+    ;; which does the sandboxing doesn't send the input manifest itself to the test
+    ;; execution, it only sends the files dictated by the manifest]
+    (let ((lp *load-pathname*))
+      (when (and lp (stem= lp filename)) ; silently permit
+        (return-from check-manifest)))
     (let ((string (namestring filename)))
       (when (or (find #\* (stem-of filename)) ; wild
                 (starts-with-p string "/dev/") ; dev/null and dev/random
