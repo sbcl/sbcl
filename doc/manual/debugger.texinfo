@@ -1087,7 +1087,26 @@ their results whenever they are called.  Options allow conditional
 printing of the trace information and conditional breakpoints on
 function entry or exit.
 
+In SBCL, tracing can be done either by temporarily redefining the
+function name (encapsulation), or using breakpoints.  When breakpoints
+are used, the function object itself is destructively modified to cause
+the tracing action.  The advantage of using breakpoints is that tracing
+works even when the function is anonymously called via @code{funcall},
+that function object identity is preserved, and that anonymous and local
+functions can also be traced.
+
 @include macro-common-lisp-trace.texinfo
+
+  In the case of functions where the known return convention is used
+  to optimize, encapsulation may be necessary in order to make
+  tracing work at all.  The symptom of this occurring is an error
+  stating
+@example
+    Error in function @var{foo}: :FUNCTION-END breakpoints are
+    currently unsupported for the known return convention.
+@end example
+  in such cases we recommend using @code{(trace @var{foo} :encapsulate
+    t)}
 
 @include macro-common-lisp-untrace.texinfo
 
@@ -1098,10 +1117,6 @@ function entry or exit.
 @include var-sb-debug-star-trace-encapsulate-default-star.texinfo
 
 @include var-sb-debug-star-trace-report-default-star.texinfo
-
-@comment FIXME rudi 2004-03-26: encapsulate is (per TODO file as of
-@comment 0.8.9) in a state of flux.  When it's sorted out, revive the
-@comment cmucl documentation.
 
 @node Single Stepping
 @comment  node-name,  next,  previous,  up
