@@ -864,8 +864,9 @@ process_directory(int count, struct ndir_entry *entry,
                 uword_t aligned_start = ALIGN_UP(addr, GENCGC_PAGE_BYTES);
                 /* Misalignment can happen only if GC page size exceeds OS page.
                  * Drop one GC page to avoid overrunning the allocated space */
-                if (aligned_start > addr) // not card-aligned
-                    dynamic_space_size -= GENCGC_PAGE_BYTES;
+                if (aligned_start > addr) // not page-aligned
+                    dynamic_space_size -= GENCGC_PAGE_BYTES, --page_table_pages;
+                gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
                 DYNAMIC_SPACE_START = addr = aligned_start;
                 check_dynamic_space_addr_ok(addr, dynamic_space_size);
                 }
@@ -984,7 +985,21 @@ static void sanity_check_loaded_core(lispobj);
  * An additional consideration is that in order to allocate static space adjacent
  * to the card table (assuming that benefits Lisp codegen), we would like to
  * perform a single mmap() spanning both ranges of memory. Therefore the card table
- * size must be known before parsing the core directory and PTEs */
+ * size must be known before parsing the core directory and PTEs.
+ *
+ * Finally, note that even though the dynamic space might get reduced by 1 GC page
+ * after this point, the card table is fine as sized. Firstly, the only possible way
+ * that -1 page could lower the theoretically minimal card table size is if the specified
+ * dynamic space was _exactly_ 1 GC page more than a power of two (strange to begin with)
+ * number of cards, and didn't map where requested, and was unaligned as actually mapped.
+ * So ALIGN_UP will shrink it to an exact power-of-2 number of cards which permits 1 fewer
+ * bit of precision in the card index mask than the power-of-2-ceiling would have
+ * determined before subtraction.  The likelihood of all that happening is incredibly small,
+ * but more importantly, _any_ card mask that is at least as fine-grained as needed to
+ * fully cover dynamic space is good enough. Accidental failure to map dynamic space as
+ * intended is not deemed a beneficial gift to the card table's memory consumption.
+ * (I may be willing to be convinced otherwise)
+ */
 static bool compute_card_table_size(int saved_card_mask_nbits)
 {
     gc_card_table_nbits = saved_card_mask_nbits;
