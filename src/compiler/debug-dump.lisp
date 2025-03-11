@@ -156,6 +156,7 @@
     (do-live-tns (tn live block)
       (let ((leaf (tn-leaf tn)))
         (when (and (lambda-var-p leaf)
+                   (not (lambda-var-no-debug leaf))
                    (or (not (member (tn-kind tn)
                                     '(:environment :debug-environment)))
                        (leaf-visible-to-debugger-p leaf node))

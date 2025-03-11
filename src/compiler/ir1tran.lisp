@@ -1411,6 +1411,15 @@
         (t
          (setf (lambda-var-constant var) t))))))
 
+(defun process-no-debug-decl (spec vars)
+  (dolist (name (rest spec))
+    (let ((var (find-in-bindings vars name)))
+      (cond
+        ((not var)
+         (warn "No ~s variable" name))
+        (t
+         (setf (lambda-var-no-debug var) t))))))
+
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP
 ;;; (and TYPE if notinline), plus type-restrictions from the lexenv.
 (defun make-new-inlinep (var inlinep local-type)
@@ -1679,6 +1688,9 @@ possible.")
         res)
        (constant-value
         (process-constant-decl spec vars)
+        res)
+       (no-debug
+        (process-no-debug-decl spec vars)
         res)
        ;; We may want to detect LAMBDA-LIST and VALUES decls here,
        ;; and report them as "Misplaced" rather than "Unrecognized".

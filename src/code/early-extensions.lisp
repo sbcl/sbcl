@@ -224,22 +224,27 @@
   (let ((macros ())
         (binds ())
         (dx ())
-        (ignores ()))
+        (ignores ())
+        (declares))
     (dolist (spec collections)
       (destructuring-bind (name &optional initial-value (collector nil collectorp)) spec
         (multiple-value-bind (name append-tail)
             (if (consp name)
                 (values (first name) (second name))
                 (values name nil))
-          (let ((n-value (copy-symbol name)))
-            (push `(,n-value ,(if (or initial-value collectorp)
-                                  initial-value
-                                  `(#-sb-xc-host unaligned-dx-cons
-                                    #+sb-xc-host list
-                                    nil)))
+          (let ((n-value (copy-symbol name))
+                (n-tail (gensymify* name "-TAIL")))
+            (push `(,n-value ,(cond ((or initial-value collectorp)
+                                     initial-value)
+                                    (t
+                                     #-sb-xc-host (push `(sb-c::no-debug ,n-value ,n-tail) declares)
+                                     `(#-sb-xc-host unaligned-dx-cons
+                                       #+sb-xc-host list
+                                       nil))))
                   binds)
-            (let* ((n-tail (gensymify* name "-TAIL"))
-                   (macro-body
+            ;; Hide unaligned-dx-cons
+
+            (let* ((macro-body
                      (cond
                        (collectorp
                         ``(progn
@@ -274,7 +279,8 @@
                 (push `(,append-tail (x) `(setf (cdr ,',n-tail) ,x)) macros)))))))
     `(macrolet ,macros
        (let* ,(nreverse binds)
-         ,@(if dx `((declare (dynamic-extent ,@dx))))
+         ,@(if dx `((declare (dynamic-extent ,@dx)
+                             ,@declares)))
          ;; Even if the user reads each collection result,
          ;; reader conditionals might statically eliminate all writes.
          ;; Since we don't know, all the -n-tail variable are ignorable.
@@ -1312,7 +1318,8 @@ NOTE: This interface is experimental and subject to change."
                                      (memq id '(special ignorable ignore
                                                 dynamic-extent
                                                 sb-c::constant-value
-                                                sb-c::no-constraints))
+                                                sb-c::no-constraints
+                                                sb-c::no-debug))
                                      (info :type :kind id))
                                  (cdr decl))))))
            (partition (spec)

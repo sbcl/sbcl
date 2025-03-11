@@ -97,11 +97,14 @@
                             #-sb-xc-host
                             (declare (muffle-conditions compiler-note))
                             (unaligned-dx-cons nil))))
-                   (declare (dynamic-extent ,map-result))
+                   (declare (dynamic-extent ,map-result)
+                            (no-debug ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest
                       (%rplacd ,temp nil) ;; replace the 0
                       (truly-the list (cdr ,map-result)))
+                     (declare (no-debug ,temp))
+
                      ;; Accumulate using %RPLACD. RPLACD becomes (SETF CDR)
                      ;; which becomes %RPLACD but relies on "defsetfs".
                      ;; This is for effect, not value, so makes no difference.

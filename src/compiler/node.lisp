@@ -1440,11 +1440,12 @@
   explicit-value-cell
   ;; Do not propagate constraints for this var
   no-constraints
-  ;; Does it hold a constant that should't be destructively modified
+  ;; Does it hold a constant that shouldn't be destructively modified
   constant
   unused-initial-value
   ;; Instruct constraint propagation to do some work.
-  compute-same-refs)
+  compute-same-refs
+  no-debug)
 
 (defstruct (lambda-var
             (:include basic-var) (:copier nil)
@@ -1502,7 +1503,8 @@
   `(lambda-var-attributep (lambda-var-flags ,var) constant))
 (defmacro lambda-var-unused-initial-value (var)
   `(lambda-var-attributep (lambda-var-flags ,var) unused-initial-value))
-
+(defmacro lambda-var-no-debug (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) no-debug))
 (defmacro lambda-var-compute-same-refs (var)
   `(lambda-var-attributep (lambda-var-flags ,var) compute-same-refs))
 

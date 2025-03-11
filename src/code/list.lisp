@@ -408,7 +408,8 @@
          (index 0)
          (length (length lists))
          (last (1- length)))
-    (declare (dynamic-extent result))
+    (declare (dynamic-extent result)
+             (sb-c::no-debug result tail))
     (loop
      (cond
        ((< (truly-the index index) last)

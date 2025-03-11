@@ -103,14 +103,18 @@
 (declaim (sb-ext:freeze-type loop-collector))
 
 (sb-xc:defmacro with-loop-list-collection-head
-    ((collector head-var tail-var &optional user-head-var) &body body)
-  (let ((l (and user-head-var (list (list user-head-var nil)))))
-    `(let* ((,head-var ,(if (loop for how in (loop-collector-history collector)
-                                  always (eq how 'list))
+    ((collector head-var tail-var &optional user-head-var) &body body &environment env)
+  (let ((l (and user-head-var (list (list user-head-var nil))))
+        (debug (sb-c:policy env (= debug 3))))
+    `(let* ((,head-var ,(if (and (not debug)
+                                 (loop for how in (loop-collector-history collector)
+                                       always (eq how 'list)))
                             `(unaligned-dx-cons nil)
                             `(list nil)))
             (,tail-var ,head-var) ,@l)
        (declare (dynamic-extent ,head-var)
+                ,@(unless debug
+                    `((sb-c::no-debug ,head-var ,tail-var))) ;; half-conses are bad for the debugger
                 ,@(and user-head-var `((list ,user-head-var))))
        ,@body)))
 
