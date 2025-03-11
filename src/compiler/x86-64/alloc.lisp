@@ -22,6 +22,21 @@
       (inst mov result base)
       (inst lea result (ea lowtag base))))
 
+(defun generate-stack-overflow-check (vop size)
+  (let ((overflow (generate-error-code
+                   vop
+                   'stack-allocated-object-overflows-stack-error
+                   (if (integerp size)
+                       (make-sc+offset immediate-sc-number size)
+                       size))))
+    (inst sub rsp-tn size)
+    (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
+    ;; avoid clearing condition codes
+    (inst lea rsp-tn (if (integerp size)
+                         (ea size rsp-tn)
+                         (ea rsp-tn size)))
+    (inst jmp :be overflow)))
+
 (defun stack-allocation (size lowtag alloc-tn &optional known-alignedp)
   (aver (not (location= alloc-tn rsp-tn)))
   (inst sub rsp-tn size)
@@ -789,18 +804,7 @@
         (store-originating-pc rax))
       (let ((size (calc-size-in-bytes words result)))
         (when (sb-c::make-vector-check-overflow-p node)
-          (let ((overflow (generate-error-code vop
-                                               'stack-allocated-object-overflows-stack-error
-                                               (if (tn-p size)
-                                                   size
-                                                   (make-sc+offset immediate-sc-number size)))))
-            (inst sub rsp-tn size)
-            (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
-            ;; avoid clearing condition codes
-            (inst lea rsp-tn (if (integerp size)
-                                 (ea size rsp-tn)
-                                 (ea rsp-tn size)))
-            (inst jmp :be overflow)))
+          (generate-stack-overflow-check vop size))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation size other-pointer-lowtag result
@@ -896,17 +900,7 @@
       (let ((size (calc-size-in-bytes length next))
             (loop (gen-label)))
         (when (sb-c::make-list-check-overflow-p node)
-          (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error
-                                               (if (integerp size)
-                                                   (list size)
-                                                   size))))
-            (inst sub rsp-tn size)
-            (inst cmp :qword rsp-tn (thread-slot-ea thread-control-stack-start-slot))
-            ;; avoid clearing condition codes
-            (inst lea rsp-tn (if (integerp size)
-                                 (ea size rsp-tn)
-                                 (ea rsp-tn size)))
-            (inst jmp :be overflow)))
+          (generate-stack-overflow-check vop size))
         (stack-allocation size list-pointer-lowtag result)
         (compute-end)
         (inst mov next result)

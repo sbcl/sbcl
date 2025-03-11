@@ -13,6 +13,22 @@
 
 ;;;; allocation helpers
 
+(defun generate-stack-overflow-check (vop size)
+  (let ((overflow (generate-error-code
+                   vop
+                   'stack-allocated-object-overflows-stack-error
+                   size)))
+        (inst sub esp-tn size)
+        (inst cmp esp-tn
+              #-sb-thread
+              (make-ea-for-symbol-value *control-stack-start* :dword)
+              #+sb-thread
+              (make-ea :dword :disp (* 4 thread-control-stack-start-slot))
+              #+sb-thread :fs)
+        ;; avoid clearing condition codes
+        (inst lea esp-tn (make-ea :dword :base esp-tn :index size))
+        (inst jmp :be overflow)))
+
 ;;; Allocation within alloc_region (which is thread local) can be done
 ;;; inline.  If the alloc_region is overflown allocation is done by
 ;;; calling the C alloc() function.
@@ -300,17 +316,7 @@
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
     (when (sb-c::make-vector-check-overflow-p node)
-      (let ((overflow (generate-error-code vop 'stack-allocated-object-overflows-stack-error result)))
-        (inst sub esp-tn result)
-        (inst cmp esp-tn
-              #-sb-thread
-              (make-ea-for-symbol-value *control-stack-start* :dword)
-              #+sb-thread
-              (make-ea :dword :disp (* 4 thread-control-stack-start-slot))
-              #+sb-thread :fs)
-        ;; avoid clearing condition codes
-        (inst lea esp-tn (make-ea :dword :base esp-tn :index result))
-        (inst jmp :be overflow)))
+      (generate-stack-overflow-check vop result))
     (stack-allocation result result other-pointer-lowtag)
     (inst cld)
     (inst lea res
