@@ -104,7 +104,7 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     THREAD_JIT_WP(0);
     *next_pc = (0x6a1 << 21) | (trap_AfterBreakpoint << 5);
 
-    os_flush_icache((os_vm_address_t) pc, sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t) next_pc, sizeof(unsigned int));
     THREAD_JIT_WP(1);
 }
 
