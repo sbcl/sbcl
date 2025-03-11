@@ -1107,7 +1107,9 @@
            (specifier-type '(or stream (not standard-object)))))
   (assert (eql (specifier-type '(or (and standard-object sb-kernel:extended-sequence)
                                  (and standard-object (not sb-kernel:extended-sequence))))
-               (specifier-type 'standard-object))))
+               (specifier-type 'standard-object)))
+  (assert (eql (specifier-type '(or (and atom (not stream)) (and stream standard-object)))
+               (specifier-type '(or (and atom (not stream)) standard-object)))))
 
 (with-test (:name :cons-intersection)
   (assert (eql (specifier-type '(and (cons (not array) atom) (cons (not integer) (not integer))))
