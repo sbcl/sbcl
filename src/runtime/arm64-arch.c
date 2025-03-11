@@ -86,10 +86,61 @@ void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 static unsigned int *skipped_break_addr, displaced_after_inst;
 static sigset_t orig_sigmask;
 
+#define N_BIT 31
+#define Z_BIT 30
+#define C_BIT 29
+#define V_BIT 28
+
+/*
+ * Perform the instruction that we overwrote with a breakpoint.  As we
+ * don't have a single-step facility, this means we have to:
+ * - put the instruction back
+ * - put a second breakpoint at the following instruction,
+ *   set after_breakpoint and continue execution.
+ *
+ * When the second breakpoint is hit (very shortly thereafter, we hope)
+ * sigtrap_handler gets called again, but follows the AfterBreakpoint
+ * arm, which
+ * - puts a bpt back in the first breakpoint place (running across a
+ *   breakpoint shouldn't cause it to be uninstalled)
+ * - replaces the second bpt with the instruction it was meant to be
+ * - carries on
+ *
+ * Clear?
+ */
+static bool
+condition_holds(os_context_t *context, unsigned int cond)
+{
+    int flags = *os_context_flags_addr(context);
+    bool result;
+    // Evaluate base condition.
+    switch (cond) {
+    case 0b000: result = ((flags >> Z_BIT) & 1);
+    case 0b001: result = ((flags >> C_BIT) & 1);
+    case 0b010: result = ((flags >> N_BIT) & 1);
+    case 0b011: result = ((flags >> V_BIT) & 1);
+    case 0b100: result = ((flags >> V_BIT) & 1) && ~((flags >> Z_BIT) & 1);
+    case 0b101: result = ((flags >> N_BIT) == (flags >> V_BIT));
+    case 0b110: result = ((flags >> N_BIT) == (flags >> V_BIT)) && !((flags >> Z_BIT) & 1);
+    case 0b111: result = 1;
+    }
+
+    // Condition flag values in the set '111x' indicate always true
+    // Otherwise, invert condition if necessary.
+    if ((cond & 0b1) && (cond != 0b1111))
+        result = !result;
+
+    return result;
+}
+
+static sword_t sign_extend(uword_t word, int n_bits) {
+  return (sword_t)(word<<(N_WORD_BITS-n_bits)) >> (N_WORD_BITS-n_bits);
+}
+
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
-    unsigned int *next_pc;
+    unsigned int *next_pc = pc;
 
     orig_sigmask = *os_context_sigmask_addr(context);
     sigaddset_blockable(os_context_sigmask_addr(context));
@@ -98,8 +149,68 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     arch_remove_breakpoint(pc, orig_inst);
     skipped_break_addr = pc;
 
+    /* Figure out where we will end up after running the displaced
+     * instruction by defaulting to the next instruction in the stream
+     * and then checking for branch instructions.  FIXME: This will
+     * probably screw up if it attempts to step a trap instruction. */
+
     /* Figure out where it goes. */
-    next_pc = pc + 1;
+    if ((orig_inst >> 24) == 0b01010100) {
+        // Cond branch
+        if (condition_holds(context, orig_inst & 0b1111))
+            next_pc += sign_extend((orig_inst >> 5) & ~(1 << 19), 19);
+        else
+            next_pc += 1;
+    }
+    else if (((orig_inst >> 26) & 0b11111) == 0b000101)
+        // Uncond branch: B, BL
+        next_pc += sign_extend(orig_inst & ~(1 << 26), 26);
+    else if (((orig_inst >> 25) & 0b1111111) == 0b1101011) {
+        int rt;
+        // Uncond branch register
+        switch ((orig_inst >> 21) & 0b1111) {
+        case 0b00: // BR
+        case 0b01: // BLR
+            rt = (orig_inst >> 5) & 0b11111;
+            break;
+        case 0b10: // RET
+            rt = reg_LR;
+            break;
+        default:
+            lose("Unrecognized instruction.");
+            break;
+        }
+        next_pc = (unsigned int*)*os_context_register_addr(context, rt);
+    }
+    else if (((orig_inst >> 25) & 0b111111) == 0b011010) {
+        // Compare branch imm
+        bool size_is_64 = (orig_inst >> 31) & 0b1;
+        bool op = (orig_inst >> 24) & 0b1;
+        int offset = sign_extend((orig_inst >> 5) & ~(1 << 19), 19);
+        int rt = orig_inst & 0b11111;
+        if (!size_is_64) lose("Size must be 64 bits.");
+        if (*os_context_register_addr(context, rt) ^ op)
+            next_pc += offset;
+        else
+            next_pc += 1;
+    }
+    else if (((orig_inst >> 25) & 0b111111) == 0b011011) {
+        // Test branch imm
+        bool b5 = (orig_inst >> 31) & 0b1;
+        bool op = (orig_inst >> 24) & 0b1;
+        bool b40 = (orig_inst >> 19) & 0b11111;
+        int bit_pos = (b5 << 6) | b40;
+        int offset = sign_extend((orig_inst >> 5) & ~(1 << 14), 14);
+        int rt = orig_inst & 0b11111;
+        if (!b5) lose("b5 must be 64 bits.");
+        if (((*os_context_register_addr(context, rt) >> bit_pos) & 0b1) ^ op)
+            next_pc += offset;
+        else
+            next_pc += 1;
+    }
+    else {
+        next_pc += 1;
+    }
     displaced_after_inst = *next_pc;
     THREAD_JIT_WP(0);
     *next_pc = (0x6a1 << 21) | (trap_AfterBreakpoint << 5);
