@@ -2144,7 +2144,8 @@
      ((1) 0))))
 
 (with-test (:name :stack-allocated-vector-checks-overflow
-            :broken-on (not (and :x86-64 :linux)))
+            ;; FIXME: no idea why we get a segfault on win32
+            :broken-on :win32)
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()

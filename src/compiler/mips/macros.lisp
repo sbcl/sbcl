@@ -159,6 +159,19 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (storew ,temp-tn ,result-tn 0 ,lowtag)
        ,@body)))
 
+(defun generate-stack-overflow-check (vop size temp)
+  (let ((overflow (generate-error-code vop
+                                       'stack-allocated-object-overflows-stack-error
+                                       size)))
+    #-sb-thread
+    (load-symbol-value temp *control-stack-end*)
+    #+sb-thread
+    (loadw temp thread-base-tn thread-control-stack-end-slot)
+    (inst sub temp temp csp-tn)
+    (inst sltu temp size temp)
+    (inst beq temp overflow)
+    (inst nop)))
+
 (defun align-csp (temp1 temp2)
   (inst li temp1 (lognot lowtag-mask))
   (inst addu temp2 csp-tn lowtag-mask)

@@ -112,14 +112,17 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
+  (:vop-var vop)
+  (:node-var node)
   (:policy :fast-safe)
   (:generator 100
     (inst addu bytes words (+ lowtag-mask
                               (* vector-data-offset n-word-bytes)))
     (inst srl bytes n-lowtag-bits)
     (inst sll bytes n-lowtag-bits)
-    ;; FIXME: It would be good to check for stack overflow here.
-    (pseudo-atomic (pa-flag) ; FIXME: why pseudo-atomic on stack?
+    (when (sb-c::make-vector-check-overflow-p node)
+      (generate-stack-overflow-check vop bytes temp))
+    (pseudo-atomic (pa-flag)      ; FIXME: why pseudo-atomic on stack?
       (align-csp temp pa-flag)
       (inst or result csp-tn other-pointer-lowtag)
       (inst addu temp csp-tn (* vector-data-offset n-word-bytes))

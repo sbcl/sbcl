@@ -13,6 +13,18 @@
 
 ;;;; Storage allocation:
 
+(defun generate-stack-overflow-check (vop size temp)
+  (let ((overflow (generate-error-code vop
+                                       'stack-allocated-object-overflows-stack-error
+                                       size)))
+    #-sb-thread
+    (load-symbol-value temp *control-stack-end*)
+    #+sb-thread
+    (loadw temp thread-base-tn thread-control-stack-end-slot)
+    (inst sub temp temp csp-tn)
+    (inst cmplw temp size)
+    (inst ble overflow)))
+
 ;;; This is the main mechanism for allocating memory in the lisp heap.
 ;;;
 ;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG

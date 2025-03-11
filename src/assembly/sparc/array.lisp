@@ -51,6 +51,7 @@
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst andn ndescr 7)
+    (generate-stack-overflow-check nil ndescr gc-temp)
     (allocation nil ndescr other-pointer-lowtag vector :temp-tn gc-temp
                 :stack-p t)
     ;; We're pseudo-atomic here, so we can do whatever is most convenient

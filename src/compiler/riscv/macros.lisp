@@ -196,7 +196,8 @@ byte-ordering issues."
 
 (defun emit-error-break (vop kind code values)
   (assemble ()
-    (when vop (note-this-location vop :internal-error))
+    (when vop
+      (note-this-location vop :internal-error))
     (inst ebreak)
     (if (= kind invalid-arg-count-trap) ; there is no "payload" in this trap kind
         (inst byte kind)
@@ -647,6 +648,17 @@ and
 
 
 ;;;; Storage allocation:
+
+(defun generate-stack-overflow-check (vop size temp)
+  (let ((overflow (generate-error-code vop
+                                       'stack-allocated-object-overflows-stack-error
+                                       size)))
+    #-sb-thread
+    (load-symbol-value temp *control-stack-end*)
+    #+sb-thread
+    (loadw temp thread-base-tn thread-control-stack-end-slot)
+    (inst sub temp temp csp-tn)
+    (inst bge size temp overflow)))
 
 #+gencgc
 (defun alloc-tramp-stub-name (tn-offset type)

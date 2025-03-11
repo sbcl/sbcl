@@ -188,6 +188,15 @@
 
 ;;;; Storage allocation:
 
+(defun generate-stack-overflow-check (vop size temp temp2)
+  (let ((overflow (generate-error-code vop
+                                       'stack-allocated-object-overflows-stack-error
+                                       size)))
+    (load-symbol-value temp *control-stack-end*)
+    (load-csp temp2)
+    (inst sub temp temp temp2)
+    (inst cmp temp size)
+    (inst b :le overflow)))
 
 ;;; This is the main mechanism for allocating memory in the lisp heap.
 ;;;

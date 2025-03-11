@@ -72,6 +72,7 @@
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst bic ndescr ndescr lowtag-mask)
+    (generate-stack-overflow-check nil ndescr pa-flag vector)
     (allocation nil ndescr other-pointer-lowtag vector
                 :flag-tn pa-flag
                 :stack-allocate-p t)

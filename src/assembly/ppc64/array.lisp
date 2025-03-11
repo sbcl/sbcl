@@ -55,6 +55,7 @@
   (pseudo-atomic (pa-flag)
     (inst addi ndescr words (fixnumize (1+ vector-data-offset)))
     (inst rldicr ndescr ndescr (- word-shift n-fixnum-tag-bits) (- 63 n-lowtag-bits))
+    (generate-stack-overflow-check nil ndescr temp)
     (align-csp temp)
     (inst ori vector csp-tn other-pointer-lowtag)
     (inst add csp-tn csp-tn ndescr)

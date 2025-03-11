@@ -132,6 +132,19 @@
 
 ;;;; Storage allocation:
 
+(defun generate-stack-overflow-check (vop size temp)
+  (let ((overflow (generate-error-code vop
+                                       'stack-allocated-object-overflows-stack-error
+                                       size)))
+    #-sb-thread
+    (load-symbol-value temp *control-stack-end*)
+    #+sb-thread
+    (loadw temp thread-tn thread-control-stack-end-slot)
+    (inst sub temp temp csp-tn)
+    (inst cmp temp size)
+    (inst b :le overflow)
+    (inst nop)))
+
 ;;;; Allocation macro
 ;;;;
 ;;;; This macro does the appropriate stuff to allocate space.

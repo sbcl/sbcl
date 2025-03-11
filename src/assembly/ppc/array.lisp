@@ -56,6 +56,7 @@
     ;; boxed words == unboxed bytes
     (inst addi ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst clrrwi ndescr ndescr n-lowtag-bits)
+    (generate-stack-overflow-check nil ndescr temp)
     (align-csp temp)
     (inst ori vector csp-tn other-pointer-lowtag)
     (inst add csp-tn csp-tn ndescr)
