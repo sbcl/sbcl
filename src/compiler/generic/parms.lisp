@@ -104,19 +104,17 @@
                                           #+relocatable-static-space safepoint
                                           #+relocatable-static-space static
                                           read-only)))
-                        (start ptr)
-                        (end (+ ptr size)))
-                   (setf ptr end)
+                        (overrides
+                         (case space
+                           (text (cons text-space-start* text-space-size*))
+                           (fixedobj (cons fixedobj-space-start* fixedobj-space-size*))))
+                        (effective-size (or (cdr overrides) size))
+                        (start (or (car overrides) ; use specified value
+                                   (prog1 ptr (incf ptr effective-size)))) ; else bump PTR
+                        (end (+ start effective-size)))
                    (if var-name
                        `((defconstant ,var-name ,start))
                        (let ((start-sym (symbolicate space "-SPACE-START")))
-                         ;; Allow expressly given addresses / sizes for immobile space.
-                         ;; The addresses are for testing only - you should not need them.
-                         (case space
-                           (text (setq start (or text-space-start* start)
-                                       end (+ start text-space-size*)))
-                           (fixedobj (setq start (or fixedobj-space-start* start)
-                                           end (+ start fixedobj-space-size*))))
                          `(,(defconstantish relocatable start-sym start)
                            ,(cond ((eq space 'alien-linkage-table)) ; nothing for the -END
                                   ((not relocatable)
