@@ -33,7 +33,7 @@ void arch_skip_instruction(os_context_t *context)
 {
     /* KLUDGE: Other platforms check for trap codes and skip inlined
      * trap/error parameters.  We should too. */
-    OS_CONTEXT_PC(context) += 4;
+    OS_CONTEXT_PC(context) += 8;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
@@ -87,10 +87,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     unsigned char register_offset =
       *((unsigned char *)(OS_CONTEXT_PC(context)) + 5);
     handle_single_step_trap(context, trap, register_offset);
-    /* KLUDGE: arch_skip_instruction() only skips one instruction, and
-     * there is a following word to deal with as well, so skip
-     * twice. */
-    arch_skip_instruction(context);
     arch_skip_instruction(context);
 }
 
@@ -120,11 +116,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
              trap_instruction);
     }
 
-    uint32_t code = *((uint32_t *)(4 + OS_CONTEXT_PC(context)));
-
-    if (code == trap_PendingInterrupt) {
-      arch_skip_instruction(context);
-    }
+    unsigned char code = *((unsigned char *)(4 + OS_CONTEXT_PC(context)));
 
     handle_trap(context, code);
 }
