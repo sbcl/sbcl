@@ -296,11 +296,11 @@
 
 (define-vop (allocate-vector-on-stack)
   (:args (type :scs (unsigned-reg immediate) :to :save)
-         (length :scs (any-reg) :to :eval :target zero)
+         (length :scs (any-reg) :to :eval :target res)
          (words :scs (any-reg) :target ecx))
   (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
-  (:temporary (:sc any-reg :offset eax-offset :from :eval) zero)
-  (:temporary (:sc any-reg :offset edi-offset) res)
+  (:temporary (:sc unsigned-reg :offset eax-offset) bytes)
+  (:temporary (:sc any-reg :offset edi-offset :from :eval) res)
   (:node-var node)
   (:vop-var vop)
   (:results (result :scs (descriptor-reg) :from :load))
@@ -309,19 +309,16 @@
               positive-fixnum)
   (:policy :fast-safe)
   (:generator 100
-    (inst lea result (make-ea :byte :base words :disp
-                              (+ (1- (ash 1 n-lowtag-bits))
-                                 (* vector-data-offset n-word-bytes))))
-    (inst and result (lognot lowtag-mask))
+    (inst lea bytes (make-ea :byte :base words :disp
+                             (+ (1- (ash 1 n-lowtag-bits))
+                                (* vector-data-offset n-word-bytes))))
+    (inst and bytes (lognot lowtag-mask))
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
     (when (sb-c::make-vector-check-overflow-p node)
-      (generate-stack-overflow-check vop result))
-    (stack-allocation result result other-pointer-lowtag)
+      (generate-stack-overflow-check vop bytes))
+    (stack-allocation result bytes other-pointer-lowtag)
     (inst cld)
-    (inst lea res
-          (make-ea :byte :base result :disp (- (* vector-data-offset n-word-bytes)
-                                               other-pointer-lowtag)))
     (sc-case type
       (immediate
        (aver (typep (tn-value type) '(unsigned-byte 8)))
@@ -329,9 +326,12 @@
       (t
        (storew type result 0 other-pointer-lowtag)))
     (storew length result vector-length-slot other-pointer-lowtag)
-    (inst xor zero zero)
+    (inst lea res
+          (make-ea :byte :base result :disp (- (* vector-data-offset n-word-bytes)
+                                               other-pointer-lowtag)))
+    (inst xor bytes bytes)
     (inst rep)
-    (inst stos zero)))
+    (inst stos bytes)))
 
 
 (define-vop (make-fdefn)

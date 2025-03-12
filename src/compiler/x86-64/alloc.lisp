@@ -777,6 +777,7 @@
                                  (typep (pad-data-block (+ (tn-value tn) vector-data-offset))
                                         'sc-offset)))))
     (:results (result :scs (descriptor-reg) :from :load))
+    (:temporary (:sc unsigned-reg) bytes)
     (:node-var node)
     (:vop-var vop)
     (:arg-types #+ubsan (:constant t)
@@ -802,7 +803,7 @@
         (inst mov :dword (vector-len-ea rax)
               (if (sc-is length immediate) (fixnumize (tn-value length)) length))
         (store-originating-pc rax))
-      (let ((size (calc-size-in-bytes words result)))
+      (let ((size (calc-size-in-bytes words bytes)))
         (when (sb-c::make-vector-check-overflow-p node)
           (generate-stack-overflow-check vop size))
         ;; Compute tagged pointer sooner than later since access off RSP
@@ -838,14 +839,18 @@
     (:temporary (:sc any-reg :offset rcx-offset) rcx)
     (:temporary (:sc any-reg :offset rax-offset) rax)
     (:temporary (:sc any-reg :offset rdi-offset) rdi)
+    (:temporary (:sc unsigned-reg) bytes)
+    (:node-var node)
+    (:vop-var vop)
     (:policy :fast-safe)
     (:generator 10
-      (let ((size (calc-size-in-bytes words result)))
+      (let ((size (calc-size-in-bytes words bytes)))
         ;; Compute tagged pointer sooner than later since access off RSP
         ;; requires an extra byte in the encoding anyway.
         (stack-allocation size other-pointer-lowtag result)
         (store-string-trailing-null result type length words)
-        ;; FIXME: It would be good to check for stack overflow here.
+        (when (sb-c::make-vector-check-overflow-p node)
+          (generate-stack-overflow-check vop size))
         (put-header result other-pointer-lowtag type length nil nil)
         (cond ((sc-is words immediate)
                (inst mov rcx (+ (tn-value words) vector-data-offset)))
@@ -895,9 +900,10 @@
     (:policy :fast-safe)
     (:node-var node)
     (:vop-var vop)
+    (:temporary (:sc unsigned-reg) bytes)
     (:temporary (:sc descriptor-reg) tail next limit)
     (:generator 20
-      (let ((size (calc-size-in-bytes length next))
+      (let ((size (calc-size-in-bytes length bytes))
             (loop (gen-label)))
         (when (sb-c::make-list-check-overflow-p node)
           (generate-stack-overflow-check vop size))

@@ -2148,19 +2148,26 @@
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()
-     (let ((x (make-array
-               ;; guaranteed to overflow the stack.
-               (abs (- (sb-sys:sap-int
-                        (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-start-slot))
-                       (sb-sys:sap-int
-                        (sb-int:descriptor-sap sb-vm:*control-stack-end*)))))))
-       (declare (dynamic-extent x))
-       (dotimes (i (length x))
-         (setf (aref x i) i))
-       123))
-   ;; This condition will be different depending on whether the
-   ;; explicit stack check signals or the guard page gets hit.
-   (() (condition 'sb-kernel::storage-condition))))
+     (let ((size
+             ;; guaranteed to overflow the stack.
+             (abs (- (sb-sys:sap-int
+                      (sb-vm::current-thread-offset-sap sb-vm::thread-control-stack-start-slot))
+                     (sb-sys:sap-int
+                      (sb-int:descriptor-sap sb-vm:*control-stack-end*))))))
+       (block nil
+         (handler-bind ((sb-kernel::stack-allocated-object-overflows-stack
+                          (lambda (c)
+                            (assert (= (sb-kernel::stack-allocated-object-overflows-stack-size c)
+                                       (sb-vm::primitive-object-size (make-array size))))
+                            (return :good)))
+                        (condition
+                          (lambda (c) (return c))))
+           (let ((x (make-array size)))
+             (declare (dynamic-extent x))
+             (dotimes (i (length x))
+               (setf (aref x i) i))
+             (aref x 0))))))
+   (() :good)))
 
 (with-test (:name :stack-allocated-vector-integer-size-arg)
   (checked-compile-and-assert
