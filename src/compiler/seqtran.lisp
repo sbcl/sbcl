@@ -397,13 +397,13 @@
          result)))
 
 
-;;; FIXME: once the confusion over doing transforms with known-complex
-;;; arrays is over, we should also transform the calls to (AND (ARRAY
-;;; * (*)) (NOT (SIMPLE-ARRAY * (*)))) objects.
-(deftransform elt ((s i) ((simple-array * (*)) t) *)
+;;; Arrays with a fill-pointer check bounds differently in ELT.
+(deftransform elt ((s i) (simple-array t) *)
   '(aref s i))
 
 (deftransform elt ((s i) (list t) * :policy (< safety 3))
+  (when (eql (lvar-type s) (specifier-type 'null))
+    (give-up-ir1-transform))
   '(nth i s))
 
 (deftransform %setelt ((s i v) ((simple-array * (*)) t t) *)
