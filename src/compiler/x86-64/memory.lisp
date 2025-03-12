@@ -18,6 +18,13 @@
                  (+ nil-value (static-symbol-offset symbol) offset)
                  (make-fixup symbol :immobile-symbol offset)))))
 
+(defun mark-gc-card (addr-or-card-index &optional (compute t))
+  (when compute
+    (inst shr addr-or-card-index gencgc-card-shift)
+    ;; :DWORD suffices because gc_allocate_ptes() asserts mask to be < 32 bits
+    (inst and :dword addr-or-card-index card-index-mask))
+  (inst mov :byte (ea gc-card-table-reg-tn addr-or-card-index) CARD-MARKED))
+
 ;;; TODOs:
 ;;; 1. Sometimes people write constructors like
 ;;;     (defun make-foo (&key a b c)
@@ -45,17 +52,7 @@
                (inst lea scratch-reg cell-address)
                ;; OBJECT could be a symbol in immobile space
                (inst mov scratch-reg (encode-value-if-immediate object)))
-           (inst shr scratch-reg gencgc-card-shift)
-           ;; gc_allocate_ptes() asserts mask to be < 32 bits, which is hugely generous.
-           (inst and :dword scratch-reg card-index-mask)
-           ;; I wanted to use thread-tn as the source of the store, but it isn't 256-byte-aligned
-           ;; due to presence of negatively indexed thread header slots.
-           ;; Probably word-alignment is enough, because we can just check the lowest bit,
-           ;; borrowing upon the idea from PSEUDO-ATOMIC which uses RBP-TN as the source.
-           ;; I'd like to measure to see if using a register is actually better.
-           ;; If all threads store 0, it might be easier on the CPU's store buffer.
-           ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
-           (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
+           (mark-gc-card scratch-reg))
           #+debug-gc-barriers
           (t
            (flet ((encode (x)
@@ -82,9 +79,7 @@
 #-soft-card-marks
 (defun emit-code-page-gengc-barrier (object scratch-reg)
   (inst mov scratch-reg object)
-  (inst shr scratch-reg gencgc-card-shift)
-  (inst and :dword scratch-reg card-index-mask)
-  (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) CARD-MARKED))
+  (mark-gc-card scratch-reg))
 
 (defun emit-store (ea value val-temp &optional (tag-immediate t))
   (sc-case value

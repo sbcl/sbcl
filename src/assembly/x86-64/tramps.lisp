@@ -237,9 +237,7 @@
         (inst jmp store))
       TRY-DYNAMIC-SPACE
       (inst mov rax object)
-      (inst shr rax gencgc-card-shift)
-      (inst and :dword rax card-index-mask)
-      (inst mov :byte (ea gc-card-table-reg-tn rax) CARD-MARKED)
+      (mark-gc-card rax)
       STORE
       (inst mov rdi object)
       (inst mov rdx word-index)

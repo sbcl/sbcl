@@ -56,7 +56,7 @@
     (inst and :dword card-index card-index-mask)
     (inst and :dword end-card-index card-index-mask)
     (emit-label LOOP)
-    (inst mov :byte (ea gc-card-table-reg-tn card-index) CARD-MARKED) ; mark one card
+    (mark-gc-card card-index nil) ; NIL = already shifted + masked
     (inst cmp card-index end-card-index)
     (inst jmp :e DONE-CARD-MARKING)
     (inst inc :dword card-index)
