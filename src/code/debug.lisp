@@ -819,8 +819,6 @@ information."
 
 ;;;; frame printing
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This is a convenient way to express what to do for each type of
 ;;; lambda-list element.
 (sb-xc:defmacro lambda-list-element-dispatch (element
@@ -852,12 +850,21 @@ information."
               ,valid)
              (t ,other)))))
 
-) ; EVAL-WHEN
+(defun frame-arg-count (frame)
+  (let ((debug-fun (sb-di:frame-debug-fun frame)))
+    (when (eq (sb-di:debug-fun-kind debug-fun) :external)
+      (let ((first (car (sb-di:debug-fun-lambda-list debug-fun))))
+        (when (sb-di::compiled-debug-var-p first)
+          (let ((x (sb-di:debug-var-value first frame)))
+            (when (fixnump x)
+              (1+ x))))))))
 
 ;;; Extract the function argument values for a debug frame.
 (defun map-frame-args (thunk frame limit)
-  (unless (zerop limit)
-    (let ((debug-fun (sb-di:frame-debug-fun frame)))
+  (let* ((debug-fun (sb-di:frame-debug-fun frame))
+         (limit (or (frame-arg-count frame)
+                    limit)))
+    (unless (zerop limit)
       (dolist (element (sb-di:debug-fun-lambda-list debug-fun))
         (funcall thunk element)
         (when (zerop (decf limit))
@@ -900,7 +907,7 @@ information."
   (declare (type sb-di:frame frame)
            (type (and unsigned-byte fixnum) limit))
   ;;; All args are available if the function has not proceeded beyond its external
-  ;;; entry point, so every imcoming value is in its argument-passing location.
+  ;;; entry point, so every incoming value is in its argument-passing location.
   (when (sb-di::all-args-available-p frame)
     (return-from frame-args-as-list (early-frame-args frame limit)))
   (handler-case

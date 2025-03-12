@@ -2495,7 +2495,7 @@ register."
 ;;; Returns the value stored for DEBUG-VAR in frame. The value may be
 ;;; invalid. This is SETFable.
 (defun debug-var-value (debug-var frame)
-  (aver (typep frame 'compiled-frame))
+  (declare (compiled-frame frame))
   (let ((res (access-compiled-debug-var-slot debug-var frame)))
     (if (indirect-value-cell-p res)
         (value-cell-ref res)
@@ -2810,7 +2810,7 @@ register."
 ;;; it is an indirect value cell. This occurs when the variable is
 ;;; both closed over and set.
 (defun (setf debug-var-value) (new-value debug-var frame)
-  (aver (typep frame 'compiled-frame))
+  (declare (compiled-frame frame))
   (let ((old-value (access-compiled-debug-var-slot debug-var frame)))
     (if (indirect-value-cell-p old-value)
         (value-cell-set old-value new-value)

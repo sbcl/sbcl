@@ -672,7 +672,7 @@
                                 c
                                 (return (cdar (sb-debug:list-backtrace :count 1))))))
                (apply fun args))))
-      ((fun t) (list t *unavailable-argument* *unavailable-argument*) :test #'equalp)
-      ((fun t 1) (list t 1 *unavailable-argument*) :test #'equalp)
+      ((fun t) (list t) :test #'equalp)
+      ((fun t 1) (list t 1) :test #'equalp)
       ((fun t 1 2) (list t 1 2) :test #'equalp)
       ((fun 1 2 3) (values 1 2 3)))))
