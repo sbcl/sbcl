@@ -235,22 +235,34 @@
                              collect (cons ep n)
                              and do (setf previous-unused (eq ep main))
                              else if (and last more)
-                             collect (cons main (1+ n))))))
-       (flet ((make-args (n)
+                             collect (cons main (1+ n)))))
+            (optional-checked 0))
+       (flet ((check-types (n)
                 (loop for i below n
                       for temp in temps
                       for var in vars
                       for info = (lambda-var-arg-info var)
+                      for type = (and (>= i optional-checked)
+                                      (cond ((and info
+                                                  (eq (arg-info-kind info) :optional)
+                                                  (neq (leaf-defined-type var) *universal-type*))
+                                             ;; Don't delegate to propagate-to-args or
+                                             ;; it will check default values too, but
+                                             ;; FTYPEs are for calls and not definitions.
+                                             (leaf-defined-type var))
+                                            ((and (not info)
+                                                  (neq (leaf-type var) *universal-type*))
+                                             ;; Check required
+                                             ;; arguments here too, or
+                                             ;; each optional entry
+                                             ;; will be checking them
+                                             (leaf-type var))))
+                      when type
                       collect
-                      (if (and info (eq (arg-info-kind info) :optional)
-                               (neq (leaf-defined-type var) *universal-type*))
-                          ;; Don't delegate to to propagate-to-args or
-                          ;; it will check default values too, but
-                          ;; FTYPEs are for calls and not definitions.
-                          `(the* (,(leaf-defined-type var)
-                                  :context ,(lambda-var-%source-name var))
-                                 ,temp)
-                          temp))))
+                      `(the* (,type
+                              :context ,(lambda-var-%source-name var))
+                             ,temp)
+                      finally (setf optional-checked n))))
          `(lambda (,n-supplied ,@temps)
             (declare (type index ,n-supplied)
                      (ignorable ,n-supplied))
@@ -258,15 +270,18 @@
               ,@(loop for ((ep . n) . next) on used-eps
                       collect
                       (cond (next
-                             `((eq ,n-supplied ,n)
-                               (%funcall ,ep ,@(make-args n))))
+                             `((progn
+                                 ,@(check-types n)
+                                 (eq ,n-supplied ,n))
+                               (%funcall ,ep ,@(subseq temps 0 n))))
                             (more
                              (with-unique-names (n-context n-count)
                                `(t
+                                 ,@(check-types n)
                                  ,(if (= max n)
                                       `(multiple-value-bind (,n-context ,n-count)
                                            (%more-arg-context ,n-supplied ,max)
-                                         (%funcall ,more ,@(make-args n) ,n-context ,n-count))
+                                         (%funcall ,more ,@temps ,n-context ,n-count))
                                       ;; The &rest var is unused, call the main entry point directly
                                       `(%funcall ,ep
                                                  ,@(loop for supplied-p = nil
@@ -286,11 +301,12 @@
                                                                 (pop vars)))))))))
                             (t
                              `(t
-                               ;; Arg-checking is performed before this step,
+                               ,@(check-types n)
+                               ;; Arg-count checking is performed before this step,
                                ;; arranged by INIT-XEP-ENVIRONMENT,
                                ;; perform the last action unconditionally,
                                ;; and without this the function derived type will be bad.
-                               (%funcall ,ep ,@(make-args n)))))))))))))
+                               (%funcall ,ep ,@(subseq temps 0 n)))))))))))))
 
 (defun can-ignore-optional-ep (n vars keyp)
   (let ((var (loop with i = n
