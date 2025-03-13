@@ -718,31 +718,29 @@ during backtrace.
      (* 2 n-word-bytes)
      list-pointer-lowtag))
 
-;;; The definitions below want to use ALIGN-UP, which is not defined
-;;; in time to put these in early-objdef, but it turns out that we don't
-;;; need them there.
-(#-relocatable-static-space defconstant #+relocatable-static-space define-symbol-macro nil-value (+ static-space-start nil-value-offset))
+(#+relocatable-static-space define-symbol-macro
+ #-relocatable-static-space defconstant nil-value (+ static-space-start nil-value-offset))
 
 #+sb-xc-host (defun get-nil-taggedptr () nil-value)
 
 ;;; Start of static objects:
 ;;;
-;;;   32-bit w/threads     |   32-bit no threads     |      64-bit
-;;;  --------------------  | --------------------    | ---------------------
-;;;       padding          |      padding            |      padding
-;;;  NIL: header (#x07__)  | NIL: header (#x06__)    | NIL: header (#x05__)
-;;;       hash             |      hash               |      hash
-;;;       value            |      value              |      value
-;;;       info             |      info               |      info
-;;;       name             |      name               |      name
-;;;       fdefn            |      fdefn              |      fdefn
-;;;       package          |      package            |      (unused)
-;;;       tls_index        |   T: header             |   T: header
-;;;       (unused)         |                         |
-;;;    T: header           |                         |
-;;;  -------------------   | --------------------    | ---------------------
-;;;    SYMBOL_SIZE=8       |   SYMBOL_SIZE=7         |   SYMBOL_SIZE=6
-;;;    NIL is 10 words     |   NIL is 8 words        |   NIL is 8 words
+;;;   32-bit w/threads  |   32-bit no threads  |      64-bit
+;;;  ------------------ | -------------------- | ------------- |
+;;;       padding       |      padding         |     padding   |
+;;;       header        |      header          |     header    | <-- start of NIL-as-symbol
+;;;       hash          |      hash            |     hash      | <-- start of NIL-as-cons
+;;;       value         |      value           |     value     |
+;;;       info          |      info            |     info      |
+;;;       name          |      name            |     name      |
+;;;       fdefn         |      fdefn           |     fdefn     |
+;;;       package       |      package         |     (unused)  |
+;;;       tls_index     |   T: header          |  T: header    |
+;;;       (unused)      |                      |               |
+;;;    T: header        |                      |               |
+;;;  ------------------ | -------------------- | ---------------
+;;;    SYMBOL_SIZE=8    |   SYMBOL_SIZE=7      | SYMBOL_SIZE=6
+;;;    NIL is 10 words  |   NIL is 8 words     | NIL is 8 words
 
 ;;; This constant is the address at which to scan NIL as a root.
 ;;; To ensure that scav_symbol is invoked, we have to see the widetag
@@ -753,23 +751,13 @@ during backtrace.
 (defconstant nil-symbol-slots-offset
   (- nil-value-offset list-pointer-lowtag n-word-bytes))
 
-;;; NIL as a symbol contains the usual number of words for a symbol,
-;;; aligned to a double-lispword. This will NOT end at a double-lispword boundary.
-;;; In all 3 scenarios depicted above, the number of slots that the 'scav' function
-;;; returns suggests that it would examine the header word of the *next* symbol.
-;;; But it does not, because it confines itself to looking only at the number of
-;;; words indicated in the symbol header of NIL. But we have to pass in the aligned
-;;; count because of the assertion in heap_scavenge that the scan ends as expected,
-;;; and scavenge methods must return an even number because nothing can be smaller
-;;; than 1 cons cell or not a multiple thereof.
-(defconstant nil-symbol-slots-end-offset
-  (+ nil-symbol-slots-offset
-     (ash (align-up symbol-size 2) word-shift)))
+;;; The definitions below use ALIGN-UP which is not defined in time to put these
+;;; in early-objdef, but it turns out that we don't need them there.
 
 ;;; This constant is the number of words to report that NIL consumes
 ;;; when Lisp asks for its primitive-object-size. So we say that it consumes
 ;;; all words from the start of static-space objects up to the next object.
-(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- symbol-size) 2)))
+(defconstant sizeof-nil-in-words (+ 2 (align-up (1- symbol-size) 2)))
 
 ;;; Address at which to start scanning static symbols when heap-walking.
 ;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.
