@@ -1610,10 +1610,9 @@ bootstrapping.
         ,(not (null rest-arg))
         :required-args ,args
         :rest-arg ,(when rest-arg (list rest-arg)))
-       (call-no-next-method ',method-cell
-                            ,@args
-                            ,@(when rest-arg
-                                    `(,rest-arg)))))
+       ,(if rest-arg
+            `(apply #'call-no-next-method ',method-cell ,@args ,rest-arg)
+            `(call-no-next-method ',method-cell ,@args))))
 
 (defmacro bind-fast-lexical-method-functions
     ((args rest-arg next-method-call (&key
