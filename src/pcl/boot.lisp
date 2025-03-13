@@ -1272,7 +1272,9 @@ bootstrapping.
                                           rest-arg
                                           &rest lmf-options)
                                          &body body)
-  `(bind-fast-lexical-method-functions (,args ,rest-arg ,next-method-call ,lmf-options)
+  `(bind-fast-lexical-method-functions (,args ,rest-arg ,next-method-call 
+                                        (,@lmf-options
+                                         :no-optionals ,(= (length args) (length lambda-list))))
      (bind-args (,(nthcdr (length args) lambda-list) ,rest-arg)
        ,@body)))
 
@@ -1620,7 +1622,8 @@ bootstrapping.
                                       setq-p
                                       parameters-setqd
                                       method-cell
-                                      applyp))
+                                      applyp
+                                      no-optionals))
      &body body
      &environment env)
   (let* ((next-method-p-def
@@ -1649,15 +1652,18 @@ bootstrapping.
                                                         ,next-method-call
                                                         ,rest-arg)
                                                        ,method-cell))
-                         (call-next-method-n (,@cnm-req-args &rest cnm-args)
-                            (declare (dynamic-extent cnm-args)
+                         (call-next-method-n (,@cnm-req-args ,@(unless no-optionals
+                                                                 `(&rest cnm-args)))
+                            (declare ,@(unless no-optionals
+                                         `((dynamic-extent cnm-args)))
                                      (muffle-conditions code-deletion-note)
                                      (optimize (sb-c:insert-step-conditions 0)))
                             ,@(when (safe-code-p env)
                                 `((%check-cnm-args (list ,@cnm-req-args) (list ,@args) ',method-cell)))
                             (fast-call-next-method-body (,cnm-req-args
                                                          ,next-method-call
-                                                         cnm-args)
+                                                         ,(unless no-optionals
+                                                            'cnm-args))
                                                         ,method-cell)))))
                 ,@next-method-p-def)
            (declare (ignorable #'next-method-p))
