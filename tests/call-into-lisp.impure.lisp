@@ -61,7 +61,8 @@
      ;; Making room for 3 args aligns the stack to a 16-byte boundary
      ;; presuming it was at CALL to me. Darwin requires the alignment, others don't care.
      `((sub ,rsp-tn 24)
-       (mov :qword ,(ea 16 rsp-tn) ,(get-lisp-obj-address T))
+       (mov ,rdi-tn ,(get-lisp-obj-address T)) ; in case T is above #x7fffffff
+       (mov :qword ,(ea 16 rsp-tn) ,rdi-tn)
        (mov :qword ,(ea  8 rsp-tn) ,(fixnumize 311))
        (mov :qword ,(ea  0 rsp-tn) ,(get-lisp-obj-address #\A))
        (mov ,rdi-tn ,(get-lisp-obj-address #'monkeybiz)) ; C arg 0 = Lisp function
