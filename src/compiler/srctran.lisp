@@ -6922,8 +6922,7 @@
               node))))
        (go :next))))
 
-(defun next-node (node-or-block &key type (cast t) single-predecessor
-                                     strict)
+(defun next-node (node-or-block &key type single-predecessor strict)
   (let ((node node-or-block)
         ctran)
     (tagbody
@@ -6941,10 +6940,6 @@
               (typecase node
                 (ref (unless (eq type :non-ref)
                        (return-from next-node node)))
-                (cast
-                 (when (or strict
-                           (not cast))
-                   (return-from next-node node)))
                 (enclose
                  (when strict
                    (return-from next-node node)))

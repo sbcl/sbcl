@@ -1272,7 +1272,7 @@ bootstrapping.
                                           rest-arg
                                           &rest lmf-options)
                                          &body body)
-  `(bind-fast-lexical-method-functions (,args ,rest-arg ,next-method-call 
+  `(bind-fast-lexical-method-functions (,args ,rest-arg ,next-method-call
                                         (,@lmf-options
                                          :no-optionals ,(= (length args) (length lambda-list))))
      (bind-args (,(nthcdr (length args) lambda-list) ,rest-arg)
