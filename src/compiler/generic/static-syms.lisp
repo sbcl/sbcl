@@ -32,6 +32,7 @@
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 #-linkage-space
+(progn
 (defun static-fdefn-offset (name)
   (let ((static-fun-index (position name +all-static-fdefns+)))
     (and static-fun-index
@@ -42,4 +43,10 @@
             (* (1+ (logior (1+ instance-data-start) 1)) n-word-bytes)
             (- list-pointer-lowtag)
             (* static-fun-index (pad-data-block fdefn-size))
-            other-pointer-lowtag)))))
+            other-pointer-lowtag))))
+;;; Return the (byte) offset from NIL to the raw-addr slot of the
+;;; fdefn object for the static function NAME.
+(defun static-fun-offset (name)
+  (+ (static-fdefn-offset name)
+     (- other-pointer-lowtag)
+     (* fdefn-raw-addr-slot n-word-bytes)))))

@@ -34,11 +34,11 @@
 
 ;;;; routines for dealing with static symbols
 
-;;; the byte offset of the static symbol SYMBOL
+;;; the distance from tagged ptr to NIL to tagged ptr to static SYMBOL, in bytes
 (defun static-symbol-offset (symbol)
   (if symbol
-      ;; This predicate returns a generalized boolean, integer indicating truth
-      ;; and also the index, or T if the argument is NIL, or NIL if non-static.
+      ;; STATIC-SYMBOL-P returns a generalized boolean: an integer indicating
+      ;; the index, or T if the argument is NIL, or NIL if non-static.
       (let ((posn (static-symbol-p symbol)))
         (unless posn (error "~S is not a static symbol." symbol))
         (+ (* posn (pad-data-block symbol-size))
@@ -59,15 +59,6 @@
   (ecase alien-linkage-table-growth-direction
     (:up   (floor (- addr alien-linkage-space-start) alien-linkage-table-entry-size))
     (:down (1- (floor (- space-end addr) space-end))))))
-
-;;; Return the (byte) offset from NIL to the raw-addr slot of the
-;;; fdefn object for the static function NAME.
-(defun static-fun-offset (name)
-  #+linkage-space (error "Can't compute static-fun-offset to ~S" name)
-  #-linkage-space
-  (+ (static-fdefn-offset name)
-     (- other-pointer-lowtag)
-     (* fdefn-raw-addr-slot n-word-bytes)))
 
 
 ;;;; interfaces to IR2 conversion
