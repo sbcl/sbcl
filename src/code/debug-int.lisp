@@ -2484,14 +2484,6 @@ register."
           (intern (debug-var-name debug-var) package))
         (make-symbol (debug-var-name debug-var)))))
 
-;;; Return the value stored for DEBUG-VAR in frame, or if the value is
-;;; not :VALID, then signal an INVALID-VALUE error.
-(defun debug-var-valid-value (debug-var frame)
-  (unless (eq (debug-var-validity debug-var (frame-code-location frame))
-              :valid)
-    (error 'invalid-value :debug-var debug-var :frame frame))
-  (debug-var-value debug-var frame))
-
 ;;; Returns the value stored for DEBUG-VAR in frame. The value may be
 ;;; invalid. This is SETFable.
 (defun debug-var-value (debug-var frame)
