@@ -662,21 +662,6 @@ void calc_immobile_space_bounds()
 }
 #endif
 
-__attribute__((unused)) static void check_dynamic_space_addr_ok(uword_t start, uword_t size)
-{
-#ifdef LISP_FEATURE_64_BIT // don't want a -Woverflow warning on 32-bit
-    uword_t end_word_addr = start + size - N_WORD_BYTES;
-    // Word-aligned pointers can't address more than 48 significant bits for now.
-    // If you want to lift that restriction, look at how SYMBOL-PACKAGE and
-    // SYMBOL-NAME are combined into one lispword.
-    uword_t unaddressable_bits = 0xFFFF000000000000;
-    if ((start & unaddressable_bits) || (end_word_addr & unaddressable_bits))
-        lose("Panic! This version of SBCL can not address memory\n"
-             "in the range %p:%p given by the OS.\nPlease report this as a bug.",
-             (void*)start, (void*)(start + size));
-#endif
-}
-
 #ifdef LISP_FEATURE_LINKAGE_SPACE
 #define LISP_LINKAGE_SPACE_SIZE (1<<(N_LINKAGE_INDEX_BITS+WORD_SHIFT))
 #endif
@@ -868,7 +853,6 @@ process_directory(int count, struct ndir_entry *entry,
                     dynamic_space_size -= GENCGC_PAGE_BYTES, --page_table_pages;
                 gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
                 DYNAMIC_SPACE_START = addr = aligned_start;
-                check_dynamic_space_addr_ok(addr, dynamic_space_size);
                 }
                 break;
             }
