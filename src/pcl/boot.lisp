@@ -1311,7 +1311,12 @@ bootstrapping.
                                   (or cnm-args ,method-args))))))
                 (next-method-p () (not (null .next-method.))))
            (declare (ignorable #'next-method-p))
-           ,@body))))
+           ;; Compatibility with fast-lexical-method-functions
+           (macrolet ((call-next-method-n (&rest args)
+                        `(call-next-method ,@args))
+                      (call-next-method-0 ()
+                        `(call-next-method)))
+             ,@body)))))
 
 (defun call-no-next-method (method-cell &rest args)
   (let ((method (car method-cell)))
@@ -1598,22 +1603,13 @@ bootstrapping.
      (apply emf args))))
 
 
-(defmacro fast-call-next-method-body ((args next-method-call rest-arg)
-                                      method-cell
-                                      cnm-args)
+(defmacro fast-call-next-method-body ((args next-method-call rest-arg) method-cell)
   `(if ,next-method-call
-       ,(let ((call `(invoke-narrow-effective-method-function
-                      ,next-method-call
-                      ,(not (null rest-arg))
-                      :required-args ,args
-                      :rest-arg ,(when rest-arg (list rest-arg)))))
-             `(if ,cnm-args
-                  (bind-args ((,@args
-                               ,@(when rest-arg
-                                       `(&rest ,rest-arg)))
-                              ,cnm-args)
-                    ,call)
-                  ,call))
+       (invoke-narrow-effective-method-function
+        ,next-method-call
+        ,(not (null rest-arg))
+        :required-args ,args
+        :rest-arg ,(when rest-arg (list rest-arg)))
        (call-no-next-method ',method-cell
                             ,@args
                             ,@(when rest-arg
@@ -1638,20 +1634,32 @@ bootstrapping.
         `(flet ,next-method-p-def
            (declare (ignorable #'next-method-p))
            ,@body)
-        `(flet (,@(when call-next-method-p
-                    `((call-next-method (&rest cnm-args)
-                        (declare (dynamic-extent cnm-args)
-                                 (muffle-conditions code-deletion-note)
-                                 (optimize (sb-c:insert-step-conditions 0)))
-                        ,@(if (safe-code-p env)
-                              `((%check-cnm-args cnm-args (list ,@args)
-                                                 ',method-cell))
-                              nil)
-                        (fast-call-next-method-body (,args
-                                                     ,next-method-call
-                                                     ,rest-arg)
-                            ,method-cell
-                            cnm-args))))
+        `(labels (,@(when call-next-method-p
+                      (let ((cnm-req-args (make-gensym-list (length args))))
+                       `((call-next-method (&rest cnm-args)
+                           (declare (dynamic-extent cnm-args)
+                                    (muffle-conditions code-deletion-note)
+                                    (optimize (sb-c:insert-step-conditions 0)))
+                           (if cnm-args
+                               (apply #'call-next-method-n cnm-args)
+                               (call-next-method-0)))
+                         (call-next-method-0 ()
+                           (declare (muffle-conditions code-deletion-note)
+                                    (optimize (sb-c:insert-step-conditions 0)))
+                           (fast-call-next-method-body (,args
+                                                        ,next-method-call
+                                                        ,rest-arg)
+                                                       ,method-cell))
+                         (call-next-method-n (,@cnm-req-args &rest cnm-args)
+                            (declare (dynamic-extent cnm-args)
+                                     (muffle-conditions code-deletion-note)
+                                     (optimize (sb-c:insert-step-conditions 0)))
+                            ,@(when (safe-code-p env)
+                                `((%check-cnm-args (list ,@cnm-req-args) (list ,@args) ',method-cell)))
+                            (fast-call-next-method-body (,cnm-req-args
+                                                         ,next-method-call
+                                                         cnm-args)
+                                                        ,method-cell)))))
                 ,@next-method-p-def)
            (declare (ignorable #'next-method-p))
            (let ,rebindings
@@ -1776,7 +1784,9 @@ bootstrapping.
                     ;; hierarchy: nil -> :simple -> T.
                     (unless (eq call-next-method-p t)
                       (setq call-next-method-p (if (cdr form) t :simple)))
-                    form)
+                (if (cdr form)
+                    `(call-next-method-n ,@(cdr form))
+                    `(call-next-method-0)))
                (function
                 (when (equal (cdr form) '(call-next-method))
                   (setq call-next-method-p t))
