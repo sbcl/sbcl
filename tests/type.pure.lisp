@@ -528,15 +528,6 @@
                        sb-vm:*specialized-array-element-type-properties*))))
     (assert-tri-eq t t (subtypep 'array u))))
 
-(with-test (:name :bug-1258716)
-  (let ((intersection (sb-kernel:type-intersection
-                       (sb-kernel:specifier-type 'simple-vector)
-                       (sb-kernel:specifier-type `(vector #:unknown)))))
-    (assert (sb-kernel:array-type-p intersection))
-    ;; and not *wild-type*
-    (assert (sb-kernel:type= (sb-kernel:array-type-specialized-element-type intersection)
-                             sb-kernel:*universal-type*))))
-
 (with-test (:name :parse-safely)
   (dolist (x '(array integer cons))
     (assert (handler-case (sb-kernel:specifier-type `(,x . 0))
@@ -1089,7 +1080,8 @@
   (assert (eql (specifier-type '(not (and base-string (not simple-array))))
                (specifier-type '(or (not base-string) simple-base-string))))
   (assert (eql (specifier-type '(and (array cons) (array number)))
-               (specifier-type '(array t)))))
+               (specifier-type '(array t))))
+  (assert (sb-kernel:intersection-type-p (specifier-type '(and (vector unknown) bit-vector)))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql

@@ -3476,8 +3476,21 @@ expansion happened."
              (stype2 (array-type-specialized-element-type type2))
              (specialized-element-type
                (cond
-                 ((eq stype1 *wild-type*) stype2)
-                 ((eq stype2 *wild-type*) stype1)
+                 ((eq stype1 *wild-type*)
+                  ;; Don't create intersections with unknown element-types
+                  (when (and (not use-specialized)
+                             (not (or (eq eltype1 *wild-type*)
+                                      (eq eltype2 *wild-type*)
+                                      (type= eltype1 eltype2))))
+                    (return-from array-intersection))
+                  stype2)
+                 ((eq stype2 *wild-type*)
+                  (when (and (not use-specialized)
+                             (not (or (eq eltype1 *wild-type*)
+                                      (eq eltype2 *wild-type*)
+                                      (type= eltype1 eltype2))))
+                    (return-from array-intersection))
+                  stype1)
                  (t
                   (aver (type= stype1 stype2))
                   stype1))))
@@ -3490,7 +3503,8 @@ expansion happened."
                          :element-type (cond
                                          (use-specialized
                                           specialized-element-type)
-                                         ((eq eltype1 *wild-type*) eltype2)
+                                         ((eq eltype1 *wild-type*)
+                                          eltype2)
                                          ((eq eltype2 *wild-type*) eltype1)
                                          (t (let ((int (type-intersection eltype1 eltype2)))
                                               (if (eq int *empty-type*)
@@ -3544,11 +3558,9 @@ expansion happened."
                                                 not-d))))
                         (unless (equal maybe-new-dim not-dim)
                           (setf new-dim maybe-new-dim))))))
-             (when (and (neq et *wild-type*)
-                        (eq not-et *wild-type*))
-               (setf new-et et))
              (cond ((and (neq sp-et *wild-type*)
-                         (eq not-sp-et *wild-type*))
+                         (eq not-sp-et *wild-type*)
+                         (eq not-et *wild-type*))
                     (setf new-sp-et sp-et))
                    ((and (eql sp-et not-sp-et)
                          (not (eql et not-et))
