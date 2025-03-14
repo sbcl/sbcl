@@ -1416,7 +1416,7 @@
     (let ((var (find-in-bindings vars name)))
       (cond
         ((not var)
-         (warn "No ~s variable" name))
+         (style-warn "No ~s variable" name))
         (t
          (setf (lambda-var-no-debug var) t))))))
 
