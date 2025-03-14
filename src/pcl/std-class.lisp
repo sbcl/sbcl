@@ -1752,9 +1752,6 @@
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.
-    ;; All uses of %CHANGE-CLASS are under the world lock, but that doesn't
-    ;; preclude user code operating on the old slots + new layout or v.v.
-    ;; Users need to synchronize their own access when changing class.
     (replace-wrapper-and-slots copy old-wrapper old-slots)
     (replace-wrapper-and-slots instance new-wrapper new-slots)
 
@@ -1800,10 +1797,9 @@
                 ,@body)))
 (defmethod change-class ((instance standard-object) (new-class standard-class)
                          &rest initargs)
-  (with-world-lock ()
-    (check-new-class-not-metaobject new-class)
-    (with-temporary-instance (temp)
-      (%change-class temp instance new-class initargs))))
+  (check-new-class-not-metaobject new-class)
+  (with-temporary-instance (temp)
+    (%change-class temp instance new-class initargs)))
 
 (defmethod change-class ((instance forward-referenced-class)
                          (new-class standard-class) &rest initargs)
@@ -1838,10 +1834,9 @@
 (defmethod change-class ((instance funcallable-standard-object)
                          (new-class funcallable-standard-class)
                          &rest initargs)
-  (with-world-lock ()
-    (check-new-class-not-metaobject new-class)
-    (with-temporary-funinstance (temp)
-      (%change-class temp instance new-class initargs)))))
+  (check-new-class-not-metaobject new-class)
+  (with-temporary-funinstance (temp)
+    (%change-class temp instance new-class initargs))))
 
 (defmethod change-class ((instance standard-object)
                          (new-class funcallable-standard-class)
