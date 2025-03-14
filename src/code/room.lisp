@@ -1523,6 +1523,37 @@ We could try a few things to mitigate this:
                       (= (ldb (byte 2 8) (instance-header-word obj)) 1))
              (format t "~x ~s~%" (get-lisp-obj-address obj) obj))))))
 
+#+sb-thread
+(defun show-all-tls-indexed-symbols ()
+  ;; *FREE-TLS-INDEX* is funky -
+  ;; Shifting turns it from a pointer into a count, taking into consideration
+  ;; that it's not really a tagged fixnum as stored, but only looks that way.
+  (let ((used (make-array (ash *free-tls-index*
+                               (- (- word-shift n-fixnum-tag-bits)))
+                          :element-type 'bit :initial-element 0))
+        (result))
+    (map-allocated-objects
+     (lambda (obj widetag size)
+       (declare (ignore size))
+       (when (= widetag symbol-widetag)
+         (let ((index (symbol-tls-index obj)))
+           (when (plusp index)
+             (push (cons index obj) result)
+             (setf (bit used (ash index (- word-shift))) 1)))))
+     :all)
+    (dolist (x (sort result #'< :key 'car))
+      (format t "~5x ~s~%" (car x) (cdr x)))
+    (format t "Wasted indices:~%")
+    (let ((n 0))
+      (loop for i from thread-lisp-thread-slot below (length used)
+            do (when (zerop (bit used i))
+                 (format t " ~5x" i)
+                 (incf n)
+                 (when (= n 10) ; print this many per line
+                   (terpri)
+                   (setq n 0)))))
+    (terpri)))
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-patch-points into the weak hash-table.
