@@ -2802,3 +2802,30 @@ mechanism for inter-thread communication."
                   tot-bytes-unboxed tot-bytes-boxed
                   (/ tot-bytes-unboxed tot-bytes)
                   (/ tot-bytes-boxed tot-bytes)))))))
+
+(defun show-thread-tlabs (&optional (thread *current-thread*) (stream *standard-output*))
+  (declare (type (or (eql :all) thread) thread))
+  (when (eq thread :all)
+    (return-from show-thread-tlabs
+      (avltree-filter
+       (lambda (node &aux (thread (avlnode-data node)))
+         (write-string "Thr ")
+         (sb-impl::%output-integer-in-base (thread-primitive-thread thread) 16 stream)
+         (show-thread-tlabs thread stream)
+         (awhen (thread-name thread) (write-string it))
+         (terpri)
+         nil)
+       *all-threads*)))
+  (flet ((show (label slot)
+           (write-string label stream)
+           (loop for i from slot repeat 3
+                 do (let ((val (sap-int (sb-vm::current-thread-offset-sap i))))
+                      (when (> i slot) (write-char #\space stream))
+                      (sb-impl::%output-integer-in-base val 16 stream)))
+           (write-char #\) stream)))
+    (show " usr=(mix=(" sb-vm::thread-mixed-tlab-slot)
+    (show " cons=(" sb-vm::thread-cons-tlab-slot)
+    (show ") sys=((" sb-vm::thread-sys-mixed-tlab-slot)
+    (show " (" sb-vm::thread-cons-tlab-slot)
+    (write-string ") "))
+  (values))

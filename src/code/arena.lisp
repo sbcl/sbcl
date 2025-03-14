@@ -25,7 +25,7 @@
 (defmacro arena-memblk-freeptr (memblk) `(sap-ref-sap ,memblk 0))
 (defmacro arena-memblk-limit (memblk) `(sap-ref-sap ,memblk ,(ash 1 word-shift)))
 (defmacro arena-memblk-next (memblk) `(sap-ref-sap ,memblk ,(ash 2 word-shift)))
-(defmacro arena-memblk-padword (memblk) `(sap-ref-sap ,memblk ,(ash 3 word-shift)))
+(defmacro arena-memblk-base (memblk) `(sap-ref-sap ,memblk ,(ash 3 word-shift)))
 
 (defmacro do-arena-blocks ((blkvar arena) &body body)
   ;; bind BLK to a SAP pointing to successive 'struct memblk' in arena

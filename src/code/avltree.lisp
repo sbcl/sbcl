@@ -185,6 +185,7 @@
     result))
 
 (defun avltree-filter (predicate tree)
+  (declare (dynamic-extent predicate))
   (let (result)
     (named-let recurse ((node tree))
       (when node

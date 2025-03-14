@@ -1461,25 +1461,29 @@ We could try a few things to mitigate this:
                      (type-of x)
                      (type-of pointee)))))))
 
-(macrolet ((aligned-base (blk)
-             `(align-up (sap-int (sap+ ,blk (* 4 n-word-bytes))) 4096)))
-(defun dump-arena-objects (arena &aux (tot-size 0))
+(defun print-arena-contents (arena)
   (do-arena-blocks (memblk arena)
-    (let ((from (aligned-base memblk))
-          (to (sap-int (arena-memblk-freeptr memblk))))
-      (format t "~&Memory block ~X..~X~%" from to)
+    (let ((base (sap-int (arena-memblk-base memblk)))
+          (free (arena-memblk-freeptr memblk))
+          (limit (arena-memblk-limit memblk)))
+      (format t "Memblk=~X Base=~X Freeptr=~X Limit=~x avail=~x~%"
+              (sap-int memblk) base (sap-int free) (sap-int limit) (sap- limit free))
       (map-objects-in-range
-       (lambda (obj type size)
-         (declare (ignore type))
-         (incf tot-size size)
-         (format t "~x ~s~%" (get-lisp-obj-address obj) (type-of obj)))
-       (%make-lisp-obj from)
-       (%make-lisp-obj to))))
-  tot-size)
+       (lambda (obj widetag size)
+         (let ((where (get-lisp-obj-address obj)))
+           (if (consp obj)
+               (format t " ~7x: (~x ~x)~%" where
+                       (get-lisp-obj-address (car obj))
+                       (get-lisp-obj-address (cdr obj)))
+               (format t " ~7x: ~x ~x~%" where widetag size))))
+       (%make-lisp-obj (sap-int (arena-memblk-base memblk)))
+       (%make-lisp-obj (sap-int (arena-memblk-freeptr memblk)))))))
+
 (defun arena-contents (arena)
   (let ((count 0))
+    ;; pass 1 - just count
     (do-arena-blocks (memblk arena)
-      (let ((base (aligned-base memblk))
+      (let ((base (sap-int (arena-memblk-base memblk)))
             (limit (sap-int (arena-memblk-freeptr memblk))))
         (map-objects-in-range
          (lambda (obj widetag size)
@@ -1487,10 +1491,11 @@ We could try a few things to mitigate this:
            (incf count))
          (%make-lisp-obj base)
          (%make-lisp-obj limit))))
+    ;; pass 2 - collect
     (let ((result (make-array count))
           (index 0))
       (do-arena-blocks (memblk arena)
-        (let ((base (aligned-base memblk))
+        (let ((base (sap-int (arena-memblk-base memblk)))
               (limit (sap-int (arena-memblk-freeptr memblk))))
           (map-objects-in-range
            (lambda (obj widetag size)
@@ -1499,7 +1504,7 @@ We could try a few things to mitigate this:
              (incf count))
            (%make-lisp-obj base)
            (%make-lisp-obj limit))))
-      result)))))
+      result))))
 
 (defun show-hashed-instances ()
   (flet ((foo (legend pred)
