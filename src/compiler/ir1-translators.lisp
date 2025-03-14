@@ -1114,7 +1114,7 @@ care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
 ;;; THE with some options for the CAST
-(def-ir1-translator the* (((value-type &key context silent-conflict
+(def-ir1-translator the* (((type &key context silent-conflict
                                        derive-type-only
                                        truly
                                        source-form
@@ -1122,9 +1122,16 @@ care."
                                        restart)
                            form)
                           start next result)
-  (let ((value-type (if (ctype-p value-type)
-                        value-type
-                        (values-specifier-type value-type)))
+  (let ((type (cond ((ctype-p type)
+                     type)
+                    ((compiler-values-specifier-type type))
+                    (t
+                     (ir1-convert start next result
+                                  `(progn
+                                     ,form
+                                     (error "Bad type specifier: ~a"
+                                            ',type)))
+                     (return-from ir1-convert-the*))))
         (*current-path* (if source-form
                             (ensure-source-path source-form)
                             (ensure-source-path form)))
@@ -1149,19 +1156,19 @@ care."
                                           (the (not exit) (car new-uses)))
                                          (t
                                           new-uses))
-                                   value-type)))))
+                                   type)))))
           (use-annotations
            (ir1-convert start next result form)
            (when result
              (add-annotation result
-                             (make-lvar-type-annotation :type value-type
+                             (make-lvar-type-annotation :type type
                                                         :source-path *current-path*
                                                         :context context))))
           (t
            (let* ((policy (lexenv-policy *lexenv*))
-                  (cast (the-in-policy value-type form (if truly
-                                                           **zero-typecheck-policy**
-                                                           policy)
+                  (cast (the-in-policy type form (if truly
+                                                     **zero-typecheck-policy**
+                                                     policy)
                                        start next result)))
              (when cast
                (setf (cast-context cast) context)
