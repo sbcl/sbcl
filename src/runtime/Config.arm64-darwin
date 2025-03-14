@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -g -Wall -fdollars-in-identifiers
+CFLAGS += -g -Wall -fdollars-in-identifiers -arch arm64
 
 OS_SRC = bsd-os.c arm64-bsd-os.c darwin-os.c arm64-darwin-os.c
 
@@ -36,7 +36,7 @@ endif
 ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
-LINKFLAGS += -dynamic -twolevel_namespace
+LINKFLAGS += -dynamic -twolevel_namespace -arch arm64
 
 CFLAGS += -fno-omit-frame-pointer
 DISABLE_PIE=no
