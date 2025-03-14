@@ -884,7 +884,7 @@
 ;;;; the effective-address (ea) structure
 (defstruct (ea (:constructor %ea (segment disp base index scale))
                (:copier nil))
-  (segment nil :type (member :cs :gs) :read-only t)
+  (segment nil :type (member :cs :fs :gs) :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
@@ -942,7 +942,7 @@
   (let ((seg :cs) disp)
     (let ((first (car args)))
       (case first
-        (:gs (setq seg first) (pop args))
+        ((:fs :gs) (setq seg first) (pop args))
         (:cs (pop args))))
     (let ((first (car args)))
       ;; Rather than checking explicitly for all the things that are legal to be
@@ -1280,6 +1280,8 @@
            (type (member :byte :word :dword :qword :do-not-set) operand-size))
   ;; Legacy prefixes are order-insensitive, but let's approximately match the
   ;; output of the system assembler for consistency's sake.
+  (when (and (ea-p thing) (eq (ea-segment thing) :fs))
+    (emit-byte segment #x64))
   (when (and (ea-p thing) (eq (ea-segment thing) :gs))
     (emit-byte segment #x65))
   (when (eq operand-size :word)
