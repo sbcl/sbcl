@@ -769,15 +769,16 @@
                           ((typep %typep %instance-typep)
                            (let ((type (second args)))
                              (when (constant-lvar-p type)
-                               (let ((val (lvar-value type)))
-                                 (add 'typep
-                                      (ok-lvar-lambda-var (first args) constraints)
-                                      (if (ctype-p val)
-                                          val
-                                          (let ((*compiler-error-context* node))
-                                           (specifier-type val)))
-                                      nil
-                                      (first args))))))
+                               (let* ((val (lvar-value type))
+                                      (ctype (if (ctype-p val)
+                                                 val
+                                                 (careful-specifier-type val))))
+                                 (when ctype
+                                   (add 'typep
+                                        (ok-lvar-lambda-var (first args) constraints)
+                                        ctype
+                                        nil
+                                        (first args)))))))
                           ((eq eql)
                            (let* ((arg1 (first args))
                                   (var1 (ok-lvar-lambda-var arg1 constraints))
