@@ -79,7 +79,7 @@
   ;; Handle the register arg cases.
   ZERO-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (inst mov rdx nil-value)
+  (inst mov rdx null-tn)
   (inst mov rdi rdx)
   (inst mov rsi rdx)
   (inst stc)
@@ -98,7 +98,7 @@
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (loadw rdx rsi -1)
   (loadw rdi rsi -2)
-  (inst mov rsi nil-value)
+  (inst mov rsi null-tn)
   (inst stc)
   (inst leave)
   (inst ret)
@@ -239,7 +239,7 @@
   (inst mov fun tmp) ; needed if the JMP invokes UNDEFINED-TRAMP
   (inst jmp (object-slot-ea tmp closure-fun-slot fun-pointer-lowtag))
   NOT-CALLABLE
-  (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
+  (inst cmp fun null-tn) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e UNDEFINED-TRAMP)
   ;; Not a symbol
   (inst pop (ea n-word-bytes rbp-tn))
@@ -456,7 +456,7 @@
       (pushw list cons-car-slot list-pointer-lowtag)
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (check DONE)
-      (inst cmp list nil-value)
+      (inst cmp list null-tn)
       (inst jmp :ne LOOP)
 
       DONE

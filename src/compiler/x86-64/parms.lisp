@@ -195,3 +195,7 @@
         simd-pack-256-ub8 simd-pack-256-ub16 simd-pack-256-ub32 simd-pack-256-ub64
         simd-pack-256-sb8 simd-pack-256-sb16 simd-pack-256-sb32 simd-pack-256-sb64)
     #'equalp))
+
+;;; This symbol-macro will be changed to something different after merging
+;;; the role of the GC card base register with a pointer to NIL.
+(define-symbol-macro null-tn nil-value)

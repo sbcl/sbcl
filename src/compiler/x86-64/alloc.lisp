@@ -335,20 +335,19 @@
         (funcall init)))))
 
 (defun list-ctor-push-elt (x scratch)
-  (multiple-value-bind (operand oversized)
+  (multiple-value-bind (operand loadp)
       (if (sc-is x immediate)
           (let ((bits (immediate-tn-repr x)))
             (values bits (typep bits '(and integer (not (signed-byte 32))))))
           (values x nil))
-    (inst push (cond ((not oversized) operand)
+    (inst push (cond ((not loadp) operand)
                      ((typep operand '(unsigned-byte 32))
                       ;; Do a 32-bit move to register, then push as 64 bits.
                       ;; A raw constant would need 8 bytes plus a 6-byte PUSH
                       ;; instruction, but this way encodes to 6 bytes in total.
                       (inst mov :dword scratch operand)
                       scratch)
-                     (t
-                      (constantize operand))))))
+                     (t (constantize operand))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
 
@@ -442,9 +441,11 @@
                 (inst sub rsp-tn 16)
                 (inst movaps (ea rsp-tn) xmmtemp))
                ((eq car cdr)
-                (let ((operand (if (or car-regp (typep car-val '(signed-byte 8)))
-                                   car-val
-                                   (progn (inst mov alloc car-val) alloc))))
+                (let ((operand (cond ((or car-regp (typep car-val '(signed-byte 8)))
+                                      car-val)
+                                     (t
+                                      (inst mov alloc car-val)
+                                      alloc))))
                   (inst push operand)
                   (inst push operand)))
                (t (list-ctor-push-elt cdr alloc)
@@ -573,7 +574,7 @@
   (:ignore car)
   (:policy :fast-safe)
   (:generator 0
-    (inst push nil-value)
+    (inst push null-tn)
     (inst lea result (ea (- list-pointer-lowtag n-word-bytes) rsp-tn))))
 
 ;;;; special-purpose inline allocators
@@ -869,7 +870,7 @@
                      (aver (/= (tn-value ,length) 0))
                      (* (tn-value ,length) n-word-bytes 2))
                     (t
-                     (inst mov result nil-value)
+                     (inst mov result null-tn)
                      (inst test ,length ,length)
                      (inst jmp :z done)
                      (inst lea ,answer
@@ -877,7 +878,7 @@
                                (ash 1 (1+ (- word-shift n-fixnum-tag-bits)))))
                      ,answer)))
            (test-for-empty-list (length)
-             `(progn (inst mov result nil-value)
+             `(progn (inst mov result null-tn)
                      (inst test ,length ,length)
                      (inst jmp :z done)
                      ,length))
@@ -918,7 +919,7 @@
         (storew next tail cons-cdr-slot list-pointer-lowtag)
         (inst cmp next limit)
         (inst jmp :ne loop)
-        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
+        (storew null-tn tail cons-cdr-slot list-pointer-lowtag))
       done))
 
   (define-vop (allocate-list-on-heap)
@@ -965,7 +966,7 @@
          (inst cmp next limit)
          (inst jmp :ne loop)
          ;; still pseudo-atomic
-         (storew nil-value tail cons-cdr-slot list-pointer-lowtag)
+         (storew null-tn tail cons-cdr-slot list-pointer-lowtag)
          ALLOC-DONE))
       done))) ; label needed by calc-size-in-bytes
 
@@ -1255,5 +1256,5 @@
        (inst or :byte result other-pointer-lowtag) ; make_lispobj()
        (inst jmp OUT)
        FAIL
-       (inst mov result nil-value)
+       (inst mov result null-tn)
        OUT)))

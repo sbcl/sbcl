@@ -86,7 +86,7 @@
 ;;;  50000108: 000000000000012D = package-id #x0001 | symbol-widetag
 ;;;  50000110: 0000000050000117 = NIL-VALUE
 ;;;  50000118: 0000000050000117
-      (inst cmp  object nil-value)
+      (inst cmp  object null-tn)
       (inst mov :byte rax sb-kernel::index-of-layout-for-NULL)
       (inst cmov :dword :ne rax object)
       (inst movzx '(:byte :dword) rax rax) ; same as "AND EAX,255" but shorter encoding

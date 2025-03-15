@@ -47,7 +47,7 @@
                 (or (eq name 'make-array)
                     (equal name '(setf %array-fill-pointer))))
            (when (eq name 'make-array) ; nullify the creating PC location
-             (inst mov :qword (object-slot-ea object 1 lowtag) nil-value))
+             (inst mov :qword (object-slot-ea object 1 lowtag) null-tn))
            (inst mov :dword (vector-len-ea object)
                  (or (encode-value-if-immediate value) value)))
           #-soft-card-marks
