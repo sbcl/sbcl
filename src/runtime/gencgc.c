@@ -4363,8 +4363,9 @@ void zero_all_free_ranges() /* called only by gc_and_save() */
 #endif
         memset(start, 0, page_end-start);
     }
-#ifndef LISP_FEATURE_SB_THREAD
+#if !defined LISP_FEATURE_X86_64 && !defined LISP_FEATURE_SB_THREAD
     // zero the allocation regions at the start of static-space
+    // (Note x86-64 uses alloc regions in 'struct thread' with or without #+sb-thread)
     // This gets a spurious warning:
     //   warning: 'memset' offset [0, 71] is out of the bounds [0, 0] [-Warray-bounds]
     // which 'volatile' works around.
