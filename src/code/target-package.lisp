@@ -2024,8 +2024,13 @@ PACKAGE."
   ;; internals. The difficulties are symmetrical, but solving the problem that occurs
   ;; hypothetically less often is better, as the solution involves consing.
   (labels
-      ((advance-from-state (bits &aux (cur-pkg
-                                       (truly-the package (car (pkg-iter-pkglist iter)))))
+      ((advance-from-state (bits &aux
+                                 (cur-pkg
+                                  (truly-the package
+                                   (or (car (pkg-iter-pkglist iter))
+                                       (load-time-value
+                                        (let ((st (make-symbol-table 0))) (%make-package st st))
+                                        t)))))
          ;; For most platforms, this CASE should become a jump-table, therefore the order
          ;; in which to test clauses is not as relevant as if may have once been.
          (case (logand bits #b11)
