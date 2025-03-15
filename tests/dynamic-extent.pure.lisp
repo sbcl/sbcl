@@ -1820,7 +1820,6 @@
   (let ((array (make-array 4)))
     (declare (dynamic-extent array))
     (assert (equalp (known-function-autodx-transform-2 array 3 '(1 2 3 4)) #(4 5 6 7)))
-    #+(or) ; appears to not work on some platforms for some reason?
     (assert-no-consing (known-function-autodx-transform-2 array 3 '(1 2 3 4)))))
 
 (defun auto-dx-cleaned-up-too-many-times (off array)
