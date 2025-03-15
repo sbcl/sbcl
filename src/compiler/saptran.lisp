@@ -43,7 +43,7 @@
 (defknown int-sap ((unsigned-byte #.sb-vm:n-machine-word-bits))
   system-area-pointer (movable flushable))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defun sb-vm::implements-cas-sap-ref (fun)
     ;; word-sized integers can be treated as signed or unsigned for CAS,
     ;; but smaller-than-word requires an explicit sign-extension step.
