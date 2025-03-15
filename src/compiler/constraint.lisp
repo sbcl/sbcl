@@ -922,14 +922,16 @@
                     (sb-xc:> (type-bound-number ref) (type-bound-number x))))))
     (let* ((x-bound (bound x))
            (y-bound (exclude (bound y)))
-           (new-bound (cond ((not x-bound)
-                             y-bound)
-                            ((not y-bound)
-                             x-bound)
-                            ((tighter-p y-bound x-bound)
-                             y-bound)
-                            (t
-                             x-bound))))
+           (new-bound (coerce-for-bound
+                       (cond ((not x-bound)
+                              y-bound)
+                             ((not y-bound)
+                              x-bound)
+                             ((tighter-p y-bound x-bound)
+                              y-bound)
+                             (t
+                              x-bound))
+                       (numeric-type-format x))))
       (if greater
           (modified-numeric-type x :low new-bound)
           (modified-numeric-type x :high new-bound)))))
