@@ -773,7 +773,8 @@
                                       (ctype (if (ctype-p val)
                                                  val
                                                  (careful-specifier-type val))))
-                                 (when ctype
+                                 (when (and ctype
+                                            (type-for-constraints-p ctype))
                                    (add 'typep
                                         (ok-lvar-lambda-var (first args) constraints)
                                         ctype
