@@ -2142,9 +2142,7 @@
              (values z)))))
      ((1) 0))))
 
-(with-test (:name :stack-allocated-vector-checks-overflow
-            ;; FIXME: no idea why we get a segfault on win32
-            :broken-on (or :sbcl :win32))
+(with-test (:name :stack-allocated-vector-checks-overflow)
   (checked-compile-and-assert
    (:optimize :safe)
    '(lambda ()

@@ -35,7 +35,7 @@
     (inst lea rsp-tn (if (integerp size)
                          (ea size rsp-tn)
                          (ea rsp-tn size)))
-    (inst jmp :be overflow)))
+    (inst jmp :le overflow)))
 
 (defun stack-allocation (size lowtag alloc-tn &optional known-alignedp)
   (aver (not (location= alloc-tn rsp-tn)))

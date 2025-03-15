@@ -27,7 +27,7 @@
               #+sb-thread :fs)
         ;; avoid clearing condition codes
         (inst lea esp-tn (make-ea :dword :base esp-tn :index size))
-        (inst jmp :be overflow)))
+        (inst jmp :le overflow)))
 
 ;;; Allocation within alloc_region (which is thread local) can be done
 ;;; inline.  If the alloc_region is overflown allocation is done by
