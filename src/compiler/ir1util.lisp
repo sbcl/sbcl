@@ -2242,7 +2242,8 @@
                         (not (and (valued-node-p node)
                                   (let ((dest (node-dest node)))
                                     (and dest
-                                         (node-to-be-deleted-p dest)
+                                         (or (not (node-prev dest))
+                                             (node-to-be-deleted-p dest))
                                          (node-source-inside-p node dest)))))
                         (visible-p path))
                    (push (cons path (node-lexenv node))
