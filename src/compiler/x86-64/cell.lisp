@@ -187,7 +187,7 @@
     (:generator 15
       (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop))
       (if (sc-is old immediate)
-          (inst mov rax (encode-value-if-immediate old))
+          (move-immediate rax (immediate-tn-repr old))
           (move rax old))
       (inst cmpxchg :lock (object-slot-ea symbol symbol-value-slot other-pointer-lowtag) new)
       (unless (policy node (= safety 0))

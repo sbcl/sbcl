@@ -93,7 +93,7 @@
                     (plausible-signed-imm32-operand-p bits))
                 (inst mov :qword ea it))
                (t
-                (inst mov val-temp bits)
+                (move-immediate val-temp bits)
                 (inst mov ea val-temp)))))
    (constant
       (inst mov val-temp value)
@@ -209,8 +209,8 @@
   ;; Heap allocation uses 0 since that costs nothing.
   ;; If the user wanted a specific value, it could have been explicitly given.
   (if (typep value 'sb-vm:word)
-       value
-       (case value
+      value
+      (case value
          (:unbound (unbound-marker-bits))
          ((nil) (bug "Should not see SPLAT NIL"))
          (t #+ubsan unwritten-vector-element-marker

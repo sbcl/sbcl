@@ -1025,18 +1025,15 @@
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg) :to :result
-                :load-if (or (and (sc-is value immediate)
-                                  (let ((bits (immediate-tn-repr value)))
-                                    (typep bits '(and integer (not (signed-byte 32))))))
-                             (sc-is value constant control-stack))))
+                :load-if (not (reg-or-legal-imm32-p value))))
   (:results (result :scs (descriptor-reg) :from :eval))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 10
-    (let ((value (encode-value-if-immediate value)))
-      (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
-                   (lambda ()
-                     (storew value result value-cell-value-slot other-pointer-lowtag))))))
+    (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
+      (lambda ()
+        (storew (encode-value-if-immediate value)
+                result value-cell-value-slot other-pointer-lowtag)))))
 
 ;;;; automatic allocators for primitive objects
 

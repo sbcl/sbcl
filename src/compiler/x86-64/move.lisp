@@ -61,6 +61,9 @@
   (typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup)))
 (defun cpu-immediate-tn-p (tn)
   (is-operand-immediate (immediate-tn-repr tn)))
+(defun reg-or-legal-imm32-p (tn)
+  (cond ((sc-is tn any-reg descriptor-reg) t)
+        ((sc-is tn immediate) (cpu-immediate-tn-p tn))))
 
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
@@ -137,7 +140,7 @@
       (sc-case y
         ((any-reg descriptor-reg)
          (if (sc-is x immediate)
-             (if (eql val 0) (zeroize y) (inst mov y val))
+             (if (eql val 0) (zeroize y) (move-immediate y val))
              (move y x)))
         ((control-stack)
          (if (= (tn-offset fp) rsp-offset)
