@@ -59,24 +59,14 @@
 ;;; An LVAR is live at the end iff it is live at any of blocks which
 ;;; BLOCK can transfer control to, or it is a stack lvar kept live
 ;;; within the extent of its cleanup. There are two kind of control
-;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.  We also
-;;; preserve any stack lvars on the stack when an lvar in a
-;;; PRESERVE-INFO set (representing a stack allocated object, not
-;;; necessarily a stack lvar) gets pushed on the stack. PUSHED does
-;;; not track this set because it only tracks stack lvars to make
-;;; liveness analysis feasible with conditional stack allocation. We
-;;; must do this because stack allocated objects can't move; object
-;;; identity must be preserved and we can't in general track all
-;;; references.
+;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
 (defun update-lvar-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
-         (original-start (ir2-block-start-stack 2block))
-         (end (ir2-block-end-stack 2block))
-         (new-end end))
+         (end (ir2-block-end-stack 2block)))
     (dolist (succ (block-succ block))
-      (setq new-end (merge-lvar-live-sets new-end
-                                          (ir2-block-start-stack (block-info succ)))))
+      (let ((succ-start (ir2-block-start-stack (block-info succ))))
+        (setq end (merge-lvar-live-sets end succ-start))))
     (do-nested-cleanups (cleanup block)
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
@@ -88,26 +78,20 @@
                   (next-stack (if exit-lvar
                                   (remove exit-lvar target-start-stack)
                                   target-start-stack)))
-             (setq new-end (merge-lvar-live-sets
-                            new-end next-stack)))))
+             (setq end (merge-lvar-live-sets end next-stack)))))
         (:dynamic-extent
-         (let* ((dynamic-extent (cleanup-mess-up cleanup))
-                (info (dynamic-extent-info dynamic-extent)))
+         (let ((info (dynamic-extent-info (cleanup-mess-up cleanup))))
            (when info
-             (pushnew info new-end))
-           (dolist (preserve (dynamic-extent-preserve-info dynamic-extent))
-             (when (memq preserve (ir2-block-stack-mess-up 2block))
-               (pushnew preserve new-end)))))))
+             (pushnew info end))))))
 
-    (setf (ir2-block-end-stack 2block) new-end)
+    (setf (ir2-block-end-stack 2block) end)
 
-    (let ((start new-end))
-      (setq start (set-difference start (ir2-block-pushed 2block)))
-      (setq start (merge-lvar-live-sets start (ir2-block-popped 2block)))
-
+    (let ((start (merge-lvar-live-sets
+                  (set-difference end (ir2-block-pushed 2block))
+                  (ir2-block-popped 2block))))
       (when *check-consistency*
-        (aver (subsetp original-start start)))
-      (cond ((subsetp start original-start)
+        (aver (subsetp (ir2-block-start-stack 2block) start)))
+      (cond ((subsetp start (ir2-block-start-stack 2block))
              nil)
             (t
              (setf (ir2-block-start-stack 2block) start)
@@ -165,6 +149,72 @@
 
   (values))
 
+;;; Change the dynamic extent of the values in the OLD dynamic extent
+;;; to the NEW dynamic extent.
+(defun change-dynamic-extent (old new)
+  (declare (cdynamic-extent old new))
+  (dolist (value (dynamic-extent-values old))
+    (pushnew value (dynamic-extent-values new))
+    (setf (lvar-dynamic-extent value) new))
+  (setf (dynamic-extent-values old) nil)
+  (setf (dynamic-extent-info old) nil))
+
+;;; For any object during whose dynamic extent another object is stack
+;;; allocated with a longer dynamic extent, change the object's
+;;; dynamic extent to the longer dynamic extent. We detect this by
+;;; checking whether the cleanup of the dynamic extent of each node in
+;;; BLOCK is associated with contains the cleanup at the end of
+;;; BLOCK. If not, then the dynamic extent of all objects still in
+;;; scope at the end of BLOCK must be changed. We must do this because
+;;; stack allocated objects can't move; object identity must be
+;;; preserved and we can't in general track all references.
+(defun maybe-extend-dynamic-extents (block)
+  (declare (type cblock block))
+  (let ((block-end-cleanup (block-end-cleanup block))
+        (did-something nil))
+    (do-nodes-backwards (node lvar block)
+      (let ((dynamic-extent
+              (typecase node
+                (enclose (enclose-dynamic-extent node))
+                (cdynamic-extent node)
+                (t (and lvar (lvar-dynamic-extent lvar))))))
+        (when (and dynamic-extent
+                   (dynamic-extent-info dynamic-extent))
+          (let ((dynamic-extent-cleanup
+                  (dynamic-extent-cleanup dynamic-extent)))
+            (cond
+              ;; If NODE stack allocates on top of objects with a
+              ;; dynamic extent containing that of NODE's, do nothing.
+              ((do ((cleanup dynamic-extent-cleanup
+                             (node-enclosing-cleanup
+                              (cleanup-mess-up cleanup))))
+                   ((null cleanup))
+                 (when (eq cleanup block-end-cleanup)
+                   (return t))))
+              ;; Either the node stack allocates on top of objects
+              ;; with a dynamic extent contained in that of NODE's, in
+              ;; which case we extend the lifetime of any intervening
+              ;; object, or when there is no nesting at all, the
+              ;; dynamic extent of NODE's value ends later than the
+              ;; objects it was stack allocated on top of, in which
+              ;; case we extend the lifetime of all objects already
+              ;; allocated at the point of NODE's stack allocation.
+              (t
+               (do ((cleanup block-end-cleanup
+                             (node-enclosing-cleanup
+                              (cleanup-mess-up cleanup))))
+                   ((null cleanup))
+                 (when (eq cleanup dynamic-extent-cleanup)
+                   (return))
+                 (let ((mess-up (cleanup-mess-up cleanup)))
+                   (when (and (eq (cleanup-kind cleanup) :dynamic-extent)
+                              (dynamic-extent-info mess-up))
+                     (change-dynamic-extent mess-up dynamic-extent)
+                     (setq did-something t))))
+               (when did-something
+                 (return))))))))
+    did-something))
+
 ;;; Do a forward walk in the flow graph and insert calls to
 ;;; %DYNAMIC-EXTENT-START whenever we mess up the run-time stack by
 ;;; allocating a dynamic extent object. BLOCK is the block that is
@@ -175,7 +225,6 @@
   (declare (type cblock block) (list stack))
   (unless (block-flag block)
     (setf (block-flag block) t)
-    (setf (ir2-block-stack-mess-up (block-info block)) stack)
     (let ((2comp (component-info (block-component block))))
       (do-nodes (node lvar block)
         (let ((dynamic-extent
@@ -185,31 +234,15 @@
                   (t (and lvar (lvar-dynamic-extent lvar))))))
           (when dynamic-extent
             (let ((info (dynamic-extent-info dynamic-extent)))
-              (when info
-                (cond
-                  ((eq info (first stack)))
-                  ;; Preserve any intervening dynamic-extents.
-                  ((memq info stack)
-                   (do ((cleanup (node-enclosing-cleanup node)
-                                 (node-enclosing-cleanup
-                                  (cleanup-mess-up cleanup))))
-                       ((null cleanup))
-                     (when (eq (cleanup-kind cleanup) :dynamic-extent)
-                       (let ((mess-up (cleanup-mess-up cleanup)))
-                         (when (eq dynamic-extent mess-up)
-                           (return))
-                         (let ((preserve (dynamic-extent-info mess-up)))
-                           (pushnew preserve
-                                    (dynamic-extent-preserve-info dynamic-extent)))))))
-                  (t
-                   (pushnew block (ir2-component-stack-mess-ups 2comp))
-                   (setf (ctran-next (node-prev node)) nil)
-                   (let ((ctran (make-ctran)))
-                     (with-ir1-environment-from-node node
-                       (ir1-convert (node-prev node) ctran info
-                                    '(%dynamic-extent-start)))
-                     (link-node-to-previous-ctran node ctran))
-                   (push info stack)))))))
+              (when (and info (not (memq info stack)))
+                (pushnew block (ir2-component-stack-mess-ups 2comp))
+                (setf (ctran-next (node-prev node)) nil)
+                (let ((ctran (make-ctran)))
+                  (with-ir1-environment-from-node node
+                    (ir1-convert (node-prev node) ctran info
+                                 '(%dynamic-extent-start)))
+                  (link-node-to-previous-ctran node ctran))
+                (push info stack)))))
         (when (entry-p node)
           (dolist (nlx-info (cleanup-nlx-info (entry-cleanup node)))
             (stack-mess-up-walk (nlx-info-target nlx-info) stack)))))
@@ -314,6 +347,13 @@
          (generators (find-values-generators receivers)))
 
     (when (ir2-component-stack-allocates-p 2comp)
+      (loop
+        (let ((did-something nil))
+          (do-blocks-backwards (block component)
+            (when (maybe-extend-dynamic-extents block)
+              (setq did-something t)))
+          (unless did-something
+            (return))))
       (clear-flags component)
       (dolist (ep (block-succ (component-head component)))
         (let ((start (block-start-node ep)))
