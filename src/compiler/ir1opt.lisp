@@ -279,14 +279,16 @@
           (and (eq lvar (first (basic-combination-args dest)))
                (return-from
                 lvar-externally-checkable-type
-                (values-specifier-type '(values complex-vector &optional))))
+                 (values-specifier-type '(values complex-vector &optional))))
           (when (call-full-like-p dest)
             (let ((info (and (eq (basic-combination-kind dest) :known)
                              (basic-combination-fun-info dest))))
               (if (and info
                        (fun-info-externally-checkable-type info))
-                  (return-from lvar-externally-checkable-type
-                    (coerce-to-values (funcall (fun-info-externally-checkable-type info) dest lvar)))
+                  (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar)))
+                    (when type
+                      (return-from lvar-externally-checkable-type
+                        (coerce-to-values type))))
                   (map-combination-args-and-types
                    (lambda (arg type &rest args)
                      (declare (ignore args))
