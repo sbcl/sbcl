@@ -40,7 +40,7 @@
       ;; STATIC-SYMBOL-P returns a generalized boolean: an integer indicating
       ;; the index, or T if the argument is NIL, or NIL if non-static.
       (let ((posn (static-symbol-p symbol)))
-        (unless posn (error "~S is not a static symbol." symbol))
+        (unless (fixnump posn) (error "~S is not a static symbol." symbol))
         (+ (* posn (pad-data-block symbol-size))
            (pad-data-block (1- symbol-size))
            other-pointer-lowtag

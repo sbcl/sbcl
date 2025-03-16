@@ -189,3 +189,8 @@
   ;; %char-code seems to belong in 'cross-char' but our CHAR-CODE-LIMIT
   ;; is not defined by then.
   (deftype %char-code () `(integer 0 (,sb-xc:char-code-limit))))
+
+;;; Convince some usage sites to perform fixnum arithmetic
+(declaim (ftype (sfunction (symbol)
+                           (or (mod #.(length +static-symbols+)) boolean))
+                static-symbol-p))
