@@ -17,6 +17,16 @@
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
+#+darwin
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (unsigned 32)
+  (context (* os-context-t)))
+
+#+darwin
+(define-alien-routine ("os_context_set_fp_control" context-set-floating-point-modes) void
+  (context (* os-context-t))
+  (value (unsigned 32)))
+
 (defun context-float-register (context index format &optional integer)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format

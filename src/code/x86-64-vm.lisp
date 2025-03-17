@@ -188,6 +188,10 @@
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)
   (context (* os-context-t)))
+#+linux
+(define-alien-routine ("os_context_set_fp_control" context-set-floating-point-modes) void
+  (context (* os-context-t))
+  (value (unsigned 32)))
 
 (define-alien-routine
     ("arch_get_fp_modes" floating-point-modes) (unsigned 32))

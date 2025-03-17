@@ -175,11 +175,16 @@ os_context_fp_addr(os_context_t *context)
     return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RBP];
 }
 
-unsigned long
+unsigned int
 os_context_fp_control(os_context_t *context)
 {
-    return (uintptr_t)&context->uc_mcontext.gregs[REG_RSP];
+    return context->uc_mcontext.fpregs->mxcsr ^ (0x3F << 7);
+}
 
+void
+os_context_set_fp_control(os_context_t *context, unsigned int value)
+{
+    context->uc_mcontext.fpregs->mxcsr = value ^ (0x3F << 7);
 }
 
 os_context_register_t *

@@ -178,14 +178,19 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; SIGFPE code to floating-point error
 #-win32
 (defconstant-eqx +sigfpe-code-error-alist+
-    `((,sb-unix::fpe-intovf . floating-point-overflow)
-      (,sb-unix::fpe-intdiv . division-by-zero)
-      (,sb-unix::fpe-fltdiv . division-by-zero)
-      (,sb-unix::fpe-fltovf . floating-point-overflow)
-      (,sb-unix::fpe-fltund . floating-point-underflow)
-      (,sb-unix::fpe-fltres . floating-point-inexact)
-      (,sb-unix::fpe-fltinv . floating-point-invalid-operation)
-      (,sb-unix::fpe-fltsub . floating-point-exception))
+    (flet ((mask (bit)
+             (logand (dpb (lognot bit)
+                          float-traps-byte #xffffffff)
+                     (dpb (lognot bit)
+                          float-sticky-bits #xffffffff))))
+      `((,sb-unix::fpe-intovf floating-point-overflow)
+        (,sb-unix::fpe-intdiv division-by-zero)
+        (,sb-unix::fpe-fltdiv division-by-zero ,(mask float-divide-by-zero-trap-bit))
+        (,sb-unix::fpe-fltovf floating-point-overflow ,(mask float-overflow-trap-bit))
+        (,sb-unix::fpe-fltund floating-point-underflow ,(mask float-underflow-trap-bit))
+        (,sb-unix::fpe-fltres floating-point-inexact ,(mask float-inexact-trap-bit))
+        (,sb-unix::fpe-fltinv floating-point-invalid-operation ,(mask float-invalid-trap-bit))
+        (,sb-unix::fpe-fltsub floating-point-exception)))
   #'equal)
 
 ;;; Signal the appropriate condition when we get a floating-point error.
@@ -195,14 +200,28 @@ sets the floating point modes to their current values (and thus is a no-op)."
   (declare (type system-area-pointer info))
   (let ((code (sb-unix::siginfo-code info)))
     (multiple-value-bind (op operands) (sb-di::decode-arithmetic-error-operands context)
-     (with-interrupts
-       ;; Reset the accumulated exceptions, may be needed on other
-       ;; platforms too, at least Linux doesn't seem to require it.
-       #+sunos (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
-       (error (or (cdr (assoc code +sigfpe-code-error-alist+))
-                  'floating-point-exception)
-              :operation op
-              :operands operands)))))
+      (with-interrupts
+        ;; Reset the accumulated exceptions, may be needed on other
+        ;; platforms too, at least Linux doesn't seem to require it.
+        #+sunos (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
+        (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
+        (destructuring-bind (&optional (condition 'floating-point-exception) trap-mask)
+            (cdr (assoc code +sigfpe-code-error-alist+))
+          (declare (ignorable trap-mask))
+          (cond #+(or (and darwin arm64) (and linux x86-64))
+                (trap-mask
+                 (with-simple-restart (continue "Disable the trap for ~s in this thread"
+                                                condition)
+                   (error condition
+                          :operation op
+                          :operands operands))
+                 (let ((modes (context-floating-point-modes context)))
+                   (context-set-floating-point-modes context
+                                                     (logand modes trap-mask))))
+                (t
+                 (error condition
+                        :operation op
+                        :operands operands))))))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions
