@@ -1315,13 +1315,13 @@
 (with-test (:name :smaller-than-qword-cons-slot-init
                   :skipped-on (:not :mark-region-gc))
   (let ((lines (disassembly-lines
-                (compile nil '(lambda (a) (list 1 a #\a))))))
+                (compile nil '(lambda (a) (list 1 a #\a #xfff000))))))
     (assert (loop for line in lines
                   thereis (search "MOV BYTE PTR" line))) ; constant 1
     (assert (loop for line in lines
                   thereis (search "MOV WORD PTR" line))) ; constant #\a
     (assert (loop for line in lines
-                  thereis (search "MOV DWORD PTR" line))))) ; constant NIL
+                  thereis (search "MOV DWORD PTR" line))))) ; constant #xfff000
 
 (defun count-labeled-instructions (function &aux (answer 0))
   (let ((lines (disassembly-lines function)))
