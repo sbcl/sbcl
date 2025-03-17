@@ -556,7 +556,7 @@
       #+mark-region-gc
       (let* ((free-ptr (gspace-free-word-index gspace))
              (avail (- (align-up free-ptr words-per-page) free-ptr)))
-        (when (< avail n-words)
+        (when (and (plusp free-ptr) (< avail n-words))
           (realign-frontier)))
       ;; and large objects have their own pages,
       #+mark-region-gc
