@@ -4688,3 +4688,15 @@
   (checked-compile
    `(lambda (&key k)
       (make-list (reduce #'max (mapcar #'length k))))))
+
+
+(with-test (:name :cdr-union-types)
+  (assert-type
+   (lambda (x)
+     (cdr (assoc x '((a . 1) (b . 2)))))
+   (or (eql 1) (eql 2) null))
+  (assert-type
+   (lambda (x)
+     (declare ((member a b) x))
+     (car (assoc x '((a . 1) (b . 3)))))
+   (member a b)))

@@ -2644,7 +2644,18 @@
     (cond ((eq type null-type)
            null-type)
           ((cons-type-p type)
-           (cons-type-car-type type)))))
+           (cons-type-car-type type))
+          ((union-type-p type)
+           (loop with cars
+                 for type in (union-type-types type)
+                 do (cond
+                      ((eq type null-type)
+                       (push type cars))
+                      ((cons-type-p type)
+                       (push (cons-type-car-type type) cars))
+                      (t
+                       (return)))
+                 finally (return (sb-kernel::%type-union cars)))))))
 
 (defoptimizer (cdr derive-type) ((cons))
   (let ((type (lvar-conservative-type cons))
@@ -2652,7 +2663,18 @@
     (cond ((eq type null-type)
            null-type)
           ((cons-type-p type)
-           (cons-type-cdr-type type)))))
+           (cons-type-cdr-type type))
+          ((union-type-p type)
+           (loop with cdrs
+                 for type in (union-type-types type)
+                 do (cond
+                      ((eq type null-type)
+                       (push type cdrs))
+                      ((cons-type-p type)
+                       (push (cons-type-cdr-type type) cdrs))
+                      (t
+                       (return)))
+                 finally (return (sb-kernel::%type-union cdrs)))))))
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
