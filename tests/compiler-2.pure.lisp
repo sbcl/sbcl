@@ -4701,3 +4701,29 @@
               (optimize speed))
      (car (assoc x '((a . 1) (b . 3)))))
    (member a b)))
+
+(with-test (:name pop-type)
+  (assert-type
+   (lambda (n)
+     (let ((x '(1 2 3)))
+       (when n
+         (setf x (cdr x)))
+       (car x)))
+   (or null (integer 1 3)))
+  (assert-type
+   (lambda ()
+     (let ((x '(1 2 3)))
+       (values (pop x) (pop x))))
+   (values (or null (integer 1 3)) (or null (integer 1 3)) &optional))
+  (assert-type
+   (lambda ()
+     (declare (optimize speed (debug 1)))
+     (destructuring-bind (a b) '(1 2)
+       (values a b)))
+   (values (or null (integer 1 2)) (or null (integer 1 2)) &optional))
+  (assert-type
+   (lambda (n)
+     (loop for x in '(a b c)
+           when (eql n x)
+           return x))
+   (member nil a b c)))

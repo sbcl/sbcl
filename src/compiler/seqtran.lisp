@@ -2636,26 +2636,70 @@
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
+;;; Find a possible CAR type a variable bound to a constant list with
+;;; all sets in the form of (setf x (cdr x))
+(defun cons-var-type (lvar)
+  (let ((ref (principal-lvar-use lvar))
+        value)
+    (when (and (ref-p ref)
+               (let ((leaf (ref-leaf ref)))
+                 (and
+                  (lambda-var-p leaf)
+                  (let ((lvar (lambda-var-ref-lvar ref t)))
+                    (cond ((and lvar
+                                (constant-lvar-p lvar)
+                                (lambda-var-sets leaf)
+                                (proper-or-dotted-list-p (setf value (lvar-value lvar)))))
+                          ;; (pop x) goes through a variable
+                          ((let* ((next-ref (principal-lvar-ref lvar))
+                                  (next-leaf (and (ref-p next-ref)
+                                                  (ref-leaf next-ref))))
+                             (when (and (lambda-var-p next-leaf)
+                                        (lambda-var-sets next-leaf))
+                               (let ((lvar (lambda-var-ref-lvar next-ref t)))
+                                 (when (and lvar
+                                            (constant-lvar-p lvar)
+                                            (lambda-var-sets next-leaf)
+                                            (proper-or-dotted-list-p (setf value (lvar-value lvar))))
+                                   (setf leaf next-leaf))))))))
+                  (loop for set in (lambda-var-sets leaf)
+                        for combination = (principal-lvar-ref-use (set-value set))
+                        always (and (combination-is combination '(cdr))
+                                    (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
+                                      (when ref
+                                        (eq (ref-leaf ref) leaf))))))))
+      (let (cars)
+        (loop for car = (pop value)
+              do
+              (push (ctype-of car) cars)
+              (unless (consp value)
+                (when (null value)
+                  (push (specifier-type 'null) cars))
+                (return)))
+        (sb-kernel::%type-union cars)))))
+
 (defoptimizer (car derive-type) ((cons))
   ;; This and CDR needs to use LVAR-CONSERVATIVE-TYPE because type inference
   ;; gets confused by things like (SETF CAR).
-  (let ((type (lvar-conservative-type cons))
-        (null-type (specifier-type 'null)))
-    (cond ((eq type null-type)
-           null-type)
-          ((cons-type-p type)
-           (cons-type-car-type type))
-          ((union-type-p type)
-           (loop with cars
-                 for type in (union-type-types type)
-                 do (cond
-                      ((eq type null-type)
-                       (push type cars))
-                      ((cons-type-p type)
-                       (push (cons-type-car-type type) cars))
-                      (t
-                       (return)))
-                 finally (return (sb-kernel::%type-union cars)))))))
+  (or (cons-var-type cons)
+      (let ((type (lvar-conservative-type cons))
+            (null-type (specifier-type 'null)))
+
+        (cond ((eq type null-type)
+               null-type)
+              ((cons-type-p type)
+               (cons-type-car-type type))
+              ((union-type-p type)
+               (loop with cars
+                     for type in (union-type-types type)
+                     do (cond
+                          ((eq type null-type)
+                           (push type cars))
+                          ((cons-type-p type)
+                           (push (cons-type-car-type type) cars))
+                          (t
+                           (return)))
+                     finally (return (sb-kernel::%type-union cars))))))))
 
 (defoptimizer (cdr derive-type) ((cons))
   (let ((type (lvar-conservative-type cons))

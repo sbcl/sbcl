@@ -1179,10 +1179,11 @@
                              (return nil)))))
                   finally (sb-impl::unreachable)))))))
 
-(defun lambda-var-ref-lvar (ref)
+(defun lambda-var-ref-lvar (ref &optional allow-sets)
   (let ((var (ref-leaf ref)))
     (when (and (lambda-var-p var)
-               (not (lambda-var-sets var)))
+               (or allow-sets
+                   (not (lambda-var-sets var))))
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
              (refs (lambda-refs fun))
