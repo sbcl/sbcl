@@ -179,7 +179,7 @@
              #+win32 '(rcx-tn rdx-tn r8-tn r9-tn)
              #-win32 '(rdi-tn rsi-tn rdx-tn rcx-tn r8-tn r9-tn)
              collect
-             (if (typep arg '(cons (eql *)))
+             (if (typep arg '(cons (eql addressof)))
                  `(inst lea ,c-arg ,(cadr arg))
                  `(inst mov ,c-arg ,arg)))
      (inst call ,fun)

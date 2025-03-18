@@ -136,13 +136,13 @@
   (with-registers-preserved (c)
     #+sb-thread
     (pseudo-atomic ()
-      (call-c "allocation_tracker_counted" (* (ea 8 rbp-tn))))))
+      (call-c "allocation_tracker_counted" (addressof (ea 8 rbp-tn))))))
 
 (define-assembly-routine (enable-sized-alloc-counter) ()
   (with-registers-preserved (c)
     #+sb-thread
     (pseudo-atomic ()
-      (call-c "allocation_tracker_sized" (* (ea 8 rbp-tn))))))
+      (call-c "allocation_tracker_sized" (addressof (ea 8 rbp-tn))))))
 
 #+win32
 (define-assembly-routine
