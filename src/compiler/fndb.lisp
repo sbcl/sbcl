@@ -2384,3 +2384,9 @@
   (movable always-translatable))
 
 (defknown %coerce-to-policy (t) policy (flushable))
+(defknown (check-ds-list check-ds-list/&rest) (t index index t)
+    t
+    (movable foldable))
+(defknown check-ds-list/&key (t index index t t)
+    t
+    (movable foldable))
