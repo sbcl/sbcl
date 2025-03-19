@@ -210,14 +210,19 @@ sets the floating point modes to their current values (and thus is a no-op)."
           (declare (ignorable trap-mask))
           (cond #+(or (and darwin arm64) (and linux x86-64))
                 (trap-mask
-                 (with-simple-restart (continue "Disable the trap for ~s in this thread"
-                                                condition)
-                   (error condition
-                          :operation op
-                          :operands operands))
-                 (let ((modes (context-floating-point-modes context)))
-                   (context-set-floating-point-modes context
-                                                     (logand modes trap-mask))))
+                 (restart-case (error condition
+                                      :operation op
+                                      :operands operands)
+                   (continue ()
+                     :report "Disable this floating point trap in this thread"
+                     (let ((modes (context-floating-point-modes context)))
+                       (context-set-floating-point-modes context
+                                                         (logand modes trap-mask))))
+                   (continue ()
+                     :report "Disable all floating point traps in this thread"
+                     (let ((modes (context-floating-point-modes context)))
+                       (context-set-floating-point-modes context
+                                                         (dpb 0 float-sticky-bits (dpb 0 float-traps-byte modes)))))))
                 (t
                  (error condition
                         :operation op
