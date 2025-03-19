@@ -593,6 +593,21 @@ static void relocate_heap(struct heap_adjust* adj)
 #endif
     fix_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(), adj);
     fix_space(TEXT_SPACE_START, text_space_highwatermark, adj);
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_IMMOBILE_SPACE
+    /* Update the static-space asm routine indirection vector
+     * which immediately follows LFLIST_TAIL_ATOM in memory */
+    lispobj* tail_atom = native_pointer(LFLIST_TAIL_ATOM);
+    struct vector* v = (void*)(tail_atom + object_size(tail_atom));
+    gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG);
+    struct code* c = (void*)asm_routines_start;
+    lispobj* jump_table = code_jumptable_start(c);
+    int vect_len = vector_len(v), j;
+    /* There may be more jumptable entries than asm routine entrypoints,
+     * because e.g. GENERIC-EQL may jump to internal labels; and there may
+     * be fewer jumptable entries because the static vector is oversized.
+     * All nonzero elements are in use and should be adjusted */
+    for (j = 0; j < vect_len && v->data[j] != 0; ++j) v->data[j] = jump_table[1+j];
+#endif
 }
 
 #if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_SPACE)

@@ -297,23 +297,6 @@
                                             (- (ash simple-fun-self-slot word-shift)
                                                fun-pointer-lowtag))))))
 
-(defun validate-asm-routine-vector ()
-  ;; If the jump table in static space does not match the jump table
-  ;; in *assembler-routines*, fix the one one in static space.
-  ;; It's OK that this is delayed until startup, because code pertinent to
-  ;; core restart always uses relative jumps to asm code.
-  #+immobile-space
-  (let* ((code sb-fasl:*assembler-routines*)
-         (external-table (truly-the (simple-array word (*))
-                                    sb-fasl::*asm-routine-vector*))
-         (insts (code-instructions code))
-         (n (sb-impl::hash-table-%count (sb-fasl::%asm-routine-table code))))
-    (declare (optimize (insert-array-bounds-checks 0)))
-    (dotimes (i n)
-      (unless (= (aref external-table i) 0)
-        (setf (aref external-table i)
-              (sap-ref-word insts (truly-the index (ash (1+ i) word-shift))))))))
-
 (defconstant cf-bit 0)
 (defconstant sf-bit 7)
 (defconstant of-bit 11)

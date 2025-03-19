@@ -267,6 +267,9 @@
   (defvar *asm-routine-vector*)
   (defvar *immobile-text*)
   (defvar *immobile-space-map* nil))
+;; Vector capacity must be adequate for the number of asm routines, but (KLUDGE)
+;; the exact count of routines is unknown until make-host-2 is done.
+#+x86-64 (defconstant asm-jump-vect-nelems 112) ; arb
 
 (defstruct page
   (type nil :type (member nil :code :list :mixed))
@@ -1927,9 +1930,12 @@ core and return a descriptor to it."
   ;; Dynamic-space code can't use "call rel32" to reach the assembly code
   ;; in a single instruction if too far away. The solution is to have a static-space
   ;; array of entrypoints addressable using "call [EA]"
+  ;; This variable holds a cons of a target lispobj and the host's proxy for it.
+  ;; The elements are filled in by FOP-ASSEMBLER-CODE.
   #+(and x86-64 immobile-code)
-  (setf *asm-routine-vector* (word-vector (make-list 256 :initial-element 0)
-                                          *static*))
+  (setf *asm-routine-vector*
+        (cons (word-vector (make-list asm-jump-vect-nelems :initial-element 0) *static*)
+              (make-array asm-jump-vect-nelems :initial-element 0)))
 
   #+linkage-space (mapc 'ensure-linkage-index sb-vm::+c-callable-fdefns+)
   #-linkage-space
@@ -1983,7 +1989,11 @@ core and return a descriptor to it."
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
-    (cold-set 'sb-fasl::*asm-routine-vector* *asm-routine-vector*)
+    (let ((targ-vec (car *asm-routine-vector*))
+          (host-vec (the simple-vector (cdr *asm-routine-vector*))))
+      (cold-set 'sb-fasl::*asm-routine-vector* targ-vec)
+      (dotimes (i (length host-vec))
+        (write-wordindexed/raw targ-vec (+ i sb-vm:vector-data-offset) (svref host-vec i))))
     (let* ((objects (gspace-objects space))
            (count (length objects)))
       (let ((remainder (rem wordindex words-per-page)))
@@ -2905,16 +2915,19 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (let ((base (code-header-words asm-code))
           (index 0))
       (dolist (item *asm-routine-alist*)
-        ;; Word 0 of code-instructions is the jump table count (the asm routine entrypoints
-        ;; look to GC exactly like a jump table in any other codeblob)
         (let ((entrypoint (lookup-assembler-reference (car item))))
-          (write-wordindexed/raw asm-code (+ base index 1) entrypoint)
-          #+immobile-space
-          (progn
-            (aver (< index (cold-vector-len *asm-routine-vector*)))
-            (write-wordindexed/raw *asm-routine-vector*
-                                   (+ sb-vm:vector-data-offset index) entrypoint)))
-        (incf index)))))
+          ;; Word 0 of code-instructions is the jump table count (the asm routine entrypoints
+          ;; look to GC exactly like a jump table in any other codeblob)
+          ;; therefore pre-increment INDEX to get to the first usable index.
+          (write-wordindexed/raw asm-code (+ base (incf index)) entrypoint)
+          ;; Subtract 1, as the static jump vector uses a 0-based index
+          #+immobile-code (setf (aref (cdr *asm-routine-vector*) (1- index))
+                                entrypoint))))))
+
+#+(and x86-64 immobile-code)
+(defun asm-routine-vector-elt-addr (i)
+  (+ (- (descriptor-bits (car *asm-routine-vector*)) sb-vm:other-pointer-lowtag)
+     (ash (+ i sb-vm:vector-data-offset) sb-vm:word-shift)))
 
 ;; The partial source info is not needed during the cold load, since
 ;; it can't be interrupted.

@@ -264,11 +264,6 @@
 
   (makunbound '*!cold-toplevels*) ; so it gets GC'd
 
-  ;; Need the static-space replica of the assembly routine jump vector
-  ;; filled in. This matters only for code that gets compiled to dynamic space,
-  ;; so it's OK that it occurs somewhat late in cold-init.
-  #+x86-64 (sb-vm::validate-asm-routine-vector)
-
   #+win32 (show-and-call reinit-internal-real-time)
 
   ;; Set sane values again, so that the user sees sane values instead
@@ -415,7 +410,6 @@ process to continue normally."
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
-      #+x86-64 (sb-vm::validate-asm-routine-vector)
       (rebuild-package-vector))
     ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
