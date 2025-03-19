@@ -4734,3 +4734,12 @@
          (when (eql x n)
            (return x)))))
    (or list (integer 1 2))))
+
+(with-test (:name :test-headers-lowtag-only)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((or hash-table string)  a))
+      (typep a '(or simple-vector string)))
+    (("") t)
+    (((make-hash-table)) nil)))
