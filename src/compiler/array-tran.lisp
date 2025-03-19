@@ -162,48 +162,55 @@
               (or (getf (leaf-info constant) key)
                   (setf (getf (leaf-info constant) key)
                         (let ((sequence (constant-value constant)))
-                          (when (proper-sequence-p sequence)
-                            (loop for i below (length sequence)
-                                  for elt* = (elt sequence i)
-                                  for elt = (if key
-                                                (handler-case (funcall key elt*)
-                                                  (error ()
-                                                    (return *universal-type*)))
-                                                elt*)
-                                  for type = (typecase elt ;; ctype-of gives too much detail
-                                               (integer
-                                                (if min
-                                                    (setf min (min min elt)
-                                                          max (max max elt))
-                                                    (setf min elt
-                                                          max elt))
-                                                nil)
-                                               (cons
-                                                (specifier-type 'cons))
-                                               (vector
-                                                (specifier-type 'vector))
-                                               (array
-                                                (specifier-type 'array))
-                                               (character
-                                                (specifier-type 'character))
-                                               (symbol
-                                                (specifier-type 'symbol))
-                                               (double-float
-                                                (specifier-type 'double-float))
-                                               (single-float
-                                                (specifier-type 'single-float))
-                                               (t (return)))
-                                  do (when type
+                          (flet ((process (elt)
+                                   (let* ((elt (if key
+                                                   (handler-case (funcall key elt)
+                                                     (error ()
+                                                       (return-from sequence-elements-type *universal-type*)))
+                                                   elt))
+                                          (type (typecase elt ;; ctype-of gives too much detail
+                                                  (integer
+                                                   (if min
+                                                       (setf min (min min elt)
+                                                             max (max max elt))
+                                                       (setf min elt
+                                                             max elt))
+                                                   nil)
+                                                  (cons
+                                                   (specifier-type 'cons))
+                                                  (vector
+                                                   (specifier-type 'vector))
+                                                  (array
+                                                   (specifier-type 'array))
+                                                  (character
+                                                   (specifier-type 'character))
+                                                  (symbol
+                                                   (specifier-type 'symbol))
+                                                  (double-float
+                                                   (specifier-type 'double-float))
+                                                  (single-float
+                                                   (specifier-type 'single-float))
+                                                  (t (return-from sequence-elements-type *universal-type*)))))
+                                     (when type
                                        (setf union
                                              (if union
                                                  (type-union union type)
-                                                 type)))
-                                  finally (return (if min
-                                                      (let ((int (make-numeric-type :class 'integer :low min :high max)))
-                                                        (if union
-                                                            (type-union union int)
-                                                            int))
-                                                      union)))))))))
+                                                 type))))))
+                            (when (cond ((vectorp sequence)
+                                         (loop for x across sequence
+                                               do (process x))
+                                         t)
+                                        ((proper-or-dotted-list-p sequence)
+                                         (loop for car = (pop sequence)
+                                               do (process car)
+                                               while (consp sequence))
+                                         t))
+                              (if min
+                                  (let ((int (make-numeric-type :class 'integer :low min :high max)))
+                                    (if union
+                                        (type-union union int)
+                                        int))
+                                  union))))))))
         (type-array-element-type (lvar-type sequence)))))
 
 (defun derive-aref-type (array)

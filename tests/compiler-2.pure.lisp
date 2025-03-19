@@ -4702,7 +4702,7 @@
      (car (assoc x '((a . 1) (b . 3)))))
    (member a b)))
 
-(with-test (:name pop-type)
+(with-test (:name :pop-type)
   (assert-type
    (lambda (n)
      (let ((x '(1 2 3)))
@@ -4726,4 +4726,11 @@
      (loop for x in '(a b c)
            when (eql n x)
            return x))
-   (member nil a b c)))
+   symbol)
+  (assert-type
+   (lambda (n)
+     (let ((x '(1 2 (10))))
+       (dolist (x x)
+         (when (eql x n)
+           (return x)))))
+   (or list (integer 1 2))))

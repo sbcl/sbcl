@@ -2638,53 +2638,47 @@
 
 ;;; Find a possible CAR type a variable bound to a constant list with
 ;;; all sets in the form of (setf x (cdr x))
-(defun cons-var-type (lvar)
+(defun cons-var-car-type (lvar)
   (let ((ref (principal-lvar-use lvar))
+        constant-lvar
         value)
     (when (and (ref-p ref)
                (let ((leaf (ref-leaf ref)))
                  (and
                   (lambda-var-p leaf)
                   (let ((lvar (lambda-var-ref-lvar ref t)))
-                    (cond ((and lvar
-                                (constant-lvar-p lvar)
-                                (lambda-var-sets leaf)
-                                (proper-or-dotted-list-p (setf value (lvar-value lvar)))))
-                          ;; (pop x) goes through a variable
-                          ((let* ((next-ref (principal-lvar-ref lvar))
-                                  (next-leaf (and (ref-p next-ref)
-                                                  (ref-leaf next-ref))))
-                             (when (and (lambda-var-p next-leaf)
-                                        (lambda-var-sets next-leaf))
-                               (let ((lvar (lambda-var-ref-lvar next-ref t)))
-                                 (when (and lvar
-                                            (constant-lvar-p lvar)
-                                            (lambda-var-sets next-leaf)
-                                            (proper-or-dotted-list-p (setf value (lvar-value lvar))))
-                                   (setf leaf next-leaf))))))))
+                    (flet ((good-lvar-p (lvar)
+                             (and lvar
+                                  (constant-lvar-p lvar)
+                                  (proper-or-dotted-list-p (setf value (lvar-value (setf constant-lvar lvar)))))))
+                      (cond ((and (lambda-var-sets leaf)
+                                  (good-lvar-p lvar)))
+                            ;; (pop x) goes through a variable
+                            ((let* ((next-ref (principal-lvar-ref lvar))
+                                    (next-leaf (and (ref-p next-ref)
+                                                    (ref-leaf next-ref))))
+                               (when (and (lambda-var-p next-leaf)
+                                          (lambda-var-sets next-leaf))
+                                 (let ((lvar (lambda-var-ref-lvar next-ref t)))
+                                   (when (good-lvar-p lvar)
+                                     (setf leaf next-leaf)))))))))
                   (loop for set in (lambda-var-sets leaf)
                         for combination = (principal-lvar-ref-use (set-value set))
                         always (and (combination-is combination '(cdr))
                                     (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
                                       (when ref
                                         (eq (ref-leaf ref) leaf))))))))
-      (let (cars)
-        (loop for car = (pop value)
-              do
-              (push (ctype-of car) cars)
-              (unless (consp value)
-                (when (null value)
-                  (push (specifier-type 'null) cars))
-                (return)))
-        (sb-kernel::%type-union cars)))))
+      (let ((type (sequence-elements-type constant-lvar)))
+        (if (cdr (last value))
+            type
+            (type-union type (specifier-type 'null)))))))
 
 (defoptimizer (car derive-type) ((cons))
   ;; This and CDR needs to use LVAR-CONSERVATIVE-TYPE because type inference
   ;; gets confused by things like (SETF CAR).
-  (or (cons-var-type cons)
+  (or (cons-var-car-type cons)
       (let ((type (lvar-conservative-type cons))
             (null-type (specifier-type 'null)))
-
         (cond ((eq type null-type)
                null-type)
               ((cons-type-p type)
