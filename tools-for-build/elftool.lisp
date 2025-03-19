@@ -1116,6 +1116,17 @@ lisp_fun_linkage_space: .zero ~:*~D
              ;; boxed objects that can reference code/simple-funs
              ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag)
               (scanptrs vaddr obj 1 (1- nwords))))))
+      ;; Fix the assembly routine entrypoint vector in static space.
+      ;; It's an unboxed vector so it would not get adjusted automatically.
+      (let ((sym (%find-target-symbol (package-id "SB-FASL") "*ASM-ROUTINE-VECTOR*"
+                                      spacemap)))
+        (when sym
+          (let* ((obj (symbol-global-value sym)) ; a tagged ptr to static space
+                 (physical-obj (translate obj spacemap))
+                 (vaddr (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
+            (scanptrs vaddr physical-obj sb-vm:vector-data-offset
+                      (+ sb-vm:vector-data-offset (1- (length obj)))
+                      t)))) ; T -> do not require is-lisp-pointer of each word
       (dolist (space (cdr spacemap))
         (unless (= (space-id space) immobile-text-core-space-id)
           (let* ((logical-addr (space-addr space))
