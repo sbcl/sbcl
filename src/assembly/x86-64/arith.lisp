@@ -361,12 +361,14 @@
 ;;; It just doesn't seem worth the effort to do all that.
 (defparameter eql-dispatch nil)
 (define-assembly-routine (generic-eql (:return-style :none)
-                                      (:export eql-ratio))
+                                      (:export generic-eql* eql-ratio))
     ((:temp rcx unsigned-reg rcx-offset)  ; callee-saved
      (:temp rax unsigned-reg rax-offset)  ; vop temps
      (:temp rsi unsigned-reg rsi-offset)
      (:temp rdi unsigned-reg rdi-offset)
      (:temp r11 unsigned-reg r11-offset))
+  (inst mov :byte rax (ea (- other-pointer-lowtag) rdi))
+  (inst sub :byte rax bignum-widetag)
   ;; SINGLE-FLOAT is included in this table because its widetag within the range
   ;; of accepted widetags in the precondition for calling this routine.
   ;; Technically it would be an error to see an other-pointer object with that tag.
@@ -387,6 +389,7 @@
   ;; widetags are spaced 4 apart, and we've subtracted BIGNUM_WIDETAG,
   ;; so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
   ;; But the upper 3 bytes of EAX hold junk presently, so clear them.
+  GENERIC-EQL*
   (inst and :dword rax #x7f)
   (inst lea r11 eql-dispatch)
   (inst jmp (ea r11 rax 2))

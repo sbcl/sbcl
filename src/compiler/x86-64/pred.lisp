@@ -416,7 +416,8 @@
     (inst cmp x y)
     (inst jmp :e done)                  ; affirmative
     (let ((x-ratiop (csubtypep (tn-ref-type x-ref) (specifier-type 'ratio)))
-          (y-ratiop (csubtypep (tn-ref-type y-ref) (specifier-type 'ratio))))
+          (y-ratiop (csubtypep (tn-ref-type y-ref) (specifier-type 'ratio)))
+          (routine 'generic-eql))
       (cond ((and x-ratiop y-ratiop)
              (move rdi x)
              (move rsi y)
@@ -439,13 +440,12 @@
              ;; This ANDing trick would be wrong if, e.g., the OTHER-POINTER tag
              ;; were #b0011 and the two inputs had lowtags #b0111 and #b1011
              ;; which when ANDed look like #b0011.
-             ;; We use :BYTE rather than :DWORD here because byte-sized
-             ;; operations on the accumulator encode more compactly.
-             (inst mov :byte rax x)
-             (inst and :byte rax y) ; now AL = #x_F only if both lowtags were #xF
-             (inst not :byte rax)  ; now AL = #x_0 only if it was #x_F
-             (inst and :byte rax #b00001111) ; will be all 0 if ok
-             (inst jmp :ne done)             ; negative
+             ;; AND EAX, ESI is more compact than AND AL, SIL
+             (inst mov :dword rax x)
+             (inst and :dword rax y) ; now AL = #x_F only if both lowtags were #xF
+             (inst not :dword rax) ; now AL = #x_0 only if it was #x_F
+             (inst test :byte rax #b00001111) ; will be all 0 if ok
+             (inst jmp :ne done)              ; negative
 
              ;; If the widetags are not the same, return false.
              ;; Using a :dword compare gets us the bignum length check almost for free
@@ -454,16 +454,17 @@
              (inst mov :dword rax (ea (- other-pointer-lowtag) x))
              (inst cmp :dword rax (ea (- other-pointer-lowtag) y))
              (inst jmp :ne done)        ; negative
-
-             ;; If not a numeric widetag, return false. See ASSUMPTIONS re widetag order.
-             (inst sub :byte rax bignum-widetag)
-             (inst cmp :byte rax (- complex-double-float-widetag bignum-widetag))
-             ;; "above" means CF=0 and ZF=0 so we're returning the right thing here
-             (inst jmp :a done)
+             (unless (or (csubtypep (tn-ref-type x-ref) (specifier-type 'number))
+                         (csubtypep (tn-ref-type y-ref) (specifier-type 'number)))
+               ;; If not a numeric widetag, return false. See ASSUMPTIONS re widetag order.
+               (inst sub :byte rax bignum-widetag)
+               (inst cmp :byte rax (- complex-double-float-widetag bignum-widetag))
+               (setf routine 'generic-eql*) ;; expects widetag-bignum in AL
+               ;; "above" means CF=0 and ZF=0 so we're returning the right thing here
+               (inst jmp :a done))
              ;; The hand-written assembly code receives args in the C arg registers.
-             ;; It also receives AL holding the biased down widetag.
              ;; Anything else it needs will be callee-saved.
              (move rdi x)               ; load the C call args
              (move rsi y)
-             (invoke-asm-routine 'call 'generic-eql vop))))
+             (invoke-asm-routine 'call routine vop))))
     DONE))
