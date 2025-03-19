@@ -28,6 +28,11 @@
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread)
   (unless (or (find :mark-region-gc sb-impl:+internal-features+)
+              ;; %LISTIFY-REST-ARGS has a problem with profiling because it uses
+              ;; the JRCXZ instruction, which can only take an 8-bit signed disp.
+              ;; The extra few bytes needed to call synchronous-trap are
+              ;; just enough to fail to encode the JRCXZ.
+              (find-symbol "SYNCHRONOUS-TRAP" "SB-VM")
               (find :gs-seg sb-impl:+internal-features+))
     (push :test-aprof *features*))
 (in-package run-tests)

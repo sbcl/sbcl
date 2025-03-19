@@ -199,8 +199,10 @@
       (inst jmp :z OUT)
       ;; if PAI was set, interrupts were disabled at the same time
       ;; using the process signal mask.
+      #+partial-sw-int-avoidance (inst call (ea (make-fixup 'synchronous-trap :assembly-routine)))
+      #-partial-sw-int-avoidance (progn
       #+int1-breakpoints (inst icebp)
-      #-int1-breakpoints (inst break pending-interrupt-trap)
+      #-int1-breakpoints (inst break pending-interrupt-trap))
       OUT)))
 
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,

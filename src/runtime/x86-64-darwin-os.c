@@ -72,3 +72,52 @@ os_context_float_register_addr(os_context_t *context, int offset)
 {
   return (os_context_register_t *)((&context->uc_mcontext->__fs.__fpu_xmm0) + offset);
 }
+
+#ifdef LISP_FEATURE_PARTIAL_SW_INT_AVOIDANCE
+void synchronous_trap(char* savearea, lispobj* sp_at_interrupt)
+{
+    struct { // unobvious order determined by gcc linux headers
+        lispobj r8, r9, r10, r11, r12, r13, r14, r15,
+                rdi, rsi, rbp, rbx, rdx, rax, rcx, rsp;
+    } *gprsave = (void*)(savearea + 16*32); // 16 32-byte YMM regs
+
+    os_context_t context, *c;
+    memset(&context, 0, sizeof context);
+    c = &context;
+
+    // Copy the pushed regs into a machine context
+    CONTEXT_SLOT(c, rax) = gprsave->rax;
+    CONTEXT_SLOT(c, rbx) = gprsave->rbx;
+    CONTEXT_SLOT(c, rcx) = gprsave->rcx;
+    CONTEXT_SLOT(c, rdx) = gprsave->rdx;
+    CONTEXT_SLOT(c, rsp) = (uword_t)sp_at_interrupt;
+    // skip rbp here
+    CONTEXT_SLOT(c, rsi) = gprsave->rsi;
+    CONTEXT_SLOT(c, rdi) = gprsave->rdi;
+    CONTEXT_SLOT(c, r8)  = gprsave->r8;
+    CONTEXT_SLOT(c, r9)  = gprsave->r9;
+    CONTEXT_SLOT(c, r10) = gprsave->r10;
+    CONTEXT_SLOT(c, r11) = gprsave->r11;
+    CONTEXT_SLOT(c, r12) = gprsave->r12;
+    CONTEXT_SLOT(c, r13) = gprsave->r13;
+    CONTEXT_SLOT(c, r14) = gprsave->r14;
+    CONTEXT_SLOT(c, r15) = gprsave->r15;
+
+    // Take the return-PC to the user code which is 1 word down from exactly where
+    // the stack-pointer was at the simulated INT3, then add 1 because a real INT
+    // instructions leaves the PC pointing after it.
+    long pc_at_interrupt = sp_at_interrupt[-1];
+    CONTEXT_SLOT(c, rip) = 1 + pc_at_interrupt;
+    // The first instruction of the asm routine was to push EFLAGS
+    CONTEXT_SLOT(c, rflags) = sp_at_interrupt[-2];
+    // The next instruction was to push RBP
+    CONTEXT_SLOT(c, rbp) = sp_at_interrupt[-3];
+
+    sigset_t curmask;
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, &curmask);
+
+    interrupt_handle_pending(&context); // GC
+
+    thread_sigmask(SIG_SETMASK, &curmask, 0);
+}
+#endif

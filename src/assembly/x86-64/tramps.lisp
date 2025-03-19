@@ -9,24 +9,32 @@
 ;;; but is more friendly to gdb. There may be some subtle bugs with regard to
 ;;; blocking/unblocking of async signals which arrive nearly around the same
 ;;; time as a synchronous trap.
-#+sw-int-avoidance ; "software interrupt avoidance"
+;;; Partal avoidance will use a call for handle-pending-interrupt after a
+;;; pseudo-atomic sequence, and will emit trapping instructions for TYPE-ERROR
+;;; and other traps.
+;;; For either feature, use at your own risk.
+#+(or sw-int-avoidance partial-sw-int-avoidance) ; "software interrupt avoidance"
 (define-assembly-routine (synchronous-trap) ()
   (inst pushf)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
-  (inst and rsp-tn (- 16))
-  (inst sub rsp-tn 8) ; PUSHing an odd number of GPRs
+  (inst and rsp-tn (- 32))
   ;; Arrange in the utterly confusing order that a linux signal context has them
   ;; so that we can memcpy() into a context. Push RBX twice to maintain alignment.
-  (regs-pushlist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
-  ;;                             ^^^ technically this is the slot for RBP
-  (inst sub rsp-tn (* 16 16))
-  (dotimes (i 16) (inst movdqa (ea (* i 16) rsp-tn) (sb-x86-64-asm::get-fpr :xmm i)))
-  (inst lea rdi-tn (ea 24 rbp-tn)) ; stack-pointer at moment of "interrupt"
-  (inst mov rsi-tn rsp-tn)         ; pointer to saved CPU state
-  (inst call (make-fixup "synchronous_trap" :foreign))
-  (dotimes (i 16) (inst movdqa (sb-x86-64-asm::get-fpr :xmm i) (ea (* i 16) rsp-tn)))
-  (inst add rsp-tn (* 16 16))
+  ;; This enum is usually in "/usr/include/x86_64-linux-gnu/sys/ucontext.h"
+  (regs-pushlist rsp rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
+  ;;                                 ^^^ technically this is the slot for RBP
+
+  (do ((i 15 (1- i))) ((< i 0))
+    (when (member i '(15 11 7 3)) (inst sub rsp-tn (* 4 32))) ; 4 32-byte regs
+    (inst vmovaps (ea (* (mod i 4) 32) rsp-tn) (sb-x86-64-asm::get-fpr :ymm i)))
+
+  (call-c "synchronous_trap" rsp-tn (addressof (ea 24 rbp-tn)))
+
+  (dotimes (i 16)
+    (inst vmovaps (sb-x86-64-asm::get-fpr :ymm i) (ea (* (mod i 4) 32) rsp-tn))
+    (when (member i '(15 11 7 3)) (inst add rsp-tn (* 4 32)))) ; 4 32-byte regs
+
   (regs-poplist rcx rax rdx rbx rbx rsi rdi r15 r14 r13 r12 r11 r10 r9 r8)
   (inst leave)
   (inst popf))

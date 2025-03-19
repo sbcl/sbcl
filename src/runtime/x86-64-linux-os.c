@@ -236,21 +236,25 @@ os_flush_icache(os_vm_address_t __attribute__((unused)) address,
 #include <math.h>
 const long libm_anchor = (long)acos;
 
-#ifdef LISP_FEATURE_SW_INT_AVOIDANCE
+#if defined LISP_FEATURE_SW_INT_AVOIDANCE || defined LISP_FEATURE_PARTIAL_SW_INT_AVOIDANCE
 extern void sigtrap_handler();
 extern char* vm_thread_name(struct thread*);
 extern void sigset_tostring(const sigset_t*, char*, int);
-void synchronous_trap(lispobj* sp_at_interrupt, char* savearea)
+void synchronous_trap(char* savearea, lispobj* sp_at_interrupt)
 {
     os_context_t context;
     memset(&context, 0, sizeof context);
 
     // Create the signal context from the values pushed on the stack
     // by the lisp assembly routine.
+
+#ifndef LISP_FEATURE_PARTIAL_SW_INT_AVOIDANCE
+    // I don't know how to create the ucontext's representation from an XSAVE area
     context.uc_mcontext.fpregs = &context.__fpregs_mem;
     if (sizeof context.uc_mcontext.fpregs->_xmm[0].element != 16) lose("sigcontext size bug");
     memcpy(context.uc_mcontext.fpregs->_xmm[0].element, savearea, 16*16);
-    char* gprsave = savearea + 16*16;
+#endif
+    char* gprsave = savearea + 16*32; // 16 32-byte registers
     memcpy(context.uc_mcontext.gregs, gprsave, 15*8);
 
     context.uc_mcontext.gregs[REG_RSP] = (greg_t)sp_at_interrupt;
@@ -279,6 +283,10 @@ void synchronous_trap(lispobj* sp_at_interrupt, char* savearea)
             os_context_pc(&context), sp_at_interrupt, savearea,
             newmask_string); */
 
+#ifdef LISP_FEATURE_PARTIAL_SW_INT_AVOIDANCE
+    // This is for GC auto-triggers during pseudo-atomic, and nothing but
+    interrupt_handle_pending(&context);
+#else
     sigtrap_handler(0, 0, &context);
 
     if (context.uc_mcontext.gregs[REG_RSP] != (greg_t)sp_at_interrupt ||
@@ -289,6 +297,7 @@ void synchronous_trap(lispobj* sp_at_interrupt, char* savearea)
     // the return PC location that the assembly routine received.
     uword_t return_pc = context.uc_mcontext.gregs[REG_RIP];
     sp_at_interrupt[-1] = return_pc;
+#endif
 
     // act like a return-from-signal by restoring the signal mask
     // Ideally this would be performed in the asm routine only after restoring

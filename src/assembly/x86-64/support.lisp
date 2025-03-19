@@ -64,6 +64,8 @@
     ((:none :full-call-no-return))))
 
 (defconstant xsave-area-size (+ 512 64 256))
+(defconstant xsave-area-alignment 64)
+
 ;;; Save or restore all FPRs at the stack pointer as it existed just prior
 ;;; to the call to the asm routine.
 (defun call-fpr-save/restore-routine (selector)
@@ -100,7 +102,7 @@
   (aver (member convention '(lisp c)))
   (aver (eql card-table-reg 12)) ; change detector
   (let* ((save-fpr (neq except 'fp))
-         (fpr-align 64)
+         (fpr-align xsave-area-alignment)
          (except (if (eq except 'fp) nil (ensure-list except)))
          (clobberables
            (remove frame-reg
