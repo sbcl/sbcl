@@ -2649,8 +2649,8 @@
                   (let ((lvar (lambda-var-ref-lvar ref t)))
                     (flet ((good-lvar-p (lvar)
                              (and lvar
-                                  (constant-lvar-p lvar)
-                                  (proper-or-dotted-list-p (setf value (lvar-value (setf constant-lvar lvar)))))))
+                                  (setf value (lvar-constant (setf constant-lvar lvar)))
+                                  (proper-or-dotted-list-p (setf value (constant-value value))))))
                       (cond ((and (lambda-var-sets leaf)
                                   (good-lvar-p lvar)))
                             ;; (pop x) goes through a variable
