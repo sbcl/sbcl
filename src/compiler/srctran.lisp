@@ -140,9 +140,12 @@
       (specifier-type 'cons)
       (lvar-type arg)))
 
-(unless-vop-existsp (:translate unaligned-dx-cons)
-  (define-source-transform unaligned-dx-cons (arg)
-    `(list ,arg)))
+(define-source-transform unaligned-dx-cons (arg)
+  (cond ((and (vop-existsp :translate unaligned-dx-cons)
+              *stack-allocate-dynamic-extent*)
+         (values nil t))
+        (t
+         `(list ,arg))))
 
 (define-source-transform make-list (length &rest rest &environment env)
   (if (or (null rest)
