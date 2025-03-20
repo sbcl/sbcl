@@ -104,17 +104,19 @@
 ;;; type weakenings, then look for any predicate that is cheaper.
 (defun maybe-weaken-check (type policy)
   (declare (type ctype type))
-  (typecase type
-    ;; Can't do much functional type checking at run-time
-    (fun-designator-type
-     (specifier-type 'function-designator))
-    (fun-type
-     (specifier-type 'function))
-    (t
-     (ecase (policy policy type-check)
-       (0 *wild-type*)
-       (2 (weaken-values-type type))
-       (3 type)))))
+  (let ((policy (policy policy type-check)))
+    (if (zerop policy)
+        *wild-type*
+        (typecase type
+          ;; Can't do much functional type checking at run-time
+          (fun-designator-type
+           (specifier-type 'function-designator))
+          (fun-type
+           (specifier-type 'function))
+          (t
+           (ecase policy
+             (2 (weaken-values-type type))
+             (3 type)))))))
 
 (defun lvar-types-to-check (types original-types n-required)
   (loop for type in types
