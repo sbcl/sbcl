@@ -104,6 +104,10 @@
 (defvar *handled-conditions* nil)
 (defvar *disabled-package-locks* nil)
 
+(defvar *stack-allocate-dynamic-extent* t
+  "If true (the default), the compiler believes DYNAMIC-EXTENT declarations
+and stack allocates otherwise inaccessible parts of the object whenever
+possible.")
 
 ;;;; miscellaneous utilities
 

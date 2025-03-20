@@ -1550,11 +1550,6 @@
          (setf (lambda-var-ignorep var) t)))))
   (values))
 
-(defvar *stack-allocate-dynamic-extent* t
-  "If true (the default), the compiler believes DYNAMIC-EXTENT declarations
-and stack allocates otherwise inaccessible parts of the object whenever
-possible.")
-
 (defun process-dynamic-extent-decl (names vars fvars)
   (if *stack-allocate-dynamic-extent*
       (dolist (name names)
