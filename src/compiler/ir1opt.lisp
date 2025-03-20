@@ -192,6 +192,8 @@
            derived-type))))
 
 (defun node-conservative-type (node)
+  (when (cast-p node)
+    (setf node (principal-lvar-use (cast-value node))))
   (let* ((derived-values-type (node-derived-type node))
          (derived-type (single-value-type derived-values-type)))
     (if (ref-p node)
