@@ -527,8 +527,11 @@
                             ((sb-kernel::defstruct-description-p type)
                              (dd-name type)))))
         (when (and typename (sb-xc:subtypep typename 'ctype))
-          (error "~S instance constructor called in a non-system file"
-                 typename)))
+          ;; If stack-allocation occurs, we should never have to
+          ;; call this predicate to inquire which TLAB to use.
+          (#.(cl:if sb-ext:*stack-allocate-dynamic-extent* 'error 'sb-c:compiler-notify)
+             "~S instance constructor called" typename))
+        nil)
       (and node
            (env-system-tlab-p (sb-c::node-lexenv node)))))
 

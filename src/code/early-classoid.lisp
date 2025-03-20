@@ -575,7 +575,9 @@
 (defun copy-ctype (x &optional (flags 0))
   (declare (type ctype x))
   (declare (sb-c::tlab :system) (inline !new-xset))
-  #+c-stack-is-control-stack (aver (stack-allocated-p x))
+  #.(cl:if (cl:and (cl:member :c-stack-is-control-stack sb-xc:*features*)
+                   sb-ext:*stack-allocate-dynamic-extent*)
+           '(aver (stack-allocated-p x)))
   (labels ((copy (x)
              ;; Return a heap copy of X if X was arena or stack-allocated.
              ;; I suspect it's quicker to copy always rather than conditionally.
