@@ -1989,6 +1989,7 @@ core and return a descriptor to it."
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
+    #+x86-64
     (let ((targ-vec (car *asm-routine-vector*))
           (host-vec (the simple-vector (cdr *asm-routine-vector*))))
       (cold-set 'sb-fasl::*asm-routine-vector* targ-vec)
