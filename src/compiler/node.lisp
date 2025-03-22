@@ -1811,7 +1811,8 @@
   ;; extent is over the environment and hence needs no cleanup code.
   (cleanup nil :type (or cleanup null))
   ;; some kind of info used by the back end
-  (info nil))
+  (info nil)
+  (preserve-info nil))
 
 (defprinter (cdynamic-extent :conc-name dynamic-extent-
                              :identity t)

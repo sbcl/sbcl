@@ -164,6 +164,9 @@
   ;; first.
   (start-stack () :type list)
   (end-stack () :type list)
+  ;; list of all lvars ever pushed onto the stack when control reaches
+  ;; the start of this block.
+  (stack-mess-up () :type list)
   ;; the first and last VOP in this block. If there are none, both
   ;; slots are null.
   (start-vop nil :type (or vop null))
