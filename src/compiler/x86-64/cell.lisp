@@ -83,8 +83,7 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 5
-     (when (member name '(cas-symbol-fdefn sb-impl::cas-symbol-%info))
-       (add-symbol-to-remset vop object))
+     (when (eq name 'sb-impl::cas-symbol-%info) (add-symbol-to-remset vop object))
      (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop))
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
