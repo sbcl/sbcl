@@ -737,3 +737,9 @@
       (dotimes (i 4)
         (cas (aref a i) (coerce 0 et) (coerce (1+ i) et)))
       (assert (equalp a #(1d0 2d0 3d0 4d0))))))
+
+(declaim (global *not-ab-global*))
+(defun cas-not-ab-global (old new) (cas *not-ab-global* old new))
+(compile 'cas-not-ab-global)
+(test-util:with-test (:name :cas-not-always-bound-global)
+  (assertoid:assert-error (cas-not-ab-global 1 2) cell-error))

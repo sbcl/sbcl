@@ -34,12 +34,16 @@
       (sb-c::give-up-ir1-transform)))
 
 (macrolet ((access-wired-tls-val (sym) ; SYM is a symbol
-             `(thread-tls-ea (load-time-tls-offset ,sym)))
-           (load-oldval ()
-             `(if (sc-is old immediate)
-                  (move-immediate rax (immediate-tn-repr old))
-                  (move rax old))))
+             `(thread-tls-ea (load-time-tls-offset ,sym))))
 
+(flet ((emit-cas (ea symbol old new rax result vop &aux (node (sb-c::vop-node vop)))
+         (if (sc-is old immediate) (move-immediate rax (immediate-tn-repr old)) (move rax old))
+         (inst cmpxchg :lock ea new)
+         (unless (or (and (sc-is symbol immediate) (sb-c::always-boundp (tn-value symbol) node))
+                     (policy node (= safety 0)))
+           (inst cmp :byte rax unbound-marker-widetag)
+           (inst jmp :e (generate-error-code vop 'unbound-symbol-error symbol)))
+         (move result rax)))
 (define-vop (%cas-symbol-global-value)
   (:translate %cas-symbol-global-value)
   (:args (symbol :scs (descriptor-reg immediate) :to (:result 0))
@@ -53,12 +57,10 @@
   (:vop-var vop)
   (:generator 10
     (emit-symbol-write-barrier vop symbol rax (vop-nth-arg 2 vop))
-    (load-oldval)
-    (inst cmpxchg :lock (if (sc-is symbol immediate)
-                            (symbol-slot-ea (tn-value symbol) symbol-value-slot)
-                            (symbol-value-slot-ea symbol))
-          new)
-    (move result rax)))
+    (emit-cas (if (sc-is symbol immediate)
+                  (symbol-slot-ea (tn-value symbol) symbol-value-slot)
+                  (symbol-value-slot-ea symbol))
+              symbol old new rax result vop)))
 
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
@@ -72,7 +74,6 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
-  (:node-var node)
   (:generator 15
   ;; This code has two pathological cases: NO-TLS-VALUE-MARKER
   ;; or UNBOUND-MARKER as NEW: in either case we would end up
@@ -86,21 +87,11 @@
     (inst add cell thread-tn)
     (inst cmp :qword (ea cell) no-tls-value-marker)
     (inst jmp :ne CAS)
-    ;; GLOBAL. All logic that follows is for both + and - sb-thread
+    ;; GLOBAL
     (emit-symbol-write-barrier vop symbol cell (vop-nth-arg 2 vop))
     (emit-lea-symbol-value-slot cell symbol)
     CAS
-    (load-oldval)
-    (inst cmpxchg :lock (ea cell) new)
-    ;; FIXME: if :ALWAYS-BOUND then elide the BOUNDP check.
-    ;; But we don't accept a constant or immediate, so how to know
-    ;; what symbol is being CASed? I kind of feel like whether to perform
-    ;; the check ought to be supplied as codegen info so that we don't
-    ;; conflate storage-class of an arg with whether we could elide the check.
-    (unless (policy node (= safety 0))
-      (inst cmp :byte rax unbound-marker-widetag)
-      (inst jmp :e (generate-error-code vop 'unbound-symbol-error symbol)))
-    (move result rax)))
+    (emit-cas (ea cell) symbol old new rax result vop))))
 
 ;; This code is tested by 'codegen.impure.lisp'
 (defun emit-symeval (value symbol symbol-ref symbol-reg check-boundp vop)
