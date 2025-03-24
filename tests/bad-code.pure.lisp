@@ -981,3 +981,11 @@
                       (unless x
                         (or)))
                    :allow-notes nil))
+
+
+(with-test (:name :check-type-bad-type)
+  (assert
+   (nth-value 2
+              (checked-compile `(lambda (x)
+                                  (check-type x (values t)))
+                               :allow-warnings t))))

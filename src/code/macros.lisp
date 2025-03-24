@@ -734,21 +734,21 @@ invoked. In that case it will store into PLACE and start over."
   ;; variable to work around Python's blind spot in type derivation.
   ;; For more complex places getting the type derived should not
   ;; matter so much anyhow.
-  (let ((expanded (%macroexpand place env))
-        (type (let ((ctype (sb-c::careful-specifier-type type)))
-                (if ctype
-                    (type-specifier ctype)
-                    type)))
-        (value (gensym)))
+  (let* ((expanded (%macroexpand place env))
+         (ctype (sb-c::careful-specifier-type type))
+         (type (if ctype
+                   (type-specifier ctype)
+                   type))
+         (value (gensym)))
     (if (symbolp expanded)
-        `(let ((,value (the* (,type :use-annotations t) ,place)))
+        `(let ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place)))
            (unless (typep ,value ',type)
              (setf ,place
                    ,(if type-string
                         `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
                         `(check-type-error-trap ',place ,value ',type)))
              nil))
-        `(do ((,value (the* (,type :use-annotations t) ,place) ,place))
+        `(do ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place) ,place))
              ((typep ,value ',type))
            (setf ,place
                  (check-type-error ',place ,value ',type
