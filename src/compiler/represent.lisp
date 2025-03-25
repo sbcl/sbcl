@@ -217,6 +217,8 @@
 (defconstant-eqx ignore-cost-vops '(set type-check-error) #'equal)
 (defconstant-eqx suppress-note-vops '(type-check-error) #'equal)
 
+(deftype sc-cost-vector () `(simple-array (and fixnum (unsigned-byte 32)) (,sb-vm:sc-number-limit)))
+
 (declaim (start-block select-tn-representation))
 
 ;;; We special-case the move VOP, since using this costs for the
@@ -229,7 +231,8 @@
 (defun add-representation-costs (tn refs scs costs
                                  ops-slot costs-slot more-costs-slot
                                  write-p)
-  (declare (type function ops-slot costs-slot more-costs-slot))
+  (declare (type function ops-slot costs-slot more-costs-slot)
+           (sc-cost-vector costs))
   (do ((ref refs (tn-ref-next ref)))
       ((null ref))
     (flet ((add-costs (cost)
@@ -237,7 +240,7 @@
                (let ((res (svref cost scn)))
                  (unless res
                    (bad-costs-error ref))
-                 (incf (svref costs scn) res)))))
+                 (incf (aref costs scn) res)))))
       (let* ((vop (tn-ref-vop ref))
              (info (vop-info vop)))
         (unless (and (neq (tn-kind tn) :constant)
@@ -256,11 +259,11 @@
                                           (svref *backend-sc-numbers* scn))
                                          (sc-number rep))))
                          (when res
-                           (incf (svref costs scn) res))))
+                           (incf (aref costs scn) res))))
                      (dolist (scn scs)
                        (let ((res (svref (sc-move-costs rep) scn)))
                          (when res
-                           (incf (svref costs scn) res))))))))
+                           (incf (aref costs scn) res))))))))
             (t
              (do ((cost (funcall costs-slot info) (cdr cost))
                   (op (funcall ops-slot vop) (tn-ref-across op)))
@@ -280,9 +283,9 @@
 ;;; value is returned which is true when the selection is unique which
 ;;; is often not the case for the MOVE VOP.
 (defun select-tn-representation (tn scs costs)
-  (declare (type tn tn) (type sc-vector costs))
+  (declare (type tn tn) (type sc-cost-vector costs))
   (dolist (scn scs)
-    (setf (svref costs scn) 0))
+    (setf (aref costs scn) 0))
 
   (add-representation-costs tn (tn-reads tn) scs costs
                             #'vop-args #'vop-info-arg-costs
@@ -298,7 +301,7 @@
         (min-scn nil)
         (unique nil))
     (dolist (scn scs)
-      (let ((cost (svref costs scn)))
+      (let ((cost (aref costs scn)))
         (cond ((= cost min)
                (setf unique nil))
               ((< cost min)
@@ -982,7 +985,7 @@
 ;;; allocated. This must be done last, since references in new
 ;;; environments may be introduced by MOVE-ARG insertion.
 (defun select-representations (component)
-  (let ((costs (make-array sb-vm:sc-number-limit))
+  (let ((costs (make-sequence 'sc-cost-vector sb-vm:sc-number-limit))
         (2comp (component-info component)))
     (sort-boxed-constants 2comp)
     (labels ((set-sc (tn sc)
