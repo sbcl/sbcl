@@ -375,75 +375,143 @@
   "Return a sequence of the given RESULT-TYPE and LENGTH, with
   elements initialized to INITIAL-ELEMENT."
   (declare (index length) (explicit-check))
-  (let* ((expanded-type (typexpand result-type))
-         (adjusted-type
-          (typecase expanded-type
-            (atom (cond
-                    ((eq expanded-type 'string) '(vector character))
-                    ((eq expanded-type 'simple-string)
-                     '(simple-array character (*)))
-                    (t expanded-type)))
-            (cons (cond
-                    ((eq (car expanded-type) 'string)
-                     `(vector character ,@(cdr expanded-type)))
-                    ((eq (car expanded-type) 'simple-string)
-                     `(simple-array character ,(if (cdr expanded-type)
-                                                   (cdr expanded-type)
-                                                   '(*))))
-                    (t expanded-type)))))
-         (type (specifier-type adjusted-type))
-         (list-type (specifier-type 'list)))
-    (cond ((csubtypep type list-type)
+  (flet ((try (type)
            (cond
-             ((type= type list-type)
-              (make-list length :initial-element initial-element))
-             ((eq type *empty-type*)
-              (bad-sequence-type-error nil))
-             ((type= type (specifier-type 'null))
-              (if (= length 0)
-                  'nil
-                  (sequence-type-length-mismatch-error type length)))
-             ((cons-type-p type)
-              (multiple-value-bind (min exactp)
-                  (sb-kernel::cons-type-length-info type)
-                (if exactp
-                    (unless (= length min)
-                      (sequence-type-length-mismatch-error type length))
-                    (unless (>= length min)
+             ((eq type 'list)
+              (return-from make-sequence (make-list length :initial-element initial-element)))
+             ((or (eq type 'vector)
+                  (eq type 'simple-vector))
+              (return-from make-sequence
+                (if initial-element
+                    (make-array length  :initial-element initial-element)
+                    (make-array length))))
+             ((or (eq type 'string)
+                  (eq type 'simple-string))
+              (return-from make-sequence
+                (if initial-element
+                    (make-array length :element-type 'character :initial-element initial-element)
+                    (make-array length :element-type 'character))))
+             ((and (consp result-type)
+                   (let ((element-type
+                           (case (car type)
+                             (vector
+                              (let ((et-cdr (cdr type)))
+                                (when (consp et-cdr)
+                                  (let ((et-car (car et-cdr))
+                                        (d-cdr (cdr et-cdr)))
+                                    (when (and (consp d-cdr)
+                                               (or (cdr d-cdr)
+                                                   (not (eql (car d-cdr) length))))
+                                      (return-from try))
+                                    (case et-car
+                                      (* t)
+                                      (t et-car))))))
+                             ((array simple-array)
+                              (let ((et-cdr (cdr type)))
+                                (when (consp et-cdr)
+                                  (let ((et-car (car et-cdr))
+                                        (d-cdr (cdr et-cdr)))
+                                    (when (or (atom d-cdr)
+                                              (cdr d-cdr))
+                                      (return-from try))
+                                    (let ((d-car (car d-cdr)))
+                                      (unless (eql d-car 1)
+                                        (when (or (atom d-car)
+                                                  (cdr d-car))
+                                          (return-from try))
+                                        (let ((d-length (car d-car)))
+                                          (unless (or (eq d-length '*)
+                                                      (eql d-length length))
+                                            (return-from try)))))
+                                    (case et-car
+                                      (* t)
+                                      (t et-car)))))))))
+                     (when element-type
+                       (multiple-value-bind (widetag n-bits-shift)
+                           (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+                         (let ((vector
+                                 (sb-vm::allocate-vector-with-widetag
+                                  #+ubsan nil widetag length n-bits-shift)))
+                           (when initial-element
+                             (fill vector initial-element))
+                           (return-from make-sequence vector)))))))
+             ((or (eq type 'base-string)
+                  (eq type 'simple-base-string))
+              (return-from make-sequence
+                (if initial-element
+                    (make-array length :element-type 'base-char :initial-element initial-element)
+                    (make-array length :element-type 'base-char)))))))
+    (try result-type)
+    (multiple-value-bind (expanded-type expanded) (typexpand result-type)
+      (when expanded
+        (try expanded-type))
+      (let* ((adjusted-type
+               (typecase expanded-type
+                 (atom (cond
+                         ((eq expanded-type 'string) '(vector character))
+                         ((eq expanded-type 'simple-string)
+                          '(simple-array character (*)))
+                         (t expanded-type)))
+                 (cons (cond
+                         ((eq (car expanded-type) 'string)
+                          `(vector character ,@(cdr expanded-type)))
+                         ((eq (car expanded-type) 'simple-string)
+                          `(simple-array character ,(if (cdr expanded-type)
+                                                        (cdr expanded-type)
+                                                        '(*))))
+                         (t expanded-type)))))
+             (type (specifier-type adjusted-type))
+             (list-type (specifier-type 'list)))
+        (cond ((csubtypep type list-type)
+               (cond
+                 ((eq type list-type)
+                  (make-list length :initial-element initial-element))
+                 ((eq type *empty-type*)
+                  (bad-sequence-type-error nil))
+                 ((eq type (specifier-type 'null))
+                  (if (= length 0)
+                      'nil
                       (sequence-type-length-mismatch-error type length)))
-                (make-list length :initial-element initial-element)))
-             ;; We'll get here for e.g. (OR NULL (CONS INTEGER *)),
-             ;; which may seem strange and non-ideal, but then I'd say
-             ;; it was stranger to feed that type in to MAKE-SEQUENCE.
-             (t (sequence-type-too-hairy (type-specifier type)))))
-          ((csubtypep type (specifier-type 'vector))
-           (cond
-             (;; is it immediately obvious what the result type is?
-              (typep type 'array-type)
-              (aver (= (length (array-type-dimensions type)) 1))
-              (let* ((etype (type-specifier
-                             (array-type-specialized-element-type type)))
-                     (etype (if (eq etype '*) t etype))
-                     (type-length (car (array-type-dimensions type))))
-                (unless (or (eq type-length '*)
-                            (= type-length length))
-                  (sequence-type-length-mismatch-error type length))
-                (if iep
-                    (make-array length :element-type etype
-                                :initial-element initial-element)
-                    (make-array length :element-type etype))))
-             (t (sequence-type-too-hairy (type-specifier type)))))
-          ((when-extended-sequence-type
-               (expanded-type type :expandedp t :prototype prototype)
-             ;; This function has the EXPLICIT-CHECK declaration, so
-             ;; we manually assert that it returns a SEQUENCE.
-             (the extended-sequence
-                  (if iep
-                      (sb-sequence:make-sequence-like
-                       prototype length :initial-element initial-element)
-                      (sb-sequence:make-sequence-like
-                       prototype length)))))
-          (t (bad-sequence-type-error (type-specifier type))))))
+                 ((cons-type-p type)
+                  (multiple-value-bind (min exactp)
+                      (sb-kernel::cons-type-length-info type)
+                    (if exactp
+                        (unless (= length min)
+                          (sequence-type-length-mismatch-error type length))
+                        (unless (>= length min)
+                          (sequence-type-length-mismatch-error type length)))
+                    (make-list length :initial-element initial-element)))
+                 ;; We'll get here for e.g. (OR NULL (CONS INTEGER *)),
+                 ;; which may seem strange and non-ideal, but then I'd say
+                 ;; it was stranger to feed that type in to MAKE-SEQUENCE.
+                 (t (sequence-type-too-hairy (type-specifier type)))))
+              ((csubtypep type (specifier-type 'vector))
+               (cond
+                 (;; is it immediately obvious what the result type is?
+                  (typep type 'array-type)
+                  (let* ((etype (type-specifier
+                                 (array-type-specialized-element-type type)))
+                         (etype (if (eq etype '*) t etype))
+                         (type-length (car (array-type-dimensions type))))
+                    (unless (or (eq type-length '*)
+                                (= type-length length))
+                      (sequence-type-length-mismatch-error type length))
+                    (if iep
+                        (make-array length :element-type etype
+                                           :initial-element initial-element)
+                        (make-array length :element-type etype))))
+                 (t (sequence-type-too-hairy (type-specifier type)))))
+              ((when-extended-sequence-type
+                   (expanded-type type :expandedp t :prototype prototype)
+                 ;; This function has the EXPLICIT-CHECK declaration, so
+                 ;; we manually assert that it returns a SEQUENCE.
+                 (the extended-sequence
+                      (if iep
+                          (sb-sequence:make-sequence-like
+                           prototype length :initial-element initial-element)
+                          (sb-sequence:make-sequence-like
+                           prototype length)))))
+              (t (bad-sequence-type-error (type-specifier type))))))))
 
 ;;;; SUBSEQ
 ;;;;
