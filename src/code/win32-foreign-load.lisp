@@ -23,6 +23,9 @@
   (handle hinstance)
   (symbol c-string))
 
+(define-alien-routine os-dlsym-default sb-win32:int-ptr
+  (symbol c-string))
+
 (define-alien-routine ("SetStdHandle" set-std-handle)
    void
  (id int)
@@ -76,25 +79,9 @@
     (setf (shared-object-handle obj) nil)))
 
 (defun find-dynamic-foreign-symbol-address (symbol)
-  ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
-  ;; but on platforms where dlsym is simulated we use the mangled name.
-  ;; Win32 is a special case. It needs EXTERN-ALIEN-NAME to mangle the
-  ;; name for static linkage, but also needs unmangled symbols for
-  ;; GetProcAddress(). So we coerce to base-string instead.
-  ;; Oh, and we assume that all runtime symbols are static-linked.
-  ;; No *runtime-dlhandle* for us.
-  ;; Also, GetProcAddress doesn't call SetLastError(0) on success,
-  ;; and GetLastError() doesn't either. For now, we assume that
-  ;; GetProcAddress() won't return NULL on success.
-  (let* ((extern (coerce symbol 'base-string))
-         (result nil))
-    (dolist (handle
-              (cons *runtime-dlhandle*
-                    (mapcar #'shared-object-handle *shared-objects*)))
-      (when handle
-        (setf result (sap-int (getprocaddress handle extern)))
-        (when (not (zerop result))
-          (return result))))))
+  (let ((addr (os-dlsym-default (coerce symbol 'base-string))))
+    (unless (zerop addr)
+      addr)))
 
 (defun runtime-exported-symbols ()
   ;; TODO: reimplement for x86-64. Not so hard.
