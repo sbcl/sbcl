@@ -740,20 +740,23 @@ invoked. In that case it will store into PLACE and start over."
                    (type-specifier ctype)
                    type))
          (value (gensym)))
-    (if (symbolp expanded)
-        `(let ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place)))
-           (unless (typep ,value ',type)
-             (setf ,place
-                   ,(if type-string
-                        `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
-                        `(check-type-error-trap ',place ,value ',type)))
-             nil))
-        `(do ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place) ,place))
-             ((typep ,value ',type))
-           (setf ,place
-                 (check-type-error ',place ,value ',type
-                                   ,@(and type-string
-                                          `(,type-string))))))))
+    (cond ((stringp type)
+           `(the ,type ,place)) ;; bad type
+          ((symbolp expanded)
+           `(let ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place)))
+              (unless (typep ,value ',type)
+                (setf ,place
+                      ,(if type-string
+                           `(check-type-error-trap '(,place . ,type) ,value (the string ,type-string))
+                           `(check-type-error-trap ',place ,value ',type)))
+                nil)))
+          (t
+           `(do ((,value ,(wrap-if ctype `(the* (,ctype :use-annotations t)) place) ,place))
+                ((typep ,value ',type))
+              (setf ,place
+                    (check-type-error ',place ,value ',type
+                                      ,@(and type-string
+                                             `(,type-string)))))))))
 
 ;;;; DEFINE-SYMBOL-MACRO
 
