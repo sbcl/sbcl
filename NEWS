@@ -6,7 +6,7 @@ changes relative to sbcl-2.5.2:
     it still has less functionality than the existing single stepper.  See the
     new debugger manual section titled "Breakpoint Commands" for more
     information on the new commands.
-  * minor incompatible change: the beahviour of :save-runtime-options has been
+  * minor incompatible change: the behaviour of :save-runtime-options has been
     restored to match the documentation.  (lp#2096995, reported by Zach Beane)
   * minor incompatible change: invoking CHANGE-CLASS from user code no longer
     grabs the CLOS world lock.  Callers must take responsibility for ordering
@@ -20,7 +20,7 @@ changes relative to sbcl-2.5.2:
     ** on Darwin/arm64 and Linux/x86-64, provide a restart to disable
        floating-point exceptions of the type signalled, and another to disable
        all floating-point exceptions.
-  * bug fix: cycle detection in class precendence lists happens before adding
+  * bug fix: cycle detection in class precedence lists happens before adding
     classes to the direct subclasses of the parent.
   * bug fix: stack-allocated unaligned cons cells no longer cause errors in
     the debugger.
@@ -115,7 +115,7 @@ changes in sbcl-2.5.1 relative to sbcl-2.5.0:
        platforms. (lp#2063340, reported by Peter van Eynde)
     ** restore building on 32-bit ARM with newer gcc versions.  (lp#1839783,
        reported by Sébastien Villemot)
-    ** fix large stack allocation on 64-bit Windows. 
+    ** fix large stack allocation on 64-bit Windows.
   * CL portability fixes to the definitions of certain compiler structures,
     detected by CLISP.  (lp#2064301, lp#2064312, thanks to Robert Brown)
   * bug fix: a misplaced assertion regarding weak hash tables would trigger
