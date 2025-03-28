@@ -1,11 +1,52 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.5.2:
-  * enhancement: CMU CL style breakpoint debugger commands have now been
-    added. Included is a stepper based on breakpoints requiring no extra
-    instrumentation. However, it still has less functionality than the
-    existing single stepper. See the new debugger manual section titled
-    "Breakpoint Commands" for more information on the new commands.
+  * enhancement: breakpoint debugger commands have been added.  Included is a
+    stepper based on breakpoints requiring no extra instrumentation.  However,
+    it still has less functionality than the existing single stepper.  See the
+    new debugger manual section titled "Breakpoint Commands" for more
+    information on the new commands.
+  * minor incompatible change: the beahviour of :save-runtime-options has been
+    restored to match the documentation.  (lp#2096995, reported by Zach Beane)
+  * minor incompatible change: invoking CHANGE-CLASS from user code no longer
+    grabs the CLOS world lock.  Callers must take responsibility for ordering
+    execution of CHANGE-CLASS and any changes to the class hierarchy.
+  * platform support:
+    ** (CAS SAP) is implemented on ARM v8.1 directly with CAS instructions.
+    ** on x86-64, list constructors emit more compact code sequences,
+       particularly in the presence of multiple references to the same object.
+    ** on x86 and x86-64, fix the stack overflow check to use signed
+       comparisons.
+    ** on Darwin/arm64 and Linux/x86-64, provide a restart to disable
+       floating-point exceptions of the type signalled, and another to disable
+       all floating-point exceptions.
+  * bug fix: cycle detection in class precendence lists happens before adding
+    classes to the direct subclasses of the parent.
+  * bug fix: stack-allocated unaligned cons cells no longer cause errors in
+    the debugger.
+  * bug fix: bad or unknown type specifiers in CHECK-TYPE do not crash the
+    compiler.  (lp#2102644, lp#2102653, lp#2104048)
+  * bug fix: numerous bug fixes relating to the type system's handling of
+    arrays make SUBTYPEP more reliable and less likely to express a
+    contradiction.  (lp#1996980, lp#2100563, lp#2100728, lp#2100779,
+    lp#2100784, lp#2100812, lp#2100825, lp#2101192, lp#2101215, lp#2101803,
+    lp#2102684)
+  * bug fix: improve other aspects of the type system's self-consistency.
+    (lp#2101073, lp#2101170, lp#2101183, lp#2101189, lp#2101399, lp#2101589)
+  * bug fix: fix compiler type error when deriving the type of FTRUNCATE.
+    (lp#2101073)
+  * bug fix: fix compiler error when deriving constraints for single-floats.
+    (lp#2102759)
+  * bug fix: startup tuning for particular microarchitectures no longer
+    accidentally disables one of the optimizations.
+  * optimization: ROW-MAJOR-AREF is transformed to use the same array
+    machinery as one-dimensional array references.  (Thanks to Scott Burson
+    for the suggestion)
+  * optimization: list constructors emit shorter code sequences on x86-64,
+    particularly in the presence of multiple references to the same object.
+  * optimization: FLOOR and CEILING on ratios do not unnecessarily cons.
+  * optimization: provide specialized CALL-NEXT-METHOD functions for the
+    no-argument and full-argument cases.
 
 changes in sbcl-2.5.2 relative to sbcl-2.5.1:
   * minor incompatible change: in some instances when the compiler cannot
