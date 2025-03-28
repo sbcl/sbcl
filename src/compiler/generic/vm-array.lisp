@@ -174,8 +174,9 @@
 ;;; Return the shift amount needed to turn length as number of elements
 ;;; into length as number of bits.
 (defun saetp-n-bits-shift (saetp)
-  (max (1- (integer-length (saetp-n-bits saetp)))
-       0)) ;; because of NIL
+  (if (zerop (saetp-n-bits saetp))
+      (1- sb-vm:n-word-bits) ;; nil-vector, will overflow modular arithmetic to zero.
+      (1- (integer-length (saetp-n-bits saetp)))))
 
 #-sb-xc-host ; not computable as constant in make-host-1
 (defconstant-eqx %%simple-array-n-bits-shifts%%

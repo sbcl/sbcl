@@ -346,14 +346,18 @@
 
 (declaim (inline vector-length-in-words))
 (defun vector-length-in-words (length n-bits-shift)
-  (declare (type index length)
-           (type (integer 0 7) n-bits-shift))
+  (declare (type fixnum length)
+           (type (integer 0 (#.n-word-bits)) n-bits-shift))
   #.(if (fixnump (ash array-dimension-limit 7))
-        '(values (ceiling (ash length n-bits-shift) 64))
-        '(let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
-               (shift (- n-bits-shift
-                       (1- (integer-length n-word-bits)))))
-          (ash (+ length mask) shift))))
+        `(values
+          ;; Shifting by n-word-bits-1 will overflow and produce 0 for a nil-vector
+          (ceiling (logand (ash length n-bits-shift) most-positive-fixnum) n-word-bits))
+        `(if (= n-bits-shift ,(1- n-word-bits)) ;; nil-vector
+             0
+             (let ((mask (ash (1- n-word-bits) (- n-bits-shift)))
+                   (shift (- n-bits-shift
+                             (1- (integer-length n-word-bits)))))
+               (ash (+ length mask) shift)))))
 
 
 ;;; N-BITS-SHIFT is the shift amount needed to turn LENGTH into array-size-in-bits,
@@ -365,16 +369,8 @@
   (let* (    ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
              ;; but a single case involving it now.
          (full-length (+ length (if (= widetag simple-base-string-widetag) 1 0)))
-         ;; Be careful not to allocate backing storage for element type NIL.
-         ;; Both it and type BIT have N-BITS-SHIFT = 0, so the determination
-         ;; of true size can't be left up to VECTOR-LENGTH-IN-WORDS.
-         ;; VECTOR-LENGTH-IN-WORDS potentially returns a machine-word-sized
-         ;; integer, so it doesn't match the primitive type restriction of
-         ;; POSITIVE-FIXNUM for the last argument of the vector alloc vops.
          (nwords (the fixnum
-                      (if (/= widetag simple-array-nil-widetag)
-                          (vector-length-in-words full-length n-bits-shift)
-                          0))))
+                      (vector-length-in-words full-length n-bits-shift))))
     #+ubsan (if poisoned ; first arg to allocate-vector must be a constant
                       (allocate-vector t widetag length nwords)
                       (allocate-vector nil widetag length nwords))
