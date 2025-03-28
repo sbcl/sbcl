@@ -1975,23 +1975,36 @@
          (ash-inner (n s)
            (if (and (fixnump s)
                     (> s most-negative-fixnum))
-             (ash n (min s 64))
-             (if (minusp n) -1 0))))
+               (ash n (min s 64))
+               (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))
              (csubtypep shift (specifier-type 'integer))
              (let ((n-low (numeric-type-low n-type))
                    (n-high (numeric-type-high n-type))
                    (s-low (numeric-type-low shift))
                    (s-high (numeric-type-high shift)))
-               (make-numeric-type :class 'integer  :complexp :real
-                                  :low (when n-low
-                                         (if (minusp n-low)
-                                           (ash-outer n-low s-high)
-                                           (ash-inner n-low s-low)))
-                                  :high (when n-high
-                                          (if (minusp n-high)
-                                            (ash-inner n-high s-low)
-                                            (ash-outer n-high s-high))))))
+               (flet ((make (n-low n-high s-low s-high)
+                        (make-numeric-type :class 'integer
+                                           :low (when n-low
+                                                  (if (minusp n-low)
+                                                      (ash-outer n-low s-high)
+                                                      (ash-inner n-low s-low)))
+                                           :high (when n-high
+                                                   (if (minusp n-high)
+                                                       (ash-inner n-high s-low)
+                                                       (ash-outer n-high s-high))))))
+                 (cond ((eql n-low 0)
+                        (type-union (specifier-type '(eql 0))
+                                    (make (1+ n-low) n-high s-low s-high)))
+                       ((and (or (not n-low)
+                                 (minusp n-low))
+                             (or (not n-high)
+                                 (plusp n-high)))
+                        (type-union (make n-low -1 s-low s-high)
+                                    (specifier-type '(eql 0))
+                                    (make 1 n-high s-low s-high)))
+                       (t
+                        (make n-low n-high s-low s-high))))))
         *universal-type*)))
 
 (defoptimizer (ash derive-type) ((n shift))
