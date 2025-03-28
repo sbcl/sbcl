@@ -3772,6 +3772,7 @@
         (give-up-ir1-transform))))
 
 (deftransform ceiling ((number divisor) (integer integer) * :node node)
+  (delay-ir1-transform node :constraint)
   (let ((truncate-type (truncate-derive-type-optimizer node)))
     (if (template-translates 'truncate (combination-args node) (single-value-type truncate-type))
         (let* ((rem-int (type-approximate-interval (lvar-type divisor)))
@@ -3792,7 +3793,7 @@
                                  (high (interval-high n-int)))
                             (if (and low high)
                                 (let ((max (max (abs low) (abs high))))
-                                  `(integer ,(- max) ,max))
+                                  `(integer ,(- max) ,(1- max)))
                                 t))))
           `(multiple-value-bind (tru rem) (truncate number divisor)
              (if (if (minusp divisor)
@@ -3803,6 +3804,11 @@
                  (values tru
                          (truly-the ,rem-type rem)))))
         (give-up-ir1-transform))))
+
+(deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :result result)
+  (if (lvar-single-value-p result)
+      `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0)
+      (give-up-ir1-transform)))
 
 (define-source-transform rem (number divisor)
   `(nth-value 1 (truncate ,number ,divisor)))
