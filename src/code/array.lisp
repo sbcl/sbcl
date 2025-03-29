@@ -499,6 +499,22 @@
                                 the vector length is ~W."
          content-length length))
 
+(defun %make-simple-array (dimensions widetag n-bits)
+  (declare (explicit-check dimensions))
+  (multiple-value-bind (array-rank total-size) (rank-and-total-size-from-dims dimensions)
+    (let ((data (allocate-vector-with-widetag #+ubsan t widetag total-size n-bits)))
+      (cond ((= array-rank 1)
+             data)
+            (t
+             (let* ((array (make-array-header simple-array-widetag array-rank)))
+               (reset-array-flags array +array-fill-pointer-p+)
+               (setf (%array-fill-pointer array) total-size)
+               (setf (%array-available-elements array) total-size)
+               (setf (%array-data array) data)
+               (setf (%array-displaced-from array) nil)
+               (populate-dimensions array dimensions array-rank)
+               array))))))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits

@@ -708,6 +708,10 @@
      node)
   (%make-array-derive-type widetag dims adjustable fill-pointer displaced-to node))
 
+(defoptimizer (sb-vm::%make-simple-array derive-type)
+    ((dims widetag n-bits) node)
+  (%make-array-derive-type widetag dims nil nil nil node))
+
 
 ;;;; constructors
 
@@ -1419,14 +1423,12 @@
                                       ,@(maybe-arg displaced-to)
                                       ,@(maybe-arg displaced-index-offset))))))
                             #-ubsan
-                            (when (and (csubtypep (lvar-type dims)
-                                                  (specifier-type 'integer))
-                                       (not (or initial-element initial-contents
-                                                adjustable fill-pointer displaced-to displaced-index-offset)))
-                             (return
-                               `(multiple-value-bind (widetag shift)
-                                    (sb-vm::%vector-widetag-and-n-bits-shift element-type)
-                                  (%make-array dims widetag shift))))
+                            (when (not (or initial-element initial-contents
+                                           adjustable fill-pointer displaced-to displaced-index-offset))
+                              (return
+                                `(multiple-value-bind (widetag shift)
+                                     (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+                                   (%make-array dims widetag shift))))
                             (give-up-ir1-transform
                              "ELEMENT-TYPE is not constant."))
                            (t
@@ -1614,9 +1616,12 @@
                                :adjustable adjustable
                                :fill-pointer fill-pointer))
 
+(deftransform %make-array ((dims widetag n-bits))
+  `(sb-vm::%make-simple-array dims widetag n-bits))
+
 #-ubsan
-(deftransform %make-array ((dims widetag n-bits)
-                           (integer t t))
+(deftransforms (%make-array sb-vm::%make-simple-array) ((dims widetag n-bits)
+                                                        (integer t t))
   `(sb-vm::allocate-vector-with-widetag widetag dims n-bits))
 
 
