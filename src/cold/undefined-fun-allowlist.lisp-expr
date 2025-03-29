@@ -133,6 +133,7 @@
   sb-interpreter::lexically-unlocked-symbol-p
   sb-interpreter:list-locals
   sb-interpreter::inline-syntactic-closure-lambda)
+ (sb-c::prepare-for-compile)
  ;; Simple-streams symbols in SB-IMPL
  (sb-impl::s-%charpos
   sb-impl::s-%clear-output
@@ -167,22 +168,7 @@
   sb-impl::unencapsulate-generic-function)
  ;; The following functions are in fact defined during make-host-2
  ;; but they are non-toplevel so they appear to be undefined.
- (sb-int:gensymify*
-  sb-int:keywordicate
-  sb-int:package-symbolicate
-  sb-int:symbolicate
-  sb-int:symbolicate!
-  sb-kernel::preinform-compiler-about-accessors
-  sb-kernel::preinform-compiler-about-slot-functions
-  ;; the next four could probably be removed by replacing a lexical
-  ;; closure with a use of LOAD-TIME-VALUE
-  sb-impl::bytes-per-utf8-character-aref
-  sb-impl::bytes-per-utf8-character-sap-ref-8
-  sb-impl::bytes-per-utf8-character/crlf-aref
-  sb-impl::bytes-per-utf8-character/crlf-sap-ref-8
-  sb-impl::user-homedir-namestring
-  sb-lockless:make-so-map/addr
+ (sb-lockless:make-so-map/addr
   sb-c::apply-core-fixups
   sb-c::pack-xref-data
-  sb-c::prepare-for-compile
   sb-sys:reinit-internal-real-time))

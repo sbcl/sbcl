@@ -684,21 +684,18 @@ exist or if is a file or a symbolic link."
                                                      :type nil
                                                      :defaults truename))))))))))
 
-(flet ((not-empty (x)
-         (and (not (equal x "")) x))
-       (lose (&optional username)
-         (error "Couldn't find home directory~@[ for ~S~]." username)))
-
-  #-win32
-  (defun user-homedir-namestring (&optional username)
+(defun user-homedir-namestring (&optional username)
+  (flet ((not-empty (x)
+           (and (not (equal x "")) x))
+         (lose (&optional username)
+           (error "Couldn't find home directory~@[ for ~S~]." username)))
+    #-win32
     (if username
         (sb-unix:user-homedir username)
         (or (not-empty (posix-getenv "HOME"))
             (not-empty (sb-unix:uid-homedir (sb-unix:unix-getuid)))
-            (lose))))
-
-  #+win32
-  (defun user-homedir-namestring (&optional username)
+            (lose)))
+    #+win32
     (if username
         (lose username)
         (or (not-empty (posix-getenv "HOME"))

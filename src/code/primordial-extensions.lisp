@@ -93,72 +93,79 @@
       (gensym (symbol-name x))
       (gensym)))
 
-(labels ((symbol-concat (package ignore-lock &rest things)
-           (dx-let ((strings (make-array (length things)))
-                    (length 0)
-                    (only-base-chars t))
-             ;; This loop is nearly like DO-REST-ARG
-             ;; but it works on the host too.
-             (loop for index from 0 below (length things)
-                   do (let* ((thing (nth index things))
-                             (s (if (integerp thing)
-                                    (write-to-string thing :base 10 :radix nil :pretty nil)
-                                    (string thing)))
-                             (l (length s)))
-                        (setf (svref strings index) s)
-                        (incf length l)
-                        #+sb-unicode
-                        (when (and (typep s '(array character (*)))
-                                   ;; BASE-CHAR-p isn't a standard predicate.
-                                   ;; and host ignores ELT-TYPE anyway.
-                                   #-sb-xc-host (notevery #'base-char-p s))
-                          (setq only-base-chars nil))))
-             ;; We copy the string when interning, so DX is ok.
-             (dx-let ((name (make-array (if package length 0)
-                                        :element-type 'character))
-                      (elt-type (if only-base-chars 'base-char 'character))
-                      (start 0))
-               (unless package
-                 ;; MAKE-SYMBOL doesn't copy NAME (unless non-simple).
-                 (setq name (if only-base-chars
-                                (make-array length :element-type 'base-char)
-                                (make-array length :element-type 'character))))
-               (dotimes (index (length things)
-                               (if package
-                                   (values (%intern name length package elt-type
-                                                    ignore-lock))
-                                   (make-symbol name)))
-                 (let ((s (svref strings index)))
-                   (replace name s :start1 start)
-                   (incf start (length s)))))))
-         #+sb-xc-host (%intern (name length package elt-type dummy)
-                        (declare (ignore length elt-type dummy))
-                        ;; Copy, in case the host respects the DX declaration,
-                        ;; but does not copy, which makes our assumption wrong.
-                        (intern (copy-seq name) package)))
-  ;; Concatenate together the names of some strings and symbols,
-  ;; producing a symbol in the current package.
-  (defun symbolicate (&rest things)
-    (apply #'symbol-concat (sane-package) nil things))
-  ;; "bang" means intern even if the specified package is locked.
-  ;; Obviously it takes a package, so it doesn't need PACKAGE- in its name.
-  ;; The main use is to create interned temp vars. It really seems like there
-  ;; ought to be a single package into which all such vars go,
-  ;; avoiding any interning in locked packages.
-  (defun symbolicate! (package &rest things)
-    (apply #'symbol-concat (find-package package) t things))
-  ;; SYMBOLICATE in given package respecting package-lock.
-  (defun package-symbolicate (package &rest things)
-    (apply #'symbol-concat (find-package package) nil things))
-  ;; like SYMBOLICATE, but producing keywords
-  (defun keywordicate (&rest things)
-    (apply #'symbol-concat *keyword-package* nil things))
-  ;; like the above, but producing an uninterned symbol.
-  ;; [we already have GENSYMIFY, and naming this GENSYMICATE for
-  ;; consistency with the above would not be particularly enlightening
-  ;; as to how it isn't just GENSYMIFY]
-  (defun gensymify* (&rest things)
-    (apply #'symbol-concat nil nil things)))
+#+sb-xc-host
+(defun %intern (name length package elt-type dummy)
+  (declare (ignore length elt-type dummy))
+  ;; Copy, in case the host respects the DX declaration,
+  ;; but does not copy, which makes our assumption wrong.
+  (intern (copy-seq name) package))
+
+(defun %symbol-concat (package ignore-lock &rest things)
+  (dx-let ((strings (make-array (length things)))
+           (length 0)
+           (only-base-chars t))
+    ;; This loop is nearly like DO-REST-ARG
+    ;; but it works on the host too.
+    (loop for index from 0 below (length things)
+          do (let* ((thing (nth index things))
+                    (s (if (integerp thing)
+                           (write-to-string thing :base 10 :radix nil :pretty nil)
+                           (string thing)))
+                    (l (length s)))
+               (setf (svref strings index) s)
+               (incf length l)
+               #+sb-unicode
+               (when (and (typep s '(array character (*)))
+                          ;; BASE-CHAR-p isn't a standard predicate.
+                          ;; and host ignores ELT-TYPE anyway.
+                          #-sb-xc-host (notevery #'base-char-p s))
+                 (setq only-base-chars nil))))
+    ;; We copy the string when interning, so DX is ok.
+    (dx-let ((name (make-array (if package length 0)
+                               :element-type 'character))
+             (elt-type (if only-base-chars 'base-char 'character))
+             (start 0))
+      (unless package
+        ;; MAKE-SYMBOL doesn't copy NAME (unless non-simple).
+        (setq name (if only-base-chars
+                       (make-array length :element-type 'base-char)
+                       (make-array length :element-type 'character))))
+      (dotimes (index (length things)
+                      (if package
+                          (values (%intern name length package elt-type
+                                           ignore-lock))
+                          (make-symbol name)))
+        (let ((s (svref strings index)))
+          (replace name s :start1 start)
+          (incf start (length s)))))))
+
+;;; Concatenate together the names of some strings and symbols,
+;;; producing a symbol in the current package.
+(defun symbolicate (&rest things)
+  (apply #'%symbol-concat (sane-package) nil things))
+
+;;; "bang" means intern even if the specified package is locked.
+;;; Obviously it takes a package, so it doesn't need PACKAGE- in its name.
+;;; The main use is to create interned temp vars. It really seems like there
+;;; ought to be a single package into which all such vars go,
+;;; avoiding any interning in locked packages.
+(defun symbolicate! (package &rest things)
+  (apply #'%symbol-concat (find-package package) t things))
+
+;;; SYMBOLICATE in given package respecting package-lock.
+(defun package-symbolicate (package &rest things)
+  (apply #'%symbol-concat (find-package package) nil things))
+
+;;; like SYMBOLICATE, but producing keywords
+(defun keywordicate (&rest things)
+  (apply #'%symbol-concat *keyword-package* nil things))
+
+;;; like the above, but producing an uninterned symbol.
+;;; [we already have GENSYMIFY, and naming this GENSYMICATE for
+;;; consistency with the above would not be particularly enlightening
+;;; as to how it isn't just GENSYMIFY]
+(defun gensymify* (&rest things)
+  (apply #'%symbol-concat nil nil things))
 
 ;;; Access *PACKAGE* in a way which lets us recover when someone has
 ;;; done something silly like (SETF *PACKAGE* :CL-USER) in unsafe code.
