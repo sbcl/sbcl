@@ -67,6 +67,7 @@
 
 
 ;;;; MAKE-ARRAY
+(declaim (inline %integer-vector-widetag-and-n-bits-shift))
 (defun %integer-vector-widetag-and-n-bits-shift (signed high)
   (let ((unsigned-table
           #.(let ((map (make-array (1+ n-word-bits))))
@@ -92,7 +93,8 @@
                                        (saetp-n-bits-shift saetp))
                              :end (+ (integer-length (numeric-type-high ctype)) 2)))
               map)))
-    (cond ((> high n-word-bits)
+    (cond ((or (not (fixnump high))
+               (> high n-word-bits))
            (values #.simple-vector-widetag
                    #.(1- (integer-length n-word-bits))))
           (signed
@@ -317,7 +319,8 @@
            (let ((types (intersection-type-types ctype)))
              (loop for type in types
                    unless (hairy-type-p type)
-                   return (%vector-widetag-and-n-bits-shift (type-specifier type)))))
+                   return (%vector-widetag-and-n-bits-shift (type-specifier type)))
+             (result simple-vector-widetag)))
           (character-set-type
            #-sb-unicode (result simple-base-string-widetag)
            #+sb-unicode
