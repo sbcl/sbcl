@@ -287,11 +287,7 @@
         (mc-args-p
          (let* ((required (make-dfun-required-args nreq))
                 (gf-args (if applyp
-                             `(list* ,@required
-                                     (sb-c::%listify-rest-args
-                                      .dfun-more-context.
-                                      (the (and unsigned-byte fixnum)
-                                        .dfun-more-count.)))
+                             `(list* ,@required (sb-c::%rest-list .rest.))
                              `(list ,@required))))
            `(named-lambda ,name ,ll
               (declare (ignore .pv. .next-method-call.))
@@ -302,7 +298,7 @@
          `(named-lambda ,name ,ll
             (declare (ignore .pv. .next-method-call.))
             (declare (ignorable ,@(make-dfun-required-args nreq)
-                                ,@(when applyp '(.dfun-more-context. .dfun-more-count.))))
+                                ,@(when applyp '(.rest.))))
             ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
@@ -623,8 +619,9 @@
 (defun wrap-with-applicable-keyword-check (effective valid-keys keyargs-start)
   `(let ((.valid-keys. ',valid-keys)
          (.keyargs-start. ',keyargs-start))
-     (check-applicable-keywords
-      .keyargs-start. .valid-keys. .dfun-more-context. .dfun-more-count.)
+     (multiple-value-bind (.more-context. .more-count.) (sb-c::%rest-context .rest.)
+      (check-applicable-keywords
+       .keyargs-start. .valid-keys. .more-context. .more-count.))
      ,effective))
 
 ;;;; the STANDARD method combination type. This is coded by hand

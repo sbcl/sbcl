@@ -1978,6 +1978,7 @@
 (defknown %rest-true (t t t) * (always-translatable))
 (defknown %rest-list (t) * (always-translatable))
 (defknown %rest-listify (t t t) * (always-translatable))
+(defknown %rest-context (t) * (always-translatable))
 
 (defknown %unary-truncate/single-float (single-float) integer
    (movable foldable flushable no-verify-arg-count))

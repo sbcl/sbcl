@@ -1384,8 +1384,7 @@ bootstrapping.
                                 ,@required-args+rest-arg))
 
 (defmacro invoke-fast-method-call/more (method-call
-                                        more-context
-                                        more-count
+                                        rest-arg
                                         &rest required-args)
   (macrolet ((generate-call (n)
                ``(funcall (fast-method-call-function ,method-call)
@@ -1393,7 +1392,7 @@ bootstrapping.
                           (fast-method-call-next-method-call ,method-call)
                           ,@required-args
                           ,@(loop for x below ,n
-                                  collect `(sb-c::%more-arg ,more-context ,x)))))
+                                  collect `(fast-&rest-nth ,x ,rest-arg)))))
     ;; The cases with only small amounts of required arguments passed
     ;; are probably very common, and special-casing speeds them up by
     ;; a factor of 2 with very little effect on the other
@@ -1402,7 +1401,7 @@ bootstrapping.
     ;; This is enough hardwired cases to handle the 0, 1, or 2 optional
     ;; arguments to STREAM-WRITE-STRING. If you change anything about this,
     ;; make sure to benchmark it.
-    `(case ,more-count
+    `(case (length ,rest-arg)
        (0 ,(generate-call 0))
        (1 ,(generate-call 1))
        (2 ,(generate-call 2))
@@ -1410,7 +1409,7 @@ bootstrapping.
             (values (fast-method-call-pv ,method-call))
             (values (fast-method-call-next-method-call ,method-call))
             ,@required-args
-            (sb-c:%more-arg-values ,more-context 0 ,more-count))))))
+            (values-list ,rest-arg))))))
 
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))

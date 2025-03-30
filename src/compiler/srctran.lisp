@@ -6005,6 +6005,13 @@
   (if (rest-var-more-context-ok list)
       `(%listify-rest-args context count)
       `list))
+
+(define-source-transform %rest-context (rest)
+  (multiple-value-bind (context count) (possible-rest-arg-context rest)
+    (if context
+        `(progn ,rest (values ,context ,count))
+        (bug "no &REST context"))))
+
 
 ;;;; transforming FORMAT
 ;;;;
