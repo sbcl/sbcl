@@ -361,13 +361,17 @@
               ;; When converting a number to a float, the limits are
               ;; the same.
               (let* ((lo (bound-func (lambda (x)
-                                       (if (sb-xc:< x ,most-negative)
+                                       (if (and (not (and (floatp x)
+                                                          (float-infinity-p x)))
+                                                (sb-xc:< x ,most-negative))
                                            ,most-negative
                                            (coerce x ',type)))
                                      (numeric-type-low num)
                                      nil))
                      (hi (bound-func (lambda (x)
-                                       (if (sb-xc:< ,most-positive x )
+                                       (if (and (not (and (floatp x)
+                                                          (float-infinity-p x)))
+                                                (sb-xc:< ,most-positive x ))
                                            ,most-positive
                                            (coerce x ',type)))
                                      (numeric-type-high num)
