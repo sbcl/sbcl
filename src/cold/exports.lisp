@@ -849,7 +849,6 @@ possibly temporarily, because it might be used internally.")
    ;; placeholders in a target system
 
    "UNCROSS"
-   "!UNCROSS-FORMAT-CONTROL"
 
    ;; might as well be shared among the various files which
    ;; need it:
