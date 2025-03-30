@@ -24,8 +24,10 @@ changes relative to sbcl-2.5.2:
     classes to the direct subclasses of the parent.
   * bug fix: stack-allocated unaligned cons cells no longer cause errors in
     the debugger.
-  * bug fix: bad or unknown type specifiers in CHECK-TYPE do not crash the
-    compiler.  (lp#2102644, lp#2102653, lp#2104048)
+  * bug fix: local function type declarations no longer inhibit tail calls in
+    (SAFETY 0) code.  (lp#2039301)
+  * bug fix: bad or unknown type specifiers in CHECK-TYPE do not crash or slow
+    down the compiler.  (lp#2102644, lp#2102653, lp#2102714, lp#2104048)
   * bug fix: numerous bug fixes relating to the type system's handling of
     arrays make SUBTYPEP more reliable and less likely to express a
     contradiction.  (lp#1996980, lp#2100563, lp#2100728, lp#2100779,
