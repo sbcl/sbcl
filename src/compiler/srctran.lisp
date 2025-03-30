@@ -5867,7 +5867,10 @@
                (let ((clambda (node-home-lambda node)))
                  (or (eq home clambda)
                      (and (or (leaf-dynamic-extent clambda)
-                              (not (functional-kind-eq clambda nil)))
+                              (let ((entry (or (lambda-entry-fun clambda)
+                                               (lambda-optional-dispatch clambda))))
+                                (and entry
+                                     (leaf-dynamic-extent entry))))
                           (loop for ref in (leaf-refs clambda)
                                 always (dx-node-p ref)))))))
       (let ((ok (and restp
