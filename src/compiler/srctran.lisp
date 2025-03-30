@@ -780,10 +780,13 @@
          (null type))
      val)
     ((consp val)
-     (let ((xbound (coerce-for-bound (car val) type)))
-       (if (coercion-loses-precision-p (car val) type)
-           xbound
-           (list xbound))))
+     (let ((val (car val)))
+       (if (float-infinity-p val)
+           (list (coerce val type))
+           (let ((xbound (coerce-for-bound val type)))
+             (if (coercion-loses-precision-p val type)
+                 xbound
+                 (list xbound))))))
     ((subtypep type 'double-float)
      (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
          (coerce val type)))
