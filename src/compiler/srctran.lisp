@@ -5987,6 +5987,19 @@
   (if (rest-var-more-context-ok list)
       `(not (eql 0 count))
       `list))
+
+;;; Unlike a plain reference to &rest it will only allocate when
+;;; executed and won't stop other %rest functions
+(define-source-transform %rest-list (rest)
+  (multiple-value-bind (context count) (possible-rest-arg-context rest)
+    (if context
+        `(%rest-listify ,rest ,context ,count)
+        rest)))
+
+(deftransform %rest-listify ((list context count))
+  (if (rest-var-more-context-ok list)
+      `(%listify-rest-args context count)
+      `list))
 
 ;;;; transforming FORMAT
 ;;;;
