@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.2:
+changes in sbcl-2.5.3 relative to sbcl-2.5.2:
   * enhancement: breakpoint debugger commands have been added.  Included is a
     stepper based on breakpoints requiring no extra instrumentation.  However,
     it still has less functionality than the existing single stepper.  See the
