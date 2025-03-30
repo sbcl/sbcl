@@ -5844,23 +5844,28 @@
          (home (when (lambda-var-p var) (lambda-var-home var)))
          (info (when (lambda-var-p var) (lambda-var-arg-info var)))
          (restp (when info (eq :rest (arg-info-kind info)))))
-    (flet ((ref-good-for-more-context-p (ref)
-             (when (not (node-lvar ref)) ; ref that goes nowhere is ok
-               (return-from ref-good-for-more-context-p t))
-             (let ((dest (principal-lvar-end (node-lvar ref))))
-               (and (combination-p dest)
-                    ;; If the destination is to anything but these, we're going to
-                    ;; actually need the rest list -- and since other operations
-                    ;; might modify the list destructively, the using the context
-                    ;; isn't good anywhere else either.
-                    (lvar-fun-is (combination-fun dest)
-                                 '(%rest-values %rest-ref %rest-length
-                                   %rest-null %rest-true))
-                    ;; If the home lambda is different and isn't DX, it might
-                    ;; escape -- in which case using the more context isn't safe.
-                    (let ((clambda (node-home-lambda dest)))
-                      (or (eq home clambda)
-                          (leaf-dynamic-extent clambda)))))))
+    (labels ((ref-good-for-more-context-p (ref)
+               (when (not (node-lvar ref)) ; ref that goes nowhere is ok
+                 (return-from ref-good-for-more-context-p t))
+               (let ((dest (principal-lvar-end (node-lvar ref))))
+                 (and (combination-p dest)
+                      ;; If the destination is to anything but these, we're going to
+                      ;; actually need the rest list -- and since other operations
+                      ;; might modify the list destructively, the using the context
+                      ;; isn't good anywhere else either.
+                      (lvar-fun-is (combination-fun dest)
+                                   '(%rest-values %rest-ref %rest-length
+                                     %rest-null %rest-true %rest-listify))
+                      ;; If the home lambda is different and isn't DX, it might
+                      ;; escape -- in which case using the more context isn't safe.
+                      (dx-node-p dest))))
+             (dx-node-p (node)
+               (let ((clambda (node-home-lambda node)))
+                 (or (eq home clambda)
+                     (and (or (leaf-dynamic-extent clambda)
+                              (not (functional-kind-eq clambda nil)))
+                          (loop for ref in (leaf-refs clambda)
+                                always (dx-node-p ref)))))))
       (let ((ok (and restp
                      (consp (arg-info-default info))
                      (not (lambda-var-specvar var))

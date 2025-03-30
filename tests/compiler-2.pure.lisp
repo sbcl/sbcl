@@ -4743,3 +4743,19 @@
       (typep a '(or simple-vector string)))
     (("") t)
     (((make-hash-table)) nil)))
+
+(with-test (:name :&rest-escaping)
+  (let ((wrapper (lambda (x)
+                   (let ((list (list -1 -2)))
+                     (declare (dynamic-extent list))
+                     (opaque-identity list)
+                     (funcall x)))))
+    (checked-compile-and-assert
+        ()
+        `(lambda (control &rest arguments)
+           (lambda ()
+             (with-standard-io-syntax
+               (apply #'format nil control arguments))))
+      (("~a~a~a" 1 2 3) "123" :test (lambda (f a)
+                                      (assert (equal (funcall wrapper (car f)) (car a)))
+                                      t)))))
