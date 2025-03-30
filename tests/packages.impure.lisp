@@ -1052,7 +1052,7 @@ if a restart was invoked."
   ;; Confirm that the compiler does not know that KEYWORDICATE
   ;; returns a KEYWORD (so the answer isn't constant-folded)
   (assert (sb-kernel:type= (sb-int:info :function :type 'sb-int:keywordicate)
-                           (sb-kernel:find-classoid 'function)))
+                           (sb-kernel:specifier-type '(function * (values t &optional)))))
   (let ((sema (sb-thread:make-semaphore))
         (n-threads 10))
     (dotimes (i 10) ; number of trials
