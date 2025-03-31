@@ -90,6 +90,7 @@
       (%make-fd-stream
        :cout #'cout
        :sout (lambda (stream string start end)
+               (declare (simple-string string))
                (loop for i from start below end
                      do (cout stream (char string i))))
        :misc (lambda (stream operation arg1)
