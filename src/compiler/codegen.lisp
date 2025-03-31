@@ -267,7 +267,8 @@
             ;; FIXME: see comment in ASSEMBLE-SECTIONS - we *can* enforce larger
             ;; alignment than the size of a cons cell.
             (let ((alignp (let ((cloop (block-loop 1block)))
-                            (when (and cloop
+                            (when (and (policy (block-start-node 1block) (<= space 1))
+                                       cloop
                                        (loop-tail cloop)
                                        (not (loop-info cloop)))
                               ;; Mark the loop as aligned by saving the IR1 block aligned.
