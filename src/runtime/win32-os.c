@@ -167,11 +167,13 @@ void* os_dlsym_default(char* name)
     HANDLE process = GetCurrentProcess();
     HMODULE modules[1024];
     DWORD needed;
+    if (K32EnumProcessModules(process, modules, sizeof(modules), &needed)) {
+        DWORD fetched = (needed / sizeof(HMODULE));
 
-    if (K32EnumProcessModules(process, modules, sizeof(modules), &needed))
-    {
-        for ( i = 0; i < (needed / sizeof(HMODULE)); i++ )
-        {
+        if (fetched > sizeof(modules))
+            fetched = sizeof(modules);
+
+        for (i = 0; i < fetched; i++) {
             if ((result = GetProcAddress(modules[i], name)))
                 return result;
         }
