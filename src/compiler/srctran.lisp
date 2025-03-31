@@ -5851,7 +5851,8 @@
          (var (when (ref-p use) (ref-leaf use)))
          (home (when (lambda-var-p var) (lambda-var-home var)))
          (info (when (lambda-var-p var) (lambda-var-arg-info var)))
-         (restp (when info (eq :rest (arg-info-kind info)))))
+         (restp (when info (eq :rest (arg-info-kind info))))
+         (seen '()))
     (labels ((ref-good-for-more-context-p (ref)
                (when (not (node-lvar ref)) ; ref that goes nowhere is ok
                  (return-from ref-good-for-more-context-p t))
@@ -5868,15 +5869,18 @@
                       ;; escape -- in which case using the more context isn't safe.
                       (dx-node-p dest))))
              (dx-node-p (node)
-               (let ((clambda (node-home-lambda node)))
-                 (or (eq home clambda)
-                     (and (or (leaf-dynamic-extent clambda)
-                              (let ((entry (or (lambda-entry-fun clambda)
-                                               (lambda-optional-dispatch clambda))))
+               (let ((fun (node-home-lambda node)))
+                 (or (eq home fun)
+                     (and (or (leaf-dynamic-extent fun)
+                              (let ((entry (or (lambda-entry-fun fun)
+                                               (lambda-optional-dispatch fun))))
                                 (and entry
                                      (leaf-dynamic-extent entry))))
-                          (loop for ref in (leaf-refs clambda)
-                                always (dx-node-p ref)))))))
+                          (cond ((member fun seen) t)
+                                (t
+                                 (push fun seen)
+                                 (loop for ref in (leaf-refs fun)
+                                       always (dx-node-p ref)))))))))
       (let ((ok (and restp
                      (consp (arg-info-default info))
                      (not (lambda-var-specvar var))

@@ -4759,3 +4759,18 @@
       (("~a~a~a" 1 2 3) "123" :test (lambda (f a)
                                       (assert (equal (funcall wrapper (car f)) (car a)))
                                       t)))))
+
+(with-test (:name :&rest-escaping.recursive-reference)
+  (checked-compile-and-assert
+   ()
+   `(lambda (control &rest arguments)
+      (labels ((f ()
+                 (opaque-identity #'g)
+                 (apply #'format nil control arguments))
+               (g ()
+                 (opaque-identity #'f #'f)))
+        (declare (dynamic-extent #'g #'f))
+        (opaque-identity #'g)
+        (opaque-identity #'f)
+        (f)))
+   (("~a~a~a" 1 2 3) "123")))
