@@ -3814,7 +3814,8 @@
         (give-up-ir1-transform))))
 
 (deftransform ceiling ((number divisor) ((and unsigned-byte fixnum) (and unsigned-byte fixnum)) * :result result)
-  (if (lvar-single-value-p result)
+  (if (and result
+           (lvar-single-value-p result))
       `(values (truly-the fixnum (truncate (+ number (1- divisor)) divisor)) 0)
       (give-up-ir1-transform)))
 
@@ -3869,6 +3870,7 @@
           (mask (1- y-abs))
           (delta (* (signum y) (1- y-abs))))
       (if (and (plusp y)
+               result
                (lvar-single-value-p result)
                (csubtypep (lvar-type result) (specifier-type 'word))
                (not (csubtypep (lvar-type x)
