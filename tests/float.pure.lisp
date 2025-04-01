@@ -874,3 +874,27 @@
                  #1#
                  (values (ftruncate p 2d0)))
                (eql 5.063089511386214d18)))
+
+(with-test (:name :truncate-big-float)
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (declare (double-float p))
+      (truncate p 3d0))
+   ((most-positive-double-float) (truncate (/ most-positive-double-float 3d0))))
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (declare (double-float p))
+      (floor p 3d0))
+   ((most-positive-double-float) (floor (/ most-positive-double-float 3d0))))
+  (checked-compile-and-assert
+   (:optimize nil)
+   `(lambda (p)
+      (truncate p 3d0))
+   ((most-positive-double-float) (truncate (/ most-positive-double-float 3d0))))
+  (checked-compile-and-assert
+   (:optimize nil)
+   `(lambda (p)
+      (floor p 3d0))
+   ((most-positive-double-float) (floor (/ most-positive-double-float 3d0)))))
