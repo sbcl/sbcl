@@ -1450,13 +1450,13 @@
                   (double-float 'sb-kernel:%make-double-float))
                (if (%bignum-0-or-plusp bignum bignum-length)
                    (let* ((length (truly-the bignum-length (bignum-buffer-integer-length bignum bignum-length)))
-                          (shift (- length ,(const 'digits)))
-                          ;; Get one more bit for rounding
+                          (shift (- length ,(const 'digits) 1)) ;; Get one more bit for rounding
                           (shifted (truly-the fixnum
                                               (last-bignum-part=>fixnum (- sb-bignum::digit-size ,(const 'digits))
-                                                                        (1- shift) bignum)))
-                          ;; Cut off the hidden bit
-                          (signif (ldb ,(const 'significand-byte) (ash shifted -1)))
+                                                                        shift bignum)))
+                          (signif (ldb (byte (byte-size ,(const 'significand-byte)) ; Cut off the hidden bit
+                                             1) ; and the rounding bit
+                                       shifted))
                           (exp (truly-the (unsigned-byte ,(byte-size sb-vm:double-float-exponent-byte))
                                           (+ ,(const 'bias) length)))
                           (bits (ash exp
@@ -1478,8 +1478,8 @@
                    (multiple-value-bind (last1 last2) (bignum-negate-last-two bignum bignum-length)
                      (let* ((last2-length (integer-length last2))
                             (length (+ last2-length (* (1- bignum-length) digit-size)))
-                            (shift (- length ,(const 'digits)))
-                            (bit-index (rem (1- shift) digit-size))
+                            (shift (- length ,(const 'digits) 1))
+                            (bit-index (rem shift digit-size))
                             (shifted (cond ((zerop last2)
                                             (truly-the word (ash last1 (- bit-index))))
                                            ((<= bit-index (- digit-size (1+ ,(const 'digits))))
