@@ -320,17 +320,15 @@
                        (mv-bind-unused-p lvar 1))
                (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
                                                floor sb-kernel::floor1
-                                               ceiling sb-kernel::ceiling1)
+                                               ceiling sb-kernel::ceiling1
+                                               ftruncate sb-kernel::ftruncate1
+                                               ffloor sb-kernel::ffloor1
+                                               fceiling sb-kernel::fceiling1)
                                              combination-name)))
                  (when single-value-fun
                    (unless (cdr args)
-                     (let* ((leaf (find-constant 1))
-                            (ref (make-ref leaf))
-                            (lvar (make-lvar combination)))
-                       (use-lvar ref lvar)
-                       (push ref (leaf-refs leaf))
-                       (insert-ref-before ref combination-name)
-                       (setf (cdr args) (list lvar))))
+                     (setf (cdr args)
+                           (list (insert-ref-before (find-constant 1) combination))))
                    (change-full-call combination single-value-fun)
                    (setf (node-derived-type combination)
                          (make-single-value-type (single-value-type (node-derived-type combination)))))))))

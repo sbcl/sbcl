@@ -236,6 +236,8 @@
   (let ((kind (basic-combination-kind call))
         (info (basic-combination-fun-info call)))
 
+    (rewrite-full-call call)
+
     (dolist (arg (basic-combination-args call))
       (unless (lvar-info arg)
         (setf (lvar-info arg)
@@ -253,8 +255,7 @@
          (when (basic-combination-info call)
            (signal-delayed-combination-condition call))
          (setf (basic-combination-kind call) :full))
-       (setf (basic-combination-info call) :full)
-       (rewrite-full-call call))))
+       (setf (basic-combination-info call) :full))))
   (annotate-fun-lvar (basic-combination-fun call))
   (values))
 

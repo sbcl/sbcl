@@ -927,13 +927,14 @@
         cast))))
 
 (defun insert-ref-before (leaf node)
-  (let ((ref (make-ref leaf))
-        (lvar (make-lvar node)))
-    (insert-node-before node ref)
-    (push ref (leaf-refs leaf))
-    (setf (leaf-ever-used leaf) t)
-    (use-lvar ref lvar)
-    lvar))
+  (with-ir1-environment-from-node node
+    (let ((ref (make-ref leaf))
+          (lvar (make-lvar node)))
+      (insert-node-before node ref)
+      (push ref (leaf-refs leaf))
+      (setf (leaf-ever-used leaf) t)
+      (use-lvar ref lvar)
+      lvar)))
 
 ;;;; miscellaneous shorthand functions
 

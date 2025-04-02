@@ -651,47 +651,51 @@
         (foreach single-float double-float #+long-float long-float))
        (fround-float (dispatch-type divisor))))))
 
-(macrolet ((def (name mode docstring)
-             `(defun ,name (number &optional (divisor 1))
-                ,docstring
+(macrolet ((def (name mode docstring &optional values)
+             `(defun ,name (number ,@(if values
+                                         `(divisor)
+                                         `(&optional (divisor 1))))
                 (declare (explicit-check))
-                (macrolet ((ftruncate-float (rtype)
-                             `(let* ((float-div (coerce divisor ',rtype))
-                                     (res (,(case rtype
-                                              (double-float 'sb-kernel:round-double)
-                                              (single-float 'sb-kernel:round-single))
-                                           (/ number float-div)
-                                           ,,mode)))
-                                (values res
-                                        (- number
-                                           (* (coerce res ',rtype) float-div)))))
-                           (unary-ftruncate-float (rtype)
-                             `(let* ((res (,(case rtype
-                                              (double-float 'sb-kernel:round-double)
-                                              (single-float 'sb-kernel:round-single))
-                                           number
-                                           ,,mode)))
-                                (values res (- number res)))))
-                  (number-dispatch ((number real) (divisor real))
-                    (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
-                     (multiple-value-bind (q r)
-                         (,(find-symbol (string mode) :cl) number divisor)
-                       (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
-                                              (and (not (minusp number)) (minusp divisor))))
-                           (values -0f0 r)
-                           (values (float q) r))))
-                    (((foreach single-float double-float)
-                      (or rational single-float))
-                     (if (eql divisor 1)
-                         (unary-ftruncate-float (dispatch-type number))
-                         (ftruncate-float (dispatch-type number))))
-                    ((double-float (or single-float double-float))
-                     (ftruncate-float double-float))
-                    ((single-float double-float)
-                     (ftruncate-float double-float))
-                    (((foreach fixnum bignum ratio)
-                      (foreach single-float double-float))
-                     (ftruncate-float (dispatch-type divisor))))))))
+                ,docstring
+                ,(wrap-if
+                  values '(values)
+                  `(macrolet ((ftruncate-float (rtype)
+                                `(let* ((float-div (coerce divisor ',rtype))
+                                        (res (,(case rtype
+                                                 (double-float 'sb-kernel:round-double)
+                                                 (single-float 'sb-kernel:round-single))
+                                              (/ number float-div)
+                                              ,,mode)))
+                                   (values res
+                                           (- number
+                                              (* (coerce res ',rtype) float-div)))))
+                              (unary-ftruncate-float (rtype)
+                                `(let* ((res (,(case rtype
+                                                 (double-float 'sb-kernel:round-double)
+                                                 (single-float 'sb-kernel:round-single))
+                                              number
+                                              ,,mode)))
+                                   (values res (- number res)))))
+                     (number-dispatch ((number real) (divisor real))
+                       (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
+                        (multiple-value-bind (q r)
+                            (,(find-symbol (string mode) :cl) number divisor)
+                          (if (and (zerop q) (or (and (minusp number) (not (minusp divisor)))
+                                                 (and (not (minusp number)) (minusp divisor))))
+                              (values -0f0 r)
+                              (values (float q) r))))
+                       (((foreach single-float double-float)
+                         (or rational single-float))
+                        (if (eql divisor 1)
+                            (unary-ftruncate-float (dispatch-type number))
+                            (ftruncate-float (dispatch-type number))))
+                       ((double-float (or single-float double-float))
+                        (ftruncate-float double-float))
+                       ((single-float double-float)
+                        (ftruncate-float double-float))
+                       (((foreach fixnum bignum ratio)
+                         (foreach single-float double-float))
+                        (ftruncate-float (dispatch-type divisor)))))))))
   (def ftruncate :truncate
     "Same as TRUNCATE, but returns first value as a float.")
 
@@ -700,6 +704,12 @@
 
   (def fceiling :ceiling
     "Same as CEILING, but returns first value as a float.")
+
+  (def ftruncate1 :truncate nil t)
+
+  (def ffloor1 :floor nil t)
+
+  (def fceiling1 :ceiling nil t)
 
   #+round-float
   (def fround :round
