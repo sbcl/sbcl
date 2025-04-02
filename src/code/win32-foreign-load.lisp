@@ -26,10 +26,13 @@
 (define-alien-routine os-dlsym-default sb-win32:int-ptr
   (symbol c-string))
 
+(define-alien-routine sb-dlsym sb-win32:int-ptr
+  (symbol c-string))
+
 (define-alien-routine ("SetStdHandle" set-std-handle)
-   void
- (id int)
- (handle int))
+  void
+  (id int)
+  (handle int))
 
 (define-alien-routine ("GetStdHandle" get-std-handle)
   int
@@ -79,9 +82,19 @@
     (setf (shared-object-handle obj) nil)))
 
 (defun find-dynamic-foreign-symbol-address (symbol)
-  (let ((addr (os-dlsym-default (coerce symbol 'base-string))))
-    (unless (zerop addr)
-      addr)))
+  (let* ((extern (coerce symbol 'base-string))
+         (result nil))
+    (dolist (handle
+             (cons *runtime-dlhandle*
+                   (mapcar #'shared-object-handle *shared-objects*)))
+      (when handle
+        (setf result (sap-int (getprocaddress handle extern)))
+        (when (not (zerop result))
+          (return-from find-dynamic-foreign-symbol-address result))))
+    ;; Search everything
+    (let ((addr (sb-dlsym extern)))
+      (unless (zerop addr)
+        addr))))
 
 (defun runtime-exported-symbols ()
   ;; TODO: reimplement for x86-64. Not so hard.

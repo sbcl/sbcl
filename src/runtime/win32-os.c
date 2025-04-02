@@ -154,9 +154,132 @@ void unmap_gc_page()
                              PAGE_NOACCESS, &oldProt));
 }
 
+uint32_t os_get_build_time_shared_libraries(uint32_t excl_maximum,
+                                       void* opt_root,
+                                       void** opt_store_handles,
+                                       const char *opt_store_names[])
+{
+    char* base = opt_root ? opt_root : (void*)runtime_module_handle;
+    /* base defaults to 0x400000 with GCC/mingw32. If you dereference
+     * that location, you'll see 'MZ' bytes */
+    char* base_magic_location =
+        base + ((IMAGE_DOS_HEADER*)base)->e_lfanew;
+
+    /* dos header provided the offset from `base' to
+     * IMAGE_FILE_HEADER where PE-i386 really starts */
+
+    void* check_duplicates[excl_maximum];
+
+    if ((*(uint32_t*)base_magic_location)!=0x4550) {
+        /* We don't need this DLL thingie _that_ much. If the world
+         * has changed to a degree where PE magic isn't found, let's
+         * silently return `no libraries detected'. */
+        return 0;
+    } else {
+        /* We traverse PE-i386 structures of SBCL.EXE in memory (not
+         * in the file). File and memory layout _surely_ differ in
+         * some places and _may_ differ in some other places, but
+         * fortunately, those places are irrelevant to the task at
+         * hand. */
+
+        IMAGE_FILE_HEADER* image_file_header = (void*)(base_magic_location + 4);
+        IMAGE_OPTIONAL_HEADER* image_optional_header =
+            (void*)(image_file_header + 1);
+        IMAGE_DATA_DIRECTORY* image_import_direntry =
+            &image_optional_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+        IMAGE_IMPORT_DESCRIPTOR* image_import_descriptor =
+            (void*)(base + image_import_direntry->VirtualAddress);
+        uint32_t nlibrary, j;
+
+        for (nlibrary=0u; nlibrary < excl_maximum
+                          && image_import_descriptor->FirstThunk;
+             ++image_import_descriptor)
+        {
+            HMODULE hmodule;
+            odxprint(runtime_link, "Now should know DLL: %s",
+                     (char*)(base + image_import_descriptor->Name));
+            /* Code using image thunk data to get its handle was here, with a
+             * number of platform-specific tricks (like using VirtualQuery for
+             * old OSes lacking GetModuleHandleEx).
+             *
+             * It's now replaced with requesting handle by name, which is
+             * theoretically unreliable (with SxS, multiple modules with same
+             * name are quite possible), but good enough to find the
+             * link-time dependencies of our executable or DLL. */
+
+            hmodule = (HMODULE)
+                GetModuleHandle(base + image_import_descriptor->Name);
+
+            if (hmodule)
+            {
+                /* We may encouncer some module more than once while
+                   traversing import descriptors (it's usually a
+                   result of non-trivial linking process, like doing
+                   ld -r on some groups of files before linking
+                   everything together.
+
+                   Anyway: using a module handle more than once will
+                   do no harm, but it slows down the startup (even
+                   now, our startup time is not a pleasant topic to
+                   discuss when it comes to :linkage-table; there is
+                   an obvious direction to go for speed, though --
+                   instead of resolving symbols one-by-one, locate PE
+                   export directories -- they are sorted by symbol
+                   name -- and merge them, at one pass, with sorted
+                   list of required symbols (the best time to sort the
+                   latter list is during Genesis -- that's why I don't
+                   proceed with memory copying, qsort() and merge
+                   right here)). */
+
+                for (j=0; j<nlibrary; ++j)
+                {
+                    if(check_duplicates[j] == hmodule)
+                        break;
+                }
+                if (j<nlibrary) continue; /* duplicate => skip it in
+                                           * outer loop */
+
+                check_duplicates[nlibrary] = hmodule;
+                if (opt_store_handles) {
+                    opt_store_handles[nlibrary] = hmodule;
+                }
+                if (opt_store_names) {
+                    opt_store_names[nlibrary] = (const char *)
+                        (base + image_import_descriptor->Name);
+                }
+                odxprint(runtime_link, "DLL detection: %u, base %p: %s",
+                         nlibrary, hmodule,
+                         (char*)(base + image_import_descriptor->Name));
+                ++ nlibrary;
+            }
+        }
+        return nlibrary;
+    }
+}
+
+static uint32_t buildTimeImageCount = 0;
+static void* buildTimeImages[16];
+
+/* Resolve symbols against the executable and its build-time dependencies */
+void* os_dlsym_default(char* name)
+{
+    unsigned int i;
+    void* result = 0;
+
+    buildTimeImages[0] = (void*)runtime_module_handle;
+    if (buildTimeImageCount == 0) {
+        buildTimeImageCount =
+            1 + os_get_build_time_shared_libraries(15u,
+                                                   NULL, 1+(void**)buildTimeImages, NULL);
+    }
+    for (i = 0; i<buildTimeImageCount && (!result); ++i) {
+        result = GetProcAddress(buildTimeImages[i], name);
+    }
+    return result;
+}
 BOOL K32EnumProcessModules(HANDLE  hProcess, HMODULE *lphModule, DWORD cb, LPDWORD lpcbNeeded);
 
-void* os_dlsym_default(char* name)
+void* sb_dlsym(char* name)
 {
     unsigned int i;
     void* result = 0;
