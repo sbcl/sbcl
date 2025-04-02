@@ -136,10 +136,9 @@ src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
 # contrib/Makefile shouldn't be counted in NCONTRIBS nor should asdf and uiop.
 # The asdf directory produces 2 fasls, so is unlike all our other contribs
 # and would therefore mess up the accounting here if included.
-NCONTRIBS=`ls -1 contrib/sb-*/Makefile | wc -l`
 NPASSED=`ls obj/sbcl-home/contrib/sb-*.fasl | wc -l`
 echo
-echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
+echo "The build seems to have finished successfully, including $NPASSED"
 echo "contributed modules. If you would like to run more extensive tests on"
 echo "the new SBCL, you can try:"
 echo
