@@ -879,4 +879,4 @@
   (multiple-value-bind (q r) (truncate (opaque-identity 1f30)
                                        (opaque-identity 49.12944))
     (assert (= q 20354393599312814931347243008))
-    (assert (= r 7.5557864e22))))
+    (assert (= r #-x86 7.5557864e22 #+x86 4.971228e22))))
