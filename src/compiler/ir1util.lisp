@@ -292,7 +292,8 @@
         (let ((fun (combination-lambda dest)))
           (when (functional-kind-eq fun mv-let)
             (let ((var (nth nth-value (lambda-vars fun))))
-              (notany #'node-lvar (leaf-refs var)))))))))
+              (and var
+                   (notany #'node-lvar (leaf-refs var))))))))))
 
 (defun combination-matches (name args combination)
   (and (combination-p combination)
