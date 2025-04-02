@@ -876,25 +876,7 @@
                (eql 5.063089511386214d18)))
 
 (with-test (:name :truncate-big-float)
-  (checked-compile-and-assert
-   ()
-   `(lambda (p)
-      (declare (double-float p))
-      (truncate p 3d0))
-   ((most-positive-double-float) (truncate (/ most-positive-double-float 3d0))))
-  (checked-compile-and-assert
-   ()
-   `(lambda (p)
-      (declare (double-float p))
-      (floor p 3d0))
-   ((most-positive-double-float) (floor (/ most-positive-double-float 3d0))))
-  (checked-compile-and-assert
-   (:optimize nil)
-   `(lambda (p)
-      (truncate p 3d0))
-   ((most-positive-double-float) (truncate (/ most-positive-double-float 3d0))))
-  (checked-compile-and-assert
-   (:optimize nil)
-   `(lambda (p)
-      (floor p 3d0))
-   ((most-positive-double-float) (floor (/ most-positive-double-float 3d0)))))
+  (multiple-value-bind (q r) (truncate (opaque-identity 1f30)
+                                       (opaque-identity 49.12944))
+    (assert (= q 20354393599312814931347243008))
+    (assert (= r 7.5557864e22))))

@@ -2212,6 +2212,30 @@
 
 (macrolet ((def (type)
              (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
+               `(defun ,(symbolicate 'unary-truncate- type '-to-bignum-div) (quot number divisor)
+                  (declare (inline ,decode))
+                  (multiple-value-bind (bits exp sign) (,decode quot)
+                    (let ((truncated ,(case type
+                                        #-64-bit
+                                        (double-float
+                                         ;; Shifting negatives right is different
+                                         `(let ((truncated (ash bits exp)))
+                                            (if (minusp sign)
+                                                (- truncated)
+                                                truncated)))
+                                        (t
+                                         `(bignum-ashift-left-fixnum (if (minusp sign)
+                                                                         (- bits)
+                                                                         bits)
+                                                                     exp)))))
+                      (values
+                       truncated
+                       (- number (* quot divisor)))))))))
+  (def double-float)
+  (def single-float))
+
+(macrolet ((def (type)
+             (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
                `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
                   (declare (inline ,decode))
                   (multiple-value-bind (bits exp sign) (,decode number)

@@ -1824,10 +1824,51 @@
   (def single-float)
   (def double-float))
 
-#+(and (not round-float) 64-bit)
+(defmacro make-defs (vars &body body)
+  (labels ((subst-if-with (test tree)
+             (labels ((s (subtree)
+                        (let ((test (funcall test subtree)))
+                          (cond (test)
+                                ((atom subtree) subtree)
+                                (t (let ((car (s (car subtree)))
+                                         (cdr (s (cdr subtree))))
+                                     (if (and (eq car (car subtree))
+                                              (eq cdr (cdr subtree)))
+                                         subtree
+                                         (cons car cdr))))))))
+               (s tree)))
+           (test (pattern with)
+             (lambda (x)
+               (when (symbolp x)
+                 (let* ((str (string x))
+                        (float (search pattern str)))
+                   (when float
+                     (symbolicate (subseq str 0 float)
+                                  with
+                                  (subseq str (+ float (length pattern)))))))))
+           (gen (vars body)
+             (if vars
+                 (loop for with in (cdar vars)
+                       append
+                       (gen (cdr vars)
+                            (subst-if-with (test (string (caar vars)) with) body)))
+                 body)))
+    `(progn ,@(gen vars body))))
+
+(make-defs (($float single-float double-float))
+  (deftransform unary-truncate-$float-to-bignum-div ((quot number divisor) * * :result result)
+    (if (or (and result
+                 (lvar-single-value-p result))
+            #+64-bit
+            (and (constant-lvar-p divisor) (sb-xc:= 1 (lvar-value divisor))))
+        `(values (unary-truncate-$float-to-bignum quot) (coerce 0 '$float))
+        (give-up-ir1-transform))))
+
+#-round-float
 (macrolet ((def (type other-float-arg-types)
              (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
-                    (unary-to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
+                    (to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
+                    (to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
                     (coerce (symbolicate "%" type))
                     (fixnum-type `(,type
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
@@ -1848,7 +1889,9 @@
                             `(unary-truncate x)
                             `(if (typep x ',',fixnum-type)
                                  (values (truly-the fixnum (,',unary x)) x)
-                                 (,',unary-to-bignum x)))
+                                 ,(wrap-if result
+                                           `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
+                                           `(,',to-bignum x))))
                         `(let* ((f (,',coerce y))
                                 (div (/ x f)))
                            (if (typep div ',',fixnum-type)
@@ -1858,19 +1901,23 @@
                                                  (locally
                                                      (declare (flushable ,',coerce))
                                                    (,',coerce r))))))
-                               (,',unary-to-bignum div)))))))))
+                               ,(wrap-if result
+                                         `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
+                                         `(,',to-bignum-div div x f))))))))))
   (def single-float ())
   (def double-float (single-float)))
 
 (macrolet ((def (name type other-float-arg-types)
-             (let* ((unary-to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
+             (let* ((to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
+                    (to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
                     (coerce (symbolicate "%" type))
                     (fixnum-type `(,type
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))))
                `(deftransform ,name ((number &optional divisor)
                                      (,type
-                                      &optional (or ,type ,@other-float-arg-types integer)))
+                                      &optional (or ,type ,@other-float-arg-types integer))
+                                     * :result result)
                   (let ((one-p (or (not divisor)
                                    (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
                     `(let* (,@(if one-p
@@ -1893,15 +1940,20 @@
                                                    ,,(ecase type
                                                        (double-float 0.0d0)
                                                        (single-float 0.0f0))))))
-                           (,',unary-to-bignum #+64-bit div
-                                               #-64-bit quot))))))))
+                           ,(wrap-if result
+                                     `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
+                                     (if one-p
+                                         `(,',to-bignum #+64-bit div
+                                                        #-64-bit quot)
+                                         `(,',to-bignum-div #+64-bit div
+                                                            #-64-bit quot number f-divisor))))))))))
   (def floor single-float ())
   (def floor double-float (single-float))
   (def ceiling single-float ())
   (def ceiling double-float (single-float))
-  #+(or round-float (not 64-bit))
+  #+round-float
   (def truncate single-float ())
-  #+(or round-float (not 64-bit))
+  #+round-float
   (def truncate double-float (single-float)))
 
 #-round-float

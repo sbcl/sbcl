@@ -353,8 +353,19 @@
 (defknown unary-truncate-double-float-to-bignum (double-float)
     (values (and integer #+64-bit bignum)
             (and double-float #+64-bit (eql 0d0)))
-   (foldable movable flushable fixed-args)
+   (foldable movable flushable fixed-args unboxed-return)
   :folder #'truncate)
+
+(defknown unary-truncate-single-float-to-bignum-div
+    (single-float single-float single-float) (values bignum single-float)
+    (foldable movable flushable fixed-args unboxed-return)
+  :folder (lambda (quot number div) (values (truncate quot) (- number (* quot div)))))
+
+(defknown unary-truncate-double-float-to-bignum-div
+    (double-float double-float double-float) (values (and integer #+64-bit bignum)
+                                                     double-float)
+   (foldable movable flushable fixed-args unboxed-return)
+  :folder (lambda (quot number div) (values (truncate quot) (- number (* quot div)))))
 
 (defknown %unary-truncate-single-float-to-bignum (single-float) bignum
    (foldable movable flushable fixed-args)
