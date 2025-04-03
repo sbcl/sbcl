@@ -7,6 +7,15 @@ jobs:
 
     runs-on: windows-latest    
 
+    strategy:
+      matrix:
+        include:
+          - { sys: mingw64, env: x86_64, arch: x86-64}
+          # - { sys: mingw32, env: i686, arch: x86}
+          - { sys: ucrt64,  env: ucrt-x86_64, arch: x86-64}
+
+      fail-fast: false
+
     defaults:
       run:
         shell: msys2 {0}
@@ -15,7 +24,8 @@ jobs:
     - uses: actions/checkout@v1
     - uses: msys2/setup-msys2@v2
       with:
-        install: mingw-w64-x86_64-gcc make diffutils git libzstd-devel
+        install: mingw-w64-${{matrix.env}}-gcc make diffutils git libzstd-devel
+        msystem: ${{matrix.sys}}
 
     - name: install host sbcl
       shell: pwsh
@@ -27,7 +37,7 @@ jobs:
       run: |
         PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
         export PATH
-        ./make.sh --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+        ./make.sh --arch=${{matrix.arch}} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make installer
       run: |
         ./make-windows-installer.sh
@@ -35,8 +45,8 @@ jobs:
     - name: save installer
       uses: actions/upload-artifact@v4
       with:
-        name: sbcl-windows-installer
-        path: sbcl-windows-installer
+        name: sbcl-windows-installer-${{ matrix.sys }}
+        path: sbcl-windows-installer-${{ matrix.sys }}
     - name: tests
       working-directory: tests
       run: ./run-tests.sh
