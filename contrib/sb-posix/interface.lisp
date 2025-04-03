@@ -744,8 +744,11 @@ not supported."
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (lisp-for-c-symbol name))
-        (real-name #+inode64 (format nil "~A$INODE64" name)
-                   #-inode64 name))
+        (real-name (or #+inode64
+                       (format nil "~A$INODE64" name)
+                       #+(and ucrt 64-bit)
+                       (format nil "~A64" name)
+                       name)))
     `(progn
       (export ',lisp-name :sb-posix)
       (declaim (inline ,lisp-name))

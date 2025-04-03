@@ -34,6 +34,7 @@ featurep() {
 # It will get added in by Config.*-win32 only if LISP_FEATURE_SB_FUTEX.
 if [ "$sbcl_os" = win32 ] ; then
    LOADLIBES=-lSynchronization featurep os-provides-wakebyaddr sb-futex
+   featurep ucrt
 fi
 
 featurep os-provides-dlopen
