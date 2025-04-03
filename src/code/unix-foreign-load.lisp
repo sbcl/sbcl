@@ -66,21 +66,23 @@
 
 (defun find-dynamic-foreign-symbol-address (symbol)
   (dlerror)                             ; clear old errors
-  (unless *runtime-dlhandle*
-    (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
   ;; On real ELF & dlsym platforms the EXTERN-ALIEN-NAME is a no-op,
   ;; but on platforms where dlsym is simulated we use the mangled name.
-  (let* ((extern (extern-alien-name symbol))
-         (result (sap-int (dlsym *runtime-dlhandle* extern)))
-         (err (dlerror)))
-    (if (or (not (zerop result)) (not err))
-        result
-        (dolist (obj *shared-objects*)
-          (let ((sap (shared-object-handle obj)))
-            (when sap
-              (setf result (sap-int (dlsym sap extern))
-                    err (dlerror))
-              (when (or (not (zerop result)) (not err))
-                (return result))))))))
+  (let* ((extern (extern-alien-name symbol)))
+    (flet ((sym (handle)
+             (let ((result (sap-int (dlsym handle extern)))
+                   (err (dlerror)))
+               (when (or (not (zerop result)) (not err))
+                 (return-from find-dynamic-foreign-symbol-address result)))))
+      ;; Search the loaded libraries first, *runtime-dlhandle* on some
+      ;; BSDs will actually search all symbols and might pick up the wrong
+      ;; thing.
+      (dolist (obj *shared-objects*)
+        (let ((handle (shared-object-handle obj)))
+          (when handle
+            (sym handle))))
+      (unless *runtime-dlhandle*
+        (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
+      (sym *runtime-dlhandle*))))
 
 
