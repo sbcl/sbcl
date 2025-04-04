@@ -382,13 +382,13 @@
              ((or (eq type 'vector)
                   (eq type 'simple-vector))
               (return-from make-sequence
-                (if initial-element
+                (if iep
                     (make-array length  :initial-element initial-element)
                     (make-array length))))
              ((or (eq type 'string)
                   (eq type 'simple-string))
               (return-from make-sequence
-                (if initial-element
+                (if iep
                     (make-array length :element-type 'character :initial-element initial-element)
                     (make-array length :element-type 'character))))
              ((and (consp result-type)
@@ -432,13 +432,13 @@
                          (let ((vector
                                  (sb-vm::allocate-vector-with-widetag
                                   #+ubsan nil widetag length n-bits-shift)))
-                           (when initial-element
+                           (when iep
                              (fill vector initial-element))
                            (return-from make-sequence vector)))))))
              ((or (eq type 'base-string)
                   (eq type 'simple-base-string))
               (return-from make-sequence
-                (if initial-element
+                (if iep
                     (make-array length :element-type 'base-char :initial-element initial-element)
                     (make-array length :element-type 'base-char)))))))
     (try result-type)
