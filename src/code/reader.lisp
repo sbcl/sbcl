@@ -149,7 +149,7 @@
 (declaim (inline whitespace[1]p whitespace[2]p))
 (declaim (inline constituentp terminating-macrop))
 (declaim (inline single-escape-p multiple-escape-p))
-(declaim (inline token-delimiterp))
+(declaim (inline token-delimiterp digit-char-p))
 
 ;;; the [1] and [2] here refer to ANSI glossary entries for "whitespace".
 (defun whitespace[1]p (char)
@@ -2015,3 +2015,5 @@ extended <package-name>::<form-in-package> syntax."
     (cond ((not (whitespace[1]p char))
            (unread-char char stream)
            (return t)))))
+
+(declaim (maybe-inline digit-char-p))
