@@ -440,20 +440,20 @@ variable: an unreadable object representing the error is printed instead.")
             (write-char #\= stream)
             t)))))
 
-(defmacro with-circularity-detection ((object stream) &body body)
+(defmacro with-circularity-detection ((object stream state) &body body)
   (with-unique-names (marker body-name)
-    `(labels ((,body-name ()
+    `(labels ((,body-name (stream ,state)
                 ,@body))
        (cond ((or (not *print-circle*)
                   (uniquely-identified-by-print-p ,object))
-              (,body-name))
+              (,body-name stream ,state))
              (*circularity-hash-table*
               (let ((,marker (check-for-circularity ,object t :logical-block)))
                 (cond (,marker
                        (when (handle-circularity ,marker ,stream)
-                         (,body-name)))
+                         (,body-name stream ,state)))
                       (t
-                       (,body-name)
+                       (,body-name stream ,state)
                        (when (and *print-circle-not-shared*
                                   (eql (gethash ,object *circularity-hash-table*) :logical-block))
                          (if (listp ,object)
@@ -466,13 +466,16 @@ variable: an unreadable object representing the error is printed instead.")
                              (remhash ,object *circularity-hash-table*)))))))
              (t
               (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
-                (output-object ,object *null-broadcast-stream*)
+                (let ((stream (sb-pretty::make-pretty-stream *null-broadcast-stream*)))
+                  (,body-name stream (cons 0 stream)))
                 (let ((*circularity-counter* 0))
                   (let ((,marker (check-for-circularity ,object t
                                                         :logical-block)))
                     (when ,marker
                       (handle-circularity ,marker ,stream)))
-                  (,body-name))))))))
+                  (,body-name stream ,state))))))))
+
+
 
 ;;;; level and length abbreviations
 

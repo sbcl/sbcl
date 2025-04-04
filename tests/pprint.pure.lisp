@@ -38,3 +38,9 @@
            (vread (read-from-string vstring)))
       (assert (equal list lread))
       (assert (equalp vector vread)))))
+
+(with-test (:name :logical-block-unrelated-object)
+  (assert (equal (with-output-to-string (s)
+                   (let ((*print-circle* t))
+                     (pprint-logical-block (s nil) (princ '(#1=(1) #1#) s))))
+                 "(#1=(1) #1#)")))
