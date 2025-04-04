@@ -466,16 +466,17 @@ variable: an unreadable object representing the error is printed instead.")
                              (remhash ,object *circularity-hash-table*)))))))
              (t
               (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
-                (let ((stream (sb-pretty::make-pretty-stream *null-broadcast-stream*)))
-                  (,body-name stream (cons 0 stream)))
+                (let* ((stream (sb-pretty::make-pretty-stream *null-broadcast-stream*))
+                       (state (cons 0 stream)))
+                  (declare (inline sb-pretty::make-pretty-stream))
+                  (declare (dynamic-extent state stream))
+                  (,body-name stream state))
                 (let ((*circularity-counter* 0))
                   (let ((,marker (check-for-circularity ,object t
                                                         :logical-block)))
                     (when ,marker
                       (handle-circularity ,marker ,stream)))
                   (,body-name stream ,state))))))))
-
-
 
 ;;;; level and length abbreviations
 
