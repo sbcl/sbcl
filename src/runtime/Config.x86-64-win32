@@ -34,9 +34,11 @@ endif
 LINKFLAGS = -Wl,-export-all-symbols
 LIBSBCL += mswin64.def mswin.def
 USE_LIBSBCL += -Wl,mswin64.def -Wl,mswin.def
+SOFLAGS += -Wl,-export-all-symbols -Wl,mswin64.def -Wl,mswin.def
+
 __LDFLAGS__ =
 
-OS_LIBS = -l ws2_32 -ladvapi32 -lm
+OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lzstd
 endif
@@ -56,7 +58,7 @@ CFLAGS += -g -W -Wall \
        -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
        -Wno-type-limits \
        -fno-omit-frame-pointer \
-       -O5 -m64 -DWINVER=0x0501 \
+       -O3 -m64 -DWINVER=0x0501 \
        -D__W32API_USE_DLLIMPORT__
 
 CC = gcc
