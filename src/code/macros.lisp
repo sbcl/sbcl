@@ -1065,11 +1065,6 @@ invoked. In that case it will store into PLACE and start over."
       (incf minimum 2))
     (>= (length keys) minimum)))
 
-(defun wrap-if (condition with form)
-  (if condition
-      (append with (list form))
-      form))
-
 ;;; CASE-BODY returns code for all the standard "case" macros. NAME is
 ;;; the macro name, and KEYFORM is the thing to case on.
 ;;; When ERRORP, no OTHERWISE-CLAUSEs are recognized,

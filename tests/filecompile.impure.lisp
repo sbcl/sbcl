@@ -13,6 +13,7 @@
 
 (unlock-package "SB-INT")
 (unlock-package "SB-IMPL")
+(unlock-package "SB-KERNEL")
 (unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP" '("CL"  "SB-XC"))
 

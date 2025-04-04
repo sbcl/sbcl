@@ -400,3 +400,10 @@
 (defun assq (item alist)
   "Return the first pair of alist where item is EQ to the key of pair."
   (assoc item alist :test #'eq))
+
+(defmacro wrap-if (condition with form)
+  `(let ((.condition. ,condition)
+         (.form. ,form))
+     (if .condition.
+         (append ,with (list .form.))
+         .form.)))
