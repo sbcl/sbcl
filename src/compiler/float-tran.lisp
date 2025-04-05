@@ -1905,7 +1905,9 @@
                                          `(,',to-bignum-div div x f))))))))))
   (def truncate single-float ())
   (def truncate double-float (single-float))
+  #+64-bit ;; can't round 32-bit bignums using truncation
   (def round single-float ())
+  #+64-bit
   (def round double-float (single-float)))
 
 (macrolet ((def (name type other-float-arg-types)
