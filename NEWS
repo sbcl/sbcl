@@ -1,4 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-2.5.3:
+  * bug fix: incorrect rounding when converting some bignums to floats.
+  * bug fix: the second value of the truncation functions is more consistently
+    computed for bignum floats.
+  * platform support:
+    ** save-lisp-and-die with :callable-exports can be used for sbcl.dll on
+       Windows.
+    ** Building with UCRT64 on Windows is now fully supported.
+  * optimization: ROUND is faster for floats.
 
 changes in sbcl-2.5.3 relative to sbcl-2.5.2:
   * enhancement: breakpoint debugger commands have been added.  Included is a

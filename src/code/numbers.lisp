@@ -315,7 +315,7 @@
 
 ;;;; TRUNCATE and friends
 
-(declaim (maybe-inline truncate floor ceiling))
+(declaim (maybe-inline truncate floor ceiling round))
 
 (defun truncate (number &optional (divisor 1))
   "Return number (or number/divisor) as an integer, rounded toward 0.
@@ -568,12 +568,6 @@
            (inline ceiling))
   (values (ceiling number divisor)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (dolist (s '(truncate floor ceiling))
-    (clear-info :function :inlining-data s)
-    (clear-info :function :inlinep s)
-    (clear-info :source-location :declaration s)))
-
 (defun rem (number divisor)
   "Return second result of TRUNCATE."
   (declare (explicit-check))
@@ -587,31 +581,52 @@
 (defun round (number &optional (divisor 1))
   "Rounds number (or number/divisor) to nearest integer.
   The second returned value is the remainder."
-  (declare (explicit-check))
-  (if (eql divisor 1)
-      (round number)
-      (multiple-value-bind (tru rem) (truncate number divisor)
-        (if (zerop rem)
-            (values tru rem)
-            (let ((thresh (/ (abs divisor) 2)))
-              (cond ((or (> rem thresh)
-                         (and (= rem thresh) (oddp tru)))
-                     (if (minusp divisor)
-                         (values (- tru 1) (+ rem divisor))
-                         (values (+ tru 1) (- rem divisor))))
-                    ((let ((-thresh (- thresh)))
-                       (or (< rem -thresh)
-                           (and (= rem -thresh) (oddp tru))))
-                     (if (minusp divisor)
-                         (values (+ tru 1) (- rem divisor))
-                         (values (- tru 1) (+ rem divisor))))
-                    (t (values tru rem))))))))
+  (declare (explicit-check)
+           (maybe-inline round))
+  (macrolet ((round-float (rtype)
+               `(round (coerce number ',rtype) (coerce divisor ',rtype))))
+    (number-dispatch ((number real) (divisor real) :non-disjoint)
+      (((foreach single-float double-float)
+        (or fixnum single-float))
+       (round-float (dispatch-type number)))
+      ((double-float (or single-float double-float))
+       (round-float double-float))
+      ((single-float double-float)
+       (round-float double-float))
+      ((real real)
+       (multiple-value-bind (tru rem) (truncate number divisor)
+         (if (zerop rem)
+             (values tru rem)
+             (let ((thresh (/ (abs divisor) 2)))
+               (cond ((or (> rem thresh)
+                          (and (= rem thresh) (oddp tru)))
+                      (if (minusp divisor)
+                          (values (- tru 1) (+ rem divisor))
+                          (values (+ tru 1) (- rem divisor))))
+                     ((let ((-thresh (- thresh)))
+                        (or (< rem -thresh)
+                            (and (= rem -thresh) (oddp tru))))
+                      (if (minusp divisor)
+                          (values (+ tru 1) (- rem divisor))
+                          (values (- tru 1) (+ rem divisor))))
+                     (t (values tru rem))))))))))
+
+(defun round1 (number divisor)
+  (declare (explicit-check)
+           (inline round))
+  (values (round number divisor)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(truncate floor ceiling round))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))
 
 (defmacro !define-float-rounding-function (name op doc)
   `(defun ,name (number &optional (divisor 1))
-    ,doc
-    (multiple-value-bind (res rem) (,op number divisor)
-      (values (float res (if (floatp rem) rem 1.0)) rem))))
+     ,doc
+     (multiple-value-bind (res rem) (,op number divisor)
+       (values (float res (if (floatp rem) rem 1.0)) rem))))
 
 #-round-float
 (defun fround (number &optional (divisor 1))

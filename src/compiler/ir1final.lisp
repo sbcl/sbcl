@@ -321,6 +321,7 @@
                (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
                                                floor sb-kernel::floor1
                                                ceiling sb-kernel::ceiling1
+                                               round sb-kernel::round1
                                                ftruncate sb-kernel::ftruncate1
                                                ffloor sb-kernel::ffloor1
                                                fceiling sb-kernel::fceiling1)

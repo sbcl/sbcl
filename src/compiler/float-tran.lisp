@@ -1865,33 +1865,32 @@
         (give-up-ir1-transform))))
 
 #-round-float
-(macrolet ((def (type other-float-arg-types)
-             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
+(macrolet ((def (fun type other-float-arg-types)
+             (let* ((unary (if (eq fun 'round)
+                               (symbolicate "%UNARY-" fun)
+                               (symbolicate "%UNARY-" fun "/" type)))
                     (to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
                     (to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
                     (coerce (symbolicate "%" type))
                     (fixnum-type `(,type
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))))
-               `(deftransform truncate ((x &optional y)
-                                        (,type
-                                         &optional (or ,type ,@other-float-arg-types integer))
-                                        * :result result :node node)
-                  (let* ((result-type (and result
-                                           (lvar-derived-type result)))
-                         (compute-all (and (or (eq result-type *wild-type*)
-                                               (values-type-p result-type))
-                                           (not (type-single-value-p result-type))))
-                         (one-p (or (not y)
-                                    (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
+               `(deftransform ,fun ((x &optional y)
+                                    (,type
+                                     &optional (or ,type ,@other-float-arg-types integer))
+                                    * :result result :node node)
+                  (let ((one-p (or (not y)
+                                   (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
                     (if one-p
-                        (if compute-all
-                            `(unary-truncate x)
-                            `(if (typep x ',',fixnum-type)
-                                 (values (truly-the fixnum (,',unary x)) x)
-                                 ,(wrap-if result
-                                           `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
-                                           `(,',to-bignum x))))
+                        `(if (typep x ',',fixnum-type)
+                             (let ((r (truly-the fixnum (,',unary x))))
+                               (values r
+                                       (- x (locally
+                                                (declare (flushable ,',coerce))
+                                              (,',coerce r)))))
+                             ,(wrap-if result
+                                       `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
+                                       `(,',to-bignum x)))
                         `(let* ((f (,',coerce y))
                                 (div (/ x f)))
                            (if (typep div ',',fixnum-type)
@@ -1904,8 +1903,10 @@
                                ,(wrap-if result
                                          `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
                                          `(,',to-bignum-div div x f))))))))))
-  (def single-float ())
-  (def double-float (single-float)))
+  (def truncate single-float ())
+  (def truncate double-float (single-float))
+  (def round single-float ())
+  (def round double-float (single-float)))
 
 (macrolet ((def (name type other-float-arg-types)
              (let* ((to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
@@ -1951,6 +1952,10 @@
   (def floor double-float (single-float))
   (def ceiling single-float ())
   (def ceiling double-float (single-float))
+  #+round-float
+  (def round single-float ())
+  #+round-float
+  (def round double-float (single-float))
   #+round-float
   (def truncate single-float ())
   #+round-float
