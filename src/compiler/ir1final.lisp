@@ -324,7 +324,8 @@
                                                round sb-kernel::round1
                                                ftruncate sb-kernel::ftruncate1
                                                ffloor sb-kernel::ffloor1
-                                               fceiling sb-kernel::fceiling1)
+                                               fceiling sb-kernel::fceiling1
+                                               fround sb-kernel::fround1)
                                              combination-name)))
                  (when single-value-fun
                    (unless (cdr args)

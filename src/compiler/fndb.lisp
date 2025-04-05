@@ -343,7 +343,7 @@
 (defknown (sb-kernel::truncate1 sb-kernel::floor1 sb-kernel::ceiling1 sb-kernel::round1) (real real) integer
   (movable foldable flushable recursive no-verify-arg-count))
 
-(defknown (sb-kernel::ftruncate1 sb-kernel::ffloor1 sb-kernel::fceiling1) (real real) float
+(defknown (sb-kernel::ftruncate1 sb-kernel::ffloor1 sb-kernel::fceiling1 sb-kernel::fround1) (real real) float
   (movable foldable flushable recursive no-verify-arg-count))
 
 (defknown unary-truncate (real) (values integer real)

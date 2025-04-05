@@ -315,7 +315,7 @@
 
 ;;;; TRUNCATE and friends
 
-(declaim (maybe-inline truncate floor ceiling round))
+(declaim (maybe-inline truncate floor ceiling round fround))
 
 (defun truncate (number &optional (divisor 1))
   "Return number (or number/divisor) as an integer, rounded toward 0.
@@ -616,12 +616,6 @@
            (inline round))
   (values (round number divisor)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (dolist (s '(truncate floor ceiling round))
-    (clear-info :function :inlining-data s)
-    (clear-info :function :inlinep s)
-    (clear-info :source-location :declaration s)))
-
 (defmacro !define-float-rounding-function (name op doc)
   `(defun ,name (number &optional (divisor 1))
      ,doc
@@ -631,7 +625,8 @@
 #-round-float
 (defun fround (number &optional (divisor 1))
   "Same as ROUND, but returns first value as a float."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (maybe-inline fround))
   (macrolet ((fround-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
                        (res (%unary-fround (/ number float-div))))
@@ -665,6 +660,18 @@
       (((foreach fixnum bignum ratio)
         (foreach single-float double-float #+long-float long-float))
        (fround-float (dispatch-type divisor))))))
+
+#-round-float
+(defun fround1 (number divisor)
+  (declare (explicit-check)
+           (inline fround))
+  (values (fround number divisor)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(truncate floor ceiling round fround))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))
 
 (macrolet ((def (name mode docstring &optional values)
              `(defun ,name (number ,@(if values
@@ -730,15 +737,18 @@
   (def fround :round
     "Same as ROUND, but returns first value as a float.")
 
-  (macrolet ((def (name)
-               `(defun ,name (x mode)
-                  (ecase mode
-                    ,@(loop for m in '(#-round-float :round :floor :ceiling :truncate)
-                            collect `(,m (,name x ,m)))))))
+  #+round-float
+  (def fround1 :round nil t))
+
+(macrolet ((def (name)
+             `(defun ,name (x mode)
+                (ecase mode
+                  ,@(loop for m in '(#-round-float :round :floor :ceiling :truncate)
+                          collect `(,m (,name x ,m)))))))
 
 
-    (def round-single)
-    (def round-double)))
+  (def round-single)
+  (def round-double))
 
 ;;;; comparisons
 
