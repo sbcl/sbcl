@@ -46,7 +46,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: sbcl-windows-installer-${{ matrix.sys }}
-        path: sbcl-windows-installer-${{ matrix.sys }}
+        path: sbcl-windows-installer
     - name: tests
       working-directory: tests
       run: ./run-tests.sh

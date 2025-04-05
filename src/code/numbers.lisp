@@ -364,7 +364,7 @@
            (bignum-truncate-single-digit number divisor)
            (bignum-truncate number divisor)))
       (((foreach single-float double-float #+long-float long-float)
-        (or rational single-float))
+        (foreach fixnum rational single-float))
        (if (eql divisor 1)
            (let ((res (unary-truncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
@@ -375,7 +375,7 @@
       #+long-float
       (((foreach double-float single-float) long-float)
        (truncate-float long-float))
-      ((double-float (or single-float double-float))
+      ((double-float double-float)
        (truncate-float double-float))
       ((single-float double-float)
        (truncate-float double-float))
@@ -451,7 +451,7 @@
                   (bignum-truncate-single-digit number divisor)
                   (bignum-truncate number divisor))))
       (((foreach single-float double-float #+long-float long-float)
-        (or rational single-float))
+        (foreach fixnum rational single-float))
        (truncate-float (dispatch-type number)))
       #+long-float
       ((long-float (or single-float double-float long-float))
@@ -459,7 +459,7 @@
       #+long-float
       (((foreach double-float single-float) long-float)
        (truncate-float long-float))
-      ((double-float (or single-float double-float))
+      ((double-float double-float)
        (truncate-float double-float))
       ((single-float double-float)
        (truncate-float double-float))
@@ -537,7 +537,7 @@
             (bignum-truncate-single-digit number divisor)
             (bignum-truncate number divisor))))
       (((foreach single-float double-float #+long-float long-float)
-        (or rational single-float))
+        (foreach fixnum rational single-float))
        (truncate-float (dispatch-type number)))
       #+long-float
       ((long-float (or single-float double-float long-float))
@@ -545,7 +545,7 @@
       #+long-float
       (((foreach double-float single-float) long-float)
        (truncate-float long-float))
-      ((double-float (or single-float double-float))
+      ((double-float double-float)
        (truncate-float double-float))
       ((single-float double-float)
        (truncate-float double-float))
