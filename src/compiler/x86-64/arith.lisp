@@ -3900,8 +3900,7 @@
      (case width
        ((8 16 32)
         (inst movsx `(,(bits->size width) :qword)
-              r
-              (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) x)))
+              r (object-slot-ea x bignum-digits-offset other-pointer-lowtag)))
        (t
         (loadw r x bignum-digits-offset other-pointer-lowtag)
         (shift-unshift r width))))))

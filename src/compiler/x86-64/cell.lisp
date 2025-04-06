@@ -533,20 +533,18 @@
       (when use-xmm-p
         (inst xorpd xmm-temp xmm-temp))
       (loop
-       (let* ((slot (pop indices))
+       (let* ((index (pop indices))
               (val (tn-ref-tn values))
-              (ea (ea (- (ash (+ instance-slots-offset slot) word-shift)
-                         instance-pointer-lowtag)
-                      instance)))
-         (aver (tn-p instance))
+              (ea (object-slot-ea instance (+ instance-slots-offset index)
+                                  instance-pointer-lowtag)))
          (setq values (tn-ref-across values))
          ;; If the xmm temp was loaded with 0 and this value is 0,
          ;; and possibly the next, then store through the temp
          (cond
            ((and use-xmm-p (constant-tn-p val) (eql (tn-value val) 0))
-            (let* ((next-slot (car indices))
-                   (next-val (if next-slot (tn-ref-tn values))))
-              (cond ((and (eql (1+ slot) next-slot)
+            (let* ((next-index (car indices))
+                   (next-val (if next-index (tn-ref-tn values))))
+              (cond ((and (eql (1+ index) next-index)
                           (constant-tn-p next-val)
                           (eql (tn-value next-val) 0))
                      (inst movupd ea xmm-temp)
@@ -585,13 +583,12 @@
   (:generator 3
     ;; Use RESULT as the source of the exchange, unless doing so
     ;; would clobber NEWVAL
-    (let ((source (if (location= result instance) temp result)))
+    (let ((source (if (location= result instance) temp result))
+          (slot (+ instance-slots-offset index)))
       (if (sc-is newval immediate)
           (inst mov source (constantize (tn-value newval)))
           (move source newval))
-      (inst xchg (ea (- (ash (+ instance-slots-offset index) word-shift)
-                        instance-pointer-lowtag) instance)
-            source)
+      (inst xchg (object-slot-ea instance slot instance-pointer-lowtag) source)
       (unless (eq source result)
         (move result temp)))))
 

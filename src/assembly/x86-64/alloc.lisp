@@ -59,12 +59,12 @@
           (inst jmp :z one-word-bignum)
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) result nil nil nil)
           (inst movdqu float0-tn (ea 8 rsp-tn))
-          (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
           (inst movq float0-tn (ea 8 rsp-tn))
-          (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16)))
      ;; "from unsigned" might need to allocate 3 digits, but it receives only high:low
      ;; because the highest digit if needed must be all 0.
@@ -81,9 +81,9 @@
           ;; due to padding, they can share the allocation request.
           (alloc-other bignum-widetag (+ bignum-digits-offset 3) result nil nil nil)
           (inst movdqu float0-tn (ea 8 rsp-tn))
-          (inst movdqu (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
-          (inst mov :qword (ea (- (ash 3 word-shift) other-pointer-lowtag) result) 0)
+          (inst mov :qword (object-slot-ea result 3 other-pointer-lowtag) 0)
           ;; Test sign bit of digit index 1
           (inst test :byte (ea (+ 7 (ash (+ bignum-digits-offset 1) word-shift)
                                   (- other-pointer-lowtag)) result) #xff)
@@ -95,7 +95,7 @@
           ONE-WORD-BIGNUM
           (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
           (inst movq float0-tn (ea 8 rsp-tn))
-          (inst movq (ea (- (ash 1 word-shift) other-pointer-lowtag) result) float0-tn)
+          (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16)))
      ;; The high bit is in the carry flag.
      (two-word-bignum (reg)
@@ -106,8 +106,8 @@
           (inst movzx '(:byte :dword) number number)
           (inst push number)
           (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
-          (inst pop (ea (- (ash 2 word-shift) other-pointer-lowtag) number))
-          (inst pop (ea (- (ash 1 word-shift) other-pointer-lowtag) number))
+          (inst pop (object-slot-ea number 2 other-pointer-lowtag))
+          (inst pop (object-slot-ea number 1 other-pointer-lowtag))
           (inst ret)))
      (define (op)
        ;; R12 is not usable for the time being.

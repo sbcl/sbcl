@@ -611,7 +611,7 @@
                   :word)
                  (t ; must be an (unsigned-byte 31)
                   :dword))))
-      (inst mov size (ea (- (* slot n-word-bytes) lowtag) object) word)))))
+      (inst mov size (object-slot-ea object slot lowtag) word)))))
 
 ;;; ALLOCATE-VECTOR
 (defun store-string-trailing-null (vector type length words)
@@ -764,7 +764,7 @@
       #+ubsan
       (cond ((want-shadow-bits)
              (inst pop temp-reg-tn) ; restore shadow bits
-             (inst mov (object-slot-ea result 1 other-pointer-lowtag) temp-reg-tn))
+             (storew temp-reg-tn result 1 other-pointer-lowtag))
             (poisoned ; uninitialized SIMPLE-VECTOR
              (store-originating-pc result)))))
 
@@ -820,9 +820,7 @@
         )
       #+ubsan
       (cond ((want-shadow-bits)
-             (inst mov (ea (- (ash vector-length-slot word-shift) other-pointer-lowtag)
-                           result)
-                   rax))
+             (storew rax result vector-length-slot other-pointer-lowtag))
             (poisoned ; uninitialized SIMPLE-VECTOR
              (store-originating-pc result)))))
 

@@ -911,8 +911,7 @@
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)
   (let ((relative-call (code-immobile-p vop))
-        (fun-ea (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
-                    fun)))
+        (fun-ea (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
     (case type
       (:designator
        (assemble ()
@@ -943,8 +942,7 @@
          (invoke-asm-routine 'call 'call-symbol vop)
          (inst jmp ret))
        call
-       (inst call (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
-                      fun))
+       (inst call (object-slot-ea fun closure-fun-slot fun-pointer-lowtag))
        ret))))
 
 ;;; This is defined separately, since it needs special code that BLT's

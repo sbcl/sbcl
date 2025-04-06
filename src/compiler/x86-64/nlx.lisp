@@ -59,7 +59,7 @@
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
     (inst movapd xmm-temp (thread-slot-ea thread-binding-stack-pointer-slot))
-    (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp)))
+    (inst movupd (object-slot-ea block unwind-block-bsp-slot 0) xmm-temp)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
@@ -80,7 +80,7 @@
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     (inst movapd xmm-temp (thread-slot-ea thread-binding-stack-pointer-slot))
-    (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
+    (inst movupd (object-slot-ea block catch-block-bsp-slot 0) xmm-temp)
     (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP. This instantiates an
@@ -287,5 +287,4 @@
     (pushw rbp-tn (frame-word-offset return-pc-save-offset))
 
     ;; Call it
-    (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
-                  block))))
+    (inst jmp (object-slot-ea block closure-fun-slot fun-pointer-lowtag))))

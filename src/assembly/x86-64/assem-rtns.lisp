@@ -168,7 +168,7 @@
     ;; And jump into the function.
     (if jump-to-the-end
         (inst jmp end)
-        (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
+        (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
 
     ;; All the arguments fit in registers, so load them.
     REGISTER-ARGS
@@ -198,7 +198,7 @@
      (:temp r10 unsigned-reg r10-offset))
   (prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10)
 
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
+  (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
 
 #+sb-assembling
 (define-assembly-routine
@@ -218,7 +218,7 @@
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test :byte rbx-tn lowtag-mask)
   (inst jmp :nz (make-fixup 'call-symbol :assembly-routine))
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
+  (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
@@ -248,13 +248,13 @@
   (%lea-for-lowtag-test tmp fun fun-pointer-lowtag) ; test FUNCTIONP
   (inst test :byte tmp lowtag-mask)
   (inst jmp :nz RETRY)
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun))
+  (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag))
   (inst .align 3)
   UNDEFINED-TRAMP
   (inst pop (ea n-word-bytes rbp-tn))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list fun))
   (inst push (ea n-word-bytes rbp-tn))
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
+  (inst jmp (object-slot-ea fun closure-fun-slot fun-pointer-lowtag)))
 
 
 (define-assembly-routine (throw
@@ -352,7 +352,7 @@
 
   ;; Go to uwp-entry, it can fetch the pushed above values if it needs
   ;; to.
-  (inst call (ea (* unwind-block-entry-pc-slot n-word-bytes) uwp))
+  (inst call (object-slot-ea uwp unwind-block-entry-pc-slot 0))
   (inst pop count)
   (inst pop start)
   (inst pop block)
@@ -368,7 +368,7 @@
   (store-tl-symbol-value uwp *current-catch-block*)
 
   ;; nlx-entry expects start in RBX and count in RCX
-  (inst jmp (ea (* unwind-block-entry-pc-slot n-word-bytes) block)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 ;;; These are trampolines, but they benefit from not being in the 'tramps' file
 ;;; because they'll automatically get a vop and an assembly routine this way,
@@ -536,7 +536,7 @@
    INSTANCEP
    (inst bts :lock :dword (ea (- instance-pointer-lowtag) rax-tn) 31)
    MAYBE-SKIP (inst jmp :c DONE-PA)
-   (inst add :byte (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag) rbx-tn)
+   (inst add :byte (object-slot-ea rbx-tn vector-data-offset other-pointer-lowtag)
          (fixnumize 1))
    (inst mov (ea (- (ash (+ 2 vector-data-offset) word-shift) other-pointer-lowtag)
                  rbx-tn rcx-tn 4)
