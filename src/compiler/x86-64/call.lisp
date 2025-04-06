@@ -484,7 +484,7 @@
     ;; stack values. In this case quickly reallocate sufficient space.
     (when (<= (sb-kernel:values-type-min-value-count type)
               register-arg-count)
-      (inst cmp nargs (fixnumize register-arg-count))
+      (inst cmp :dword nargs (fixnumize register-arg-count))
       (inst jmp :g stack-values)
       #+#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (inst sub rsp-tn nargs)
@@ -1085,7 +1085,7 @@
     (unless (policy node (> space speed))
       ;; Check for the single case.
       (let ((not-single (gen-label)))
-        (inst cmp nvals (fixnumize 1))
+        (inst cmp :dword nvals (fixnumize 1))
         (inst jmp :ne not-single)
         ;; Return with one value.
         (loadw a0 vals -1)
