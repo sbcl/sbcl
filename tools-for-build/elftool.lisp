@@ -1725,6 +1725,9 @@ lisp_fun_linkage_space: .zero ~:*~D
          (progn
            (ecase *heap-arrangement*
              (:gencgc
+              ;; FIXME: should depend on target features but oh well
+              #-immobile-space (move-dynamic-code-to-text-space input-pathname tmp)
+              #+immobile-space
               ;; input core could be readonly
               (run-program "cp" `("--no-preserve=mode" ,input-pathname ,tmp)
                            :search t))
