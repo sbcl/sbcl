@@ -1040,8 +1040,8 @@
     ;; Set the multiple value return flag.
     (inst stc)
     ;; And away we go. Except that return-pc is still on the
-    ;; stack and we've changed the stack pointer. So we have to
-    ;; tell it to index off of RBX instead of RBP.
+    ;; stack and we've changed the stack pointer. So we might have to
+    ;; tell it to index off of RBX instead of RBP, depending on nvals.
     (cond ((<= nvals register-arg-count)
            (inst leave)
            (inst ret))
@@ -1055,10 +1055,8 @@
            (inst lea rsp-tn
                  (ea (frame-byte-offset (1- nvals)) rbp-tn))
            (move rbp-tn old-fp)
-           (inst push (ea (frame-byte-offset
-                           (+ sp->fp-offset (tn-offset return-pc)))
-                          rbx))
-           (inst ret)))))
+           (emit-mv-return
+            (ea (frame-byte-offset (+ sp->fp-offset (tn-offset return-pc))) rbx))))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.) We check for the common case of a single return

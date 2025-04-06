@@ -72,9 +72,7 @@
   (loadw rsi rbx -3)
 
   ;; And back we go.
-  (inst stc)
-  (inst push rax)
-  (inst ret)
+  (emit-mv-return rax t)
 
   ;; Handle the register arg cases.
   ZERO-VALUES
@@ -460,9 +458,7 @@
       (inst jmp :ne LOOP)
 
       DONE
-      (inst stc)
-      (inst push return)
-      (inst ret)
+      (emit-mv-return return t)
 
       ZERO-VALUES-ERROR
       (cerror-call nil 'bogus-arg-to-values-list-error list)

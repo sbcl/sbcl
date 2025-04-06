@@ -186,3 +186,21 @@
                  `(inst mov ,c-arg ,arg)))
      (inst call ,fun)
      #+win32 (inst add rsp-tn 32)))
+
+;; A multi-value return of more than REGISTER-ARG-COUNT values used to be emitted
+;; as "PUSH return-address ; RET"
+;; but I don't see that it's better than a JMP instruction. It may have been thought
+;; to help because the CPU predicts where to fetch instructions after a RET. That's true
+;; in so far as RET utilizes a hidden (internal to the CPU) call/return stack to avoid
+;; referencing the memory-based stack.  But an explicit PUSH is an extra memory store
+;; beyond the price already paid for a CALL instruction, while the operand of JMP is either
+;; already in a register, or may be speculatively loaded.
+;; One might argue that failure to execute RET causes imbalance to the hidden stack,
+;; but Lisp causes inefficiencies for other reasons, and it it seems overly hopeful to claim
+;; that 4-valued return is suboptimal because it didn't use 2 instructions to do the job of 1.
+;; But if a microbenchmark can show that to be true, it suffices to change it only here
+;; instead of in a few places.
+(defmacro emit-mv-return (reg/mem &optional emit-stc)
+  ;; All mv returns (incl. 0) need CF set, but it could occur outside (before) the macro
+  `(progn ,@(if emit-stc '((inst stc)))
+          (inst jmp ,reg/mem)))
