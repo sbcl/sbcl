@@ -441,9 +441,10 @@
        (declare (type word ,n-collisions))
        (with-eq-hash*-inlined (,state ,count-collisions-p)
          ,@body)
-       (unless (adapt-eq-hash-fun-by-n-collisions
-                ,table (length index-vector)
-                (truly-the fixnum ,n-collisions))
+       (unless (and (not (hash-table-weak-p table))
+                    (adapt-eq-hash-fun-by-n-collisions
+                     ,table (length index-vector)
+                     (truly-the fixnum ,n-collisions)))
          (return)))
      (fill index-vector 0)
      (setq next-free 0)))
