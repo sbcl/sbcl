@@ -4206,7 +4206,9 @@
                                     (inst jmp (if not-p :e :ne) target))
                                    (t
                                     (inst cmp size x (imm lo))
-                                    (inst jmp (if not-p :l :ge) target)))))
+                                    (inst jmp (if (eq size :dword)
+                                                  (if not-p :b :ae)
+                                                  (if not-p :l :ge)) target)))))
                               (t
                                (if (= lo 0)
                                    (setf temp x)
