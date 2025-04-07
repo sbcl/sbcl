@@ -1268,12 +1268,13 @@
                             (conset-add-constraint gen 'typep var type nil)))
                         (maybe-add-eql-var-var-constraint var val gen)
                         (add-var-result-constraints var val gen)))
-           ((nil)
+           ((nil optional)
             (loop for var in (lambda-vars fun)
                   for type = (leaf-defined-type var)
                   do
                   (when (and (lambda-var-constraints var)
-                             (type-for-constraints-p type))
+                             (type-for-constraints-p type)
+                             (not (lambda-var-arg-info var)))
                     (conset-add-constraint gen 'typep var type nil))))
            (mv-let
             (add-mv-let-result-constraints (lvar-dest (node-lvar (first (lambda-refs fun)))) fun gen)))))
