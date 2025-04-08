@@ -1322,6 +1322,7 @@ lisp_fun_linkage_space: .zero ~:*~D
                 (delete immobile-text-core-space-id (reverse space-list)
                         :key #'space-id))
                (spacemap (cons sap (sort (copy-list space-list) #'> :key #'space-addr)))
+               (new-header (change-dynamic-space-size core-header dynamic-space-size))
                (pte-nbytes (cdar copy-actions)))
           (collect-relocations spacemap relocs enable-pie)
           (with-open-file (output elf-core-pathname
@@ -1332,11 +1333,10 @@ lisp_fun_linkage_space: .zero ~:*~D
                             +backend-page-bytes+ ; core header
                             pte-nbytes)
                          relocs output enable-pie)
-            (let ((new-header (change-dynamic-space-size core-header dynamic-space-size)))
-              ;; This word will be fixed up by the system linker
-              (setf (%vector-raw-bits new-header code-start-fixup-ofs)
-                    (if enable-pie +code-space-nominal-address+ 0))
-              (write-sequence new-header output))
+            ;; This word will be fixed up by the system linker
+            (setf (%vector-raw-bits new-header code-start-fixup-ofs)
+                  (if enable-pie +code-space-nominal-address+ 0))
+            (write-sequence new-header output)
             (force-output output)
             ;; ELF cores created from #-immobile-space cores use +required-foreign-symbols+.
             ;; But if #+immobile-space the alien-linkage-table values are computed

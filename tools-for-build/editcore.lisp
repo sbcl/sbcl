@@ -88,7 +88,7 @@
 ;;;
 (defun get-space (id spacemap)
   (find id (cdr spacemap) :key #'space-id))
-(defglobal *heap-arrangement* nil)
+(declaim (global *heap-arrangement*))
 (defglobal *nil-taggedptr* 0)
 (defun core-null-p (x) (= (get-lisp-obj-address x) *nil-taggedptr*))
 
@@ -557,9 +557,12 @@
     (setf (%vector-raw-bits new 3) (* new-size 1024 1024))
     new))
 
-;; These will get set to 0 if the target is not using mark-region-gc
-(defglobal *bitmap-bits-per-page* (/ gencgc-page-bytes (* cons-size n-word-bytes)))
-(defglobal *bitmap-bytes-per-page* (/ *bitmap-bits-per-page* n-byte-bits))
+(define-symbol-macro *bitmap-bits-per-page*
+    (ecase *heap-arrangement*
+      (:mark-region-gc (/ gencgc-page-bytes (* cons-size n-word-bytes)))
+      (:gencgc 0)))
+(define-symbol-macro *bitmap-bytes-per-page*
+    (/ *bitmap-bits-per-page* n-byte-bits))
 
 (defstruct page
   words-used
@@ -1121,8 +1124,6 @@
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (output output-pathname :direction :output
                                             :element-type '(unsigned-byte 8) :if-exists :supersede)
-      (when (eq *heap-arrangement* :gencgc)
-        (setq *bitmap-bits-per-page* 0 *bitmap-bytes-per-page* 0))
       (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header))
              (parsed-header (parse-core-header input core-header core-offset))
@@ -1230,6 +1231,8 @@
                  (%make-lisp-obj (sap-int new-space))
                  (%make-lisp-obj (sap-int (sap+ new-space freeptr))))
               ;; don't zerofill asm code in static space
+              ;; TODO: Why can't we delete the static space asm code, and call indirectly
+              ;; through the vector of asm routine entrypoints in the static space?
               (zerofill-old-code spacemap (cdr codeblobs) page-ranges)
               ;; Update the core header to contain newspace
               (let ((spaces (nconc
