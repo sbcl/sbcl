@@ -1163,9 +1163,6 @@
                        ;; new object will be at FREEPTR bytes from new space start
                        (setf (gethash (sap-int vaddr) fwdmap) freeptr)
                        (incf freeptr size))))))
-            ;; FIXME: this _still_ doesn't work, because if the buid has :IMMOBILE-SPACE
-            ;; then the symbols CL:*FEATURES* and SB-IMPL:+INTERNAL-FEATURES+
-            ;; are not in dynamic space.
             (when (member :immobile-space target-features)
               (error "Can't relocate code to text space since text space already exists"))
             (setq codeblobs
