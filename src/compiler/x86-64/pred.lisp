@@ -219,7 +219,7 @@
 ;;; Return NIL to give up.
 (defun computable-from-flags-p (res x y flags)
   ;; TODO: handle unsigned-reg
-  (unless (and (singleton-p flags)
+  (unless (and (singleton-p (conditional-flags-flags flags))
                (sc-is res sb-vm::any-reg sb-vm::descriptor-reg))
     (return-from computable-from-flags-p nil))
   ;; There are plenty more algebraic transforms possible,
@@ -256,7 +256,7 @@
            (y (tn-value y-tn))
            #+gs-seg (thread-tn nil)
            (hint (computable-from-flags-p res x y flags))
-           (flag (car flags)))
+           (flag (car (conditional-flags-flags flags))))
       (ecase hint
         (boolean
          ;; FIXNUMP -> {T,NIL} could be special-cased, reducing the instruction count by
