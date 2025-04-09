@@ -994,6 +994,8 @@
                           (initfun (core-header-initfun parsed-header))
                           (fd (sb-impl::fd-stream-fd output)))
   (aver (= (%vector-raw-bits core-header offset) directory-core-entry-type-code))
+  ;; OFFSET starts as the index of the word containing the core header entry type.
+  ;; Following that is the length in words, where we begin rewriting the directory.
   (let ((nwords (+ (* (length directory) 5) 2)))
     (setf (%vector-raw-bits core-header (incf offset)) nwords))
   (let ((page-count (linkage-space-npages (core-header-linkage-space-info parsed-header)))
@@ -1461,8 +1463,7 @@
   (scan-slot symbol-value-slot)
   (scan-slot symbol-fdefn-slot)
   (scan-slot symbol-info-slot)
-  (scan-slot symbol-name-slot ; decode the packed NAME word
-   (make-descriptor (ldb (byte 48 0) (load-bits-wordindexed sap symbol-name-slot)))))
+  (scan-slot symbol-name-slot))
 
 ;;; This is a less general variant of do-referenced-object, but more efficient.
 ;;; I think it's the most concisely an object slot visitor can be expressed.
