@@ -769,16 +769,8 @@ process_directory(int count, struct ndir_entry *entry,
             (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
                                        ALIEN_LINKAGE_SPACE_SIZE);
 #endif
-    } else
-#endif
-    // NB: The preceding 'else', if it's there, needs at least an empty
-    // statement following it if there is no immobile space.
-    {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size +=
-            text_space_size + ALIEN_LINKAGE_SPACE_SIZE;
-#endif
     }
+#endif
 
     for ( ; --count >= 0 ; ++entry) {
         long id = entry->identifier; // FIXME: is this 'long' and not 'int' for a reason?
