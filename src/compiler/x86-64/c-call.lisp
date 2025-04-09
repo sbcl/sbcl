@@ -631,8 +631,8 @@
             ;; +4 is because RIP-relative EA is relative to following instruction
             (let* ((pc (sap+ (vector-sap result) (+ (fixup-note-position note) 4)))
                    (fixup (fixup-note-fixup note))
-                   (disp (sap- (int-sap (ea-disp (static-symbol-value-ea (fixup-name fixup))))
-                               pc)))
+                   (ea (+ nil-value (ea-disp (static-symbol-value-ea (fixup-name fixup)))))
+                   (disp (sap- (int-sap ea) pc)))
               (setf (signed-sap-ref-32  (vector-sap result) (fixup-note-position note))
                     disp))))
         result))))

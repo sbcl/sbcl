@@ -462,7 +462,7 @@
     ;; so now we have to figure out everything else.
     #+sb-safepoint
     (when (and (eql (machine-ea-base value) sb-vm::card-table-reg)
-               (eql (machine-ea-disp value) -8))
+               (eql (machine-ea-disp value) sb-vm::nil-static-space-end-offs))
       (return-from print-mem-ref (note "safepoint" dstate)))
 
     (when (and (eq (machine-ea-base value) :rip) (neq mode :compute))
@@ -507,6 +507,15 @@
                    (floor (machine-ea-disp value) sb-vm:alien-linkage-table-entry-size))))
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
+
+    (when (and disp (eq base-reg sb-vm::card-table-reg) (not index-reg))
+      (let* ((ptr (sap+ (sb-vm::read-r12) disp))
+             (contents (sap-ref-word ptr 0))
+             (name (sb-disassem::find-assembler-routine contents)))
+        (when name
+          (return-from print-mem-ref
+            (note (lambda (s) (format s "[#~x] = #~x ; ~a" (sap-int ptr) contents name))
+                  dstate)))))
 
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)

@@ -75,19 +75,47 @@
 
 ;;;; description of the target address space
 
-;;; where to put the different spaces.
+;;; Static space:
+;;;
+;;;    start                                          |<- 4k ->|
+;;;    +----------------------|-------+---------+-----+--------+-
+;;;    |                      | asm   | other   |     |        |
+;;;    | other                | code  | popular | NIL | Safept | GC card
+;;;    | static               | jmp   | consts  |     | Trap   | table
+;;;    | data                 | table |         |     | Page   |
+;;;    +----------------------*-------+---------+-----+--------+-
+;;;             ^ freeptr                         end ^
 
-;;; Currently the read-only and static spaces must be located in low
-;;; memory (certainly under the 4GB limit, very probably under 2GB
-;;; limit). This is due to the inability of using immediate values of
-;;; more than 32 bits (31 bits if you take sign extension into
-;;; account) in any other instructions except MOV. Removing this limit
-;;; would be possible, but probably not worth the time and code bloat
-;;; it would cause. -- JES, 2005-12-11
+;;;   R12 (GC-card-table-reg) = NIL
+;;;   R12 + 64 - lowtag_of(NIL) = GC cards
+
+;;; If the safepoint page is present, then the cards are shifted up by 4k.
+;;; It makes sense that the safepoint page is a shorter distance from NIL.
+;;; i.e. the constant offset from NIL to reach the safepoint page fits in 1 byte,
+;;; while the offset to the card table does not fit in 1 byte.
+;;; There are typically 10x more safepoint instructions inserted than there
+;;; are barrier instructions. So whether you measure execution or just code size,
+;;; it's better to encode the safepoint trap more compactly.
+
+;;; TODOs:
+;;; - for #-immobile-space, place lisp and alien linkage tables below the static symbols
+;;; - store other important value between NIL and the GC card table, such as:
+;;;     * FUNCTION-LAYOUT (for allocating closures)
+;;;     * lockfree list tail
+;;;     * T and NIL in consecutive words for COMPUTE-FROM-FLAGS
+;;; - if the asm routine indirection vector is filled downward and the ALLOC-TRAMP addresses
+;;;   are in the highest cells, it may be possible to shorten their CALL encodings
+;;;   to use imm8 displacement from NULL-TN, hypothetically:
+;;;      41FF542481       CALL [R12-127]
+;;;   versus
+;;;      41FF94240904F0FF CALL [R12-1047543]
+
+(defconstant nil-static-space-end-offs 41) ; 6 words (48 bytes) _minus_ list-pointer-lowtag
 
 #+(or linux darwin)
-(gc-space-setup #x50000000
+(gc-space-setup #x7FE00000
                      :read-only-space-size 0
+                     :fixedobj-space-start #x50000000
                      :fixedobj-space-size #.(* 60 1024 1024)
                      :text-space-size #.(* 160 1024 1024)
                      :text-space-start #xB800000000
@@ -97,8 +125,9 @@
 ;;; run under the default 1G data size limit.
 
 #-(or linux darwin)
-(gc-space-setup #x20000000
+(gc-space-setup #x50000000
                      :read-only-space-size 0
+                     :fixedobj-space-start #x20000000
                      :fixedobj-space-size #.(* 60 1024 1024)
                      :text-space-size #.(* 130 1024 1024)
                      :text-space-start #x1000000000
@@ -165,8 +194,7 @@
     #-sb-thread *alien-stack-pointer*    ; a thread slot if #+sb-thread
     ;; Asm code assembled by DEFINE-ALIEN-CALLABLE resides in static space and looks up
     ;; the address of the C helper via the SYMBOL-VALUE slot of this Lisp symbol.
-    callback-wrapper-trampoline
-    *cpu-feature-bits*)
+    callback-wrapper-trampoline)
   #'equalp)
 
 ;; No static-fdefns are actually needed, but #() here causes the
@@ -195,7 +223,3 @@
         simd-pack-256-ub8 simd-pack-256-ub16 simd-pack-256-ub32 simd-pack-256-ub64
         simd-pack-256-sb8 simd-pack-256-sb16 simd-pack-256-sb32 simd-pack-256-sb64)
     #'equalp))
-
-;;; This symbol-macro will be changed to something different after merging
-;;; the role of the GC card base register with a pointer to NIL.
-(define-symbol-macro null-tn nil-value)

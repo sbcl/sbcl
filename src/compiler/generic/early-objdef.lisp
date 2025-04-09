@@ -295,6 +295,7 @@
   ;; space, it admits some optimizations that might "dereference" the value
   ;; before checking the widetag.
   ;; Architectures other than x86-64 do not take that liberty.
+  ;;   FIXME: this looks inadmissible if static space start can move
   #+x86-64 (logior (+ sb-vm:static-space-start #x100) unbound-marker-widetag)
   #-x86-64 unbound-marker-widetag)
 

@@ -338,7 +338,8 @@
   (multiple-value-bind (operand loadp)
       (if (sc-is x immediate)
           (let ((bits (immediate-tn-repr x)))
-            (values bits (typep bits '(and integer (not (signed-byte 32))))))
+            (values bits (typep bits '(or (and integer (not (signed-byte 32)))
+                                          nil-relative))))
           (values x nil))
     (inst push (cond ((not loadp) operand)
                      ((typep operand '(unsigned-byte 32))
@@ -347,6 +348,7 @@
                       ;; instruction, but this way encodes to 6 bytes in total.
                       (inst mov :dword scratch operand)
                       scratch)
+                     ((nil-relative-p operand) (move-immediate scratch operand))
                      (t (constantize operand))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
@@ -379,13 +381,17 @@
                  ;; When IMMEDIATE-TN-REPR returns a fixup
                  ;; it is promised to fit in (SIGNED-BYTE 32)
                  (must-load (or (sc-is tn constant control-stack)
-                                (and imm (not (typep imm '(or (signed-byte 32) fixup))))))
+                                (and imm
+                                     (neq imm null-tn)
+                                     (not (typep imm '(or (signed-byte 32) fixup))))))
                  (repeats (memq tn inits))
-                 (load (or must-load (and imm repeats)))
+                 (load (or must-load (and imm (neq imm null-tn) repeats)))
                  (val (or imm tn)))
             (let ((operand (cond (load
                                   ;; MOVE only wants TNs
-                                  (if (tn-p val) (move temp val) (inst mov temp val))
+                                  (cond ((tn-p val) (move temp val))
+                                        ((nil-relative-p val) (move-immediate temp val))
+                                        (t (inst mov temp val)))
                                   temp)
                                  (t val))))
               (let ((slot (svref word-indices i)))
@@ -432,7 +438,7 @@
       ;; don't technically require a temp. However, I believe that one memory load
       ;; is better than two PUSH instructions using memory as the source operand.
       (when list-nil-p
-        (inst movaps xmmtemp (ea (- nil-value list-pointer-lowtag)))) ; prefetch
+        (inst movaps xmmtemp (ea (- list-pointer-lowtag) null-tn))) ; prefetch
       (cond
         ((node-stack-allocate-p node)
          (unless (aligned-stack-p)
@@ -443,6 +449,8 @@
                ((eq car cdr)
                 (let ((operand (cond ((or car-regp (typep car-val '(signed-byte 8)))
                                       car-val)
+                                     ((nil-relative-p car-val)
+                                      (move-immediate alloc car-val))
                                      (t
                                       (inst mov alloc car-val)
                                       alloc))))

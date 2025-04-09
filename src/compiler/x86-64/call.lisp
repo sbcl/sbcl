@@ -397,9 +397,8 @@
                        (inst jmp :nc default-stack-slots))
                       (t
                        (inst jmp :c regs-defaulted)
-                       (loop for null = nil-value then (car used-registers)
-                             for reg in used-registers
-                             do (inst mov :dword reg null))
+                       (loop for reg in used-registers
+                             do (inst mov reg null-tn))
                        (inst jmp done)))
                 REGS-DEFAULTED
                 (do ((i register-arg-count (1+ i))
@@ -432,9 +431,8 @@
                       (when (or (not trust)
                                 (<= min-values 1))
                         (emit-label default-stack-slots)
-                        (loop for null = nil-value then (car used-registers)
-                              for reg in used-registers
-                              do (inst mov :dword reg null))
+                        (loop for reg in used-registers
+                              do (inst mov reg null-tn))
                         (move rbx rsp-tn))
                       (dolist (default defaults)
                         (emit-label (car default))

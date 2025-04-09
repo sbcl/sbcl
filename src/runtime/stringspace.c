@@ -161,6 +161,9 @@ static uword_t walk_range_wrapper(lispobj* where, lispobj* limit, uword_t arg)
 /* Call 'fun' on every object in every space, passing it object and 'arg' */
 static void walk_all_gc_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
 {
+#ifdef T_SYMBOL_SLOTS_START
+    walk_range(T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, fun, arg);
+#endif
     walk_range(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, fun, arg);
     walk_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, fun, arg);
     if (PERMGEN_SPACE_START)

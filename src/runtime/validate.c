@@ -96,7 +96,9 @@ bool allocate_hardwired_spaces(bool hard_failp)
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
         { ALIEN_LINKAGE_SPACE_START, ALIEN_LINKAGE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID },
 #endif
+#ifndef LISP_FEATURE_X86_64 // x86-64 static space allocation request depends on dynamic space size
         { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
+#endif
 #ifdef LISP_FEATURE_DARWIN_JIT
         { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, STATIC_CODE_CORE_SPACE_ID },
 #endif
