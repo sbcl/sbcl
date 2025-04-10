@@ -3385,15 +3385,14 @@
   (def check-range<<= t nil t)
   (def check-range<=< nil t t))
 
-
 (define-vop (signed-multiply-low-high)
   (:policy :fast-safe)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg) :to (:result 1))
+         (y :scs (any-reg) :to (:result 1)))
   (:arg-types tagged-num tagged-num)
   (:results (lo :scs (unsigned-reg))
             (hi :scs (signed-reg)))
   (:result-types unsigned-num signed-num)
   (:generator 2
-    (inst smulh hi x y)
-    (inst mul lo x y)))
+    (inst mul lo x y)
+    (inst smulh hi x y)))
