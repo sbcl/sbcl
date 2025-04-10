@@ -704,9 +704,6 @@ during backtrace.
 
 ;;; The offset of NIL in static space, including the tag.
 (defconstant nil-value-offset
-  #+x86-64 ; NIL is at the end of static space
-  (- (- static-space-end static-space-start) nil-static-space-end-offs)
-  #-x86-64 ; NIL is at the beginning of static space
   (+ ;; Make space for the different regions, if they exist.
      ;; If you change this, then also change zero_all_free_ranges() in
      ;; gencgc.
@@ -767,13 +764,10 @@ during backtrace.
 ;;; Or: go to NIL's header word, subtract 1 word, and add in the physical
 ;;; size of NIL in bytes that we report for primitive-object-size.
 (defconstant static-space-objects-offset
-  #+x86-64 0 ; super easy
-  #-x86-64 (+ nil-symbol-slots-offset
-              (ash (1- sizeof-nil-in-words) word-shift)))
+  (+ nil-symbol-slots-offset
+     (ash (1- sizeof-nil-in-words) word-shift)))
 
 (defconstant lockfree-list-tail-value-offset
   (+ static-space-objects-offset
-     (* (+ (length +static-symbols+)
-           #+x86-64 -1) ; T is just below NIL, so disccount it from the length
-        (ash (align-up symbol-size 2) word-shift))
+     (* (length +static-symbols+) (ash (align-up symbol-size 2) word-shift))
      instance-pointer-lowtag))

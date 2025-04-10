@@ -546,11 +546,3 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     (inst mov :byte new 1)
     (zeroize old)
     (inst cmpxchg :lock :byte (mutex-slot m state) new)))
-
-(defknown read-r12 () system-area-pointer)
-(define-vop (read-r12)
-   (:policy :fast-safe) (:translate read-r12)
-   (:results (r :scs (sap-reg)))
-   (:result-types system-area-pointer)
-   (:generator 1 (move r r12-tn)))
-(defun read-r12 () (read-r12))

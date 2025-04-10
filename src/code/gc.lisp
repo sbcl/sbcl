@@ -542,10 +542,8 @@ Experimental: interface subject to change."
                     ((< sb-vm:text-space-start addr
                         (sap-int sb-vm:*text-space-free-pointer*))
                      :static)
-                    ((or #+x86-64 (< (extern-alien "static_space_trailer_start" unsigned)
-                                     addr sb-vm:static-space-end)
-                         (< sb-vm:static-space-start addr
-                            (sap-int sb-vm:*static-space-free-pointer*)))
+                    ((< sb-vm:static-space-start addr
+                        (sap-int sb-vm:*static-space-free-pointer*))
                      :static))))
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)

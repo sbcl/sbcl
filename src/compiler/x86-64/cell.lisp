@@ -107,11 +107,11 @@
 
 ;; Return the effective address of the value slot of static SYMBOL.
 (defun static-symbol-value-ea (symbol &optional (byte 0))
-  (ea (+ (static-symbol-offset symbol)
-         (ash symbol-value-slot word-shift)
-         byte
-         (- other-pointer-lowtag))
-      null-tn))
+   (ea (+ nil-value
+          (static-symbol-offset symbol)
+          (ash symbol-value-slot word-shift)
+          byte
+          (- other-pointer-lowtag))))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -310,7 +310,7 @@
   (:generator 2
     (loadw result fdefn fdefn-fun-slot other-pointer-lowtag)
     (inst test :dword result result)
-    (inst cmov :z result null-tn)))
+    (inst cmov :z result (ea (- nil-value list-pointer-lowtag)))))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)

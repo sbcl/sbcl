@@ -9,18 +9,17 @@
 
 (in-package "SB-VM")
 
-(macrolet ((feature-bits-ea (disp) `(ea (+ -16 (- list-pointer-lowtag) ,disp) null-tn)))
 (defun test-cpu-feature (feature-bit)
   (multiple-value-bind (byte bit)
       (floor (+ feature-bit n-fixnum-tag-bits) n-byte-bits)
-    (inst test :byte (feature-bits-ea byte) (ash 1 bit)))))
+    (inst test :byte (static-symbol-value-ea '*cpu-feature-bits* byte) (ash 1 bit))))
 
 (defun uniquify-fixup (name &aux (asmstream *asmstream*))
   (or (cdr (assoc name (sb-assem::asmstream-indirection-table asmstream)))
       (let ((label (gen-label)))
         (assemble (:elsewhere)
           (emit-label label)
-          (inst jmp (ea (make-fixup name :assembly-routine) null-tn)))
+          (inst jmp (ea (make-fixup name :assembly-routine))))
         (push (cons name label) (sb-assem::asmstream-indirection-table asmstream))
         label)))
 
@@ -28,7 +27,7 @@
   (inst* (the (member jmp call) inst)
          (if (or (null vop) (code-immobile-p vop))
              (make-fixup routine :assembly-routine)
-             (ea (make-fixup routine :assembly-routine) null-tn))))
+             (ea (make-fixup routine :assembly-routine)))))
 
 (defmacro call-reg-specific-asm-routine (node prefix tn &optional (suffix ""))
   `(invoke-asm-routine
@@ -78,7 +77,7 @@
         ;; direct call from asm routine or immobile code
         (inst call (make-fixup routine :assembly-routine))
         ;; indirect call from dynamic space
-        (inst call (ea (make-fixup routine :assembly-routine) null-tn)))))
+        (inst call (ea (make-fixup routine :assembly-routine))))))
 
 (defmacro regs-pushlist (&rest regs)
   `(progn ,@(mapcar (lambda (stem) `(inst push ,(symbolicate stem "-TN"))) regs)))

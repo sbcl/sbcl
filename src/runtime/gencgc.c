@@ -3554,9 +3554,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
     }
 
     if (GC_LOGGING) fprintf(gc_activitylog(), "begin scavenge static roots\n");
-#ifdef T_SYMBOL_SLOTS_START
-    heap_scavenge(T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END);
-#endif
     heap_scavenge(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END);
     heap_scavenge((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer);
 #ifdef LISP_FEATURE_PERMGEN

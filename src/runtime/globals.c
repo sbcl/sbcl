@@ -52,7 +52,6 @@ lispobj *current_binding_stack_pointer;
 
 lispobj *read_only_space_free_pointer;
 lispobj *static_space_free_pointer;
-lispobj *static_space_trailer_start;
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 lispobj *static_code_space_free_pointer;

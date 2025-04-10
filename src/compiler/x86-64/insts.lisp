@@ -3366,22 +3366,20 @@
                                           (setf val (ash val -8))))))))))
 
 #+sb-xc-host (declaim (ftype function sb-fasl::asm-routine-vector-elt-addr))
-;;; Return an address which when added to NULL-TN and dereferenced will yield ADDR
+;;; Return an address which when _dereferenced_ will return ADDR
 (defun sb-vm::asm-routine-indirect-address (addr)
-  (let* ((i (sb-fasl::asm-routine-index-from-addr addr))
-         (addr
-          #-immobile-space
-          (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*) (ash i word-shift)))
-          ;; When asm routines are in relocatable text space, the vector of indirections
-          ;; is stored externally in static space.
-          #+immobile-space
-          (progn
-           ;; Accounting for the jump-table-count as the first unboxed word in
-           ;; code-instructions, subtract 1 from I to get the correct vector element.
-           #+sb-xc-host (sb-fasl::asm-routine-vector-elt-addr (1- i))
-           #-sb-xc-host (sap-int (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
-                                       (ash (1- i) word-shift))))))
-    (ldb (byte 32 0) (- addr sb-vm:nil-value))))
+  (let ((i (sb-fasl::asm-routine-index-from-addr addr)))
+    #-immobile-space (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*)
+                                    (ash i word-shift)))
+    ;; When asm routines are in relocatable text space, the vector of indirections
+    ;; is stored externally in static space.
+    #+immobile-space
+    (progn
+      ;; Accounting for the jump-table-count as the first unboxed word in
+      ;; code-instructions, subtract 1 from I to get the correct vector element.
+      #+sb-xc-host (sb-fasl::asm-routine-vector-elt-addr (1- i))
+      #-sb-xc-host (sap-int (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
+                                  (ash (1- i) word-shift))))))
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.

@@ -131,8 +131,10 @@
                            ;; produce one absolute fixup per allocation site.
                            ((and (sap>= target insts)
                                  (sap< target (sap+ insts (%code-text-size code)))
-                                 (= (sap-ref-32 target 0) #x24A4FF41)) ; JMP [R12-disp32]
-                            (let ((ea (sap-ref-32 target 4)))
+                                 (= (sap-ref-8 target 0) #xFF)
+                                 (= (sap-ref-8 target 1) #x24)
+                                 (= (sap-ref-8 target 2) #x25))
+                            (let ((ea (sap-ref-32 target 3)))
                               (cond ((= ea enable-counted-indirect)
                                      (alien-funcall allocation-tracker-counted (vector-sap stack)))
                                     ((= ea enable-sized-indirect)

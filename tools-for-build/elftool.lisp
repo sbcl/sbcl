@@ -1116,6 +1116,17 @@ lisp_fun_linkage_space: .zero ~:*~D
              ;; boxed objects that can reference code/simple-funs
              ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag)
               (scanptrs vaddr obj 1 (1- nwords))))))
+      ;; Fix the assembly routine entrypoint vector in static space.
+      ;; It's an unboxed vector so it would not get adjusted automatically.
+      (let ((sym (%find-target-symbol (package-id "SB-FASL") "*ASM-ROUTINE-VECTOR*"
+                                      spacemap)))
+        (when sym
+          (let* ((obj (symbol-global-value sym)) ; a tagged ptr to static space
+                 (physical-obj (translate obj spacemap))
+                 (vaddr (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
+            (scanptrs vaddr physical-obj sb-vm:vector-data-offset
+                      (+ sb-vm:vector-data-offset (1- (length obj)))
+                      t)))) ; T -> do not require is-lisp-pointer of each word
       (dolist (space (cdr spacemap))
         (unless (= (space-id space) immobile-text-core-space-id)
           (let* ((logical-addr (space-addr space))
@@ -1169,7 +1180,6 @@ lisp_fun_linkage_space: .zero ~:*~D
           (page-adjust 0)
           (linkage-space-info (vector 0 0 0 0 0))
           (code-start-fixup-ofs 0) ; where to fixup the core header
-          (static-consts-fixup-ofs 0)
           (space-list)
           (copy-actions)
           (fixedobj-range) ; = (START . SIZE-IN-BYTES)
@@ -1231,8 +1241,6 @@ lisp_fun_linkage_space: .zero ~:*~D
                                (make-array count :element-type 'word)))
                  (push (cons data-page (* npages +backend-page-bytes+)) copy-actions)
                  (incf original-total-npages npages))))
-            (#.static-constants-core-entry-type-code
-             (setq static-consts-fixup-ofs ptr))
             (#.page-table-core-entry-type-code
              (aver (= len 3))
              (symbol-macrolet ((n-ptes (%vector-raw-bits core-header (+ ptr 0)))
@@ -1297,7 +1305,6 @@ lisp_fun_linkage_space: .zero ~:*~D
                  (/= (%vector-raw-bits core-header 1) runtime-options-magic))
         (let ((added-words 5))
           (incf (linkage-space-header-ptr linkage-space-info) added-words)
-          (incf static-consts-fixup-ofs added-words)
           (incf code-start-fixup-ofs added-words)))
       (unless enable-pie
         ;; This fixup sets the 'address' field of the core directory entry
@@ -1321,21 +1328,6 @@ lisp_fun_linkage_space: .zero ~:*~D
           (with-open-file (output elf-core-pathname
                                   :direction :output :if-exists :supersede
                                   :element-type '(unsigned-byte 8))
-            #+x86-64 ; adjust the words of the core header that fill in *ASM-ROUTINE-VECTOR*
-            (let ((code-start (bounds-low (space-bounds immobile-text-core-space-id spacemap)))
-                  (static-asm-jmpvec-nelts
-                   (ash (%vector-raw-bits new-header (1+ static-consts-fixup-ofs))
-                        (- n-fixnum-tag-bits))))
-              (aver (= (%vector-raw-bits new-header static-consts-fixup-ofs)
-                       simple-array-unsigned-byte-64-widetag))
-              (loop for i from (+ static-consts-fixup-ofs vector-data-offset)
-                    repeat static-asm-jmpvec-nelts
-                    do (let ((word (%vector-raw-bits new-header i)))
-                         (unless (= word 0)
-                           (setf (%vector-raw-bits new-header i) 0)
-                           (vector-push-extend
-                            `#(,R_ABS64 ,(ash i word-shift) 1 ,(- word code-start))
-                            relocs)))))
             (prepare-elf (+ (apply #'+ (mapcar #'space-nbytes-aligned data-spaces))
                             (* (linkage-space-npages linkage-space-info) +backend-page-bytes+)
                             +backend-page-bytes+ ; core header

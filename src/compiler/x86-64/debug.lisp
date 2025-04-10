@@ -83,7 +83,7 @@
     (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
                        thing temp n-word-bytes))
     ;; note that LEA does not affect any flags
-    (inst cmov :z code null-tn)) ; put NIL into CODE if ZF
+    (inst cmov :z code (ea (- nil-value list-pointer-lowtag)))) ; put NIL into CODE if ZF
     ;; I don't know where to load a NIL from with relocatable static space.
     #+relocatable-static-space
     (let ((bogus (gen-label))

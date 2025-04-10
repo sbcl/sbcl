@@ -41,13 +41,6 @@
       ;; the index, or T if the argument is NIL, or NIL if non-static.
       (let ((posn (static-symbol-p symbol)))
         (unless (fixnump posn) (error "~S is not a static symbol." symbol))
-        #+x86-64
-        (case symbol
-          ((t) (- t-nil-offset))
-          (t (+ (* (1- posn) (pad-data-block symbol-size))
-                (- nil-value-offset)
-                other-pointer-lowtag)))
-        #-x86-64
         (+ (* posn (pad-data-block symbol-size))
            (pad-data-block (1- symbol-size))
            other-pointer-lowtag

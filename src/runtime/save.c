@@ -256,17 +256,6 @@ static void unwind_binding_stack(struct thread* th)
     if (verbose) printf("done]\n");
 }
 
-static void write_static_space_constants(FILE *file)
-{
-    lispobj* ptr = (lispobj*)static_space_trailer_start;
-    unsigned int nwords = (lispobj*)STATIC_SPACE_END - ptr;
-    write_lispobj(STATIC_CONSTANTS_CORE_ENTRY_TYPE_CODE, file);
-    // +2 for the core header entry itself
-    write_lispobj(2+nwords, file);
-    /* write_lispobj(STATIC_SPACE_START, file); */
-    if (fwrite(ptr, N_WORD_BYTES, nwords, file) != nwords) perror(GENERAL_WRITE_FAILURE_MSG);
-}
-
 bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
                         int save_runtime_options,
@@ -410,10 +399,6 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  text_space_highwatermark,
                  core_start_pos,
                  core_compression_level), ++count;
-
-#ifdef LISP_FEATURE_X86_64
-    write_static_space_constants(file);
-#endif
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(3, file);

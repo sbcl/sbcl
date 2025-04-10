@@ -90,9 +90,7 @@
   (find id (cdr spacemap) :key #'space-id))
 (declaim (global *heap-arrangement*))
 (defglobal *nil-taggedptr* 0)
-(defglobal *t-taggedptr* -1)
 (defun core-null-p (x) (= (get-lisp-obj-address x) *nil-taggedptr*))
-(defun core-t-p (x) (= (get-lisp-obj-address x) *t-taggedptr*))
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
 ;;; the range at which the core is now mapped during execution of this tool,
@@ -177,11 +175,9 @@
     (dovector (x (translate (cdr cells) spacemap))
       (unless (fixnump x)
         (funcall function
-                 ;; Do not attempt to call symbol-name on T or NIL.
-                 ;; (static space trailer isn't mapped in)
-                 (cond ((core-t-p x) "T")
-                       ((core-null-p x) "NIL")
-                       (t (translate (symbol-name (translate x spacemap)) spacemap)))
+                 (if (core-null-p x) ; any random package can export NIL. wow.
+                     "NIL"
+                     (translate (symbol-name (translate x spacemap)) spacemap))
                  x)))))
 
 (defun core-pkgname-from-id (id core)
@@ -929,7 +925,6 @@
   pte-nbytes
   space-list
   linkage-space-info
-  static-constants
   initfun
   card-mask-nbits)
 
@@ -940,7 +935,6 @@
         (pte-nbytes)
         (card-mask-nbits)
         (core-dir-start)
-        (constants)
         (initfun))
     (do-core-header-entry ((id len ptr) core-header)
       (ecase id
@@ -975,7 +969,6 @@
                  (1 :gencgc)
                  (2 :mark-region-gc)))
          (setf *nil-taggedptr* (%vector-raw-bits core-header (+ ptr 2)))
-         #+x86-64 (setf *t-taggedptr* (- *nil-taggedptr* sb-vm::t-nil-offset))
          (let* ((strptr (+ ptr 3))
                 (string (make-string (%vector-raw-bits core-header strptr)
                                      :element-type 'base-char)))
@@ -983,10 +976,6 @@
            (format nil "Build ID [~a] len=~D ptr=~D actual-len=~D, gc=~A~%"
                    string len ptr (length string) *heap-arrangement*)))
         (#.runtime-options-magic) ; ignore
-        (#.static-constants-core-entry-type-code
-         ;; DO-CORE-HEADER-ENTRY subtracts 2 from LEN, but we want _all_ the words
-         (setq constants (loop for i from (- ptr 2) repeat (+ len 2)
-                               collect (%vector-raw-bits core-header i))))
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
     (make-core-header :dir-start core-dir-start
@@ -994,7 +983,6 @@
                       :pte-nbytes pte-nbytes
                       :space-list (nreverse space-list)
                       :linkage-space-info linkage-space-info
-                      :static-constants (coerce constants '(array sb-vm:word 1))
                       :initfun initfun
                       :card-mask-nbits card-mask-nbits)))
 
@@ -1022,8 +1010,6 @@
           (dolist (word (list id nwords page-count vaddr npages))
             (setf (%vector-raw-bits core-header (incf offset)) word))
           (incf page-count npages))))
-    (dovector (word (core-header-static-constants parsed-header))
-      (setf (%vector-raw-bits core-header (incf offset)) word))
     (let* ((sizeof-corefile-pte (+ n-word-bytes 2))
            (pte-bytes (align-up (* sizeof-corefile-pte n-ptes) n-word-bytes)))
       (dolist (word (list  page-table-core-entry-type-code
@@ -1584,8 +1570,6 @@
                  (return-from recurse (%make-lisp-obj addr)))
                (awhen (gethash addr seen) ; NIL is not recorded
                  (return-from recurse it))
-               (when (eql addr *t-taggedptr*)
-                 (return-from recurse t))
                (when (eql addr *nil-taggedptr*)
                  (return-from recurse nil))
                (let ((sap (int-sap (translate-ptr (logandc2 addr lowtag-mask)
@@ -1724,23 +1708,15 @@
 (defun unvisited (hashset obj) (remhash (descriptor-bits obj) hashset))
 (defun was-visitedp (hashset obj) (gethash (descriptor-bits obj) hashset))
 
-(defun trace-t/nil-symbols (static-constants visitor)
-  (with-pinned-objects (static-constants)
-    (let* ((sap (sap+ (vector-sap static-constants) (ash 2 word-shift)))
-           (t-sap (sap+ sap (size-of sap)))
-           (nil-sap (sap+ t-sap (+ (size-of t-sap) n-word-bytes))))
-      (trace-symbol visitor t-sap)
-      (trace-symbol visitor nil-sap))))
-
 (defun call-with-each-static-object (function spacemap)
   (declare (function function))
   (dolist (id `(,static-core-space-id ,permgen-core-space-id))
     (binding* ((space (get-space id spacemap) :exit-if-null)
                (physaddr (space-physaddr space spacemap))
                (limit (sap+ physaddr (ash (space-nwords space) word-shift))))
-      (do ((object (if (= id permgen-core-space-id)
-                       (sap+ physaddr (ash (+ 256 2) word-shift)) ; KLUDGE
-                       physaddr)
+      (do ((object (if (= id static-core-space-id)
+                       (sap+ (compute-nil-symbol-sap spacemap) (ash 7 word-shift)) ; KLUDGE
+                       (sap+ physaddr (ash (+ 256 2) word-shift))) ; KLUDGE
                    (sap+ object (size-of object))))
           ((sap>= object limit))
         ;; There are no static cons cells
@@ -1752,14 +1728,13 @@
 
 ;;; Gather all the objects in the order we want to reallocate them in.
 ;;; This relies on MAPHASH in SBCL iterating in insertion order.
-(defun visit-everything (spacemap initfun linkage-info static-constants
+(defun visit-everything (spacemap initfun linkage-info
                          &optional print
                          &aux (seen (make-visited-table))
                               (defer-debug-info
                                   (make-array 10000 :fill-pointer 0 :adjustable t))
                               stack)
-  (visited seen (make-descriptor *nil-taggedptr*))
-  #+x86-64 (visited seen (make-descriptor *t-taggedptr*))
+  (visited seen (make-descriptor nil-value))
   (labels ((root (descriptor)
              (visited seen descriptor)
              (trace-obj #'visit descriptor spacemap))
@@ -1786,12 +1761,12 @@
     (root (make-descriptor initfun))
     (dotimes (i (linkage-space-count linkage-info))
       (let ((word (aref (linkage-space-cells linkage-info) i)))
-        (unless (or (= word 0) (= word *nil-taggedptr*))
+        (unless (= word 0)
           (let ((header (sap-ref-word (int-sap (translate-ptr word spacemap))
                                       (ash -2 word-shift))))
             (when (= (logand header widetag-mask) funcallable-instance-widetag)
               (root (fun-entry->descriptor word)))))))
-    (trace-t/nil-symbols static-constants #'visit)
+    (trace-symbol #'visit (compute-nil-symbol-sap spacemap))
     (call-with-each-static-object #'root spacemap)
     (transitive-closure)
     (dovector (sap (prog1 defer-debug-info (setq defer-debug-info nil)))
@@ -1955,8 +1930,7 @@
                (sap+ (int-sap new-vaddr) (ash 2 word-shift))))))
     new-vaddr))
 
-(defun fixup-compacted (linkage-cells static-constants old-spacemap new-spacemap seen
-                        &optional print)
+(defun fixup-compacted (linkage-cells old-spacemap new-spacemap seen &optional print)
   (labels
       ((visit (sap slot value widetag)
            (unless (descriptor-p value) (return-from visit))
@@ -1990,7 +1964,7 @@
        (layout-vaddr->paddr (ptr)
            (translate-ptr ptr old-spacemap)))
     (when print (format t "~&Fixing static space~%"))
-    (trace-t/nil-symbols static-constants #'visit)
+    (trace-symbol #'visit (compute-nil-symbol-sap old-spacemap))
     (call-with-each-static-object
        (lambda (descriptor) (trace-obj #'visit descriptor old-spacemap))
        old-spacemap)
@@ -2030,7 +2004,6 @@
                (seen (visit-everything spacemap
                                        (core-header-initfun parsed-header)
                                        (core-header-linkage-space-info parsed-header)
-                                       (core-header-static-constants parsed-header)
                                        print))
                (oldspace (get-space dynamic-core-space-id spacemap)))
           ;;(summarize-object-counts spacemap seen)
@@ -2067,7 +2040,6 @@
             (maphash (lambda (key value) (if (eq value t) (remhash key seen))) seen)
             (fixup-compacted (linkage-space-cells
                               (core-header-linkage-space-info parsed-header))
-                             (core-header-static-constants parsed-header)
                              spacemap new-spacemap seen)
             (setf (core-header-initfun parsed-header)
                   (gethash (core-header-initfun parsed-header) seen))

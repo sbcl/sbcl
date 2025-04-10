@@ -213,9 +213,6 @@ void coalesce_similar_objects()
 
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
     coalesce_range((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, arg);
-#ifdef T_SYMBOL_SLOTS_START
-    coalesce_range(T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, arg);
-#endif
     coalesce_range(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, arg);
     coalesce_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, arg);
     if (PERMGEN_SPACE_START)

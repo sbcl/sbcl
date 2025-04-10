@@ -62,18 +62,15 @@
                    :qword))
          (ea (ea (- (* slot n-word-bytes) lowtag) ptr)))
     (aver (eq size :qword))
-    (cond ((or (typep value '(and integer (not (signed-byte 32))))
-               (nil-relative-p value))
+    (cond ((typep value '(and integer (not (signed-byte 32))))
            (cond (temp
-                  (if (nil-relative-p value)
-                      (move-immediate temp value)
-                      (inst mov temp value))
+                  (inst mov temp value)
                   (inst mov ea temp)
                   ;; uhh, why does this clause return TEMP but the
                   ;; T clause returns nothing in particular?
                   temp)
                  (t
-                  (bug "need temp reg for STOREW of immediate operand"))))
+                  (bug "need temp reg for STOREW of oversized immediate operand"))))
           (t
            (inst mov :qword ea value)))))
 
@@ -87,8 +84,7 @@
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
-  (cond (symbol `(inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn)))
-        (t `(inst mov ,reg null-tn))))
+  `(inst mov ,reg (+ nil-value ,(static-symbol-offset symbol))))
 
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
@@ -182,7 +178,7 @@
   ;; straight-line code, e.g. (LIST (LIST X Y) (LIST Z W)) should emit 1 safepoint
   ;; not 3, even if we consider it 3 separate pointer bumps.
   ;; (Ideally we'd only do 1 pointer bump, but that's a separate issue)
-  (inst test :byte rax-tn (ea nil-static-space-end-offs null-tn)))
+  (inst test :byte rax-tn (ea -8 gc-card-table-reg-tn)))
 
 (macrolet ((pa-bits-ea ()
              `(thread-slot-ea thread-pseudo-atomic-bits-slot

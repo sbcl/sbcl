@@ -13,23 +13,17 @@
 (in-package "SB-VM")
 
 (defun symbol-slot-ea (symbol slot)
-  (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
-    (if (static-symbol-p symbol)
-        (ea (+ (static-symbol-offset symbol) offset) null-tn)
-        (ea (make-fixup symbol :immobile-symbol offset)))))
+  (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
+             (if (static-symbol-p symbol)
+                 (+ nil-value (static-symbol-offset symbol) offset)
+                 (make-fixup symbol :immobile-symbol offset)))))
 
-;;; The GC card table base is either an imm8 displacement from NULL-TN, or that
-;;; plus one backend page if #+sb-safepoint. The reason for sliding the table up
-;;; with #+sb-safepoint is that the safepoint trap address wants to be an imm8 away
-;;; from NIL, as there are far more safepoint instructions than GC barriers.
 (defun mark-gc-card (addr-or-card-index &optional (compute t))
   (when compute
     (inst shr addr-or-card-index gencgc-card-shift)
     ;; :DWORD suffices because gc_allocate_ptes() asserts mask to be < 32 bits
     (inst and :dword addr-or-card-index card-index-mask))
-  (let ((disp (+ sb-vm::nil-static-space-end-offs
-                 #+sb-safepoint sb-c:+backend-page-bytes+))) ; stupidly excessive
-    (inst mov :byte (ea disp null-tn addr-or-card-index) CARD-MARKED)))
+  (inst mov :byte (ea gc-card-table-reg-tn addr-or-card-index) CARD-MARKED))
 
 ;;; TODOs:
 ;;; 1. Sometimes people write constructors like
@@ -98,7 +92,6 @@
                          bits)
                     (plausible-signed-imm32-operand-p bits))
                 (inst mov :qword ea it))
-               ((tn-p bits) (inst mov ea bits)) ; null-tn
                (t
                 (move-immediate val-temp bits)
                 (inst mov ea val-temp)))))
@@ -239,10 +232,12 @@
   (:generator 1
    (progn words) ; don't put it in :ignore, which gets inherited
    (let ((bits (compute-splat-bits value)))
+     (when (integerp bits)
+       ;; it's gonna get treated as simm32 by the CPU, so it had better be
+       (aver (plausible-signed-imm32-operand-p bits)))
      (inst mov :qword
            (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
-           (cond ((= bits nil-value) null-tn)
-                 (t (aver (plausible-signed-imm32-operand-p bits)) bits))))
+           bits))
    (move result vector)))
 
 (define-vop (splat-small splat-word)
@@ -251,7 +246,7 @@
   (:generator 5
    (let ((bits (compute-splat-bits value)))
      (cond ((= bits nil-value)
-            (inst movaps pattern (ea (- list-pointer-lowtag) null-tn)))
+            (inst movaps pattern (ea (- nil-value list-pointer-lowtag))))
            ((/= bits 0) (inst movddup pattern (register-inline-constant :qword bits)))
            (t (inst xorps pattern pattern))))
    (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
@@ -291,8 +286,7 @@
            (t
             ;; words could be in RAX, so read it first, then zeroize
             (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
-            (cond ((= bits 0) (zeroize rax))
-                  (t (inst mov rax (if (= bits nil-value) null-tn bits)))))))
+            (if (= bits 0) (zeroize rax) (inst mov rax bits)))))
    (inst rep)
    (inst stos :qword)
    (move result vector)))

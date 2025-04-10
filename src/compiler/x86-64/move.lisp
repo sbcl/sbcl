@@ -59,12 +59,11 @@
 ;;;; the MOVE VOP
 (defun is-operand-immediate (val)
   (typep val '(or (signed-byte 32) #+(or immobile-space permgen) fixup)))
-(defun cpu-imm/reg-tn-p (tn)
-  (let ((repr (immediate-tn-repr tn)))
-    (or (eq repr null-tn) (is-operand-immediate repr))))
+(defun cpu-immediate-tn-p (tn)
+  (is-operand-immediate (immediate-tn-repr tn)))
 (defun reg-or-legal-imm32-p (tn)
   (cond ((sc-is tn any-reg descriptor-reg) t)
-        ((sc-is tn immediate) (cpu-imm/reg-tn-p tn))))
+        ((sc-is tn immediate) (cpu-immediate-tn-p tn))))
 
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
@@ -73,7 +72,7 @@
                :load-if
                (not (location= x y))))
   (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)
-               :unused-if (or (not (sc-is x immediate)) (cpu-imm/reg-tn-p x)))
+               :unused-if (or (not (sc-is x immediate)) (cpu-immediate-tn-p x)))
               temp)
   (:generator 0
     (if (sc-is x immediate)
@@ -85,14 +84,6 @@
   (any-reg descriptor-reg))
 
 (defun move-immediate (target val &optional tmp-tn zeroed)
-  (when (nil-relative-p val)
-    (let ((dst (if (gpr-tn-p target) target tmp-tn)))
-      (inst lea dst (ea (nil-relative-disp val) null-tn))
-      (when (eq dst tmp-tn) (inst mov target tmp-tn)))
-    (return-from move-immediate target))
-  (when (eq val null-tn)
-    (inst mov target val)
-    (return-from move-immediate target))
   ;; Try to emit the smallest immediate operand if the destination word
   ;; is already zeroed. Otherwise a :qword.
   (cond
@@ -142,7 +133,7 @@
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:temporary (:sc unsigned-reg
-               :unused-if (or (not (sc-is x immediate)) (cpu-imm/reg-tn-p x)))
+               :unused-if (or (not (sc-is x immediate)) (cpu-immediate-tn-p x)))
               val-temp) ; for oversized immediate operand
   (:generator 0
     (let ((val (encode-value-if-immediate x)))

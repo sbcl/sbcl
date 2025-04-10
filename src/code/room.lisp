@@ -321,7 +321,6 @@ We could try a few things to mitigate this:
             (:static
              ;; Static space starts with NIL, which requires special
              ;; handling, as the header and alignment are slightly off.
-             #+x86-64 (funcall fun t symbol-widetag (* symbol-size n-word-bytes))
              (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
              (let ((start (%make-lisp-obj (+ static-space-start static-space-objects-offset)))
                    (end (%make-lisp-obj (sap-int *static-space-free-pointer*))))
