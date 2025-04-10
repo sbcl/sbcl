@@ -18,7 +18,7 @@ fi
 
 # Some distributions do not have strace by default or restrict the
 # ptrace system call.
-if which strace > /dev/null && ! strace ls > /dev/null 2>&1 ; then
+if ! which strace > /dev/null || ! strace ls > /dev/null 2>&1 ; then
     exit $EXIT_TEST_WIN
 fi
 
