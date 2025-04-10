@@ -389,27 +389,19 @@
 ;;;  11 bits for the number of simple-funs in the code component
 ;;;   5 bits for the number of pad bytes added to align the fun-offset-table
 ;;; See also code_n_funs() in code.h
-(declaim (inline code-fun-table-count))
-(defun code-fun-table-count (code-obj)
-  (if (eql (code-trailer-len code-obj) 0)
-      0
-      (let ((word (code-trailer-ref code-obj -4)))
-        ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
-        #+little-endian (ldb (byte 16  0) word)
-        #+big-endian    (ldb (byte 16 16) word))))
+(macrolet ((code-fun-table-count (code-obj)
+             `(if (eql (code-trailer-len ,code-obj) 0)
+                  0
+                  (let ((word (code-trailer-ref ,code-obj -4)))
+                    ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+                    #+little-endian (ldb (byte 16  0) word)
+                    #+big-endian    (ldb (byte 16 16) word)))))
 
 ;;; Return the number of simple-funs in CODE-OBJ
 ;;; Keep in sync with C function code_n_funs()
 (defun code-n-entries (code-obj)
   (declare (type code-component code-obj))
   (ash (code-fun-table-count code-obj) -5))
-
-;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
-;;; to its FUN-INDEXth function.
-(declaim (inline %code-fun-offset))
-(defun %code-fun-offset (code-obj fun-index)
-  (declare ((unsigned-byte 11) fun-index))
-  (code-trailer-ref code-obj (* -4 (+ fun-index 2))))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
 ;;; machine instructions. It's generally ok to use TEXT-SIZE or CODE-SIZE if searching
@@ -422,12 +414,19 @@
 ;;;       final simple-fun if instructions have variable length (as on x86).
 ;;;       The C definition doesn't really care about that minor detail
 ;;;       so it might overreport the size by the padding amount.
-(declaim (inline %code-text-size))
 (defun %code-text-size (code-obj)
   (- (%code-code-size code-obj)
      (code-trailer-len code-obj)
      ;; Subtract between 0 and 31 bytes of padding
      (logand (code-fun-table-count code-obj) #x1f)))
+) ; end MACROLET
+
+;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
+;;; to its FUN-INDEXth function.
+(declaim (inline %code-fun-offset))
+(defun %code-fun-offset (code-obj fun-index)
+  (declare ((unsigned-byte 11) fun-index))
+  (code-trailer-ref code-obj (* -4 (+ fun-index 2))))
 
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
