@@ -318,7 +318,7 @@
 ;;; and total number of actual insertions performed across threads
 ;;; should equal the total number of keys.
 (defun test-insert-same-keys-concurrently (tbl keys
-                                           &key (nthreads (floor test-util:*n-cpus* 2))
+                                           &key (nthreads (max 2 (floor test-util:*n-cpus* 2)))
                                                 ((:delete keys-to-delete)))
   (flet ((worker (sem &aux inserted)
            (sb-thread:wait-on-semaphore sem)
