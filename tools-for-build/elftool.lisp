@@ -1189,10 +1189,6 @@ lisp_fun_linkage_space: .zero ~:*~D
   ;; Remove old files
   (ignore-errors (delete-file asm-pathname))
   (ignore-errors (delete-file elf-core-pathname))
-  ;; Crappy assumption: we already called redirect-text-space-calls which
-  ;; assigned a value to *nil-taggedptr*. Anyway, why doesn't this use
-  ;; PARSE-CORE-HEADER like it should?
-  (assert (/= *nil-taggedptr* 0))
   ;; Ensure that all files can be opened
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (asm-file asm-pathname :direction :output :if-exists :supersede)
@@ -1472,7 +1468,7 @@ lisp_fun_linkage_space: .zero ~:*~D
                       (unless (plusp (decf remaining n)) (return))))
               (aver (zerop remaining)))))))))
 
-;; The extra copy of ASM routines, particularly C-calling trampolines, that now reside in text
+;; The extra copy of ASM routines, particularly C-calling trampolines, that will reside in text
 ;; space have to be modified to correctly reference their C functions. They assume that static
 ;; space is near alien-linkage space, and so they use this form:
 ;;   xxxx: E8A1F0EFFF  CALL #x50000060 ; alloc
@@ -1483,8 +1479,8 @@ lisp_fun_linkage_space: .zero ~:*~D
 ;; but is callable from the text-space code.
 ;;; I don't feel like programmatically scanning the asm code to determine these.
 ;;; Hardcoded is good enough (until it isn't)
-(defparameter *c-linkage-redirects*
-  (mapcar #'list
+(defglobal *c-linkage-redirects*
+  (mapcar (lambda (x) (cons nil (concatenate 'string #+darwin "_" x)))
           '("switch_to_arena"
             "alloc"
             "alloc_list"
@@ -1505,7 +1501,6 @@ lisp_fun_linkage_space: .zero ~:*~D
              (header-bytes (ash (code-header-words old-code) word-shift))
              (old-insts-vaddr (+ old-code-vaddr header-bytes))
              (new-insts-vaddr (+ new-code-vaddr header-bytes))
-             (items *c-linkage-redirects*)
              (inst-buffer (make-array 8 :element-type '(unsigned-byte 8)))
              (code-offsets-vector-size (primitive-object-size code-offsets-vector))
              (c-linkage-vector-vaddr (+ (space-addr text-space) code-offsets-vector-size))
@@ -1513,52 +1508,50 @@ lisp_fun_linkage_space: .zero ~:*~D
               (%make-lisp-obj (logior (sap-int (sap+ (space-physaddr text-space spacemap)
                                                      code-offsets-vector-size))
                                       other-pointer-lowtag)))
-             (target-alien-lss ; linkage-space-start
+             (alien-ls-start
               (symbol-global-value
                (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-SPACE-START"
-                                   spacemap))))
-    (aver (<= (length items) (length c-linkage-vector)))
+                                   spacemap)))
+             (alien-ls-end (1- (+ alien-ls-start alien-linkage-space-size))))
+    (aver (<= (length *c-linkage-redirects*) (length c-linkage-vector)))
     (dolist (x *c-linkage-redirects*)
-      (let* ((index (position (car x) (core-alien-linkage-symbols core)
+      (let* ((index (position (cdr x) (core-alien-linkage-symbols core)
                               :test (lambda (a b) (and (stringp b) (string= a b)))))
-             (addr (+ target-alien-lss (* (core-alien-linkage-entry-size core) index))))
-        (rplacd x (int-sap addr))))
+             (addr (+ alien-ls-start (* (core-alien-linkage-entry-size core) index))))
+        (rplaca x addr)))
     (with-pinned-objects (inst-buffer)
       (do ((sap (vector-sap inst-buffer))
            (item-index 0 (1+ item-index))
-           (items items (cdr items)))
+           (items *c-linkage-redirects* (cdr items)))
           ((null items))
         ;; Each new quasi-linkage-table entry takes 8 bytes to encode.
         ;; The JMP is 7 bytes, followed by a nop.
         ;; FF2425nnnnnnnn = JMP [ea]
-        (setf (sap-ref-8 sap 0) #xFF
-              (sap-ref-8 sap 1) #x24
-              (sap-ref-8 sap 2) #x25
-              (sap-ref-32 sap 3) (sap-int (sap+ (cdar items) 8))
+        (setf (sap-ref-32 sap 0) #x2524FF
+              (sap-ref-32 sap 3) (+ (caar items) 8) ; addr within the real alien linkage entry
               (sap-ref-8 sap 7) #x90) ; nop
         (setf (aref c-linkage-vector item-index) (%vector-raw-bits inst-buffer 0))))
     ;; Produce a model of the instructions. It doesn't really matter whether we scan
     ;; OLD-CODE or NEW-CODE since we're supplying the proper virtual address either way.
-    (let ((insts (get-code-instruction-model old-code old-code-vaddr core)))
-;;  (dovector (inst insts) (write inst :base 16 :pretty nil :escape nil) (terpri))
-      (dovector (inst insts)
-        ;; Look for any call to a linkage table entry.
+    (let* ((skip (ash (code-jump-table-words old-code) word-shift))
+           (insts-start (sap+ (code-instructions old-code) skip))
+           (insts-len (- (%code-text-size old-code) skip))
+           (insts (simple-collect-inst-model insts-start insts-len (+ old-insts-vaddr skip)))
+           (textspace-insts-sap (code-instructions new-code)))
+      (dolist (inst insts)
+        ;; Look for any call to an alien linkage table entry.
         (when (eq (second inst) 'call)
           (let ((operand (third inst)))
-            (when (and (integerp operand)
-                       (>= operand target-alien-lss)
-                       (< operand (+ target-alien-lss alien-linkage-space-size)))
-              (let* ((index (position (int-sap operand) *c-linkage-redirects*
-                                      :key #'cdr :test #'sap=))
+            (when (and (integerp operand) (<= alien-ls-start operand alien-ls-end))
+              (let* ((index (position operand *c-linkage-redirects* :key #'car))
                      (branch-target (+ c-linkage-vector-vaddr
                                        (ash vector-data-offset word-shift)
                                        ;; each new linkage entry takes up exactly 1 word
                                        (* index n-word-bytes)))
-                     (old-next-ip-abs (int-sap (inst-end inst))) ; virtual
-                     (next-ip-rel (sap- old-next-ip-abs (int-sap old-insts-vaddr)))
-                     (new-next-ip (+ new-insts-vaddr next-ip-rel)))
-                (setf (signed-sap-ref-32 (code-instructions new-code) (- next-ip-rel 4))
-                      (- branch-target new-next-ip))))))))))
+                     (rel-pc (+ skip (+ (car inst) 1))))
+                (setf (signed-sap-ref-32 textspace-insts-sap rel-pc)
+                      ;; I played with this math until it came out right.
+                      (- branch-target (+ new-insts-vaddr rel-pc 4)))))))))))
 
 (defconstant smallvec-elts
   (- (ash gencgc-page-bytes (- word-shift)) vector-data-offset))

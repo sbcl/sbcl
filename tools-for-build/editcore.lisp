@@ -89,7 +89,7 @@
 (defun get-space (id spacemap)
   (find id (cdr spacemap) :key #'space-id))
 (declaim (global *heap-arrangement*))
-(defglobal *nil-taggedptr* 0)
+(declaim (global *nil-taggedptr*))
 (defun core-null-p (x) (= (get-lisp-obj-address x) *nil-taggedptr*))
 
 ;;; Given OBJ which is tagged pointer into the target core, translate it into
@@ -1119,6 +1119,11 @@
                                     (- fun-pointer-lowtag)
                                     (ash 2 word-shift)))))))))
 
+;;; After running MOVE-...-to-text-space, the replica of asm code is found thusly:
+;;; (defvar *a1* (%make-lisp-obj (logior text-space-start other-pointer-lowtag)))
+;;; (defvar *a2* (%make-lisp-obj (+ (get-lisp-obj-address *a1*) (primitive-object-size *a1*))))
+;;; (defvar *c* (%make-lisp-obj (+ (get-lisp-obj-address *a2*) (primitive-object-size *a2*))))
+;;; *c* => #<code id=0 [0] {550000011B6F..550000014AF0}>
 (defun move-dynamic-code-to-text-space (input-pathname output-pathname)
   ;; Remove old files
   (ignore-errors (delete-file output-pathname))
@@ -1341,7 +1346,7 @@
       (loop (let ((pc (sb-disassem:dstate-cur-offs dstate)))
               (result (cons pc (sb-disassem:disassemble-instruction dstate))))
             (when (>= (sb-disassem:dstate-cur-offs dstate) (sb-disassem:seg-length segment))
-              (result (list (sb-disassem:dstate-cur-offs dstate) 'nop)) ; so next-pc exists
+              (result (list (sb-disassem:dstate-cur-offs dstate) :end)) ; so next-pc exists
               (return)))
       (result))))
 
