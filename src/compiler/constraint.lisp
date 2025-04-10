@@ -857,6 +857,13 @@
        (eq (numeric-type-class x) 'integer)
        (eq (numeric-type-complexp x) :real)))
 
+(defun ratio-type-p (x)
+  (declare (type ctype x))
+  (and (numeric-type-p x)
+       (eq (numeric-type-class x) 'rational)
+       (eq (numeric-type-complexp x) :real)
+       (csubtypep x (specifier-type 'ratio))))
+
 ;;; Given that an inequality holds on values of type X and Y, return a
 ;;; new type for X. If GREATER is true, then X was greater than Y,
 ;;; otherwise less. If OR-EQUAL is true, then the inequality was

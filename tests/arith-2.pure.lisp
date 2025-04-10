@@ -679,3 +679,23 @@
     ((6) t)
     ((13) t)
     ((14) nil)))
+
+(with-test (:name :ratio+integer-type)
+  (assert-type
+   (lambda (x r)
+     (declare (integer x)
+              (ratio r))
+     (+ x r))
+   ratio)
+  (assert-type
+   (lambda (x r)
+     (declare (integer x)
+              (ratio r))
+     (+ r x))
+   ratio)
+  (assert-type
+   (lambda (x r)
+     (declare (integer x)
+              (ratio r))
+     (/ r x))
+   ratio))

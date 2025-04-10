@@ -1610,7 +1610,7 @@
 ;;; For the case of member types, if a MEMBER-FUN is given it is
 ;;; called to compute the result otherwise the member type is first
 ;;; converted to a numeric type and the DERIVE-FUN is called.
-(defun one-arg-derive-type (arg derive-fun member-fun &optional (ratio-to-rational t))
+(defun one-arg-derive-type (arg derive-fun member-fun)
   (declare (type function derive-fun)
            (type (or null function) member-fun))
   (let ((arg-list (prepare-arg-for-derive-type (lvar-type arg))))
@@ -1626,12 +1626,8 @@
                           (arithmetic-error () nil))
                         ;; Otherwise convert to a numeric type.
                         (funcall derive-fun (convert-member-type x))))
-                   ((or (numeric-type-p x)
-                        (and (not ratio-to-rational)
-                             (eq x (specifier-type 'ratio))))
-                    (funcall derive-fun x))
-                   ((eq x (specifier-type 'ratio))
-                    (deriver (specifier-type 'rational))))))
+                   ((numeric-type-p x)
+                    (funcall derive-fun x)))))
         ;; Run down the list of args and derive the type of each one,
         ;; saving all of the results in a list.
         (let ((results nil))
@@ -1653,23 +1649,14 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun &optional (ratio-to-rational t))
+(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun &optional)
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
                         derive-fun member-fun
-                        (same-leaf-ref-p arg1 arg2)
-                        ratio-to-rational))
+                        (same-leaf-ref-p arg1 arg2)))
 
-(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf (ratio-to-rational t))
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf)
   (declare (type function derive-fun member-fun))
-  (labels ((numeric-or-ratio-p (x)
-             (or (numeric-type-p x)
-                 (eq x (specifier-type 'ratio))))
-           (deriver (x y same-arg)
-             (when ratio-to-rational
-               (when (eq x (specifier-type 'ratio))
-                 (setf x (specifier-type 'rational)))
-               (when (eq y (specifier-type 'ratio))
-                 (setf y (specifier-type 'rational))))
+  (labels ((deriver (x y same-arg)
              (cond ((and (member-type-p x) (member-type-p y))
                     (let* ((x (first (member-type-members x)))
                            (y (first (member-type-members y)))
@@ -1682,11 +1669,11 @@
                                                 :complexp :real))
                             (t
                              (specifier-type `(eql ,result))))))
-                   ((and (member-type-p x) (numeric-or-ratio-p y))
+                   ((and (member-type-p x) (numeric-type-p y))
                     (funcall derive-fun (convert-member-type x) y same-arg))
-                   ((and (numeric-or-ratio-p x) (member-type-p y))
+                   ((and (numeric-type-p x) (member-type-p y))
                     (funcall derive-fun x (convert-member-type y) same-arg))
-                   ((and (numeric-or-ratio-p x) (numeric-or-ratio-p y))
+                   ((and (numeric-type-p x) (numeric-type-p y))
                     (funcall derive-fun x y same-arg))
                    (t
                     *universal-type*)))
@@ -1717,7 +1704,13 @@
     (derive arg1-type arg2-type same-leaf)))
 
 (defun +-derive-type-aux (x y same-arg)
-  (cond ((and (numeric-type-real-p x)
+  (cond ((and (integer-type-p x)
+              (ratio-type-p y))
+         (specifier-type 'ratio))
+        ((and (integer-type-p y)
+              (ratio-type-p x))
+         (specifier-type 'ratio))
+        ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
          (let* ((x-interval (numeric-type->interval x))
                 (y-interval (if same-arg
@@ -1748,22 +1741,23 @@
                           (interval-ratio-p x-interval)))
                  (type-intersection numeric (specifier-type 'ratio))
                  numeric))))
-        ((and (eq x (specifier-type 'ratio))
-              (numeric-type-p y)
-              (eq (numeric-type-class y) 'integer))
-         (specifier-type 'ratio))
-        ((and (eq y (specifier-type 'ratio))
-              (numeric-type-p x)
-              (eq (numeric-type-class x) 'integer))
-         (specifier-type 'ratio))
         (t
          (numeric-contagion x y))))
 
 (defoptimizer (+ derive-type) ((x y))
-  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+ nil))
+  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+))
 
 (defun --derive-type-aux (x y same-arg)
-  (cond ((and (numeric-type-real-p x)
+  (cond ((and (integer-type-p x)
+              (ratio-type-p y))
+         (specifier-type 'ratio))
+        ((and (integer-type-p y)
+              (ratio-type-p x))
+         (specifier-type 'ratio))
+        ((and same-arg
+              (ratio-type-p x))
+         (specifier-type '(integer 0 0)))
+        ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
          (let* ((x-interval (numeric-type->interval x))
                 (y-interval (if same-arg
@@ -1799,25 +1793,17 @@
                           (interval-ratio-p x-interval)))
                  (type-intersection numeric (specifier-type 'ratio))
                  numeric))))
-        ((and (eq x (specifier-type 'ratio))
-              (numeric-type-p y)
-              (eq (numeric-type-class y) 'integer))
-         (specifier-type 'ratio))
-        ((and (eq y (specifier-type 'ratio))
-              (numeric-type-p x)
-              (eq (numeric-type-class x) 'integer))
-         (specifier-type 'ratio))
-        ((and same-arg
-              (eq x (specifier-type 'ratio)))
-         (specifier-type '(integer 0 0)))
         (t
          (numeric-contagion x y))))
 
 (defoptimizer (- derive-type) ((x y))
-  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:- nil))
+  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:-))
 
 (defun *-derive-type-aux (x y same-arg)
-  (cond ((and (numeric-type-real-p x)
+  (cond ((and same-arg
+              (ratio-type-p x))
+         (specifier-type '(and ratio (rational 0))))
+        ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
          (let* ((x-interval (numeric-type->interval x))
                 (y-interval (if same-arg
@@ -1864,11 +1850,6 @@
                        (ratio-result-p y y-interval x-interval))
                    (type-intersection numeric (specifier-type 'ratio))
                    numeric)))))
-        ((and same-arg
-              (eq x (specifier-type 'ratio)))
-         ;; TODO: should be positive, but this result is an
-         ;; intersection type which other optimizers do not see.
-         (specifier-type 'ratio))
         (t
          (numeric-contagion x y))))
 
@@ -1883,14 +1864,14 @@
                  (return
                    (let ((result (%two-arg-derive-type (type-intersection x (specifier-type '(and integer (not (eql 0)))))
                                                        y
-                                                       #'*-derive-type-aux #'sb-xc:* nil)))
+                                                       #'*-derive-type-aux #'sb-xc:*)))
                      (when result
                        (type-union result (specifier-type '(eql 0)))))))))
         ;; If one of the integer arguments is non zero seperate the zero
         ;; result from the rest of the result range.
         (try-zero x-type y-type)
         (try-zero y-type x-type)
-        (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:* nil)))))
+        (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*)))))
 
 (defoptimizer (%signed-multiply-high derive-type) ((x y))
   (two-arg-derive-type x y
@@ -1909,7 +1890,12 @@
   (%signed-multiply-high-derive-type-optimizer node))
 
 (defun /-derive-type-aux (x y same-arg)
-  (cond ((and (numeric-type-real-p x)
+  (cond ((and (ratio-type-p x)
+              (cond (same-arg
+                     (specifier-type '(integer 1 1)))
+                    ((integer-type-p y)
+                     (specifier-type 'ratio)))))
+        ((and (numeric-type-real-p x)
               (numeric-type-real-p y))
          (let* ((x-interval (numeric-type->interval x))
                 (y-interval (if same-arg
@@ -1954,17 +1940,11 @@
                              (interval-ratio-p x-interval))
                         (type-intersection numeric (specifier-type 'ratio))
                         numeric))))))
-        ((and (eq x (specifier-type 'ratio))
-              (cond (same-arg
-                     (specifier-type '(integer 1 1)))
-                    ((and (numeric-type-p y)
-                          (eq (numeric-type-class y) 'integer))
-                     (specifier-type 'ratio)))))
         (t
          (numeric-contagion x y))))
 
 (defoptimizer (/ derive-type) ((x y))
-  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/ nil))
+  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/))
 
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
@@ -2028,25 +2008,26 @@
 (defoptimizer (lognot derive-type) ((int))
   (one-arg-derive-type int #'lognot-derive-type-aux #'lognot))
 
-
 (defun %negate-derive-type-aux (type)
-  (if (eq type (specifier-type 'ratio))
-      type
-      (flet ((negate-bound (b)
-               (and b
-                    (set-bound (sb-xc:- (type-bound-number b))
-                               (consp b)))))
-        (modified-numeric-type
-         type
-         :low (negate-bound (numeric-type-high type))
-         :high (negate-bound (numeric-type-low type))))))
+  (flet ((negate-bound (b)
+           (and b
+                (set-bound (sb-xc:- (type-bound-number b))
+                           (consp b)))))
+    (let ((r
+            (modified-numeric-type
+             type
+             :low (negate-bound (numeric-type-high type))
+             :high (negate-bound (numeric-type-low type)))))
+      (if (ratio-type-p type)
+          (type-intersection r (specifier-type 'ratio))
+          r))))
 
 (defoptimizer (%negate derive-type) ((num))
-  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:- nil))
+  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:-))
 
 (defun abs-derive-type-aux (type)
-  (cond ((eq type (specifier-type 'ratio))
-         type)
+  (cond ((ratio-type-p type)
+         (specifier-type '(and ratio (rational 0))))
         ((eq (numeric-type-complexp type) :complex)
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
@@ -2075,7 +2056,7 @@
                    (interval-high abs-bnd) bound-type))))))
 
 (defoptimizer (abs derive-type) ((num))
-  (one-arg-derive-type num #'abs-derive-type-aux #'abs nil))
+  (one-arg-derive-type num #'abs-derive-type-aux #'abs))
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -2945,7 +2926,7 @@
                (+ weight 10))))))
 
 (defun signum-derive-type-aux (type)
-  (cond ((eq type (specifier-type 'ratio))
+  (cond ((ratio-type-p type)
          (specifier-type '(or (eql 1) (eql -1))))
         ((eq (numeric-type-complexp type) :complex)
          (let* ((format (case (numeric-type-class type)
