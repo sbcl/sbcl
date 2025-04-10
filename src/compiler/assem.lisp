@@ -1542,9 +1542,7 @@
         ;; Since code can only go on pages reserved for code, there will be no smaller
         ;; object on the same page to cause misalignment.
         ;; Extra padding can be inserted before the trailing simple-fun table.
-        (let ((padding (if (eql n-entries 0)
-                           0
-                           (- index trailer-len (label-position end-text)))))
+        (let ((padding (- index trailer-len (label-position end-text))))
           (unless (and (typep trailer-len '(unsigned-byte 16))
                        (typep n-entries '(unsigned-byte 12))
                        ;; Padding must be representable in 4 bits at assembly time,
