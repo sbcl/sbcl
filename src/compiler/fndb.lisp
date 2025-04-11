@@ -332,11 +332,11 @@
 (defknown denominator (rational) (integer 1)
   (movable foldable flushable))
 
-(defknown (floor ceiling round)
+(defknown (floor ceiling)
   (real &optional real) (values integer real)
   (movable foldable flushable))
 
-(defknown truncate
+(defknown (truncate round)
   (real &optional real) (values integer real)
   (movable foldable flushable recursive))
 
