@@ -157,8 +157,8 @@ static inline char *page_address(page_index_t page_num)
 #endif
 
 #ifdef LISP_FEATURE_X86_64
-#define GC_SAFEPOINT_PAGE_ADDR (void*)(gc_card_mark-BACKEND_PAGE_BYTES)
-#define GC_SAFEPOINT_TRAP_ADDR (void*)(gc_card_mark-8)
+#define GC_SAFEPOINT_PAGE_ADDR (void*)(STATIC_SPACE_END)
+#define GC_SAFEPOINT_TRAP_ADDR (void*)(STATIC_SPACE_END)
 #endif
 void remap_free_pages(page_index_t,page_index_t);
 void page_remap_as_type(int,void*,sword_t);

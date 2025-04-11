@@ -27,10 +27,16 @@ lispobj* atomic_bump_static_space_free_ptr(int nbytes)
 {
     gc_assert((nbytes & LOWTAG_MASK) == 0);
     lispobj* claimed_ptr = static_space_free_pointer;
+#ifdef LISP_FEATURE_X86_64
+    // Must not clobber some constant data on the final page of static space
+    lispobj* limit = static_space_trailer_start;
+#else
+    lispobj* limit = (lispobj*)STATIC_SPACE_END;
+#endif
     do {
         lispobj* new = (lispobj*)((char*)claimed_ptr + nbytes);
         // Fail if space exhausted or bogusly wrapped around
-        if (new > (lispobj*)STATIC_SPACE_END || new < claimed_ptr) return 0;
+        if (new > limit || new < claimed_ptr) return 0;
         lispobj* actual_old = __sync_val_compare_and_swap(&static_space_free_pointer,
                                                           claimed_ptr, new);
         if (actual_old == claimed_ptr) return claimed_ptr;

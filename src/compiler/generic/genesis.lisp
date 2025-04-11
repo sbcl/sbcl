@@ -678,6 +678,7 @@
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
 (defvar *t-descriptor*)
+(defvar *t-symbol-info*)
 (defvar *lflist-tail-atom*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
@@ -1790,6 +1791,21 @@ core and return a descriptor to it."
 ;;; Construct and return a value for use as *NIL-DESCRIPTOR*.
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
+#+x86-64
+(defun make-nil-descriptor ()
+  ;; NIL is placed at the end, not the beginning, of static space,
+  ;; and T precedes it.
+  (let* ((nil-base (+ sb-vm:static-space-end (* -6 sb-vm:n-word-bytes)))
+         (nil-des (make-random-descriptor (logior nil-base sb-vm:list-pointer-lowtag)))
+         (t-des (make-random-descriptor (- (descriptor-bits nil-des) sb-vm::t-nil-offset))))
+    (setf *nil-descriptor* nil-des
+          *t-descriptor* t-des
+          (gethash (descriptor-bits nil-des) *cold-symbols*) nil
+          (get nil 'cold-intern-info) nil-des
+          (gethash (descriptor-bits t-des) *cold-symbols*) t
+          (get t 'cold-intern-info) t-des))
+  nil)
+#-x86-64
 (defun make-nil-descriptor ()
   (gspace-claim-n-words *static* (/ (- sb-vm::nil-value-offset
                                        (* 2 sb-vm:n-word-bytes)
@@ -1859,11 +1875,15 @@ core and return a descriptor to it."
   (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-id-slot 1)
                      (make-fixnum-descriptor sb-impl::+package-id-lisp+))
   (when core-file-name
-    ;; NIL did not have its package assigned. Do that now.
+    ;; NIL did not have its package assigned, nor did T if #+x86-64. Do that now.
+    #+x86-64 (record-accessibility :external (cold-find-package-info "COMMON-LISP")
+                                   *t-descriptor*)
     (record-accessibility :external (cold-find-package-info "COMMON-LISP")
                           *nil-descriptor*))
   ;; Intern the others.
-  (dovector (symbol sb-vm:+static-symbols+)
+  ;; For x86-64, T is allocated next to NIL and thus excluded from the follwing loop.
+  (dovector (symbol #+x86-64 (subseq sb-vm:+static-symbols+ 1)
+                    #-x86-64 sb-vm:+static-symbols+)
     (let* ((des (cold-intern symbol :gspace *static*))
            (offset-wanted (sb-vm:static-symbol-offset symbol))
            (offset-found (- (descriptor-bits des)
@@ -1894,6 +1914,7 @@ core and return a descriptor to it."
         (aver (eql tls-index (ensure-symbol-tls-index symbol))))))
 
   ;; Establish the value of T.
+  #-x86-64
   (let ((t-symbol (cold-intern t :gspace *static*)))
     (setq *t-descriptor* t-symbol)
     (cold-set t-symbol t-symbol))
@@ -1934,7 +1955,9 @@ core and return a descriptor to it."
   ;; The elements are filled in by FOP-ASSEMBLER-CODE.
   #+(and x86-64 immobile-code)
   (setf *asm-routine-vector*
-        (cons (word-vector (make-list asm-jump-vect-nelems :initial-element 0) *static*)
+        (cons (make-random-descriptor
+               (- (descriptor-bits *t-descriptor*)
+                  (ash (+ sb-vm:vector-data-offset asm-jump-vect-nelems) sb-vm:word-shift)))
               (make-array asm-jump-vect-nelems :initial-element 0)))
 
   #+linkage-space (mapc 'ensure-linkage-index sb-vm::+c-callable-fdefns+)
@@ -1989,12 +2012,7 @@ core and return a descriptor to it."
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
-    #+x86-64
-    (let ((targ-vec (car *asm-routine-vector*))
-          (host-vec (the simple-vector (cdr *asm-routine-vector*))))
-      (cold-set 'sb-fasl::*asm-routine-vector* targ-vec)
-      (dotimes (i (length host-vec))
-        (write-wordindexed/raw targ-vec (+ i sb-vm:vector-data-offset) (svref host-vec i))))
+    #+x86-64 (cold-set 'sb-fasl::*asm-routine-vector* (car *asm-routine-vector*))
     (let* ((objects (gspace-objects space))
            (count (length objects)))
       (let ((remainder (rem wordindex words-per-page)))
@@ -2093,19 +2111,6 @@ core and return a descriptor to it."
   (dump-symbol-infos
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
-
-  #+x86-64 ; Dump a popular constant
-  (let ((array
-         ;; Embed the constant in an unboxed array. This shouldn't be necessary,
-         ;; because the start of the scanned space is STATIC_SPACE_OBJECTS_START,
-         ;; but not all uses strictly follow that rule. (They should though)
-         ;; This must not conflict with the alloc regions at the start of the space.
-         (make-random-descriptor (logior (- sb-vm::non-negative-fixnum-mask-constant-wired-address
-                                            (* 2 sb-vm:n-word-bytes))
-                                         sb-vm:other-pointer-lowtag))))
-    (write-wordindexed/raw array 0 sb-vm:simple-array-unsigned-byte-64-widetag)
-    (write-wordindexed array 1 (make-fixnum-descriptor 1))
-    (write-wordindexed/raw array 2 sb-vm::non-negative-fixnum-mask-constant))
 
   #+x86
   (progn
@@ -2276,18 +2281,19 @@ core and return a descriptor to it."
                  :key (lambda (x) (descriptor-bits (cold-intern (car x)))))
      do (aver warm-sym) ; enforce that NIL was specially dealt with already
         (aver (> (sb-impl::packed-info-len info) 1))
-        (write-wordindexed
-         (cold-intern warm-sym)
-         sb-vm:symbol-info-slot
-         (dump-packed-info
-          ;; Each packed-info will have one fixnum, possibly the symbol SETF,
-          ;; and zero, one, or two #<fdefn>, and/or a classoid-cell.
-          (map 'list (lambda (elt)
-                       (etypecase elt
-                         (symbol (cold-intern elt))
-                         (sb-xc:fixnum (make-fixnum-descriptor elt))
-                         (descriptor elt)))
-               (sb-impl::packed-info-cells info))))))
+        (let ((info
+               (dump-packed-info
+                ;; Each packed-info will have one fixnum, possibly the symbol SETF,
+                ;; and zero, one, or two #<fdefn>, and/or a classoid-cell.
+                (map 'list (lambda (elt)
+                             (etypecase elt
+                               (symbol (cold-intern elt))
+                               (sb-xc:fixnum (make-fixnum-descriptor elt))
+                               (descriptor elt)))
+                     (sb-impl::packed-info-cells info)))))
+          (cond
+            #+x86-64 ((eq warm-sym t) (setq *t-symbol-info* info))
+            (t (write-wordindexed (cold-intern warm-sym) sb-vm:symbol-info-slot info))))))
 
 ;;;; fixups and related stuff
 
@@ -3931,6 +3937,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                    (loop for symbol being each hash-value of *cold-symbols*
                          using (hash-key bits)
                          when (and symbol
+                                   (/= bits (descriptor-bits *t-descriptor*))
                                    (let ((des (make-random-descriptor bits)))
                                      (or (plusp (fname-linkage-index des))
                                          (cold-symbol-function des nil))))
@@ -4072,6 +4079,47 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                  5 ; = number of words in this core header entry
                  n-ptes (+ (* n-ptes bitmap-bytes-per-page) pte-bytes) data-page)))
 
+#+x86-64
+(defun create-static-space-constants ()
+  (let* ((nil-alloc-words 8)
+         (t-alloc-words (align-up sb-vm:symbol-size 2)) ; = 6
+         (nil-slots (make-array nil-alloc-words))
+         (t-slots (make-array t-alloc-words))
+         ;; NIL-ADDR is its address as a cons cell, not as a symbol
+         (nil-addr (+ sb-vm:static-space-end (* -6 sb-vm:n-word-bytes)))
+         (t-addr (+ nil-addr (ash -8 sb-vm:word-shift)))
+         (nil-des (make-random-descriptor (logior nil-addr sb-vm:list-pointer-lowtag)))
+         (t-des (make-random-descriptor (logior t-addr sb-vm:other-pointer-lowtag))))
+    (setf (aref nil-slots 0) 0 ; CPU feature bits get stored here at runtime
+          (aref nil-slots 1) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
+          (aref nil-slots 2) (descriptor-bits nil-des) ; car
+          (aref nil-slots 3) (descriptor-bits nil-des) ; cdr
+          (aref nil-slots 4) 0 ; function
+          (aref nil-slots 5) (descriptor-bits (cold-cons nil-des nil-des)) ; globaldb info
+          (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL"))
+          (aref nil-slots 7) sb-vm::non-negative-fixnum-mask-constant)
+    (setf (aref t-slots 0) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
+          (aref t-slots sb-vm:symbol-hash-slot) (compute-symhash "T" t-des)
+          (aref t-slots sb-vm:symbol-value-slot) (descriptor-bits t-des)
+          (aref t-slots sb-vm:symbol-fdefn-slot) 0
+          (aref t-slots sb-vm:symbol-info-slot) (descriptor-bits *t-symbol-info*)
+          (aref t-slots sb-vm:symbol-name-slot) (descriptor-bits (string-literal-to-core "T")))
+    (let ((words (make-array (+ 2 ; core entry preamble
+                                2 ; vector header
+                                asm-jump-vect-nelems
+                                t-alloc-words
+                                nil-alloc-words)))
+          (ptr 4))
+      (setf (aref words 0) static-constants-core-entry-type-code
+            (aref words 1) (length words)
+            (aref words 2) sb-vm:simple-array-unsigned-byte-64-widetag
+            (aref words 3) (ash asm-jump-vect-nelems sb-vm:n-fixnum-tag-bits))
+      #+immobile-code (replace words (cdr *asm-routine-vector*) :start1 ptr)
+      (incf ptr asm-jump-vect-nelems)
+      (replace words t-slots :start1 (prog1 ptr (incf ptr t-alloc-words)))
+      (replace words nil-slots :start1 ptr)
+      words)))
+
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later
 ;;; by executing SAVE-LISP-AND-DIE in a running system, perhaps after we've
@@ -4115,16 +4163,25 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       ;; loading the directory. It's not in the directory because it doesn't allocate
       ;; a space in the usual way: it's either random or contiguous with text space.
       #+linkage-space (setq data-page (output-linkage-table data-page core-file))
-      ;; Write the Directory entry header.
-      (write-words core-file directory-core-entry-type-code)
-      (let ((spaces `(,*static*
+
+     ;; x86-64: The constants T and NIL are at the highest end of static space
+     ;; so that a small (depending on +/- safepoint) displacement from NIL can reach
+     ;; the GC card table. Since the print-names are dynamic-space strings, they must
+     ;; be allocated before establishing dynamic-space-free-pointer.
+     (let (#+x86-64 (static-space-constants (create-static-space-constants))
+           (spaces `(,*static*
                       #+permgen ,*permgen*
                       #+immobile-space ,@`(,*immobile-fixedobj* ,*immobile-text*)
                       ,*dynamic* ,*read-only*)))
+        ;; Write the Directory entry header.
+        (write-words core-file directory-core-entry-type-code)
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-words core-file (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
-          (setq data-page (output-gspace space data-page core-file verbose))))
+          (setq data-page (output-gspace space data-page core-file verbose)))
+        ;; Output the T/NIL constants
+        #+x86-64 (write-words core-file static-space-constants))
+
       (output-page-table *dynamic* data-page core-file verbose)
 
       ;; Write the initial function.

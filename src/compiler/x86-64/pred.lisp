@@ -151,8 +151,10 @@
                      (unless size
                        (setf size :dword))
                      (setf size :qword))
+                 (if (nil-relative-p bits)
+                     (move-immediate dst bits)
                  ;; Can't use ZEROIZE, since XOR will affect the flags.
-                 (inst mov dst bits))))
+                     (inst mov dst bits)))))
         (cond ((null (rest flags))
                (cond ((sc-is else immediate)
                       (load-immediate res else))
@@ -303,12 +305,14 @@
   (:policy :fast-safe)
   (:translate eq)
   (:arg-refs x-tn-ref)
-  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg) temp) ; TODO: add :unused-if
   (:generator 6
     (cond
       ((sc-is y constant)
        (inst cmp x (cond ((sc-is x descriptor-reg any-reg) y)
                          (t (inst mov temp y) temp))))
+      ((and (sc-is y immediate) (nil-relative-p (immediate-tn-repr y)))
+       (inst cmp x (move-immediate temp (immediate-tn-repr y))))
       ((sc-is y immediate)
        (let* ((value (encode-value-if-immediate y))
               (immediate (plausible-signed-imm32-operand-p value)))
@@ -327,7 +331,7 @@
                        (specifier-type 'cons)))
              (inst cmp :byte x (logand nil-value #xff))
              (return-from if-eq)))
-         (cond ((fixup-p value) ; immobile object
+         (cond ((or (fixup-p value) (tn-p value)) ; immobile object or NIL
                 (inst cmp x value))
                ((and (zerop value) (sc-is x any-reg descriptor-reg))
                 (inst test x x))
@@ -371,7 +375,8 @@
             :load-if (or (not (sc-is x immediate))
                          (typep (tn-value x)
                                 '(and integer
-                                  (not (signed-byte #.(- 32 n-fixnum-tag-bits))))))))
+                                  (not (signed-byte #.(- 32 n-fixnum-tag-bits)))))
+                         (nil-relative-p (immediate-tn-repr x)))))
   (:arg-types * (:constant (unsigned-byte 16)) *)
   (:info slot)
   (:translate %instance-ref-eq)

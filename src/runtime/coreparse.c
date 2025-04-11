@@ -583,6 +583,9 @@ static void relocate_heap(struct heap_adjust* adj)
     // itself.
     adjust_pointers((void*)(NIL - LIST_POINTER_LOWTAG), 1, adj);
 #endif
+#ifdef T_SYMBOL_SLOTS_START
+    fix_space((uword_t)T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, adj);
+#endif
     fix_space((uword_t)NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, adj);
     fix_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_PERMGEN
@@ -594,10 +597,8 @@ static void relocate_heap(struct heap_adjust* adj)
     fix_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(), adj);
     fix_space(TEXT_SPACE_START, text_space_highwatermark, adj);
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_IMMOBILE_SPACE
-    /* Update the static-space asm routine indirection vector
-     * which immediately follows LFLIST_TAIL_ATOM in memory */
-    lispobj* tail_atom = native_pointer(LFLIST_TAIL_ATOM);
-    struct vector* v = (void*)(tail_atom + object_size(tail_atom));
+    /* Update the static-space asm routine indirection vector */
+    struct vector* v = (void*)static_space_trailer_start;
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG);
     struct code* c = (void*)asm_routines_start;
     lispobj* jump_table = code_jumptable_start(c);
@@ -687,6 +688,15 @@ void calc_immobile_space_bounds()
 static os_vm_address_t reserve_space(int space_id, int attr,
                                      os_vm_address_t addr, os_vm_size_t size)
 {
+#ifndef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+    /* temporary hack: spaces allocated by coreparse are assumed to be movable.
+     * immovable static space ought to have been reserved by allocate_hardwired_spaces()
+     * but it can't have been, because the allocation request must take into account the
+     * size of the GC card table, which isn't known until parsing the core.
+     * So this request has to be changed to not movable so that it fails if not
+     * placed as required */
+    if (space_id == STATIC_CORE_SPACE_ID) attr &= ~MOVABLE;
+#endif
     __attribute__((unused)) int extra_request = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
@@ -805,10 +815,10 @@ process_directory(int count, struct ndir_entry *entry,
 #else
         if (id == READ_ONLY_CORE_SPACE_ID) {
 #endif
-            if (len) // There is no "nominal" size of static or
+            if (len) { // There is no "nominal" size of static or
                      // readonly space, so give them a size
-                spaces[id].desired_size = len;
-            else { // Assign some address, so free_pointer does enclose [0 .. addr+0]
+                if (len > spaces[id].desired_size) spaces[id].desired_size = len;
+            } else { // Assign some address, so free_pointer does enclose [0 .. addr+0]
                 if (id == STATIC_CORE_SPACE_ID)
                     lose("Static space size is 0?");
                 READ_ONLY_SPACE_START = READ_ONLY_SPACE_END = addr;
@@ -1081,13 +1091,12 @@ void gc_allocate_ptes()
 #endif
 
     long num_gc_cards = 1 + gc_card_table_mask;
-#if defined LISP_FEATURE_SB_SAFEPOINT && defined LISP_FEATURE_X86_64
-    /* The card table is hardware-page-aligned. Preceding it and occupying a whole
-     * "backend page" - which by the way is overkill - is the global safepoint trap page.
-     * The dummy TEST instruction for safepoints encodes shorter this way */
-    void* result = os_alloc_gc_space(0, MOVABLE, 0,
-                                     ALIGN_UP(num_gc_cards, BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES);
-    gc_card_mark = (unsigned char*)result + BACKEND_PAGE_BYTES;
+#ifdef LISP_FEATURE_X86_64
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+    gc_card_mark = (void*)(STATIC_SPACE_END + BACKEND_PAGE_BYTES);
+# else
+    gc_card_mark = (void*)STATIC_SPACE_END;
+# endif
 #elif defined LISP_FEATURE_PPC64
     unsigned char* mem = checked_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
     gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
@@ -1412,7 +1421,11 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 
     struct coreparse_space defined_spaces[] = {
         {READ_ONLY_CORE_SPACE_ID, 0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
+#ifdef LISP_FEATURE_X86_64 // specify the static space size in order to allocate it
+        {STATIC_CORE_SPACE_ID, STATIC_SPACE_SIZE, 0, STATIC_SPACE_START, &static_space_free_pointer},
+#else                      // must not specify the static space size
         {STATIC_CORE_SPACE_ID, 0, 0, STATIC_SPACE_START, &static_space_free_pointer},
+#endif
 #ifdef LISP_FEATURE_PERMGEN
         {PERMGEN_CORE_SPACE_ID, PERMGEN_SPACE_SIZE | 1, 0,
          PERMGEN_SPACE_START, &permgen_space_free_pointer},
@@ -1484,7 +1497,22 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             if (stringlen != (sizeof build_id-1) || memcmp(ptr, build_id, stringlen))
                 lose("core was built for runtime \"%.*s\" but this is \"%s\"",
                      (int)stringlen, (char*)ptr, build_id);
+#ifdef LISP_FEATURE_X86_64
+            spaces[STATIC_CORE_SPACE_ID].desired_size +=
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+                BACKEND_PAGE_BYTES + /* ridiculously oversized */
+# endif
+                ALIGN_UP((1+gc_card_table_mask), os_reported_page_size);
+#endif
             break;
+        case STATIC_CONSTANTS_CORE_ENTRY_TYPE_CODE: {
+            int nwords = remaining_len;
+            lispobj* base = (lispobj*)
+              ((STATIC_SPACE_START+STATIC_SPACE_SIZE) - (nwords<<WORD_SHIFT));
+            static_space_trailer_start = base;
+            memcpy(base, ptr, nwords<<WORD_SHIFT);
+            break;
+        }
         case DIRECTORY_CORE_ENTRY_TYPE_CODE:
             process_directory(remaining_len / NDIR_ENTRY_LENGTH,
                               (struct ndir_entry*)ptr,

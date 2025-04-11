@@ -400,9 +400,9 @@
      (:temp rdi unsigned-reg rdi-offset)
      (:temp rsi unsigned-reg rsi-offset)
      (:temp count unsigned-reg rcx-offset)
-     (:temp null unsigned-reg r8-offset)
      (:temp temp unsigned-reg r9-offset)
      (:temp return unsigned-reg r10-offset))
+  (symbol-macrolet ((null null-tn))
   (flet ((check (label)
            (assemble ()
              (%test-lowtag list temp skip nil list-pointer-lowtag)
@@ -410,7 +410,6 @@
              (inst jmp label)
              skip)))
     (assemble ()
-      (inst mov null nil-value)
       (%test-lowtag list temp ZERO-VALUES-ERROR t list-pointer-lowtag)
       (inst cmp list null)
       (inst jmp :e ZERO-VALUES)
@@ -474,7 +473,7 @@
       (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
       (inst stc)
       (inst leave)
-      (inst ret))))
+      (inst ret)))))
 
 ;; Adding to the thread-local remset has to be pseudo-atomic because GC takes
 ;; ownership of the the vector when it inserts rememberd objects into the common

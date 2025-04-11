@@ -269,8 +269,9 @@
           (let* ((asm-code (sb-fasl::get-asm-routine 'undefined-tramp))
                  (base (sap+ (int-sap (get-lisp-obj-address tramp)) (- fun-pointer-lowtag)))
                  (sap (sap+ base 23)))
-            (setf (sap-ref-16 sap 1) #x2524
-                  (sap-ref-32 sap 3) (asm-routine-indirect-address asm-code)
+            (setf (sap-ref-32 sap 0) #x24A4FF41 ; JMP [R12+disp]
+                  (sap-ref-32 sap 4) (asm-routine-indirect-address asm-code)
+                  (sap-ref-32 sap 8) #x90
                   ;; The undefined function name is stored in the "function" slot.
                   ;; The slot setter doesn't like this of course.
                   (sap-ref-lispobj base (ash funcallable-instance-function-slot word-shift))
