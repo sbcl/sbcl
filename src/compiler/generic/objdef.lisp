@@ -494,10 +494,10 @@ during backtrace.
 ;;; These slots hold frequently-referenced constants.
 ;;; If we can't do that for some reason - like, say, the safepoint page
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
+;;; TODO: these all belong in the static-constants of the core header.
 (defconstant-eqx +thread-header-slot-names+
     `#(#+x86-64
-       ,@'(t-nil-constants
-           linkage-table
+       ,@'(linkage-table
            alien-linkage-table-base
            msan-xor-constant
            ;; The following slot's existence must NOT be conditional on #+msan

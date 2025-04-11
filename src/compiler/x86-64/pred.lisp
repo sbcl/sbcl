@@ -242,8 +242,15 @@
                 (typep (fixnumize y) '(signed-byte 32))
                 (member (abs (fixnumize (- x y))) '(2 4 8))
                 'add)))
-    (or #+sb-thread (or (and (eq x t) (eq y nil) 'boolean)
-                        (and (eq x nil) (eq y t) 'boolean))
+    ;; FIXME: the BOOLEAN case has little benefit, except that converting to
+    ;; a CMOV in the general way unnecessarily loads both inputs even when
+    ;; one of them is NIL, e.g. (lambda (x) (eql x 1)) becomes
+    ;;   CMP RSI, 2
+    ;;   MOV RDX, R12 ; <-- this is completely superfluous
+    ;;   LEA RAX, [R12-56]
+    ;;   CMOVEQ RDX, RAX
+    (or (or (and (eq x t) (eq y nil) 'boolean)
+            (and (eq x nil) (eq y t) 'boolean))
         (try-shift x y)
         (try-shift y x)
         (try-add x y))))
@@ -261,18 +268,9 @@
            (flag (car (conditional-flags-flags flags))))
       (ecase hint
         (boolean
-         ;; FIXNUMP -> {T,NIL} could be special-cased, reducing the instruction count by
-         ;; 1 or 2 depending on whether the argument and result are in the same register.
-         ;; Best case would be "AND :dword res, arg, 1 ; MOV res, [ea]".
-         (when (eql x t)
-           ;; T is at the lower address, so to pick it out we need index=0
-           ;; which makes the condition in (IF BIT T NIL) often flipped.
-           (setq flag (negate-condition flag)))
-         (inst set flag res)
-         (inst movzx '(:byte :dword) res res)
-         (inst mov :dword res
-               (ea thread-segment-reg (ash thread-t-nil-constants-slot word-shift)
-                   thread-tn res 4)))
+         (when (eql x t) (setq flag (negate-condition flag)))
+         (load-symbol res t) ; doesn't mess up flags
+         (inst cmov flag res null-tn))
         (shl
          (when (eql x 0)
            (setq flag (negate-condition flag)))

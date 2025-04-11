@@ -102,7 +102,6 @@
 ;;; - store other important value between NIL and the GC card table, such as:
 ;;;     * FUNCTION-LAYOUT (for allocating closures)
 ;;;     * lockfree list tail
-;;;     * T and NIL in consecutive words for COMPUTE-FROM-FLAGS
 ;;; - if the asm routine indirection vector is filled downward and the ALLOC-TRAMP addresses
 ;;;   are in the highest cells, it may be possible to shorten their CALL encodings
 ;;;   to use imm8 displacement from NULL-TN, hypothetically:

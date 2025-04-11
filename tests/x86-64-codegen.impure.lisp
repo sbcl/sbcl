@@ -1366,20 +1366,20 @@
      (loop for line in lines
            thereis (and (search "PUSH #x" line) (search "':FOO" line))))))
 
-(defun check-branchless (lexpr)
-  ;; check that it contains neither JMP nor CMOV
+(defun check-hasnot (instructions lexpr)
   (let ((f (compile nil lexpr)))
     (dolist (inst (get-simple-fun-instruction-model f))
       (let ((mnemonic (second inst)))
-        (assert (string/= mnemonic "CMOV"))
-        (assert (string/= mnemonic "JMP"))))))
+        (assert (not (find mnemonic instructions :test 'string=)))))))
 
 (with-test (:name :compute-lisp-bool-from-c-bool :skipped-on (:not :sb-thread))
-  (check-branchless '(lambda (x)
-                       (declare (optimize (sb-c::verify-arg-count 0)))
-                       (= (truly-the fixnum x) 1))))
+  (check-hasnot '("JMP")
+                '(lambda (x)
+                  (declare (optimize (sb-c::verify-arg-count 0)))
+                  (= (truly-the fixnum x) 1))))
 
 (with-test (:name :compute-c-bool-from-lisp-bool)
-  (check-branchless '(lambda (x)
-                       (declare (optimize (sb-c::verify-arg-count 0)))
-                       (if x 1 0))))
+  (check-hasnot '("JMP" "CMOV")
+                '(lambda (x)
+                  (declare (optimize (sb-c::verify-arg-count 0)))
+                  (if x 1 0))))
