@@ -2876,7 +2876,10 @@
 ;;; race conditions and (at least on Linux) does not make use of any shell environment variables
 ;;; to determine a directory - in fact it doesn't make a directory entry at all.
 (defun sb-unix:unix-tmpfile ()
-  (make-stdio-file (alien-funcall (extern-alien "tmpfile" (function system-area-pointer)))))
+  (let ((sap (alien-funcall (extern-alien "tmpfile" (function system-area-pointer)))))
+    (if (zerop (sap-int sap))
+        (error "Error calling tmpfile(): ~a" (strerror))
+        (make-stdio-file sap))))
 
 (defun sb-unix:unix-fclose (file)
   (alien-funcall (extern-alien "fclose" (function int system-area-pointer))
