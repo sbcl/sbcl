@@ -4157,6 +4157,17 @@
           `(values 0 x)
           (give-up-ir1-transform)))))
 
+(make-defs (($fun truncate ceiling floor))
+  (deftransform $fun ((x y) (sb-vm:signed-word sb-vm:signed-word) * :node node :important nil)
+    (delay-ir1-transform node :ir1-phases)
+    (when (csubtypep (single-value-type (node-asserted-type node))
+                     (specifier-type 'sb-vm:signed-word))
+      (give-up-ir1-transform))
+    `(if (and (= y -1)
+              (= x ,(- #1=(expt 2 (1- sb-vm:n-word-bits)))))
+         (values ,#1# 0)
+         (truly-the sb-vm:signed-word ($fun x (truly-the (not (eql -1)) y))))))
+
 
 ;;;; arithmetic and logical identity operation elimination
 
