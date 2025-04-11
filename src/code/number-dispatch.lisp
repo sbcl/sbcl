@@ -83,7 +83,7 @@
 ;;; would fail at runtime if given var1 fixnum and var2 double-float,
 ;;; even though the second clause matches this signature. To catch
 ;;; this earlier than runtime we throw an error already here.
-(defun generate-number-dispatch (vars error-tags cases disjoint)
+(defun generate-number-dispatch (vars error-tags cases)
   ;; Shouldn't be necessary, but avoids a warning in certain lisps that
   ;; seem to like to warn about self-calls in :COMPILE-TOPLEVEL situation.
   (named-let generate-number-dispatch ((vars vars) (error-tags error-tags) (cases cases))
@@ -91,9 +91,8 @@
         (let ((var (first vars))
               (cases (sort cases #'type-test-order :key #'car)))
           (flet ((error-if-sub-or-supertype (type1 type2)
-                   (when (and disjoint
-                              (or (cl:subtypep type1 type2)
-                                  (cl:subtypep type2 type1)))
+                   (when (or (cl:subtypep type1 type2)
+                             (cl:subtypep type2 type1))
                      (error "Types not disjoint: ~S ~S." type1 type2)))
                  (error-if-supertype (type1 type2)
                    (when (cl:subtypep type2 type1)
@@ -163,11 +162,9 @@
 ;;; and lead to a compile time error; see GENERATE-NUMBER-DISPATCH above
 ;;; for an example.
 (defmacro number-dispatch (var-specs &body cases)
-  (let* ((res (list nil))
-         (disjoint (not (find :non-disjoint var-specs)))
-         (var-specs (remove :non-disjoint var-specs))
-         (vars (mapcar #'car var-specs))
-         (block (gensym "NUMBER-DISPATCH")))
+  (let ((res (list nil))
+        (vars (mapcar #'car var-specs))
+        (block (gensym "NUMBER-DISPATCH")))
     (dolist (case cases)
       (if (symbolp (first case))
           (let ((cases (apply (symbol-function (first case)) (rest case))))
@@ -198,7 +195,7 @@
          (tagbody
             (return-from ,block
               ,@(generate-number-dispatch var-specs (error-tags)
-                                          (cdr res) disjoint))
+                                          (cdr res)))
             ,@(errors))))))
 
 ;;;; binary operation dispatching utilities

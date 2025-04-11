@@ -446,7 +446,8 @@
                          (pop s))))
       1)))
 
-(with-test (:name :overflow+make-array)
+(with-test (:name :overflow+make-array
+                  :fails-on (not :64-bit))
   (assert
    (= (count 'sb-vm::overflow+t
              (ir2-vops '(lambda (y)

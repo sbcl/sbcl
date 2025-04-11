@@ -2234,6 +2234,28 @@
   (def double-float)
   (def single-float))
 
+#-64-bit
+(defun round-double-float-to-bignum (number)
+  (declare (double-float number))
+  (multiple-value-bind (tru rem) (truncate number)
+    (if (zerop rem)
+        (values tru rem)
+        (let ((thresh 0.5d0))
+          (cond ((or (> rem thresh)
+                     (and (= rem thresh) (oddp tru)))
+                 (values (+ tru 1) (- rem 1d0)))
+                ((let ((-thresh (- thresh)))
+                   (or (< rem -thresh)
+                       (and (= rem -thresh) (oddp tru))))
+                 (values (- tru 1) (+ rem 1d0)))
+                (t (values tru rem)))))))
+
+#-64-bit
+(defun round-double-float-to-bignum-div (quot number divisor)
+  (declare (double-float number))
+  (let ((rounded (round-double-float-to-bignum quot)))
+    (values rounded (- number (* rounded divisor)))))
+
 (macrolet ((def (type)
              (let ((decode (package-symbolicate "SB-KERNEL" 'integer-decode- type)))
                `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)

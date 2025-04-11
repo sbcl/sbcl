@@ -663,18 +663,18 @@
            (maybe-inline round))
   (macrolet ((round-float (rtype)
                `(round (coerce number ',rtype) (coerce divisor ',rtype))))
-    (number-dispatch ((number real) (divisor real) :non-disjoint)
-      #+64-bit ;; no transform for 32 bits
+    (number-dispatch ((number real) (divisor real))
       (((foreach single-float double-float)
         (foreach single-float fixnum rational))
        (round-float (dispatch-type number)))
-      #+64-bit
       ((double-float double-float)
        (round-float double-float))
-      #+64-bit
       ((single-float double-float)
        (round-float double-float))
-      ((real real)
+      ((rational
+        (foreach single-float double-float))
+       (round-float (dispatch-type divisor)))
+      ((rational rational)
        (multiple-value-bind (tru rem) (truncate number divisor)
          (if (zerop rem)
              (values tru rem)

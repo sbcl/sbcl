@@ -1865,12 +1865,17 @@
         (give-up-ir1-transform))))
 
 #-round-float
-(macrolet ((def (fun type other-float-arg-types)
+(macrolet ((def (fun type other-float-arg-types &optional bignum-rounder)
              (let* ((unary (if (eq fun 'round)
                                (symbolicate "%UNARY-" fun)
                                (symbolicate "%UNARY-" fun "/" type)))
-                    (to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
-                    (to-bignum (symbolicate 'unary-truncate- type '-to-bignum))
+                    (to-bignum-div (or (and bignum-rounder
+                                            (package-symbolicate "SB-BIGNUM"
+                                                                 bignum-rounder
+                                                                 '-div))
+                                       (symbolicate 'unary-truncate- type '-to-bignum-div)))
+                    (to-bignum (or bignum-rounder
+                                   (symbolicate 'unary-truncate- type '-to-bignum)))
                     (coerce (symbolicate "%" type))
                     (fixnum-type `(,type
                                    ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
@@ -1905,10 +1910,8 @@
                                          `(,',to-bignum-div div x f))))))))))
   (def truncate single-float ())
   (def truncate double-float (single-float))
-  #+64-bit ;; can't round 32-bit bignums using truncation
   (def round single-float ())
-  #+64-bit
-  (def round double-float (single-float)))
+  (def round double-float (single-float) #-64-bit sb-bignum::round-double-float-to-bignum))
 
 (macrolet ((def (name type other-float-arg-types)
              (let* ((to-bignum-div (symbolicate 'unary-truncate- type '-to-bignum-div))
