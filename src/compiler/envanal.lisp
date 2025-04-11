@@ -285,10 +285,11 @@
 
 ;;; For each downward funarg, mark the funarg as dynamic extent. For
 ;;; now this only works on globally named functions.
-(defun dxify-downward-funargs (node dxable-args fun-name)
-  #+sb-xc-host
-  (declare (ignore fun-name))
-  (let (dynamic-extent)
+(defun dxify-downward-funargs (node)
+  (let* ((fun-name (combination-fun-source-name node nil))
+         (dxable-args (and fun-name
+                           (fun-name-dx-args fun-name)))
+         dynamic-extent)
     ;; Experience shows that users place incorrect DYNAMIC-EXTENT declarations
     ;; without due consideration and care. Since the declaration was ignored
     ;; in more contexts than not, it was relatively harmless.
@@ -299,62 +300,63 @@
     ;; that callers should always use more stack space. You should really
     ;; only do that if you don't also need an arbitrarily long call chain.
     ;; MAP and friends are good examples where this pertains]
-    (when #+sb-xc-host t                ; always trust our own code
-          #-sb-xc-host
-          (or (let ((pkg (sb-xc:symbol-package (fun-name-block-name fun-name))))
-                ;; callee "probably" won't get redefined
-                (or (not pkg)
-                    (package-locked-p pkg)
-                    (system-package-p pkg)
-                    (eq pkg *cl-package*)
-                    (basic-combination-fun-info node)))
-              (policy node (= safety 0)))
-          (dolist (arg-spec dxable-args)
-            (when (symbolp arg-spec)
-              ;; If there are keywords, we had better have a FUN-TYPE
-              (let ((fun-type (lvar-type (combination-fun node))))
-                ;; Can't do anything unless we can ascertain where
-                ;; the keyword arguments start.
-                (when (fun-type-p fun-type)
-                  (let* ((keys-index
-                           (+ (length (fun-type-required fun-type))
-                              (length (fun-type-optional fun-type))))
-                         (keywords-supplied
-                           (nthcdr keys-index (combination-args node))))
-                    ;; Everything in a keyword position needs to be
-                    ;; constant.
-                    (loop
-                      (unless (cdr keywords-supplied) (return))
-                      (let ((keyword (car keywords-supplied)))
-                        (unless (constant-lvar-p keyword)
-                          (return))
-                        (when (eq (lvar-value keyword) arg-spec)
-                          ;; Map it to a positional arg
-                          (setq arg-spec (1+ keys-index))
-                          (return))
-                        (setq keywords-supplied (cddr keywords-supplied))
-                        (incf keys-index 2)))))))
-            (when (integerp arg-spec)
-              (let* ((arg (or (nth arg-spec (combination-args node))
-                              (return-from dxify-downward-funargs)))
-                     (use (principal-lvar-use arg)))
-                (when (and (not (lvar-dynamic-extent arg))
-                           ;; We check that the use is a lambda so
-                           ;; that we don't end up getting notes about
-                           ;; not being able to allocate later.
-                           (ref-p use)
-                           (lambda-p (ref-leaf use))
-                           (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
-                  (let ((enclose (xep-enclose (ref-leaf use))))
-                    (cond ((and enclose
-                                (enclose-dynamic-extent enclose))
-                           (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
-                                 t))
-                          (t
-                           (unless dynamic-extent
-                             (setq dynamic-extent (insert-dynamic-extent node)))
-                           (setf (lvar-dynamic-extent arg) dynamic-extent)
-                           (push arg (dynamic-extent-values dynamic-extent))))))))))))
+    (when (and dxable-args
+               #-sb-xc-host                   ; always trust our own code
+               (or (let ((pkg (sb-xc:symbol-package
+                               (fun-name-block-name fun-name))))
+                     ;; callee "probably" won't get redefined
+                     (or (not pkg)
+                         (package-locked-p pkg)
+                         (system-package-p pkg)
+                         (eq pkg *cl-package*)
+                         (basic-combination-fun-info node)))
+                   (policy node (= safety 0))))
+      (dolist (arg-spec dxable-args)
+        (when (symbolp arg-spec)
+          ;; If there are keywords, we had better have a FUN-TYPE
+          (let ((fun-type (lvar-type (combination-fun node))))
+            ;; Can't do anything unless we can ascertain where
+            ;; the keyword arguments start.
+            (when (fun-type-p fun-type)
+              (let* ((keys-index
+                       (+ (length (fun-type-required fun-type))
+                          (length (fun-type-optional fun-type))))
+                     (keywords-supplied
+                       (nthcdr keys-index (combination-args node))))
+                ;; Everything in a keyword position needs to be
+                ;; constant.
+                (loop
+                  (unless (cdr keywords-supplied) (return))
+                  (let ((keyword (car keywords-supplied)))
+                    (unless (constant-lvar-p keyword)
+                      (return))
+                    (when (eq (lvar-value keyword) arg-spec)
+                      ;; Map it to a positional arg
+                      (setq arg-spec (1+ keys-index))
+                      (return))
+                    (setq keywords-supplied (cddr keywords-supplied))
+                    (incf keys-index 2)))))))
+        (when (integerp arg-spec)
+          (let* ((arg (or (nth arg-spec (combination-args node))
+                          (return-from dxify-downward-funargs)))
+                 (use (principal-lvar-use arg)))
+            (when (and (not (lvar-dynamic-extent arg))
+                       ;; We check that the use is a lambda so
+                       ;; that we don't end up getting notes about
+                       ;; not being able to allocate later.
+                       (ref-p use)
+                       (lambda-p (ref-leaf use))
+                       (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
+              (let ((enclose (xep-enclose (ref-leaf use))))
+                (cond ((and enclose
+                            (enclose-dynamic-extent enclose))
+                       (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
+                             t))
+                      (t
+                       (unless dynamic-extent
+                         (setq dynamic-extent (insert-dynamic-extent node)))
+                       (setf (lvar-dynamic-extent arg) dynamic-extent)
+                       (push arg (dynamic-extent-values dynamic-extent))))))))))))
 
 ;;; Make LVAR have DYNAMIC-EXTENT, recursively looking for otherwise
 ;;; inaccessible potentially stack-allocatable parts. If LVAR already
@@ -401,11 +403,7 @@
       (when (and (combination-p node)
                  (memq (basic-combination-kind node)
                        '(:full :unknown-keys :known)))
-        (let ((name (combination-fun-source-name node nil)))
-          (when name
-            (let ((dxable-args (fun-name-dx-args name)))
-              (when dxable-args
-                (dxify-downward-funargs node dxable-args name))))))))
+        (dxify-downward-funargs node))))
   ;; For each dynamic extent declared variable, each value that the
   ;; variable can take on is also dynamic extent.
   (dolist (lambda (component-lambdas component))
