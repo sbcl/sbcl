@@ -140,13 +140,18 @@
                                   (signed-sap-ref-32 sap 1) (sap- cell (sap+ sap 5)))))
                      #-immobile-space
                      (cond ((eq inst jmp)
-                            (aver (= (sap-ref-32 sap -4) #xF0458B49)) ; MOV RAX, [R13-16]
+                            ;; Manually specifying bytes to match is such a horrible hack, but I don't have a
+                            ;; great alternative. This calculation could be done at compile-time, wiring in the
+                            ;; correct to take into account where we're actually getting the linkage table
+                            ;; base from. Of course, I want the linkage-table to be placed below NIL now,
+                            ;; so these instructions are subject to change anyway.
+                            (aver (= (sap-ref-32 sap -4) #xF8458B49)) ; MOV RAX, [R13-8]
                             (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
                             (setf (sap-ref-16 sap 0) #xa0ff   ; JMP [RAX+n]
                                   (signed-sap-ref-32 sap 2) (ash index word-shift)))
 
                            (t
-                            (aver (= (sap-ref-32 sap -5) #xF0458B49)) ; MOV RAX, [R13-16]
+                            (aver (= (sap-ref-32 sap -5) #xF8458B49)) ; MOV RAX, [R13-8]
                             (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
                             (setf (sap-ref-16 sap -1) #x90ff   ; CALL [RAX+n]
                                   (signed-sap-ref-32 sap 1) (ash index word-shift)))))))))
