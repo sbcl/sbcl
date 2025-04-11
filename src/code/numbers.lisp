@@ -667,7 +667,9 @@
                (cond ((or (> thresh abs-divisor)
                           (and (= thresh abs-divisor)
                                (oddp tru)))
-                      (if (minusp tru)
+                      (if (or (minusp tru)
+                              (and (zerop tru)
+                                   (neq (minusp number) (minusp divisor))))
                           (values (- tru 1) (+ rem divisor))
                           (values (+ tru 1) (- rem divisor))))
                      (t
