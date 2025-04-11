@@ -184,7 +184,7 @@
         (funcall function
                  ;; Do not attempt to call symbol-name on T or NIL.
                  ;; (static space trailer isn't mapped in)
-                 (cond ((core-t-p x) "T")
+                 (cond #-arm64 ((core-t-p x) "T")
                        ((core-null-p x) "NIL")
                        (t (translate (symbol-name (translate x spacemap)) spacemap)))
                  x)))))
@@ -1594,10 +1594,8 @@
                  (return-from recurse (%make-lisp-obj addr)))
                (awhen (gethash addr seen) ; NIL is not recorded
                  (return-from recurse it))
-               (when (eql addr *t-taggedptr*)
-                 (return-from recurse t))
-               (when (eql addr *nil-taggedptr*)
-                 (return-from recurse nil))
+               #-arm64 (when (eql addr *t-taggedptr*) (return-from recurse t))
+               (when (eql addr *nil-taggedptr*) (return-from recurse nil))
                (let ((sap (int-sap (translate-ptr (logandc2 addr lowtag-mask)
                                                   spacemap))))
                  (flet ((translated-obj ()
