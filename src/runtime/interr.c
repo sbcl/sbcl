@@ -35,7 +35,6 @@
 #include "gc.h"
 
 /* the way that we shut down the system on a fatal error */
-void lisp_backtrace(int frames);
 extern void ldb_monitor(void);
 
 static void
@@ -47,7 +46,7 @@ default_lossage_handler(void)
         // This may not be exactly the right condition for determining
         // whether it might be possible to backtrace, but at least it prevents
         // lose() from itself losing early in startup.
-        if (get_sb_vm_thread()) lisp_backtrace(100);
+        if (get_sb_vm_thread()) print_lisp_backtrace(100, stderr);
     }
     exit(1);
 }
@@ -60,7 +59,7 @@ configurable_lossage_handler()
 
     if (dyndebug_config.dyndebug_backtrace_when_lost) {
         fprintf(stderr, "lose: backtrace follows as requested\n");
-        lisp_backtrace(100);
+        print_lisp_backtrace(100, stderr);
     }
 
     if (dyndebug_config.dyndebug_sleep_when_lost) {

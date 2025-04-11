@@ -887,7 +887,6 @@ static int print_context_cmd(char **ptr, iochannel_t io)
 
 static int backtrace_cmd(char **ptr, iochannel_t io)
 {
-    void lisp_backtrace(int frames);
     int n;
 
     if (more_p(ptr)) {
@@ -896,7 +895,7 @@ static int backtrace_cmd(char **ptr, iochannel_t io)
         n = 100;
 
     fprintf(io->out, "Backtrace:\n");
-    lisp_backtrace(n);
+    print_lisp_backtrace(n, io->out);
     return 0;
 }
 

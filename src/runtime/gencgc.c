@@ -4314,8 +4314,7 @@ int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* faul
         break;
     default:
         if (!ignore_memoryfaults_on_unprotected_pages) {
-            void lisp_backtrace(int frames);
-            lisp_backtrace(10);
+            print_lisp_backtrace(10, stderr);
             fprintf(stderr,
                     "Fault @ %p, PC=%p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x gc_active=%d\n"
                     "  mixed_region=%p:%p\n"

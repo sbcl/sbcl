@@ -338,6 +338,14 @@ print_entry_points (struct code *code, FILE *f)
     });
 }
 
+/* SBCL itself uses print_lisp_backtrace() with one of stdout or
+ * stderr. This is the old interface, in case people debug with it. */
+void
+lisp_backtrace(int nframes)
+{
+    void print_lisp_backtrace(int frames, FILE *f);
+    print_lisp_backtrace(nframes, stdout);
+}
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 
@@ -475,7 +483,7 @@ int lisp_frame_previous(struct thread *thread, struct call_info *info)
 }
 
 void
-lisp_backtrace(int nframes)
+print_lisp_backtrace(int nframes, FILE *f)
 {
     struct thread *thread = get_sb_vm_thread();
     struct call_info info;
@@ -491,41 +499,41 @@ lisp_backtrace(int nframes)
     do {
         if (!lisp_frame_previous(thread, &info)) {
             if (info.frame) // 0 is normal termination of the call chain
-                printf("Bad frame pointer %p [valid range=%p..%p]\n", info.frame,
-                       thread->control_stack_start, thread->control_stack_end);
+                fprintf(f, "Bad frame pointer %p [valid range=%p..%p]\n", info.frame,
+                        thread->control_stack_start, thread->control_stack_end);
             break;
         }
-        printf("%4d: ", i);
+        fprintf(f, "%4d: ", i);
         // Print spaces to keep the alignment nice
         if (info.interrupted
 #ifdef reg_LRA
             || info.lra == NIL
 #endif
             ) {
-            putchar('[');
-            if (info.interrupted) { footnotes |= 1; putchar('I'); }
+            putc('[', f);
+            if (info.interrupted) { footnotes |= 1; putc('I', f); }
 #ifdef reg_LRA
-            if (info.lra == NIL) { footnotes |= 2; putchar('*'); }
+            if (info.lra == NIL) { footnotes |= 2; putc('*', f); }
 #endif
-            putchar(']');
-            if (!(info.lra == NIL && info.interrupted)) putchar(' ');
+            putc(']', f);
+            if (!(info.lra == NIL && info.interrupted)) putc(' ', f);
         } else {
-            printf("    ");
+            fprintf(f, "    ");
         }
-        printf("%p ", info.frame);
+        fprintf(f, "%p ", info.frame);
         void* absolute_pc = 0;
         if (info.code) {
             absolute_pc = (char*)info.code + info.pc;
-            printf("pc=%p {%p+%04x} ", absolute_pc, info.code, (int)info.pc);
+            fprintf(f, "pc=%p {%p+%04x} ", absolute_pc, info.code, (int)info.pc);
         } else {
             absolute_pc = (char*)info.pc;
-            printf("pc=%p ", absolute_pc);
+            fprintf(f, "pc=%p ", absolute_pc);
         }
 #ifdef reg_LRA
         // If LRA does not match the PC, print it. This should not happen.
         if (info.lra != make_lispobj(absolute_pc, OTHER_POINTER_LOWTAG)
             && info.lra != NIL)
-            printf("LRA=%p ", (void*)info.lra);
+            fprintf(f, "LRA=%p ", (void*)info.lra);
 #endif
 
         int fpvalid = (lispobj*)info.frame >= thread->control_stack_start
@@ -533,31 +541,31 @@ lisp_backtrace(int nframes)
 
         // If the FP is invalid, then quite likely we'd crash trying to find a
         // compiled-debug-fun because info.code is a wild pointer
-        if (!fpvalid) { printf(" BAD FRAME\n"); break; }
+        if (!fpvalid) { fprintf(f, " BAD FRAME\n"); break; }
 
         if (info.code) {
             lispobj name;
             if (absolute_pc &&
                 (name = debug_function_name_from_pc((struct code *)info.code, absolute_pc)))
-                print_entry_name(barrier_load(&name), stdout);
+                print_entry_name(barrier_load(&name), f);
             else
                 // I can't imagine a scenario where we have info.code
                 // but do not have an absolute_pc, or debug-fun can't be found.
                 // Anyway, we can uniquely identify code by serial# now.
-                printf("{code_serialno=%x}", code_serialno(info.code));
+                fprintf(f, "{code_serialno=%x}", code_serialno(info.code));
         }
 
-        putchar('\n');
+        putc('\n', f);
 
     } while (++i <= nframes);
-    if (footnotes) printf("Note: [I] = interrupted"
+    if (footnotes) fprintf(f, "Note: [I] = interrupted"
 #ifdef reg_LRA
-                          ", [*] = no LRA"
+                           ", [*] = no LRA"
 #endif
-                          "\n");
+                           "\n");
 }
 
-#else
+#else /* (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)) */
 
 static int
 altstack_pointer_p(__attribute__((unused)) struct thread* thread,
@@ -696,10 +704,12 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
 
 /* This function has been split from lisp_backtrace() to enable Lisp
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
- * example when debugging threading deadlocks.
+ * example when debugging threading deadlocks. (SBCL internals call
+ * print_backtrace_from_fp() however, because the right stream to
+ * write to is context-dependent.)
  */
 void NO_SANITIZE_MEMORY
-log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE *f)
+print_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE *f)
 {
   int i = start;
 
@@ -715,24 +725,24 @@ log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE 
   fflush(f);
 }
 void backtrace_from_fp(void *fp, int nframes, int start) {
-    log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
+    print_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
 }
 
 void print_backtrace_from_context(os_context_t *context, int nframes, FILE* file) {
     void *fp = (void *)os_context_frame_pointer(context);
     print_backtrace_frame((void *)os_context_pc(context), fp, 0, file);
-    log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes - 1, 1, file);
+    print_backtrace_from_fp(get_sb_vm_thread(), fp, nframes - 1, 1, file);
 }
 
 void
-lisp_backtrace(int nframes)
+print_lisp_backtrace(int nframes, FILE *f)
 {
     struct thread *thread = get_sb_vm_thread();
     int free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (free_ici) {
         os_context_t *context = nth_interrupt_context(free_ici - 1, thread);
-        print_backtrace_from_context(context, nframes, stdout);
+        print_backtrace_from_context(context, nframes, f);
     } else {
         void *fp;
 
@@ -741,7 +751,7 @@ lisp_backtrace(int nframes)
 #elif defined (LISP_FEATURE_X86_64)
         asm("movq %%rbp,%0" : "=g" (fp));
 #endif
-        backtrace_from_fp(fp, nframes, 0);
+        print_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, 0, f);
     }
 }
 #endif
@@ -878,7 +888,7 @@ void libunwind_backtrace(struct thread *th, FILE* f)
 #else
     // If you don't have libunwind, this will almost surely not work,
     // because we can't figure out how to get backwards past a signal frame.
-    log_backtrace_from_fp(th, (void*)*os_context_fp_addr(context), 100, 0, stderr);
+    print_backtrace_from_fp(th, (void*)*os_context_fp_addr(context), 100, 0, stderr);
 #endif
     bt_suspension_context = 0;
     if (th != get_sb_vm_thread()) pthread_kill(th->os_thread, SIGXCPU);
