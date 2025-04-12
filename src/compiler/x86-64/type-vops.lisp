@@ -716,7 +716,8 @@
 ;;; but hey at least this provides the IR2 support for it.
 (define-vop (car-eq-if-listp)
   (:args (value :scs (descriptor-reg))
-         (obj :scs (immediate any-reg descriptor-reg)))
+         (obj :scs (any-reg descriptor-reg)
+              :load-if (not (reg-or-legal-imm32-p obj))))
   (:temporary (:sc unsigned-reg) temp)
   (:conditional :z)
   (:policy :fast-safe)

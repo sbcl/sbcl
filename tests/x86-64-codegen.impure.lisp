@@ -1383,3 +1383,7 @@
                 '(lambda (x)
                   (declare (optimize (sb-c::verify-arg-count 0)))
                   (if x 1 0))))
+
+(with-test (:name :car-eq-if-listp)
+  (let ((f (compile nil '(lambda (x) (typep x '(cons (eql t)))))))
+    (assert (eq (funcall f '(t)) t))))
