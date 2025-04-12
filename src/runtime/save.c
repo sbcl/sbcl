@@ -256,6 +256,7 @@ static void unwind_binding_stack(struct thread* th)
     if (verbose) printf("done]\n");
 }
 
+#ifdef LISP_FEATURE_X86_64
 static void write_static_space_constants(FILE *file)
 {
     lispobj* ptr = (lispobj*)static_space_trailer_start;
@@ -266,6 +267,7 @@ static void write_static_space_constants(FILE *file)
     /* write_lispobj(STATIC_SPACE_START, file); */
     if (fwrite(ptr, N_WORD_BYTES, nwords, file) != nwords) perror(GENERAL_WRITE_FAILURE_MSG);
 }
+#endif
 
 bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                         bool make_executable,
