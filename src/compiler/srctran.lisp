@@ -3493,16 +3493,18 @@
     `(* integer ,(ash 1 shift))))
 
 (defun cast-or-check-bound-type (node &optional fixnum)
-  (multiple-value-bind (dest lvar) (immediately-used-let-dest (node-lvar node) node t)
-    (cond ((cast-p dest)
-           (and (cast-type-check dest)
-                (single-value-type (cast-type-to-check dest))))
-          ((and (combination-p dest)
-                (equal (combination-fun-debug-name dest) '(transform-for check-bound))
-                (eq (third (combination-args dest)) lvar))
-           (if fixnum
-               (specifier-type 'index)
-               (specifier-type 'sb-vm:signed-word))))))
+  (let ((lvar (node-lvar node)))
+    (when lvar
+      (multiple-value-bind (dest lvar) (immediately-used-let-dest lvar node t)
+        (cond ((cast-p dest)
+               (and (cast-type-check dest)
+                    (single-value-type (cast-type-to-check dest))))
+              ((and (combination-p dest)
+                    (equal (combination-fun-debug-name dest) '(transform-for check-bound))
+                    (eq (third (combination-args dest)) lvar))
+               (if fixnum
+                   (specifier-type 'index)
+                   (specifier-type 'sb-vm:signed-word))))))))
 
 (defun overflow-transform (name x y node &optional (swap t))
   (unless (node-lvar node)
