@@ -4774,3 +4774,8 @@
         (opaque-identity #'f)
         (f)))
    (("~a~a~a" 1 2 3) "123")))
+
+(with-test (:name :car-eq-if-listp)
+  (let ((f (compile nil '(lambda (x) (typep x '(cons (eql t)))))))
+    (assert (eq (funcall f '(t)) t))
+    (assert (eq (funcall f '(1)) nil))))
