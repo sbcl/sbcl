@@ -4279,6 +4279,15 @@
   (def + :type rational :folded (+ -))
   (def * :type rational :folded (* /)))
 
+(deftransform * ((x y) (t (constant-arg ratio)))
+  (let* ((y (lvar-value y))
+         (reciprocal (/ y)))
+    (if (and (integerp reciprocal)
+             (ignore-errors
+              (maybe-exact-reciprocal (float y))))
+        `(/ x ,reciprocal)
+        (give-up-ir1-transform))))
+
 (deftransform * ((x y) (rational (constant-arg ratio)))
   (let ((y (/ (lvar-value y))))
     (if (integerp y)
