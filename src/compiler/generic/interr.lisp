@@ -135,7 +135,8 @@
    ("ASH overflow" ash-overflow2 2)
    ("Negate overflow" negate-overflow 1)
    ("FILL-POINTER error" fill-pointer 1)
-   ("MPRINT" mprint 1))
+   ("MPRINT" mprint 1)
+   ("Operations not of type" op-not-type2 2))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function

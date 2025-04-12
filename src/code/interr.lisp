@@ -596,6 +596,10 @@
           (object-not-type-error (- x) type nil)
           (object-not-type-error x 'number nil)))))
 
+(deferr op-not-type2-error (a b)
+  (destructuring-bind (type . op) (sb-di:error-context)
+   (object-not-type-error (funcall op a b) type nil)))
+
 (deferr fill-pointer-error (array)
   (declare (notinline fill-pointer-error))
   (if (and (arrayp array)

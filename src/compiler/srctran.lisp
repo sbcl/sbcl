@@ -5749,10 +5749,25 @@
     (t
      0)))
 
-(deftransform / ((numerator denominator) (integer integer))
+(deftransform / ((numerator denominator) (integer integer) integer)
+  `(values (truncate numerator denominator)))
+
+(deftransform / ((numerator denominator)
+                 (:or ((word word) *)
+                      ((sb-vm:signed-word sb-vm:signed-word) *))
+                 * :node node :important nil)
+  (let ((cast (or (cast-or-check-bound-type node)
+                  (give-up-ir1-transform))))
+    (if (csubtypep (type-intersection cast (specifier-type 'rational))
+                   (specifier-type 'integer))
+        `(multiple-value-bind (q rem) (truncate numerator denominator)
+           (unless (eql rem 0)
+             (sb-vm::op-not-type2-error numerator denominator '(,(type-specifier cast) . /)))
+           q)
+        (give-up-ir1-transform))))
+
+(deftransform / ((numerator denominator) (integer (constant-arg integer)))
   "convert x/2^k to shift"
-  (unless (constant-lvar-p denominator)
-    (give-up-ir1-transform))
   (let* ((denominator (lvar-value denominator))
          (bits (1- (integer-length denominator))))
     (unless (and (> denominator 0) (= (ash 1 bits) denominator))

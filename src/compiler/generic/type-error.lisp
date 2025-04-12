@@ -134,7 +134,8 @@
   (def "NIL-FUN-RETURNED"        nil-fun-returned-error       nil fun)
   (def "UNREACHABLE"             sb-impl::unreachable         nil)
   (def "FAILED-AVER"             sb-impl::%failed-aver        nil form)
-  (def "FILL-POINTER"            fill-pointer-error           nil array))
+  (def "FILL-POINTER"            fill-pointer-error           nil array)
+  (def "OP-NOT-TYPE2"            op-not-type2-error           t a b))
 
 
 (defun emit-internal-error (kind code values &key trap-emitter)
