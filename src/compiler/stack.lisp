@@ -71,12 +71,10 @@
 (defun update-lvar-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
-         (original-start (ir2-block-start-stack 2block))
-         (end (ir2-block-end-stack 2block))
-         (new-end end))
+         (end (ir2-block-end-stack 2block)))
     (dolist (succ (block-succ block))
-      (setq new-end (merge-lvar-live-sets new-end
-                                          (ir2-block-start-stack (block-info succ)))))
+      (let ((succ-start (ir2-block-start-stack (block-info succ))))
+        (setq end (merge-lvar-live-sets end succ-start))))
     (do-nested-cleanups (cleanup block)
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
@@ -88,26 +86,24 @@
                   (next-stack (if exit-lvar
                                   (remove exit-lvar target-start-stack)
                                   target-start-stack)))
-             (setq new-end (merge-lvar-live-sets
-                            new-end next-stack)))))
+             (setq end (merge-lvar-live-sets end next-stack)))))
         (:dynamic-extent
          (let* ((dynamic-extent (cleanup-mess-up cleanup))
                 (info (dynamic-extent-info dynamic-extent)))
            (when info
-             (pushnew info new-end))
+             (pushnew info end))
            (dolist (preserve (dynamic-extent-preserve-info dynamic-extent))
              (when (memq preserve (ir2-block-stack-mess-up 2block))
-               (pushnew preserve new-end)))))))
+               (pushnew preserve end)))))))
 
-    (setf (ir2-block-end-stack 2block) new-end)
+    (setf (ir2-block-end-stack 2block) end)
 
-    (let ((start new-end))
-      (setq start (set-difference start (ir2-block-pushed 2block)))
-      (setq start (merge-lvar-live-sets start (ir2-block-popped 2block)))
-
+    (let ((start (merge-lvar-live-sets
+                  (set-difference end (ir2-block-pushed 2block))
+                  (ir2-block-popped 2block))))
       (when *check-consistency*
-        (aver (subsetp original-start start)))
-      (cond ((subsetp start original-start)
+        (aver (subsetp (ir2-block-start-stack 2block) start)))
+      (cond ((subsetp start (ir2-block-start-stack 2block))
              nil)
             (t
              (setf (ir2-block-start-stack 2block) start)
