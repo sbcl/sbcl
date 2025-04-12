@@ -703,6 +703,21 @@
            (inline round))
   (values (round number divisor)))
 
+(defun %unary-round (number)
+  (declare (explicit-check)
+           (inline round))
+  (values (round number 1)))
+
+(defun %unary-truncate (number)
+  (declare (explicit-check)
+           (inline truncate))
+  (values (truncate number 1)))
+
+(defun unary-truncate (number)
+  (declare (explicit-check)
+           (inline truncate))
+  (truncate number 1))
+
 (defmacro !define-float-rounding-function (name op doc)
   `(defun ,name (number &optional (divisor 1))
      ,doc

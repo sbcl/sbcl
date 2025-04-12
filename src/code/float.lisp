@@ -762,82 +762,6 @@
   (def double-float)
   (def single-float))
 
-;;; This function is called when we are doing a truncate without any funky
-;;; divisor, i.e. converting a float or ratio to an integer. Note that we do
-;;; *not* return the second value of truncate, so it must be computed by the
-;;; caller if needed.
-;;;
-;;; In the float case, we pick off small arguments so that compiler
-;;; can use special-case operations.
-(defun %unary-truncate (number)
-  (declare (explicit-check number))
-  (macrolet ((fits-fixnum (type)
-               `(sb-xc:<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
-                          number
-                          ,(symbol-value (symbolicate 'most-positive-fixnum- type))))
-             (shift (type integer count)
-               `(,(case type
-                    #-64-bit
-                    (double-float 'ash)
-                    (t 'bignum-ashift-left-fixnum))
-                 ,integer ,count)))
-    (number-dispatch ((number real))
-      ((integer) number)
-      ((ratio) (values (truncate (numerator number) (denominator number))))
-      (((foreach single-float double-float #+long-float long-float))
-       (if (fits-fixnum (dispatch-type number))
-           (truly-the fixnum (%unary-truncate number))
-           (multiple-value-bind (bits exp sign) (integer-decode-float number)
-             (shift (dispatch-type number)
-                    (if (minusp sign)
-                        (- bits)
-                        bits)
-                    exp)))))))
-
-;;; Produce both values, unlike %unary-truncate
-(defun unary-truncate (number)
-  (declare (explicit-check number))
-  (macrolet ((fits-fixnum (type)
-               `(sb-xc:<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
-                          number
-                          ,(symbol-value (symbolicate 'most-positive-fixnum- type))))
-             (shift (type)
-               (case type
-                 #-64-bit
-                 (double-float
-                  ;; Shifting negatives right is different
-                  `(let ((truncated (ash bits exp)))
-                     (if (minusp sign)
-                         (- truncated)
-                         truncated)))
-                 (t
-                  `(bignum-ashift-left-fixnum (if (minusp sign)
-                                                  (- bits)
-                                                  bits)
-                                              exp)))))
-    (number-dispatch ((number real))
-      ((integer) (values number 0))
-      ((ratio)
-       (let ((truncated (truncate (numerator number) (denominator number))))
-         (values truncated
-                 (- number truncated))))
-      (((foreach single-float double-float #+long-float long-float))
-       (if (fits-fixnum (dispatch-type number))
-           (let* ((truncated (truly-the fixnum (%unary-truncate number))))
-             (values truncated
-                     (sb-xc:- number
-                              (coerce truncated '(dispatch-type number)))))
-           (multiple-value-bind (bits exp sign) (integer-decode-float number)
-             (let ((truncated (shift (dispatch-type number))))
-               (values
-                truncated
-                #+64-bit
-                (coerce 0 '(dispatch-type number))
-                #-64-bit
-                (if (eq '(dispatch-type number) 'single-float)
-                    (coerce 0 '(dispatch-type number))
-                    (sb-xc:- number (coerce truncated '(dispatch-type number))))))))))))
-
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)
@@ -855,45 +779,6 @@
   (values (ceiling m)))
 (defun %unary-floor (m)
   (values (floor m)))
-
-;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
-;;; can't use the round primitive, then we do our own round-to-nearest on the
-;;; result of i-d-f. [Note that this rounding will really only happen
-;;; with double floats on 32-bit architectures, where there are
-;;; fractional floats past most-x-fixnum]
-(defun %unary-round (number)
-  (declare (explicit-check))
-  (macrolet ((fits-fixnum (type)
-               `(sb-xc:<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
-                          number
-                          ,(symbol-value (symbolicate 'most-positive-fixnum- type)))))
-    (number-dispatch ((number real))
-      ((integer) number)
-      ((ratio) (values (round (numerator number) (denominator number))))
-      (((foreach single-float double-float #+long-float long-float))
-       (if (fits-fixnum (dispatch-type number))
-           (truly-the fixnum (%unary-round number))
-           #+64-bit
-           (multiple-value-bind (bits exp sign) (integer-decode-float number)
-             (bignum-ashift-left-fixnum
-              (if (minusp sign)
-                  (- bits)
-                  bits)
-              exp))
-           #-64-bit
-           (multiple-value-bind (bits exp) (integer-decode-float number)
-             (let* ((shifted (ash bits exp))
-                    (rounded (if (minusp exp)
-                                 (let ((fractional-bits (logand bits (lognot (ash -1 (- exp)))))
-                                       (0.5bits (ash 1 (- -1 exp))))
-                                   (cond
-                                     ((> fractional-bits 0.5bits) (1+ shifted))
-                                     ((< fractional-bits 0.5bits) shifted)
-                                     (t (if (oddp shifted) (1+ shifted) shifted))))
-                                 shifted)))
-               (if (minusp number)
-                   (- rounded)
-                   rounded))))))))
 
 #-round-float
 (defun %unary-fround (number)
