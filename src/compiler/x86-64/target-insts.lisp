@@ -102,7 +102,7 @@
 
 ;;; Print to STREAM the name of the general-purpose register encoded by
 ;;; VALUE and of size WIDTH.
-(defun print-reg-with-width (value width stream dstate)
+(defun print-reg-with-width (value width stream dstate &optional (note t))
   (declare (type (or null stream) stream)
            (type disassem-state dstate))
   (let* ((num (etypecase value
@@ -116,6 +116,9 @@
                                 (<= 4 num 7))
                            (+ 16 -4 num) ; legacy high-byte register
                            num))))
+    (when (and note
+               (= (reg-num reg) sb-vm::card-table-reg))
+      (note "NIL" dstate))
     (if stream
         (princ (reg-name reg) stream)
         (operand reg dstate)))
@@ -146,7 +149,7 @@
   (print-reg-with-width value :byte stream dstate))
 
 (defun print-addr-reg (value stream dstate)
-  (print-reg-with-width value +default-address-size+ stream dstate))
+  (print-reg-with-width value +default-address-size+ stream dstate nil))
 
 ;;; Print a register or a memory reference of the given WIDTH.
 ;;; If SIZED-P is true, add an explicit size indicator for memory
@@ -543,6 +546,11 @@
                  ;; symbol header that provides an offset into TLS.
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
+            ((and (eql base-reg sb-vm::card-table-reg)
+                  (not index-reg))
+             (let ((static (find disp +static-symbols+ :key #'static-symbol-offset)))
+               (when static
+                 (note (lambda (s) (princ static s)) dstate))))
             ;; thread slots
             ((and (eql base-reg sb-vm::thread-reg)
                   #+gs-seg (dstate-getprop dstate +gs-segment+)

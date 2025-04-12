@@ -75,7 +75,7 @@
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
     (test-movnti (ea 57 rdi-tn) eax "0FC34739         MOVNTI [RDI+57], EAX")
-    (test-movnti (ea rax-tn) r12-tn "4C0FC320         MOVNTI [RAX], R12")))
+    (test-movnti (ea rax-tn) r11-tn "4C0FC318         MOVNTI [RAX], R11")))
 
 (test-util:with-test (:name :assemble-crc32 :skipped-on (not :x86-64))
   ;; Destination size = :DWORD

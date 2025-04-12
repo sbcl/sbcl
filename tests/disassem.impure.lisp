@@ -1,4 +1,3 @@
-
 ;;; Assert that save-lisp-and-die didn't accidentally recreate the inst space.
 ;;; Fails in parallel-exec which uses PURE-RUNNER which performs ENCAPSULATE
 ;;; which calls UNDO-STATIC-LINKAGE which invokes the disassembler
@@ -93,7 +92,8 @@
                (declare (type dchunk chunk) (type instruction inst))
                (awhen (inst-printer inst)
                  (funcall it chunk inst nil dstate)
-                 (setf (dstate-n-operands dstate) 0)))
+                 (setf (dstate-n-operands dstate) 0
+                       (dstate-notes dstate) nil)))
              seg dstate nil))))))
   (when show-progress
     (format t " done~%")))

@@ -1333,18 +1333,24 @@
 (defun print-notes-and-newline (stream dstate)
   (declare (type stream stream)
            (type disassem-state dstate))
-  (with-print-restrictions
-    (dolist (note (dstate-notes dstate))
-      (format stream "~Vt " *disassem-note-column*)
-      (pprint-logical-block (stream nil :per-line-prefix "; ")
-      (etypecase note
-        (string
-         (write-string note stream))
-        (function
-         (funcall note stream))))
-      (terpri stream))
-    (fresh-line stream)
-    (setf (dstate-notes dstate) nil)))
+  (flet ((print-note (note)
+           (format stream "~Vt " *disassem-note-column*)
+           (pprint-logical-block (stream nil :per-line-prefix "; ")
+             (etypecase note
+               (string
+                (write-string note stream))
+               (function
+                (funcall note stream))))
+           (terpri stream)))
+    (let ((notes (dstate-notes dstate)))
+      (when notes
+        (with-print-restrictions
+            (if (listp notes)
+                (dolist (note (dstate-notes dstate))
+                  (print-note note))
+                (print-note notes)))
+        (setf (dstate-notes dstate) nil))))
+  (fresh-line stream))
 
 (defun prin1-short (thing stream)
   (with-print-restrictions
@@ -2330,7 +2336,11 @@
 (defun note (note dstate)
   (declare (type (or string function) note)
            (type disassem-state dstate))
-  (setf (dstate-notes dstate) (nconc (dstate-notes dstate) (list note))))
+  (let ((notes (dstate-notes dstate)))
+    (setf (dstate-notes dstate) (typecase notes
+                                  (null note)
+                                  (cons (nconc notes (list note)))
+                                  (t (list notes note))))))
 
 (defun prin1-quoted-short (thing stream)
   (if (self-evaluating-p thing)

@@ -116,7 +116,7 @@
   (cur-offs-hooks nil :type list)
 
   ;; for the current location
-  (notes nil :type list)
+  (notes nil) ; a single note or a list of notes
 
   ;; currently active source variables
   (current-valid-locations nil :type (or null (vector bit))))
