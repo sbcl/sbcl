@@ -119,23 +119,16 @@
 ;;; Do a forward walk in the flow graph and put LVARs on the start/end
 ;;; stacks of BLOCK in the right order. STACK is an already sorted
 ;;; stack coming from a predecessor of BLOCK. Because all LVARs live
-;;; at the start of BLOCK are on STACK, we just need to remove dead
-;;; LVARs. As an optimization we only do this above the top-most stack
-;;; LVAR, since nothing allocated before it can be dead.
+;;; at the start of BLOCK are on STACK, we just need to remove the
+;;; dead LVARs in STACK to compute BLOCK's ordered start stack.
 (defun order-lvar-sets-walk (block stack)
   (unless (block-flag block)
     (setf (block-flag block) t)
     (let* ((2block (block-info block))
            (start (ir2-block-start-stack 2block))
-           (start-stack
-             (collect ((prefix))
-               (do ((tail stack (cdr tail)))
-                   ((null tail) (prefix))
-                 (let ((lvar (car tail)))
-                   (when (memq lvar start)
-                     (when (eq (ir2-lvar-kind (lvar-info lvar)) :stack)
-                       (return (append (prefix) tail)))
-                     (prefix lvar)))))))
+           (start-stack (remove-if-not (lambda (lvar)
+                                         (memq lvar start))
+                                       stack)))
       (aver (subsetp start start-stack))
       (setf (ir2-block-start-stack 2block) start-stack)
 
@@ -235,8 +228,8 @@
 ;;; wastes only space.
 (defun discard-unused-values (block1 block2)
   (declare (type cblock block1 block2))
-  (let* ((end-stack (ir2-block-end-stack (block-info block1)))
-         (start-stack (ir2-block-start-stack (block-info block2))))
+  (let ((end-stack (ir2-block-end-stack (block-info block1)))
+        (start-stack (ir2-block-start-stack (block-info block2))))
     (collect ((cleanup-code))
       (labels ((find-popped (before after)
                  ;; Return (VALUES last-popped rest), where

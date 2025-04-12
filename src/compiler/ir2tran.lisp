@@ -1839,19 +1839,29 @@
          (first (lvar-value last-preserved))
          (2first (lvar-info first))
 
-         (moved-tns '()))
+         (moved-tns '())
+         (movep t))
+    (aver (memq (ir2-lvar-kind 2after) '(:unknown :stack)))
     (dolist (moved-lvar moved)
       (let ((2lvar (lvar-info (lvar-value moved-lvar))))
-        ;; we cannot move stack-allocated DX objects
-        (aver (eq (ir2-lvar-kind 2lvar) :unknown))
-        (push (first (ir2-lvar-locs 2lvar)) moved-tns)))
-    (aver (memq (ir2-lvar-kind 2after) '(:unknown :stack)))
-    (aver (eq (ir2-lvar-kind 2first) :unknown))
-    (vop* %%nip-values node block
-          ((first (ir2-lvar-locs 2after))
-           (first (ir2-lvar-locs 2first))
-           (reference-tn-list moved-tns nil))
-          ((reference-tn-list moved-tns t)))))
+        (ecase (ir2-lvar-kind 2lvar)
+          (:unknown
+           (push (first (ir2-lvar-locs 2lvar)) moved-tns))
+          (:stack
+           ;; Stack objects can't move, so instead, set the stack lvar
+           ;; so that resetting it cleans the nipped values as well.
+           (emit-move node block
+                      (first (ir2-lvar-locs 2lvar))
+                      (first (ir2-lvar-locs 2after)))
+           (setq movep nil)
+           (return)))))
+    (when movep
+      (aver (eq (ir2-lvar-kind 2first) :unknown))
+      (vop* %%nip-values node block
+            ((first (ir2-lvar-locs 2after))
+             (first (ir2-lvar-locs 2first))
+             (reference-tn-list moved-tns nil))
+            ((reference-tn-list moved-tns t))))))
 
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)

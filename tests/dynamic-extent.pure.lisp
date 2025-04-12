@@ -2249,3 +2249,45 @@
          (funcall function)))
      ((1) 1)
      ((nil) t))))
+
+(with-test (:name :dynamic-extent-lp2043242.reduced)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (a b)
+       (let ((v (block block258
+                  (let ((z (lambda ()
+                             (return-from block258))))
+                    (declare (dynamic-extent z))
+                    (print-nothing z)
+                    (cons a b)))))
+         (declare (dynamic-extent v))
+         (copy-tree v)))
+     ((1 2) '(1 . 2) :test #'equal))))
+
+(with-test (:name :dynamic-extent-lp2043242.reduced.2)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (a b)
+       (let ((v (if a
+                    (cons a b)
+                    (let ((z (cons b b)))
+                      (declare (dynamic-extent z))
+                      (print-nothing z)
+                      (cons a b)))))
+         (declare (dynamic-extent v))
+         (copy-tree v)))
+     ((1 2) '(1 . 2) :test #'equal))))
+
+(with-test (:name :dynamic-extent-lp2043242)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (a b)
+       (let* ((v (ignore-errors (cons a b))))
+         (declare (dynamic-extent v))
+         (assert (sb-ext:stack-allocated-p v))
+         (case (if t 450336 v)
+           (t (copy-tree v)))))
+     ((1 2) '(1 . 2) :test #'equal))))
