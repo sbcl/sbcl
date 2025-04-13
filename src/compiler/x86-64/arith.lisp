@@ -1870,6 +1870,36 @@
     (move quo eax)
     (move rem edx)))
 
+(define-vop (truncate-mod64 fast-truncate/signed=>signed)
+  (:translate truncate-mod64)
+  (:results (quo :scs (unsigned-reg))
+            (rem :scs (signed-reg)))
+  (:result-types unsigned-num signed-num)
+  (:optional-results rem)
+  (:generator 33
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
+                                    (specifier-type '(eql 0)))
+      (if (sc-is y signed-reg)
+          (inst test y y)
+          (inst cmp y 0))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
+    (move eax x)
+
+    (inst cmp y -1)
+    (inst jmp :ne NO-OVERFLOW)
+    (inst neg eax)
+    (unless (eq (tn-kind rem) :unused)
+      (zeroize rem))
+    (inst jmp DONE)
+    
+    NO-OVERFLOW
+    (inst cqo)
+    (inst idiv y)
+    (unless (eq (tn-kind rem) :unused)
+      (move rem edx))
+    DONE
+    (move quo eax)))
+
 (defun power-of-two-p (x)
   (and (typep x 'signed-word)
        (let ((abs (abs x)))

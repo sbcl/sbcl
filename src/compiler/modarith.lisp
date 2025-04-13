@@ -137,18 +137,19 @@
 
 (defmacro define-modular-fun-optimizer
     (name ((&rest lambda-list) kind signedp &key (width (gensym "WIDTH"))
-                                                 result-width)
+                                                 result-width
+                                                 (node (gensym "NODE")))
      &body body)
   (%check-modular-fun-macro-arguments name kind lambda-list)
-  (with-unique-names (call args result-width-name)
+  (with-unique-names (args result-width-name)
     `(setf (gethash ',name (modular-class-funs (find-modular-class ',kind ',signedp)))
-           (lambda (,call ,width ,(or result-width
+           (lambda (,node ,width ,(or result-width
                                    result-width-name))
-             (declare (type basic-combination ,call)
+             (declare (type basic-combination ,node)
                       (type (integer 0) ,width)
                       ,@(unless result-width
                           `((ignore ,result-width-name))))
-             (let ((,args (basic-combination-args ,call)))
+             (let ((,args (basic-combination-args ,node)))
                (when (= (length ,args) ,(length lambda-list))
                  (destructuring-bind ,lambda-list ,args
                    (declare (type lvar ,@lambda-list))
@@ -734,3 +735,39 @@
             `(sb-vm::calc-phash val ,n-temps ,steps)
             form)))))
 )
+
+#+(or arm64 x86-64)
+(progn
+  (defknown sb-vm::truncate-mod64 (sb-vm:signed-word sb-vm:signed-word)
+      (values word sb-vm:signed-word)
+      (foldable flushable movable))
+
+  (defoptimizer (sb-vm::truncate-mod64 derive-type) ((n d) node)
+    (let ((res (truncate-derive-type-optimizer node)))
+      (when res
+        (destructuring-bind (q r) (values-type-required res)
+          (make-values-type  (list (%two-arg-derive-type q
+                                                         (specifier-type `(eql ,(ldb (byte sb-vm:n-word-bits 0) -1)))
+                                                         #'logand-derive-type-aux #'logand)
+                                   r))))))
+
+  (deftransform sb-vm::truncate-mod64 ((n d) * * :node node)
+    (let ((truncate-type (truncate-derive-type-optimizer node)))
+      (if (and truncate-type
+               (values-subtypep truncate-type
+                                (values-specifier-type `(values sb-vm:signed-word t &optional))))
+          `(multiple-value-bind (q r) (truncate n d)
+             (values (logand q ,most-positive-word)
+                     r))
+          (give-up-ir1-transform))))
+
+  (define-modular-fun-optimizer truncate
+      ((n d) :untagged nil :width width :node node)
+    (when (and (= width sb-vm:n-word-bits)
+               (not (values-subtypep (node-derived-type node)
+                                     (values-specifier-type `(values sb-vm:signed-word t &optional))))
+               (csubtypep (lvar-type n) (specifier-type 'sb-vm:signed-word))
+               (csubtypep (lvar-type d) (specifier-type 'sb-vm:signed-word)))
+      'sb-vm::truncate-mod64))
+  (setf (gethash 'sb-vm::truncate-mod64 (modular-class-versions (find-modular-class ':untagged 'nil)))
+        `(truncate ,sb-vm:n-word-bits)))

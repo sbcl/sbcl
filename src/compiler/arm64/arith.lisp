@@ -453,6 +453,12 @@
     (unless (eq (tn-kind rem) :unused)
       (inst msub rem quo y x))))
 
+(define-vop (truncate-mod64 fast-truncate/signed=>signed)
+  (:translate truncate-mod64)
+  (:results (quo :scs (unsigned-reg) :from :eval)
+            (rem :scs (signed-reg) :from :eval))
+  (:result-types unsigned-num signed-num))
+
 (defun power-of-two-p (x)
   (and (typep x 'signed-word)
        (let ((abs (abs x)))
