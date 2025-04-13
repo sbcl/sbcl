@@ -56,7 +56,7 @@
 
 (define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) sb-kernel::os-vm-size-t)
 
-#+immobile-space
+#+(or x86-64 immobile-space)
 (define-symbol-macro sb-vm:alien-linkage-space-start
     (extern-alien "ALIEN_LINKAGE_SPACE_START" unsigned))
 

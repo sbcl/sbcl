@@ -255,8 +255,8 @@
   (:result-types system-area-pointer)
   (:vop-var vop)
   (:generator 2
-    #-immobile-space ; non-relocatable alien linkage table
-    (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))
+    #-immobile-space
+    (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) null-tn))
     #+immobile-space ; relocatable alien linkage table
     (cond ((code-immobile-p vop)
            (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
@@ -326,11 +326,11 @@
   (:temporary (:sc unsigned-reg :offset r15-offset :from :eval :to :result) r15)
   #+win32
   (:ignore r15)
-  #+win32
   (:temporary (:sc unsigned-reg :offset rbx-offset :from :eval :to :result) rbx)
   (:ignore results)
   (:vop-var vop)
   (:generator 0
+    (progn rbx)
     (emit-c-call vop rax c-symbol args varargsp
                  #+sb-safepoint pc-save
                  #+win32 rbx))
@@ -392,7 +392,9 @@
   (pseudo-atomic (:elide-if (not (call-out-pseudo-atomic-p vop)))
     (inst call (if (tn-p fun)
                  fun
-                 #-immobile-space (ea (make-fixup fun :foreign 8))
+                 #-immobile-space
+                 (progn (inst lea rbx-tn (ea (make-fixup fun :alien-code-linkage-index) null-tn))
+                        rbx-tn)
                  #+immobile-space
                  (cond ((code-immobile-p vop) (make-fixup fun :foreign))
                        (t

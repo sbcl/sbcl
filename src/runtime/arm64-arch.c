@@ -327,3 +327,36 @@ void gcbarrier_patch_code(void* where, int nbits)
     unsigned int mask = ~0x0000FC00; // 6 bits at position 10
     *pc = (*pc & mask) | ((GENCGC_CARD_SHIFT + nbits - 1) << 10);
 }
+
+os_vm_address_t coreparse_alloc_space(int space_id, int attr,
+                                      os_vm_address_t addr, os_vm_size_t size)
+{
+    __attribute__((unused)) int extra_request = 0;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
+        extra_request = ALIEN_LINKAGE_SPACE_SIZE;
+        size += extra_request;
+        addr -= extra_request; // try to put text space start where expected
+    }
+#endif
+    if (size == 0) return addr;
+
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    if (space_id == STATIC_CORE_SPACE_ID) {
+        // Allocate space for the safepoint page.
+        addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, size + BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES;
+    }
+    else
+#endif
+        addr = os_alloc_gc_space(space_id, attr, addr, size);
+
+    if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
+      ALIEN_LINKAGE_SPACE_START = (uword_t)addr;
+      addr += extra_request;
+    }
+#endif
+    return addr;
+}

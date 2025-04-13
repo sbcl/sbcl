@@ -3401,13 +3401,28 @@
               (1- (ash 1 value)))
              (:linkage-cell
               (let ((index (ash value word-shift)))
+                #-immobile-space
                 (ecase kind
-                  #+immobile-space (:rel32 (+ sb-vm::lisp-linkage-space-addr index))
+                  (:abs32 ; implicitly has a base reg of NULL-TN
+                   (let ((lt (+ (- sb-vm::alien-linkage-space-size)
+                                (- (ash 1 (+ sb-vm::n-linkage-index-bits sb-vm:word-shift)))
+                                (- sb-vm::nil-value-offset))))
+                     (setf (signed-sap-ref-32 sap offset) (+ lt index)))
+                   (return-from fixup-code-object)))
+                #+immobile-space
+                (ecase kind
+                  (:rel32 (+ sb-vm::lisp-linkage-space-addr index))
                   (:abs32 index))))
              (:assembly-routine
               (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value) value))
              ((:alien-code-linkage-index :alien-data-linkage-index)
-              (* value alien-linkage-table-entry-size))
+              #-immobile-space ; implicitly has a base reg of NULL-TN
+              (let ((lt (+ (- sb-vm::alien-linkage-space-size)
+                           (- sb-vm::nil-value-offset)))
+                    (index (* value alien-linkage-table-entry-size)))
+                (setf (signed-sap-ref-32 sap offset) (+ lt index))
+                (return-from fixup-code-object))
+              #+immobile-space (* value alien-linkage-table-entry-size))
              (:layout-id ; layout IDs are signed quantities on x86-64
               (setf (signed-sap-ref-32 sap offset) value)
               (return-from fixup-code-object))

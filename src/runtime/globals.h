@@ -110,9 +110,11 @@ extern lispobj *static_code_space_free_pointer;
 #endif
 
 extern lispobj *text_space_highwatermark;
+#if defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_IMMOBILE_SPACE
+extern lispobj ALIEN_LINKAGE_SPACE_START;
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern lispobj *fixedobj_free_pointer;
-extern lispobj ALIEN_LINKAGE_SPACE_START;
 #endif
 #define FIRST_USABLE_LINKAGE_ELT 1
 extern lispobj *linkage_space;

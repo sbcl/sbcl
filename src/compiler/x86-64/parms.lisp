@@ -75,16 +75,15 @@
 
 ;;;; description of the target address space
 
-;;; Static space:
-;;;
-;;;    start                                          |<- 4k ->|
-;;;    +----------------------|-------+---------+-----+--------+-
-;;;    |                      | asm   | other   |     |        |
-;;;    | other                | code  | popular | NIL | Safept | GC card
-;;;    | static               | jmp   | consts  |     | Trap   | table
-;;;    | data                 | table |         |     | Page   |
-;;;    +----------------------*-------+---------+-----+--------+-
-;;;             ^ freeptr                         end ^
+;;;     Linkage     |
+;;;      Spaces     | Static Space
+;;;  +--------------+----------------------|-------+---------+-----+--------+-
+;;;  |      |       |                      | asm   | other   |     |        |
+;;;  | Lisp | Alien | other                | code  | popular | NIL | Safept | GC card
+;;;  |      |       | static               | jmp   | consts  |     | Trap   | table
+;;;  | 4 MB |  1 MB | data                 | table |         |     | Page   |
+;;;  +--------------+----------------------*-------+---------+-----+--------+-
+;;;                          ^ freeptr                         end ^
 
 ;;;   R12 (GC-card-table-reg) = NIL
 ;;;   R12 + 64 - lowtag_of(NIL) = GC cards
@@ -136,16 +135,11 @@
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
 
-#+(and sb-xc-host (not immobile-space))
-(defparameter lisp-linkage-space-addr #x1500000000) ; arbitrary
-#+(and sb-xc-host immobile-space)
-(progn
-(defparameter lisp-linkage-space-addr
-  ;; text space:
-  ;;   | ALIEN LINKAGE | LISP LINKAGE | CODE OBJECTS ...
-  ;;   |<------------->|<------------>| ....
-  (- text-space-start (* (ash 1 n-linkage-index-bits) 8)))
-(defparameter alien-linkage-space-start (- lisp-linkage-space-addr alien-linkage-space-size)))
+#+sb-xc-host
+(progn (defparameter alien-linkage-space-start
+         (- (or #+immobile-space text-space-start static-space-start) alien-linkage-space-size))
+       (defparameter lisp-linkage-space-addr
+         (- alien-linkage-space-start (* 8 (ash 1 n-linkage-index-bits)))))
 
 (defenum (:start 8)
   halt-trap

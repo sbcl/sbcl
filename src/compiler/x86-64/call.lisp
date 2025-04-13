@@ -51,6 +51,8 @@
                          :linkage-cell))))
 
 (defun compute-linkage-cell (node name res)
+  #-immobile-space (inst lea res (ea (linkage-cell-fixup name node) null-tn))
+  #+immobile-space ; this is ironically worse than #-immobile-space
   (cond ((code-immobile-p node)
          (inst lea res (rip-relative-ea (linkage-cell-fixup name node))))
         (t
@@ -901,6 +903,9 @@
          (inst* instruction (ea rax-tn)))
         ((code-immobile-p node)
          (inst* instruction (rip-relative-ea (linkage-cell-fixup name node))))
+        #-immobile-space
+        (t (inst* instruction (ea (linkage-cell-fixup name node) null-tn)))
+        #+immobile-space ; again, this should not be worse than #-immobile-space, but it is
         (t
          ;; get the linkage table base into RAX
          (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))

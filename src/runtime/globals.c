@@ -58,9 +58,11 @@ lispobj *static_space_trailer_start;
 lispobj *static_code_space_free_pointer;
 #endif
 
+#if defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_IMMOBILE_SPACE
+lispobj ALIEN_LINKAGE_SPACE_START;
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 lispobj *fixedobj_free_pointer;
-lispobj ALIEN_LINKAGE_SPACE_START;
 #endif
 os_vm_address_t anon_dynamic_space_start;
 // The end of immobile text mapped from disk, equivalently the starting address

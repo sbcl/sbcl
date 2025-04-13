@@ -92,11 +92,12 @@ bool allocate_hardwired_spaces(bool hard_failp)
         unsigned size;
         int id;
     } preinit_spaces[] = {
+#ifndef LISP_FEATURE_X86_64
+      // For x86-64, static space allocation request depends on dynamic space size,
+      // and linkage spaces (alien + lisp) are either placed at the start of
+      // text space if it exists, or below static space otherwise.
         { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, READ_ONLY_CORE_SPACE_ID },
-#ifndef LISP_FEATURE_IMMOBILE_SPACE
         { ALIEN_LINKAGE_SPACE_START, ALIEN_LINKAGE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID },
-#endif
-#ifndef LISP_FEATURE_X86_64 // x86-64 static space allocation request depends on dynamic space size
         { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
 #endif
 #ifdef LISP_FEATURE_DARWIN_JIT

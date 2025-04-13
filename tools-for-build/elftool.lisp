@@ -145,10 +145,14 @@
 ;;; At execution time the function will have virtual address LOAD-ADDR.
 #+x86-64
 (defun list-textual-instructions (sap length core load-addr emit-cfi)
-  (let ((insts (simple-collect-inst-model sap length load-addr))
-        (alien-linkage-end
-         (+ (bounds-low (core-linkage-bounds core)) alien-linkage-space-size))
-        (result))
+  (let* ((insts (simple-collect-inst-model sap length load-addr))
+         (alien-linkage-bounds
+          (make-bounds (- (bounds-high (core-linkage-bounds core)) alien-linkage-space-size)
+                       (bounds-high (core-linkage-bounds core))))
+         (lisp-linkage-bounds
+          (make-bounds (bounds-low (core-linkage-bounds core))
+                       (bounds-low alien-linkage-bounds)))
+         (result))
     (flet ((pc-relative-ea-p (x)
              (when (consp x) (setq x (car x)))
              (and (typep x 'machine-ea) (eq (machine-ea-base x) :rip)))
@@ -167,40 +171,41 @@
                     (pc-relative-ea-p ea))
             (cond ((and (integerp ea) (in-bounds-p ea (core-linkage-bounds core)))
                    (aver (eq (cadr inst) 'sb-x86-64-asm::call))
-                   (aver (< ea alien-linkage-end)) ; CALL via alien linkage
+                   (aver (in-bounds-p ea alien-linkage-bounds)) ; CALL via alien linkage
                    (aver (= inst-len 5))
                    (push (list* (car inst) 5 :call ea) result))
                   ((pc-relative-ea-p ea)
                    (let* ((next-pc (+ load-addr (caadr insts)))
                           (ea (+ next-pc (ea-disp-of ea)))
-                          (table-offset (- ea alien-linkage-end)))
-                     (when (in-bounds-p ea (core-linkage-bounds core))
-                       (cond ((< ea alien-linkage-end) ; alien linkage
-                              (aver (= inst-len 7))
-                              (let ((op (ecase (cadr inst)
-                                          (sb-x86-64-asm::mov :mov-gotpcrel)
-                                          (sb-x86-64-asm::lea :lea)))
-                                    (args (list ea (string-downcase (princ-to-string (third inst))))))
-                                (push (list* (car inst) 7 op args) result)))
-                             ((eq (cadr inst) 'sb-x86-64-asm::lea)
+                          (table-offset (- ea (bounds-low lisp-linkage-bounds))))
+                     (cond ((in-bounds-p ea alien-linkage-bounds)
+                            (aver (= inst-len 7))
+                            (let ((op (ecase (cadr inst)
+                                        (sb-x86-64-asm::mov :mov-gotpcrel)
+                                        (sb-x86-64-asm::lea :lea)))
+                                  (args (list ea (string-downcase (princ-to-string (third inst))))))
+                              (push (list* (car inst) 7 op args) result)))
+                           ((and (in-bounds-p ea lisp-linkage-bounds)
+                                 (eq (cadr inst) 'sb-x86-64-asm::lea))
                               ;; Get ADDRESS of lisp linkage cell in stepping-enabled code
-                              (aver (eq (third inst) (get-gpr :qword 0))) ; %rax
-                              (aver (= inst-len 7))
-                              (push (list* (car inst) 7 :lea (format nil "(fntbl+~d)(%rip),%rax"
-                                                                      table-offset))
-                                    result))
-                             (t ; lisp CALL or JMP
-                              (aver (= inst-len 6))
-                              (let ((new-inst
-                                     (format nil "~a *(fntbl+~d)(%rip)"
-                                             (string-downcase (cadr inst))
-                                             table-offset)))
-                                (push (list* (car inst) 6 :lispcall new-inst) result))))))))))))
+                            (aver (eq (third inst) (get-gpr :qword 0))) ; %rax
+                            (aver (= inst-len 7))
+                            (push (list* (car inst) 7 :lea (format nil "(fntbl+~d)(%rip),%rax"
+                                                                   table-offset))
+                                  result))
+                           ((in-bounds-p ea lisp-linkage-bounds) ; lisp CALL or JMP
+                            (aver (= inst-len 6))
+                            (let ((new-inst
+                                   (format nil "~a *(fntbl+~d)(%rip)"
+                                           (string-downcase (cadr inst))
+                                           table-offset)))
+                              (push (list* (car inst) 6 :lispcall new-inst) result)))))))))))
       (nreverse result)))
 
 (defun c-linkage-sym-from-addr (addr core)
-  (let ((entry-index (/ (- addr (bounds-low (core-linkage-bounds core)))
-                        (core-alien-linkage-entry-size core))))
+  ;; assumption: alien-linkage-table-growth-direction is :UP for the platform
+  (let* ((alien-ls-start (- (bounds-high (core-linkage-bounds core)) alien-linkage-space-size))
+         (entry-index (/ (- addr alien-ls-start) (core-alien-linkage-entry-size core))))
     (setf (bit (core-alien-linkage-symbol-usedp core) entry-index) 1)
     (let ((symbol (aref (core-alien-linkage-symbols core) entry-index)))
       (if (listp symbol)
@@ -1516,12 +1521,11 @@ lisp_fun_linkage_space: .zero ~:*~D
               (%make-lisp-obj (logior (sap-int (sap+ (space-physaddr text-space spacemap)
                                                      code-offsets-vector-size))
                                       other-pointer-lowtag)))
-             (alien-ls-start
-              (symbol-global-value
-               (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-SPACE-START"
-                                   spacemap)))
+             (alien-ls-start (- (space-addr (or text-space static-space))
+                                alien-linkage-space-size))
              (alien-ls-end (1- (+ alien-ls-start alien-linkage-space-size))))
     (aver (<= (length *c-linkage-redirects*) (length c-linkage-vector)))
+    ;; (format t "~&alien linkage range = ~x .. ~x~%" alien-ls-start alien-ls-end)
     (dolist (x *c-linkage-redirects*)
       (let* ((index (position (cdr x) (core-alien-linkage-symbols core)
                               :test (lambda (a b) (and (stringp b) (string= a b)))))

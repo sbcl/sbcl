@@ -13,10 +13,7 @@
 
 #-sb-assembling ; avoid redefinition warning
 (macrolet ((static-fun-addr (name)
-             #-immobile-code
-             `(progn
-                (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
-                (ea (make-fixup ,name :linkage-cell) rax-tn))
+             #-immobile-code `(ea (make-fixup ,name :linkage-cell) null-tn)
              ;; Caution: this looks like it jumps to the linkage cell's address,
              ;; and that is indeed what it would do if it were not for the fact that
              ;; genesis recognizes that this isn't right, and instead does what you mean.

@@ -498,6 +498,26 @@
                               (:qword (unboxed-constant-ref dstate addr disp))))
                      dstate))))))
 
+    ;; Recognize [R12-disp] as a linkage table use (lisp or alien)
+    #-immobile-space
+    (when (and (eq (machine-ea-base value) sb-vm::card-table-reg)
+               (not (machine-ea-index value))
+               (minusp (machine-ea-disp value)))
+      (let* ((alien-end (- sb-vm::nil-value-offset))
+             (alien-start (- alien-end sb-vm:alien-linkage-space-size))
+             (lisp-start (- alien-start (ash 1 (+ sb-vm:n-linkage-index-bits 3))))
+             (disp (machine-ea-disp value)))
+        (cond ((<= lisp-start disp (1- alien-start))
+               (let ((name (linkage-addr->name (- disp lisp-start) :rel)))
+                 (note (lambda (s) (format s "~S" name)) dstate))
+               (return-from print-mem-ref))
+              ((<= alien-start disp (1- alien-end))
+               (let ((name (sb-impl::alien-linkage-index-to-name
+                            (floor (- disp alien-start)
+                                   sb-vm:alien-linkage-table-entry-size))))
+                 (note (lambda (s) (format s "&~A" name)) dstate))
+               (return-from print-mem-ref)))))
+
     ;; Recognize "[Rbase+disp]" as an alien linkage table reference if Rbase was
     ;; just loaded with the base address in the prior instruction.
     (when (and (eql (machine-ea-base value)

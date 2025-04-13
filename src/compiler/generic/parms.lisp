@@ -82,7 +82,9 @@
         ((spaces (append `((read-only ,ro-space-size)
                            #+(and win32 x86-64)
                            (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
-                           #-immobile-space (alien-linkage ,alien-linkage-space-size)
+                           ;; #+immobile-space implies a relocatable alien linkage space. And x86-64 always
+                           ;; has relocatable linkage tables
+                           #-(or x86-64 immobile-space) (alien-linkage ,alien-linkage-space-size)
                            ;; safepoint on 64-bit uses a relocatable trap page just below the card mark
                            ;; table, which works nicely assuming a register is wired to the card table
                            #+(and sb-safepoint (not x86-64))

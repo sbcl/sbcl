@@ -784,4 +784,85 @@ lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs) {
     return call_into_lisp_first_time_(fun, args, nargs, get_sb_vm_thread());
 }
 
+/*
+ * On x86-64 we try to place the alien and lisp linkage tables in such a way
+ * that avoids extra load instructions when calling, but also allows those tables
+ * to be fully relocatable. It is best achieved by using PC-relative addressng,
+ * which works only for immobile text space. Failing that, we can place the
+ * linkage tables below NIL and use NIL-relative addressing.
+ * The core file makes no indication of the "effective size" of static space
+ * or text space, so we have to oversize them.
+ * It's a little confusing, so here are the possibilities:
+ *
+ * Supports           |   extra allocation amount
+ * Immobile | elfcode |      text         | static
+ * ---------|-----------------------------|-------------------------------------
+ *   Yes    |   No    | +AL +LL below     | none
+ *   Yes    |   Yes   |     n/a           | +AL below, +GC cards above
+ *   No     |   No    |     none          | +AL+LL below, +GC cards above
+ *   No     |   Yes   |     n/a           | +AL below, +GC cards above
+ *
+ * AL = alien linkage
+ * LL = lisp linkage
+ * n/a means the call does not occur for that space
+ *
+ * For #+immobile-space we want to end up with text space having both linkage subspaces
+ * (unless code-in-ELF)
+ *   | LISP LINKAGE | ALIEN LINKAGE | CODE OBJECTS ...
+ *   |<------------>|<------------->| ....
+ * For code-in-ELF then the lisp linkage space was preallocated to a .bss section,
+ * so we only oversize the static space by the alien linkage space size.
+ * If there is no text space (i.e. for #-immobile-space) then the linkage tables
+ * are below static space.
+ */
+os_vm_address_t coreparse_alloc_space(int space_id, int attr,
+                                      os_vm_address_t addr, os_vm_size_t size)
+{
+    if (size == 0) return addr;
+
+    /* temporary hack: spaces allocated by coreparse are assumed to be movable.
+     * immovable static space ought to have been reserved by allocate_hardwired_spaces()
+     * but it can't have been, because the allocation request must take into account the
+     * size of the GC card table, which isn't known until parsing the core.
+     * So this request has to be changed to not movable so that it fails if not
+     * placed as required */
+    if (space_id == STATIC_CORE_SPACE_ID) attr &= ~MOVABLE;
+
+    int extra_below = 0, extra_above = 0;
+    extern int lisp_code_in_elf();
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+# define LINKAGE_TABLE_CONTAINER IMMOBILE_TEXT_CORE_SPACE_ID
+#else
+# define LINKAGE_TABLE_CONTAINER STATIC_CORE_SPACE_ID
+#endif
+    if (!lisp_code_in_elf()) { // a normal core
+        if (space_id == LINKAGE_TABLE_CONTAINER)
+            extra_below = LISP_LINKAGE_SPACE_SIZE + ALIEN_LINKAGE_SPACE_SIZE;
+    } else { // code-in-ELF core
+        if (space_id == STATIC_CORE_SPACE_ID)
+            extra_below = ALIEN_LINKAGE_SPACE_SIZE;
+    }
+    if (space_id == STATIC_CORE_SPACE_ID) {
+        extra_above =
+# ifdef LISP_FEATURE_SB_SAFEPOINT // should just add 1 OS page but instead
+            BACKEND_PAGE_BYTES +  // it's a ridiculously generous bump up
+# endif
+                ALIGN_UP((1+gc_card_table_mask), os_reported_page_size);
+    }
+
+    addr -= extra_below; // endeavor to return the requested address as it was
+    size += extra_below + extra_above;
+    //fprintf(stderr, "requesting space for space_id %d, below=%x above=%x\n", space_id, extra_below, extra_above);
+    addr = os_alloc_gc_space(space_id, attr, addr, size);
+    if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
+
+    if (extra_below) { // it contains at least alien linkage if not also lisp linkage
+        if (extra_below > ALIEN_LINKAGE_SPACE_SIZE) linkage_space = (void*)addr;
+        addr += extra_below;
+        ALIEN_LINKAGE_SPACE_START = (uword_t)addr - ALIEN_LINKAGE_SPACE_SIZE;
+    }
+    return addr;
+}
+
 #include "x86-arch-shared.inc"

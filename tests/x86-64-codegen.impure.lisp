@@ -175,7 +175,7 @@
          (c-call (find "os_deallocate" lines :test #'search)))
     ;; Depending on #+immobile-code it's either direct or memory indirect.
     #+immobile-code (assert (search "CALL #x" c-call))
-    #-immobile-code (assert (search "CALL [#x" c-call))))
+    #-immobile-code (assert (search "LEA RBX, [R12-" c-call))))
 
 (with-test (:name :set-symbol-value-imm)
   (let (success)

@@ -678,36 +678,16 @@ void calc_immobile_space_bounds()
 }
 #endif
 
-#ifdef LISP_FEATURE_LINKAGE_SPACE
-#define LISP_LINKAGE_SPACE_SIZE (1<<(N_LINKAGE_INDEX_BITS+WORD_SHIFT))
-#endif
-
-#if defined LISP_FEATURE_IMMOBILE_SPACE && defined LISP_FEATURE_ARM64
-#define LISP_LINKAGE_SPACE_SIZE 0
-#endif
-static os_vm_address_t reserve_space(int space_id, int attr,
-                                     os_vm_address_t addr, os_vm_size_t size)
+#if defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
+extern
+os_vm_address_t coreparse_alloc_space(int space_id, int attr,
+                                      os_vm_address_t addr, os_vm_size_t size);
+#else
+static os_vm_address_t coreparse_alloc_space(int space_id, int attr,
+                                             os_vm_address_t addr, os_vm_size_t size)
 {
-#ifndef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-    /* temporary hack: spaces allocated by coreparse are assumed to be movable.
-     * immovable static space ought to have been reserved by allocate_hardwired_spaces()
-     * but it can't have been, because the allocation request must take into account the
-     * size of the GC card table, which isn't known until parsing the core.
-     * So this request has to be changed to not movable so that it fails if not
-     * placed as required */
-    if (space_id == STATIC_CORE_SPACE_ID) attr &= ~MOVABLE;
-#endif
-    __attribute__((unused)) int extra_request = 0;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
-        extra_request = ALIEN_LINKAGE_SPACE_SIZE + LISP_LINKAGE_SPACE_SIZE;
-        size += extra_request;
-        addr -= extra_request; // compensate to try to put text space start where expected
-    }
-#endif
     if (size == 0) return addr;
-    // 64-bit already allocated a trap page when the GC card mark table was made
-#if defined(LISP_FEATURE_SB_SAFEPOINT) && !defined(LISP_FEATURE_X86_64)
+#ifdef LISP_FEATURE_SB_SAFEPOINT // this is only for 32-bit x86, I think
     if (space_id == STATIC_CORE_SPACE_ID) {
         // Allocate space for the safepoint page.
         addr = os_alloc_gc_space(space_id, attr, addr - BACKEND_PAGE_BYTES, size + BACKEND_PAGE_BYTES) + BACKEND_PAGE_BYTES;
@@ -716,15 +696,9 @@ static os_vm_address_t reserve_space(int space_id, int attr,
 #endif
         addr = os_alloc_gc_space(space_id, attr, addr, size);
     if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
-      ALIEN_LINKAGE_SPACE_START = (uword_t)addr;
-      linkage_space = (void*)((char*)addr + ALIEN_LINKAGE_SPACE_SIZE);
-      addr += extra_request;
-    }
-#endif
     return addr;
 }
+#endif
 
 static __attribute__((unused)) uword_t corespace_checksum(uword_t* base, int nwords)
 {
@@ -772,13 +746,6 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
         // unprotect the pages
         os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        // ELF core without immobile space has alien linkage space below static space.
-        ALIEN_LINKAGE_SPACE_START =
-            (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
-                                       ALIEN_LINKAGE_SPACE_SIZE);
-#endif
     }
 #endif
 
@@ -833,8 +800,8 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_ASLR
             addr = 0;
 #endif
-            addr = (uword_t)reserve_space(id, sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                          (os_vm_address_t)addr, request);
+            addr = (uword_t)coreparse_alloc_space(id, sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                                  (os_vm_address_t)addr, request);
             switch (id) {
             case PERMGEN_CORE_SPACE_ID:
                 PERMGEN_SPACE_START = addr;
@@ -925,9 +892,6 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     if (linkage_table_count) {
-        // Only #-immobile-space should allocate linkage space now,
-        // because otherwise it must be contiguous with text space.
-        if (linkage_space == 0) linkage_space = (void*)os_allocate(LISP_LINKAGE_SPACE_SIZE);
         off_t filepos = file_offset + (1 + linkage_table_data_page) * os_vm_page_size;
         gc_assert(os_reported_page_size);
         // Linkage space is only 8-byte-aligned in an ELF core. It doesn't need more than that.
@@ -1497,13 +1461,6 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             if (stringlen != (sizeof build_id-1) || memcmp(ptr, build_id, stringlen))
                 lose("core was built for runtime \"%.*s\" but this is \"%s\"",
                      (int)stringlen, (char*)ptr, build_id);
-#ifdef LISP_FEATURE_X86_64
-            spaces[STATIC_CORE_SPACE_ID].desired_size +=
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-                BACKEND_PAGE_BYTES + /* ridiculously oversized */
-# endif
-                ALIGN_UP((1+gc_card_table_mask), os_reported_page_size);
-#endif
             break;
         case STATIC_CONSTANTS_CORE_ENTRY_TYPE_CODE: {
             int nwords = remaining_len;
