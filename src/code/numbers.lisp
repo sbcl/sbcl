@@ -1671,6 +1671,7 @@ and the number of 0 bits if INTEGER is negative."
 ;;; Using division before doing binary GCD, like some sources suggest,
 ;;; doesn't speed things up uniformly.
 (declaim (maybe-inline fixnum-gcd))
+#-arm
 (defun fixnum-gcd (u v)
   (declare (optimize (safety 0) speed)
            (fixnum u v))
@@ -1680,6 +1681,30 @@ and the number of 0 bits if INTEGER is negative."
               (values v (rem u (the (not (eql 0)) v))))
         (if (zerop v)
             (return u))))
+
+;;; But 32-bit arm has no division instruction
+#+arm
+(defun fixnum-gcd (u v)
+  (declare (optimize (safety 0)))
+  (locally
+      (declare (optimize (speed 3) (safety 0)))
+    (do ((k 0 (1+ k))
+         (u (abs u) (ash u -1))
+         (v (abs v) (ash v -1)))
+        ((oddp (logior u v))
+         (do ((temp (if (oddp u) (- v) (ash u -1))
+                    (ash temp -1)))
+             (nil)
+           (declare (fixnum temp))
+           (when (oddp temp)
+             (if (plusp temp)
+                 (setq u temp)
+                 (setq v (- temp)))
+             (setq temp (- u v))
+             (when (zerop temp)
+               (return (the (integer 0 #.(1+ most-positive-fixnum)) (ash u k)))))))
+      (declare (type (mod #.sb-vm:n-word-bits) k)
+               (type sb-vm:signed-word u v)))))
 
 ;;; Do the GCD of two integer arguments.
 ;;; We pick off the special case
