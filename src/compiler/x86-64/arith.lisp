@@ -4277,7 +4277,7 @@
 
 (define-vop (dpb-c/unsigned)
   (:translate %dpb)
-  (:args (posn :scs (unsigned-reg))
+  (:args (posn :scs (unsigned-reg) :to :save)
          (y :scs (unsigned-reg) :target res))
   (:arg-types (:constant integer)
               (:constant (integer 1 1)) unsigned-num
@@ -4295,7 +4295,7 @@
 
 (define-vop (dpb-c/signed)
   (:translate %dpb)
-  (:args (posn :scs (unsigned-reg))
+  (:args (posn :scs (unsigned-reg) :to :save)
          (y :scs (signed-reg) :target res))
   (:arg-types (:constant integer)
               (:constant (integer 1 1))
