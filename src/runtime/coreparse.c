@@ -892,6 +892,9 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_LINKAGE_SPACE
     if (linkage_table_count) {
+#ifdef LISP_FEATURE_PPC64
+        linkage_space = (void*)os_allocate(LISP_LINKAGE_SPACE_SIZE);
+#endif
         off_t filepos = file_offset + (1 + linkage_table_data_page) * os_vm_page_size;
         gc_assert(os_reported_page_size);
         // Linkage space is only 8-byte-aligned in an ELF core. It doesn't need more than that.
