@@ -174,7 +174,7 @@
   (aver (stringp fun))
   (setq fun (if (or #+immobile-space t (member :sb-assembling sb-xc:*features*))
                 `(make-fixup ,fun :foreign)
-                `(ea (make-fixup ,fun :foreign 8))))
+                `(ea (make-fixup ,fun :alien-code-linkage-index 8) null-tn)))
   `(progn
      #+win32 (inst sub rsp-tn 32)
      ,@(loop for arg in args

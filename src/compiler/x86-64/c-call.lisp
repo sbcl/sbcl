@@ -223,9 +223,24 @@
     (16 (sign-extend x size))
     (32 (sign-extend x size))))
 
-;;; Note that if jumping _to_ the linkage entry, the jump is to the JMP instruction
-;;; at entry + 0, but if jumping _via_ the linkage index, we can jump to [entry+8]
-;;; which holds the ultimate address to jump to.
+;;; There is a troublesome assumption about alien code linkage entries, namely that you
+;;; can reference entry + 8 to extract the actual address of the C function.
+;;; This is not ideal, for two distinct reasons:
+;;;
+;;; (1) The linkage entry should contain instructions for GC yieldpoint cooperation,
+;;; removing such instructions from call out sites. (You have to inform the GC that
+;;; a thread is leaving managed code and entering code that won't execute yieldpoints.)
+;;; Clearly this won't work if jumping into the middle of the linkage entry is allowed.
+;;;
+;;; (2) The CPU has separate I+D caches, and there is a cost to shuttling data between
+;;; them. Jumping to an alien linkage entries as they are puts the whole entry into the I
+;;; cache (presumably) when the second word should instead be in the D cache.
+;;; To optimally structure the entries, all JMPs should precede all data words, like so:
+;;;   jmp [RIP+disp]
+;;;   jmp [RIP+disp]
+;;;   ...
+;;;   data ...
+;;; And were such change made, it would cease to be valid to jump to an entry + 8.
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
@@ -236,9 +251,9 @@
   (:result-types system-area-pointer)
   (:vop-var vop)
   (:generator 2
-    #-immobile-space ; non-relocatable alien linkage table
-    (inst mov res (make-fixup foreign-symbol :foreign))
-    #+immobile-space ; relocatable alien linkage table
+    #-immobile-space
+    (inst lea res (ea (make-fixup foreign-symbol :alien-code-linkage-index) null-tn))
+    #+immobile-space
     (cond ((code-immobile-p vop)
            (inst lea res (rip-relative-ea (make-fixup foreign-symbol :foreign))))
           (t
@@ -257,7 +272,7 @@
   (:generator 2
     #-immobile-space
     (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) null-tn))
-    #+immobile-space ; relocatable alien linkage table
+    #+immobile-space
     (cond ((code-immobile-p vop)
            (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
           (t
@@ -416,7 +431,7 @@
          ;; which table cell was referenced, if undefined.
          #+immobile-space ; relocatable table
          (cond ((code-immobile-p vop)
-                (inst lea rbx (rip-relative-ea (make-fixup fun :foreign 8))))
+                (inst lea rbx (rip-relative-ea (make-fixup fun :foreign 8)))) ; BAD!
                (t
                 (inst mov rbx (make-fixup fun :alien-code-linkage-index 8))
                 (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot))))

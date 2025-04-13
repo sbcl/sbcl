@@ -3420,7 +3420,7 @@
               (let ((lt (+ (- sb-vm::alien-linkage-space-size)
                            (- sb-vm::nil-value-offset)))
                     (index (* value alien-linkage-table-entry-size)))
-                (setf (signed-sap-ref-32 sap offset) (+ lt index))
+                (incf (signed-sap-ref-32 sap offset) (+ lt index))
                 (return-from fixup-code-object))
               #+immobile-space (* value alien-linkage-table-entry-size))
              (:layout-id ; layout IDs are signed quantities on x86-64

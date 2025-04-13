@@ -354,13 +354,15 @@
                 (when 2nd-tn-live
                   (inst mov 2nd-tn null-tn))
                 (when (> nvals 2)
+                  ;; FIXME: simplify this logic- don't use 2nd-tn as a proxy
+                  ;; for NIL now that NULL-TN is a thing.
                   (loop
                     for tn-ref = (tn-ref-across 2nd-tn-ref)
                     then (tn-ref-across tn-ref)
                     for count from 2 below register-arg-count
                     unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
                     do
-                    (inst mov :dword (tn-ref-tn tn-ref)
+                    (inst mov (tn-ref-tn tn-ref)
                           (if 2nd-tn-live 2nd-tn null-tn)))))
               (inst mov rbx rsp-tn)
               regs-defaulted))
