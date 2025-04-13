@@ -110,7 +110,7 @@ echo Custom core: PASS
 
 (cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a)
 
-export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap
+export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap_64
 i=1
 while [ $i -le 6 ]
 do
