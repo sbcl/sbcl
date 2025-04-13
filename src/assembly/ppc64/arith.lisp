@@ -177,74 +177,6 @@
   (frob signed-* "signed *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
 
-
-
-;;;; Division.
-
-(define-assembly-routine (positive-fixnum-truncate
-                          (:note "unsigned fixnum truncate")
-                          (:cost 45)
-                          (:translate truncate)
-                          (:policy :fast-safe)
-                          (:arg-types positive-fixnum positive-fixnum)
-                          (:result-types positive-fixnum positive-fixnum))
-                         ((:arg dividend any-reg nl0-offset)
-                          (:arg divisor any-reg nl1-offset)
-
-                          (:res quo any-reg nl2-offset)
-                          (:res rem any-reg nl0-offset))
-  (aver (location= rem dividend))
-  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
-    (inst cmpdi divisor 0)
-    (inst beq error))
-    (inst divdu quo dividend divisor)
-    (inst mulld divisor quo divisor)
-    (inst sub rem dividend divisor)
-    (inst sldi quo quo n-fixnum-tag-bits))
-
-(define-assembly-routine (fixnum-truncate
-                          (:note "fixnum truncate")
-                          (:cost 50)
-                          (:policy :fast-safe)
-                          (:translate truncate)
-                          (:arg-types tagged-num tagged-num)
-                          (:result-types tagged-num tagged-num))
-                         ((:arg dividend any-reg nl0-offset)
-                          (:arg divisor any-reg nl1-offset)
-
-                          (:res quo any-reg nl2-offset)
-                          (:res rem any-reg nl0-offset))
-
-  (aver (location= rem dividend))
-  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
-    (inst cmpdi divisor 0)
-    (inst beq error))
-    (inst divd quo dividend divisor)
-    (inst mulld divisor quo divisor)
-    (inst subf rem divisor dividend)
-    (inst sldi quo quo n-fixnum-tag-bits))
-
-(define-assembly-routine (signed-truncate
-                          (:note "(signed-byte 64) truncate")
-                          (:cost 60)
-                          (:policy :fast-safe)
-                          (:translate truncate)
-                          (:arg-types signed-num signed-num)
-                          (:result-types signed-num signed-num))
-
-                         ((:arg dividend signed-reg nl0-offset)
-                          (:arg divisor signed-reg nl1-offset)
-
-                          (:res quo signed-reg nl2-offset)
-                          (:res rem signed-reg nl0-offset))
-
-  (let ((error (generate-error-code nil 'division-by-zero-error dividend)))
-    (inst cmpdi divisor 0)
-    (inst beq error))
-    (inst divd quo dividend divisor)
-    (inst mulld divisor quo divisor)
-    (inst subf rem divisor dividend))
-
 
 ;;;; Comparison
 

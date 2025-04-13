@@ -1183,25 +1183,50 @@
     (inst mulld temp dividend c) ; want only the low 64 bits
     (inst mulhdu remainder temp divisor))) ; want only the high 64 bits
 
-(in-package "SB-C")
+(define-vop (fast-truncate/signed=>signed fast-safe-arith-op)
+  (:translate truncate)
+  (:args (x :scs (signed-reg) :to :result)
+         (y :scs (signed-reg) :to :result))
+  (:arg-types signed-num signed-num)
+  (:arg-refs nil y-ref)
+  (:results (quo :scs (signed-reg) :from :eval)
+            (rem :scs (signed-reg) :from :eval))
+  (:optional-results rem)
+  (:result-types signed-num signed-num)
+  (:note "inline (signed-byte 64) arithmetic")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 33
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
+                                    (specifier-type '(eql 0)))
+      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
+        (inst cmpdi y 0)
+        (inst beq zero)))
+    (inst divd quo x y)
+    (unless (eq (tn-kind rem) :unused)
+      (inst mulld rem quo y)
+      (inst subf rem rem x))))
 
-#+nil
-(deftransform * ((x y)
-                 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
-                 (unsigned-byte 32))
-  "recode as shifts and adds"
-  (let ((y (lvar-value y)))
-    (multiple-value-bind (result adds shifts)
-        (ub32-strength-reduce-constant-multiply 'x y)
-      (cond
-       ((typep y '(signed-byte 16))
-        ;; a mulli instruction has a latency of 5.
-        (when (> (+ adds shifts) 4)
-          (give-up-ir1-transform)))
-       (t
-        ;; a mullw instruction also has a latency of 5, plus two
-        ;; instructions (in general) to load the immediate into a
-        ;; register.
-        (when (> (+ adds shifts) 6)
-          (give-up-ir1-transform))))
-      (or result 0))))
+(define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)
+  (:translate truncate)
+  (:args (x :scs (unsigned-reg) :to :result)
+         (y :scs (unsigned-reg) :to :result))
+  (:arg-types unsigned-num unsigned-num)
+  (:arg-refs nil y-ref)
+  (:results (quo :scs (unsigned-reg) :from :eval)
+            (rem :scs (unsigned-reg) :from :eval))
+  (:optional-results rem)
+  (:result-types unsigned-num unsigned-num)
+  (:note "inline (unsigned-byte 64) arithmetic")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 30
+    (when (types-equal-or-intersect (tn-ref-type y-ref)
+                                    (specifier-type '(eql 0)))
+      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
+        (inst cmpdi y 0)
+        (inst beq zero)))
+    (inst divdu quo x y)
+    (unless (eq (tn-kind rem) :unused)
+      (inst mulld rem quo y)
+      (inst subf rem rem x))))
