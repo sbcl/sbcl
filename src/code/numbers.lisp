@@ -1665,32 +1665,24 @@ and the number of 0 bits if INTEGER is negative."
                 (values n m))
           (* (truncate max (gcd n m)) min)))))
 
+;;; Actually do a simple Euclidean algorithm instead of a binary GCD,
+;;; binary GCD is slow on large numbers, using count-trailing-zeros
+;;; helps, but only when there's a lot of trailing zeros.
+;;; Using division before doing binary GCD, like some sources suggest,
+;;; doesn't speed things up uniformly.
 (declaim (maybe-inline fixnum-gcd))
 (defun fixnum-gcd (u v)
-  (declare (optimize (safety 0)))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (do ((k 0 (1+ k))
-         (u (abs u) (ash u -1))
-         (v (abs v) (ash v -1)))
-        ((oddp (logior u v))
-         (do ((temp (if (oddp u) (- v) (ash u -1))
-                    (ash temp -1)))
-             (nil)
-           (declare (fixnum temp))
-           (when (oddp temp)
-             (if (plusp temp)
-                 (setq u temp)
-                 (setq v (- temp)))
-             (setq temp (- u v))
-             (when (zerop temp)
-               (return (the (integer 0 #.(1+ most-positive-fixnum)) (ash u k)))))))
-      (declare (type (mod #.sb-vm:n-word-bits) k)
-               (type sb-vm:signed-word u v)))))
+  (declare (optimize (safety 0) speed)
+           (fixnum u v))
+  (setf u (abs u)
+        v (abs v))
+  (loop (setf (values u v)
+              (values v (rem u (the (not (eql 0)) v))))
+        (if (zerop v)
+            (return u))))
 
-;;; Do the GCD of two integer arguments. With fixnum arguments, we use the
-;;; binary GCD algorithm from Knuth's seminumerical algorithms (slightly
-;;; structurified), otherwise we call BIGNUM-GCD. We pick off the special case
+;;; Do the GCD of two integer arguments.
+;;; We pick off the special case
 ;;; of 0 before the dispatch so that the bignum code doesn't have to worry
 ;;; about "small bignum" zeros.
 (defun two-arg-gcd (u v)
