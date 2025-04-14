@@ -19,9 +19,11 @@
 
 ;;; Save and restore dynamic environment.
 (define-vop (current-stack-pointer)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (any-reg descriptor-reg control-stack)))
   (:generator 1
-    (move res csp-tn)))
+    (if (sc-is res control-stack)
+        (store-stack-tn res csp-tn)
+        (move res csp-tn))))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
