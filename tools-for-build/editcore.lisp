@@ -1005,11 +1005,21 @@
 
 (defconstant +lispwords-per-corefile-page+ (/ +backend-page-bytes+ n-word-bytes))
 
+(defun directory-entry-priority (x)
+  (let ((id (second x)))
+    (case id
+      (#.static-core-space-id 1)
+      ((#.immobile-fixedobj-core-space-id #.permgen-core-space-id) 2)
+      (#.read-only-core-space-id 3)
+      (#.dynamic-core-space-id 4)
+      (#.immobile-text-core-space-id 5))))
+
 (defun rewrite-core (directory core-header parsed-header spacemap output
                      &aux (offset (core-header-dir-start parsed-header))
                           (dynamic-space (get-space dynamic-core-space-id spacemap))
                           (initfun (core-header-initfun parsed-header))
                           (fd (sb-impl::fd-stream-fd output)))
+  (setq directory (sort directory #'< :key #'directory-entry-priority))
   (aver (= (%vector-raw-bits core-header offset) directory-core-entry-type-code))
   ;; OFFSET starts as the index of the word containing the core header entry type.
   ;; Following that is the length in words, where we begin rewriting the directory.
