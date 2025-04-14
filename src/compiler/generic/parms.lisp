@@ -431,5 +431,9 @@
          #'equal))
 #-64-bit (defconstant-eqx sb-impl::symbol-hash-prng-byte (byte 3 0) #'equal)
 
+(defmacro symhash-xor-constant (tagged-nil)
+  #+x86-64 `(dpb 0 (byte n-linkage-index-bits symbol-linkage-index-pos) ,tagged-nil)
+  #-x86-64 0)
+
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)

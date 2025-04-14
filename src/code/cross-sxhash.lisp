@@ -68,6 +68,8 @@
   (assert (= length (length string)))
   (cond #+(and 64-bit (not relocatable-static-space))
         ((string= string "NIL") ; :NIL must hash the same as NIL
+         #+x86-64 0 ; always 0
+         #-x86-64
          ;; Return the high 4 bytes in NIL's car slot.
          ;; out-of-order with defconstant nil-value
          (ldb (byte 32 32) (sb-vm::get-nil-taggedptr)))

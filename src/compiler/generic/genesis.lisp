@@ -1153,7 +1153,18 @@ core and return a descriptor to it."
       ;; arm64 can't use immobile symbols
       #+(and immobile-space x86-64) '*immobile-fixedobj*
       '*dynamic*))
-(defun compute-symhash (name descriptor)
+
+(defun symhash-xor-constant ()
+  #+x86-64 (logandc2 (descriptor-bits *nil-descriptor*)
+                     (mask-field (byte sb-vm:n-linkage-index-bits
+                                       sb-vm::symbol-linkage-index-pos)
+                                 -1))
+  #-x86-64 0)
+
+;;; Compute bits to store into the HASH slot (as opposed to what the hash is
+;;; logically) of a symbol. For x86-64 this means XORing with some of NIL's bits
+;;; - just the ones that overlap the hash - so that linkage index reads as 0.
+(defun symhash-bits (name descriptor)
   ;; "why not just call sb-c::symbol-name-hash?" you ask? because: no symbol.
   (let ((name-hash (sb-c::calc-symbol-name-hash name (length name)))
         (salt (sb-impl::murmur3-fmix-word (descriptor-bits descriptor)))
@@ -1161,9 +1172,9 @@ core and return a descriptor to it."
     ;; 64-bit: Low 4 bytes to high 4 bytes of slot
     ;; 32-bit: name-hash to high 29 bits
     ;; plus salt the hash any way you want as long as the build is reproducible.
-    (logior (ash name-hash (+ (byte-size prng-byte) (byte-position prng-byte)))
-            (mask-field prng-byte salt)
-            #+x86-64 #b111)))
+    (logxor (sb-vm::symhash-xor-constant (descriptor-bits *nil-descriptor*))
+            (logior (ash name-hash (+ (byte-size prng-byte) (byte-position prng-byte)))
+                    (mask-field prng-byte salt)))))
 
 (defun set-symbol-pkgid (symbol pkg &optional (nil-slots-magic 0))
   (let ((wordindex (+ #-64-bit sb-vm:symbol-package-id-slot nil-slots-magic)))
@@ -1186,7 +1197,7 @@ core and return a descriptor to it."
              (pkg-id (if cold-package
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+)))
-        (write-wordindexed/raw symbol sb-vm:symbol-hash-slot (compute-symhash name symbol))
+        (write-wordindexed/raw symbol sb-vm:symbol-hash-slot (symhash-bits name symbol))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
         (set-symbol-pkgid symbol pkg-id)
@@ -1859,7 +1870,7 @@ core and return a descriptor to it."
                 (bvref-word (descriptor-mem des) nil-cons-cdr-offs) sb-vm:nil-value))
         ;; Assign HASH if and only if NIL's hash is address-insensitive
         #+(or relocatable-static-space (not 64-bit))
-        (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (compute-symhash "NIL" des))
+        (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (symhash-bits "NIL" des))
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (set-symbol-pkgid des sb-impl::+package-id-lisp+ 1)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
@@ -4106,7 +4117,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
           (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL"))
           (aref nil-slots 7) sb-vm::non-negative-fixnum-mask-constant)
     (setf (aref t-slots 0) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
-          (aref t-slots sb-vm:symbol-hash-slot) (compute-symhash "T" t-des)
+          (aref t-slots sb-vm:symbol-hash-slot) (symhash-bits "T" t-des)
           (aref t-slots sb-vm:symbol-value-slot) (descriptor-bits t-des)
           (aref t-slots sb-vm:symbol-fdefn-slot) 0
           (aref t-slots sb-vm:symbol-info-slot) (descriptor-bits *t-symbol-info*)

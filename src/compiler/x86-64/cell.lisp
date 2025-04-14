@@ -221,6 +221,13 @@
       (inst sub bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp))))
 
+;;; I don't know which of SYMBOL-HASH or SYMBOL-NAME-HASH is dynamically executed most.
+;;; Whichever one that is can slightly optimized more by avoiding a load from the hash of NIL
+;;; and using NULL-TN directly. Currently this favors SYMBOL-HASH.
+;;; To favor SYMBOL-NAME-HASH, we would need to flip the position of the hash and fname-index
+;;; fields within the hash slot.  Putting HASH in the low 4 bytes allows a :DWORD XOR with
+;;; NULL-TN to achieve position-independence of NIL's hash.
+;;; Such minutia I do not care to deal with at the moment.
 (define-vop (symbol-hash)
   (:policy :fast-safe)
   (:translate symbol-hash)
@@ -229,6 +236,7 @@
   (:result-types positive-fixnum)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst xor res null-tn)
     (inst shr res n-symbol-hash-discard-bits)))
 
 (eval-when (:compile-toplevel)
@@ -243,10 +251,16 @@
   ;; identical translations believe it or not
   (:translate symbol-name-hash hash-as-if-symbol-name)
   (:generator 1
-    ;; NIL gets 0 for its name hash since its upper 4 address bytes are 0
+    ;; The number of times this vop is executed on an arg _not_ known to be a symbol
+    ;; is about 20x the number of times it _is_ known to be a symbol. (Think of all the
+    ;; CASE expressions where the arg type was not pre-tested)
+    ;; It is quick to unconditionally XOR with a word that is likely in L1 cache already
+    ;; (CAR of NIL) versus conditionally branching, making this vop more efficient than
+    ;; with the alternate definition of SYMBOL slots which put HASH near the end.
     (inst mov :dword res
           (ea (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)
-              symbol))))
+              symbol))
+    (inst xor :dword res (ea (- 4 list-pointer-lowtag) null-tn))))
 
 (aver (= sb-impl::package-id-bits 16))
 (define-vop (symbol-package-id)

@@ -397,9 +397,9 @@ distinct from the global value. Can also be SETF."
         (setf (sap-ref-word (int-sap (get-lisp-obj-address symbol))
                             (- (ash sb-vm:symbol-hash-slot sb-vm:word-shift)
                                sb-vm:other-pointer-lowtag))
-              #+64-bit (logior (ash name-hash 32)
-                               (mask-field symbol-hash-prng-byte salt)
-                               #+x86-64 #b111) ; boolean flags
+              #+64-bit (logxor (sb-vm::symhash-xor-constant sb-vm:nil-value)
+                               (logior (ash name-hash 32)
+                                       (mask-field symbol-hash-prng-byte salt)))
               #-64-bit (logior (ash name-hash 3) (ldb (byte 3 0) salt)))))
     ;; Compact-symbol (which is equivalent to #+64-bit) has the package already NIL
     ;; because the PACKAGE-ID-BITS field defaults to 0.
