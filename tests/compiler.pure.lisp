@@ -2085,7 +2085,7 @@
                                      (declare (optimize (speed 3)))
                                      (+ x 2))))))
     ;; forced-to-do GENERIC-+, etc, possible word -> bignum conversion note
-    (assert (> (length notes) 1)))
+    (assert (> (length notes) 0)))
 
   (let ((notes (nth-value
                 4 (checked-compile '(lambda (x)

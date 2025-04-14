@@ -4248,13 +4248,15 @@
 ;;; More complicated stuff that also depends on commutativity
 ;;; (e.g. (f (f x k1) (f y k2)) => (f (f x y) (f k1 k2))) should
 ;;; probably be handled with a more general tree-rewriting pass.
-(macrolet ((def (operator &key (type 'integer) (folded (list operator)))
-             `(deftransform ,operator ((x z) (,type (constant-arg ,type)))
+(macrolet ((def (operator &key (type 'integer) (folded (list operator))
+                               (combine operator)
+                               flip no-ratios)
+             `(deftransform ,operator ((x z) (,type (constant-arg ,type)) * :important nil :node n)
                 ,(format nil "associate ~A/~A of constants"
                          operator folded)
-                (binding* ((node  (if (lvar-has-single-use-p x)
-                                      (lvar-use x)
-                                      (give-up-ir1-transform)))
+                (binding* ((node (if (lvar-has-single-use-p x)
+                                     (lvar-use x)
+                                     (give-up-ir1-transform)))
                            (folded (or (and (combination-p node)
                                             (car (memq (lvar-fun-name
                                                         (combination-fun node))
@@ -4263,21 +4265,33 @@
                            (y   (second (combination-args node)))
                            (nil (or (constant-lvar-p y)
                                     (give-up-ir1-transform)))
-                           (y   (lvar-value y)))
-                  (unless (typep y ',type)
-                    (give-up-ir1-transform))
+                           (y (funcall folded (lvar-value y)))
+                           (z (funcall ',(if flip
+                                             operator
+                                             'identity)
+                                       (lvar-value z)))
+                           (constant (funcall ',(or flip
+                                                    combine)
+                                              z y)))
+                  ,@(when no-ratios
+                      `((when (and (integerp y)
+                                   (ratiop constant)
+                                   (eq folded ',no-ratios))
+                          (give-up-ir1-transform))))
                   (splice-fun-args x folded 2)
                   `(lambda (x y z)
                      (declare (ignore y z))
                      ;; (operator (folded x y) z)
                      ;; == (operator x (folded z y))
-                     (,',operator x (,folded ,(lvar-value z) ,y)))))))
+                     (,',(if flip flip operator) x ,constant))))))
   (def logand)
   (def logior)
   (def logxor)
-  (def logtest :folded (logand))
+  (def logtest :folded (logand) :combine logand)
   (def + :type rational :folded (+ -))
-  (def * :type rational :folded (* /)))
+  (def - :type rational :folded (+ -) :flip +)
+  (def * :type rational :folded (* /))
+  (def / :type rational :folded (* /) :flip * :no-ratios *))
 
 ;;; Transform (logior a (- (mask-field (byte 1 n) a)))
 ;;; to (mask-signed-field n a)
