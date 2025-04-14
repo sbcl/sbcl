@@ -247,3 +247,28 @@
         (,big-op x (make-small-bignum y)))
        ((bignum bignum)
         (,big-op x y))))))
+
+(defmacro dispatch-ratio ((ratio numerator denominator) &body body)
+  `(let ((,numerator (numerator ,ratio))
+         (,denominator (denominator ,ratio)))
+     (if (and (fixnump ,numerator)
+              (fixnump ,denominator))
+         (progn ,@body)
+         (progn ,@body))))
+
+(defmacro dispatch-two-ratios ((numerator1-var numerator1)
+                               (denominator1-var denominator1)
+                               (numerator2-var numerator2)
+                               (denominator2-var denominator2)
+                               body
+                               &optional (fixnum-body body))
+  `(let ((,numerator1-var ,numerator1)
+         (,denominator1-var ,denominator1)
+         (,numerator2-var ,numerator2)
+         (,denominator2-var ,denominator2))
+     (if (and (fixnump ,numerator1-var)
+              (fixnump ,numerator2-var)
+              (fixnump ,denominator1-var)
+              (fixnump ,denominator2-var))
+         ,fixnum-body
+         ,body)))
