@@ -1891,7 +1891,7 @@
     (unless (eq (tn-kind rem) :unused)
       (zeroize rem))
     (inst jmp DONE)
-    
+
     NO-OVERFLOW
     (inst cqo)
     (inst idiv y)
@@ -3933,7 +3933,27 @@
               r (object-slot-ea x bignum-digits-offset other-pointer-lowtag)))
        (t
         (loadw r x bignum-digits-offset other-pointer-lowtag)
-        (shift-unshift r width))))))
+        (shift-unshift r width)))))
+
+  (define-vop (mask-signed-field-integer)
+    (:translate sb-c::mask-signed-field)
+    (:policy :fast-safe)
+    (:args (x :scs (descriptor-reg) :to :save))
+    (:arg-types (:constant (integer 0 64)) integer)
+    (:results (r :scs (signed-reg)))
+    (:result-types signed-num)
+    (:info width)
+    (:generator 6
+      (move r x)
+      (inst sar r n-fixnum-tag-bits)
+      (inst jmp :nc DO)
+      (loadw r x bignum-digits-offset other-pointer-lowtag)
+      DO
+      (case width
+        ((8 16 32)
+         (inst movsx `(,(bits->size width) :qword) r r))
+        (t
+         (shift-unshift r width))))))
 
 (define-vop (mask-signed-field-fixnum)
   (:translate sb-c::mask-signed-field)

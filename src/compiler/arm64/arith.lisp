@@ -1442,6 +1442,24 @@
     (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits))
     DONE))
 
+(define-vop (mask-signed-field-integer)
+  (:translate sb-c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types (:constant (integer 0 64)) integer)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 63
+    (aver (/= width 0))
+    (inst asr r x n-fixnum-tag-bits)
+    (inst tbz x 0 do)
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    DO
+    (cond ((= width 64))
+          (t
+           (inst sbfm r r 0 (1- width))))))
+
 (define-vop (logand-word-mask)
   (:translate logand)
   (:policy :fast-safe)
