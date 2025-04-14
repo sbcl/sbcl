@@ -794,8 +794,8 @@
                     (unless (tn-reads tn)
                       (do ((ref (tn-writes tn) (tn-ref-next ref)))
                           ((null ref))
-                        (aver (eq (vop-name (tn-ref-vop ref))
-                                  'current-stack-pointer))
+                        (aver (memq (vop-name (tn-ref-vop ref))
+                                    '(current-stack-pointer move)))
                         (delete-vop (tn-ref-vop ref)))))
                   (return))
                  (t
