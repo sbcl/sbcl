@@ -1881,10 +1881,6 @@ core and return a descriptor to it."
 (defun initialize-static-space (tls-init)
   "Initialize the cold load symbol-hacking data structures."
   (declare (ignorable tls-init))
-  ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
-  #-compact-symbol
-  (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-id-slot 1)
-                     (make-fixnum-descriptor sb-impl::+package-id-lisp+))
   (when core-file-name
     ;; NIL did not have its package assigned, nor did T if #+x86-64. Do that now.
     #+x86-64 (record-accessibility :external (cold-find-package-info "COMMON-LISP")
