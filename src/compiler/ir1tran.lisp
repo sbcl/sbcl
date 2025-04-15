@@ -1888,7 +1888,7 @@
   (declare (list names))
   (let ((type (specifier-type spec)))
     (unless (csubtypep type (specifier-type 'function))
-      (error "Not a function type: ~/sb-impl:print-type/" spec))
+      (error "Not a function type: ~/sb-impl:print-type-specifier/" spec))
     (dolist (name names)
       (process-1-ftype-proclamation name type))))
 
