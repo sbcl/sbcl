@@ -1445,6 +1445,14 @@ and the number of 0 bits if INTEGER is negative."
          (bignum-ashift-left integer count)
          (bignum-ashift-right integer (- count))))))
 
+(defun ash-right (integer count)
+  (declare (explicit-check))
+  (number-dispatch ((integer integer))
+    ((fixnum)
+     (ash integer (- (truly-the (mod #.sb-vm:n-word-bits) count))))
+    ((bignum)
+     (bignum-ashift-right integer count))))
+
 (defun integer-length (integer)
   "Return the number of non-sign bits in the twos-complement representation
   of INTEGER."

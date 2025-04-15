@@ -1542,6 +1542,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%DOUBLE-FLOAT" "%DPB" "%EQL"
            "%EXIT"
            "%EXP" "%EXPM1"
+           "ASH-RIGHT"
            "FILL-POINTER-ERROR"
            "%FIND-POSITION"
            "%FIND-POSITION-VECTOR-MACRO" "%FIND-POSITION-IF"

@@ -3210,6 +3210,14 @@
 
 ;;; Rightward ASH
 
+(deftransform ash ((integer amount) (integer (constant-arg (integer (#.(- sb-vm:n-word-bits)) -1))) *
+                   :node node :important nil)
+  (when (or (csubtypep (lvar-type integer) (specifier-type 'word))
+            (csubtypep (lvar-type integer) (specifier-type 'sb-vm:signed-word)))
+    (give-up-ir1-transform))
+  (delay-ir1-transform node :ir1-phases)
+  `(ash-right integer ,(- (lvar-value amount))))
+
 (when-vop-existsp (:translate sb-kernel:%ash/right)
   (defun %ash/right (integer amount)
     (ash integer (- amount)))

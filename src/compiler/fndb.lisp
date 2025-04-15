@@ -469,6 +469,10 @@
   (or word sb-vm:signed-word)
   (movable foldable flushable always-translatable))
 
+(defknown ash-right (integer (mod #.sb-vm:n-word-bits))
+  integer
+  (movable foldable flushable no-verify-arg-count))
+
 (defknown (logcount integer-length) (integer) bit-index
   (movable foldable flushable))
 ;;; FIXME: According to the ANSI spec, it's legal to use any
