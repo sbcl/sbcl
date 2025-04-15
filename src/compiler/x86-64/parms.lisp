@@ -110,8 +110,6 @@
 
 (defconstant nil-static-space-end-offs 41) ; 6 words (48 bytes) _minus_ list-pointer-lowtag
 
-;;; minor TODO : investigate why picking #xFFFF000000 for static space caused failure
-;;; of traceroot.impure.lisp which is otherwise OK given the value below.
 #+(or linux darwin)
 (gc-space-setup #x1080000000 ; chosen to fail spectacularly if everything isn't right
                 ;; (> 4GB and sign-bit is 1 if treated as 32-bit int)

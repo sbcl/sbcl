@@ -477,7 +477,7 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
 
 static bool root_p(lispobj ptr, int criterion)
 {
-    if (ptr <= STATIC_SPACE_END) return 1; // always a root
+    if (ptr >= STATIC_SPACE_START && ptr < STATIC_SPACE_END) return 1; // always a root
     // 0 to 2 are in order of weakest to strongest condition for stopping,
     // i.e. criterion 0 implies that that largest number of objects
     // are considered roots.
