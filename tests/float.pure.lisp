@@ -880,3 +880,9 @@
                                        (opaque-identity 49.12944))
     (assert (= q 20354393599312814931347243008))
     (assert (= r #-x86 7.5557864e22 #+x86 4.971228e22))))
+
+(with-test (:name :round-big-float)
+  (multiple-value-bind (q r) (round (opaque-identity sb-kernel::most-positive-fixnum-double-float)
+                                    (opaque-identity 1d0))
+    (assert (plusp q))
+    (assert (typep r 'double-float))))
