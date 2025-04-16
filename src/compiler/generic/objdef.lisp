@@ -772,8 +772,8 @@ during backtrace.
               (ash (1- sizeof-nil-in-words) word-shift)))
 
 (defconstant lockfree-list-tail-value-offset
-  (+ static-space-objects-offset
-     (* (+ (length +static-symbols+)
-           #+x86-64 -1) ; T is just below NIL, so disccount it from the length
-        (ash (align-up symbol-size 2) word-shift))
-     instance-pointer-lowtag))
+  (logior instance-pointer-lowtag
+          #+x86-64 (+ (* (1- (length +static-symbols+)) (pad-data-block symbol-size))
+                      (ash 258 word-shift)) ; **PRIMITIVE-OBJECT-LAYOUTS**
+          #-x86-64 (+ (* (length +static-symbols+) (pad-data-block symbol-size))
+                      static-space-objects-offset)))

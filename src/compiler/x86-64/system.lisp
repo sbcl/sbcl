@@ -91,11 +91,8 @@
       (inst cmov :dword :ne rax object)
       (inst movzx '(:byte :dword) rax rax) ; same as "AND EAX,255" but shorter encoding
       LOAD-FROM-VECTOR
-      (inst mov :dword result
-            (ea (make-fixup '**primitive-object-layouts** :symbol-value
-                           (- (ash vector-data-offset word-shift)
-                              other-pointer-lowtag))
-                nil rax 8)) ; no base register
+      (inst mov :dword result (ea (- (ash vector-data-offset word-shift) nil-value-offset)
+                                  null-tn rax 8))
       DONE))
 (define-vop ()
     (:policy :fast-safe)

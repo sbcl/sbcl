@@ -71,9 +71,8 @@
 (defconstant index-of-layout-for-null 1)
 #-sb-xc-host
 (!cold-init-forms
-;; This vector is allocated into immobile fixedobj space if #+compact-instance-header.
-;; There isn't a way to do that from lisp, so it's special-cased in genesis.
-#-compact-instance-header (setq **primitive-object-layouts** (make-array 256))
+;; Genesis allocates this vector in static space for #+x86-64
+#-x86-64 (setq **primitive-object-layouts** (make-array 256))
 (map-into **primitive-object-layouts**
           (lambda (name) (classoid-layout (find-classoid name)))
           #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))

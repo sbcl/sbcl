@@ -1887,6 +1887,8 @@ core and return a descriptor to it."
                                    *t-descriptor*)
     (record-accessibility :external (cold-find-package-info "COMMON-LISP")
                           *nil-descriptor*))
+  ;; Make **PRIMITIVE-OBJECT-LAYOUTS** if it's in static space
+  #+x86-64 (allocate-vector sb-vm:simple-vector-widetag 256 256 *static*)
   ;; Intern the others.
   ;; For x86-64, T is allocated next to NIL and thus excluded from the follwing loop.
   (dovector (symbol #+x86-64 (subseq sb-vm:+static-symbols+ 1)
@@ -1927,33 +1929,14 @@ core and return a descriptor to it."
     (cold-set t-symbol t-symbol))
 
   ;; Establish the value of SB-VM:FUNCTION-LAYOUT and **PRIMITIVE-OBJECT-LAYOUTS**
+  #+x86-64
+  (cold-set '**primitive-object-layouts**
+            (make-random-descriptor
+             (logior sb-vm:static-space-start sb-vm:other-pointer-lowtag)))
   #+compact-instance-header
-  (progn
   (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
                          sb-vm:symbol-value-slot
                          (ash (cold-layout-descriptor-bits 'function) 32))
-  (cold-set '**primitive-object-layouts**
-            #+permgen
-            (emplace-vector (make-random-descriptor
-                             (logior (gspace-byte-address *permgen*)
-                                     sb-vm:other-pointer-lowtag))
-                            sb-vm:simple-vector-widetag 256)
-            #+immobile-space
-            (let* ((layouts-vector-total-nwords (+ sb-vm:vector-data-offset 256)) ; physical size
-                   (padding-vector-total-nwords (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
-                                                   layouts-vector-total-nwords))
-                   (padding-vector (make-random-descriptor
-                                    (logior (gspace-byte-address *immobile-fixedobj*)
-                                            sb-vm:other-pointer-lowtag)))
-                   (padding-vector-end (+ (gspace-byte-address *immobile-fixedobj*)
-                                          (ash padding-vector-total-nwords sb-vm:word-shift)))
-                   (layouts-vector (make-random-descriptor
-                                    (logior padding-vector-end sb-vm:other-pointer-lowtag))))
-              ;; The free word index of imobile-fixedobj space was initialized to 1 page above
-              ;; the space address so that we can retroactively place these vectors at the start.
-              (emplace-vector padding-vector sb-vm:simple-array-fixnum-widetag
-                              (- padding-vector-total-nwords sb-vm:vector-data-offset))
-              (emplace-vector layouts-vector sb-vm:simple-vector-widetag 256))))
 
   ;; Dynamic-space code can't use "call rel32" to reach the assembly code
   ;; in a single instruction if too far away. The solution is to have a static-space
@@ -4275,12 +4258,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                                      sb-vm:static-space-start))
            #+immobile-space
            (*immobile-fixedobj*
-            ;; Primordial layouts (from INITIALIZE-LAYOUTS) are made before anything else,
-            ;; but they don't allocate starting from word index 0, because page 0 is reserved
-            ;; for the **PRIMITIVE-OBJECT-LAYOUTS** vector.
             (make-gspace :immobile-fixedobj immobile-fixedobj-core-space-id
-                         sb-vm:fixedobj-space-start
-                         :free-word-index (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
+                         sb-vm:fixedobj-space-start))
            #+immobile-space
            (*immobile-text*
             (make-gspace :immobile-text immobile-text-core-space-id sb-vm:text-space-start

@@ -1433,11 +1433,6 @@ search_immobile_space(void *pointer)
                && pointer < (void*)fixedobj_free_pointer) {
         low_page_index_t page_index = find_fixedobj_page_index(pointer);
         char *page_base = PTR_ALIGN_DOWN(pointer, IMMOBILE_CARD_BYTES);
-        // Page attributes are inadequate to represent the size of objects
-        // on the reserved page (of which there is only 1 at present).
-        // In addition, there are actually differently sized objects on the page.
-        // We don't really care about dissimilar sizes, since it is not used as
-        // a root for scavenging. It resembles READ-ONLY space in that regard.
         if (page_attributes_valid && page_index >= FIXEDOBJ_RESERVED_PAGES) {
             int spacing = fixedobj_page_obj_align(page_index);
             if (spacing == 0) return NULL;

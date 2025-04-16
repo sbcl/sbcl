@@ -46,6 +46,7 @@
           ((t) (- t-nil-offset))
           (t (+ (* (1- posn) (pad-data-block symbol-size))
                 (- nil-value-offset)
+                (ash 258 word-shift) ; **PRIMITIVE-OBJECT-LAYOUTS**
                 other-pointer-lowtag)))
         #-x86-64
         (+ (* posn (pad-data-block symbol-size))

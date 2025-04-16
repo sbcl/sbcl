@@ -512,6 +512,7 @@
   (+ (- nil-value-offset) ; go back to the start of static space
      ;; Skip over all static symbols except T which isn't in low static space
      (* (1- (length +static-symbols+)) (pad-data-block symbol-size))
+     (ash 258 word-shift) ; **PRIMITIVE-OBJECT-LAYOUTS**
      instance-pointer-lowtag))
 
 ;;; Return the bits (descriptor or raw as specified) representing the CPU's
