@@ -732,12 +732,12 @@ during backtrace.
 ;;;  ------------------ | -------------------- | ------------- |
 ;;;       padding       |      padding         |     padding   |
 ;;;       header        |      header          |     header    | <-- start of NIL-as-symbol
-;;;       hash          |      hash            |     hash      | <-- start of NIL-as-cons
+;;;       fdefn         |      fdefn           |     hash      | <-- start of NIL-as-cons
 ;;;       value         |      value           |     value     |
 ;;;       info          |      info            |     info      |
 ;;;       name          |      name            |     name      |
-;;;       fdefn         |      fdefn           |     fdefn     |
-;;;       package       |      package         |     (unused)  |
+;;;       hash          |      hash            |     fdefn     |
+;;;       packageid     |      packageid       |     (unused)  |
 ;;;       tls_index     |   T: header          |  T: header    |
 ;;;       (unused)      |                      |               |
 ;;;    T: header        |                      |               |
