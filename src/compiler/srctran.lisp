@@ -3826,6 +3826,9 @@
 (deftransform floor ((number divisor) ((real (0) (1)) (integer (0) *)) * :important nil)
   `(values 0 number))
 
+(deftransform floor ((number divisor) ((real 0) (real 0)) * :important nil)
+  `(truncate number divisor))
+
 (deftransform truncate ((number divisor) ((and (real (-1) (1)) (not (eql -0d0)) (not (eql -0f0)))
                                           (and integer (not (eql 0))))
                         * :important nil)
