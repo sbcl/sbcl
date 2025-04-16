@@ -699,3 +699,11 @@
               (ratio r))
      (/ r x))
    ratio))
+
+(with-test (:name :fixnum-gcd-overflow)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (gcd a b))
+    ((most-negative-fixnum most-negative-fixnum) (- most-negative-fixnum))
+    ((most-negative-fixnum 48) 16)))

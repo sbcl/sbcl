@@ -1658,12 +1658,13 @@ and the number of 0 bits if INTEGER is negative."
 (defun fixnum-gcd (u v)
   (declare (optimize (safety 0) speed)
            (fixnum u v))
-  (setf u (abs u)
-        v (abs v))
-  (loop (setf (values u v)
-              (values v (rem u (the (not (eql 0)) v))))
-        (if (zerop v)
-            (return u))))
+  (let ((u (abs u))
+        (v (abs v)))
+    (declare (sb-vm:signed-word u v))
+    (loop (setf (values u v)
+                (values v (rem u (the (not (eql 0)) v))))
+          (if (zerop v)
+              (return u)))))
 
 ;;; But 32-bit arm has no division instruction
 #+arm
