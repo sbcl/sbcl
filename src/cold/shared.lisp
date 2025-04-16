@@ -337,6 +337,8 @@
           (push :round-float sb-xc:*features*))
         (when (target-featurep '(:and :arm64 :darwin))
           (push :arm-v8.1 backend-subfeatures))
+        (when (target-featurep '(:and :ppc64 :little-endian))
+          (push :fsqrt backend-subfeatures))
 
         ;; Putting arch and gc choice first is visually convenient, versus
         ;; having to parse a random place in the line to figure out the value

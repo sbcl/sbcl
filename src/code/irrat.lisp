@@ -29,22 +29,27 @@
 
 ;;; Make these INLINE, since the call to C is at least as compact as a
 ;;; Lisp call, and saves number consing to boot.
-(defmacro def-math-rtn (name num-args &optional wrapper)
-  (let ((function (symbolicate "%" (string-upcase name)))
-        (args (loop for i below num-args
-                    collect (intern (format nil "ARG~D" i)))))
-    `(progn
-       (declaim (inline ,function))
-       (defun ,function ,args
-         (declare (sb-c:flushable sb-c:%alien-funcall))
-         (truly-the ;; avoid checking the result
-          ,(type-specifier (fun-type-returns (info :function :type function)))
-          (alien-funcall
-           (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
-                         (function double-float
-                                   ,@(loop repeat num-args
-                                           collect 'double-float)))
-           ,@args))))))
+(defmacro def-math-rtn (name num-args &optional wrapper transform)
+  (let* ((function (symbolicate "%" (string-upcase name)))
+         (args (loop for i below num-args
+                     collect (intern (format nil "ARG~D" i))))
+         (body `(locally
+                    (declare (sb-c:flushable sb-c:%alien-funcall))
+                  (truly-the ;; avoid checking the result
+                   ,(type-specifier (fun-type-returns (info :function :type function)))
+                   (alien-funcall
+                    (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
+                                  (function double-float
+                                            ,@(loop repeat num-args
+                                                    collect 'double-float)))
+                    ,@args)))))
+    (if transform
+        `(sb-c:deftransform ,function (,args)
+           ',body)
+        `(progn
+           (declaim (inline ,function))
+           (defun ,function ,args
+             ,body)))))
 
 
 #+x86 ;; for constant folding
@@ -97,7 +102,8 @@
 #-x86 (def-math-rtn "log" 1)
 #-x86 (def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
-#-(or x86 x86-64 arm-vfp arm64 riscv) (def-math-rtn "sqrt" 1)
+#-(or x86 x86-64 arm-vfp arm64 riscv)
+(def-math-rtn "sqrt" 1 nil #+ppc64 t)
 #-x86 (def-math-rtn "log1p" 1)
 #-x86 (def-math-rtn "log2" 1)
 

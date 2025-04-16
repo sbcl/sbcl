@@ -487,8 +487,8 @@
 (def-ppc-iformat (x-20 '(:name :tab frt "," ra "," rb))
   frt ra rb (xo xo21-30))
 
-(def-ppc-iformat (x-21 '(:name :tab frt "," rb))
-  frt rb (xo xo21-30) rc)
+(def-ppc-iformat (x-21 '(:name :tab frt "," frb))
+  frt frb (xo xo21-30) rc)
 
 (def-ppc-iformat (x-22 '(:name :tab frt))
   frt (xo xo21-30) rc)
@@ -1010,7 +1010,7 @@
            (define-x-21-instruction (name op xo rc-p &key (cost 4) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                  `(define-instruction ,name (segment frt frb)
-                   ;; (:printer x-21 ((op ,op) (xo ,xo) (rc ,(if rc-p 1 0))))
+                   (:printer x-21 ((op ,op) (xo ,xo) (rc ,(if rc-p 1 0))))
                    (:cost ,cost)
                    (:delay ,cost)
                    (:dependencies (reads frb) ,@other-reads
@@ -1895,6 +1895,8 @@
                               0)))
 
   (define-2-x-21-instructions fneg 63 40)
+  (define-2-x-21-instructions fsqrt 63 22)
+  (define-2-x-21-instructions fsqrts 59 22)
 
   (define-2-x-21-instructions fmr 63 72)
   (define-2-x-21-instructions fnabs 63 136)
