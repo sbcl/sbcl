@@ -2912,8 +2912,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; All the backends should do this, as its avoids consing in GENERIC-NEGATE
     ;; when the argument is MOST-NEGATIVE-FIXNUM.
     #+x86-64 (write-wordindexed asm-code sb-vm:code-constants-offset
-                                (bignum-to-core (- most-negative-fixnum)
-                                                #-immobile-space *static*))
+                                (bignum-to-core (- most-negative-fixnum)))
     ;; Update the name -> address table.
     (let (table)
       (dotimes (i n-routines)
