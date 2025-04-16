@@ -84,10 +84,6 @@
                    (:layout-id (layout-id name))
                    (:card-table-index-mask (extern-alien "gc_card_table_nbits" int))
                    (:immobile-symbol (get-lisp-obj-address name))
-                   ;; It is legal to take the address of symbol-value only if the
-                   ;; value is known to be an immobile object
-                   ;; (whose address we don't want to wire in).
-                   (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
                    (t (bug "bad fixup flavor ~s" flavor)))
                  kind flavor)
          callees)

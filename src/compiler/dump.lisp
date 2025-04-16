@@ -1085,7 +1085,6 @@
     :code-object
     :layout :immobile-symbol
     #+linkage-space ,@'(:linkage-cell :linkage-cell-ud)
-    :symbol-value
     :layout-id)
   #'equalp)
 
@@ -1170,12 +1169,7 @@
                    (:layout-id (the layout name))
                    ((:assembly-routine
                      :symbol-tls-index
-                     ;; Only #+immobile-space can use the following two flavors.
-                     ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
-                     ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
-                     ;; In the latter case, the symbol's address doesn't matter,
-                     ;; but its global value must be an immobile object.
-                     :immobile-symbol :symbol-value)
+                     :immobile-symbol) ; only #+immobile-space can use
                     (the symbol name))
                    (t name)))) ; function name
             (dump-object operand fasl-output)

@@ -3463,7 +3463,7 @@
             #+(or permgen immobile-space)
             ((and (eq (fixup-note-kind note) :abs32)
                   (memq flavor ; these all point to fixedobj space
-                        '(:layout :immobile-symbol :symbol-value)))
+                        '(:layout :immobile-symbol)))
              (push offset abs32-fixups))))))
 
 ;;; Coverage support

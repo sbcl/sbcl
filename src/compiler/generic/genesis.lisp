@@ -3001,8 +3001,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
-              (descriptor-bits (if (symbolp name) (cold-intern name) name)))
-             (:symbol-value (descriptor-bits (cold-symbol-value name))))
+              (descriptor-bits (if (symbolp name) (cold-intern name) name))))
            kind flavor)))))
   (write-wordindexed code-obj sb-vm::code-fixups-slot
                      #+linkage-space

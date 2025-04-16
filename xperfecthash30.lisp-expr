@@ -1194,6 +1194,12 @@
   (let ((b (& (>> val 1) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(56E935B 578E28F 95BECAA A1FC394 A31A1DB B2C6780 136C4AC5 14FE847C 1836DEFB 1D714507 1FE456EC)
+ "#(:ASSEMBLY-ROUTINE :CARD-TABLE-INDEX-MASK :SYMBOL-TLS-INDEX :ALIEN-CODE-LINKAGE-INDEX :ALIEN-DATA-LINKAGE-INDEX :FOREIGN :FOREIGN-DATAREF :CODE-OBJECT :LAYOUT :IMMOBILE-SYMBOL :LAYOUT-ID)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 2 0 0 13 2 4 13)))
+  (let ((b (>> (<< val 3) 29)))
+   (let ((a (& val #x7)))
+    (^ a (aref tab b))))))")
 (#(5BA4FD3 7168950 F5ABDAB 128A2060 12FE1EC2)
  "(:QWORD :DWORD :WORD :HALFWORD :BYTE)"
  "(  (& (>> val 12) 7))")
