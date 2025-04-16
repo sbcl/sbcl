@@ -74,6 +74,10 @@ static inline low_page_index_t find_text_page_index(void *addr)
   return -1;
 }
 
+/* The benefit if this approach to testing for two ranges is questionable,
+ * especially as text space is now _higher_ than dynamic space.
+ * Maybe reconsider just using the obvious two discrete range tests,
+ * or else rearrange the spaces again to where this makes sense */
 static inline bool immobile_space_p(lispobj obj)
 {
 /* To test the two immobile ranges, we first check that a pointer is within

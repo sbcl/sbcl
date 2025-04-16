@@ -666,6 +666,13 @@ void calc_immobile_space_bounds()
         {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
     struct range range2 =
         {TEXT_SPACE_START, TEXT_SPACE_START + text_space_size};
+    if (range1.start == 0) {
+        immobile_space_lower_bound  = range2.start;
+        immobile_space_max_offset   = range2.end - range2.start;
+        immobile_range_1_max_offset = immobile_space_max_offset;
+        immobile_range_2_min_offset = immobile_space_max_offset;
+        return;
+    }
     if (range2.start < range1.start) { // swap
         struct range temp = range1;
         range1 = range2;

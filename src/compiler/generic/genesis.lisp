@@ -4185,7 +4185,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
      (let (#+x86-64 (static-space-constants (create-static-space-constants))
            (spaces `(,*static*
                       #+permgen ,*permgen*
-                      #+immobile-space ,@`(,*immobile-fixedobj* ,*immobile-text*)
+                      #+(and immobile-space x86-64) ,*immobile-fixedobj*
+                      #+immobile-space ,*immobile-text*
                       ,*dynamic* ,*read-only*)))
         ;; Write the Directory entry header.
         (write-words core-file directory-core-entry-type-code)

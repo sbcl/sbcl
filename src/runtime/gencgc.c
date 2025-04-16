@@ -5029,15 +5029,16 @@ static int count_immobile_objects(__attribute__((unused)) int gen, int res[3])
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     lispobj* where = (lispobj*)FIXEDOBJ_SPACE_START;
     lispobj* end = fixedobj_free_pointer;
-    while (where < end) {
-        if (immobile_obj_generation(where) == gen) {
-            switch (widetag_of(where)) {
-            case INSTANCE_WIDETAG: ++res[0]; break;
-            case SYMBOL_WIDETAG: ++res[1]; break;
-            }
-        }
-        where += object_size(where);
-    }
+    /* arm64 does not map fixedobj space. Technically it's not legal to compare
+     * null pointers for inequality (in the loop test) */
+    if (where)
+        for ( ; where < end; where += object_size(where) )
+            if (immobile_obj_generation(where) == gen)
+                switch (widetag_of(where)) {
+                case INSTANCE_WIDETAG: ++res[0]; break;
+                case SYMBOL_WIDETAG: ++res[1]; break;
+                }
+
     where = (lispobj*)TEXT_SPACE_START;
     end = text_space_highwatermark;
     while (where < end) {
