@@ -1955,3 +1955,7 @@ and the number of 0 bits if INTEGER is negative."
     (if (minusp integer)
         (sb-c::mask-signed-field sb-vm:n-fixnum-bits (ash integer amount))
         (logand most-positive-fixnum (ash integer amount)))))
+
+(defun sb-vm::truncate-mod64 (a b)
+  (multiple-value-bind (q r) (truncate a b)
+    (values (ldb (byte 64 0) q) r)))
