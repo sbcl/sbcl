@@ -707,3 +707,16 @@
          (gcd a b))
     ((most-negative-fixnum most-negative-fixnum) (- most-negative-fixnum))
     ((most-negative-fixnum 48) 16)))
+
+(with-test (:name :signed-word-minus1-division)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (truncate
+          (the sb-vm:signed-word a)
+          (the (member -8 -1) b)))
+    ((-2 -1) (values 2 0))
+    ((-2 -8) (values 0 -2))
+    (((- #1=(expt 2 (1- sb-vm:n-word-bits))) -1) (values #1# 0))
+    (((- #1#) -8) (values (- (ash (- #1#) -3))
+                          0))))

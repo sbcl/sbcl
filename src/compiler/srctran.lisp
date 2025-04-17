@@ -4182,7 +4182,7 @@
     `(if (and (= y -1)
               (= x ,(- #1=(expt 2 (1- sb-vm:n-word-bits)))))
          (values ,#1# 0)
-         (truly-the sb-vm:signed-word ($fun x (truly-the (not (eql -1)) y))))))
+         (truly-the sb-vm:signed-word ($fun x y)))))
 
 
 ;;;; arithmetic and logical identity operation elimination
