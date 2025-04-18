@@ -188,7 +188,7 @@
 
   DO-UWP
   (loadw target-uwp cur-uwp unwind-block-uwp-slot)
-  (store-current-unwind-protect-blocK target-uwp)
+  (store-current-unwind-protect-block target-uwp)
   (inst j DO-EXIT))
 
 ;;;; Some runtime routines.
