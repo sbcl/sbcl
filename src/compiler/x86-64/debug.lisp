@@ -72,8 +72,6 @@
     ;; This vop is supposed to return NIL if the simple-fun has an invalid header
     ;; as determined by the relative backpointer being 0.  I don't know why a simple-fun
     ;; would ever be constructed like that.
-    #-relocatable-static-space
-    (progn
     ;; The largest displacement in words from a code header to
     ;; the header word of a contained function is #xFFFFFF.
     ;; (See FUN_HEADER_NWORDS_MASK in 'gc.h')
@@ -83,22 +81,7 @@
     (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
                        thing temp n-word-bytes))
     ;; note that LEA does not affect any flags
-    (inst cmov :z code null-tn)) ; put NIL into CODE if ZF
-    ;; I don't know where to load a NIL from with relocatable static space.
-    #+relocatable-static-space
-    (let ((bogus (gen-label))
-          (done (gen-label)))
-      (inst mov :dword temp (ea (- fun-pointer-lowtag) thing))
-      (inst shr :dword temp n-widetag-bits)
-      (inst jmp :z bogus)
-      (inst neg temp)
-      (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
-                         thing temp n-word-bytes))
-      (emit-label done)
-      (assemble (:elsewhere)
-        (emit-label bogus)
-        (inst mov code nil-value)
-        (inst jmp done)))))
+    (inst cmov :z code null-tn))) ; put NIL into CODE if ZF
 
 (define-vop (%make-lisp-obj)
   (:policy :fast-safe)

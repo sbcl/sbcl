@@ -3664,28 +3664,30 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
             (let ((val (if (listp binding) (second binding))))
               (if (eq val 't) "LISP_T" val)))))
 
-(defun maybe-relativize (value)
-  #-relocatable-static-space value
-  #+relocatable-static-space (- value sb-vm:static-space-start))
-
 (defun write-static-symbols (stream)
-  (dolist (symbol (cons nil (coerce sb-vm:+static-symbols+ 'list)))
-    (format stream "#define ~A LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
+  (flet ((cdef (name value)
+           (format stream "#define ~A LISPOBJ(~A)~%" name
+                   (or #-relocatable-static-space (format nil "0x~X" value)
+                       (format nil "STATIC_SPACE_START + 0x~X"
+                               (- value sb-vm:static-space-start))))))
+    (dolist (symbol (cons nil (coerce sb-vm:+static-symbols+ 'list)))
             ;; FIXME: It would be nice not to need to strip anything
             ;; that doesn't get stripped always by C-SYMBOL-NAME.
-            (if (eq symbol 't) "LISP_T" (c-symbol-name symbol "%*.!"))
-            #-relocatable-static-space nil
-            #+relocatable-static-space t
-            (maybe-relativize
-             (if *static*               ; if we ran GENESIS
+      (cdef (if (eq symbol 't) "LISP_T" (c-symbol-name symbol "%*.!"))
+            (if *static*               ; if we ran GENESIS
                  ;; We actually ran GENESIS, use the real value.
-                 (descriptor-bits (cold-intern symbol))
-                 (+ sb-vm:nil-value
-                    (if symbol (sb-vm:static-symbol-offset symbol) 0))))))
-  (format stream "#define LFLIST_TAIL_ATOM LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
-          #-relocatable-static-space nil
-          #+relocatable-static-space t
-          (maybe-relativize (descriptor-bits *lflist-tail-atom*)))
+                (descriptor-bits (cold-intern symbol))
+                (+ sb-vm:nil-value (sb-vm:static-symbol-offset symbol)))))
+    (cdef "LFLIST_TAIL_ATOM" (descriptor-bits *lflist-tail-atom*))
+    (let ((where (+ (descriptor-base-address *lflist-tail-atom*)
+                    (sb-vm:pad-data-block (+ sb-vm:instance-data-start 2)) ; LF tail atom
+                    sb-vm:other-pointer-lowtag))
+          (increment (sb-vm:pad-data-block sb-vm:fdefn-size)))
+      (dolist (symbol (or #-linkage-space sb-vm::+c-callable-fdefns+))
+        (cdef (concatenate 'string (c-symbol-name symbol) "_FDEFN")
+              (if *static*               ; if we ran GENESIS
+                  (descriptor-bits (ensure-cold-fdefn symbol))
+                  (prog1 where (incf where increment)))))))
   #+sb-thread
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))
@@ -3707,26 +3709,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
   #+linkage-space
   (loop for symbol in sb-vm::+c-callable-fdefns+
         do (format stream "#define ~A_fname_index ~d~%"
-                   (c-symbol-name symbol) (ensure-linkage-index symbol)))
-
-  ;; Everybody else can address each fdefn directly.
-  #-linkage-space
-  (loop for symbol in sb-vm::+c-callable-fdefns+
-        for index from 0
-        do
-    (format stream "#define ~A_FDEFN LISPOBJ(~:[~;STATIC_SPACE_START + ~]0x~X)~%"
-            (c-symbol-name symbol)
-            #-relocatable-static-space nil
-            #+relocatable-static-space t
-            (maybe-relativize
-             (if *static*               ; if we ran GENESIS
-                 ;; We actually ran GENESIS, use the real value.
-                 (descriptor-bits (ensure-cold-fdefn symbol))
-                 ;; We didn't run GENESIS, so guess at the address.
-                 (+ sb-vm:nil-value
-                    (* (length sb-vm:+static-symbols+)
-                       (sb-vm:pad-data-block sb-vm:symbol-size))
-                    (* index (sb-vm:pad-data-block sb-vm:fdefn-size))))))))
+                   (c-symbol-name symbol) (ensure-linkage-index symbol))))
 
 (defun init-runtime-routines ()
   (dolist (symbol sb-vm::*runtime-asm-routines*)
