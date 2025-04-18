@@ -1994,7 +1994,7 @@ PACKAGE."
   (loop for (this . use) in *!initial-package-graph*
         do (setf (package-tables (find-package this))
                  (map 'vector (lambda (x) (package-external-symbols (find-package x)))
-                              use)))
+                      (the list use)))) ; THE LIST yields a better transform of MAP
 
   (rebuild-package-vector)
   ;; Having made all packages, verify that symbol hashes are good.
