@@ -191,7 +191,10 @@
   (:note "constant load")
   (:generator 1
     (cond ((sb-c::tn-leaf x)
-           (inst mov y (tn-value x)))
+           ;; some bad value might sneak in due to imperfect type
+           ;; propagation, but it shouldn't be reachable, just mask it
+           ;; off.
+           (inst mov y (ldb (byte 64 0) (tn-value x))))
           (t
            (inst mov y x)
            (inst sar y n-fixnum-tag-bits)))))
