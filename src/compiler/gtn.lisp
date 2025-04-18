@@ -203,38 +203,6 @@
                              (not (all-returns-tail-calls-p dest)))
                     (return-from punt nil))))))))))
 
-;;; If policy indicates, give an efficiency note about our inability to
-;;; use the known return convention. We try to find a function in the
-;;; tail set with non-constant return values to use as context. If
-;;; there is no such function, then be more vague.
-(defun return-value-efficiency-note (tails)
-  (declare (type tail-set tails))
-  (let ((funs (tail-set-funs tails)))
-    (when (policy (lambda-bind (first funs))
-                  (> (max speed space)
-                     inhibit-warnings))
-      (dolist (fun funs
-                   (let ((*compiler-error-context* (lambda-bind (first funs))))
-                     (compiler-notify
-                      "Return value count mismatch prevents known return ~
-                       from these functions:~
-                       ~{~%  ~A~}"
-                      (mapcar #'leaf-source-name
-                              (remove-if-not #'leaf-has-source-name-p funs)))))
-        (let ((ret (lambda-return fun)))
-          (when ret
-            (let ((rtype (return-result-type ret)))
-              (multiple-value-bind (ignore count) (values-types rtype)
-                (declare (ignore ignore))
-                (when (eq count :unknown)
-                  (let ((*compiler-error-context* (lambda-bind fun)))
-                    (compiler-notify
-                     "Return type not fixed values, so can't use known return ~
-                      convention:~%  ~S"
-                     (type-specifier rtype)))
-                  (return)))))))))
-  (values))
-
 ;;; Return a RETURN-INFO structure describing how we should return
 ;;; from functions in the specified tail set. We use the unknown
 ;;; values convention if the number of values is unknown, or if it is
@@ -245,9 +213,6 @@
   (multiple-value-bind (types count) (values-types (tail-set-type tails))
     (let ((ptypes (mapcar #'primitive-type types)))
       (multiple-value-bind (use-standard specialized-xep-type) (use-standard-returns tails)
-        (when (and (eq count :unknown) (not use-standard)
-                   (not (eq (tail-set-type tails) *empty-type*)))
-          (return-value-efficiency-note tails))
         (cond ((eq use-standard :unboxed)
                (make-return-info :unboxed
                                  count
