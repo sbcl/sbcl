@@ -54,7 +54,6 @@ extern os_vm_size_t thread_control_stack_size;
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
 extern uword_t STATIC_SPACE_START, STATIC_SPACE_END;
 #endif
-extern uword_t STATIC_SPACE_TRAILER_START, STATIC_SPACE_TRAILER_END;
 
 extern uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
 #ifdef LISP_FEATURE_CHENEYGC
