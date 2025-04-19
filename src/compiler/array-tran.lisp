@@ -1084,7 +1084,10 @@
                             (leaf (when (ref-p (lvar-uses arg))
                                     (ref-leaf (lvar-uses arg)))))
                        (and (constant-p leaf) ; (I think it has to be)
-                            (eq (constant-value leaf) 'make-unbound-marker))))
+                            (let ((val (constant-value leaf)))
+                              (and (vop-info-p val)
+                                   (eq (vop-info-name val)
+                                       'make-unbound-marker))))))
             ;; don't need to look at the other codegen arg which is
             ;; surely NIL.
             :unbound)))))

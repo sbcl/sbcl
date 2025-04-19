@@ -1387,3 +1387,20 @@
                 '(lambda (x)
                   (declare (optimize (sb-c::verify-arg-count 0)))
                   (if x 1 0))))
+
+(with-test (:name :pcl-ctor-slotv-allocator)
+  (flet ((get-asm-lines (n)
+           (disassembly-lines
+            (compile nil
+             `(lambda () (make-array ,n :initial-element sb-pcl:+slot-unbound+))))))
+    (let ((lines (get-asm-lines 1)))
+      (assert (loop for line in lines
+                    thereis (and (search "MOV QWORD PTR" line)
+                                 (search "], 9" line))))) ; UNBOUND-MARKER-WIDETAG
+    (loop for nelts from 2 to 10
+          do (let ((lines (get-asm-lines nelts)))
+               (assert (loop for line in lines
+                             thereis (search "MOVDDUP XMM" line)))))
+    (let ((lines (get-asm-lines 11)))
+      (assert (loop for line in lines
+                    thereis (search "REPE STOSQ" line))))))
