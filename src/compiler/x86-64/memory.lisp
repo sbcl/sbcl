@@ -219,7 +219,7 @@
       value
       (case value
          (:unbound unbound-marker-widetag)
-         ((nil) (bug "Should not see SPLAT NIL"))
+         ((nil) null-tn)
          (t #+ubsan unwritten-vector-element-marker
             #-ubsan 0))))
 
@@ -239,10 +239,8 @@
   (:generator 1
    (progn words) ; don't put it in :ignore, which gets inherited
    (let ((bits (compute-splat-bits value)))
-     (inst mov :qword
-           (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag) vector)
-           (cond ((= bits nil-value) null-tn)
-                 (t (aver (plausible-signed-imm32-operand-p bits)) bits))))
+     (aver (or (tn-p bits) (plausible-signed-imm32-operand-p bits)))
+     (inst mov :qword (object-slot-ea vector vector-data-offset other-pointer-lowtag) bits))
    (move result vector)))
 
 (define-vop (splat-small splat-word)
@@ -250,19 +248,22 @@
   (:temporary (:sc complex-double-reg) pattern)
   (:generator 5
    (let ((bits (compute-splat-bits value)))
-     (cond ((= bits nil-value)
-            (inst movaps pattern (ea (- list-pointer-lowtag) null-tn)))
-           ((/= bits 0) (inst movddup pattern (register-inline-constant :qword bits)))
-           (t (inst xorps pattern pattern))))
-   (let ((data-addr (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-                        vector)))
-     (multiple-value-bind (quo rem) (truncate words 2)
-       (dotimes (i quo)
-         (inst movaps data-addr pattern) ; 1 byte shorter encoding than movapd
-         (setf data-addr (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
-                             (ea-base data-addr))))
-       (unless (zerop rem)
-         (inst movsd data-addr pattern))))
+     (cond ((and (eq bits null-tn) (eql words 2)) ; don't use XMM register
+            (storew null-tn vector vector-data-offset other-pointer-lowtag)
+            (storew null-tn vector (1+ vector-data-offset) other-pointer-lowtag))
+           (t
+            (cond ((eq bits null-tn)
+                   (inst movaps pattern (ea (- list-pointer-lowtag) null-tn)))
+                  ((/= bits 0) (inst movddup pattern (register-inline-constant :qword bits)))
+                  (t (inst xorps pattern pattern)))
+            (let ((data-addr (object-slot-ea vector vector-data-offset other-pointer-lowtag)))
+              (multiple-value-bind (quo rem) (truncate words 2)
+                (dotimes (i quo)
+                  (inst movaps data-addr pattern) ; 1 byte shorter encoding than movapd
+                  (setf data-addr (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
+                                      (ea-base data-addr))))
+                (unless (zerop rem)
+                  (inst movsd data-addr pattern)))))))
    (move result vector)))
 
 (define-vop (splat-any splat-word)
@@ -280,10 +281,9 @@
                :to (:result 0)) rax)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-   (inst lea rdi (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-                        vector))
+   (inst lea rdi (object-slot-ea vector vector-data-offset other-pointer-lowtag))
    (let ((bits (compute-splat-bits value)))
-     (cond ((and (= bits 0)
+     (cond ((and (eql bits 0)
                  (constant-tn-p words)
                  (typep (tn-value words) '(unsigned-byte 7)))
             (zeroize rax)
@@ -291,8 +291,7 @@
            (t
             ;; words could be in RAX, so read it first, then zeroize
             (inst mov rcx (or (and (constant-tn-p words) (tn-value words)) words))
-            (cond ((= bits 0) (zeroize rax))
-                  (t (inst mov rax (if (= bits nil-value) null-tn bits)))))))
+            (if (eql bits 0) (zeroize rax) (inst mov rax bits)))))
    (inst rep)
    (inst stos :qword)
    (move result vector)))

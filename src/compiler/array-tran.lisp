@@ -1052,11 +1052,11 @@
                    ,(- (1- (integer-length n-elements-per-word)))))))))
 
 ;;; TODO: "initial-element #\space" for strings would be nice to handle.
-(declaim (inline splat-value-p))
 (defun splat-value-p (elt-ctype initial-element default-initial-element)
   (declare (ignorable elt-ctype))
   ;; If the initial-element is specified and equivalent to 0-fill
   ;; then use SPLAT.
+  ;; Return the answer as a QUOTE form if required to disambiguate it
   (if (constant-lvar-p initial-element)
       (cond ((eql (lvar-value initial-element) default-initial-element)
              0)
@@ -1066,7 +1066,7 @@
             ;; a defect of the FILL transforms that they can't do as well.
             #+x86-64
             ((eq (lvar-value initial-element) nil)
-             sb-vm:nil-value))
+             ''nil))
       ;; This case should not be architecture-dependent, and it isn't,
       ;; except that the other architectures lack the ability
       ;; to convert SPLAT via a vop.

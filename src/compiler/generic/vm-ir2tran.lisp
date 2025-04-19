@@ -438,10 +438,13 @@
   (let* ((writer (producer-vop (vop-args vop)))
          ;; Take the last of the info arguments
          ;; in case WORDS is also an info argument.
+         (last (car (last (vop-codegen-info vop))))
          (value
-          (the (or sb-vm:word
-                   (member :trap :unbound :safe-default :unsafe-default))
-               (car (last (vop-codegen-info vop)))))
+          (if last
+              (the (or sb-vm:word
+                       (member :trap :unbound :safe-default :unsafe-default))
+                   last)
+              (return-from elide-zero-fill))) ; :INITIAL-ELEMENT NIL
          (elidep
           (ecase (vop-name writer)
             (sb-vm::allocate-vector-on-heap
