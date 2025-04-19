@@ -2201,7 +2201,7 @@ core and return a descriptor to it."
      (or #+(or sparc arm riscv) ; raw addr is the function descriptor
          (descriptor-bits function)
          ;; For all others raw addr is the starting address
-         (+ (logandc2 (descriptor-bits function) sb-vm:lowtag-mask)
+         (+ (descriptor-base-address function)
             (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
     fdefn)
   #+linkage-space
@@ -2342,8 +2342,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defun assembler-code-insts-start ()
   (let ((code-component *assembler-routines*))
-    (+ (logandc2 (descriptor-bits code-component) sb-vm:lowtag-mask)
-       (code-header-bytes code-component))))
+    (+ (descriptor-base-address code-component) (code-header-bytes code-component))))
 
 (defun lookup-assembler-reference (symbol)
   (let ((cell (or (assq symbol *asm-routine-alist*)
@@ -4357,7 +4356,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                 (let* ((des (if (consp x) (car x) x))
                        (word (read-bits-wordindexed des 0)))
                   (format stream "~x: ~x~@[ ~x~]~%"
-                          (logandc2 (descriptor-bits des) sb-vm:lowtag-mask)
+                          (descriptor-base-address des)
                           word
                           (when (and (not (consp x))
                                      (>= (logand word sb-vm:widetag-mask) #x80))
