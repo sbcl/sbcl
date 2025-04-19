@@ -33,10 +33,14 @@
                         ;; the start of static space, but it holds a zero.
                         (simple-vector 2))))))
     (assert (not (funcall f (sb-kernel:make-unbound-marker)))))
-  (assert (not (equalp (sb-kernel:make-unbound-marker) "")))
-  (let ((a (- (sb-kernel:get-lisp-obj-address (sb-kernel:make-unbound-marker))
-              sb-vm:other-pointer-lowtag)))
-    (assert (> a sb-vm:static-space-start))))
+  (let ((ubm (opaque-identity (sb-kernel:make-unbound-marker)))
+        (thing (opaque-identity "")))
+    (assert (not (eql thing ubm)))
+    (assert (not (equal thing ubm)))
+    (assert (not (equalp thing ubm)))
+    (assert (not (eql ubm thing)))
+    (assert (not (equal ubm thing)))
+    (assert (not (equalp ubm thing)))))
 
 (sb-vm::define-vop (tryme)
   (:generator 1 (sb-assem:inst mov :byte (sb-vm::ea :gs sb-vm::rax-tn) 0)))

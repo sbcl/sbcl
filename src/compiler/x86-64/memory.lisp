@@ -218,7 +218,7 @@
   (if (typep value 'sb-vm:word)
       value
       (case value
-         (:unbound (unbound-marker-bits))
+         (:unbound unbound-marker-widetag)
          ((nil) (bug "Should not see SPLAT NIL"))
          (t #+ubsan unwritten-vector-element-marker
             #-ubsan 0))))

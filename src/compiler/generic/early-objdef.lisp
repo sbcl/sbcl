@@ -290,15 +290,6 @@
 ;;; on the heap.
 (defconstant no-tls-value-marker most-positive-word)
 
-(defmacro unbound-marker-bits ()
-  ;; By having unbound-marker-bits appear to be a valid pointer into static
-  ;; space, it admits some optimizations that might "dereference" the value
-  ;; before checking the widetag.
-  ;; Architectures other than x86-64 do not take that liberty.
-  ;;   FIXME: this looks inadmissible if static space start can move
-  #+x86-64 (logior (+ sb-vm:static-space-start #x100) unbound-marker-widetag)
-  #-x86-64 unbound-marker-widetag)
-
 ;;; Map each widetag symbol to a string to go in 'tagnames.h'.
 ;;; I didn't want to mess with the formatting of the table above.
 (defparameter *widetag-string-alist*

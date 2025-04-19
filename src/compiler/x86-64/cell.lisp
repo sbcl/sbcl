@@ -95,7 +95,7 @@
   (:args)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (inst mov result (unbound-marker-bits))))
+    (inst mov result unbound-marker-widetag)))
 
 (defun emit-symbol-write-barrier (vop symbol temp newval-tn-ref)
   (when (require-gengc-barrier-p symbol newval-tn-ref)
