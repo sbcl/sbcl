@@ -3,6 +3,7 @@
 :linkage-space
 :gencgc
 :use-cons-region
+:relocatable-static-space
 :soft-card-marks
 :stack-grows-downward-not-upward
 :c-stack-is-control-stack

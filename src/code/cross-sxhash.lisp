@@ -66,7 +66,7 @@
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
   (assert (= length (length string)))
-  (cond #+(and 64-bit (not relocatable-static-space))
+  (cond #+(or x86-64 (and 64-bit (not relocatable-static-space)))
         ((string= string "NIL") ; :NIL must hash the same as NIL
          #+x86-64 0 ; always 0
          #-x86-64

@@ -112,8 +112,7 @@
 (define-symbol-macro static-space-end (+ nil-value nil-static-space-end-offs))
 
 #+(or linux darwin)
-(gc-space-setup #x1080000000 ; chosen to fail spectacularly if everything isn't right
-                ;; (> 4GB and sign-bit is 1 if treated as 32-bit int)
+(gc-space-setup #x520000000000
                      :read-only-space-size 0
                      :fixedobj-space-start #x50000000
                      :fixedobj-space-size #.(* 60 1024 1024)

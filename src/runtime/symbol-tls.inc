@@ -105,6 +105,9 @@ static inline unsigned int fdefn_linkage_index(struct fdefn* f) {
     return ((unsigned int*)f)[1]; // same
 #endif
 }
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+extern uword_t STATIC_SPACE_START; // for self-containedness of this header
+#endif
 static inline unsigned int symbol_linkage_index(struct symbol* s) {
     // never look at NIL's hash slot's low bits
     if ((uword_t)s == (STATIC_SPACE_START + NIL_SYMBOL_SLOTS_OFFSET)) return 0;

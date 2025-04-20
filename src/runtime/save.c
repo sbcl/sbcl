@@ -308,11 +308,7 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_lispobj(2, file);
 #endif
     write_lispobj(gc_card_table_nbits, file);
-#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-    write_lispobj(0, file);
-#else
     write_lispobj(NIL, file);
-#endif
     write_lispobj(stringlen, file);
     int nwrote = fwrite(build_id, 1, stringlen, file);
     /* Write padding bytes to align to core_entry_elt_t */
@@ -749,8 +745,9 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     // FIXME: Instead of disabling purify for static space relocation,
     // we should make r/o space read-only after fixing up pointers to
     // static space instead.
+    // BUT: On x86-64 it's ok to use the R/O space. All objects there are leaves.
 #if ((defined LISP_FEATURE_SPARC && defined LISP_FEATURE_LINUX) || \
-     (defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE))
+     (defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE && !defined LISP_FEATURE_X86_64))
     /* SunOS says it'll give you the memory where you want, then it says
      * it won't map over it from the core file.  That's news to me.
      * Fragment of output from 'strace -e mmap2 src/runtime/sbcl --core output/sbcl.core':

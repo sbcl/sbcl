@@ -366,7 +366,7 @@ during backtrace.
       :alloc-trans %alloc-symbol
       :type symbol)))
 
-#+(and 64-bit (not relocatable-static-space))
+#+(or (and 64-bit (not relocatable-static-space)) x86-64)
 (define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons
@@ -407,7 +407,7 @@ during backtrace.
 
 ;;; 64-bit relocatable-static is a little like 64-bit, a little like 32-bit.
 ;;; Refer to comments above for details on each slot.
-#+(and 64-bit relocatable-static-space)
+#+(and 64-bit relocatable-static-space (not x86-64))
 (define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
   (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
   (value :init :unbound)
@@ -713,8 +713,9 @@ during backtrace.
      (* 2 n-word-bytes) ; magic padding because of NIL's symbol/cons-like duality
      list-pointer-lowtag))
 
-(#+relocatable-static-space define-symbol-macro
- #-relocatable-static-space defconstant nil-value (+ static-space-start nil-value-offset))
+#-relocatable-static-space (defconstant nil-value (+ static-space-start nil-value-offset))
+#+relocatable-static-space (define-symbol-macro nil-value
+                               (truly-the word (+ static-space-start nil-value-offset)))
 
 #+sb-xc-host (defun get-nil-taggedptr () nil-value)
 

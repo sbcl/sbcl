@@ -820,14 +820,6 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
 {
     if (size == 0) return addr;
 
-    /* temporary hack: spaces allocated by coreparse are assumed to be movable.
-     * immovable static space ought to have been reserved by allocate_hardwired_spaces()
-     * but it can't have been, because the allocation request must take into account the
-     * size of the GC card table, which isn't known until parsing the core.
-     * So this request has to be changed to not movable so that it fails if not
-     * placed as required */
-    if (space_id == STATIC_CORE_SPACE_ID) attr &= ~MOVABLE;
-
     int extra_below = 0, extra_above = 0;
     extern int lisp_code_in_elf();
 

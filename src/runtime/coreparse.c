@@ -232,6 +232,7 @@ struct heap_adjust {
     int n_ranges;
     int n_relocs_abs; // absolute
     int n_relocs_rel; // relative
+    uword_t symhash_adjust;
 };
 
 #include "genesis/gc-tables.h"
@@ -284,6 +285,14 @@ set_adjustment(struct cons* pair, int id, uword_t actual_addr)
     sword_t len = spaces[id].len;
     sword_t delta = len ? actual_addr - desired_addr : 0;
     if (!delta) return;
+#ifdef LISP_FEATURE_X86_64
+    if (id == STATIC_CORE_SPACE_ID) {
+        lispobj nil_want = (lispobj)desired_addr + NIL_VALUE_OFFSET;
+        lispobj nil_have = (lispobj)actual_addr + NIL_VALUE_OFFSET;
+        adj->symhash_adjust = (nil_want ^ nil_have) & SYMBOL_HASH_MASK;
+        len = STATIC_SPACE_SIZE; // T and NIL are above the supplied 'len'
+    }
+#endif
     int j = adj->n_ranges;
     adj->range[j].start = (lispobj)desired_addr;
     adj->range[j].end   = (lispobj)desired_addr + len;
@@ -419,6 +428,7 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Modeled on scav_symbol() in gc-common
             struct symbol* s = (void*)where;
 #ifdef LISP_FEATURE_64_BIT
+            s->hash ^= adj->symhash_adjust;
             lispobj name = decode_symbol_name(s->name);
             lispobj adjusted_name = adjust_word(adj, name);
             // writeback the name if it changed
@@ -577,7 +587,7 @@ static void relocate_heap(struct heap_adjust* adj)
                         (char*)adj->range[i].start + adj->range[i].delta,
                         (char*)adj->range[i].end + adj->range[i].delta);
     }
-#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+#if defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE && !defined LISP_FEATURE_X86_64
     fix_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, adj);
     // Relocate the CAR slot of nil-as-a-list, which needs to point to
     // itself.
@@ -587,6 +597,7 @@ static void relocate_heap(struct heap_adjust* adj)
     fix_space((uword_t)T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, adj);
 #endif
     fix_space((uword_t)NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, adj);
+    CONS(NIL)->car = NIL;
     fix_space(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_PERMGEN
     fix_space(PERMGEN_SPACE_START, permgen_space_free_pointer, adj);
