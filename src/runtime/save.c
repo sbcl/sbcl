@@ -751,7 +751,7 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     // static space instead.
 #if ((defined LISP_FEATURE_SPARC && defined LISP_FEATURE_LINUX) || \
      (defined LISP_FEATURE_RELOCATABLE_STATIC_SPACE))
-    /* OS says it'll give you the memory where you want, then it says
+    /* SunOS says it'll give you the memory where you want, then it says
      * it won't map over it from the core file.  That's news to me.
      * Fragment of output from 'strace -e mmap2 src/runtime/sbcl --core output/sbcl.core':
      * ...
