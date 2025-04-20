@@ -3368,7 +3368,8 @@
 #+sb-xc-host (declaim (ftype function sb-fasl::asm-routine-vector-elt-addr))
 ;;; Return an address which when added to NULL-TN and dereferenced will yield ADDR
 (defun sb-vm::asm-routine-indirect-address (addr)
-  (let* ((i (sb-fasl::asm-routine-index-from-addr addr))
+  (let* ((i (the (mod 512) ; arb
+                 (sb-fasl::asm-routine-index-from-addr addr)))
          (addr
           #-immobile-space
           (sap-int (sap+ (code-instructions sb-fasl:*assembler-routines*) (ash i word-shift)))
