@@ -18,7 +18,8 @@
 (defun parse-number-dispatch (vars result types var-types body)
   ;; Shouldn't be necessary, but avoids a warning in certain lisps that
   ;; seem to like to warn about self-calls in :COMPILE-TOPLEVEL situation.
-  (named-let parse-number-dispatch ((vars vars) (result result) (types types)
+  (named-let parse-number-dispatch ((vars vars) (result result)
+                                    (types (subst 'sb-xc:fixnum 'fixnum types))
                                     (var-types var-types) (body body))
     (cond ((null vars)
            (unless (null types) (error "More types than vars."))
@@ -48,7 +49,7 @@
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
 (defconstant-eqx +type-test-ordering+
-    '((eql 1) fixnum single-float double-float integer #+long-float long-float
+    '((eql 1) sb-xc:fixnum single-float double-float integer #+long-float long-float
       sb-vm:signed-word word bignum
       complex ratio)
   #'equal)

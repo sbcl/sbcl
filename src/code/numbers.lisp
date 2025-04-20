@@ -1813,65 +1813,61 @@ and the number of 0 bits if INTEGER is negative."
        (build-ratio (maybe-truncate nx gcd)
                     (* (maybe-truncate y gcd) (denominator x)))))))
 
-;;; from Robert Smith; changed not to cons unnecessarily, and tuned for
-;;; faster operation on fixnum inputs by compiling the central recursive
-;;; algorithm twice, once using generic and once fixnum arithmetic, and
-;;; dispatching on function entry into the applicable part. For maximum
-;;; speed, the fixnum part recurs into itself, thereby avoiding further
-;;; type dispatching. This pattern is not supported by NUMBER-DISPATCH
-;;; thus some special-purpose macrology is needed.
+;;; This uses the algorithm employed by python in
+;;; https://github.com/python/cpython/blob/3.13/Modules/mathmodule.c#L1494
 (defun isqrt (n)
   "Return the greatest integer less than or equal to the square root of N."
-  (declare (type unsigned-byte n) (explicit-check))
-  (macrolet
-      ((isqrt-recursion (arg recurse fixnum-p)
-         ;; Expands into code for the recursive step of the ISQRT
-         ;; calculation. ARG is the input variable and RECURSE the name
-         ;; of the function to recur into. If FIXNUM-P is true, some
-         ;; type declarations are added that, together with ARG being
-         ;; declared as a fixnum outside of here, make the resulting code
-         ;; compile into fixnum-specialized code without any calls to
-         ;; generic arithmetic. Else, the code works for bignums, too.
-         ;; The input must be at least 16 to ensure that RECURSE is called
-         ;; with a strictly smaller number and that the result is correct
-         ;; (provided that RECURSE correctly implements ISQRT, itself).
-         `(macrolet ((if-fixnum-p-truly-the (type expr)
-                       ,@(if fixnum-p
-                             '(`(truly-the ,type ,expr))
-                             '((declare (ignore type))
-                               expr))))
-            (let* ((fourth-size (ash (1- (integer-length ,arg)) -2))
-                   (significant-half (ash ,arg (- (ash fourth-size 1))))
-                   (significant-half-isqrt
-                     (if-fixnum-p-truly-the
-                      (integer 1 #.(isqrt most-positive-fixnum))
-                      (,recurse significant-half)))
-                   (zeroth-iteration (ash significant-half-isqrt
-                                          fourth-size)))
-              (multiple-value-bind (quot rem)
-                  (floor ,arg zeroth-iteration)
-                (let ((first-iteration (ash (+ zeroth-iteration quot) -1)))
-                  (cond ((oddp quot)
-                         first-iteration)
-                        ((> (if-fixnum-p-truly-the
-                             fixnum
-                             (expt (- first-iteration zeroth-iteration) 2))
-                            rem)
-                         (1- first-iteration))
-                        (t
-                         first-iteration))))))))
-    (typecase n
-      (fixnum (labels ((fixnum-isqrt (n)
-                         (declare (type fixnum n))
-                         (cond ((> n 24)
-                                (isqrt-recursion n fixnum-isqrt t))
-                               ((> n 15) 4)
-                               ((> n  8) 3)
-                               ((> n  3) 2)
-                               ((> n  0) 1)
-                               ((= n  0) 0))))
-                (fixnum-isqrt n)))
-      (bignum (isqrt-recursion n isqrt nil)))))
+  (declare (explicit-check))
+  (labels ((approximate-isqrt (n)
+             (declare ((unsigned-byte 64) n))
+             (let ((table #.(coerce (loop for i from 64 below 256
+                                          collect (min (round (sqrt (+ (* i 256) 128))) 255))
+                                    '(vector (unsigned-byte 8)))))
+
+               (let* ((u (aref table (truly-the index (- (ash n -56) 64))))
+                      (u (+ (ash u 7)
+                            (truncate (ash n -41) u))))
+                 (+ (ash u 15)
+                    (truncate (ash n -17) u))))))
+    (declare (inline approximate-isqrt))
+    (macrolet ((word-sized-sqrt (type)
+                 `(let* ((c (truncate (1- (integer-length n)) 2))
+                         (shift (- 31 c))
+                         (approximate (truly-the ,type
+                                                 (ash (approximate-isqrt
+                                                       (truly-the (unsigned-byte 64) (ash n (* shift 2))))
+                                                      (- shift)))))
+                    (if (> (truly-the ,type (* approximate approximate)) n)
+                        (1- approximate)
+                        approximate))))
+
+      (number-dispatch ((n unsigned-byte))
+        ((fixnum)
+         (cond ((zerop n)
+                0)
+               (t
+                (word-sized-sqrt fixnum))))
+        ((word)
+         (word-sized-sqrt (unsigned-byte 64)))
+        ((unsigned-byte)
+         (let* ((bit-length (integer-length n))
+                (c (floor (1- bit-length) 2))
+                (c-bit-length (integer-length c))
+                (d (ash c (- 5 c-bit-length)))
+                (m (ash n (- 62 (* 2 c))))
+                (a (ash (approximate-isqrt m) (- d 31))))
+           (loop for s from (- c-bit-length 6) downto 0
+                 for e = d
+                 do
+                 (setf d (ash c (- s)))
+                 (let* ((shift-amount (- (+ (* 2 c) 1) d e))
+                        (n-shifted (ash n (- shift-amount)))
+                        (q (truncate n-shifted a)))
+
+                   (setf a (+ (ash a (- d 1 e)) q))))
+           (when (< n (* a a))
+             (decf a))
+           a))))))
 
 ;;;; miscellaneous number predicates
 
