@@ -1154,13 +1154,6 @@ core and return a descriptor to it."
       #+(and immobile-space x86-64) '*immobile-fixedobj*
       '*dynamic*))
 
-(defun symhash-xor-constant ()
-  #+x86-64 (logandc2 (descriptor-bits *nil-descriptor*)
-                     (mask-field (byte sb-vm:n-linkage-index-bits
-                                       sb-vm::symbol-linkage-index-pos)
-                                 -1))
-  #-x86-64 0)
-
 ;;; Compute bits to store into the HASH slot (as opposed to what the hash is
 ;;; logically) of a symbol. For x86-64 this means XORing with some of NIL's bits
 ;;; - just the ones that overlap the hash - so that linkage index reads as 0.
@@ -3562,6 +3555,9 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
        (sub-write-primitive-object (get-primitive-obj 'fdefn) lang)
        (sub-write-primitive-object (get-primitive-obj 'binding) lang)
        (when (eq lang :c)
+         (format t "#define SYMBOL_HASH_MASK 0x~X~A~%"
+                 (sb-vm::symhash-xor-constant sb-ext:most-positive-word)
+                 +c-literal-64bit+)
          (format t "#include ~S~%"
                  (namestring (merge-pathnames "symbol-tls.inc" (lispobj-dot-h))))))
       (sb-vm::unwind-block
