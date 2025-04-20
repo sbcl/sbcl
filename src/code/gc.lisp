@@ -543,7 +543,7 @@ Experimental: interface subject to change."
                         (sap-int sb-vm:*text-space-free-pointer*))
                      :static)
                     ((or #+x86-64 (< (extern-alien "static_space_trailer_start" unsigned)
-                                     addr sb-vm:static-space-end)
+                                     addr sb-vm::static-space-end)
                          (< sb-vm:static-space-start addr
                             (sap-int sb-vm:*static-space-free-pointer*)))
                      :static))))

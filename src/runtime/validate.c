@@ -31,7 +31,7 @@ uword_t DYNAMIC_SPACE_START;
 #endif
 uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
-uword_t STATIC_SPACE_START, STATIC_SPACE_END;
+uword_t STATIC_SPACE_START;
 #endif
 
 uword_t asm_routines_start, asm_routines_end;

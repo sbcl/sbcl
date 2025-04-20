@@ -118,13 +118,16 @@
                        `((defconstant ,var-name ,start))
                        (let ((start-sym (symbolicate space "-SPACE-START")))
                          `(,(defconstantish relocatable start-sym start)
-                           ,(cond ((eq space 'alien-linkage-table)) ; nothing for the -END
-                                  ((not relocatable)
-                                   `(defconstant ,(symbolicate space "-SPACE-END") ,end))
-                                  #-sb-xc-host ((eq space 'text)) ; don't emit anything
-                                  (t
-                                   `(defconstant ,(symbolicate space "-SPACE-SIZE")
-                                      ,(- end start)))))))))))
+                           ,@(cond ((member space '(alien-linkage #-sb-xc-host text))
+                                    ;; * alien-linkage-space-size is already defined above
+                                    ;; * text-space-size is only needed in 1st genesis
+                                    ;;   (probably true of most of these constants in fact)
+                                    nil) ; neither -END nor -SIZE constant
+                                   ((and (not (eq space 'static)) (not relocatable))
+                                    `((defconstant ,(symbolicate space "-SPACE-END") ,end)))
+                                   ((or (eq space 'static) relocatable)
+                                    `((defconstant ,(symbolicate space "-SPACE-SIZE")
+                                        ,(- end start))))))))))))
       `(progn
          ,@small-space-forms
          ,(defconstantish t 'dynamic-space-start

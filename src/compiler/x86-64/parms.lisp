@@ -109,6 +109,7 @@
 ;;;      41FF94240904F0FF CALL [R12-1047543]
 
 (defconstant nil-static-space-end-offs 41) ; 6 words (48 bytes) _minus_ list-pointer-lowtag
+(define-symbol-macro static-space-end (+ nil-value nil-static-space-end-offs))
 
 #+(or linux darwin)
 (gc-space-setup #x1080000000 ; chosen to fail spectacularly if everything isn't right

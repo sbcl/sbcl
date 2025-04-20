@@ -1806,7 +1806,8 @@ core and return a descriptor to it."
 (defun make-nil-descriptor ()
   ;; NIL is placed at the end, not the beginning, of static space,
   ;; and T precedes it.
-  (let* ((nil-base (+ sb-vm:static-space-end (* -6 sb-vm:n-word-bytes)))
+  (let* ((space-end (+ sb-vm:static-space-start sb-vm:static-space-size))
+         (nil-base (+ space-end (* -6 sb-vm:n-word-bytes)))
          (nil-des (make-random-descriptor (logior nil-base sb-vm:list-pointer-lowtag)))
          (t-des (make-random-descriptor (- (descriptor-bits nil-des) sb-vm::t-nil-offset))))
     (setf *nil-descriptor* nil-des
@@ -3026,10 +3027,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                    (error "Space overlap: ~A with ~A" space (car other))))
                (push (cons space type) types))))
       (check sb-vm:read-only-space-start sb-vm:read-only-space-end :read-only)
-      #-relocatable-static-space
-      (check sb-vm:static-space-start sb-vm:static-space-end :static)
-      #+relocatable-static-space
-      (check sb-vm:static-space-start (+ sb-vm:static-space-start sb-vm::static-space-size) :static)
+      (check sb-vm:static-space-start (+ sb-vm:static-space-start sb-vm:static-space-size) :static)
       (check sb-vm:dynamic-space-start
              (+ sb-vm:dynamic-space-start sb-vm::default-dynamic-space-size)
              :dynamic)
@@ -4063,7 +4061,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
          (nil-slots (make-array nil-alloc-words))
          (t-slots (make-array t-alloc-words))
          ;; NIL-ADDR is its address as a cons cell, not as a symbol
-         (nil-addr (+ sb-vm:static-space-end (* -6 sb-vm:n-word-bytes)))
+         (space-end (+ sb-vm:static-space-start sb-vm:static-space-size))
+         (nil-addr (+ space-end (* -6 sb-vm:n-word-bytes)))
          (t-addr (+ nil-addr (ash -8 sb-vm:word-shift)))
          (nil-des (make-random-descriptor (logior nil-addr sb-vm:list-pointer-lowtag)))
          (t-des (make-random-descriptor (logior t-addr sb-vm:other-pointer-lowtag))))

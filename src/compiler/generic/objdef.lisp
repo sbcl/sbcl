@@ -705,7 +705,7 @@ during backtrace.
 ;;; The offset of NIL in static space, including the tag.
 (defconstant nil-value-offset
   #+x86-64 ; NIL is at the end of static space
-  (- (- static-space-end static-space-start) nil-static-space-end-offs)
+  (- static-space-size nil-static-space-end-offs)
   #-x86-64 ; NIL is at the beginning of static space
   (+ ;; Make space for the different regions, if they exist.
      ;; If you change this, then also change zero_all_free_ranges() in

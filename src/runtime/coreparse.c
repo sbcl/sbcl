@@ -816,7 +816,6 @@ process_directory(int count, struct ndir_entry *entry,
             case STATIC_CORE_SPACE_ID:
 #ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
                 STATIC_SPACE_START = addr;
-                STATIC_SPACE_END = addr + len;
 #endif
                 break;
             case READ_ONLY_CORE_SPACE_ID:
