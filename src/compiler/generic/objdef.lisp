@@ -707,18 +707,10 @@ during backtrace.
   #+x86-64 ; NIL is at the end of static space
   (- static-space-size nil-static-space-end-offs)
   #-x86-64 ; NIL is at the beginning of static space
-  (+ ;; Make space for the different regions, if they exist.
-     ;; If you change this, then also change zero_all_free_ranges() in
-     ;; gencgc.
-     #+(and gencgc (not sb-thread) (not 64-bit))
-     (* 10 n-word-bytes)
-     ;; This offset of #x100 has to do with some edge cases where a vop
-     ;; might treat UNBOUND-MARKER as a pointer. So it has an address
-     ;; that is somewhere near NIL which makes it sort of "work"
-     ;; to dereference it. See git rev f1a956a6a771 for more info.
-     #+64-bit #x100
-     ;; magic padding because of NIL's symbol/cons-like duality
-     (* 2 n-word-bytes)
+  (+ ;; Make space for up to three 3-word alloc regions (plus an alignment word).
+     ;; If you change this, then also change zero_all_free_ranges() in gencgc.
+     #+(and gencgc (not sb-thread) (not 64-bit)) (* 10 n-word-bytes)
+     (* 2 n-word-bytes) ; magic padding because of NIL's symbol/cons-like duality
      list-pointer-lowtag))
 
 (#+relocatable-static-space define-symbol-macro
