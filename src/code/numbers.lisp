@@ -1856,7 +1856,7 @@ and the number of 0 bits if INTEGER is negative."
                 (d (ash c (- 5 c-bit-length)))
                 (m #-64-bit (ash n (- 62 (* 2 c)))
                    #+64-bit (sb-bignum::last-bignum-part=>word (logand bit-length 1) (- (* 2 c) 62) n))
-                (a (ash (approximate-isqrt m) (- d 31))))
+                (a (ash (approximate-isqrt m) (truly-the (integer * 0) (- d 31)))))
            (loop for s from (- c-bit-length 6) downto 0
                  for e = d
                  do
