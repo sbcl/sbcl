@@ -3831,9 +3831,6 @@ register."
 
 ;;;; MAKE-BPT-LRA (used for :FUN-END breakpoints)
 
-;;; FIXME: why does this imply that it makes an LRA when it actually makes
-;;; a code blob?  Despite the rename in git rev 2437d7f139 apparently I took a cue
-;;; from the former name ("MAKE-BOGUS-LRA") as if that spoke the truth.
 ;;; Make a breakpoint LRA object that signals a breakpoint trap when returned to.
 ;;; If the breakpoint trap handler returns, REAL-LRA is returned to.
 ;;; Three values are returned: the new LRA object, the code component it is part of,
@@ -3845,10 +3842,9 @@ register."
   (declare (type #-(or x86 x86-64 arm64 riscv) lra
                  #+(or arm64 riscv) fixnum
                  #+(or x86 x86-64) system-area-pointer real-lra))
-  (macrolet ((symbol-addr (name)
-               `(find-dynamic-foreign-symbol-address ,name))
-             (trap-offset ()
-               `(- (symbol-addr "fun_end_breakpoint_trap") src-start)))
+  (flet ((symbol-addr (name)
+           (find-dynamic-foreign-symbol-address name)))
+    (declaim (inline symbol-addr))
     ;; These are really code labels, not variables: but this way we get
     ;; their addresses.
     (let* ((src-start (if known-return-p
@@ -3857,6 +3853,7 @@ register."
                           ;; process unknown values in that case.
                           (symbol-addr "fun_end_breakpoint_trap")
                           (symbol-addr "fun_end_breakpoint_guts")))
+           (trap-offset (- (symbol-addr "fun_end_breakpoint_trap") src-start))
            (length (the index (- (symbol-addr "fun_end_breakpoint_end")
                                  src-start)))
            (code-object
@@ -3892,7 +3889,7 @@ register."
             (values #+(or x86 x86-64) instructions
                     #+(or arm64 riscv) (%make-lisp-obj (sap-int instructions))
                     code-object
-                    (+ (trap-offset) n-word-bytes))))
+                    (+ trap-offset n-word-bytes))))
         #-(or x86 x86-64 arm64 riscv)
         (let* ((lra-header-addr
                  ;; Skip over the jump table prefix, and align properly for LRA header
@@ -3912,7 +3909,7 @@ register."
           (values (%make-lisp-obj (logior (sap-int lra-header-addr) other-pointer-lowtag))
                   (sanctify-for-execution code-object)
                   ;; FIXME: what does "3" represent in this formula?
-                  (+ (trap-offset) (* 3 n-word-bytes))))))))
+                  (+ trap-offset (* 3 n-word-bytes))))))))
 
 ;;;; miscellaneous
 
