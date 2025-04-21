@@ -1314,8 +1314,8 @@
           ;; properly tagged interior pointers. For those which do use LRAs,
           ;; there are at least that many, because we allow pointing to LRAs,
           ;; but they aren't enumerable so we don't know the actual count.
-          (assert (#+(or x86 x86-64 arm64) =
-                   #-(or x86 x86-64 arm64) >
+          (assert (#+(or x86 x86-64 arm64 riscv) =
+                   #-(or x86 x86-64 arm64 riscv) >
                      (loop for ptr from (+ base (* 2 sb-vm:n-word-bytes))
                            below limit count (properly-tagged-p ptr))
                      n))
