@@ -1747,6 +1747,25 @@
                                        (ash (%bignum-ref bignum (1+ word-index))
                                             (truly-the (integer 0 (#.digit-size)) (- digit-size bit-index)))
                                        (ash one (- bit-index)))))))))
+
+(declaim (inline last-bignum-part=>word))
+(defun last-bignum-part=>word (byte-size-left byte-pos bignum)
+  (declare (type bit-index byte-pos)
+           (type (integer 0 #.sb-vm:n-word-bits) byte-size-left)
+           (bignum bignum)
+           (optimize speed))
+  (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
+    (let ((one (%bignum-ref bignum word-index)))
+      (cond ((<= bit-index byte-size-left) ; contained in one word
+             (truly-the word (ash one (- bit-index))))
+            (t
+             ;; At least one bit is obtained from each of two words,
+             ;; and not more than two words.
+             (truly-the word (logior
+                              (truly-the word (ash (%bignum-ref bignum (1+ word-index))
+                                                   (truly-the (integer 0 (#.digit-size)) (- digit-size bit-index))))
+                              (ash one (- bit-index)))))))))
+
 
 ;;;; TRUNCATE
 
