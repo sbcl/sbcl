@@ -481,7 +481,7 @@
     (g x)
     (g x)))
 
-(with-test (:name (trace :flet :known-values-return)
+(with-test (:name (trace :flet :known-values-return-multiple)
                   . #.*breakpoint-tracing-expectations*)
   (assert
    (equal
@@ -493,14 +493,6 @@
       (0 (flet g :in fn-known-values-return-multiple) :exit 9 9 9 9 9 9 9)
       (0 (flet g :in fn-known-values-return-multiple) :enter 9)
       (0 (flet g :in fn-known-values-return-multiple) :exit 9 9 9 9 9 9 9)))))
-
-(with-test (:name (trace :flet :known-values-return-multiple)
-                  . #.*breakpoint-tracing-expectations*)
-  (assert (equal (collecting-traces ((flet body :in (compiler-macro fn-with-cmac)))
-                                    (compile nil '(lambda () (fn-with-cmac 0))))
-                 '((0 (flet body :in (compiler-macro fn-with-cmac)) :enter)
-                   (0 (flet body :in (compiler-macro fn-with-cmac)) :exit 42)))))
-
 
 (with-test (:name (trace :flet :within-compiler-macro)
                   . #.*breakpoint-tracing-expectations*)
