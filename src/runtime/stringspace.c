@@ -119,9 +119,12 @@ static int readonly_unboxed_obj_p(lispobj* obj)
         if (!length) return 1; // length 0 vectors can't be stored into
         if (*obj & (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<ARRAY_FLAGS_POSITION) {
             // If every element is non-pointer, then it can go in readonly space
+            /* TODO: I'd like to allow vectors containing symbols into R/O space,
+             * but they might have to be adjusted upon heap relocation.
+             * The general benefit should outweigh the possible cost. */
             sword_t i;
             for (i=0; i<length; ++i)
-                if (v->data[i] != NIL && is_lisp_pointer(v->data[i])) return 0;
+                if (is_lisp_pointer(v->data[i])) return 0;
             return 1;
         }
     }
