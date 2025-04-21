@@ -181,13 +181,13 @@
   (return-pc-pass (missing-arg) :type sc+offset :read-only t)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset :read-only t)
-  #-fp-and-pc-standard-save
-  (lra-saved-pc (missing-arg) :type sc+offset :read-only t)
-  #-fp-and-pc-standard-save
-  (cfp-saved-pc (missing-arg) :type sc+offset :read-only t)
   (closure-save (missing-arg) :type (or sc+offset null) :read-only t)
   #+unwind-to-frame-and-call-vop
   (bsp-save (missing-arg) :type (or sc+offset null) :read-only t)
+  #-fp-and-pc-standard-save
+  (lra-saved-pc (missing-arg) :type index :read-only t)
+  #-fp-and-pc-standard-save
+  (cfp-saved-pc (missing-arg) :type index :read-only t)
   ;; The earliest PC in this function at which the environment is
   ;; properly initialized (arguments moved from passing locations,
   ;; etc.)
