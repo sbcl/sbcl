@@ -320,6 +320,7 @@
   (show-and-call sb-disassem::!compile-inst-printers)
 
   ;; Toggle some readonly bits
+  #-sb-devel
   (dovector (sc sb-c:*backend-sc-numbers*)
     (when sc
       (logically-readonlyize (sb-c::sc-move-funs sc))
