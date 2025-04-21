@@ -522,15 +522,17 @@
 ;;; different values, because this slot is relative to the object base
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant bpt-lra-boxed-nwords
-  ;; * For backends with LRA: a single boxed constant holds the true LRA.
-  ;;   Additionally, MIPS gets a boxed slot for the cookie
-  ;;   that formerly went in a weak hash-table.
-  ;; * For backends without LRA: one boxed constant holds the code object to which
-  ;;   to return, one holds the displacement into that object,
-  ;;   and one holds the cookie
-  (+ code-constants-offset 2 #+(or x86-64 x86 arm64 riscv) 1))
+  ;; * For backends with LRA: one boxed constant holds the true LRA,
+  ;;   one holds KNOWN-RETURN-P.  Additionally, MIPS gets a boxed slot
+  ;;   for the cookie that formerly went in a weak hash-table.
+  ;; * For backends without LRA: one boxed constant holds the code
+  ;;   object to which to return, one holds the displacement into that
+  ;;   object, and one holds the cookie.
+  (+ code-constants-offset 3))
 (defconstant real-lra-slot code-constants-offset)
-(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64 arm64 riscv) 1))
+#-(or x86 x86-64 arm64 riscv)
+(defconstant known-return-p-slot (+ code-constants-offset 1))
+(defconstant cookie-slot (+ code-constants-offset 2))
 
 (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -3376,18 +3378,17 @@ register."
        (:fun-start
         (%make-breakpoint hook-fun what kind info))
        (:fun-end
-        (unless (eq (sb-c::compiled-debug-fun-returns
-                     (compiled-debug-fun-compiler-debug-fun what))
-                    :standard)
-          (error ":FUN-END breakpoints are currently unsupported ~
-                  for the known return convention."))
-
         (let* ((bpt (%make-breakpoint hook-fun what kind info))
-               (starter (compiled-debug-fun-end-starter what)))
+               (starter (compiled-debug-fun-end-starter what))
+               (returns (sb-c::compiled-debug-fun-returns
+                         (compiled-debug-fun-compiler-debug-fun what))))
+          (when (eq returns :fixed)
+            (error ":FUN-END breakpoints are currently unsupported ~
+                    for the known return convention on low debug."))
           (unless starter
             (setf starter (%make-breakpoint #'list what :fun-start nil))
             (setf (breakpoint-hook-fun starter)
-                  (fun-end-starter-hook starter what))
+                  (fun-end-starter-hook starter what (not (eq returns :standard))))
             (setf (compiled-debug-fun-end-starter what) starter))
           (setf (breakpoint-start-helper bpt) starter)
           (push bpt (breakpoint-%info starter))
@@ -3416,14 +3417,15 @@ register."
 ;;; provides the returnee with any values. Since the returned function
 ;;; effectively activates FUN-END-BPT on each entry to DEBUG-FUN's
 ;;; function, we must establish breakpoint-data about FUN-END-BPT.
-(defun fun-end-starter-hook (starter-bpt debug-fun)
+(defun fun-end-starter-hook (starter-bpt debug-fun &optional known-return-p)
   (declare (type breakpoint starter-bpt)
            (type compiled-debug-fun debug-fun))
   (lambda (frame breakpoint)
     (declare (ignore breakpoint)
              (type frame frame))
     (multiple-value-bind (lra bpt-codeblob offset)
-        (make-bpt-lra (frame-saved-lra frame debug-fun))
+        (make-bpt-lra (frame-saved-lra frame debug-fun)
+                      known-return-p)
       (setf (frame-saved-lra frame debug-fun) lra)
       (let ((end-bpts (breakpoint-%info starter-bpt)))
         (let ((data (breakpoint-data bpt-codeblob offset)))
@@ -3796,24 +3798,35 @@ register."
     (dolist (bpt breakpoints)
       (funcall (breakpoint-hook-fun bpt)
                frame bpt
-               (get-fun-end-breakpoint-values scp)
+               (get-fun-end-breakpoint-values bpt scp)
                cookie))))
 
-(defun get-fun-end-breakpoint-values (scp)
+(defun get-fun-end-breakpoint-values (bpt scp)
   (let ((ocfp (int-sap (context-register
                         scp
                         #-(or x86 x86-64) sb-vm::ocfp-offset
                         #+x86-64 sb-vm::rbx-offset
                         #+x86 sb-vm::ebx-offset)))
-        (nargs (boxed-context-register scp sb-vm::nargs-offset))
-        (reg-arg-offsets '#.sb-vm::*register-arg-offsets*)
+        (returns (sb-c::compiled-debug-fun-returns
+                  (compiled-debug-fun-compiler-debug-fun
+                   (breakpoint-what bpt))))
         (results nil))
-    (dotimes (arg-num nargs)
-      (push (if reg-arg-offsets
-                (boxed-context-register scp (pop reg-arg-offsets))
-                (stack-ref ocfp (+ arg-num
-                                   #+(or x86 x86-64) sb-vm::sp->fp-offset)))
-            results))
+    (case returns
+      (:standard
+       (let ((nargs (boxed-context-register scp sb-vm::nargs-offset))
+             (reg-arg-offsets '#.sb-vm::*register-arg-offsets*))
+         (dotimes (arg-num nargs)
+           (push (if reg-arg-offsets
+                     (boxed-context-register scp (pop reg-arg-offsets))
+                     (stack-ref ocfp (+ arg-num
+                                        #+(or x86 x86-64) sb-vm::sp->fp-offset)))
+                 results))))
+      (:fixed
+       (bug "shouldn't get here"))
+      (t
+       (dovector (sc+offset returns)
+         (push (sub-access-debug-var-slot ocfp sc+offset scp)
+               results))))
     (nreverse results)))
 
 ;;;; MAKE-BPT-LRA (used for :FUN-END breakpoints)
@@ -3828,7 +3841,7 @@ register."
 ;;; Note: you can't cache these, because object identity confers a full dynamic
 ;;; state of the program, not merely a return PC location.
 ;;; (I tried changing this to DEFUN-CACHED, which failed a regression test)
-(defun make-bpt-lra (real-lra)
+(defun make-bpt-lra (real-lra &optional known-return-p)
   (declare (type #-(or x86 x86-64 arm64 riscv) lra
                  #+(or arm64 riscv) fixnum
                  #+(or x86 x86-64) system-area-pointer real-lra))
@@ -3838,7 +3851,12 @@ register."
                `(- (symbol-addr "fun_end_breakpoint_trap") src-start)))
     ;; These are really code labels, not variables: but this way we get
     ;; their addresses.
-    (let* ((src-start (symbol-addr "fun_end_breakpoint_guts"))
+    (let* ((src-start (if known-return-p
+                          ;; Just trap when using the known return
+                          ;; values convention, since call sites don't
+                          ;; process unknown values in that case.
+                          (symbol-addr "fun_end_breakpoint_trap")
+                          (symbol-addr "fun_end_breakpoint_guts")))
            (length (the index (- (symbol-addr "fun_end_breakpoint_end")
                                  src-start)))
            (code-object
@@ -3884,7 +3902,8 @@ register."
                                  (int-sap (logandc2 (get-lisp-obj-address code-object)
                                                     lowtag-mask)))
                            (- word-shift))))
-          (setf (code-header-ref code-object real-lra-slot) real-lra)
+          (setf (code-header-ref code-object real-lra-slot) real-lra
+                (code-header-ref code-object known-return-p-slot) known-return-p)
           (setf (sap-ref-word lra-header-addr 0)
                 (logior (ash delta n-widetag-bits) return-pc-widetag))
           (system-area-ub8-copy (int-sap src-start) 0

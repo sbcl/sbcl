@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
 changes relative to sbcl-2.5.3:
+  * enhancement: :FUN-END breakpoints now support the known values return
+    convention when DEBUG > 0. This means that tracing local functions works
+    in more situations.
   * bug fix: incorrect rounding when converting some bignums to floats.
   * bug fix: the second value of the truncation functions is more consistently
     computed for bignum floats.
