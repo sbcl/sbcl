@@ -3844,7 +3844,7 @@ register."
                  #+(or x86 x86-64) system-area-pointer real-lra))
   (flet ((symbol-addr (name)
            (find-dynamic-foreign-symbol-address name)))
-    (declaim (inline symbol-addr))
+    (declare (inline symbol-addr))
     ;; These are really code labels, not variables: but this way we get
     ;; their addresses.
     (let* ((src-start (if known-return-p
