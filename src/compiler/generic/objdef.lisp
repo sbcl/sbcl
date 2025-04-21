@@ -177,14 +177,9 @@ during backtrace.
 
 ;;; The header contains the total size of the object (including
 ;;; the header itself) in words.
-;;; NB: while we have in fact done a fairly thorough job of eradicating
-;;; hidden dependencies on primitive object sizes for the most part,
-;;; 'ppc-assem.S' contains a literal constant that relies on knowing
-;;; the precise size of a code object. Yes, there is a FIXME there :-)
-;;; So, if you touch this, then fix that. REALLY REALLY.
 (define-primitive-object (code :type code-component
-                                :lowtag other-pointer-lowtag
-                                :widetag code-header-widetag)
+                               :lowtag other-pointer-lowtag
+                               :widetag code-header-widetag)
   ;; This is the length of the boxed section, in bytes, not tagged.
   ;; It will be a multiple of the word size.
   ;; It can be accessed as a tagged value in Lisp by shifting.

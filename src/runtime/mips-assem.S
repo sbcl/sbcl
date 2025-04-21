@@ -334,7 +334,6 @@ lra:	.word	RETURN_PC_WIDETAG
 	.align  3 /* minimum alignment for a lisp object */
 	LEAF(fun_end_breakpoint_guts)
 	.set    noreorder
-	.word	(((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	b       multiple_value_return
 	 nop
 	.set    reorder

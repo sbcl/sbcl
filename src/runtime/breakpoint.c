@@ -67,14 +67,9 @@ void breakpoint_do_displaced_inst(os_context_t* context,
 
 lispobj find_code(os_context_t *context)
 {
-#ifdef reg_CODE
+#if (defined(reg_LRA) && !defined(LISP_FEATURE_PPC) && !defined(LISP_FEATURE_PPC64))
     lispobj code = *os_context_register_addr(context, reg_CODE);
     lispobj header;
-
-#ifdef LISP_FEATURE_PPC64
-    if (lowtag_of(code) == 0)
-        code |= OTHER_POINTER_LOWTAG;
-#endif
 
     if (lowtag_of(code) != OTHER_POINTER_LOWTAG)
         return NIL;
