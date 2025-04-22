@@ -1587,9 +1587,47 @@ void asm_routine_poke(const char* routine, int offset, char byte)
         address[offset] = byte;
 }
 
-static void trace_sym(lispobj, struct symbol*, struct grvisit_context*);
+static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* context);
+
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+static void trace_linkage_cells(lispobj packed_int, lispobj codeblob,
+                                struct grvisit_context* context)
+{
+    const unsigned int smallvec_elts =
+        (GENCGC_PAGE_BYTES - offsetof(struct vector,data)) / N_WORD_BYTES;
+    if (!packed_int) return; // do no work for leaf codeblobs
+    lispobj name_map = SYMBOL(LINKAGE_NAME_MAP)->value;
+    if (name_map == UNBOUND_MARKER_WIDETAG) return; /* cold-init perhaps */
+    gc_assert(simple_vector_p(name_map));
+    struct vector* outer_vector = VECTOR(name_map);
+    struct varint_unpacker unpacker;
+    varint_unpacker_init(&unpacker, packed_int);
+    int prev_index = 0, index;
+    while (varint_unpack(&unpacker, &index) && index != 0) {
+        index += prev_index;
+        prev_index = index;
+        int index_high = (unsigned int)index / smallvec_elts;
+        int index_low = (unsigned int)index % smallvec_elts;
+        lispobj smallvec = outer_vector->data[index_high];
+        gc_assert(other_pointer_p(smallvec));
+        struct vector* inner_vector = VECTOR(smallvec);
+        lispobj name = inner_vector->data[index_low];
+        gc_assert(is_lisp_pointer(name));
+        graph_visit(codeblob, name, context);
+    }
+}
+#else
+#define trace_linkage_cells(dummy1,dummy2,dummy3)
+#endif
 
 #define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,context)
+static void trace_sym(lispobj ptr, struct symbol* sym, struct grvisit_context* context)
+{
+    RECURSE(decode_symbol_name(sym->name));
+    RECURSE(sym->value);
+    RECURSE(sym->info);
+    RECURSE(sym->fdefn);
+}
 
 /* Despite this being a nice concise expression of a pointer tracing algorithm,
  * it turns out to be almost unusable in any sufficiently complicated object graph
@@ -1613,10 +1651,11 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
         RECURSE(CONS(ptr)->cdr);
     } else switch (widetag_of(obj = native_pointer(ptr))) {
         case SIMPLE_VECTOR_WIDETAG:
-            {
-            struct vector* v = (void*)obj;
-            sword_t len = vector_len(v);
-            for(i=0; i<len; ++i) RECURSE(v->data[i]);
+            if (vector_is_weak_not_hashing_p(VECTOR(ptr)->header)) {
+            } else {
+                struct vector* v = (void*)obj;
+                sword_t len = vector_len(v);
+                for(i=0; i<len; ++i) RECURSE(v->data[i]);
             }
             break;
         case INSTANCE_WIDETAG:
@@ -1639,6 +1678,7 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
         case CODE_HEADER_WIDETAG:
             nwords = code_header_words((struct code*)obj);
             for(i=2; i<nwords; ++i) RECURSE(obj[i]);
+            trace_linkage_cells(((struct code*)obj)->fixups, ptr, context);
             break;
         // In all the remaining cases, 'nwords' is the count of payload words
         // (following the header), so we iterate up to and including that
@@ -1666,22 +1706,13 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
             RECURSE(decode_fdefn_rawfun(FDEFN(ptr)));
             break;
         default:
-            // weak-pointer can be considered an ordinary boxed object.
-            // the 'next' link looks like a fixnum.
-            if (!leaf_obj_widetag_p(widetag_of(obj))) {
+            if (!leaf_obj_widetag_p(widetag_of(obj))
+                && widetag_of(obj) != WEAK_POINTER_WIDETAG) {
                 sword_t size = headerobj_size(obj);
                 for(i=1; i<size; ++i) RECURSE(obj[i]);
             }
       }
       --context->depth;
-}
-
-static void trace_sym(lispobj ptr, struct symbol* sym, struct grvisit_context* context)
-{
-    RECURSE(decode_symbol_name(sym->name));
-    RECURSE(sym->value);
-    RECURSE(sym->info);
-    RECURSE(sym->fdefn);
 }
 
 /* Caller must provide an uninitialized hopscotch table.
@@ -1704,7 +1735,8 @@ visit_heap_from_static_roots(struct hopscotch_table* reached,
     context->action = action;
     context->data = data;
     context->depth = context->maxdepth = 0;
-    trace_sym(NIL, SYMBOL(NIL), context);
+    // ppc64 does not like SYMBOL(NIL). I wonder if this is a cause of problems elsewhere
+    trace_sym(NIL, (void*)NIL_SYMBOL_SLOTS_START, context);
     lispobj* where = (lispobj*)STATIC_SPACE_OBJECTS_START;
     lispobj* end = static_space_free_pointer;
     while (where<end) {
