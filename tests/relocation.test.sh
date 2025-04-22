@@ -37,6 +37,37 @@ do
   i=`expr $i + 1`
 done
 
-rm -f $test_sbcl
+create_test_subdirectory
+tmpcore=$TEST_DIRECTORY/$TEST_FILESTEM.core
+
+run_sbcl <<EOF
+  (defglobal original-static-space-bounds
+    (cons sb-vm:static-space-start (sb-sys:sap-int sb-vm:*static-space-free-pointer*)))
+  (when (member :alien-callbacks sb-impl:+internal-features+)
+    (push :do-test *features*)
+    (sb-alien:define-alien-callable foo int () 42))
+  (save-lisp-and-die "$tmpcore")
+EOF
+
+$test_sbcl --lose-on-corruption --disable-ldb --noinform --core $tmpcore \
+              --no-sysinit --no-userinit --noprint --disable-debugger <<EOF
+#-do-test (quit)
+;; check that static space relocation happened
+(assert (not (eql sb-vm:static-space-start (car original-static-space-bounds))))
+;; the identical alien is stored in two places (so there is 1 and only 1 SAP)
+(assert (eq (aref sb-alien::*alien-callbacks* 0)
+            (gethash 'foo sb-alien::*alien-callables*)))
+;; the SAP points within static space
+(let* ((alien (aref sb-alien::*alien-callbacks* 0))
+       (sap (alien-sap alien)))
+ (assert (sb-sys:sap>= sap (sb-sys:int-sap sb-vm:static-space-start)))
+ (assert (sb-sys:sap< sap sb-vm:*static-space-free-pointer*)))
+;; the callable doesn't crash
+(let ((result (alien-funcall (sb-alien:alien-callable-function 'foo))))
+  (assert (= result 42)))
+(format t "~&I'm back!~%")
+EOF
+
+rm -f $tmpcore $test_sbcl
 
 exit $EXIT_TEST_WIN

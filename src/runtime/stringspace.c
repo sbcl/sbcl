@@ -97,7 +97,7 @@ static int readonly_unboxed_obj_p(lispobj* obj)
 #endif
     case BIGNUM_WIDETAG: case DOUBLE_FLOAT_WIDETAG:
     case COMPLEX_SINGLE_FLOAT_WIDETAG: case COMPLEX_DOUBLE_FLOAT_WIDETAG:
-    case SAP_WIDETAG: case SIMPLE_ARRAY_NIL_WIDETAG:
+    case SIMPLE_ARRAY_NIL_WIDETAG:
 #ifdef SIMD_PACK_WIDETAG
     case SIMD_PACK_WIDETAG:
 #endif
@@ -107,6 +107,11 @@ static int readonly_unboxed_obj_p(lispobj* obj)
         return 1;
     case RATIO_WIDETAG: case COMPLEX_RATIONAL_WIDETAG:
         return fixnump(obj[1]) && fixnump(obj[2]);
+    case SAP_WIDETAG:
+#if defined LISP_FEATURE_X86_64
+        if (((uint32_t*)obj)[1]) return 0; // high half of header != 0 ==> adjustable
+#endif
+        return 1;
     }
     if ((widetag > SIMPLE_VECTOR_WIDETAG && widetag < COMPLEX_BASE_STRING_WIDETAG)) {
         if (!vector_len((struct vector*)obj)) return 1; // length 0 vectors can't be stored into

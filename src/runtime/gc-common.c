@@ -1082,10 +1082,21 @@ static sword_t size_fdefn(lispobj __attribute__((unused)) *where) {
     return FDEFN_SIZE;
 }
 
+/* Unboxed objects other than vector and bignum all have a payload length expressible
+ * in 1 byte. They use the scav/trans/size functions below */
+static inline sword_t size_unboxed(lispobj *where) {
+    unsigned char byte =
+#ifdef LISP_FEATURE_BIG_ENDIAN
+      (*where >> 8) & 0xFF;
+#else
+      1[(unsigned char*)where];
+#endif
+    return ALIGN_UP((byte + 1), 2);
+}
 static sword_t
 scav_unboxed(lispobj __attribute__((unused)) *where, lispobj object)
 {
-    sword_t length = HeaderValue(object) + 1;
+    sword_t length = (HeaderValue(object) & 0xFF) + 1;
     return ALIGN_UP(length, 2);
 }
 
@@ -1093,8 +1104,7 @@ static lispobj
 trans_unboxed(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-    sword_t length = HeaderValue(*native_pointer(object)) + 1;
-    return copy_unboxed_object(object, ALIGN_UP(length, 2));
+    return copy_unboxed_object(object, size_unboxed(native_pointer(object)));
 }
 
 static lispobj

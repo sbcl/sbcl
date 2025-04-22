@@ -57,7 +57,8 @@ os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size
         case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID: fuzzed = val2; break;
         case DYNAMIC_CORE_SPACE_ID: fuzzed = val3; break;
 #ifdef LISP_FEATURE_X86_64
-        case STATIC_CORE_SPACE_ID: fuzzed = addr + (getpid()&0xfffff)*4096; break;
+        // 1+ to ensure that the space is displaced by a nonzero amount
+        case STATIC_CORE_SPACE_ID: fuzzed = addr + (1+(getpid()&0xfffff))*4096; break;
 #endif
         }
     }

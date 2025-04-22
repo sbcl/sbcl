@@ -539,11 +539,19 @@ static void fix_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 
         // Other
         case SAP_WIDETAG:
+#if defined LISP_FEATURE_X86_64
+            if (((uint32_t*)where)[1]) { // high half of header != 0 ==> static-space-relative
+                FIXUP(where[1] = STATIC_SPACE_START + ((uint32_t*)where)[1],
+                      where+1);
+            } else
+#endif
+            // guess whether the SAP looks like it should be adjusted
             if ((delta = calc_adjustment(adj, where[1])) != 0) {
-                fprintf(stderr,
-                        "WARNING: SAP at %p -> %p in relocatable core\n",
-                        where, (void*)where[1]);
-                FIXUP(where[1] += delta, where+1);
+                if (!lisp_startup_options.noinform) {
+                    fprintf(stderr, "WARNING: SAP at %p -> %p in relocatable core\n",
+                            where, (void*)where[1]);
+                }
+                // FIXUP(where[1] += delta, where+1);
             }
             continue;
         default:

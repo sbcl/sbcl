@@ -49,6 +49,15 @@
     (make-hash-table :test #'equal)
   "A cache of free alien callback indices keyed by type specifier.")
 
+(defun adjustable-sap (sap)
+  #+x86-64
+  (with-pinned-objects (sap)
+    (setf (sap-ref-32 (int-sap (sb-kernel:get-lisp-obj-address sap))
+                      (- 4 sb-vm:other-pointer-lowtag))
+          (truly-the (unsigned-byte 32)
+                     (sap- sap (int-sap sb-vm:static-space-start)))))
+  sap)
+
 (defun %alien-callback-alien (alien-fun-type specifier function)
   (let ((free-indices (gethash specifier *free-alien-callback-indices*)))
     (cond
@@ -81,7 +90,7 @@
                      0))))
          (vector-push-extend function *alien-callback-functions*)
          ;; Assembler-wrapper is static, so sap-taking is safe.
-         (let ((alien (%sap-alien (vector-sap assembler-wrapper)
+         (let ((alien (%sap-alien (adjustable-sap (vector-sap assembler-wrapper))
                                   alien-fun-type)))
            (vector-push-extend alien *alien-callbacks*)
            alien))))))

@@ -235,7 +235,6 @@
                    "trans_" transtab)
       (format stream "#define size_pointer (sizerfn)0~%")
       (format stream "#define size_immediate (sizerfn)0~%")
-      (format stream "#define size_unboxed size_boxed~%")
       (write-table "sword_t (*sizetab[256])(lispobj *where)"
                    "size_" sizetab)
       (format stream "#undef size_immediate~%")
