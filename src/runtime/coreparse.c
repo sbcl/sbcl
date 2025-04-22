@@ -1656,11 +1656,14 @@ static void graph_visit(lispobj referer, lispobj ptr, struct grvisit_context* co
             break;
         case SYMBOL_WIDETAG:
             trace_sym(ptr, SYMBOL(ptr), context);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+            RECURSE(linkage_cell_function(symbol_linkage_index(SYMBOL(ptr))));
+#endif
             break;
         case FDEFN_WIDETAG:
-            RECURSE(((struct fdefn*)obj)->name);
-            RECURSE(((struct fdefn*)obj)->fun);
-            RECURSE(decode_fdefn_rawfun((struct fdefn*)obj));
+            RECURSE(FDEFN(ptr)->name);
+            RECURSE(FDEFN(ptr)->fun);
+            RECURSE(decode_fdefn_rawfun(FDEFN(ptr)));
             break;
         default:
             // weak-pointer can be considered an ordinary boxed object.
