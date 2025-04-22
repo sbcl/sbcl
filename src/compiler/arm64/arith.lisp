@@ -1713,6 +1713,38 @@
     (inst sub length length 1)
     (inst cbnz length LOOP)))
 
+(define-vop (bignum-mult-and-add-word-loop)
+  (:args (a* :scs (descriptor-reg))
+         (b :scs (unsigned-reg))
+         (la :scs (unsigned-reg) :target length)
+         (r* :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg) length)
+  (:temporary (:sc unsigned-reg) index digit-a a r
+              lo hi)
+  (:generator 10
+    (inst add-sub a a* #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub r r* #1#)
+
+    (move length la)
+    (inst mov hi 0)
+    (inst adds index zr-tn zr-tn) ;; clear carry
+
+    LOOP
+    (inst ldr digit-a (@ a (extend index :lsl 3)))
+    (inst mul lo digit-a b)
+    (inst adcs lo lo hi)
+    (inst umulh hi digit-a b)
+
+    (inst str lo (@ r (extend index :lsl 3)))
+
+    (inst add index index 1)
+    (inst sub length length 1)
+    (inst cbnz length LOOP)
+
+    (inst adc hi hi zr-tn)
+    (inst str hi (@ r (extend index :lsl 3)))))
+
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
   (:policy :fast-safe)
