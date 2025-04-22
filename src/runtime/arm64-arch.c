@@ -360,3 +360,9 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
 #endif
     return addr;
 }
+
+long sb_udivmodti4(__uint128_t x, unsigned long y, unsigned long *rem) {
+    if (rem)
+        *rem = x % y;
+    return x / y;
+}

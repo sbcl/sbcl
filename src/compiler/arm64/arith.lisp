@@ -1828,6 +1828,50 @@
   (:generator 20
     (inst smulh hi x y)))
 
+(deftransform sb-bignum:%bigfloor ((div-high div-low divisor) * * :result result)
+  #-darwin
+  (if (sb-c::lvar-single-value-p result)
+      `(values (sb-alien:alien-funcall
+                (sb-alien:extern-alien "sb_udivmodti4"
+                                       (function (sb-alien:unsigned 64)
+                                                 (sb-alien:unsigned 64)
+                                                 (sb-alien:unsigned 64)
+                                                 (sb-alien:unsigned 64)
+                                                 (sb-alien:unsigned 64)))
+                div-low div-high divisor 0)
+               0)
+      `(with-alien ((rem (sb-alien:unsigned 64)))
+         (values (sb-alien:alien-funcall (sb-alien:extern-alien "sb_udivmodti4"
+                                                                (function (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (* (sb-alien:unsigned 64))))
+                                         div-low div-high divisor (addr rem))
+                 rem)))
+  #+darwin
+  (if (sb-c::lvar-single-value-p result)
+      `(values (sb-alien:alien-funcall
+                (sb-alien:extern-alien  "__udivmodti4"
+                                        (function (sb-alien:unsigned 64)
+                                                  (sb-alien:unsigned 64)
+                                                  (sb-alien:unsigned 64)
+                                                  (sb-alien:unsigned 64)
+                                                  (sb-alien:unsigned 64)
+                                                  (sb-alien:unsigned 64)))
+                div-low div-high divisor 0 0)
+               0)
+      `(with-alien ((rem (sb-alien:unsigned 64)))
+         (values (sb-alien:alien-funcall (sb-alien:extern-alien "__udivmodti4"
+                                                                (function (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (sb-alien:unsigned 64)
+                                                                          (* (sb-alien:unsigned 64))))
+                                         div-low div-high divisor 0 (addr rem))
+                 rem))))
+#+nil
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)
@@ -1851,12 +1895,17 @@
         (unless (= i 64)
           (inst adc rem rem rem))))))
 
-(define-vop (half-bignum-floor bignum-floor)
+(define-vop (half-bignum-floor)
   (:translate sb-bignum:%half-bigfloor)
   (:args (div-high :scs (unsigned-reg) :to :save)
          (div-low :scs (unsigned-reg) :target x)
          (divisor :scs (unsigned-reg) :to (:result 1)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg :from (:argument 1)) x)
+  (:results (quo :scs (unsigned-reg) :from (:argument 1))
+            (rem :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num unsigned-num)
+  (:policy :fast-safe)
   (:generator 30
     (move x div-low)
     (inst bfm x div-high 32 31)
