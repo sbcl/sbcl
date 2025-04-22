@@ -2523,39 +2523,50 @@
   (:note "inline (signed-byte 64) integer-length")
   (:policy :fast-safe)
   (:args (arg :scs (signed-reg) :target res))
+  (:arg-refs arg-ref)
   (:arg-types signed-num)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 28
-    (move res arg)
-    (inst test res res)
-    (inst jmp :ge POS)
-    (inst not res)
-    POS
-    (inst bsr res res)
-    (inst jmp :z ZERO)
-    (inst inc :dword res)
-    (inst jmp DONE)
-    ZERO
-    (zeroize res)
-    DONE))
+    (let ((zerop (types-equal-or-intersect (tn-ref-type arg-ref)
+                                           (specifier-type '(eql 0)))))
+      (assemble ()
+        (move res arg)
+        (inst test res res)
+        (inst jmp :ge POS)
+        (if zerop
+            (inst xor res -1) ;; affect flags
+            (inst not res))
+        POS
+        (when zerop
+          (inst jmp :z DONE))
+        (inst bsr res res)
+        (inst inc :dword res)
+        DONE))))
 
 (define-vop (unsigned-byte-64-len)
   (:translate integer-length)
   (:note "inline (unsigned-byte 64) integer-length")
   (:policy :fast-safe)
   (:args (arg :scs (unsigned-reg)))
+  (:arg-refs arg-ref)
   (:arg-types unsigned-num)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 26
-    (inst bsr res arg)
-    (inst jmp :z ZERO)
-    (inst inc :dword res)
-    (inst jmp DONE)
-    ZERO
-    (zeroize res)
-    DONE))
+    (let ((zerop (types-equal-or-intersect (tn-ref-type arg-ref)
+                                           (specifier-type '(eql 0)))))
+      (assemble ()
+        (inst bsr res arg)
+        (when zerop
+          (inst jmp :z ZERO))
+        (inst inc :dword res)
+        (when zerop
+          (inst jmp DONE))
+        ZERO
+        (when zerop
+          (zeroize res))
+        DONE))))
 
 ;; The code on which this was based existed in no less than three varieties,
 ;; differing in response to 0 input: produce NIL, -1, or signal an error.
