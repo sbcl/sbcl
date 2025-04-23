@@ -43,6 +43,9 @@ tmpcore=$TEST_DIRECTORY/$TEST_FILESTEM.core
 run_sbcl <<EOF
   (defglobal original-static-space-bounds
     (cons sb-vm:static-space-start (sb-sys:sap-int sb-vm:*static-space-free-pointer*)))
+  ;; there's no point in testing for #-x86-64. While arm64 allows #+relocatable-static-space
+  ;; it only does so if #+immobile-space which is not the default config
+  #+x86-64
   (when (member :alien-callbacks sb-impl:+internal-features+)
     (push :do-test *features*)
     (sb-alien:define-alien-callable foo int () 42))
