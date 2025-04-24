@@ -3884,7 +3884,8 @@
 (deftransform truncate ((x y)
                         (:or ((sb-vm:signed-word (constant-arg integer)) sb-vm:signed-word)
                              ((unsigned-byte (constant-arg integer)) *))
-                        *  :result result :node node)
+                        *  :result result :node node
+                           :important nil)
   "convert division by 2^k to shift"
   (let* ((y (lvar-value y))
          (y-abs (abs y))

@@ -369,13 +369,13 @@
                `(truncate (coerce number ',rtype)
                           (coerce divisor ',rtype)))
              (single-digit-bignum-p (x)
-               #+(or x86-64 x86 ppc64)
+               #+(or x86-64 x86 ppc64 arm64)
                `(or (typep ,x 'word)
                     (typep ,x 'sb-vm:signed-word))
                ;; Other backends don't have native double-word/word division,
                ;; and their bigfloor implementation doesn't handle
                ;; full-width divisors.
-               #-(or x86-64 x86 ppc64)
+               #-(or x86-64 x86 ppc64 arm64)
                `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
                     (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
                                 ,(1- (expt 2 (- sb-vm:n-word-bits 1))))))))

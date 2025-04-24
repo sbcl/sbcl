@@ -273,3 +273,8 @@
               (fixnump ,denominator2-var))
          ,fixnum-body
          ,body)))
+
+(defmacro cond-dispatch (cond &body body)
+  `(if ,cond
+       (progn ,@body)
+       (progn ,@body)))

@@ -1338,6 +1338,15 @@ variable: an unreadable object representing the error is printed instead.")
                                                    sb-vm:other-pointer-lowtag)))))
            ,@body)))))
 
+(defmacro with-string-buffer ((size buffer) &body body)
+  #+c-stack-is-control-stack
+  `(let* ((,buffer (make-array ,size :element-type 'base-char)))
+     (declare (dynamic-extent ,buffer))
+     ,@body)
+  #-c-stack-is-control-stack
+  `(with-lisp-string-on-alien-stack (,buffer ,size)
+     ,@body))
+
 ;;; Using specialized routines for the various cases seems to work nicely.
 ;;;
 ;;; Testing with 100,000 random integers, output to a sink stream, x86-64:
@@ -1359,45 +1368,17 @@ variable: an unreadable object representing the error is printed instead.")
   ;; but a symbol-macrolet is ok. This is a FIXME except I don't care.
   (symbol-macrolet ((chars "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
     (declare (optimize (sb-c:insert-array-bounds-checks 0) speed))
-    (macrolet ((iterative-algorithm ()
-                 `(loop (multiple-value-bind (q r)
-                            (truncate (truly-the word integer) base)
-                          (decf ptr)
-                          (setf (aref buffer ptr) (schar chars r))
-                          (when (zerop (setq integer q)) (return)))))
-               (recursive-algorithm (dividend-type)
-                 `(named-let recurse ((n integer))
-                    (multiple-value-bind (q r) (truncate (truly-the ,dividend-type n) base)
-                      ;; Recurse until you have all the digits pushed on
-                      ;; the stack.
-                      (unless (zerop q) (recurse q))
-                      ;; Then as each recursive call unwinds, turn the
-                      ;; digit (in remainder) into a character and output
-                      ;; the character.
-                      (write-char (schar chars r) stream)))))
+    (macrolet ((iterative-algorithm (integer)
+                 `(let ((integer ,integer))
+                    (loop (multiple-value-bind (q r)
+                              (truncate (truly-the word integer) base)
+                            (decf ptr)
+                            (setf (aref buffer ptr) (schar chars r))
+                            (when (zerop (setq integer q)) (return)))))))
       (cond ((typep integer 'word) ; Division vops can handle this all inline.
-             #+c-stack-is-control-stack ; strings can be DX-allocated
-             ;; For bases exceeding 10 we know how many characters (at most)
-             ;; will be output. This allows for a single %WRITE-STRING call.
-             ;; There's diminishing payback for other bases because the fixed array
-             ;; size increases, and we don't have a way to elide initial 0-fill.
-             ;; Calling APPROX-CHARS-IN-REPL doesn't help much - we still 0-fill.
-             (if (< base 10)
-                 (recursive-algorithm word)
-                 (let* ((ptr #.(length (write-to-string sb-ext:most-positive-word
-                                                        :base 10)))
-                        (buffer (make-array ptr :element-type 'base-char)))
-                   (declare (dynamic-extent buffer))
-                   (iterative-algorithm)
-                   (%write-string buffer stream ptr (length buffer))))
-             #-c-stack-is-control-stack ; strings can't be DX-allocated
-             ;; Use the alien stack, which is not as fast as using the control stack
-             ;; (when we can). Even the absence of 0-fill doesn't make up for it.
-             ;; Since we've no choice in the matter, might as well allow
-             ;; any value of BASE - it's just a few more words of storage.
-             (let ((ptr sb-vm:n-word-bits))
-               (with-lisp-string-on-alien-stack (buffer sb-vm:n-word-bits)
-                 (iterative-algorithm)
+             (with-string-buffer (sb-vm:n-word-bits buffer)
+               (let ((ptr sb-vm:n-word-bits))
+                 (iterative-algorithm integer)
                  (%write-string buffer stream ptr sb-vm:n-word-bits))))
             ((eql base 16)
              ;; No division is involved at all.
@@ -1407,12 +1388,39 @@ variable: an unreadable object representing the error is printed instead.")
                    do (write-char (schar chars (sb-bignum::ldb-bignum=>fixnum 4 pos
                                                                               integer))
                                   stream)))
-            ;; The ideal cutoff point between this and the "huge" algorithm
-            ;; might be platform-specific, and it also could depend on the output base.
-            ;; Nobody has cared to tweak it in so many years that I think we can
-            ;; arbitrarily say 3 bigdigits is fine.
-            ((<= (sb-bignum:%bignum-length (truly-the bignum integer)) 3)
-             (recursive-algorithm integer))
+            ;; Divide by the largest base^n that produces a word remainder
+            ;; then process the remainder using word arithmetic
+            ((<= (sb-bignum:%bignum-length (truly-the bignum integer)) 32)
+             (with-string-buffer (sb-vm:n-word-bits buffer)
+               (cond-dispatch (= base 10)
+                 (let* ((divisors #.(coerce (loop for b to 36
+                                                  collect (if (< b 2)
+                                                              1
+                                                              (loop for i from 2
+                                                                    when (> (expt b i) most-positive-word)
+                                                                    return (expt b (1- i)))))
+                                            `(vector (unsigned-byte ,sb-vm:n-word-bits))))
+                        (zeros #.(coerce (loop for b to 36
+                                               collect (loop for i from 1
+                                                             when (or (< b 2)
+                                                                      (> (expt b i) most-positive-word))
+                                                             return (1- i)))
+                                         '(vector (unsigned-byte 8))))
+                        (divisor (aref divisors base))
+                        (zeros (aref zeros base)))
+                   (named-let recurse
+                       ((n integer))
+                     (multiple-value-bind (q r) (truly-the (values unsigned-byte word) (truncate n divisor))
+                       (unless (zerop q)
+                         (recurse q))
+                       (let ((ptr sb-vm:n-word-bits))
+                         (iterative-algorithm r)
+                         ;; Don't pad the most significant digits
+                         (unless (zerop q)
+                           (let ((pad (- ptr (- sb-vm:n-word-bits zeros))))
+                             (loop for i below pad
+                                   do (setf (char buffer (decf ptr)) #\0))))
+                         (%write-string buffer stream ptr sb-vm:n-word-bits))))))))
             (t
              (%output-huge-integer-in-base integer base stream)))))
   nil)
