@@ -563,7 +563,7 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 64) arithmetic")
   (:vop-var vop)
-  (:generator 6
+  (:generator 4
     (move eax x)
     (inst mul y)
     (move r eax)))
@@ -582,7 +582,7 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 64) arithmetic")
   (:vop-var vop)
-  (:generator 6
+  (:generator 3
     (move eax x)
     (inst mul :qword (register-inline-constant :qword y))
     (move r eax)))
