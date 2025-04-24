@@ -523,11 +523,11 @@
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant bpt-lra-boxed-nwords
   ;; * For backends with LRA: one boxed constant holds the true LRA,
-  ;;   one holds KNOWN-RETURN-P.  Additionally, MIPS gets a boxed slot
-  ;;   for the cookie that formerly went in a weak hash-table.
+  ;;   one holds KNOWN-RETURN-P.
   ;; * For backends without LRA: one boxed constant holds the code
   ;;   object to which to return, one holds the displacement into that
-  ;;   object, and one holds the cookie.
+  ;;   object.
+  ;; All backends have an additional slot to hold the cookie.
   (+ code-constants-offset 3))
 (defconstant real-lra-slot code-constants-offset)
 #-(or x86 x86-64 arm64 riscv)
@@ -3842,74 +3842,76 @@ register."
   (declare (type #-(or x86 x86-64 arm64 riscv) lra
                  #+(or arm64 riscv) fixnum
                  #+(or x86 x86-64) system-area-pointer real-lra))
-  (flet ((symbol-addr (name)
-           (find-dynamic-foreign-symbol-address name)))
-    (declare (inline symbol-addr))
-    ;; These are really code labels, not variables: but this way we get
-    ;; their addresses.
-    (let* ((src-start (if known-return-p
-                          ;; Just trap when using the known return
-                          ;; values convention, since call sites don't
-                          ;; process unknown values in that case.
-                          (symbol-addr "fun_end_breakpoint_trap")
-                          (symbol-addr "fun_end_breakpoint_guts")))
-           (trap-offset (- (symbol-addr "fun_end_breakpoint_trap") src-start))
-           (length (the index (- (symbol-addr "fun_end_breakpoint_end")
-                                 src-start)))
-           (code-object
-             (sb-c:allocate-code-object
-              nil
-              ;; Ensure required boxed header alignment.
-              (align-up bpt-lra-boxed-nwords sb-c::code-boxed-words-align)
-              (+ length
-                 n-word-bytes   ; Jump Table prefix word
-                 ;; Alignment padding, LRA header
-                 #-(or x86 x86-64) (* 2 n-word-bytes)
-                 ;; 2 extra raw bytes represent CODE-N-ENTRIES (which is zero)
-                 2))))
-      (setf (%code-debug-info code-object) :bpt-lra)
-      (with-pinned-objects (code-object)
-        #+(or x86 x86-64 arm64 riscv)
-        (let ((instructions   ; Don't touch the jump table prefix word
-                (sap+ (code-instructions code-object) n-word-bytes)))
-          (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
-            (setf (code-header-ref code-object real-lra-slot) code
-                  (code-header-ref code-object (1+ real-lra-slot)) offset)
-            #-darwin-jit
-            (system-area-ub8-copy (int-sap src-start) 0 instructions 0 length)
-            #+darwin-jit
-            (sb-vm::jit-memcpy instructions (int-sap src-start) length)
-            #-(or x86 x86-64)
-            (sanctify-for-execution code-object)
-            ;; CODE-OBJECT is implicitly pinned after leaving WITH-PINNED-OBJECTS
-            ;; (and would be pinned even if the W-P-O were deleted), so we're OK
-            ;; to return a SAP to the instructions.
-            ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the trapping
-            ;; opcode, for which we have to account for the jump table prefix word.
-            (values #+(or x86 x86-64) instructions
-                    #+(or arm64 riscv) (%make-lisp-obj (sap-int instructions))
-                    code-object
-                    (+ trap-offset n-word-bytes))))
+  (let* ((src-start
+           ;; Just trap when using the known return values convention,
+           ;; as call sites don't process unknown values in that case.
+           (if known-return-p
+               (foreign-symbol-sap "fun_end_breakpoint_trap" t)
+               (foreign-symbol-sap "fun_end_breakpoint_guts" t)))
+         ;; START-OFFSET is the distance from CODE-INSTRUCTIONS to the
+         ;; start of the copied :FUN-END code.
+         (start-offset
+           (+ n-word-bytes ; Jump Table prefix word
+              ;; Alignment padding, LRA header.
+              #-(or x86 x86-64 arm64 riscv)
+              (* 2 n-word-bytes)))
+         ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the
+         ;; actual magic fun_end breakpoint trap.
+         (trap-offset
+           (+ start-offset
+              (sap- (foreign-symbol-sap "fun_end_breakpoint_trap" t)
+                    src-start)))
+         ;; The length of the assembly code we are copying.
+         (length (sap- (foreign-symbol-sap "fun_end_breakpoint_end" t)
+                       src-start))
+         (code-object
+           (sb-c:allocate-code-object
+            nil
+            ;; Ensure required boxed header alignment.
+            (align-up bpt-lra-boxed-nwords sb-c::code-boxed-words-align)
+            (+ start-offset
+               length
+               ;; 2 extra trailing raw bytes represent CODE-N-ENTRIES
+               ;; (which is zero)
+               2))))
+    (setf (%code-debug-info code-object) :bpt-lra)
+    (with-pinned-objects (code-object)
+      (let ((dst-start
+              (sap+ (code-instructions code-object) start-offset)))
         #-(or x86 x86-64 arm64 riscv)
-        (let* ((lra-header-addr
-                 ;; Skip over the jump table prefix, and align properly for LRA header
-                 (sap+ (code-instructions code-object) (* 2 n-word-bytes)))
+        (progn
+          (setf (code-header-ref code-object real-lra-slot) real-lra)
+          (setf (code-header-ref code-object known-return-p-slot) known-return-p))
+        #+(or x86 x86-64 arm64 riscv)
+        (multiple-value-bind (offset code)
+            (compute-lra-data-from-pc real-lra)
+          (setf (code-header-ref code-object real-lra-slot) code)
+          (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
+        #-darwin-jit
+        (system-area-ub8-copy src-start 0 dst-start 0 length)
+        #+darwin-jit
+        (sb-vm::jit-memcpy dst-start src-start length)
+        #-(or x86 x86-64)
+        (sanctify-for-execution code-object)
+        ;; CODE-OBJECT is implicitly pinned after leaving
+        ;; WITH-PINNED-OBJECTS (and would be pinned even if the W-P-O
+        ;; were deleted), so it's OK to return a SAP into CODE-OBJECT.
+        #+(or x86 x86-64 arm64 riscv)
+        (let ((dst-start #+(or x86 x86-64) dst-start
+                         #+(or arm64 riscv) (%make-lisp-obj (sap-int dst-start))))
+          (values dst-start code-object trap-offset))
+        #-(or x86 x86-64 arm64 riscv)
+        (let* ((lra-header (sap+ dst-start (* -1 n-word-bytes)))
                ;; Compute the LRA->code backpointer in words
-               (delta (ash (sap- lra-header-addr
+               (delta (ash (sap- lra-header
                                  (int-sap (logandc2 (get-lisp-obj-address code-object)
                                                     lowtag-mask)))
                            (- word-shift))))
-          (setf (code-header-ref code-object real-lra-slot) real-lra
-                (code-header-ref code-object known-return-p-slot) known-return-p)
-          (setf (sap-ref-word lra-header-addr 0)
+          (setf (sap-ref-word lra-header 0)
                 (logior (ash delta n-widetag-bits) return-pc-widetag))
-          (system-area-ub8-copy (int-sap src-start) 0
-                                (sap+ lra-header-addr n-word-bytes)
-                                0 length)
-          (values (%make-lisp-obj (logior (sap-int lra-header-addr) other-pointer-lowtag))
-                  (sanctify-for-execution code-object)
-                  ;; FIXME: what does "3" represent in this formula?
-                  (+ trap-offset (* 3 n-word-bytes))))))))
+          (values (%make-lisp-obj (logior (sap-int lra-header) other-pointer-lowtag))
+                  code-object
+                  trap-offset))))))
 
 ;;;; miscellaneous
 

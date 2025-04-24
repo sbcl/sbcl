@@ -287,7 +287,6 @@ GNAME(funcall_alien_callback):
 
 	.text
 	.globl 	GNAME(fun_end_breakpoint_guts)
-	.align	align_16byte
 GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
 	jc	multiple_value_return

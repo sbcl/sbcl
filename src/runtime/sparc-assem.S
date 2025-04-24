@@ -199,7 +199,6 @@ call_into_c:
  */
 
 	.text
-	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
 	b	1f
