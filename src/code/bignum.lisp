@@ -462,7 +462,8 @@
 ;;;; multiplication
 
 (defun multiply-bignums (a b)
-  (declare (type bignum a b))
+  (declare (type bignum a b)
+           (optimize speed (safety 0)))
   (let* ((a-plusp (bignum-plus-p a))
          (b-plusp (bignum-plus-p b))
          (a (if a-plusp a (negate-bignum-not-fully-normalized a)))
@@ -470,27 +471,41 @@
          (len-a (%bignum-length a))
          (len-b (%bignum-length b))
          (len-res (+ len-a len-b))
-         (res (alloc-zeroing len-res))
+         (res (%allocate-bignum len-res))
          (negate-res (not (eq a-plusp b-plusp))))
     (declare (type bignum-length len-a len-b len-res))
-    (dotimes (i len-a)
-      (declare (type bignum-index i))
-      (let ((carry-digit 0)
-            (x (%bignum-ref a i))
-            (k i))
-        (declare (type bignum-index k)
-                 (type bignum-element-type carry-digit x))
-        (dotimes (j len-b)
-          (multiple-value-bind (big-carry res-digit)
-              (%multiply-and-add x
-                                 (%bignum-ref b j)
-                                 (%bignum-ref res k)
-                                 carry-digit)
-            (declare (type bignum-element-type big-carry res-digit))
-            (setf (%bignum-ref res k) res-digit)
-            (setf carry-digit big-carry)
-            (incf k)))
-        (setf (%bignum-ref res k) carry-digit)))
+    (when (> len-a len-b)
+      (rotatef a b)
+      (rotatef len-a len-b))
+
+    ;; The partial result is zero on the first iteration,
+    ;; so don't include it. And no need to zero when allocating it.
+    (let ((x (%bignum-ref a 0)))
+      (sb-c::if-vop-existsp (:named sb-vm::bignum-mult-and-add-word-loop)
+        (sb-sys:%primitive sb-vm::bignum-mult-and-add-word-loop b x len-b res)
+        (let ((carry-digit 0))
+          (declare (fixnum carry-digit))
+          (dotimes (index len-b)
+            (declare (type bignum-index index))
+            (setf (values carry-digit
+                          (%bignum-ref res index))
+                  (%multiply-and-add (%bignum-ref b index) x carry-digit)))
+          (setf (%bignum-ref res len-b) carry-digit))))
+
+    (loop for i of-type bignum-index from 1 below len-a
+          do
+          (let ((x (%bignum-ref a i))
+                (k i)
+                (carry-digit 0))
+            (declare (type bignum-index k))
+            (dotimes (j len-b)
+              (setf (values carry-digit (%bignum-ref res k))
+                    (%multiply-and-add x
+                                       (%bignum-ref b j)
+                                       (%bignum-ref res k)
+                                       carry-digit))
+              (incf k))
+            (setf (%bignum-ref res k) carry-digit)))
     (when negate-res (negate-bignum-in-place res))
     (%normalize-bignum res len-res)))
 
