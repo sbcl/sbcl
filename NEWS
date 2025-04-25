@@ -4,15 +4,36 @@ changes relative to sbcl-2.5.3:
   * enhancement: :FUN-END breakpoints now support the known values return
     convention when DEBUG > 0. This means that tracing local functions works
     in more situations.
+  * platform support:
+    ** on x86-64, relocation of static space is always enabled.
+    ** save-lisp-and-die with :callable-exports can be used for sbcl.dll on
+       Windows.
+    ** Building with UCRT64 on Windows is now fully supported.
   * bug fix: :FUN-END breakpoints work on PowerPC, SPARC, and MIPS again.
   * bug fix: incorrect rounding when converting some bignums to floats.
   * bug fix: the second value of the truncation functions is more consistently
     computed for bignum floats.
-  * platform support:
-    ** save-lisp-and-die with :callable-exports can be used for sbcl.dll on
-       Windows.
-    ** Building with UCRT64 on Windows is now fully supported.
+  * bug fix: fix code generation for constants being considered from
+    conflicting type propagation information.  (lp#2107652)
+  * bug fix: fix 32-bit range check code generation on x86-64.  (lp#2106432)
+  * bug fix: types are correctly propagated from the keyword argument
+    processor to their uses.  (lp#2106358, reported by Vasily Postnicov)
+  * bug fix: fix compilation error from CHECK-TYPE when the value checked is a
+    keyword argument and the type specifier argument is not a valid type
+    specifier.  (lp#2104089)
+  * bug fix: generate stack-manipulation code in the presence of non-local
+    exits and dynamic-extent declarations even more carefully.  (lp#2043242)
+  * optimization: (LOGIOR A (- (MASK-FIELD (BYTE 1 N) A))) is recognized as an
+    idiom for sign-extending the N+1-bit field in A.
   * optimization: ROUND is faster for floats.
+  * optimization: MAKE-SEQUENCE does not invoke the full type algebra when the
+    provided type specifier is simple.
+  * optimization: don't attempt to align branch targets if the SPACE
+    optimization quality is greater than 1.
+  * optimization: circularity detection for printing now places its temporary
+    data structures on the stack.
+  * optimization: the implementation of ISQRT has been replaced with the
+    (faster) algorithm currently implemented in CPython.
 
 changes in sbcl-2.5.3 relative to sbcl-2.5.2:
   * enhancement: breakpoint debugger commands have been added.  Included is a
