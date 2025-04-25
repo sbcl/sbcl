@@ -23,15 +23,20 @@ changes relative to sbcl-2.5.3:
     specifier.  (lp#2104089)
   * bug fix: generate stack-manipulation code in the presence of non-local
     exits and dynamic-extent declarations even more carefully.  (lp#2043242)
-  * optimization: (LOGIOR A (- (MASK-FIELD (BYTE 1 N) A))) is recognized as an
-    idiom for sign-extending the N+1-bit field in A.
+  * optimization: (LOGIOR A (- (MASK-FIELD (BYTE 1 constantN) A))), or its
+    equivalent (LOGIOR A (- (LOGAND (ASH 1 constantN) A))), is recognized as
+    an idiom for sign-extending the N+1-bit field in A, and can be used for
+    signed modular arithmetic.
   * optimization: ROUND is faster for floats.
+  * optimization: TRUNCATE/FLOOR/etc. are faster on ratios.
   * optimization: MAKE-SEQUENCE does not invoke the full type algebra when the
     provided type specifier is simple.
   * optimization: don't attempt to align branch targets if the SPACE
     optimization quality is greater than 1.
   * optimization: circularity detection for printing now places its temporary
     data structures on the stack.
+  * optimization: faster GCD on fixnums, especially when the difference in
+    magnitude is large.
   * optimization: the implementation of ISQRT has been replaced with the
     (faster) algorithm currently implemented in CPython.
 
