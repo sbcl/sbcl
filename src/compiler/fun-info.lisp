@@ -90,7 +90,7 @@
   ;; The function does not verify the arg count and must be always
   ;; called with the right arguments and can avoid passing NARGS.
   no-verify-arg-count
-  ;; Arguments are can be passed unboxed, no type checking on entry is
+  ;; Arguments can be passed unboxed, no type checking on entry is
   ;; performed, and the number of arguments passed in registers can be
   ;; greater than the standard number. Only fixed arguments can be used.
   fixed-args

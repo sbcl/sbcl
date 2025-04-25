@@ -1390,37 +1390,55 @@ variable: an unreadable object representing the error is printed instead.")
                                   stream)))
             ;; Divide by the largest base^n that produces a word remainder
             ;; then process the remainder using word arithmetic
-            ((<= (sb-bignum:%bignum-length (truly-the bignum integer)) 32)
-             (with-string-buffer (sb-vm:n-word-bits buffer)
-               (cond-dispatch (= base 10)
-                 (let* ((divisors #.(coerce (loop for b to 36
-                                                  collect (if (< b 2)
-                                                              1
-                                                              (loop for i from 2
-                                                                    when (> (expt b i) most-positive-word)
-                                                                    return (expt b (1- i)))))
-                                            `(vector (unsigned-byte ,sb-vm:n-word-bits))))
-                        (zeros #.(coerce (loop for b to 36
-                                               collect (loop for i from 1
-                                                             when (or (< b 2)
-                                                                      (> (expt b i) most-positive-word))
-                                                             return (1- i)))
-                                         '(vector (unsigned-byte 8))))
-                        (divisor (aref divisors base))
-                        (zeros (aref zeros base)))
-                   (named-let recurse
-                       ((n integer))
-                     (multiple-value-bind (q r) (truly-the (values unsigned-byte word) (truncate n divisor))
-                       (unless (zerop q)
-                         (recurse q))
-                       (let ((ptr sb-vm:n-word-bits))
-                         (iterative-algorithm r)
-                         ;; Don't pad the most significant digits
-                         (unless (zerop q)
-                           (let ((pad (- ptr (- sb-vm:n-word-bits zeros))))
-                             (loop for i below pad
-                                   do (setf (char buffer (decf ptr)) #\0))))
-                         (%write-string buffer stream ptr sb-vm:n-word-bits))))))))
+            ((let ((len (sb-bignum:%bignum-length (truly-the bignum integer))))
+               (when (<= len 32)
+                 (when (zerop (sb-bignum:%bignum-ref integer (1- len)))
+                   ;; Ignore sign extension
+                   (decf len))
+                 (let ((q (%allocate-bignum len))) ; this will be reused
+                   (with-string-buffer (sb-vm:n-word-bits buffer)
+                     (cond-dispatch (= base 10)
+                       (let* ((divisors #.(coerce (loop for b to 36
+                                                        collect (if (< b 2)
+                                                                    1
+                                                                    (loop for i from 2
+                                                                          when (> (expt b i)
+                                                                                  (1- (expt 2 (+ sb-vm:n-word-bits
+                                                                                                 ;; Others have a deficient %bignum-floor
+                                                                                                 #-(or x86-64 x86 ppc64 arm64) -1))))
+                                                                          return (expt b (1- i)))))
+                                                  `(vector (unsigned-byte ,sb-vm:n-word-bits))))
+                              (zeros #.(coerce (loop for b to 36
+                                                     collect (loop for i from 1
+                                                                   when (or (< b 2)
+                                                                            (> (expt b i)
+                                                                               (1- (expt 2 (+ sb-vm:n-word-bits
+                                                                                              #-(or x86-64 x86 ppc64 arm64) -1)))))
+                                                                   return (1- i)))
+                                               '(vector (unsigned-byte 8))))
+                              (divisor (aref divisors base))
+                              (zeros (aref zeros base)))
+                         (named-let recurse
+                             ((n integer)
+                              (len len))
+                           (multiple-value-bind (q r new-len) (truly-the (values unsigned-byte word index &optional)
+                                                                         (sb-bignum::bignum-truncate-single-digit-to n divisor q len))
+                             (tagbody
+                                (when (= new-len 1)
+                                  (let ((ptr sb-vm:n-word-bits))
+                                    (iterative-algorithm (truly-the word q))
+                                    ;; Don't pad the most significant digits
+                                    (%write-string buffer stream ptr sb-vm:n-word-bits)
+                                    (go remainder)))
+                                (recurse q new-len)
+                              REMAINDER
+                                (let ((ptr sb-vm:n-word-bits))
+                                  (iterative-algorithm r)
+                                  (let ((pad (- ptr (- sb-vm:n-word-bits zeros))))
+                                    (loop for i below pad
+                                          do (setf (char buffer (decf ptr)) #\0)))
+                                  (%write-string buffer stream ptr sb-vm:n-word-bits)))))))))
+                 t)))
             (t
              (%output-huge-integer-in-base integer base stream)))))
   nil)
