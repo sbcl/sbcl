@@ -4080,7 +4080,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                                 2 ; vector header
                                 asm-jump-vect-nelems
                                 t-alloc-words
-                                nil-alloc-words)))
+                                nil-alloc-words)
+                             :initial-element 0))
           (ptr 4))
       (setf (aref words 0) static-constants-core-entry-type-code
             (aref words 1) (length words)
