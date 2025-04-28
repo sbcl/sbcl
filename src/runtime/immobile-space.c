@@ -547,7 +547,7 @@ bool immobile_space_preserve_pointer(void* addr)
     int valid = 0;
     low_page_index_t page_index;
 
-    if ((page_index = find_fixedobj_page_index(addr)) >= FIXEDOBJ_RESERVED_PAGES
+    if ((page_index = find_fixedobj_page_index(addr)) >= 0
         && ((fixedobj_pages[page_index].gens & genmask) != 0)) {
         int obj_spacing = fixedobj_page_obj_align(page_index);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
@@ -595,7 +595,7 @@ static void full_scavenge_immobile_newspace()
     // Fixed-size object pages.
 
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
-    for (page = FIXEDOBJ_RESERVED_PAGES; page <= max_used_fixedobj_page; ++page) {
+    for (page = 0; page <= max_used_fixedobj_page; ++page) {
         if (!(fixedobj_pages[page].gens & bit)) continue;
         // Skip amount within the loop is in bytes.
         int obj_spacing = fixedobj_page_obj_align(page);
@@ -700,7 +700,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
 
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     low_page_index_t page;
-    for (page = FIXEDOBJ_RESERVED_PAGES; page <= max_used_fixedobj_page ; ++page) {
+    for (page = 0; page <= max_used_fixedobj_page ; ++page) {
         if (fixedobj_page_wp(page) || !(fixedobj_pages[page].gens & genmask))
             continue;
         int obj_spacing = fixedobj_page_obj_align(page);
@@ -977,7 +977,7 @@ sweep_fixedobj_pages(int raise)
 
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     low_page_index_t page;
-    for (page = FIXEDOBJ_RESERVED_PAGES; page <= max_used_fixedobj_page; ++page) {
+    for (page = 0; page <= max_used_fixedobj_page; ++page) {
         // On pages that won't need manipulation of the freelist,
         // we try to do less work than for pages that need it.
         if (!(fixedobj_pages[page].gens & relevant_genmask)) {
@@ -1196,14 +1196,7 @@ void immobile_space_coreparse(uword_t fixedobj_len,
     }
 
     n_pages = fixedobj_len / IMMOBILE_CARD_BYTES;
-    for (page = 0; page <= FIXEDOBJ_RESERVED_PAGES; ++page) {
-        // set page attributes that can't match anything in get_freeish_page()
-        fixedobj_pages[page].attr.parts.obj_align = 1;
-        if (gen != 0 && ENABLE_PAGE_PROTECTION)
-            fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
-        fixedobj_pages[page].gens |= 1 << gen;
-    }
-    for (page = FIXEDOBJ_RESERVED_PAGES ; page < n_pages ; ++page) {
+    for (page = 0 ; page < n_pages ; ++page) {
         lispobj* page_data = fixedobj_page_address(page);
         for (word_idx = 0 ; word_idx < WORDS_PER_PAGE ; ++word_idx) {
             lispobj* obj = page_data + word_idx;
@@ -1433,7 +1426,7 @@ search_immobile_space(void *pointer)
                && pointer < (void*)fixedobj_free_pointer) {
         low_page_index_t page_index = find_fixedobj_page_index(pointer);
         char *page_base = PTR_ALIGN_DOWN(pointer, IMMOBILE_CARD_BYTES);
-        if (page_attributes_valid && page_index >= FIXEDOBJ_RESERVED_PAGES) {
+        if (page_attributes_valid && page_index >= 0) {
             int spacing = fixedobj_page_obj_align(page_index);
             if (spacing == 0) return NULL;
             int index = ((char*)pointer - page_base) / spacing;
@@ -1714,15 +1707,6 @@ static int classify_symbol(lispobj* obj)
     return 3;
 }
 
-static inline char* compute_defrag_start_address()
-{
-    // The first fixedobj page contains some essential layouts,
-    // the addresses of which might be wired in by code generation.
-    // As such they must never move.
-    return (char*)FIXEDOBJ_SPACE_START + 2*IMMOBILE_CARD_BYTES;
-
-}
-
 static int calc_n_fixedobj_pages(int n_objects, int words_per_object)
 {
   words_per_object = ALIGN_UP(words_per_object, 2);
@@ -1828,7 +1812,7 @@ static void defrag_immobile_space(bool verbose)
     // Find the starting address of fixed-size objects that will undergo defrag.
     // Never move the first pages of LAYOUTs created by genesis.
     // so that codegen can wire in layout of function with less pain.
-    char* defrag_base = compute_defrag_start_address();
+    char* defrag_base = (char*)FIXEDOBJ_SPACE_START;
     low_page_index_t page_index = find_fixedobj_page_index(defrag_base);
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     for ( ; page_index <= max_used_fixedobj_page ; ++page_index) {

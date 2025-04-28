@@ -361,7 +361,7 @@ static void sweep_fixedobj_pages()
     low_page_index_t page;
     uword_t space_base = FIXEDOBJ_SPACE_START;
     sword_t bitmap_index_bias = fixedobj_index_bit_bias;
-    for (page = FIXEDOBJ_RESERVED_PAGES ; ; ++page) {
+    for (page = 0 ; ; ++page) {
         lispobj *obj = fixedobj_page_address(page);
         if (obj >= fixedobj_free_pointer)
             break;
