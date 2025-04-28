@@ -205,10 +205,27 @@
      #-sb-devel
      (aver (sap= start end)))))
 
-#+mark-region-gc
-(define-alien-variable "allocation_bitmap" (* unsigned-char))
+(defun map-immobile-objects (function subspace)
+  (declare (function function) (dynamic-extent function)
+           (type (member :text :fixed) subspace))
+  (multiple-value-bind (start end) (%space-bounds subspace)
+    (when (eq subspace :text)
+      (return-from map-immobile-objects (map-objects-in-range function start end)))
+    (do ((start (descriptor-sap start))
+         (end (descriptor-sap end)))
+        ((sap>= start end))
+      (let ((widetag (widetag@baseptr start)))
+        (cond ((member widetag `(,instance-widetag ,symbol-widetag))
+               (let* ((obj (lispobj@baseptr start widetag))
+                      (size (truly-the (signed-byte 64) (primitive-object-size obj))))
+                 (funcall function obj widetag size)
+                 (setq start (sap+ start size))))
+              (t
+               (setq start (sap+ start (ash cons-size word-shift)))))))))
 
 #+mark-region-gc
+(progn
+(define-alien-variable "allocation_bitmap" (* unsigned-char))
 (defun map-objects-in-discontiguous-range (fun start end generation-mask)
   (declare (type function fun)
            (type fixnum start end))
@@ -244,20 +261,11 @@
                        ;; But why??? We're in a generational space aren't we?
                        (let ((gen (generation-of obj)))
                          (when (and gen (logbitp gen generation-mask))
-                           (funcall fun obj typecode size)))))))))))
+                           (funcall fun obj typecode size))))))))))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
 (define-alien-variable "next_free_page" sb-kernel::page-index-t)
-
-(deftype immobile-subspaces () '(member :fixed :text))
-(declaim (ftype (sfunction (function &rest immobile-subspaces) null)
-                map-immobile-objects))
-(defun map-immobile-objects (function &rest subspaces) ; Perform no filtering
-  (declare (dynamic-extent function))
-  (do-rest-arg ((subspace) subspaces)
-    (multiple-value-bind (start end) (%space-bounds subspace)
-      (map-objects-in-range function start end))))
 
 #|
 MAP-ALLOCATED-OBJECTS is fundamentally unsafe to use if the user-supplied
@@ -337,13 +345,9 @@ We could try a few things to mitigate this:
                (map-immobile-objects fun :text)))
             #+immobile-space
             (:immobile
+             (map-immobile-objects fun :fixed)
              (with-system-mutex (*allocator-mutex*)
-               (map-immobile-objects fun :text))
-             ;; Filter out padding words
-             (dx-flet ((filter (obj type size)
-                         (unless (= type list-pointer-lowtag)
-                           (funcall fun obj type size))))
-               (map-immobile-objects #'filter :fixed))))))
+               (map-immobile-objects fun :text))))))
     (do-rest-arg ((space) spaces)
       (if (eq space :dynamic)
           (without-gcing (walk-dynamic-space fun #b1111111 0 0))
@@ -458,7 +462,7 @@ We could try a few things to mitigate this:
 
 #+immobile-space
 (progn
-(declaim (ftype (function (immobile-subspaces) (values t t t &optional))
+(declaim (ftype (function ((member :text :fixed)) (values t t t &optional))
                 immobile-fragmentation-information))
 (defun immobile-fragmentation-information (subspace)
   (binding* (((start free-pointer) (%space-bounds subspace))
