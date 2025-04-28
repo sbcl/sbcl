@@ -327,7 +327,7 @@
            (when (not (types-equal-or-intersect
                        (type-difference (tn-ref-type x-tn-ref) (specifier-type 'null))
                        (specifier-type 'cons)))
-             (inst cmp :byte x (logand nil-value #xff))
+             (inst cmp :byte x null-tn)
              (return-from if-eq)))
          (cond ((or (fixup-p value) (tn-p value)) ; immobile object or NIL
                 (inst cmp x value))

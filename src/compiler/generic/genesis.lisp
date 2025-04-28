@@ -3951,7 +3951,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
     (force-output core-file) ; not sure if this does anything
     (let ((posn (file-position core-file)))
       (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
-      (setf (bvref-64 data 0) sb-vm:nil-value)
+      (setf (bvref-64 data 0) sb-ext:most-positive-word)
       (write-bigvec-as-sequence data core-file :end n-data-bytes)
       (force-output core-file)
       (file-position core-file posn))

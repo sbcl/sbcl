@@ -675,7 +675,7 @@
              '(lambda (x) (if (stringp (foo-s (truly-the foo x))) 'is 'not)))))
     ;; Comparison of X to NIL should be a single-byte test.
     ;; Note that the disassembler always treats imm8 operands as signed
-    (let ((expect (sb-disassem:sign-extend (logand sb-vm:nil-value #xff) 8)))
+    (let ((expect "R12"))
       (assert (loop for line in f1
                   thereis (and (search (format nil "CMP ") line) ; register is arbitrary
                                (search (format nil ", ~D" expect) line)))))
