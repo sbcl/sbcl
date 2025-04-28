@@ -235,12 +235,14 @@
   (:result-types positive-fixnum)
   (:generator 2
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst eor res null-tn res)
     (inst lsr res res n-symbol-hash-discard-bits)))
 (define-vop (symbol-name-hash symbol-hash)
-  (:translate symbol-name-hash #-relocatable-static-space hash-as-if-symbol-name)
+  (:translate symbol-name-hash hash-as-if-symbol-name)
   (:generator 1 ; ASSUMPTION: little-endian
-    (inst ldr (32-bit-reg res)
-          (@ symbol (- (+ 4 (ash symbol-hash-slot word-shift)) other-pointer-lowtag)))))
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst eor res null-tn res)
+    (inst lsr res res 32)))
 
 (define-vop ()
   (:args (symbol :scs (descriptor-reg)))

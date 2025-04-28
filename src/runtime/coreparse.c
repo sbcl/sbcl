@@ -285,12 +285,14 @@ set_adjustment(struct cons* pair, int id, uword_t actual_addr)
     sword_t len = spaces[id].len;
     sword_t delta = len ? actual_addr - desired_addr : 0;
     if (!delta) return;
-#ifdef LISP_FEATURE_X86_64
     if (id == STATIC_CORE_SPACE_ID) {
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
         lispobj nil_want = (lispobj)desired_addr + NIL_VALUE_OFFSET;
         lispobj nil_have = (lispobj)actual_addr + NIL_VALUE_OFFSET;
         adj->symhash_adjust = (nil_want ^ nil_have) & SYMBOL_HASH_MASK;
+#ifdef LISP_FEATURE_X86_64
         len = STATIC_SPACE_SIZE; // T and NIL are above the supplied 'len'
+#endif
     }
 #endif
     int j = adj->n_ranges;

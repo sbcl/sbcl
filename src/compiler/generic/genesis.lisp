@@ -1863,7 +1863,7 @@ core and return a descriptor to it."
           (setf (bvref-word (descriptor-mem des) nil-cons-car-offs) sb-vm:nil-value
                 (bvref-word (descriptor-mem des) nil-cons-cdr-offs) sb-vm:nil-value))
         ;; Assign HASH if and only if NIL's hash is address-insensitive
-        #+(or relocatable-static-space (not 64-bit))
+        #-64-bit ; 64-bit depends on address
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (symhash-bits "NIL" des))
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
         (set-symbol-pkgid des sb-impl::+package-id-lisp+ 1)

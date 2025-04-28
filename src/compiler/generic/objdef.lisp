@@ -361,7 +361,7 @@ during backtrace.
       :alloc-trans %alloc-symbol
       :type symbol)))
 
-#+(or (and 64-bit (not relocatable-static-space)) x86-64)
+#+64-bit
 (define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons
@@ -398,19 +398,6 @@ during backtrace.
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :ref-trans symbol-name :init :arg))
-
-;;; 64-bit relocatable-static is a little like 64-bit, a little like 32-bit.
-;;; Refer to comments above for details on each slot.
-#+(and 64-bit relocatable-static-space (not x86-64))
-(define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
-  (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
-  (value :init :unbound)
-  (info :ref-trans symbol-%info :ref-known (flushable)
-        :cas-trans sb-impl::cas-symbol-%info
-        :type (or instance list)
-        :init :null)
-  (hash :set-trans %set-symbol-hash)
   (name :ref-trans symbol-name :init :arg))
 
 #-64-bit

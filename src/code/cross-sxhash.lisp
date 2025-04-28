@@ -66,13 +66,14 @@
   ;; The reader passes a string buffer and length to avoid consing a new string
   ;; for each symbol read. That does not occur in cross-compilation.
   (assert (= length (length string)))
-  (cond #+(or x86-64 (and 64-bit (not relocatable-static-space)))
+  (cond #+64-bit
         ((string= string "NIL") ; :NIL must hash the same as NIL
-         #+x86-64 0 ; always 0
-         #-x86-64
-         ;; Return the high 4 bytes in NIL's car slot.
-         ;; out-of-order with defconstant nil-value
-         (ldb (byte 32 32) (sb-vm::get-nil-taggedptr)))
+         (or #+(or arm64 x86-64)
+             ;; NIL's hash reads as 0 because we always XOR the loaded value with NIL
+             0
+             ;; Return the high 4 bytes in NIL's car slot.
+             ;; out-of-order with defconstant nil-value
+             (ldb (byte 32 32) (sb-vm::get-nil-taggedptr))))
         (t
          (ldb (byte 32 0) ; discard high bits for 64-bit builds
               (logxor (%sxhash-simple-string string) most-positive-fixnum)))))

@@ -436,8 +436,12 @@
 
 (defmacro symhash-xor-constant (tagged-nil)
   (declare (ignorable tagged-nil))
-  #+x86-64 `(dpb 0 (byte n-linkage-index-bits symbol-linkage-index-pos) ,tagged-nil)
-  #-x86-64 0)
+  (or #+(or arm64 x86-64)
+      ;; Leave a 20-bit field untouched. LINKAGE-INDEX generally gets 19 bits starting
+      ;; at index 3, but N-LINKAGE-INDEX-BITS is 0 on arm64.
+      ;; The lowest 3 bits are flags, which are initialized to #b011
+      `(dpb 0 (byte 20 2) ,tagged-nil)
+      0))
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)
