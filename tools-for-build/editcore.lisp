@@ -1008,8 +1008,8 @@
 (defun directory-entry-priority (x)
   (let ((id (second x)))
     (case id
-      (#.static-core-space-id 1)
-      ((#.immobile-fixedobj-core-space-id #.permgen-core-space-id) 2)
+      ((#.immobile-fixedobj-core-space-id #.permgen-core-space-id) 1)
+      (#.static-core-space-id 2)
       (#.read-only-core-space-id 3)
       (#.dynamic-core-space-id 4)
       (#.immobile-text-core-space-id 5))))

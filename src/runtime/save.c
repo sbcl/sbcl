@@ -346,6 +346,19 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_lispobj(0, file); // placeholder
 
     int count = 0;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Apparently when using MAP_32BIT on Linux, if the requested address can't be granted,
+     * sometimes the kernel won't attempt to find an alternative address that works, instead
+     * returning ENOMEM even though lack of memory is not the real issue. So now that static
+     * space is above 4GB, the next-most-problematic mapping is fixedobj space. By placing
+     * it frst in the directory, it stands the highest chance of mapping as requested. */
+    output_space(file,
+                 IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
+                 (lispobj *)FIXEDOBJ_SPACE_START,
+                 fixedobj_free_pointer,
+                 core_start_pos,
+                 core_compression_level), ++count;
+#endif
     output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
@@ -390,14 +403,6 @@ bool save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  read_only_space_free_pointer,
                  core_start_pos,
                  core_compression_level), ++count;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    output_space(file,
-                 IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
-                 (lispobj *)FIXEDOBJ_SPACE_START,
-                 fixedobj_free_pointer,
-                 core_start_pos,
-                 core_compression_level), ++count;
-#endif
     // Leave this space for last! Things are easier when splitting a core into
     // code and non-code if we don't have to compensate for removal of pages.
     // i.e. if code resided between dynamic and fixedobj space, then dynamic
