@@ -293,8 +293,8 @@ set_adjustment(struct cons* pair, int id, uword_t actual_addr)
 #ifdef LISP_FEATURE_X86_64
         len = STATIC_SPACE_SIZE; // T and NIL are above the supplied 'len'
 #endif
-    }
 #endif
+    }
     int j = adj->n_ranges;
     adj->range[j].start = (lispobj)desired_addr;
     adj->range[j].end   = (lispobj)desired_addr + len;
