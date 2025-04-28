@@ -2529,7 +2529,7 @@
   (:result-types unsigned-num)
   (:generator 28
     (let ((zerop (types-equal-or-intersect (tn-ref-type arg-ref)
-                                           (specifier-type '(eql 0)))))
+                                           (specifier-type '(integer -1 0)))))
       (assemble ()
         (move res arg)
         (inst test res res)

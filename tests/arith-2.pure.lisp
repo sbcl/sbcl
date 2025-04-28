@@ -720,3 +720,12 @@
     (((- #1=(expt 2 (1- sb-vm:n-word-bits))) -1) (values #1# 0))
     (((- #1#) -8) (values (- (ash (- #1#) -3))
                           0))))
+
+(with-test (:name :integer-length-minus1)
+  (checked-compile-and-assert
+      ()
+      `(lambda (c)
+         (declare ((and sb-vm:signed-word (integer * -1)) c))
+         (integer-length c))
+    ((-1) 0)
+    ((-2) 1)))
