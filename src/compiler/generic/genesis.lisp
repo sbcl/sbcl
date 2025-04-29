@@ -3658,6 +3658,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
               (if (eq val 't) "LISP_T" val)))))
 
 (defun write-static-symbols (stream)
+  (aver *static*)
   (flet ((cdef (name value)
            (format stream "#define ~A LISPOBJ(~A)~%" name
                    (or #-relocatable-static-space (format nil "0x~X" value)
@@ -3667,20 +3668,11 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
             ;; FIXME: It would be nice not to need to strip anything
             ;; that doesn't get stripped always by C-SYMBOL-NAME.
       (cdef (if (eq symbol 't) "LISP_T" (c-symbol-name symbol "%*.!"))
-            (if *static*               ; if we ran GENESIS
-                 ;; We actually ran GENESIS, use the real value.
-                (descriptor-bits (cold-intern symbol))
-                (+ sb-vm:nil-value (sb-vm:static-symbol-offset symbol)))))
+            (descriptor-bits (cold-intern symbol))))
     (cdef "LFLIST_TAIL_ATOM" (descriptor-bits *lflist-tail-atom*))
-    (let ((where (+ (descriptor-base-address *lflist-tail-atom*)
-                    (sb-vm:pad-data-block (+ sb-vm:instance-data-start 2)) ; LF tail atom
-                    sb-vm:other-pointer-lowtag))
-          (increment (sb-vm:pad-data-block sb-vm:fdefn-size)))
-      (dolist (symbol (or #-linkage-space sb-vm::+c-callable-fdefns+))
-        (cdef (concatenate 'string (c-symbol-name symbol) "_FDEFN")
-              (if *static*               ; if we ran GENESIS
-                  (descriptor-bits (ensure-cold-fdefn symbol))
-                  (prog1 where (incf where increment)))))))
+    (dolist (symbol (or #-linkage-space sb-vm::+c-callable-fdefns+))
+      (cdef (concatenate 'string (c-symbol-name symbol) "_FDEFN")
+            (descriptor-bits (ensure-cold-fdefn symbol)))))
   #+sb-thread
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))
