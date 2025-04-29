@@ -1637,7 +1637,7 @@
     (inst asr digit-b b 63)
     (inst cbz length DONE)
 
-    ;; Add the sign digit with carry to the remaining digits of the longest bignum
+    ;; Add the sign digit with carry to the remaining digits of the bignum
     LOOP-A
     (inst ldr digit-a (@ a (extend index :lsl 3)))
     (inst adcs n digit-a digit-b)
@@ -1650,6 +1650,76 @@
     DONE
     (inst asr digit-a digit-a 63) ;; has the last digit of A
     (inst adc n digit-a digit-b)
+    (inst str n (@ r (extend index :lsl 3)))))
+
+(define-vop (bignum-sub-word-loop)
+  (:args (a* :scs (descriptor-reg))
+         (b :scs (unsigned-reg))
+         (la :scs (unsigned-reg))
+         (r* :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg) length)
+  (:temporary (:sc unsigned-reg) n index digit-a digit-b a r)
+  (:generator 10
+    (inst add-sub a a* #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub r r* #1#)
+
+    (inst ldr digit-a (@ a))
+    (inst subs n digit-a b)
+    (inst str n (@ r))
+    (inst mov index 1)
+    (inst sub length la 1)
+
+    (inst asr digit-b b 63)
+    (inst cbz length DONE)
+
+    LOOP
+    (inst ldr digit-a (@ a (extend index :lsl 3)))
+    (inst sbcs n digit-a digit-b)
+    (inst str n (@ r (extend index :lsl 3)))
+
+    (inst add index index 1)
+    (inst sub length length 1)
+    (inst cbnz length LOOP)
+
+    DONE
+    (inst asr digit-a digit-a 63) ;; has the last digit of A
+    (inst sbc n digit-a digit-b)
+    (inst str n (@ r (extend index :lsl 3)))))
+
+(define-vop (word-sub-bignum-loop)
+  (:args (a :scs (unsigned-reg))
+         (b* :scs (descriptor-reg))
+         (lb :scs (unsigned-reg))
+         (r* :scs (descriptor-reg)))
+  (:arg-types unsigned-num bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg) length)
+  (:temporary (:sc unsigned-reg) n index digit-a digit-b b r)
+  (:generator 10
+    (inst add-sub b b* #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag))
+    (inst add-sub r r* #1#)
+
+    (inst ldr digit-b (@ b))
+    (inst subs n a digit-b)
+    (inst str n (@ r))
+    (inst mov index 1)
+    (inst sub length lb 1)
+
+    (inst asr digit-a a 63)
+    (inst cbz length DONE)
+
+    LOOP
+    (inst ldr digit-b (@ b (extend index :lsl 3)))
+    (inst sbcs n digit-a digit-b)
+    (inst str n (@ r (extend index :lsl 3)))
+
+    (inst add index index 1)
+    (inst sub length length 1)
+    (inst cbnz length LOOP)
+
+    DONE
+    (inst asr digit-b digit-b 63) ;; has the last digit of B
+    (inst sbc n digit-a digit-b)
     (inst str n (@ r (extend index :lsl 3)))))
 
 (define-vop (bignum-negate-loop)
