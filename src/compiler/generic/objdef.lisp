@@ -696,10 +696,18 @@ during backtrace.
      list-pointer-lowtag))
 
 #-relocatable-static-space (defconstant nil-value (+ static-space-start nil-value-offset))
-#+relocatable-static-space (define-symbol-macro nil-value
-                               (truly-the word (+ static-space-start nil-value-offset)))
+#+relocatable-static-space
+(define-symbol-macro nil-value
+    #+sb-xc-host (+ static-space-start nil-value-offset)
+    #-sb-xc-host (truly-the fixnum (get-lisp-obj-address nil)))
 
-#+sb-xc-host (defun get-nil-taggedptr () nil-value)
+#+sb-xc-host
+(defun get-nil-symbol-name-hash ()
+  ;; arm64, x86-64: NIL's hash reads as 0 because we always XOR the loaded value
+  ;; with NIL. This is true whether or not static-space is relocatable
+  #+(or arm64 x86-64) 0
+  ;; all others: the high 4 bytes in NIL's car slot
+  #-(or arm64 x86-64) (ldb (byte 32 32) nil-value))
 
 ;;; Start of static objects:
 ;;;

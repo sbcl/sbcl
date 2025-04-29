@@ -68,12 +68,7 @@
   (assert (= length (length string)))
   (cond #+64-bit
         ((string= string "NIL") ; :NIL must hash the same as NIL
-         (or #+(or arm64 x86-64)
-             ;; NIL's hash reads as 0 because we always XOR the loaded value with NIL
-             0
-             ;; Return the high 4 bytes in NIL's car slot.
-             ;; out-of-order with defconstant nil-value
-             (ldb (byte 32 32) (sb-vm::get-nil-taggedptr))))
+         (sb-vm::get-nil-symbol-name-hash))
         (t
          (ldb (byte 32 0) ; discard high bits for 64-bit builds
               (logxor (%sxhash-simple-string string) most-positive-fixnum)))))
