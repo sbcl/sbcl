@@ -1857,11 +1857,8 @@ core and return a descriptor to it."
         ;; The header-word for NIL "as a symbol" contains a widetag.
         (write-wordindexed/raw des 1 sb-vm:symbol-widetag)
         ;; Write the CAR and CDR of nil-as-cons
-        (let* ((nil-cons-base-addr (- sb-vm:nil-value sb-vm:list-pointer-lowtag))
-               (nil-cons-car-offs (- nil-cons-base-addr (gspace-byte-address *static*)))
-               (nil-cons-cdr-offs (+ nil-cons-car-offs sb-vm:n-word-bytes)))
-          (setf (bvref-word (descriptor-mem des) nil-cons-car-offs) sb-vm:nil-value
-                (bvref-word (descriptor-mem des) nil-cons-cdr-offs) sb-vm:nil-value))
+        (write-wordindexed nil-val 0 nil-val)
+        (write-wordindexed nil-val 1 nil-val)
         ;; Assign HASH if and only if NIL's hash is address-insensitive
         #-64-bit ; 64-bit depends on address
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (symhash-bits "NIL" des))
