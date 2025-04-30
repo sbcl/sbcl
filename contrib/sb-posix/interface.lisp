@@ -751,7 +751,6 @@ not supported."
                        name)))
     `(progn
       (export ',lisp-name :sb-posix)
-      (declaim (inline ,lisp-name))
       (defun ,lisp-name (,arg &optional stat)
         (declare (type (or null stat) stat))
         (with-alien-stat a-stat ()
