@@ -42,7 +42,7 @@
 ;;;; Lisp types used by syscalls
 
 (deftype unix-pathname () 'simple-string)
-(deftype unix-fd () `(integer 0 ,most-positive-fixnum))
+(deftype unix-fd () '(unsigned-byte #-win32 31 #+win32 #.sb-vm:n-word-bits))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
 (deftype unix-pid () '(unsigned-byte 32))
@@ -200,8 +200,8 @@ corresponds to NAME, or NIL if there is none."
 ;;; associated with it.
 (/show0 "unix.lisp 391")
 (defun unix-close (fd)
+  (declare (type unix-fd fd))
   #+win32 (sb-win32:unixlike-close fd)
-  #-win32 (declare (type unix-fd fd))
   #-win32 (void-syscall ("close" int) fd))
 
 ;;;; stdlib.h
@@ -848,7 +848,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
              (%extract-stat-results (addr buf))
              name (addr buf))))
 (defun unix-fstat (fd)
-  #-win32
   (declare (type unix-fd fd))
   (#-win32 funcall #+win32 sb-win32::call-with-crt-fd
    (lambda (fd)
