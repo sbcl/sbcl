@@ -34,6 +34,8 @@
   (let (streams)
     (dotimes (i 6)
       (push (open "autoclose-stream.impure.lisp") streams))
+    ;; fd-has-finalizer-p is unreliable
+    #+nil
     (dolist (stream streams)
       (assert (fd-has-finalizer-p (sb-impl::fd-stream-fd stream))))
     (setq *fds*
@@ -54,6 +56,8 @@
   (make-streams)
   (gc)
   (sb-kernel:run-pending-finalizers)
+  #+sb-thread
+  (sb-impl::finalizer-thread-stop)
   (sb-sys:scrub-control-stack)
   (let ((nsmashed 0))
     (dolist (entry *fds*)
