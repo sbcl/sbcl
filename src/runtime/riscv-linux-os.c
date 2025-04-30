@@ -82,7 +82,11 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     os_vm_address_t end_address
         = (os_vm_address_t)(((uintptr_t) address) + length);
+#ifdef LISP_FEATURE_OS_PROVIDES_FLUSH_ICACHE
     __riscv_flush_icache(address, end_address, 0);
+#else
+    syscall(SYS_riscv_flush_icache, address, end_address, 0, 0);
+#endif
 }
 
 #include <sys/types.h>

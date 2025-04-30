@@ -63,3 +63,8 @@ fi
 if [ "$sbcl_arch" = arm ] ; then
    featurep arm-softfp
 fi
+
+case "$sbcl_arch" in
+    riscv*)
+        featurep os-provides-flush-icache
+esac
