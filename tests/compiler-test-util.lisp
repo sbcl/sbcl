@@ -167,10 +167,15 @@
   (declare (type fixnum times))
   #+(and sb-thread gencgc) (sb-vm::close-thread-alloc-region)
   (setf sb-int:*n-bytes-freed-or-purified* 0)
-  (let ((before (sb-ext:get-bytes-consed)))
-    (dotimes (i times)
-      (funcall thunk))
-    (values before (sb-ext:get-bytes-consed))))
+  (unwind-protect
+       (progn #+sb-thread
+              (sb-impl::finalizer-thread-stop)
+              (let ((before (sb-ext:get-bytes-consed)))
+                (dotimes (i times)
+                  (funcall thunk))
+                (values before (sb-ext:get-bytes-consed))))
+    #+sb-thread
+    (sb-impl::finalizer-thread-start)))
 
 (defun check-consing (yes/no form thunk times)
   (multiple-value-bind (before after)
