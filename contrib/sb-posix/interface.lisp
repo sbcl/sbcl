@@ -387,11 +387,12 @@ not supported."
                  (sb-thread:avltree-list sb-thread::*all-threads*)))
       (sb-impl::finalizer-thread-start)
       (error "Cannot fork with multiple threads running."))
-    (let ((pid (posix-fork)))
-      (when (= pid 0) ; child
-        (alien-funcall (extern-alien "sb_posix_after_fork" (function void))))
-      #+sb-thread (sb-impl::finalizer-thread-start)
-      pid))
+    (sb-sys:without-interrupts
+      (let ((pid (posix-fork)))
+        (when (= pid 0)                 ; child
+          (alien-funcall (extern-alien "sb_posix_after_fork" (function void))))
+        #+sb-thread (sb-impl::finalizer-thread-start)
+        pid)))
   (export 'fork :sb-posix)
 
   (define-call "getpgid" pid-t minusp (pid pid-t))
