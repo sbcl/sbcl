@@ -1985,6 +1985,7 @@ static void impart_mark_stickiness(lispobj word)
     page_index_t page = find_page_index((void*)word);
     if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
         && (word & (GENCGC_PAGE_BYTES - 1)) < page_bytes_used(page)
+        && page_table[page].gen != 0
         && lowtag_ok_for_page_type(word, page_table[page].type)
         && plausible_tag_p(word)) { // "plausible" is good enough
         /* if 'word' is the correctly-tagged pointer to the base of a SIMPLE-VECTOR,
@@ -1997,18 +1998,13 @@ static void impart_mark_stickiness(lispobj word)
         if (lowtag_of(word) == OTHER_POINTER_LOWTAG &&
             widetag_of(native_pointer(word)) == SIMPLE_VECTOR_WIDETAG) {
             generation_index_t gen = page_table[page].gen;
-            /* Skip pointers to gen 0, vectors receive no barrier
-             * elimination (yet) and there should be no values allocated
-             * after a card mark is stored. */
-            if (gen != 0) {
-                while (1) {
-                    long card = page_to_card_index(page);
-                    int i;
-                    for(i=0; i<CARDS_PER_PAGE; ++i)
-                        if (gc_card_mark[card+i]==CARD_MARKED) gc_card_mark[card+i]=STICKY_MARK;
-                    if (page_ends_contiguous_block_p(page, gen)) return;
-                    ++page;
-                }
+            while (1) {
+                long card = page_to_card_index(page);
+                int i;
+                for(i=0; i<CARDS_PER_PAGE; ++i)
+                    if (gc_card_mark[card+i]==CARD_MARKED) gc_card_mark[card+i]=STICKY_MARK;
+                if (page_ends_contiguous_block_p(page, gen)) return;
+                ++page;
             }
         } else if (gc_card_mark[addr_to_card_index((void*)word)] == CARD_MARKED) {
             gc_card_mark[addr_to_card_index((void*)word)] = STICKY_MARK;
@@ -3184,7 +3180,7 @@ conservative_stack_scan(struct thread* th,
 
     __attribute__((unused)) void (*context_method)(os_context_register_t,void*) =
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        sticky_preserve_pointer;
+        gen == 0 ? sticky_preserve_pointer : preserve_pointer;
 #else
         preserve_pointer;
 #endif

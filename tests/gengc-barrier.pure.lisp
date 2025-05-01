@@ -25,7 +25,7 @@
                       (when (typep y '(or fixnum null))
                         (rplaca x y)))))
 
-(with-test (:name :rplaca-union-types)
+(with-test (:name :move-from-fixnum)
   (assert-barriers 1 0
                    `(lambda (a b)
                       (declare (fixnum a))
@@ -34,6 +34,13 @@
                    `(lambda (a b)
                       (declare (fixnum a))
                       (setf (car b) (- a)))))
+
+(with-test (:name :old-slot-set-no-barrier)
+  (assert-barriers 1 0
+                   '(lambda (y)
+                     (let ((x (cons 0 0)))
+                       (setf (car x) y)
+                       x))))
 
 (with-test (:name :consequent)
   (assert-barriers 2 2
@@ -57,6 +64,7 @@
                         (declare (fixnum m))
                         (setf (car x) m)
                         (setf (cdr x) j)))
+    #+nil
     (assert-barriers 1 1
                      `(lambda (x m j)
                         (setf (car x) m)

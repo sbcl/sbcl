@@ -1419,19 +1419,22 @@
                                      (compatible-scs-p (tn-sc tn) sc))
                            return tn)))
             (let ((barrier (vop-info-gc-barrier info)))
-              (when barrier
-                (destructuring-bind (object value &optional allocator) barrier
-                 (let* ((tn (tn-ref-tn (sb-vm::vop-nth-arg object vop)))
-                        (register (register-p tn)))
-                   (if (and (not (and register
-                                      (memq (tn-offset tn) 2block-gc-barriers)))
-                            (sb-vm::require-gengc-barrier-p tn
-                                                            (sb-vm::vop-nth-arg value vop)
-                                                            (and allocator
-                                                                 (nth allocator (vop-codegen-info vop)))))
-                       (when register
-                         (push (tn-offset tn) 2block-gc-barriers))
-                       (nsubst nil barrier (vop-codegen-info vop)))))))
+              (if barrier
+                  (destructuring-bind (object value &optional allocator) barrier
+                    (let* ((tn (tn-ref-tn (sb-vm::vop-nth-arg object vop)))
+                           (register (register-p tn)))
+                      (if (and
+                           (not (and register
+                                     (memq (tn-offset tn) 2block-gc-barriers)))
+                           (sb-vm::require-gengc-barrier-p tn
+                                                           (sb-vm::vop-nth-arg value vop)
+                                                           (and allocator
+                                                                (nth allocator (vop-codegen-info vop)))))
+                          (when register
+                            (push (tn-offset tn) 2block-gc-barriers))
+                          (nsubst nil barrier (vop-codegen-info vop)))))
+                  ;; FIXME: can't straddle an allocation sequences
+                  (setf 2block-gc-barriers nil)))
             (case (vop-name vop)
               ((move sb-vm::move-arg)
                (let* ((args (vop-args vop))

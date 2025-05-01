@@ -392,7 +392,7 @@ static void impart_mark_stickiness(lispobj word)
     // At worst this will spurisouly mark a card as sticky,
     // which can happen only if it was already marked as dirty.
     page_index_t page = find_page_index((void*)word);
-    // Unlike for gencgc, do not check page_bytes_used
+    // Unlike for gencgc, do not check page_bytes_used or generation
     // (maybe could/should for large object pages?)
     if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
         && lowtag_ok_for_page_type(word, page_table[page].type)
@@ -615,8 +615,8 @@ conservative_stack_scan(struct thread* th,
      * sigcontext, though there could, in theory be if it performs
      * GC while handling an interruption */
 
-    void (*context_method)(os_context_register_t,void*) = sticky_preserve_pointer;
-
+    void (*context_method)(os_context_register_t,void*) =
+        gen == 0 ? sticky_preserve_pointer : preserve_pointer;
 
     void* esp = (void*)-1;
 # if defined(LISP_FEATURE_SB_SAFEPOINT)

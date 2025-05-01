@@ -1307,15 +1307,6 @@
 (with-test (:name :signed-vops) (test-signed))
 (with-test (:name :unsigned-vops) (test-unsigned))
 
-(with-test (:name :old-slot-set-no-barrier)
-  (let ((vops-with-barrier
-          (find-gc-barriers
-           '(lambda (y)
-             (let ((x (cons 0 0)))
-               (setf (car x) y)
-               x)))))
-    (assert (not vops-with-barrier))))
-
 (with-test (:name :smaller-than-qword-cons-slot-init
                   :skipped-on (:not :mark-region-gc))
   (let ((lines (disassembly-lines
