@@ -351,11 +351,6 @@
                  #+win32 rbx))
   . #.(destroyed-c-registers))
 
-#+win32
-(progn
-(defconstant win64-seh-direct-thunk-addr win64-seh-data-addr)
-(defconstant win64-seh-indirect-thunk-addr (+ win64-seh-data-addr 8)))
-
 (defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
   (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
@@ -419,26 +414,21 @@
                         (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
                         (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn))))))
 
-  ;; On win64, calls go through one of the thunks defined in set_up_win64_seh_data().
+  ;; On win64, calls go through a thunk defined in set_up_win64_seh_data().
   #+win32
-  (cond ((tn-p fun)
-         (move rbx fun)
-         (inst mov rax win64-seh-direct-thunk-addr)
-         (inst call rax))
-        (t
-         ;; RBX is loaded with the address of the word containing the address in the alien
-         ;; linkage table of the alien function to call. This informs UNDEFINED-ALIEN-TRAMP
-         ;; which table cell was referenced, if undefined.
-         #+immobile-space ; relocatable table
-         (cond ((code-immobile-p vop)
-                (inst lea rbx (rip-relative-ea (make-fixup fun :foreign 8)))) ; BAD!
-               (t
-                (inst mov rbx (make-fixup fun :alien-code-linkage-index 8))
-                (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot))))
-         ;; else, wired table base address
-         #-immobile-space (inst mov rbx (make-fixup fun :foreign 8))
-         (inst mov rax win64-seh-indirect-thunk-addr)
-         (inst call rax)))
+  (progn
+    (if (tn-p fun)
+        (move rbx fun)
+        ;; Compute address of entrypoint in the alien linkage table into RBX
+        (cond ((code-immobile-p vop)
+               (inst lea rbx (rip-relative-ea (make-fixup fun :foreign))))
+              #-immobile-space
+              (t (inst lea rbx (ea (make-fixup fun :alien-code-linkage-index) null-tn)))
+              #+immobile-space
+              (t (inst mov rbx (make-fixup fun :alien-code-linkage-index))
+                 (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
+    (inst mov rax win64-seh-data-addr)
+    (inst call rax))
 
   ;; For the undefined alien error
   (note-this-location vop :internal-error)

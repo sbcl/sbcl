@@ -503,7 +503,6 @@ typedef struct _UNWIND_INFO {
 
 struct win64_seh_data {
     uint8_t direct_thunk[8];
-    uint8_t indirect_thunk[8];
     uint8_t handler_trampoline[16];
     UNWIND_INFO ui; // needs to be DWORD-aligned
     RUNTIME_FUNCTION rt;
@@ -531,16 +530,6 @@ set_up_win64_seh_thunk(size_t page_size)
     dthunk[5] = 0x57;
     dthunk[6] = 0xC3; // ret
     dthunk[7] = 0x90; // nop (padding)
-
-    volatile uint8_t *ithunk = seh_data->indirect_thunk;
-    ithunk[0] = 0x41; // pop r15
-    ithunk[1] = 0x5F;
-    ithunk[2] = 0xFF; // call qword ptr [rbx]
-    ithunk[3] = 0x13;
-    ithunk[4] = 0x41; // push r15
-    ithunk[5] = 0x57;
-    ithunk[6] = 0xC3; // ret
-    ithunk[7] = 0x90; // nop (padding)
 
     volatile uint8_t *tramp = seh_data->handler_trampoline;
     tramp[0] = 0xFF; // jmp qword ptr [rip+2]
