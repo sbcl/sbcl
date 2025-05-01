@@ -251,14 +251,13 @@
   (:result-types system-area-pointer)
   (:vop-var vop)
   (:generator 2
-    #-immobile-space
-    (inst lea res (ea (make-fixup foreign-symbol :alien-code-linkage-index) null-tn))
+    #-immobile-space (inst lea res (ea (make-fixup foreign-symbol :foreign) null-tn))
     #+immobile-space
     (cond ((code-immobile-p vop)
            (inst lea res (rip-relative-ea (make-fixup foreign-symbol :foreign))))
           (t
-           (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
-           (inst lea res (ea (make-fixup foreign-symbol :alien-code-linkage-index) res))))))
+           (inst mov res (make-fixup foreign-symbol :foreign))
+           (inst add res (thread-slot-ea thread-alien-linkage-table-base-slot))))))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -270,14 +269,13 @@
   (:result-types system-area-pointer)
   (:vop-var vop)
   (:generator 2
-    #-immobile-space
-    (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) null-tn))
+    #-immobile-space (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref) null-tn))
     #+immobile-space
     (cond ((code-immobile-p vop)
            (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
           (t
            (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
-           (inst mov res (ea (make-fixup foreign-symbol :alien-data-linkage-index) res))))))
+           (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref) res))))))
 
 #+sb-safepoint
 (defconstant thread-saved-csp-offset (- (1+ sb-vm::thread-header-slots)))
@@ -351,17 +349,14 @@
                  #+win32 rbx))
   . #.(destroyed-c-registers))
 
+;;; Remember when changing this to check that these work:
+;;; - disassembly, undefined alien, and conversion to ELF core
 (defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save #+win32 rbx)
   (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
   #+sb-safepoint
   (let ((label (gen-label)))
-    ;; This looks unnecessary. GC can look at the stack word physically below
-    ;; the CSP-around-foreign-call, which must be a PC pointing into the lisp caller.
-    ;; A more interesting question would arise if we had callee-saved registers
-    ;; within lisp code, which we don't at the moment. If we did, those
-    ;; wouldn't be anywhere on the stack unless C code decides to save them.
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
     (move pc-save rax))
@@ -400,33 +395,34 @@
   ;; this instruction sequence can take.
   #-win32
   (pseudo-atomic (:elide-if (not (call-out-pseudo-atomic-p vop)))
-    (inst call (if (tn-p fun)
-                 fun
-                 #-immobile-space
-                 (progn (inst lea rbx-tn (ea (make-fixup fun :alien-code-linkage-index) null-tn))
-                        rbx-tn)
-                 #+immobile-space
-                 (cond ((code-immobile-p vop) (make-fixup fun :foreign))
-                       (t
-                        ;; Pick r10 as the lowest unused clobberable register.
-                        ;; RAX has a designated purpose, and RBX is nonvolatile (not always
-                        ;; spilled by Lisp because a C function has to save it if used)
-                        (inst mov r10-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
-                        (ea (make-fixup fun :alien-code-linkage-index 8) r10-tn))))))
+    (inst call
+          #-immobile-space ; always call via RBX
+          (cond ((stringp fun) (inst lea rbx-tn (ea (make-fixup fun :foreign) null-tn)) rbx-tn)
+                (t fun))
+          #+immobile-space ; sometimes call via RBX
+          (if (stringp fun)
+              (cond ((code-immobile-p vop) (make-fixup fun :foreign))
+                    (t
+                     (inst mov rbx-tn (make-fixup fun :foreign))
+                     (inst add rbx-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
+                     rbx-tn))
+              ;; Emit a 3-byte NOP so the undefined-alien routine reads a well-defined byte
+              ;; on error. In practice, decoding never seemed to go wrong, but looked fishy
+              ;; due to the possibility of any random bytes preceding the call.
+              (dolist (b '(#x0f #x1f #x00) fun) (inst byte b)))))
 
   ;; On win64, calls go through a thunk defined in set_up_win64_seh_data().
   #+win32
   (progn
-    (if (tn-p fun)
-        (move rbx fun)
-        ;; Compute address of entrypoint in the alien linkage table into RBX
-        (cond ((code-immobile-p vop)
-               (inst lea rbx (rip-relative-ea (make-fixup fun :foreign))))
-              #-immobile-space
-              (t (inst lea rbx (ea (make-fixup fun :alien-code-linkage-index) null-tn)))
-              #+immobile-space
-              (t (inst mov rbx (make-fixup fun :alien-code-linkage-index))
-                 (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
+    (cond ((tn-p fun) (move rbx fun)) ; wasn't this already done by the VOP ?
+          ;; Compute address of entrypoint in the alien linkage table into RBX
+          ((code-immobile-p vop)
+           (inst lea rbx (rip-relative-ea (make-fixup fun :foreign))))
+          (t
+           #-immobile-space (inst lea rbx (ea (make-fixup fun :foreign) null-tn))
+           #+immobile-space
+           (progn (inst mov rbx (make-fixup fun :foreign))
+                  (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
     (inst mov rax win64-seh-data-addr)
     (inst call rax))
 

@@ -19,6 +19,9 @@
 (defconstant sb-fasl:+backend-fasl-file-implementation+ :x86-64)
 (defconstant-eqx +fixup-kinds+ #(:abs32 :*abs32 :rel32 :absolute) #'equalp)
 
+;;; :FOREIGN fixup modifier. NIL + fixup = address of indirection word within linkage entry
+#-immobile-space (defconstant +nil-indirect+ 1)
+
 ;;; This size is supposed to indicate something about the actual granularity
 ;;; at which you can map memory.  We just hardwire it, but that may or may not
 ;;; be necessary any more.

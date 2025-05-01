@@ -1080,7 +1080,6 @@
 (defconstant-eqx +fixup-flavors+
  `#(:assembly-routine
     :card-table-index-mask :symbol-tls-index
-    :alien-code-linkage-index :alien-data-linkage-index
     :foreign :foreign-dataref
     :code-object
     :layout :immobile-symbol
@@ -1160,8 +1159,7 @@
           (incf nelements) ; used 1 element of the fasl stack
           (let ((operand
                  (fixup-flavor-case flavor-id
-                   ((:alien-code-linkage-index :alien-data-linkage-index
-                     :foreign :foreign-dataref) (the string name))
+                   ((:foreign :foreign-dataref) (the string name))
                    (:layout
                     (if (symbolp name)
                         name

@@ -152,49 +152,32 @@
     (pseudo-atomic ()
       (call-c "allocation_tracker_sized" (addressof (ea 8 rbp-tn))))))
 
-#+win32
+#+(or win32 (not immobile-space))
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
-#-win32
+#+(and immobile-space (not win32))
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
   ;; This routine computes into RBX the address of the linkage table entry that was called,
   ;; corresponding to the undefined alien function.
-  (inst push rax-tn) ; save registers in case we want to see the old values
-  (inst push rbx-tn)
+  (inst push rax-tn)
   ;; load RAX with the PC after the call site
-  (inst mov rax-tn (ea 16 rsp-tn))
+  (inst mov rax-tn (ea 8 rsp-tn))
+  ;; The CALL takes one of 3 shapes. Only the first has #xE8 at next PC - 5.
+  ;;  * CALL rel32                                  | from immobile code
+  ;;  * MOV EBX, imm32 / ADD EBX, [tbl] / CALL RBX  | from dynamic space
+  ;;  * multibyte-nop / CALL rbx                    | anonymous call
+  (inst cmp :byte (ea -5 rax-tn) #xE8)
+  (inst jmp :ne TRAP) ; RBX is valid
   ;; load RBX with the signed 32-bit immediate from the call instruction
   (inst movsx '(:dword :qword) rbx-tn (ea -4 rax-tn))
-  ;; The decoding seems scary, but it's actually not. Any C call-out instruction has
-  ;; a 4-byte trailing operand, with the preceding byte being unique.
-  ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
-  ;; if ...              #xE8 then ...                32-bit offset
-  ;; if ...              #x92 then it was "call *DISP(%r10)" where r10 is the table base
-  #-immobile-space ; only non-relocatable alien linkage table can use "CALL [ABS]" form
-  (progn (inst cmp :byte (ea -5 rax-tn) #x25)
-         (inst jmp :e ABSOLUTE))
-  #+immobile-space ; only relocatable alien linkage table can use "CALL rel32" form
-  (progn (inst cmp :byte (ea -5 rax-tn) #xE8)
-         (inst jmp :e RELATIVE)
-         (inst cmp :byte (ea -5 rax-tn) #x92)
-         (inst jmp :e ABSOLUTE))
-  ;; failing those, assume RBX was valid. ("can't happen")
-  (inst mov rbx-tn (ea rsp-tn)) ; restore pushed value of RBX
-  (inst jmp trap)
-  ABSOLUTE
-  #-immobile-space (inst sub rbx-tn 8)
-  #+immobile-space (inst lea rbx-tn (ea -8 r10-tn rbx-tn))
-  (inst jmp TRAP)
-  RELATIVE
   (inst add rbx-tn rax-tn)
   TRAP
-  ;; XXX: why aren't we adding something to the stack pointer to balance the two pushes?
-  ;; (I guess we can only THROW at this point, so it doesn't matter)
+  (inst pop rax-tn)
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
 #+debug-gc-barriers

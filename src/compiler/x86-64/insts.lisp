@@ -3393,6 +3393,23 @@
 (defun fixup-code-object (code offset value kind flavor
                           &aux (sap (code-instructions code)))
   (declare (type index offset))
+  (when (member flavor '(:foreign :foreign-dataref))
+    ;; If nonzero, the value stored at the fixup location is not an optional addend;
+    ;; instead it's an opaque enumerated value further specifying how to adjust the value.
+    (let ((disp (* value alien-linkage-table-entry-size))
+          #-immobile-space (subkind (shiftf (sap-ref-32 sap offset) 0)))
+      (setf value
+            (ecase kind
+              (:abs32
+               #+immobile-space disp
+               #-immobile-space
+               (let ((nil-based-disp
+                      (- disp (+ sb-vm::nil-value-offset sb-vm:alien-linkage-space-size))))
+                 (setq kind :disp)
+                 (if (eql subkind sb-vm::+nil-indirect+) (+ nil-based-disp 8) nil-based-disp)))
+              (:rel32 ; subkind is meaningless - this is a PC-relative fixup.
+               ;; must be ASM codeblob if #-immobile-space
+               (sb-vm::alien-linkage-table-entry-address value))))))
   ;; Preprocess the value based on FLAVOR and the implicit addend at the
   ;; fixup location.  The addend will be zero for most <KIND,FLAVOR> pairs.
   (setq value
@@ -3416,14 +3433,6 @@
                   (:abs32 index))))
              (:assembly-routine
               (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value) value))
-             ((:alien-code-linkage-index :alien-data-linkage-index)
-              #-immobile-space ; implicitly has a base reg of NULL-TN
-              (let ((lt (+ (- sb-vm::alien-linkage-space-size)
-                           (- sb-vm::nil-value-offset)))
-                    (index (* value alien-linkage-table-entry-size)))
-                (incf (signed-sap-ref-32 sap offset) (+ lt index))
-                (return-from fixup-code-object))
-              #+immobile-space (* value alien-linkage-table-entry-size))
              (:layout-id ; layout IDs are signed quantities on x86-64
               (setf (signed-sap-ref-32 sap offset) value)
               (return-from fixup-code-object))
@@ -3444,6 +3453,7 @@
      (unless (immobile-space-obj-p code)
        (error "Can't compute fixup relative to movable object ~S" code))
      (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
+    (:disp (setf (signed-sap-ref-32 sap offset) value))
     (:absolute ; 64-bit jump table target address
      (setf (sap-ref-64 sap offset) value)))
   nil))

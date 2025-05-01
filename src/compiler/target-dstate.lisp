@@ -101,6 +101,7 @@
                 :type (member :beginning
                               :block-boundary
                               nil))
+  (previous-chunk) ; as an integer, however much was fetched
   (known-register-contents)
 
   ;; alist of (address . label-number)

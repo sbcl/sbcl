@@ -2360,15 +2360,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (sb-vm:fixup-code-object code-object after-header value kind flavor)
   code-object)
 
-(defun alien-linkage-table-note-symbol (symbol-name datap &optional (mode :address))
+(defun alien-linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address or index in proto-linkage-table."
   (let ((index
          (ensure-gethash (if datap (list symbol-name) symbol-name)
                          *cold-foreign-symbol-table*
                          (hash-table-count *cold-foreign-symbol-table*))))
-    (case mode
-      (:address (sb-vm::alien-linkage-table-entry-address index))
-      (:index index))))
+    #+x86-64 index
+    #-x86-64 (sb-vm::alien-linkage-table-entry-address index)))
 
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
@@ -2975,10 +2974,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:assembly-routine (lookup-assembler-reference name))
              (:foreign (alien-linkage-table-note-symbol string nil))
              (:foreign-dataref (alien-linkage-table-note-symbol string t))
-             (:alien-code-linkage-index
-              (alien-linkage-table-note-symbol string nil :index))
-             (:alien-data-linkage-index
-              (alien-linkage-table-note-symbol string t :index))
              (:code-object (descriptor-bits code-obj))
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index name))

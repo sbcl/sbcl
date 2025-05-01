@@ -172,9 +172,10 @@
 
 (defmacro call-c (fun &rest args)
   (aver (stringp fun))
-  (setq fun (if (or #+immobile-space t (member :sb-assembling sb-xc:*features*))
-                `(make-fixup ,fun :foreign)
-                `(ea (make-fixup ,fun :alien-code-linkage-index 8) null-tn)))
+  (setq fun #-immobile-space (if (member :sb-assembling sb-xc:*features*)
+                                 `(make-fixup ,fun :foreign) ; PC-relative call
+                                 `(ea (make-fixup ,fun :foreign ,+nil-indirect+) null-tn))
+            #+immobile-space `(make-fixup ,fun :foreign)) ; always PC-relative
   `(progn
      #+win32 (inst sub rsp-tn 32)
      ,@(loop for arg in args

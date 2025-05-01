@@ -1979,7 +1979,8 @@
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
        (awhen (inst-printer inst)
-         (funcall it chunk inst stream dstate)))
+         (funcall it chunk inst stream dstate)
+         (setf (dstate-previous-chunk dstate) chunk)))
      segment
      dstate
      stream)))

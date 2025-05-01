@@ -48,6 +48,15 @@
            #-(or arm64 ppc64 x86 x86-64) fun))
      (setf (sb-vm::%simple-fun-self fun) self)))
 
+(defmacro alien-linkage-value (name datap)
+  ;; x86-64 foreign fixups pass the machine-dependent code patcher an index into the
+  ;; alien linkage table. The index increases by 1 (not LINKAGE-ENTRY-SIZE) per entry.
+  ;; This is important if the entry address does not increment linearly with the index.
+  ;; See comment above FOREIGN-SYMBOL-SAP in src/compiler/x86-64 for why it may be best
+  ;; to arrange all the indirect words adjacent, followed by all the JMP instructions.
+  ;; All other architectures expect to receive an address inside the alien linkage table.
+  `(#+x86-64 sb-impl::ensure-alien-linkage-index #-x86-64 foreign-symbol-address ,name ,datap))
+
 (flet ((fixup (code-obj offset name kind flavor-id real-code-obj callees
                &aux (flavor (aref +fixup-flavors+ flavor-id)))
          ;; NAME depends on the kind and flavor of fixup.
@@ -65,10 +74,8 @@
                                           (error "Unknown asm routine ~S" name)))))
                       (sap-int (sap+ (code-instructions asm-code)
                                      (aref *asm-routine-offsets* index)))))
-                   (:alien-code-linkage-index (sb-impl::ensure-alien-linkage-index name nil))
-                   (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
-                   (:foreign (foreign-symbol-address name))
-                   (:foreign-dataref (foreign-symbol-address name t))
+                   (:foreign (alien-linkage-value name nil))
+                   (:foreign-dataref (alien-linkage-value name t))
                    #+linkage-space
                    ((:linkage-cell :linkage-cell-ud)
                     (let* ((quiet (eq flavor :linkage-cell))

@@ -1171,7 +1171,7 @@
   (dolist (memspace '(:dynamic :immobile))
     (let ((sb-c::*compile-to-memory-space* memspace))
       (assert (find-in-disassembly
-               (if (eq sb-c::*compile-to-memory-space* :immobile) "lose" "&lose")
+               "lose"
                '(lambda ()
                  (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
                  (alien-funcall (extern-alien "lose" (function void))))))

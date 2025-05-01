@@ -223,7 +223,11 @@
              (when (<= a (machine-ea-disp value) (1- (+ a (primitive-object-size v))))
                (let ((target (sap-ref-word (int-sap (machine-ea-disp value)) 0)))
                  (maybe-note-assembler-routine target t dstate))))))
-        (t (write value :stream stream :escape nil))))
+        (t
+         (let ((regs (shiftf (sb-disassem::dstate-known-register-contents dstate) nil)))
+           (when (eq (car regs) 'alien)
+             (note (lambda (s) (format s "~A" (cdr regs))) dstate)))
+         (write value :stream stream :escape nil))))
 
 (defun print-sized-byte-reg/mem (value stream dstate)
   (print-reg/mem-with-width value :byte t stream dstate))
@@ -592,6 +596,16 @@
                                  (logior +rex+ +rex-w+ +rex-b+)))
                    (setf (sb-disassem::dstate-known-register-contents dstate)
                          `(,(reg-num (regrm-inst-reg dchunk-zero dstate)) . ,symbol)))
+                 ;; The only use of an ADD into a reg with the source as the alien-linkage-table-base
+                 ;; is for a following CALL inst. So assume it. Probably should verify, but ... meh.
+                 (when (and (eql index sb-vm::thread-alien-linkage-table-base-slot)
+                            (eql (logand (sb-disassem::dstate-previous-chunk dstate) #xFF) #xBB)
+                            (eq (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)) 'add))
+                   (aver (= (reg-num (regrm-inst-reg dchunk-zero dstate)) 3))
+                   (let* ((disp (ldb (byte 32 8) (sb-disassem::dstate-previous-chunk dstate)))
+                          (name (sb-impl::alien-linkage-index-to-name
+                                 (floor disp sb-vm:alien-linkage-table-entry-size))))
+                     (setf (sb-disassem::dstate-known-register-contents dstate) (cons 'alien name))))
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "thread.~(~A~)" symbol))
                          dstate))))
