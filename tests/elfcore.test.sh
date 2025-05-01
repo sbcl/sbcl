@@ -62,6 +62,16 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-us
               (> (sb-kernel:code-n-entries obj) 0))
      (assert (/= (sb-kernel:%code-serialno obj) 0))))
  :all)
+
+;; Test that lisp linkage cells were bypassed.
+;; (This test was copied from elf-sans-immobile)
+(in-package sb-impl)
+(defun asm-string () (with-output-to-string (ss) (disassemble 'y-or-n-p :stream ss)))
+#+x86-64 (assert (search "#'QUERY-READ-CHAR" (asm-string)))
+(defun query-read-char () #\y) ; will undo static linkage
+#+x86-64 (assert (search "; QUERY-READ-CHAR" (asm-string)))
+(assert (eq (let ((*query-io* (make-broadcast-stream))) (y-or-n-p)) t))
+(format t "~&Function redef OK~%")
 EOF
 (cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o shrinkwrap-sbcl.core)
 

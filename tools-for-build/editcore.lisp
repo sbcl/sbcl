@@ -58,7 +58,7 @@
 ;;; Some high address that won't conflict with any of the ordinary spaces
 ;;; It's more-or-less arbitrary, but we must be able to discern whether a
 ;;; pointer looks like it points to code in case coreparse has to walk the heap.
-(defconstant +code-space-nominal-address+ #x550000000000)
+(defconstant +code-space-nominal-address+ #x680000000000)
 
 (defstruct (core-space ; "space" is a CL symbol
             (:conc-name space-)
@@ -994,6 +994,9 @@
                                collect (%vector-raw-bits core-header i))))
         (#.initial-fun-core-entry-type-code
          (setq initfun (%vector-raw-bits core-header ptr)))))
+    (let ((static (find static-core-space-id space-list :key 'space-id)))
+      (assert static)
+      (assert (= *nil-taggedptr* (+ (space-addr static) sb-vm::nil-value-offset))))
     (make-core-header :dir-start core-dir-start
                       :total-npages total-npages
                       :pte-nbytes pte-nbytes
@@ -1804,7 +1807,8 @@
     (root (make-descriptor initfun))
     (dotimes (i (linkage-space-count linkage-info))
       (let ((word (aref (linkage-space-cells linkage-info) i)))
-        (unless (or (= word 0) (= word *nil-taggedptr*))
+        (unless (or (= word 0) (= word sb-ext:most-positive-word)
+                    (= word *nil-taggedptr*))
           (let ((header (sap-ref-word (int-sap (translate-ptr word spacemap))
                                       (ash -2 word-shift))))
             (when (= (logand header widetag-mask) funcallable-instance-widetag)

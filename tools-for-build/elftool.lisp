@@ -1485,9 +1485,9 @@ lisp_fun_linkage_space: .zero ~:*~D
 ;; space have to be modified to correctly reference their C functions. They assume that static
 ;; space is near alien-linkage space, and so they use this form:
 ;;   xxxx: E8A1F0EFFF  CALL #x50000060 ; alloc
-;; which unforuntately means that after relocating to text space, that instruction refers
+;; which unfortunately means that after relocating to text space, that instruction refers
 ;; to random garbage, and more unfortunately there is no room to squeeze in an instruction
-;; that encodes to 7 bytes.
+;; that encodes to 8 bytes.
 ;; So we have to create an extra jump "somewhere" that indirects through the linkage table
 ;; but is callable from the text-space code.
 ;;; I don't feel like programmatically scanning the asm code to determine these.
@@ -1521,11 +1521,10 @@ lisp_fun_linkage_space: .zero ~:*~D
               (%make-lisp-obj (logior (sap-int (sap+ (space-physaddr text-space spacemap)
                                                      code-offsets-vector-size))
                                       other-pointer-lowtag)))
-             (alien-ls-start (- (space-addr (or text-space static-space))
+             (alien-ls-start (- (space-addr (or #+immobile-space text-space static-space))
                                 alien-linkage-space-size))
              (alien-ls-end (1- (+ alien-ls-start alien-linkage-space-size))))
     (aver (<= (length *c-linkage-redirects*) (length c-linkage-vector)))
-    ;; (format t "~&alien linkage range = ~x .. ~x~%" alien-ls-start alien-ls-end)
     (dolist (x *c-linkage-redirects*)
       (let* ((index (position (cdr x) (core-alien-linkage-symbols core)
                               :test (lambda (a b) (and (stringp b) (string= a b)))))
@@ -1536,13 +1535,12 @@ lisp_fun_linkage_space: .zero ~:*~D
            (item-index 0 (1+ item-index))
            (items *c-linkage-redirects* (cdr items)))
           ((null items))
-        ;; Each new quasi-linkage-table entry takes 8 bytes to encode.
-        ;; The JMP is 7 bytes, followed by a nop.
-        ;; FF2425nnnnnnnn = JMP [ea]
-        (setf (sap-ref-32 sap 0) #x2524FF
-              (sap-ref-32 sap 3) (+ (caar items) 8) ; addr within the real alien linkage entry
-              (sap-ref-8 sap 7) #x90) ; nop
-        (setf (aref c-linkage-vector item-index) (%vector-raw-bits inst-buffer 0))))
+        (let ((disp (+ (- (caar items) *nil-taggedptr*) 8)))
+          ;; Each new quasi-linkage-table entry takes 8 bytes to encode.
+          (setf (sap-ref-32 sap 0) #x24A4FF41 ; JMP [R12-disp]
+                (signed-sap-ref-32 sap 4) disp) ; gets to the addr within the real linkage entry
+          (setf (aref c-linkage-vector item-index) (%vector-raw-bits inst-buffer 0)))))
+
     ;; Produce a model of the instructions. It doesn't really matter whether we scan
     ;; OLD-CODE or NEW-CODE since we're supplying the proper virtual address either way.
     (let* ((skip (ash (code-jump-table-words old-code) word-shift))
@@ -1598,7 +1596,10 @@ lisp_fun_linkage_space: .zero ~:*~D
           (spacemap (core-spacemap core))
           (text-bounds (space-bounds immobile-text-core-space-id spacemap))
           (linkage-bounds (core-linkage-bounds core))
-          (alien-linkage-end (+ (bounds-low linkage-bounds) alien-linkage-space-size))
+          (lisp-linkage-bounds
+           (make-bounds (bounds-low linkage-bounds)
+                        (+ (bounds-low linkage-bounds)
+                           (ash 1 (+ sb-vm:n-linkage-index-bits sb-vm:word-shift)))))
           (indices))
   (declare (simple-vector insts))
   (labels ((linkage-table-load-p (prev-inst)
@@ -1615,9 +1616,8 @@ lisp_fun_linkage_space: .zero ~:*~D
              (cond ((eq (machine-ea-base ea) :rip) ; RIP+n format
                     (let* ((next-pc (+ (range-vaddr (car inst)) (range-bytecount (car inst))))
                            (addr (+ next-pc (machine-ea-disp ea))))
-                      (when (and (>= addr alien-linkage-end)
-                                 (< addr (bounds-high linkage-bounds)))
-                        (ash (- addr alien-linkage-end) (- word-shift)))))
+                      (when (in-bounds-p addr lisp-linkage-bounds)
+                        (ash (- addr (bounds-low lisp-linkage-bounds)) (- word-shift)))))
                    ((and (eql (machine-ea-base ea) 0) ; RAX+n format
                          (null (machine-ea-index ea))
                          ;; 0 is not a usable linkage cell
