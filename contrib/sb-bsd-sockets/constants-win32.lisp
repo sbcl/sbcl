@@ -41,6 +41,8 @@
  (:integer SHUT_WR "SD_SEND")
  (:integer SHUT_RDWR "SD_BOTH")
 
+ (:integer msg-waitall "MSG_WAITALL")
+
  (:integer EADDRINUSE "WSAEADDRINUSE")
  (:integer EAGAIN "WSAEWOULDBLOCK")
  (:integer EBADF "WSAEBADF")
