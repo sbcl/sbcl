@@ -319,8 +319,13 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                        (and (consp y)
                             (,recurse-car (car x) (car y))
                             (,recurse-cdr (cdr x) (cdr y))))
-                      ((stringp x)
-                       (and (stringp y) (string= x y)))
+                      ((%other-pointer-p x)
+                       (when (%other-pointer-p y)
+                         (cond ((stringp x)
+                                (and (stringp y) (string= x y)))
+                               ((bit-vector-p x)
+                                (and (bit-vector-p y)
+                                     (bit-vector-= x y))))))
                       ;; We could remove this case by ensuring that
                       ;; MAKE-PATHNAME, PARSE-NAMESTRING,
                       ;; MERGE-PATHNAME, etc look in a weak hash-based
@@ -330,11 +335,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                       ;; of pathname construction, which seems like a
                       ;; good tradeoff.
                       ((pathnamep x)
-                       (and (pathnamep y) (pathname= x y)))
-                      ((bit-vector-p x)
-                       (and (bit-vector-p y)
-                            (bit-vector-= x y)))
-                      (t nil))))
+                       (and (pathnamep y) (pathname= x y))))))
     ;; Calling local functions is still slow, so we inline
     ;; self-recursion on CAR (at even depths only to avoid infinite
     ;; inlining). This doubles the code size, but it also makes
