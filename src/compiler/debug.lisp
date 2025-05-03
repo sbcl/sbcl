@@ -1116,25 +1116,42 @@
       (format t "cleanup ~s~%" (cleanup-kind (block-end-cleanup block)))))
   (values))
 
+(defun tn-write-count (tn)
+  (loop for ref = (tn-writes tn) then (tn-ref-next ref)
+        while ref
+        count t))
+
+(defun tn-read-count (tn)
+  (loop for ref = (tn-reads tn) then (tn-ref-next ref)
+        while ref
+        count t))
+
 ;;; Print the guts of a TN. (logic shared between PRINT-OBJECT (TN T)
 ;;; and printers for compound objects which contain TNs)
 (defun print-tn-guts (tn &optional (stream *standard-output*))
   (declare (type tn tn))
-  (let ((leaf (tn-leaf tn)))
-    (cond (leaf
-           (print-leaf leaf stream)
-           (format stream "!~D" (tn-id tn)))
-          (t
-           (format stream "t~D" (tn-id tn))))
-    (when (and (tn-sc tn) (tn-offset tn))
-      (format stream "[~A]" (location-print-name tn)))
-    (format stream " ~s~@[ ~a~]~@[ ~a~]" (tn-kind tn)
-            (and *debug-print-types*
-                 (and (tn-sc tn)
-                      (sc-name (tn-sc tn))))
-            (and *debug-print-types*
-                 (and (tn-primitive-type tn)
-                      (primitive-type-name (tn-primitive-type tn)))))))
+  (flet ((print-tn-name (tn)
+           (let ((leaf (tn-leaf tn)))
+             (cond (leaf
+                    (print-leaf leaf stream)
+                    (format stream "!~D" (tn-id tn)))
+                   (t
+                    (format stream "t~D" (tn-id tn))))
+             (when (and (tn-sc tn) (tn-offset tn))
+               (format stream "[~A]" (location-print-name tn))))))
+    (print-tn-name tn)
+    (format stream " ~s" (tn-kind tn))
+    (when (eq (tn-kind tn) :alias)
+      (format stream " to ")
+      (print-tn-name (tn-save-tn tn)))
+    (when *debug-print-types*
+      (format stream "~@[ ~a~]~@[ ~a~]"
+              (and (tn-sc tn)
+                   (sc-name (tn-sc tn)))
+              (and (tn-primitive-type tn)
+                   (primitive-type-name (tn-primitive-type tn)))))
+    #+nil
+    (format stream "/r~aw~a/" (tn-read-count tn) (tn-write-count tn))))
 
 ;;; Print the TN-REFs representing some operands to a VOP, linked by
 ;;; TN-REF-ACROSS.
