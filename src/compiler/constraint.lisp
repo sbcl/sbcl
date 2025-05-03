@@ -1069,6 +1069,8 @@
                       (when (and ref
                                  (constant-p other))
                         (change-ref-leaf ref other)
+                        (when (eq (node-derived-type ref) *empty-type*)
+                          (pushnew ref *blocks-to-terminate*))
                         (return-from type-from-constraints))
                       (intersect-result other-type))
                      ((constant-p other)
