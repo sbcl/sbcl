@@ -336,6 +336,32 @@
                  (result simple-vector-widetag)
                  (%vector-widetag-and-n-bits-shift expansion)))))))))
 
+(defun %string-widetag-and-n-bits-shift (element-type)
+  (declare (explicit-check))
+  (macrolet ((result (widetag)
+               (let ((value (symbol-value widetag)))
+                 `(values ,value
+                          ,(saetp-n-bits-shift
+                            (find value
+                                  *specialized-array-element-type-properties*
+                                  :key #'saetp-typecode))))))
+    (cond ((eq element-type 'character)
+           #+sb-unicode
+           (result simple-character-string-widetag)
+           #-sb-unicode
+           (result simple-base-string-widetag))
+          ((or (eq element-type 'base-char)
+               (eq element-type 'standard-char)
+               (eq element-type nil))
+           (result simple-base-string-widetag))
+          (t
+           (multiple-value-bind (widetag n-bits-shift)
+               (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+             (unless (or #+sb-unicode (= widetag sb-vm:simple-character-string-widetag)
+                         (= widetag sb-vm:simple-base-string-widetag))
+               (error "~S is not a valid :ELEMENT-TYPE for MAKE-STRING" element-type))
+             (values widetag n-bits-shift))))))
+
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()
                `(case widetag

@@ -600,18 +600,11 @@ new string COUNT long filled with the fill character."
             (unless (or #+sb-unicode (= widetag sb-vm:simple-character-string-widetag)
                         (= widetag sb-vm:simple-base-string-widetag))
               (error "~S is not a valid :ELEMENT-TYPE for MAKE-STRING" element-type))
-            ;; If you give a ridiculous type such as (member #\EN_SPACE) as your
-            ;; :ELEMENT-TYPE, then you get what you deserve - slow type checking.
-            (when (and iep (not (typep initial-element element-type)))
-              (error 'simple-type-error
-                     :datum initial-element
-                     :expected-type element-type
-                     :format-control "~S is not a ~S"
-                     :format-arguments (list initial-element element-type)))
             (let ((string
                    (sb-vm::allocate-vector-with-widetag
                     #+ubsan nil widetag count n-bits-shift)))
-              (when initial-element (fill string initial-element))
+              (when iep
+                (fill string initial-element))
               string)))))
 
 (defmacro nstring-case (case-index a z)

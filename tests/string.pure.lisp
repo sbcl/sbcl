@@ -269,15 +269,11 @@ claim that any particular result from these edge cases constitutes a bug.
    (funcall (opaque-identity 'make-string) (truncate array-total-size-limit 2)
             :element-type '(unsigned-byte 8))))
 
-(with-test (:name :make-string-pedantic-initial-element)
+(with-test (:name :make-string-initial-element-mismatch)
   ;; This used to be silently accepted (at least in the interpreter)
   (assert-error
    (funcall (opaque-identity 'make-string) 10
-            :element-type '(member #\a #\b #\c) :initial-element nil))
-  ;; As was this
-  (assert-error
-   (funcall (opaque-identity 'make-string) 10
-            :element-type '(member #\a #\b #\c) :initial-element #\x)))
+            :element-type '(member #\a #\b #\c) :initial-element nil)))
 
 (with-test (:name :%sp-string-compare-argument-order)
   (checked-compile-and-assert

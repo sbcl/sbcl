@@ -728,22 +728,32 @@
 ;;; array of things that are not characters, and then signaling an error.
 (deftransform make-string ((length &key element-type initial-element))
   (let ((elt-ctype
-         (cond ((not element-type) (specifier-type 'character))
-               ((constant-lvar-p element-type)
-                (ir1-transform-specifier-type (lvar-value element-type))))))
-    (when (or (not elt-ctype)
-              (eq elt-ctype *empty-type*) ; silly, don't do it
-              (contains-unknown-type-p elt-ctype))
-      (give-up-ir1-transform))
-    (multiple-value-bind (subtypep certainp)
-        (csubtypep elt-ctype (specifier-type 'character))
-      (if (not certainp) (give-up-ir1-transform)) ; could be valid, don't know
-      (if (not subtypep)
-          (abort-ir1-transform "~S is not a valid :ELEMENT-TYPE for MAKE-STRING"
-                               (lvar-value element-type))))
-    `(the simple-string (make-array (the index length)
-                         ,@(when initial-element '(:initial-element initial-element))
-                         :element-type ',(type-specifier elt-ctype)))))
+          (cond ((not element-type) (specifier-type 'character))
+                ((constant-lvar-p element-type)
+                 (ir1-transform-specifier-type (lvar-value element-type))))))
+    (cond ((or (not elt-ctype)
+               (eq elt-ctype *empty-type*) ; silly, don't do it
+               (contains-unknown-type-p elt-ctype))
+           `(multiple-value-bind (widetag shift)
+                (sb-vm::%string-widetag-and-n-bits-shift element-type)
+              (let ((string (truly-the simple-string (sb-vm::allocate-vector-with-widetag widetag length shift))))
+                ,@(when initial-element
+                    `((cond #+sb-unicode
+                            ((eq widetag sb-vm:simple-character-string-widetag)
+                             (fill (truly-the (simple-array character (*)) string) initial-element))
+                            (t
+                             (fill (truly-the simple-base-string string) initial-element)))))
+                string)))
+          (t
+           (multiple-value-bind (subtypep certainp)
+               (csubtypep elt-ctype (specifier-type 'character))
+             (if (not certainp) (give-up-ir1-transform)) ; could be valid, don't know
+             (if (not subtypep)
+                 (abort-ir1-transform "~S is not a valid :ELEMENT-TYPE for MAKE-STRING"
+                                      (lvar-value element-type))))
+           `(the simple-string (make-array (the index length)
+                                           ,@(when initial-element '(:initial-element initial-element))
+                                           :element-type ',(type-specifier elt-ctype)))))))
 
 ;; Traverse the :INTIAL-CONTENTS argument to an array constructor call,
 ;; changing the skeleton of the data to be constructed by calls to LIST

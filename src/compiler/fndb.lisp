@@ -1266,6 +1266,13 @@
     (values (integer 128 255) (integer 0 7))
     (flushable foldable recursive no-verify-arg-count))
 
+(defknown sb-vm::%string-widetag-and-n-bits-shift (type-specifier)
+    (values (member #+sb-unicode #.sb-vm:simple-character-string-widetag
+                    #.sb-vm:simple-base-string-widetag)
+            (member #+sb-unicode 5
+                    3))
+    (flushable foldable recursive no-verify-arg-count))
+
 (defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)
