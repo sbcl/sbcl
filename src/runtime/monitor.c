@@ -49,8 +49,11 @@ typedef int cmd(char **ptr,iochannel_t);
 
 struct crash_preamble {
     uword_t signature;
+    uword_t linkage_start;
+    uword_t linkage_nbytes;
     uword_t static_start;
     uword_t static_nbytes;
+    uword_t static_freeptr;
     uword_t readonly_start;
     uword_t readonly_nbytes;
     uword_t permgen_start;
@@ -138,8 +141,12 @@ void save_gc_crashdump(char *pathname,
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
     preamble.signature = CRASH_PREAMBLE_SIGNATURE;
+    preamble.linkage_start = (uword_t)linkage_space;
+    preamble.linkage_nbytes = LISP_LINKAGE_SPACE_SIZE;
     preamble.static_start = STATIC_SPACE_START;
-    preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
+    // saving all of static space is easier the separating out the constants at the end
+    preamble.static_nbytes = STATIC_SPACE_SIZE; // (uword_t)static_space_free_pointer - STATIC_SPACE_START;
+    preamble.static_freeptr = (uword_t)static_space_free_pointer;
     preamble.readonly_start = READ_ONLY_SPACE_START;
     preamble.readonly_nbytes = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
     preamble.permgen_start = PERMGEN_SPACE_START;
@@ -171,6 +178,7 @@ void save_gc_crashdump(char *pathname,
     struct filewriter writer = { .fd = fd, .total = 0, .verbose = verbose };
     // write the preamble and static + readonly spaces
     checked_write("preamble", &writer, &preamble, sizeof preamble);
+    checked_write("linkage", &writer, (char*)linkage_space, preamble.linkage_nbytes);
     checked_write("static", &writer, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     checked_write("R/O", &writer, (char*)READ_ONLY_SPACE_START, preamble.readonly_nbytes);
     checked_write("perm", &writer, (char*)PERMGEN_SPACE_START, preamble.permgen_nbytes);
@@ -1209,6 +1217,13 @@ extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
 extern struct thread *alloc_thread_struct(void*);
 
+/* For the time being at least, the standalone monitor requires that all spaces in
+ * a dump file map exactly as requested. I'd prefer if that were not so, but I don't
+ * see a way to perform the heap verification until fixing up the core as
+ * it actually mapped. It could be impossible if the heap was messed up enough to
+ * cause a crash in the first place */
+#define LDB_SPACE_MOVABILITY 0
+
 int load_gc_crashdump(char* pathname)
 {
     int fd;
@@ -1238,21 +1253,36 @@ int load_gc_crashdump(char* pathname)
     if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
+    gc_card_table_mask = (1<<gc_card_table_nbits)-1;
+#ifdef LISP_FEATURE_LINKAGE_SPACE
+    linkage_space = (lispobj*)os_alloc_gc_space(0, 0, (char*)preamble.linkage_start,
+                                                preamble.linkage_nbytes);
+    checked_read("linkage", fd, (char*)linkage_space, preamble.linkage_nbytes);
+#endif
     // static + readonly
+#ifdef LISP_FEATURE_RELOCATABLE_STATIC_SPACE
+    STATIC_SPACE_START =
+        (uword_t)os_alloc_gc_space(STATIC_CORE_SPACE_ID, 0, (char*)preamble.static_start,
+                                   STATIC_SPACE_SIZE + (1+gc_card_table_mask));
+    printf("static: wanted %lx got %lx\n", preamble.static_start, STATIC_SPACE_START);
+#endif
     checked_read("static", fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
-    static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
+    static_space_free_pointer =
+        (lispobj*)(((char*)preamble.static_freeptr - (char*)preamble.static_start)
+                   + (char*)STATIC_SPACE_START);
     if (!preamble.readonly_nbytes) {
         checked_read("R/O", fd, 0, 0);
     } else {
         void* actual =
-            os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, 0, (char*)preamble.readonly_start,
+            os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, LDB_SPACE_MOVABILITY,
+                              (char*)preamble.readonly_start,
                               ALIGN_UP(preamble.readonly_nbytes, 4096));
         if (actual != (void*)preamble.readonly_start)
             fprintf(stderr, "WARNING: wanted R/O space @ %p but got %p\n",
                     (char*)preamble.readonly_start, actual);
-        checked_read("R/O", fd, (char*)preamble.readonly_start, preamble.readonly_nbytes);
+        checked_read("R/O", fd, (char*)actual, preamble.readonly_nbytes);
 #ifndef READ_ONLY_SPACE_START /* if non-constant */
-        READ_ONLY_SPACE_START = preamble.readonly_start;
+        READ_ONLY_SPACE_START = (uword_t)actual;
         READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + preamble.readonly_nbytes;
         read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_END;
 #endif
@@ -1270,17 +1300,22 @@ int load_gc_crashdump(char* pathname)
         permgen_space_free_pointer = (lispobj*)(preamble.permgen_start + preamble.permgen_nbytes);
     }
     //
+    page_table_pages = preamble.dynspace_npages_total;
     gc_allocate_ptes();
     dynamic_space_size = preamble.dynspace_npages_total * GENCGC_PAGE_BYTES;
     next_free_page = preamble.dynspace_npages_used;
     DYNAMIC_SPACE_START = preamble.dynspace_start;
     long dynspace_nbytes = preamble.dynspace_npages_used * GENCGC_PAGE_BYTES;
-    char* dynspace = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, 0, (char*)preamble.dynspace_start,
+    char* dynspace = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, LDB_SPACE_MOVABILITY,
+                                       (char*)preamble.dynspace_start,
                                        DEFAULT_DYNAMIC_SPACE_SIZE);
-    if (dynspace != (char*)preamble.dynspace_start)
+    if (dynspace != (char*)preamble.dynspace_start
+        && LDB_SPACE_MOVABILITY == 0) {
         lose("Didn't map dynamic space where expected: %p vs %p",
              dynspace, (char*)preamble.dynspace_start);
-    checked_read("dynamic", fd, (char*)DYNAMIC_SPACE_START, dynspace_nbytes);
+    }
+    DYNAMIC_SPACE_START = (uword_t)dynspace;
+    checked_read("dynamic", fd, dynspace, dynspace_nbytes);
     fprintf(stderr, "snapshot: %"PAGE_INDEX_FMT" pages in use (%ld bytes)\n",
             next_free_page, dynspace_nbytes);
     checked_read("PTE", fd, page_table, sizeof (struct page) * next_free_page);
@@ -1433,6 +1468,9 @@ int load_gc_crashdump(char* pathname)
     gc_assert(read(fd, signature, 1) == 0);
     close(fd);
     all_threads = threads;
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = all_threads;
+#endif
     return 0;
 }
 
@@ -1445,6 +1483,8 @@ int main(int argc, char *argv[], char **envp)
         fprintf(stderr, "Usage: ldb crashdump\n");
         return 1;
     }
+    extern void sb_query_os_page_size();
+    sb_query_os_page_size();
     bool have_hardwired_spaces = os_preinit(argv, envp);
     // Unlike in ordinary startup where we might try to call personality()
     // to disable ASLR, this can't proceed if the preinit fails.

@@ -814,6 +814,30 @@ int sb_unw_get_pc(void* a, void* b) { lose("unw_get_pc %p %p", a, b); }
 #endif
 
 #ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
+void libunwind_bt_from_sigcontext(void* context)
+{
+    char procname[100];
+    unw_cursor_t cursor;
+    FILE * f = stderr;
+    unw_init_local2(&cursor, context, UNW_INIT_SIGNAL_FRAME);
+    // This thread performs the backtrace of the other thread, so it matters not
+    // whether libunwind functions are interrupt-safe (though they do claim to be)
+    do {
+        uword_t offset;
+        char *pc, *fp;
+        unw_get_reg(&cursor, UNW_TDEP_IP, (uword_t*)&pc);
+        unw_get_reg(&cursor, UNW_TDEP_BP, (uword_t*)&fp);
+        fprintf(f, "fp=%p ", fp);
+        if (print_lisp_fun_name(pc, f)) {
+            // printed
+        } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
+            fprintf(f, " %p [%s]\n", pc, procname);
+        } else {
+            fprintf(f, " %p ?\n", pc);
+        }
+    } while (unw_step(&cursor));
+}
+
 static sem_t bt_suspend_sem;
 static os_context_t *bt_suspension_context;
 void libunwind_backtrace(struct thread *th, FILE* f)
