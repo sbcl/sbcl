@@ -383,3 +383,9 @@ claim that any particular result from these edge cases constitutes a bug.
       (find #\1 s :test #'char/=))
    ((" ") #\Space)
    (("1") nil)))
+
+(with-test (:name :inline-fill)
+  (assert (equal (ctu:ir1-named-calls
+                  `(lambda (x)
+                     (make-string 2 :element-type x :initial-element #\a)))
+                 '(sb-vm::%string-widetag-and-n-bits-shift))))

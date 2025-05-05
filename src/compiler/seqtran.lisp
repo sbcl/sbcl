@@ -916,7 +916,8 @@
                     (and (constant-lvar-p start)
                          (eql (lvar-value start) 0)))
                 (not end)
-                (typep (array-type-dimensions type) '(cons number null))
+                (or (typep (array-type-dimensions type) '(cons number null))
+                    (delay-ir1-transform node :constraint))
                 (<= (car (array-type-dimensions type))
                     (cond #+soft-card-marks
                           ((eq element-ctype *universal-type*)
