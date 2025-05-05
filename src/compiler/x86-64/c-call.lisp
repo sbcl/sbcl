@@ -423,8 +423,7 @@
            #+immobile-space
            (progn (inst mov rbx (make-fixup fun :foreign))
                   (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
-    (inst mov rax (ea (make-fixup 'seh-trampoline :assembly-routine) null-tn))
-    (inst call rax))
+    (invoke-asm-routine 'call 'seh-trampoline vop))
 
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
