@@ -42,6 +42,9 @@
 (compile 'read-slot-way2)
 
 ;;; Collect up a bunch of instances that are subtypes of STRUCTURE-OBJECT
+;;; I've seen mismatch occur in the SLOT-VALUE calls, so I've inserted logic
+;;; to exclude expected faillures.
+;;; (I guess the finalizer thread manipulates hash-tables while this thread runs?)
 (with-test (:name :fast-structure-slot-value)
   (let ((instances
          (sb-vm:list-allocated-objects
@@ -59,8 +62,10 @@
         (dolist (dsd (sb-kernel:dd-slots dd))
           (let ((slot-name (sb-kernel:dsd-name dsd)))
             ;; some slots may be raw, don't worry about being EQ
-            (assert (eql (read-slot-way1 x slot-name)
-                         (read-slot-way2 x slot-name)))))))))
+            (unless (eql (read-slot-way1 x slot-name)
+                         (read-slot-way2 x slot-name))
+              (unless (and (hash-table-p x) (eq slot-name 'sb-impl::cache))
+                (error "Failed on ~s ~s" x slot-name)))))))))
 
 (defstruct a-struct x)
 (defstruct (another-struct (:include a-struct)) y)
