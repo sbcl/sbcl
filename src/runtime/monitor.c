@@ -141,8 +141,10 @@ void save_gc_crashdump(char *pathname,
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
     preamble.signature = CRASH_PREAMBLE_SIGNATURE;
+#ifdef LISP_FEATURE_LINKAGE_SPACE
     preamble.linkage_start = (uword_t)linkage_space;
     preamble.linkage_nbytes = LISP_LINKAGE_SPACE_SIZE;
+#endif
     preamble.static_start = STATIC_SPACE_START;
     // saving all of static space is easier the separating out the constants at the end
     preamble.static_nbytes = STATIC_SPACE_SIZE; // (uword_t)static_space_free_pointer - STATIC_SPACE_START;
@@ -178,7 +180,9 @@ void save_gc_crashdump(char *pathname,
     struct filewriter writer = { .fd = fd, .total = 0, .verbose = verbose };
     // write the preamble and static + readonly spaces
     checked_write("preamble", &writer, &preamble, sizeof preamble);
+#ifdef LISP_FEATURE_LINKAGE_SPACE
     checked_write("linkage", &writer, (char*)linkage_space, preamble.linkage_nbytes);
+#endif
     checked_write("static", &writer, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     checked_write("R/O", &writer, (char*)READ_ONLY_SPACE_START, preamble.readonly_nbytes);
     checked_write("perm", &writer, (char*)PERMGEN_SPACE_START, preamble.permgen_nbytes);
@@ -1468,7 +1472,7 @@ int load_gc_crashdump(char* pathname)
     gc_assert(read(fd, signature, 1) == 0);
     close(fd);
     all_threads = threads;
-#ifdef LISP_FEATURE_GCC_TLS
+#if defined(LISP_FEATURE_GCC_TLS) && defined(LISP_FEATURE_SB_THREAD)
     current_thread = all_threads;
 #endif
     return 0;
