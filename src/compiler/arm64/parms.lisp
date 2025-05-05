@@ -73,7 +73,8 @@
                      #x2F0000000
                      #+darwin #x300000000
                      #-darwin :read-only-space-size #-darwin 0
-                     :fixedobj-space-size #.(* 65536 1024)
+                     :fixedobj-space-start 0
+                     :fixedobj-space-size 0
                      :text-space-start #x0A00000000
                      :text-space-size #.(* 2 65536 1024)
                      :dynamic-space-start
