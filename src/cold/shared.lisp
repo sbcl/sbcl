@@ -395,6 +395,10 @@
           ":SYSTEM-TLABS requires SB-THREAD")
          ("(and sb-futex (not sb-thread))"
           "Can't enable SB-FUTEX on platforms lacking thread support")
+         ("(and relocatable-static-space (not (or arm64 x86-64)))"
+          "Relocatable-static-space not supported for chosen architecture")
+         ("(and relocatable-static-space arm64 (not immobile-space))"
+          "Relocatable-static-space requires immobile-space")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))
