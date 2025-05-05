@@ -423,7 +423,7 @@
            #+immobile-space
            (progn (inst mov rbx (make-fixup fun :foreign))
                   (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
-    (inst mov rax win64-seh-data-addr)
+    (inst mov rax (ea (make-fixup 'seh-trampoline :assembly-routine) null-tn))
     (inst call rax))
 
   ;; For the undefined alien error

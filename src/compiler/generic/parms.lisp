@@ -80,8 +80,6 @@
                )))
     (let*
         ((spaces (append `((read-only ,ro-space-size)
-                           #+(and win32 x86-64)
-                           (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
                            ;; #+immobile-space implies a relocatable alien linkage space. And x86-64 always
                            ;; has relocatable linkage tables
                            #-(or x86-64 immobile-space) (alien-linkage ,alien-linkage-space-size)

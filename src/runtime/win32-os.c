@@ -501,60 +501,32 @@ typedef struct _UNWIND_INFO {
   ULONG ExceptionData[1];
 } UNWIND_INFO;
 
-struct win64_seh_data {
-    uint8_t direct_thunk[8];
-    uint8_t handler_trampoline[16];
-    UNWIND_INFO ui; // needs to be DWORD-aligned
-    RUNTIME_FUNCTION rt;
-};
+static struct win64_seh_data { RUNTIME_FUNCTION rt; } seh_data;
 
-static void
-set_up_win64_seh_thunk(size_t page_size)
+void set_up_win64_seh_thunk(lispobj* asm_routine)
 {
-    if (page_size < sizeof(struct win64_seh_data))
-        lose("Not enough space to allocate struct win64_seh_data");
+    // TODO: make asm routines findable in cold-init
+    if (!asm_routine) return; // (though cold-init is ok w/o this exception handler)
+    gc_assert(sizeof (UNWIND_INFO) <= 16);
+    asm_routine[2] = (lispobj)handle_exception;
 
-    gc_assert(VirtualAlloc(WIN64_SEH_DATA_ADDR, page_size,
-                           MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE));
-
-    struct win64_seh_data *seh_data = (void *) WIN64_SEH_DATA_ADDR;
-    DWORD64 base = (DWORD64) seh_data;
-
-    // 'volatile' works around "warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]"
-    volatile uint8_t *dthunk = seh_data->direct_thunk;
-    dthunk[0] = 0x41; // pop r15
-    dthunk[1] = 0x5F;
-    dthunk[2] = 0xFF; // call rbx
-    dthunk[3] = 0xD3;
-    dthunk[4] = 0x41; // push r15
-    dthunk[5] = 0x57;
-    dthunk[6] = 0xC3; // ret
-    dthunk[7] = 0x90; // nop (padding)
-
-    volatile uint8_t *tramp = seh_data->handler_trampoline;
-    tramp[0] = 0xFF; // jmp qword ptr [rip+2]
-    tramp[1] = 0x25;
-    UNALIGNED_STORE32((void*volatile)(tramp+2), 2);
-    tramp[6] = 0x66; // 2-byte nop
-    tramp[7] = 0x90;
-    *(void **)(tramp+8) = handle_exception;
-
-    UNWIND_INFO *ui = &seh_data->ui;
+    UNWIND_INFO *ui = (void*)(asm_routine + 3);
     ui->Version = 1;
     ui->Flags = UNW_FLAG_EHANDLER;
     ui->SizeOfProlog = 0;
     ui->CountOfCodes = 0;
     ui->FrameRegister = 0;
     ui->FrameOffset = 0;
-    ui->ExceptionHandler = (DWORD64) tramp - base;
+    ui->ExceptionHandler = 8; // offset within asm routine
     ui->ExceptionData[0] = 0;
 
-    RUNTIME_FUNCTION *rt = &seh_data->rt;
+    RUNTIME_FUNCTION *rt = &seh_data.rt;
     rt->BeginAddress = 0;
     rt->EndAddress = 16;
-    rt->UnwindData = (DWORD64) ui - base;
+    rt->UnwindData = 24; // = ui - asm_routine
 
-    gc_assert(RtlAddFunctionTable(rt, 1, base));
+    BOOLEAN ok = RtlAddFunctionTable(rt, 1, (DWORD64)asm_routine);
+    gc_assert(ok);
 }
 #endif
 
@@ -641,10 +613,6 @@ void os_init()
     os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
         system_info.dwPageSize : BACKEND_PAGE_BYTES;
     os_number_of_processors = system_info.dwNumberOfProcessors;
-
-#ifdef LISP_FEATURE_X86_64
-    set_up_win64_seh_thunk(os_vm_page_size);
-#endif
 
     resolve_optional_imports();
     runtime_module_handle = (HMODULE)win32_get_module_handle_by_address(&runtime_module_handle);

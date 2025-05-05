@@ -3237,10 +3237,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
   (terpri)
 
-  #+(and win32 x86-64)
-  (format t "#define WIN64_SEH_DATA_ADDR ((void*)~DUL) /* ~:*0x~X */~%"
-            sb-vm:win64-seh-data-addr)
-
   ;; FIXME: The SPARC has a PSEUDO-ATOMIC-TRAP that differs between
   ;; platforms. If we export this from the SB-VM package, it gets
   ;; written out as #define trap_PseudoAtomic, which is confusing as

@@ -114,6 +114,11 @@ void tune_asm_routines_for_microarch(void)
     if (cpuid_fn1_ecx & (1<<23)) our_cpu_feature_bits |= 2;
     *FEATURE_BITS_EA = make_fixnum(our_cpu_feature_bits);
 
+#ifdef LISP_FEATURE_WIN32
+    extern void set_up_win64_seh_thunk(lispobj*);
+    set_up_win64_seh_thunk((lispobj*)get_asm_routine_by_name("SEH-TRAMPOLINE", 0));
+#endif
+
     unsigned char* asm_routine = (void*)get_asm_routine_by_name(VECTOR_FILL_T, 0);
     if (!asm_routine) return;
     // Since a particular runtime expects a particular core,
@@ -142,6 +147,10 @@ void tune_asm_routines_for_microarch(void)
    instructions that don't exist on some cpu family members */
 void untune_asm_routines_for_microarch(void)
 {
+#ifdef LISP_FEATURE_WIN32
+    lispobj* routine = (lispobj*)get_asm_routine_by_name("SEH-TRAMPOLINE", 0);
+    memset(routine + 2, 0, 3*N_WORD_BYTES);
+#endif
     asm_routine_poke(VECTOR_FILL_T, vector_fill_offset_to_poke,
                      0xEB); // Change JL to JMP
     *FEATURE_BITS_EA = 0;
