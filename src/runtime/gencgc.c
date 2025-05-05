@@ -1269,11 +1269,12 @@ lispobj *search_dynamic_space(void *pointer)
     }
     char* limit = page_address(page_index) +  page_bytes_used(page_index);
     if ((char*)pointer > limit) return NULL;
-    if (type == PAGE_TYPE_CONS) {
-        return (lispobj*)ALIGN_DOWN((uword_t)pointer, 2*N_WORD_BYTES);
-    }
     lispobj *start;
-    if (type == PAGE_TYPE_SMALL_MIXED) { // find the nearest card boundary below 'pointer'
+    /* Do NOT optimistically treat any cons-aligned pointer on a cons page as valid,
+     * because pages with some FILLER_WIDETAG object can have cons-looking garbage
+     * in the interior of fillers. However, aligning down to a card is ok, as fillers
+     * can't span cards. This optimization is only admissible on two page types */
+    if (type == PAGE_TYPE_SMALL_MIXED || type == PAGE_TYPE_CONS) {
         start = (lispobj*)ALIGN_DOWN((uword_t)pointer, GENCGC_CARD_BYTES);
     } else {
         start = (lispobj *)page_scan_start(page_index);
