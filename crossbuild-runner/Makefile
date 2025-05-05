@@ -20,7 +20,7 @@ obj/xbuild/arm64-darwin.core: obj/xbuild/arm64-darwin/xc.core
 	$(SBCL) $(ARGS) arm64-darwin < $(SCRIPT2)
 
 obj/xbuild/arm64-reloc/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) arm64-reloc arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :RELOCATABLE-STATIC-SPACE)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) arm64-reloc arm64 "(:UNIX :LINUX :ELF :LITTLE-ENDIAN :SB-THREAD :RELOCATABLE-STATIC-SPACE :IMMOBILE-SPACE)" < $(SCRIPT1)
 obj/xbuild/arm64-reloc.core: obj/xbuild/arm64-reloc/xc.core
 	$(SBCL) $(ARGS) arm64-reloc < $(SCRIPT2)
 
