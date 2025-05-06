@@ -3647,6 +3647,7 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
 
 (defun write-static-symbols (stream)
   (aver *static*)
+  #+x86-64 (format stream "#define NIL_CARDTABLE_DISP $0x~x~%" sb-vm::nil-cardtable-disp)
   (flet ((cdef (name value)
            (format stream "#define ~A LISPOBJ(~A)~%" name
                    (or #-relocatable-static-space (format nil "0x~X" value)

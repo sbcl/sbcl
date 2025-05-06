@@ -112,6 +112,8 @@
 ;;;      41FF94240904F0FF CALL [R12-1047543]
 
 (defconstant nil-static-space-end-offs 41) ; 6 words (48 bytes) _minus_ list-pointer-lowtag
+(defconstant nil-cardtable-disp (+ nil-static-space-end-offs
+                                   #+sb-safepoint +backend-page-bytes+)) ; stupidly excessive
 (define-symbol-macro static-space-end (+ nil-value nil-static-space-end-offs))
 
 #+(or linux darwin)

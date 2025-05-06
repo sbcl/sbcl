@@ -27,9 +27,7 @@
     (inst shr addr-or-card-index gencgc-card-shift)
     ;; :DWORD suffices because gc_allocate_ptes() asserts mask to be < 32 bits
     (inst and :dword addr-or-card-index card-index-mask))
-  (let ((disp (+ sb-vm::nil-static-space-end-offs
-                 #+sb-safepoint sb-c:+backend-page-bytes+))) ; stupidly excessive
-    (inst mov :byte (ea disp null-tn addr-or-card-index) CARD-MARKED)))
+  (inst mov :byte (ea nil-cardtable-disp null-tn addr-or-card-index) CARD-MARKED))
 
 ;;; TODOs:
 ;;; 1. Sometimes people write constructors like
