@@ -22,29 +22,29 @@ long long powish(unsigned int x, unsigned int y) {
 }
 
 float return9th(float f1, float f2, float f3, float f4, float f5,
-		float f6, float f7, float f8, float f9, float f10,
-		float f11, float f12) {
+                float f6, float f7, float f8, float f9, float f10,
+                float f11, float f12) {
     return f9;
 }
 
 double return9thd(double f1, double f2, double f3, double f4, double f5,
-		  double f6, double f7, double f8, double f9, double f10,
-		  double f11, double f12) {
+                  double f6, double f7, double f8, double f9, double f10,
+                  double f11, double f12) {
     return f9;
 }
 
 int long_test8(int a1, int a2, int a3, int a4, int a5,
-	       int a6, int a7, long long l1) {
+               int a6, int a7, long long l1) {
     return (l1 == powish(2,34));
 }
 
 int long_test9(int a1, int a2, int a3, int a4, int a5,
-	       int a6, int a7, long long l1, int a8) {
+               int a6, int a7, long long l1, int a8) {
     return (l1 == powish(2,35));
 }
 
 int long_test2(int i1, int i2, int i3, int i4, int i5, int i6,
-	       int i7, int i8, int i9, long long l1, long long l2) {
+               int i7, int i8, int i9, long long l1, long long l2) {
     return (l1 == (1 + powish(2,37)));
 }
 
