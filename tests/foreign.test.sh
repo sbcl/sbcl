@@ -15,6 +15,7 @@
 # more information.
 
 run_compiler=`pwd`/run-compiler.sh
+primary_c_source=`pwd`/foreigntest.c
 . ./expect.sh
 . ./subr.sh
 
@@ -25,102 +26,20 @@ echo //entering foreign.test.sh
 ## Make some shared object files to test with.
 
 build_so() (
-  echo building $1.so
-  /bin/sh ${run_compiler} -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
+  if [ $# -eq 2 ]
+  then
+    echo building $1.so from $2
+    /bin/sh ${run_compiler} -sbcl-pic -sbcl-shared "$2" -o "$1.so"
+  else
+    echo building $1.so
+    /bin/sh ${run_compiler} -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
+  fi
 )
 
 # We want to bail out in case any of these Unix programs fails.
 set -e
 
-cat > $TEST_FILESTEM.c <<EOF
-int summish(int x, int y) { return 1 + x + y; }
-
-int numberish = 42;
-
-int nummish(int x) { return numberish + x; }
-
-short negative_short() { return -1; }
-int negative_int()     { return -2; }
-long negative_long()   { return -3; }
-
-long long powish(unsigned int x, unsigned int y) {
-  long long acc = 1;
-  long long xx = (long long) x;
-  for(; y != 1; y /= 2) {
-    if (y & 1) {
-      acc *= xx;
-      y -= 1;
-    }
-    xx *= xx;
-  }
-  return xx*acc;
-}
-
-float return9th(float f1, float f2, float f3, float f4, float f5,
-		float f6, float f7, float f8, float f9, float f10,
-		float f11, float f12) {
-    return f9;
-}
-
-double return9thd(double f1, double f2, double f3, double f4, double f5,
-		  double f6, double f7, double f8, double f9, double f10,
-		  double f11, double f12) {
-    return f9;
-}
-
-int long_test8(int a1, int a2, int a3, int a4, int a5,
-	       int a6, int a7, long long l1) {
-    return (l1 == powish(2,34));
-}
-
-int long_test9(int a1, int a2, int a3, int a4, int a5,
-	       int a6, int a7, long long l1, int a8) {
-    return (l1 == powish(2,35));
-}
-
-int long_test2(int i1, int i2, int i3, int i4, int i5, int i6,
-	       int i7, int i8, int i9, long long l1, long long l2) {
-    return (l1 == (1 + powish(2,37)));
-}
-
-int long_sap_test1(int *p1, long long l1) {
-    return (l1 == (3 + powish(2,*p1)));
-}
-
-int long_sap_test2(int *p1, int i1, long long l1) {
-    return (l1 == (3 + powish(2,*p1)));
-}
-
-long long return_long_long() {
-    return powish(2,33);
-}
-
-signed char return_schar_test(signed char *p) {
-    return *p;
-}
-
-unsigned char return_uchar_test(unsigned char *p) {
-    return *p;
-}
-
-short return_short_test(short *p) {
-    return *p;
-}
-
-unsigned short return_ushort_test(unsigned short *p) {
-    return *p;
-}
-
-int return_int_test(int *p) {
-    return *p;
-}
-
-unsigned int return_uint_test(unsigned int *p) {
-    return *p;
-}
-EOF
-
-build_so $TEST_FILESTEM
+build_so $TEST_FILESTEM $primary_c_source
 
 echo 'int foo = 13;' > $TEST_FILESTEM-b.c
 echo 'int bar() { return 42; }' >> $TEST_FILESTEM-b.c
@@ -141,6 +60,11 @@ echo 'int late_bar() { return 14; }' >> $TEST_FILESTEM-c.c
 build_so $TEST_FILESTEM-c
 
 cat > $TEST_FILESTEM-noop-dlclose-test.c <<EOF
+#ifdef _WIN32
+int dlclose_is_noop() { return 1; }
+#else
+// Why is this test which establishes preconditions of the actual test
+// expressed as a loadable library? It's ridiculousy obfuscated imho.
 #include <dlfcn.h>
 #include <stddef.h>
 
@@ -156,6 +80,7 @@ int dlclose_is_noop () {
 #endif
     return 0;
 }
+#endif
 EOF
 build_so $TEST_FILESTEM-noop-dlclose-test
 
@@ -167,8 +92,9 @@ build_so $TEST_FILESTEM-noop-dlclose-test-helper
 ## Foreign definitions & load
 
 cat > $TEST_FILESTEM.base.lisp <<EOF
+  (declaim (muffle-conditions compiler-note))
   (define-alien-variable environ (* c-string))
-  (defvar *environ* environ)
+  #+unix (defvar *environ* environ)
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (handler-case
         (progn
@@ -211,15 +137,14 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   ;;
   ;; This cannot be tested in a saved core, as there is no guarantee
   ;; that the location will be the same.
+  #+unix
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
 EOF
 
-echo "(declaim (optimize speed))" > $TEST_FILESTEM.fast.lisp
-cat $TEST_FILESTEM.base.lisp >> $TEST_FILESTEM.fast.lisp
+echo "(declaim (optimize speed))" | cat - $TEST_FILESTEM.base.lisp > $TEST_FILESTEM.fast.lisp
 
-echo "(declaim (optimize space))" > $TEST_FILESTEM.small.lisp
-cat $TEST_FILESTEM.base.lisp >> $TEST_FILESTEM.small.lisp
+echo "(declaim (optimize space))" | cat - $TEST_FILESTEM.base.lisp > $TEST_FILESTEM.small.lisp
 
 # Test code
 cat > $TEST_FILESTEM.test.lisp <<EOF
@@ -233,6 +158,7 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   ;;
   ;; HATE.
   (defun note (x)
+     (write-string " | " *standard-output*)
      (write-line x *standard-output*)
      (force-output *standard-output*))
   (note "/initial assertions")
@@ -327,7 +253,7 @@ set +e
 test_compile() {
     x="$1"
     run_sbcl <<EOF
-(progn (load (compile-file "$TEST_FILESTEM.$x.lisp"))
+(progn (load (compile-file "$TEST_FILESTEM.$x.lisp" :verbose nil) :verbose nil)
 (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose "compile $1" $?
@@ -335,14 +261,17 @@ EOF
 
 test_compile fast
 test_compile small
+echo # blank line
 
 test_use() {
+    echo 'Testing' $1 '...'
     run_sbcl --load $TEST_FILESTEM.$1.fasl --load $TEST_FILESTEM.test.lisp
     check_status_maybe_lose "use $1" $? 22 "(load-shared-object not supported)"
 }
 
 test_use small
 test_use fast
+echo # blank line
 
 test_save() {
     echo testing save $1
@@ -359,12 +288,13 @@ EOF
 
 test_save small
 test_save fast
+echo # blank line
 
+options="--noinform --no-sysinit --no-userinit"
 test_start() {
     if [ -f $TEST_FILESTEM.$1.core ] ; then
         echo testing start $1
-        run_sbcl_with_core $TEST_FILESTEM.$1.core \
-            --no-sysinit --no-userinit \
+        run_sbcl_with_core $TEST_FILESTEM.$1.core $options \
             --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
             --load $TEST_FILESTEM.test.lisp
         check_status_maybe_lose "start $1" $?
@@ -375,10 +305,12 @@ test_start() {
 
 test_start fast
 test_start small
+echo # blank line
 
 if [ -f $TEST_FILESTEM.fast.core ] ; then
 # missing object file
-    run_sbcl_with_core $TEST_FILESTEM.fast.core --no-sysinit --no-userinit \
+    echo Building core for missing shared-object-file test
+    run_sbcl_with_core $TEST_FILESTEM.fast.core $options --noprint \
         --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
         <<EOF
   (setf *invoke-debugger-hook*
@@ -398,7 +330,7 @@ fi
 
 rm $TEST_FILESTEM-b.so $TEST_FILESTEM-b2.so
 if [ -f $TEST_FILESTEM.missing.core ] ; then
-    run_sbcl_with_core $TEST_FILESTEM.missing.core --no-sysinit --no-userinit \
+    run_sbcl_with_core $TEST_FILESTEM.missing.core $options --noprint \
         --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
         <<EOF
   (assert (= 22 (summish 10 11)))

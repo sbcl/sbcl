@@ -671,8 +671,6 @@
        (lambda (x)
          (member (pathname-name x)
                  '("filesys.test" ; too many assertions about symlinks to care about just yet
-                   ;; foreign-test-noop-dlclose-test.c:1:10: fatal error: dlfcn.h: No such file or directory
-                   "foreign.test"
                    ;; No built SBCL here (.../tests/run-sbcl-test-5863): run 'sh make.sh' first!
                    "run-sbcl.test"
                    "side-effectful-pathnames.test") ; no idea
