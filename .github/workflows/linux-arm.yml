@@ -15,7 +15,12 @@ jobs:
         sudo dpkg --add-architecture armhf
         sudo apt-get -qq update | true
         sudo apt-get -qq install 
-        sudo apt-get -qq install libc6:armhf gcc-arm-linux-gnueabihf sbcl
+        sudo apt-get -qq install libc6:armhf gcc-arm-linux-gnueabihf
+        cd /tmp/
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-1.4.15.11468-de94930ec-linux-arm64-binary.tar.bz2
+        tar xf sbcl-1.4.15.11468-de94930ec-linux-arm64-binary.tar.bz2
+        cd sbcl-1.4.15.11468-de94930ec-linux-arm64
+        sudo ./install.sh
 
     - name: build
       env:

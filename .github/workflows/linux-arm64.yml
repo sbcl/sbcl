@@ -21,7 +21,12 @@ jobs:
     - name: install host sbcl
       run: |
         sudo apt-get -qq update | true
-        sudo apt-get -qq install sbcl libcapstone-dev libzstd-dev
+        sudo apt-get -qq install libcapstone-dev libzstd-dev
+        cd /tmp/
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-1.4.15.11468-de94930ec-linux-arm64-binary.tar.bz2
+        tar xf sbcl-1.4.15.11468-de94930ec-linux-arm64-binary.tar.bz2
+        cd sbcl-1.4.15.11468-de94930ec-linux-arm64
+        sudo ./install.sh
 
     - name: build
       env:
@@ -30,6 +35,22 @@ jobs:
     - name: test-fasteval
       if: matrix.subfeatures == 'fasteval'
       run: cd tests; ./run-tests.sh --evaluator-mode interpret
+    - name: make binary
+      run: |
+        name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-linux-arm64
+        mkdir sbcl-linux-binary-arm64
+        cd ..
+        mv sbcl $name
+        ./$name/binary-distribution.sh $name
+        bzip2 $name-binary.tar
+        mv $name sbcl
+        mv $name-binary.tar.bz2 sbcl/sbcl-linux-binary-arm64
+    - name: save binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbcl-linux-binary-arm64
+        path: sbcl-linux-binary-arm64
+
     - name: test
       run: cd tests; ./run-tests.sh --slow
     - name: ansi-test
