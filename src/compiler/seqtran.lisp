@@ -872,9 +872,9 @@
                                       (typep (lvar-value item) 'base-char))
                                  (* multiplier (char-code (lvar-value item)))
                                  ;; Use multiplication if it's known to be cheap
-                                 #+(or x86 x86-64)
+                                 #+(or x86 x86-64 arm64)
                                  `(* ,multiplier (char-code (the base-char item)))
-                                 #-(or x86 x86-64)
+                                 #-(or x86 x86-64 arm64)
                                  '(let ((code (char-code (the base-char item))))
                                    (setf code (dpb code (byte 8 8) code))
                                    (setf code (dpb code (byte 16 16) code))
