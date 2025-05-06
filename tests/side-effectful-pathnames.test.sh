@@ -13,6 +13,9 @@
 
 . ./subr.sh
 
+run_sbcl --eval '(exit :code (or #+unix 0 2))'
+if [ $? -eq 2 ] ; then echo $0: SKIPPING ; exit $EXIT_TEST_WIN ; fi
+
 use_test_subdirectory
 testdir="`pwd -P`" # resolve symbolic links in the directory.
 

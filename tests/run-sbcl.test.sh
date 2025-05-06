@@ -1,6 +1,9 @@
-set -e
-
 . ./subr.sh
+
+run_sbcl --eval '(exit :code (or #+unix 0 2))'
+if [ $? -eq 2 ] ; then echo $0: SKIPPING ; exit $EXIT_TEST_WIN ; fi
+
+set -e
 
 # run-sbcl.sh's pathname munging turns out always to have been
 # insufficient in one way or another.

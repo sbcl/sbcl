@@ -658,21 +658,4 @@
   (filter-test-files "*.impure-cload.lisp"))
 
 (defun sh-files ()
-  (let ((result (filter-test-files "*.test.sh")))
-    #+unix result
-    ;; Rather than hack up the shell scripts which don't pass on #-unix
-    ;; (which would require at least a few lines of shell script and lisp
-    ;; to invoke SBCL and exit with some other code), just confine the kludge
-    ;; to this file.
-    #-unix
-    (if *explicit-test-files*
-        result
-      (remove-if
-       (lambda (x)
-         (member (pathname-name x)
-                 '("filesys.test" ; too many assertions about symlinks to care about just yet
-                   ;; No built SBCL here (.../tests/run-sbcl-test-5863): run 'sh make.sh' first!
-                   "run-sbcl.test"
-                   "side-effectful-pathnames.test") ; no idea
-                 :test 'string=))
-        result))))
+  (filter-test-files "*.test.sh"))
