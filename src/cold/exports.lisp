@@ -1625,7 +1625,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%SET-SIGNED-SAP-REF-32" "%SET-SIGNED-SAP-REF-64"
            "%SET-SIGNED-SAP-REF-WORD"
            "%SET-SIGNED-SAP-REF-8" "%SET-STACK-REF"
-           "%SET-SYMBOL-HASH"
            "%SIN" "%SIN-QUICK" "%SINGLE-FLOAT"
            "%SINH" "%SQRT"
            "%SXHASH-BIT-VECTOR" "%SXHASH-SIMPLE-BIT-VECTOR"

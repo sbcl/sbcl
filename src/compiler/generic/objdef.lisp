@@ -376,7 +376,7 @@ during backtrace.
   ;; using lisp code equivalent to "native_pointer(ptr)[1]".
   ;; This improves the code for CASE and ECASE over symbols
   ;; regardless of whether the object being tested is known to be a symbol.
-  (hash :set-trans %set-symbol-hash)
+  (hash)
   (value :init :unbound)
   ;; Symbols either store an fdefn or a function. The better way is a function.
   ;; This slot *MUST* coincide with the FDEFN-FUN slot. (This is AVERed)

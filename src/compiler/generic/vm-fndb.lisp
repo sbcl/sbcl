@@ -123,9 +123,6 @@
 ;;; not only symbols. The value is reliable only if the object is a symbol.
 (defknown hash-as-if-symbol-name (t) symbol-name-hash (flushable movable always-translatable))
 
-(defknown %set-symbol-hash ((and (not null) symbol) hash-code)
-  t ())
-
 ;;; SYMBOL-PACKAGE-ID for #+compact-symbol demands a vop which avoids loading
 ;;; a raw bit value in a descriptor register (the SLOT vop returns a descriptor)
 (defknown symbol-package-id (symbol) (unsigned-byte 16))
