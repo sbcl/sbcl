@@ -270,7 +270,7 @@
                  (base (sap+ (int-sap (get-lisp-obj-address tramp)) (- fun-pointer-lowtag)))
                  (sap (sap+ base 23)))
             (setf (sap-ref-32 sap 0) #x24A4FF41 ; JMP [R12+disp]
-                  (sap-ref-32 sap 4) (asm-routine-indirect-address asm-code)
+                  (signed-sap-ref-32 sap 4) (asm-routine-indirect-address asm-code)
                   (sap-ref-32 sap 8) #x90
                   ;; The undefined function name is stored in the "function" slot.
                   ;; The slot setter doesn't like this of course.

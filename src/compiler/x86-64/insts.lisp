@@ -3382,7 +3382,7 @@
            #+sb-xc-host (sb-fasl::asm-routine-vector-elt-addr (1- i))
            #-sb-xc-host (sap-int (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
                                        (ash (1- i) word-shift))))))
-    (ldb (byte 32 0) (- addr sb-vm:nil-value))))
+    (- addr sb-vm:nil-value)))
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
@@ -3405,7 +3405,6 @@
                #-immobile-space
                (let ((nil-based-disp
                       (- disp (+ sb-vm::nil-value-offset sb-vm:alien-linkage-space-size))))
-                 (setq kind :disp)
                  (if (eql subkind sb-vm::+nil-indirect+) (+ nil-based-disp 8) nil-based-disp)))
               (:rel32 ; subkind is meaningless - this is a PC-relative fixup.
                ;; must be ASM codeblob if #-immobile-space
@@ -3416,33 +3415,33 @@
         (+ (case flavor
              (:card-table-index-mask ; the VALUE is nbits, so convert it to a mask
               (aver (zerop (sap-ref-32 sap offset))) ; enforce zero addend
-              (1- (ash 1 value)))
+              ;; The AND inst uses a 32-bit reg, so the upper 32 bits get cleared, making this the
+              ;; sole place where an imm32 is treated as unsigned. To use 2^32 cards though, the
+              ;; heap would have to be 4TiB for gencgc or 1TiB for pmrgc. Not possible.
+              (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
+              (return-from fixup-code-object))
              (:linkage-cell
               (let ((index (ash value word-shift)))
                 #-immobile-space
                 (ecase kind
                   (:abs32 ; implicitly has a base reg of NULL-TN
-                   (let ((lt (+ (- sb-vm::alien-linkage-space-size)
-                                (- (ash 1 (+ sb-vm::n-linkage-index-bits sb-vm:word-shift)))
-                                (- sb-vm::nil-value-offset))))
-                     (setf (signed-sap-ref-32 sap offset) (+ lt index)))
-                   (return-from fixup-code-object)))
+                   (+ (- sb-vm::alien-linkage-space-size)
+                      (- (ash 1 (+ sb-vm::n-linkage-index-bits sb-vm:word-shift)))
+                      (- sb-vm::nil-value-offset)
+                      index)))
                 #+immobile-space
                 (ecase kind
                   (:rel32 (+ sb-vm::lisp-linkage-space-addr index))
                   (:abs32 index))))
              (:assembly-routine
               (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value) value))
-             (:layout-id ; layout IDs are signed quantities on x86-64
-              (setf (signed-sap-ref-32 sap offset) value)
-              (return-from fixup-code-object))
              (t value))
            (if (eq kind :absolute)
                (signed-sap-ref-64 sap offset)
                (signed-sap-ref-32 sap offset))))
   (ecase kind
-    ((:abs32 :*abs32) ; 32 unsigned bits
-     (setf (sap-ref-32 sap offset) value))
+    ((:abs32 :*abs32) ; 32 signed bits
+     (setf (signed-sap-ref-32 sap offset) value))
     (:rel32
      ;; Replace word with the difference between VALUE and current pc.
      ;; JMP/CALL are relative to the next instruction,
@@ -3453,7 +3452,6 @@
      (unless (immobile-space-obj-p code)
        (error "Can't compute fixup relative to movable object ~S" code))
      (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
-    (:disp (setf (signed-sap-ref-32 sap offset) value))
     (:absolute ; 64-bit jump table target address
      (setf (sap-ref-64 sap offset) value)))
   nil))
