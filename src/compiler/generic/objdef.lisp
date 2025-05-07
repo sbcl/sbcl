@@ -23,11 +23,9 @@
 ;;;;     SIMPLE-FUN-DEBUG-INFO slot holding a tagged object which needs
 ;;;;     to be GCed, you need to tweak scav_code_blob() and
 ;;;;     verify_space() in gencgc.c, and the corresponding code in gc.c.
-;;;;   * Various code (e.g. STATIC-FSET in genesis.lisp) is hard-wired
-;;;;     to know the name of the last slot of the object the code works
-;;;;     with, and implicitly to know that the last slot is special (being
-;;;;     the beginning of an arbitrary-length sequence of bytes following
-;;;;     the fixed-layout slots).
+;;;;   * Various code is hard-wired to know the name of the last slot,
+;;;;     and that when :REST-P T is present in the slot definition,
+;;;;     it begins an arbitrary-length sequence of trailing slots.
 ;;;; -- WHN 2001-12-29
 
 ;;;; the primitive objects themselves
