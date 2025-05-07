@@ -4057,7 +4057,10 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
           (aref nil-slots 3) (descriptor-bits nil-des) ; cdr
           (aref nil-slots 4) 0 ; function
           (aref nil-slots 5) (descriptor-bits (cold-cons nil-des nil-des)) ; globaldb info
-          (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL")))
+          (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL"))
+          ;; I had some difficulty getting 'struct static_trailer_constants' to begin
+          ;; at this word because math is hard. Just zero the slot.
+          (aref nil-slots 7) 0) ; available for use
     (setf (aref t-slots 0) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref t-slots sb-vm:symbol-hash-slot) (symhash-bits "T" t-des)
           (aref t-slots sb-vm:symbol-value-slot) (descriptor-bits t-des)
