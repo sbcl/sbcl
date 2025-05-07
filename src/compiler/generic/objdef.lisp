@@ -473,20 +473,13 @@ during backtrace.
 
 ;;; Define some slots that precede 'struct thread' so that each may be read
 ;;; using a small negative 1-byte displacement.
-;;; These slots hold frequently-referenced constants.
-;;; If we can't do that for some reason - like, say, the safepoint page
-;;; is located prior to 'struct thread', then these just become ordinary slots.
-;;; TODO: these all belong in the static-constants of the core header.
 (defconstant-eqx +thread-header-slot-names+
-    `#(#+x86-64
-       ,@'(linkage-table
-           alien-linkage-table-base
-           msan-xor-constant
-           ;; The following slot's existence must NOT be conditional on #+msan
-           msan-param-tls) ; = &__msan_param_tls
-       #+permgen
-       ,@'(function-layout)
-       #+immobile-space
+    `#(#+x86-64 ;; The following slot's existence must NOT be conditional on #+msan
+       ,@'(msan-param-tls) ; = &__msan_param_tls
+       ;; These aren't actually thread-local but I needed a way to conveniently access
+       ;; them without using a register on x86-64, and that logic was copied into arm64.
+       ;; x86-64 no longer needs these
+       #+(and immobile-space (not x86-64))
        ,@'(function-layout
            text-space-addr
            text-card-count

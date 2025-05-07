@@ -203,7 +203,7 @@
                    (and (eql (machine-ea-base value)
                              (car (sb-disassem::dstate-known-register-contents dstate)))
                         (eq (cdr (sb-disassem::dstate-known-register-contents dstate))
-                            'sb-vm::linkage-table)
+                            'sb-vm::lisp-linkage-table)
                         (integerp (machine-ea-disp value))
                         (not (machine-ea-index value))))
            (setf (sb-disassem::dstate-known-register-contents dstate) nil)
@@ -527,13 +527,36 @@
     (when (and (eql (machine-ea-base value)
                     (car (sb-disassem::dstate-known-register-contents dstate)))
                (eq (cdr (sb-disassem::dstate-known-register-contents dstate))
-                   'sb-vm::alien-linkage-table-base)
+                   'sb-vm::alien-linkage-table)
                (not (machine-ea-index value))
                (integerp (machine-ea-disp value)))
       (let ((name (sb-impl::alien-linkage-index-to-name
                    (floor (machine-ea-disp value) sb-vm:alien-linkage-table-entry-size))))
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
+
+    (when (and (eql base-reg sb-vm::card-table-reg) (typep disp '(integer 0 127)) (not index-reg))
+      ;; Possibly a static-space trailer constant
+      (multiple-value-bind (quo rem) (floor (- disp 41) n-word-bytes)
+        (when (and (eql rem 0) (< quo (length sb-vm::+static-space-trailer-constants+)))
+          (let ((sym (aref sb-vm::+static-space-trailer-constants+ quo)))
+            (when (and (member sym '(sb-vm::lisp-linkage-table sb-vm::alien-linkage-table))
+                       (eq (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)) 'mov))
+              (setf (sb-disassem::dstate-known-register-contents dstate)
+                    `(,(reg-num (regrm-inst-reg dchunk-zero dstate)) . ,sym)))
+            ;; The only use of an ADD into a reg with the source as the alien-linkage-table
+            ;; is for a following CALL inst. So assume it. Probably should verify, but ... meh.
+            (when (and (eq sym 'sb-vm::alien-linkage-table)
+                       ;; prior inst must be MOV RBX,imm32
+                       (eql (logand (sb-disassem::dstate-previous-chunk dstate) #xFF) #xBB)
+                       (eq (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)) 'add))
+              (aver (= (reg-num (regrm-inst-reg dchunk-zero dstate)) sb-vm::rbx-offset))
+              (let* ((disp (ldb (byte 32 8) (sb-disassem::dstate-previous-chunk dstate)))
+                     (name (sb-impl::alien-linkage-index-to-name
+                            (floor disp sb-vm:alien-linkage-table-entry-size))))
+                (setf (sb-disassem::dstate-known-register-contents dstate) (cons 'alien name))))
+            (return-from print-mem-ref
+              (note (lambda (s) (princ sym s)) dstate))))))
 
     (when (and disp (eq base-reg sb-vm::card-table-reg) (not index-reg))
       (let* ((ptr (sap+ (int-sap sb-vm:nil-value) disp))
@@ -590,22 +613,6 @@
                                   ((< index (length thread-slot-names))
                                    (aref thread-slot-names index)))))
                (when symbol
-                 (when (and (member index `(,sb-vm::thread-alien-linkage-table-base-slot
-                                            ,sb-vm::thread-linkage-table-slot))
-                            (eql (logandc2 (sb-disassem::dstate-inst-properties dstate) +rex-r+)
-                                 (logior +rex+ +rex-w+ +rex-b+)))
-                   (setf (sb-disassem::dstate-known-register-contents dstate)
-                         `(,(reg-num (regrm-inst-reg dchunk-zero dstate)) . ,symbol)))
-                 ;; The only use of an ADD into a reg with the source as the alien-linkage-table-base
-                 ;; is for a following CALL inst. So assume it. Probably should verify, but ... meh.
-                 (when (and (eql index sb-vm::thread-alien-linkage-table-base-slot)
-                            (eql (logand (sb-disassem::dstate-previous-chunk dstate) #xFF) #xBB)
-                            (eq (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)) 'add))
-                   (aver (= (reg-num (regrm-inst-reg dchunk-zero dstate)) 3))
-                   (let* ((disp (ldb (byte 32 8) (sb-disassem::dstate-previous-chunk dstate)))
-                          (name (sb-impl::alien-linkage-index-to-name
-                                 (floor disp sb-vm:alien-linkage-table-entry-size))))
-                     (setf (sb-disassem::dstate-known-register-contents dstate) (cons 'alien name))))
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "thread.~(~A~)" symbol))
                          dstate))))

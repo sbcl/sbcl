@@ -490,10 +490,9 @@
   (let* ((bindings
           (matchp iterator
                   (load-time-value
-                   `((mov ?scratch ?header)
-                     (or :qword ?scratch
-                         (ea ,(ash sb-vm::thread-function-layout-slot sb-vm:word-shift)
-                             ,(get-gpr :qword sb-vm::thread-reg)))
+                   `(;(mov ?scratch ?header)
+                     (mov :qword ?scratch (ea -57 ,(get-gpr :qword 12)))
+                     (mov :word ?scratch ?header)
                      (mov :qword (ea ,(- sb-vm:fun-pointer-lowtag) ?result) ?scratch))
                    t)
                   bindings))

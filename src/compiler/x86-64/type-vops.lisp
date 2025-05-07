@@ -417,9 +417,9 @@
 ;;; Sign bit and fixnum tag bit.
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
-;; this magic constant resides in an otherwise unused word after the symbol slots of NIL
+;; this magic constant resides in the word preceding the symbol header of NIL
 (defun non-negative-fixnum-mask-ea ()
-  (ea (- (ash 5 word-shift) list-pointer-lowtag) null-tn))
+  (ea (- (ash -2 word-shift) list-pointer-lowtag) null-tn))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with

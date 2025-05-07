@@ -83,11 +83,34 @@ static const unsigned char vector_fill_expect_bytes[] = {
   0xEB, 0x07
 };
 
-#define FEATURE_BITS_EA (lispobj*)(NIL-LIST_POINTER_LOWTAG-16)
 // Poke in a byte that changes an opcode to enable faster vector fill.
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
 void tune_asm_routines_for_microarch(void)
 {
+    // Assign the static lisp symbol's value the address of the C function
+    // that assists calling C from Lisp.
+#ifdef LISP_FEATURE_SB_THREAD
+    extern void callback_wrapper_trampoline();
+    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)callback_wrapper_trampoline;
+#else
+    extern void funcall_alien_callback();
+    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)funcall_alien_callback;
+#endif
+
+    struct static_trailer_constants* consts =
+      (void*)((char*)STATIC_SPACE_END - sizeof (struct static_trailer_constants));
+#ifdef LAYOUT_OF_FUNCTION
+    consts->function_layout = LAYOUT_OF_FUNCTION << 32;
+#endif
+    consts->lisp_linkage_table = (uword_t)linkage_space;
+    consts->alien_linkage_table = ALIEN_LINKAGE_SPACE_START;
+    consts->msan_xor_constant = (uword_t)0x500000000000;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    consts->text_space_addr = TEXT_SPACE_START;
+    consts->text_card_count = text_space_size / IMMOBILE_CARD_BYTES;
+    consts->text_card_marks = (lispobj)text_page_touched_bits;
+#endif
+
     unsigned int eax, ebx, ecx, edx;
     unsigned int cpuid_fn1_ecx = 0;
 
@@ -108,11 +131,11 @@ void tune_asm_routines_for_microarch(void)
         }
     }
     int our_cpu_feature_bits = 0;
-    // avx2_supported gets copied into bit 1 of *CPU-FEATURE-BITS*
+    // avx2_supported gets copied into bit 1 of cpu_feature_bits
     if (avx2_supported) our_cpu_feature_bits |= 1;
-    // POPCNT = ECX bit 23, which gets copied into bit 2 in *CPU-FEATURE-BITS*
+    // POPCNT = ECX bit 23, which gets copied into bit 2 in cpu_feature_bits
     if (cpuid_fn1_ecx & (1<<23)) our_cpu_feature_bits |= 2;
-    *FEATURE_BITS_EA = make_fixnum(our_cpu_feature_bits);
+    consts->cpu_feature_bits = our_cpu_feature_bits;
 
 #ifdef LISP_FEATURE_WIN32
     extern void set_up_win64_seh_thunk(lispobj*);
@@ -153,8 +176,10 @@ void untune_asm_routines_for_microarch(void)
 #endif
     asm_routine_poke(VECTOR_FILL_T, vector_fill_offset_to_poke,
                      0xEB); // Change JL to JMP
-    *FEATURE_BITS_EA = 0;
     // ensure no random value lingering in static space on image save
+    struct static_trailer_constants* consts =
+      (void*)((char*)STATIC_SPACE_END - sizeof (struct static_trailer_constants));
+    memset(consts, 0, sizeof *consts);
     SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = 0;
 }
 

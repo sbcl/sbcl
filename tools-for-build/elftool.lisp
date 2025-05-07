@@ -1608,9 +1608,8 @@ lisp_fun_linkage_space: .zero ~:*~D
                   (let ((src (fourth prev-inst)))
                     (and (typep src '(cons machine-ea (eql :qword)))
                          (let ((ea (car src)))
-                           (and (eql (machine-ea-base ea) 13)
-                                (eql (machine-ea-disp ea)
-                                     (ash sb-vm::thread-linkage-table-slot word-shift))
+                           (and (eql (machine-ea-base ea) 12) ; KLUDGE
+                                (eql (machine-ea-disp ea) 41) ; KLUDGE
                                 (null (machine-ea-index ea))))))))
            (linkage-index (ea inst i)
              (cond ((eq (machine-ea-base ea) :rip) ; RIP+n format

@@ -78,15 +78,14 @@
 
 ;;;; description of the target address space
 
-;;;     Linkage     |
-;;;      Spaces     | Static Space
-;;;  +--------------+----------------------|-------+---------+-----+--------+-
-;;;  |      |       |                      | asm   | other   |     |        |
-;;;  | Lisp | Alien | other                | code  | popular | NIL | Safept | GC card
-;;;  |      |       | static               | jmp   | consts  |     | Trap   | table
-;;;  | 4 MB |  1 MB | data                 | table |         |     | Page   |
-;;;  +--------------+----------------------*-------+---------+-----+--------+-
-;;;                          ^ freeptr                         end ^
+;;;   Linkage Tables|        | <--        Static Space        ---> |
+;;;  +--------------+--------|--------------|-------+--------------+--------+-
+;;;  |      |       | resv'd |              | asm   | T   | word-  |        |
+;;;  | Lisp | Alien | for    | other        | code  |---- |  sized | Safept | GC card
+;;;  |      |       | future | static       | jmp   | NIL | consts | Trap   | table
+;;;  | 4 MB |  1 MB | use    | data         | table |     | ...    | Page   |
+;;;  +--------------+--------+----------------------*--------------+--------+-
+;;;                                   ^ freeptr
 
 ;;;   R12 (GC-card-table-reg) = NIL
 ;;;   R12 + 64 - lowtag_of(NIL) = GC cards
@@ -100,10 +99,6 @@
 ;;; it's better to encode the safepoint trap more compactly.
 
 ;;; TODOs:
-;;; - for #-immobile-space, place lisp and alien linkage tables below the static symbols
-;;; - store other important value between NIL and the GC card table, such as:
-;;;     * FUNCTION-LAYOUT (for allocating closures)
-;;;     * lockfree list tail
 ;;; - if the asm routine indirection vector is filled downward and the ALLOC-TRAMP addresses
 ;;;   are in the highest cells, it may be possible to shorten their CALL encodings
 ;;;   to use imm8 displacement from NULL-TN, hypothetically:
@@ -111,9 +106,32 @@
 ;;;   versus
 ;;;      41FF94240904F0FF CALL [R12-1047543]
 
-(defconstant nil-static-space-end-offs 41) ; 6 words (48 bytes) _minus_ list-pointer-lowtag
+(defconstant-eqx +static-space-trailer-constants+
+  #(lisp-linkage-table ; This should be first - elftool hardwires it
+    alien-linkage-table
+    function-layout
+    msan-xor-constant
+    text-space-addr
+    text-card-count
+    text-card-marks
+    cpu-feature-bits)
+  #'equalp)
+(defconstant n-static-trailer-constants (length +static-space-trailer-constants+))
+
+(defconstant nil-static-space-end-offs
+  ;; 6 words (48 bytes) plus room for trailer constants minus NIL's lowtag.
+  (- (* (+ 6 n-static-trailer-constants) 8)
+     7)) ; LIST-POINTER-LOWTAG (which is not defined yet)
 (defconstant nil-cardtable-disp (+ nil-static-space-end-offs
                                    #+sb-safepoint +backend-page-bytes+)) ; stupidly excessive
+
+(eval-when (:compile-toplevel)
+  ;; Proper alignment of NIL depends on there being an even number of words to static-space-end
+  (unless (evenp n-static-trailer-constants) (error "Please check alignment of NIL"))
+  #-sb-safepoint
+  (unless (<= nil-cardtable-disp 127) ; > 1-byte disp to reach card table is undesirable
+    (error "Consider reducing the number of elements in static-space-trailer")))
+
 (define-symbol-macro static-space-end (+ nil-value nil-static-space-end-offs))
 
 #+(or linux darwin)

@@ -180,7 +180,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (aver (not (location= temp result)))
     (inst lea temp ea)
     (sb-assem:inst* insn modifier result (ea temp))
-    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
+    (inst xor temp (static-constant-ea msan-xor-constant))
     ;; Per the documentation, shadow is tested _after_
     (let ((mask (sb-c::masked-memory-load-p vop))
           (good (gen-label))
@@ -217,7 +217,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
   #+linux
   (when (sb-c:msan-unpoison sb-c:*compilation*)
     (inst lea temp ea)
-    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
+    (inst xor temp (static-constant-ea msan-xor-constant))
     (inst mov size (ea temp) 0))
   (when (sc-is value constant immediate)
     (cond ((plausible-signed-imm32-operand-p (tn-value value))

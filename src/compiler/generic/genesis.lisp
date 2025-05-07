@@ -1798,9 +1798,9 @@ core and return a descriptor to it."
 #+x86-64
 (defun make-nil-descriptor ()
   ;; NIL is placed at the end, not the beginning, of static space,
-  ;; and T precedes it.
+  ;; and T precedes it. See diagram in src/compiler/x86-64/parms
   (let* ((space-end (+ sb-vm:static-space-start sb-vm:static-space-size))
-         (nil-base (+ space-end (* -6 sb-vm:n-word-bytes)))
+         (nil-base (- space-end (* (+ 6 sb-vm::n-static-trailer-constants) sb-vm:n-word-bytes)))
          (nil-des (make-random-descriptor (logior nil-base sb-vm:list-pointer-lowtag)))
          (t-des (make-random-descriptor (- (descriptor-bits nil-des) sb-vm::t-nil-offset))))
     (setf *nil-descriptor* nil-des
@@ -3647,7 +3647,14 @@ static inline int hashtable_weakness(struct hash_table* ht) { return ht->uw_flag
 
 (defun write-static-symbols (stream)
   (aver *static*)
-  #+x86-64 (format stream "#define NIL_CARDTABLE_DISP $0x~x~%" sb-vm::nil-cardtable-disp)
+  #+x86-64
+  (progn
+    (format stream "#ifndef __ASSEMBLER__~%#include ~S~%struct static_trailer_constants {~%"
+            (lispobj-dot-h))
+    (dovector (x sb-vm::+static-space-trailer-constants+)
+      (format stream "  uword_t ~A;~%" (c-name (string-downcase x))))
+    (format stream "};~%#endif~%")
+    (format stream "#define NIL_CARDTABLE_DISP $0x~x~%" sb-vm::nil-cardtable-disp))
   (flet ((cdef (name value)
            (format stream "#define ~A LISPOBJ(~A)~%" name
                    (or #-relocatable-static-space (format nil "0x~X" value)
@@ -4037,20 +4044,20 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
          (t-alloc-words (align-up sb-vm:symbol-size 2)) ; = 6
          (nil-slots (make-array nil-alloc-words))
          (t-slots (make-array t-alloc-words))
-         ;; NIL-ADDR is its address as a cons cell, not as a symbol
          (space-end (+ sb-vm:static-space-start sb-vm:static-space-size))
-         (nil-addr (+ space-end (* -6 sb-vm:n-word-bytes)))
+         (trailing-words sb-vm::n-static-trailer-constants)
+         ;; NIL-ADDR is its address as a cons cell, not as a symbol
+         (nil-addr (- space-end (* (+ 6 trailing-words) sb-vm:n-word-bytes)))
          (t-addr (+ nil-addr (ash -8 sb-vm:word-shift)))
          (nil-des (make-random-descriptor (logior nil-addr sb-vm:list-pointer-lowtag)))
          (t-des (make-random-descriptor (logior t-addr sb-vm:other-pointer-lowtag))))
-    (setf (aref nil-slots 0) 0 ; CPU feature bits get stored here at runtime
+    (setf (aref nil-slots 0) sb-vm::non-negative-fixnum-mask-constant
           (aref nil-slots 1) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref nil-slots 2) (descriptor-bits nil-des) ; car
           (aref nil-slots 3) (descriptor-bits nil-des) ; cdr
           (aref nil-slots 4) 0 ; function
           (aref nil-slots 5) (descriptor-bits (cold-cons nil-des nil-des)) ; globaldb info
-          (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL"))
-          (aref nil-slots 7) sb-vm::non-negative-fixnum-mask-constant)
+          (aref nil-slots 6) (descriptor-bits (string-literal-to-core "NIL")))
     (setf (aref t-slots 0) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref t-slots sb-vm:symbol-hash-slot) (symhash-bits "T" t-des)
           (aref t-slots sb-vm:symbol-value-slot) (descriptor-bits t-des)
@@ -4061,7 +4068,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                                 2 ; vector header
                                 asm-jump-vect-nelems
                                 t-alloc-words
-                                nil-alloc-words)
+                                nil-alloc-words
+                                trailing-words)
                              :initial-element 0))
           (ptr 4))
       (setf (aref words 0) static-constants-core-entry-type-code
@@ -4072,6 +4080,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       (incf ptr asm-jump-vect-nelems)
       (replace words t-slots :start1 (prog1 ptr (incf ptr t-alloc-words)))
       (replace words nil-slots :start1 ptr)
+      ;; The trailing constants words are written as 0s into the core file
       words)))
 
 ;;; Create a core file created from the cold loaded image. (This is

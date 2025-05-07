@@ -257,7 +257,7 @@
            (inst lea res (rip-relative-ea (make-fixup foreign-symbol :foreign))))
           (t
            (inst mov res (make-fixup foreign-symbol :foreign))
-           (inst add res (thread-slot-ea thread-alien-linkage-table-base-slot))))))
+           (inst add res (static-constant-ea alien-linkage-table))))))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -274,7 +274,7 @@
     (cond ((code-immobile-p vop)
            (inst mov res (rip-relative-ea (make-fixup foreign-symbol :foreign-dataref))))
           (t
-           (inst mov res (thread-slot-ea thread-alien-linkage-table-base-slot))
+           (inst mov res (static-constant-ea alien-linkage-table))
            (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref) res))))))
 
 #+sb-safepoint
@@ -404,7 +404,7 @@
               (cond ((code-immobile-p vop) (make-fixup fun :foreign))
                     (t
                      (inst mov rbx-tn (make-fixup fun :foreign))
-                     (inst add rbx-tn (thread-slot-ea thread-alien-linkage-table-base-slot))
+                     (inst add rbx-tn (static-constant-ea alien-linkage-table))
                      rbx-tn))
               ;; Emit a 3-byte NOP so the undefined-alien routine reads a well-defined byte
               ;; on error. In practice, decoding never seemed to go wrong, but looked fishy
@@ -422,7 +422,7 @@
            #-immobile-space (inst lea rbx (ea (make-fixup fun :foreign) null-tn))
            #+immobile-space
            (progn (inst mov rbx (make-fixup fun :foreign))
-                  (inst add rbx (thread-slot-ea thread-alien-linkage-table-base-slot)))))
+                  (inst add rbx (static-constant-ea alien-linkage-table)))))
     (invoke-asm-routine 'call 'seh-trampoline vop))
 
   ;; For the undefined alien error

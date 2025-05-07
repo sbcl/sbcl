@@ -999,16 +999,6 @@ alloc_thread_struct(void* spaces) {
 #endif
 
     __attribute((unused)) lispobj* tls = (lispobj*)th;
-#if defined LISP_FEATURE_LINKAGE_SPACE && defined LISP_FEATURE_X86_64
-    tls[THREAD_LINKAGE_TABLE_SLOT] = (lispobj)linkage_space;
-    tls[THREAD_ALIEN_LINKAGE_TABLE_BASE_SLOT] = (lispobj)ALIEN_LINKAGE_SPACE_START;
-#endif
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_LINUX
-    tls[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
-#endif
-#ifdef LAYOUT_OF_FUNCTION
-    tls[THREAD_FUNCTION_LAYOUT_SLOT] = LAYOUT_OF_FUNCTION << 32;
-#endif
 #ifdef THREAD_TEXT_CARD_MARKS_SLOT
     extern unsigned int* text_page_touched_bits;
     tls[THREAD_TEXT_SPACE_ADDR_SLOT] = TEXT_SPACE_START;

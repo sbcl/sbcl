@@ -776,19 +776,6 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     ensure_undefined_alien();
     os_link_runtime();
 
-#ifdef CALLBACK_WRAPPER_TRAMPOLINE
-    // Assign the static lisp symbol's value the address of the C function
-    // that assists calling C from Lisp.
-    // t'would be nicer if this went into x86-64-arch.c perhaps ?
-#ifdef LISP_FEATURE_SB_THREAD
-    extern void callback_wrapper_trampoline();
-    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)callback_wrapper_trampoline;
-#else
-    extern void funcall_alien_callback();
-    SYMBOL(CALLBACK_WRAPPER_TRAMPOLINE)->value = (lispobj)funcall_alien_callback;
-#endif
-#endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Delayed until after dynamic space has been mapped, fixups made,
      * and/or immobile-space linkage entries written,

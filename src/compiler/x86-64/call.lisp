@@ -56,7 +56,7 @@
   (cond ((code-immobile-p node)
          (inst lea res (rip-relative-ea (linkage-cell-fixup name node))))
         (t
-         (inst mov res (thread-slot-ea sb-vm::thread-linkage-table-slot))
+         (inst mov res (static-constant-ea lisp-linkage-table))
          (inst lea res (ea (linkage-cell-fixup name node) res)))))
 
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
@@ -910,7 +910,7 @@
         #+immobile-space ; again, this should not be worse than #-immobile-space, but it is
         (t
          ;; get the linkage table base into RAX
-         (inst mov rax-tn (thread-slot-ea sb-vm::thread-linkage-table-slot))
+         (inst mov rax-tn (static-constant-ea lisp-linkage-table))
          (inst* instruction (ea (linkage-cell-fixup name node) rax-tn)))))
 
 ;;; Invoke the function-designator FUN.

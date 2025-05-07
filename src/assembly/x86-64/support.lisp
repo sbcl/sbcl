@@ -9,11 +9,9 @@
 
 (in-package "SB-VM")
 
-(macrolet ((feature-bits-ea (disp) `(ea (+ -16 (- list-pointer-lowtag) ,disp) null-tn)))
-(defun test-cpu-feature (feature-bit)
-  (multiple-value-bind (byte bit)
-      (floor (+ feature-bit n-fixnum-tag-bits) n-byte-bits)
-    (inst test :byte (feature-bits-ea byte) (ash 1 bit)))))
+(defun test-cpu-feature (bit-number)
+  (multiple-value-bind (byte bit) (floor bit-number n-byte-bits)
+    (inst test :byte (static-constant-ea cpu-feature-bits byte) (ash 1 bit))))
 
 (defun uniquify-fixup (name &aux (asmstream *asmstream*))
   (or (cdr (assoc name (sb-assem::asmstream-indirection-table asmstream)))

@@ -102,6 +102,12 @@
   ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
   #-gs-seg (ea index thread-tn))
 
+(defmacro static-constant-ea (name &optional (extra 0)) ; EXTRA is for byte-sized access
+  (declare (notinline position))
+  ;; 6 = number of words between native ptr to NIL-as-list and 1st trailer constant
+  (let ((n (+ 6 (position name +static-space-trailer-constants+))))
+    `(ea (+ ,extra ,(- (ash n word-shift) list-pointer-lowtag)) null-tn)))
+
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-tn
 (eval-when (:compile-toplevel)

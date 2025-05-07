@@ -1009,7 +1009,7 @@
             (allocation closure-widetag bytes 0 result node temp thread-tn))
         (storew* #-compact-instance-header header ; write the widetag and size
                  #+compact-instance-header        ; ... plus the layout pointer
-                 (let ((layout (thread-slot-ea thread-function-layout-slot)))
+                 (let ((layout (static-constant-ea function-layout)))
                    (cond ((typep header '(unsigned-byte 16))
                           (inst mov temp layout)
                           ;; emit a 2-byte constant, the low 4 of TEMP were zeroed
