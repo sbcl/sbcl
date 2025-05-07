@@ -44,14 +44,6 @@
 
 ;;;; Computation of live lvar sets
 
-;;; Add LVARs from LATE to EARLY; use EQ to check whether EARLY has
-;;; been changed.
-(defun merge-lvar-live-sets (early late)
-  (declare (type list early late))
-  ;; FIXME: O(N^2)
-  (dolist (e late early)
-    (pushnew e early)))
-
 ;;; Update information on stacks of unknown-values and stack LVARs on
 ;;; the boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
@@ -74,31 +66,28 @@
          (end (ir2-block-end-stack 2block)))
     (dolist (succ (block-succ block))
       (let ((succ-start (ir2-block-start-stack (block-info succ))))
-        (setq end (merge-lvar-live-sets end succ-start))))
+        (setq end (union end succ-start))))
     (do-nested-cleanups (cleanup block)
-      (case (cleanup-kind cleanup)
-        ((:block :tagbody :catch :unwind-protect)
-         (dolist (nlx-info (cleanup-nlx-info cleanup))
-           (let* ((target (nlx-info-target nlx-info))
-                  (target-start-stack (ir2-block-start-stack
-                                       (block-info target)))
-                  (exit-lvar (nlx-info-lvar nlx-info))
-                  (next-stack (if exit-lvar
-                                  (remove exit-lvar target-start-stack)
-                                  target-start-stack)))
-             (setq end (merge-lvar-live-sets end next-stack)))))
-        (:dynamic-extent
-         (let* ((dynamic-extent (cleanup-mess-up cleanup))
-                (info (dynamic-extent-info dynamic-extent)))
-           (when info
-             (pushnew info end))
-           (dolist (preserve (dynamic-extent-preserve-info dynamic-extent))
-             (when (memq preserve (ir2-block-stack-mess-up 2block))
-               (pushnew preserve end)))))))
+      (dolist (nlx-info (cleanup-nlx-info cleanup))
+        (let* ((target-stack (ir2-block-start-stack
+                              (block-info (nlx-info-target nlx-info))))
+               (exit-lvar (nlx-info-lvar nlx-info))
+               (next-stack (if exit-lvar
+                               (remove exit-lvar target-stack)
+                               target-stack)))
+          (setq end (union end next-stack))))
+      (when (eq (cleanup-kind cleanup) :dynamic-extent)
+        (let* ((dynamic-extent (cleanup-mess-up cleanup))
+               (info (dynamic-extent-info dynamic-extent)))
+          (when info
+            (pushnew info end))
+          (dolist (preserve (dynamic-extent-preserve-info dynamic-extent))
+            (when (memq preserve (ir2-block-stack-mess-up 2block))
+              (pushnew preserve end))))))
 
     (setf (ir2-block-end-stack 2block) end)
 
-    (let ((start (merge-lvar-live-sets
+    (let ((start (union
                   (set-difference end (ir2-block-pushed 2block))
                   (ir2-block-popped 2block))))
       (when *check-consistency*
