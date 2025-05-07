@@ -959,3 +959,10 @@
    (lambda (s j)
      (find j s :test-not #'char=))
    (or character null)))
+
+(with-test (:name :zerop-length)
+  (assert (null
+           (ctu:ir1-named-calls
+            `(lambda (sequence)
+               (declare ((or vector list) sequence))
+               (zerop (length sequence)))))))

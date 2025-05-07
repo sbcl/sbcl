@@ -6070,6 +6070,26 @@
     (specifier-type '(mod #.(truncate sb-vm::max-dynamic-space-size
                              (* sb-vm:cons-size sb-vm:n-word-bytes))))))
 
+;;; Optimize (zerop (length sequence))
+(defoptimizer (length optimizer) ((sequence) node)
+  (when (and (policy node (< safety 3)) ;; signaling errors for improper lists
+             (csubtypep (lvar-type sequence) (specifier-type '(or vector list)))
+             (not (csubtypep (lvar-type sequence) (specifier-type 'vector))))
+    (let ((dest (node-dest node)))
+      (cond ((and (combination-matches 'eq '(* 0) dest)
+                  (when (splice-fun-args (first (combination-args dest))
+                                         'length 1 nil)
+                    (transform-call dest
+                                    `(lambda (sequence zero)
+                                       (declare (ignore zero))
+                                       (if (listp sequence)
+                                           (eq sequence nil)
+                                           (eq (length (truly-the vector sequence)) 0)))
+                                    'length-optimizer-optimizer)
+                    t)))
+            (t
+             (delay-ir1-optimizer node :constraint))))))
+
 ;;; ENDP, NULL and NOT -> %REST-NULL
 ;;;
 ;;; Outside &REST convert into an IF so that IF optimizations will eliminate
