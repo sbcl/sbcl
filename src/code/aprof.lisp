@@ -498,6 +498,8 @@
                    t)
                   bindings))
          (header (and (listp bindings) (cdr (assoc '?header bindings)))))
+    ;; FIXME: This never detects CLOSURE. I don't understand the pattern syntax
+    ;; and there was no regression test
     (if (and (integerp header) (eq (logand header #xFF) sb-vm:closure-widetag))
         'closure
         'function)))

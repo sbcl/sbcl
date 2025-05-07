@@ -1005,8 +1005,8 @@
       (pseudo-atomic (:default-exit (not remain-pseudo-atomic)
                       :elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
-            (stack-allocation bytes fun-pointer-lowtag result stack-allocate-p)
-            (allocation closure-widetag bytes fun-pointer-lowtag result node temp thread-tn))
+            (stack-allocation bytes 0 result stack-allocate-p)
+            (allocation closure-widetag bytes 0 result node temp thread-tn))
         (storew* #-compact-instance-header header ; write the widetag and size
                  #+compact-instance-header        ; ... plus the layout pointer
                  (let ((layout (thread-slot-ea thread-function-layout-slot)))
@@ -1018,9 +1018,10 @@
                           (inst mov temp header)
                           (inst or temp layout)))
                    temp)
-                 result 0 fun-pointer-lowtag (not stack-allocate-p))
+                 result 0 0 (not stack-allocate-p))
         (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-        (storew temp result closure-fun-slot fun-pointer-lowtag)))))
+        (storew temp result closure-fun-slot 0)
+        (inst or :byte result fun-pointer-lowtag)))))
 
 (define-vop (reference-closure)
   (:info label)
