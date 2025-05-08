@@ -3391,24 +3391,29 @@
     (#-sb-xc-host (sb-vm::lisp-linkage-space-addr
                    (sb-alien:extern-alien "linkage_space" sb-alien:unsigned)))
 (defun fixup-code-object (code offset value kind flavor
-                          &aux (sap (code-instructions code)))
+                          &aux (sap (code-instructions code))
+                               (addend (if (eq kind :absolute)
+                                           (signed-sap-ref-64 sap offset)
+                                           (signed-sap-ref-32 sap offset))))
   (declare (type index offset))
-  (when (member flavor '(:foreign :foreign-dataref))
-    ;; If nonzero, the value stored at the fixup location is not an optional addend;
-    ;; instead it's an opaque enumerated value further specifying how to adjust the value.
-    (let ((disp (* value alien-linkage-table-entry-size))
-          #-immobile-space (subkind (shiftf (sap-ref-32 sap offset) 0)))
-      (setf value
+  ;; Depending on flavor, a nonzero value stored at the fixup location is not an optional
+  ;; addend- instead it's an opaque enumerated value further specifying a fixup behavior.
+  (case flavor
+    (:linkage-cell (setf addend 0))
+    ((:foreign :foreign-dataref)
+     (let ((disp (* value alien-linkage-table-entry-size)))
+       (setf value
             (ecase kind
               (:abs32
                #+immobile-space disp
                #-immobile-space
                (let ((nil-based-disp
                       (- disp (+ sb-vm::nil-value-offset sb-vm:alien-linkage-space-size))))
-                 (if (eql subkind sb-vm::+nil-indirect+) (+ nil-based-disp 8) nil-based-disp)))
+                 (if (eql addend sb-vm::+nil-indirect+) (+ nil-based-disp 8) nil-based-disp)))
               (:rel32 ; subkind is meaningless - this is a PC-relative fixup.
                ;; must be ASM codeblob if #-immobile-space
-               (sb-vm::alien-linkage-table-entry-address value))))))
+               (sb-vm::alien-linkage-table-entry-address value)))
+            addend 0))))
   ;; Preprocess the value based on FLAVOR and the implicit addend at the
   ;; fixup location.  The addend will be zero for most <KIND,FLAVOR> pairs.
   (setq value
@@ -3436,9 +3441,7 @@
              (:assembly-routine
               (if (eq kind :*abs32) (sb-vm::asm-routine-indirect-address value) value))
              (t value))
-           (if (eq kind :absolute)
-               (signed-sap-ref-64 sap offset)
-               (signed-sap-ref-32 sap offset))))
+           addend))
   (ecase kind
     ((:abs32 :*abs32) ; 32 signed bits
      (setf (signed-sap-ref-32 sap offset) value))

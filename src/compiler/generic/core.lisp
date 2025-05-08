@@ -77,12 +77,10 @@
                    (:foreign (alien-linkage-value name nil))
                    (:foreign-dataref (alien-linkage-value name t))
                    #+linkage-space
-                   ((:linkage-cell :linkage-cell-ud)
-                    (let* ((quiet (eq flavor :linkage-cell))
-                           (index (ensure-linkage-index name quiet)))
+                   (:linkage-cell
+                    (let* ((warn #+x86-64 (= (sap-ref-32 (code-instructions code-obj) offset) 1))
+                           (index (ensure-linkage-index name (not warn))))
                       (unless (permanent-fname-p name) (setq callees (adjoin index callees)))
-                      ;; machine-dependent fixup doesn't want to know which flavor was used
-                      (setq flavor :linkage-cell)
                       index))
                    (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))

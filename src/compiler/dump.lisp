@@ -1083,7 +1083,7 @@
     :foreign :foreign-dataref
     :code-object
     :layout :immobile-symbol
-    #+linkage-space ,@'(:linkage-cell :linkage-cell-ud)
+    #+linkage-space :linkage-cell
     :layout-id)
   #'equalp)
 

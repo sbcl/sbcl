@@ -46,9 +46,8 @@
                               (and (eq (sb-c::undefined-warning-kind x) :function)
                                    (equal (sb-c::undefined-warning-name x) name))))
                         sb-c::*undefined-warnings*))))
-    (make-fixup name (if lt-warn
-                         :linkage-cell-ud  ; was undefined at compile-time
-                         :linkage-cell))))
+    ;; The "addend" field of the fixup is used as a boolean flag.
+    (make-fixup name :linkage-cell (if lt-warn 1 0))))
 
 (defun compute-linkage-cell (node name res)
   #-immobile-space (inst lea res (ea (linkage-cell-fixup name node) null-tn))

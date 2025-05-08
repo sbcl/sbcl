@@ -541,6 +541,12 @@
   (let ((b (& (>> val 13) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(BA316CC 1FE456EC 3836DEFB 5D714507 6A1FC394 A56E935B AB2C6780 B4FE847C E578E28F F36C4AC5)
+ "#(:ASSEMBLY-ROUTINE :CARD-TABLE-INDEX-MASK :SYMBOL-TLS-INDEX :FOREIGN :FOREIGN-DATAREF :CODE-OBJECT :LAYOUT :IMMOBILE-SYMBOL :LINKAGE-CELL :LAYOUT-ID)"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 9 0 5 0 3 2 7)))
+  (let ((b (& (>> val 28) #x7)))
+   (let ((a (>> (<< val 31) 29)))
+    (^ a (aref tab b))))))")
 (#(BCB074C 10599A53 5256235A 7CC5F551 9647F466 A49305EF)
  "(:UNKNOWN :ALIEN :GLOBAL :MACRO :CONSTANT :SPECIAL)"
  "(  (& (- (>> val 1) (>> val 4)) 7))")
