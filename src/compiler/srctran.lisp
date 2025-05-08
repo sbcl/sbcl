@@ -6087,6 +6087,17 @@
                                            (eq (length (truly-the vector sequence)) 0)))
                                     'length-optimizer-optimizer)
                     t)))
+            ((and (combination-matches '> '(* 0) dest)
+                  (when (splice-fun-args (first (combination-args dest))
+                                         'length 1 nil)
+                    (transform-call dest
+                                    `(lambda (sequence zero)
+                                       (declare (ignore zero))
+                                       (if (listp sequence)
+                                           (not (eq sequence nil))
+                                           (> (length (truly-the vector sequence)) 0)))
+                                    'length-optimizer-optimizer)
+                    t)))
             (t
              (delay-ir1-optimizer node :constraint))))))
 

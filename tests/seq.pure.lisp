@@ -965,4 +965,9 @@
            (ctu:ir1-named-calls
             `(lambda (sequence)
                (declare ((or vector list) sequence))
-               (zerop (length sequence)))))))
+               (zerop (length sequence))))))
+  (assert (null
+           (ctu:ir1-named-calls
+            `(lambda (sequence)
+               (declare ((or vector list) sequence))
+               (plusp (length sequence)))))))
