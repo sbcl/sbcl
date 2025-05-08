@@ -508,24 +508,27 @@ void set_up_win64_seh_thunk(lispobj* asm_routine)
     // TODO: make asm routines findable in cold-init
     if (!asm_routine) return; // (though cold-init is ok w/o this exception handler)
     gc_assert(sizeof (UNWIND_INFO) <= 16);
-    asm_routine[2] = (lispobj)handle_exception;
 
-    UNWIND_INFO *ui = (void*)(asm_routine + 3);
+    char* jmp_inst = (char*)(asm_routine + 1);
+    char* indirect_addr = jmp_inst + 6 + (int32_t)UNALIGNED_LOAD32(jmp_inst+2);
+    *(lispobj*)indirect_addr = (lispobj)handle_exception;
+
+    UNWIND_INFO *ui = (void*)(indirect_addr - 16);
     ui->Version = 1;
     ui->Flags = UNW_FLAG_EHANDLER;
     ui->SizeOfProlog = 0;
     ui->CountOfCodes = 0;
     ui->FrameRegister = 0;
     ui->FrameOffset = 0;
-    ui->ExceptionHandler = 8; // offset within asm routine
+    ui->ExceptionHandler = jmp_inst - (char*)ui;
     ui->ExceptionData[0] = 0;
 
     RUNTIME_FUNCTION *rt = &seh_data.rt;
-    rt->BeginAddress = 0;
-    rt->EndAddress = 16;
-    rt->UnwindData = 24; // = ui - asm_routine
+    rt->BeginAddress = (char*)asm_routine - (char*)ui;
+    rt->EndAddress = rt->BeginAddress + 16;
+    rt->UnwindData = 0;
 
-    BOOLEAN ok = RtlAddFunctionTable(rt, 1, (DWORD64)asm_routine);
+    BOOLEAN ok = RtlAddFunctionTable(rt, 1, (DWORD64)ui);
     gc_assert(ok);
 }
 #endif

@@ -189,18 +189,3 @@
     (%clear-pseudo-atomic)
     ;; There's a spurious RET instruction auto-inserted, but no matter.
     (error-call nil 'tls-exhausted-error)))
-
-;; This should stay as the *very* *last* asm routine because presence of
-;; non-instructions bytes within messes up disassembly of whatever follows.
-#+win32
-(define-assembly-routine (seh-trampoline (:return-style :none)) ()
-  (inst pop r15-tn)               ;; 8-byte boundary
-  (inst call rbx-tn)
-  (inst push r15-tn)
-  (inst ret) (inst nop)
-  (inst jmp (rip-relative-ea L1)) ;; 8-byte boundary
-  (inst nop) (inst nop)
-  L1                              ;; 8-byte boundary
-  (inst .lispword 0) ; will hold &handle_exception
-  (inst .lispword 0) ; this and next word will hold an UNWIND_INFO
-  (inst .lispword 0))

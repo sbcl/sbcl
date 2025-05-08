@@ -170,10 +170,9 @@ void tune_asm_routines_for_microarch(void)
    instructions that don't exist on some cpu family members */
 void untune_asm_routines_for_microarch(void)
 {
-#ifdef LISP_FEATURE_WIN32
-    lispobj* routine = (lispobj*)get_asm_routine_by_name("SEH-TRAMPOLINE", 0);
-    memset(routine + 2, 0, 3*N_WORD_BYTES);
-#endif
+    char* jmp_inst = get_asm_routine_by_name("SEH-TRAMPOLINE", 0) + 8;
+    char* indirect_addr = jmp_inst + 6 + (int32_t)UNALIGNED_LOAD32(jmp_inst+2);
+    memset(indirect_addr - 16, 0, 24); // erase foreign data
     asm_routine_poke(VECTOR_FILL_T, vector_fill_offset_to_poke,
                      0xEB); // Change JL to JMP
     // ensure no random value lingering in static space on image save

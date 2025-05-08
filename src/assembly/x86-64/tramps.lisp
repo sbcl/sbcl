@@ -5,6 +5,20 @@
 
 (in-package "SB-VM")
 
+;;; This is _not_ conditioned on #+win32 so that there is one less distinction
+;;; in x86-64-arch.c - ok, so it wastes a few words on #+unix.
+(define-assembly-routine (seh-trampoline (:return-style :none)) ()
+  (inst pop r15-tn)      ; \
+  (inst call rbx-tn)     ;  \ __ exactly 8 bytes
+  (inst push r15-tn)     ;  /
+  (inst ret) (inst nop)  ; /
+  ;; Caution: SORT-INLINE-CONSTANTS rearranges constants by size, putting larger ones first.
+  ;; We rely on it here! For this to work, no other asm routine may have unboxed data.
+  ;; If that becomes a problem, this could reserve one :HWORD instead, but that overaligns,
+  ;; causing 3 extra words of padding to be inserted.
+  (inst jmp (register-inline-constant :qword -1))
+  (register-inline-constant :oword -1)) ; for effect
+
 ;;; The SYNCHRONOUS-TRAP routine has nearly the same effect as executing INT3
 ;;; but is more friendly to gdb. There may be some subtle bugs with regard to
 ;;; blocking/unblocking of async signals which arrive nearly around the same
