@@ -375,16 +375,16 @@ not supported."
     ;;   To be totally safe you should restrict yourself to only executing async-signal safe
     ;;   operations until such time as one of the exec functions is called.
     #+sb-thread
-    (when (cdr (sb-int:with-system-mutex (sb-thread::*make-thread-lock*)
-                 (sb-impl::finalizer-thread-stop)
-                 ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
-                 ;; Do that now so that the forked process has only the main thread
-                 ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
-                 (sb-thread::%dispose-thread-structs)
-                 ;; Threads are added to ALL-THREADS before they have an OS thread,
-                 ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
-                 ;; So we need to go lower-level to sense whether any exist.
-                 (sb-thread:avltree-list sb-thread::*all-threads*)))
+    (when (sb-int:with-system-mutex (sb-thread::*make-thread-lock*)
+            (sb-impl::finalizer-thread-stop)
+            ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
+            ;; Do that now so that the forked process has only the main thread
+            ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
+            (sb-thread::%dispose-thread-structs)
+            ;; Threads are added to ALL-THREADS before they have an OS thread,
+            ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
+            ;; So we need to go lower-level to sense whether any exist.
+            (> (sb-thread::avl-count sb-thread::*all-threads*) 1))
       (sb-impl::finalizer-thread-start)
       (error "Cannot fork with multiple threads running."))
     (sb-sys:without-interrupts
