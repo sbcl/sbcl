@@ -222,7 +222,8 @@
 
 (flet ((maybe-function-documentation (name)
          (cond
-           ((not (legal-fun-name-p name)))
+           ((not (legal-fun-name-p name))
+            nil)
            ((random-documentation name 'function))
            ;; Nothing under the name, check the function object.
            ((fboundp name)

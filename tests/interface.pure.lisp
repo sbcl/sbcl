@@ -247,3 +247,7 @@
   (assert (= (funcall 'flem 9) 12))
   (compile 'flem (compile nil '(lambda (x) (* x 3))))
   (assert (= (funcall 'flem 9) 27)))
+
+(with-test (:name (documentation (not sb-impl::legal-fun-name-p)))
+  (assert (typep (documentation '(xxx yyy) 'function)
+                 '(or null string))))
