@@ -12,6 +12,10 @@
   :prefilter #'invert-4
   :printer #'print-ymmreg)
 
+(define-arg-type vvvv-reg
+  :prefilter #'invert-4
+  :printer #'print-reg)
+
 (define-arg-type ymm-reg-is4
   :printer #'print-ymmreg)
 
@@ -1249,3 +1253,21 @@
    (emit-byte segment #x0F)
    (emit-byte segment #xAE)
    (emit-ea segment dst 5)))
+
+(define-instruction-format (vex3-vex-gpr (+ 24 16) :include vex3
+                                                   :default-printer '(:name :tab reg ", " vvvv ", " reg/mem))
+  (op :field (byte 8 (+ 24 0)))
+  (vvvv :type 'vvvv-reg)
+  (reg/mem :fields (list (byte 2 (+ 24 14)) (byte 3 (+ 24 8))) :type 'reg/mem)
+  (reg :field (byte 3 (+ 24 11)) :type 'reg))
+
+
+(define-instruction mulx (segment &prefix prefix hi lo src)
+  (:emitter
+   (emit-avx2-inst segment src hi #xF2 #xF6 :opcode-prefix #x0f38 :vvvv lo
+                                            :w (ecase (pick-operand-size prefix lo src)
+                                                 (:qword 1)
+                                                 (:dword 0))))
+  . #.(avx2-inst-printer-list 'vex-gpr #xF2 #xF6
+                              :nds t
+                              :opcode-prefix #x0f38))
