@@ -6067,8 +6067,12 @@
 
 (defoptimizer (length derive-type) ((sequence))
   (when (csubtypep (lvar-type sequence) (specifier-type 'list))
-    (specifier-type '(mod #.(truncate sb-vm::max-dynamic-space-size
-                             (* sb-vm:cons-size sb-vm:n-word-bytes))))))
+    (specifier-type `(integer
+                      ,(if (csubtypep (lvar-type sequence) (specifier-type 'cons))
+                           1
+                           0)
+                      (#.(truncate sb-vm::max-dynamic-space-size
+                                   (* sb-vm:cons-size sb-vm:n-word-bytes)))))))
 
 ;;; Optimize (zerop (length sequence))
 (defoptimizer (length optimizer) ((sequence) node)

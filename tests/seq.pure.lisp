@@ -971,3 +971,9 @@
             `(lambda (sequence)
                (declare ((or vector list) sequence))
                (plusp (length sequence)))))))
+
+(with-test (:name :cons-length)
+  (assert-type
+   (lambda (x)
+     (min (length (the cons x)) 10))
+   (integer 1 10)))
