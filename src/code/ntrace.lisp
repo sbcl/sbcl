@@ -231,7 +231,6 @@
                  (*in-trace* t))
              (case (trace-info-report info)
                (trace
-                (fresh-line)
                 (print-trace-indentation)
                 (if (trace-info-encapsulated info)
                     (prin1 `(,(trace-info-what info)
@@ -249,6 +248,7 @@
                              hook-args
                              (nth-value 1 (frame-call frame))))
                 (apply #'trace-print-unadorned frame (trace-info-print info) hook-args)))
+             (fresh-line *trace-output*)
              (write-sequence (get-output-stream-string *standard-output*)
                              *trace-output*)
              (finish-output *trace-output*))
