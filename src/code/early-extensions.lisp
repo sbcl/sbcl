@@ -522,8 +522,7 @@ NOTE: This interface is experimental and subject to change."
   (dolist (name *cache-vector-symbols*)
     ;; We really don't need to call ABOUT-TO-MODIFY-SYMBOL-VALUE 18 times
     ;; just to clear the caches.
-    #-sb-xc-host (%primitive %set-symbol-global-value name nil)
-    #+sb-xc-host (set name nil)))
+    (%set-symbol-global-value name nil)))
 
 (defmacro sb-int-package () (find-package "SB-INT"))
 
@@ -534,10 +533,7 @@ NOTE: This interface is experimental and subject to change."
   (let (cache)
     ;; It took me a while to figure out why infinite recursion could occur
     ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
-    (macrolet ((set! (symbol value)
-                 #-sb-xc-host `(%primitive %set-symbol-global-value ,symbol ,value)
-                 #+sb-xc-host `(set ,symbol ,value))
-               (reset-stats ()
+    (macrolet ((reset-stats ()
                  ;; If statistics gathering is not not compiled-in,
                  ;; no sense in setting a symbol that is never used.
                  ;; While this uses SYMBOLICATE at runtime,
@@ -546,7 +542,7 @@ NOTE: This interface is experimental and subject to change."
                      `(let ((statistics
                              (package-symbolicate (sb-int-package) symbol "-STATS")))
                         (unless (boundp statistics)
-                          (set! statistics
+                          (%set-symbol-global-value statistics
                                 (make-array 3 :element-type 'fixnum
                                               :initial-contents '(1 0 0))))))))
       ;; It would be bad if another thread sees MAKE-ARRAY's result in the
@@ -556,7 +552,7 @@ NOTE: This interface is experimental and subject to change."
       (sb-thread:barrier (:write)
         (reset-stats)
         (setq cache (make-array size :initial-element 0)))
-      (set! symbol cache)
+      (%set-symbol-global-value symbol cache)
       cache)))
 
 ;; At present we make a new vector every time a line is re-written,

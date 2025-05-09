@@ -35,10 +35,17 @@
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))
   (about-to-modify-symbol-value symbol 'set new-value)
-  (%set-symbol-value symbol new-value))
+  (%primitive set symbol new-value)
+  new-value)
 
-(defun %set-symbol-value (symbol new-value)
-  (%set-symbol-value symbol new-value))
+;;; The vop named %SET-SYMBOL-GLOBAL-VALUE does not translate the function of that name.
+;;; A bunch of calls in cold-init (and later) need an installed function.
+;;; Also note that the vop doesn't yield a value, but this does, because a 1-valued return
+;;; is shorter than a 0-valued return and seems like the right thing to do anyway.
+(defun %set-symbol-global-value (symbol value)
+  (declare (type (and symbol (not null)) symbol))
+  (%primitive %set-symbol-global-value symbol value)
+  value)
 
 (defun symbol-global-value (symbol)
   "Return the SYMBOL's current global value. Identical to SYMBOL-VALUE,
@@ -54,7 +61,11 @@ distinct from the global value. Can also be SETF."
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)
-  (%set-symbol-value symbol (make-unbound-marker)))
+  (let ((marker (make-unbound-marker)))
+    (%primitive set symbol marker)
+    ;; I don't think this can ever be called "for value", but it's cheaper
+    ;; to return a value than not to. It always returned the unbound marker.
+    marker))
 
 (defun makunbound (symbol)
   "Make SYMBOL unbound, removing any value it may currently have."
@@ -519,9 +530,9 @@ distinct from the global value. Can also be SETF."
   (declare (sb-c::tlab :system)) ; heap-cons the property list if copying it
   (let ((new-symbol (make-symbol (symbol-name symbol))))
     (when copy-props
-      ;; Should this really copy a thread-local value ?
-      ;; I would think it more correct to copy only a global value.
-      (%set-symbol-value new-symbol (%primitive sb-c:fast-symbol-value symbol))
+      ;; Just like for %INTERN, we set the global value. However, should we really _copy_
+      ;; a thread-local value if one existed? I don't know but I don't think so.
+      (%set-symbol-global-value new-symbol (%primitive sb-c:fast-symbol-value symbol))
       (locally (declare (optimize speed)) ; will inline COPY-LIST
         (setf (symbol-plist new-symbol)
               (copy-list (symbol-plist symbol))))

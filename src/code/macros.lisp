@@ -338,21 +338,18 @@ tree structure resulting from the evaluation of EXPRESSION."
   ;; :macro-expansion of something that is getting defined as constant.
   (clear-info :variable :macro-expansion name)
   (clear-info :source-location :symbol-macro name)
+  #+sb-xc-host ;; Define the constant in the cross-compilation host, since the
+               ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
+               ;; which reference the constant.
+  (progn (eval `(unless (boundp ',name) (defconstant ,name ',value)))
+         (setf (info :variable :kind name) :constant))
   #-sb-xc-host
-  (progn
-    (when docp
-      (setf (documentation name 'variable) doc))
-    (%set-symbol-value name value))
-  ;; Define the constant in the cross-compilation host, since the
-  ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
-  ;; which reference the constant.
-  #+sb-xc-host
-  (eval `(unless (boundp ',name) (defconstant ,name ',value)))
-  (setf (info :variable :kind name) :constant)
-  ;; Deoptimize after changing it to :CONSTANT, and not before, though tbh
-  ;; if your code cares about the timing of PROGV relative to DEFCONSTANT,
-  ;; well, I can't even.
-  #-sb-xc-host (unset-symbol-progv-optimize name)
+  (progn (%set-symbol-global-value name value)
+         (setf (info :variable :kind name) :constant)
+         ;; Deoptimize after changing it to :CONSTANT, and not before, though if user code
+         ;; cares about the timing of PROGV relative to DEFCONSTANT, it's buggy anyway.
+         (unset-symbol-progv-optimize name)
+         (when docp (setf (documentation name 'variable) doc)))
   name)
 
 (sb-xc:defmacro defvar (var &optional (val nil valp) (doc nil docp))

@@ -54,6 +54,8 @@
 
 (defmacro define-load-time-global (&rest args) `(defvar ,@args))
 
+(defun %set-symbol-global-value (sym val) (setf (symbol-value sym) val))
+
 ;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.
 (defun set-symbol-global-value (sym val)
   (error "Unexpected (~S ~S ~S)" 'set-symbol-global-value sym val))

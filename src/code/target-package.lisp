@@ -1397,14 +1397,18 @@ Experimental: interface subject to change."
           (if (and where (or allow-inherited (neq where :inherited)))
               (values symbol where)
               (let* ((symbol-name (make-readonly-string length name elt-type))
+                     (keywordp (eq package *keyword-package*))
                      ;; optimistically create the symbol
                      (symbol ; Symbol kind: 1=keyword, 2=other interned
-                       (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
-                     (table (cond ((eq package *keyword-package*)
-                                   (%set-symbol-value symbol symbol)
-                                   (package-external-symbols package))
-                                  (t
-                                   (package-internal-symbols package)))))
+                       (%make-symbol (if keywordp 1 2) symbol-name))
+                     (table
+                      ;; No difference between set-symbol-GLOBAL-value or not here, but
+                      ;; global is simpler.
+                      (cond (keywordp
+                             (%set-symbol-global-value symbol symbol)
+                             (package-external-symbols package))
+                            (t
+                             (package-internal-symbols package)))))
                 ;; Set the symbol's package before storing it into the package
                 ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
                 ;; This matters in the case of concurrent INTERN.

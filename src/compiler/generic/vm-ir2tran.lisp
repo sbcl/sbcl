@@ -322,22 +322,6 @@
      sb-vm:other-pointer-lowtag
      (loop for i from 1 to n-args collect `(:arg . ,i)))))
 
-;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
-;;; cut it for symbols, where under certain compilation options
-;;; (e.g. #+SB-THREAD) we have to do something complicated, rather
-;;; than simply set the slot.  So we build the IR2 converting function
-;;; by hand.  -- CSR, 2003-05-08
-(let ((fun-info (fun-info-or-lose '%set-symbol-value)))
-  (setf (fun-info-ir2-convert fun-info)
-        (lambda (node block)
-          (let ((args (basic-combination-args node)))
-            (destructuring-bind (symbol value) args
-              (let ((value-tn (lvar-tn node block value)))
-                (vop set node block
-                     (lvar-tn node block symbol) value-tn)
-                (move-lvar-result
-                 node block (list value-tn) (node-lvar node))))))))
-
 ;;; Stack allocation optimizers per platform support
 (defoptimizer (make-array-header* stack-allocate-result) ((&rest args))
   t)
