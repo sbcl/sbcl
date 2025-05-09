@@ -542,6 +542,7 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     return 0;
 }
 
+#if !(defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64)
 static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
@@ -553,6 +554,7 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     struct code* code = (struct code*)dynamic_space_code_from_pc((char *)addr);
     if (code) pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
 }
+#endif
 
 #if GENCGC_IS_PRECISE && !defined(reg_CODE)
 

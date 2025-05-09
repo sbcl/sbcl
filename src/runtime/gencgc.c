@@ -3036,6 +3036,7 @@ move_pinned_pages_to_newspace()
     }
 }
 
+#if !(defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64)
 static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     page_index_t page = find_page_index((char*)addr);
 
@@ -3051,6 +3052,7 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
         pin_exact_root(make_lispobj(code, OTHER_POINTER_LOWTAG));
     }
 }
+#endif
 
 #if defined reg_RA
 static void conservative_pin_code_from_return_addresses(struct thread* th) {
