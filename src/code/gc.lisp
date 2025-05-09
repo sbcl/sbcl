@@ -298,7 +298,7 @@ used to specify the oldest generation guaranteed to be collected."
 
 (define-alien-routine scrub-control-stack void)
 
-(defglobal sb-unicode::*name->char-buffers* nil)
+(define-load-time-global sb-unicode::*name->char-buffers* nil)
 (defun unsafe-clear-roots (gen)
   (declare (ignorable gen))
   ;; KLUDGE: Do things in an attempt to get rid of extra roots. Unsafe

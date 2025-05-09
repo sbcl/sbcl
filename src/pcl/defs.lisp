@@ -577,7 +577,7 @@
 ;; nothing needs it, even if OBJECT persists. You might think that calling
 ;; gethash on a live key should get the identical specializer, but since
 ;; nothing referenced the old specializer, consing a new one is fine.
-(defglobal *eql-specializer-table*
+(define-load-time-global *eql-specializer-table*
   (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
 
 (defun intern-eql-specializer (object)

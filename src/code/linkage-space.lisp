@@ -20,7 +20,7 @@
 
 (define-load-time-global *linkage-space-mutex* (sb-thread:make-mutex))
 (declaim (type sb-thread:mutex *linkage-space-mutex*))
-(defglobal *linkage-cell-modified* nil)
+(define-load-time-global *linkage-cell-modified* nil)
 (declaim (type (or null simple-bit-vector) *linkage-cell-modified*))
 
 ;;; A weak mapping from linkage index to name, represented as a simple-vector
@@ -30,8 +30,8 @@
 (define-load-time-global *linkage-name-map* #())
 (declaim (simple-vector *linkage-name-map*))
 (defconstant linkage-smallvec-elts (- gencgc-page-words vector-data-offset))
-(defglobal *fname-map-available-elts* nil)
-(defglobal *fname-map-observed-gc-epoch* 0)
+(define-load-time-global *fname-map-available-elts* nil)
+(define-load-time-global *fname-map-observed-gc-epoch* 0)
 (declaim (ftype function unbypass-linkage))
 
 (defun fname-linkage-index (fname)

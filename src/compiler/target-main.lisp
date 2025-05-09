@@ -473,7 +473,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                 (line/col-from-charpos stream end-pos))
         (values nil nil))))
 
-(sb-ext:defglobal *background-tasks* nil)
+(define-load-time-global *background-tasks* nil)
 (defun default-compiler-worker (&aux compiled)
   (loop
     (let ((item (sb-ext:atomic-pop *background-tasks*)))

@@ -663,7 +663,7 @@
 
 #-sb-xc-host
 (progn
-(defglobal *!initial-ctypes* nil)
+(define-load-time-global *!initial-ctypes* nil)
 (defun preload-ctype-hashsets ()
   (dolist (pair (nreverse *!initial-ctypes*))
     (let ((instance (car pair))

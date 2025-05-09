@@ -56,7 +56,7 @@
 
 ;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.
 (defun set-symbol-global-value (sym val)
-  (setf (symbol-value sym) val))
+  (error "Unexpected (~S ~S ~S)" 'set-symbol-global-value sym val))
 
 (defun %defun (name lambda &optional inline-expansion)
   (declare (ignore inline-expansion))

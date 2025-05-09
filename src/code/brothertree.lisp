@@ -176,7 +176,7 @@
 ;;; frequent, so unfortunately we have to try all the others first to make
 ;;; sure we don't wrongly pick the last.
 ;;; Hence it doesn't really matter much in what order the others are tried.
-(defglobal *cases* (make-array 8))
+(define-load-time-global *cases* (make-array 8))
 (defmacro pattern-case ((L R) &rest clauses &aux (n -1))
   (flet ((shape-is (node shape)
            ;; SHAPE has a small number of hardcoded possibilities which are

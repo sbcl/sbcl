@@ -28,7 +28,7 @@
 (in-package "SB-PCL")
 
 (declaim (list **standard-method-classes**))
-(defglobal **standard-method-classes** nil)
+(define-load-time-global **standard-method-classes** nil)
 
 (defconstant-eqx +standard-method-class-names+
   '(standard-method standard-reader-method

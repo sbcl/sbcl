@@ -310,7 +310,7 @@ Examples:
       (sb-vm::reconstitute-object (sb-lockless:so-key node))))
 
 ;;; Perform various cleanups around finalizers
-(defglobal *saved-finalizers* nil)
+(define-load-time-global *saved-finalizers* nil)
 (defun finalizers-deinit (&aux save)
   (labels
       ((filter-actions (object actions)

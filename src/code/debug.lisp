@@ -2599,7 +2599,7 @@ forms that explicitly control this kind of evaluation.")
 ;; get_proc_name can slow down the unwind by 100x. Depending on whether you need
 ;; every stack trace with C symbols many times quickly, or not so many times but
 ;; more informatively, you'd set this off or on respectively.
-(defglobal *use-libunwind-get-proc-name* nil)
+(define-load-time-global *use-libunwind-get-proc-name* nil)
 (defun libunwind-backtrace (thread thread-sap context stream)
   (declare (ignorable thread thread-sap))
   (sb-alien:with-alien

@@ -281,7 +281,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
         (t
          (format t "~&Already created~%"))))
 
-(defglobal *foo* nil)
+(define-load-time-global *foo* nil)
 (defun arena-smoketest ()
   (setq *foo* nil)
   (with-arena (*my-arena*)

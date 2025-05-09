@@ -178,7 +178,7 @@
               (let ((oldval (cas *dynspace-codeblob-tree* tree newtree)))
                 (if (eq oldval tree) (return) (setq tree oldval))))))))
 
-(defglobal *code-alloc-count* 0) ; frlock: bump once on entry, again on exit
+(define-load-time-global *code-alloc-count* 0) ; frlock: bump once on entry, again on exit
 (declaim (fixnum *code-alloc-count*))
 
 ;;; Allocate a code component with BOXED words in the header

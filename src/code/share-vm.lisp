@@ -162,7 +162,7 @@
   ;; eval-when doesn't work correctly in the XC
   (setf (getf *cpu-features* name) detect)
   `(progn
-     (defglobal ,(symbolicate '+ name '-routines+) ())
+     (define-load-time-global ,(symbolicate '+ name '-routines+) ())
      (setf (getf *cpu-features* ',name) ',detect)))
 
 (defmacro def-variant (name cpu-feature lambda-list &body body)
