@@ -3887,7 +3887,7 @@ III. initially undefined function references (alphabetically):
            (format t "
 INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
 =====  ==========  ==========  ==========  ====
-~:{~[     ~:;~:*~5D~]  ~:[          ~;~:*~10x~]  ~10,'0X  ~10,'0X  ~S~%~}~%"
+~:{~[     ~:;~:*~5D~]  ~:[            ~;~:*~12x~]  ~10,'0X  ~10,'0X  ~S~%~}~%"
                    list)))
     (let* ((names
             (nconc (sb-int:%hash-table-alist *cold-fdefn-objects*) ; name -> descriptor
