@@ -6066,13 +6066,29 @@
 (define-source-transform list-length (list) (source-transform-length list))
 
 (defoptimizer (length derive-type) ((sequence))
-  (when (csubtypep (lvar-type sequence) (specifier-type 'list))
-    (specifier-type `(integer
-                      ,(if (csubtypep (lvar-type sequence) (specifier-type 'cons))
-                           1
-                           0)
-                      (#.(truncate sb-vm::max-dynamic-space-size
-                                   (* sb-vm:cons-size sb-vm:n-word-bytes)))))))
+  (when (csubtypep (lvar-type sequence) (specifier-type '(or vector list)))
+    (let ((list-int (type-intersection (lvar-type sequence) (specifier-type 'list))))
+      (unless (eq list-int *empty-type*)
+        (let* ((vector-int (type-intersection (lvar-type sequence) (specifier-type 'vector)))
+               (vector (and (neq vector-int *empty-type*)
+                            (vector-length-type vector-int))))
+          (when (or (eq vector-int *empty-type*)
+                    vector)
+            (let ((list (cond ((eq list-int (specifier-type 'null))
+                               (specifier-type '(integer 0 0)))
+                              ((csubtypep list-int (specifier-type 'cons))
+                               (specifier-type '(integer
+                                                 1
+                                                 (#.(truncate sb-vm::max-dynamic-space-size
+                                                     (* sb-vm:cons-size sb-vm:n-word-bytes))))))
+                              (t
+                               (specifier-type '(integer
+                                                 0
+                                                 (#.(truncate sb-vm::max-dynamic-space-size
+                                                     (* sb-vm:cons-size sb-vm:n-word-bytes)))))))))
+              (if vector
+                  (type-union list vector)
+                  list))))))))
 
 ;;; Optimize (zerop (length sequence))
 (defoptimizer (length optimizer) ((sequence) node)

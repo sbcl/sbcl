@@ -976,4 +976,12 @@
   (assert-type
    (lambda (x)
      (min (length (the cons x)) 10))
-   (integer 1 10)))
+   (integer 1 10))
+  (assert-type
+   (lambda (x)
+     (min (length (the (or cons (simple-string 5)) x)) 10))
+   (integer 1 10))
+  (assert-type
+   (lambda (x)
+     (length (the (or null (simple-string 10)) x)))
+   (or (integer 0 0) (integer 10 10))))
