@@ -22,13 +22,7 @@
              (let ((offset-sym (symbolicate name "-OFFSET")))
                `(eval-when (:compile-toplevel :load-toplevel :execute)
                   (defconstant ,offset-sym ,offset)
-                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
-
-           (defregset (name &rest regs)
-             `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (defparameter ,name
-                  (list ,@(mapcar #'(lambda (name)
-                                      (symbolicate name "-OFFSET")) regs))))))
+                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name))))))
 
   (defreg r0 0)
   (defreg r1 1)

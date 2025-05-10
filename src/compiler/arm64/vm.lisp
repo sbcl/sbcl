@@ -24,12 +24,7 @@
              (let ((offset-sym (symbolicate name "-OFFSET")))
                `(progn
                   (defconstant ,offset-sym ,offset)
-                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
-
-           (defregset (name &rest regs)
-             `(defglobal ,name
-                  (list ,@(mapcar #'(lambda (name)
-                                      (symbolicate name "-OFFSET")) regs)))))
+                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name))))))
 
   (defreg nl0 0)
   (defreg nl1 1)

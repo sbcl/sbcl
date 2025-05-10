@@ -34,14 +34,7 @@
                  `(eval-when (:compile-toplevel :load-toplevel :execute)
                    (defconstant ,offset-sym ,offset)
                    (setf (svref *register-names* ,offset-sym)
-                        ,(symbol-name name)))))
-
-           (defregset (name &rest regs)
-                `(eval-when (:compile-toplevel :load-toplevel :execute)
-                  (defparameter ,name
-                    (list ,@(mapcar (lambda (name)
-                                      (symbolicate name "-OFFSET"))
-                                    regs))))))
+                        ,(symbol-name name))))))
   ;; c.f. src/runtime/sparc-lispregs.h
 
   ;; Globals.  These are difficult to extract from a sigcontext.

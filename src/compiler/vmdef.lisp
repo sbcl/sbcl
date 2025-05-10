@@ -238,3 +238,17 @@
           for arg-type = (nth argument (template-arg-types template))
           thereis (and (consp arg-type)
                        (memq primitive-type (cdr arg-type))))))
+
+(defmacro sb-vm::defregset (name &rest regs)
+  (let ((form `(list ,@(mapcar (lambda (name) (symbolicate name "-OFFSET"))
+                               regs)))
+        (string (string name)))
+    ;; regsets are constant lists, but both the host and cross-compiler will style-warn
+    ;; on seeing (DEFCONSTANT-EQX *EARMUFFED-NAME* ...) so depending how the NAME looks,
+    ;; use a workaround which seems less trouble than changing it everywhere.
+    (if (char/= (char string 0) #\*)
+        `(defconstant-eqx ,name ,form #'equal)
+        (let ((constant (symbolicate "+" (subseq string 1 (1- (length string))) "+")))
+          `(progn
+             (define-symbol-macro ,name ,constant)
+             (defconstant-eqx ,constant ,form #'equal))))))

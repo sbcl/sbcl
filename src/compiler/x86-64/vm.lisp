@@ -93,13 +93,6 @@
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
              `(defconstant ,(symbolicate name "-OFFSET") ,offset))
-           (defregset (name &rest regs)
-             ;; FIXME: this would be DEFCONSTANT-EQX were it not
-             ;; for all the style-warnings about earmuffs on a constant.
-             `(defglobal ,name
-                  (list ,@(mapcar (lambda (name)
-                                    (symbolicate name "-OFFSET"))
-                                  regs))))
            ;; Define general-purpose regs in a more concise way, as we seem
            ;; to (redundantly) want each register's offset for dword and qword
            ;; even though the value of the constant is the same.

@@ -29,12 +29,7 @@
                     ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
-                (defconstant ,(symbolicate name "-OFFSET") ,offset)))
-           (defregset (name &rest regs)
-             `(defglobal ,name
-                  (list ,@(mapcar (lambda (name)
-                                    (symbolicate name "-OFFSET"))
-                                  regs)))))
+                (defconstant ,(symbolicate name "-OFFSET") ,offset))))
 
   ;; byte registers
   ;;

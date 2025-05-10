@@ -107,10 +107,9 @@
   (non-descriptors -1 :type fixnum)
   (float -1 :type fixnum))
 
-(declaim (#+sb-xc-host special
-          #-sb-xc-host sb-ext:global
-          *float-regs* *descriptor-args*
-          #-c-stack-is-control-stack *non-descriptor-args*))
+#-(or arm64 x86-64) (defvar *descriptor-args*)
+#-(or arm64 c-stack-is-control-stack) (defvar *non-descriptor-args*)
+#-(or x86 arm64 x86-64) (defvar *float-regs*)
 
 (defun fixed-call-arg-location (type state)
   (let* ((primtype (if (typep type 'primitive-type)

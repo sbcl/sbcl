@@ -23,12 +23,8 @@
                (let ((offset-sym (symbolicate name "-OFFSET")))
                  `(eval-when (:compile-toplevel :load-toplevel :execute)
                    (defconstant ,offset-sym ,offset)
-                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name))))))
 
-           (defregset (name &rest regs)
-               `(eval-when (:compile-toplevel :load-toplevel :execute)
-                 (defparameter ,name
-                   (list ,@(mapcar #'(lambda (name) (symbolicate name "-OFFSET")) regs))))))
   ;; Wired zero register.
   (defreg zero 0) ; NULL
   ;; Reserved for assembler use.
