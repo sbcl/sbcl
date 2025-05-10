@@ -358,38 +358,92 @@
                        (setf (lvar-dynamic-extent arg) dynamic-extent)
                        (push arg (dynamic-extent-values dynamic-extent))))))))))))
 
-;;; Make LVAR have DYNAMIC-EXTENT, recursively looking for otherwise
-;;; inaccessible potentially stack-allocatable parts. If LVAR already
-;;; has a different dynamic extent set, we don't do anything.
+;;; Check that REF delivers a value to a combination which is DX safe
+;;; or whose result is that value and ends up being discarded.
+(defun ref-good-for-dx-p (ref)
+  (let* ((lvar (ref-lvar ref))
+         (dest (when lvar (lvar-dest lvar))))
+    (and (combination-p dest)
+         (case (combination-kind dest)
+           (:known
+            (awhen (combination-fun-info dest)
+              (or (ir1-attributep (fun-info-attributes it) dx-safe)
+                  (and (not (combination-lvar dest))
+                       (awhen (fun-info-result-arg it)
+                         (eql lvar (nth it (combination-args dest))))))))
+           (:local
+            (loop for arg in (combination-args dest)
+                  for var in (lambda-vars (combination-lambda dest))
+                  do (when (eq arg lvar)
+                       (return
+                         (dolist (ref (lambda-var-refs var) t)
+                           (unless (ref-good-for-dx-p ref)
+                             (return nil)))))
+                  finally (sb-impl::unreachable)))))))
+
+;;; Recursively look for otherwise inaccessible potentially
+;;; stack-allocatable parts in the uses of LVAR. If there is one,
+;;; bound LVAR's extent by DYNAMIC-EXTENT. If LVAR already has a
+;;; different dynamic extent set, we don't do anything.
 (defun find-stack-allocatable-parts (lvar dynamic-extent)
   (declare (type lvar lvar)
            (type cdynamic-extent dynamic-extent))
-  (unless (lvar-dynamic-extent lvar)
-    (setf (lvar-dynamic-extent lvar) dynamic-extent))
-  (when (eq (lvar-dynamic-extent lvar) dynamic-extent)
+  (when (lvar-dynamic-extent lvar)
+    (aver (not (eq (lvar-dynamic-extent lvar) dynamic-extent)))
+    (return-from find-stack-allocatable-parts))
+  (flet ((recurse (subpart)
+           (find-stack-allocatable-parts subpart dynamic-extent)
+           (when (lvar-dynamic-extent subpart)
+             (setf (lvar-dynamic-extent lvar) dynamic-extent))))
     (do-uses (use lvar)
-      (when (use-good-for-dx-p use dynamic-extent)
-        (etypecase use
-          (cast
-           (find-stack-allocatable-parts (cast-value use) dynamic-extent))
-          (combination
-           ;; Don't propagate through &REST, for sanity.
-           (unless (eq (combination-fun-source-name use nil)
-                       '%listify-rest-args)
-             (dolist (arg (combination-args use))
-               (when (and arg
-                          (lvar-good-for-dx-p arg dynamic-extent))
-                 (find-stack-allocatable-parts arg dynamic-extent)))))
-          (ref
-           (let ((leaf (ref-leaf use)))
-             (typecase leaf
-               (lambda-var
-                (find-stack-allocatable-parts (let-var-initial-value leaf)
-                                              dynamic-extent))
-               (clambda
+      (typecase use
+        (cast
+         (unless (cast-type-check use)
+           (recurse (cast-value use))))
+        (combination
+         (when (eq (combination-kind use) :known)
+           (let* ((info (combination-fun-info use))
+                  (stack-alloc-res (fun-info-stack-allocate-result info))
+                  (result-arg
+                    (let ((i (fun-info-result-arg info)))
+                      (and i (nth i (combination-args use))))))
+             (when result-arg
+               (recurse result-arg))
+             (when (and stack-alloc-res (funcall stack-alloc-res use))
+               (setf (lvar-dynamic-extent lvar) dynamic-extent))
+             (when (and (lvar-dynamic-extent lvar)
+                        ;; Don't propagate through &REST, for sanity.
+                        (not (eq (combination-fun-source-name use nil)
+                                 '%listify-rest-args)))
+               (dolist (arg (combination-args use))
+                 (when (and arg (not (eq result-arg arg)))
+                   (find-stack-allocatable-parts arg dynamic-extent)))))))
+        (ref
+         (let ((leaf (ref-leaf use)))
+           (typecase leaf
+             (lambda-var
+              ;; LET lambda var with no SETS.
+              (when (and (functional-kind-eq (lambda-var-home leaf) let)
+                         (not (lambda-var-sets leaf))
+                         (lexenv-contains-lambda (lambda-var-home leaf)
+                                                 (node-lexenv dynamic-extent))
+                         ;; Check the other refs are good.
+                         (dolist (ref (leaf-refs leaf) t)
+                           (unless (eq use ref)
+                             (when (not (ref-good-for-dx-p ref))
+                               (return nil)))))
+                (recurse (let-var-initial-value leaf))))
+             (clambda
+              (aver (functional-kind-eq leaf external))
+              (when (and (null (rest (leaf-refs leaf)))
+                         (environment-closure (get-lambda-environment leaf))
+                         (lexenv-contains-lambda leaf
+                                                 (node-lexenv dynamic-extent)))
+                (aver (eq use (first (leaf-refs leaf))))
                 (let ((fun (functional-entry-fun leaf)))
                   (setf (enclose-dynamic-extent (functional-enclose fun))
                         dynamic-extent)
+                  (setf (lvar-dynamic-extent lvar) dynamic-extent)
                   (setf (leaf-dynamic-extent fun) t)))))))))))
 
 ;;; Find all stack allocatable values in COMPONENT, setting
@@ -439,15 +493,12 @@
     (dolist (dynamic-extent (lambda-dynamic-extents lambda))
       (dolist (lvar (dynamic-extent-values dynamic-extent))
         (aver (eq dynamic-extent (lvar-dynamic-extent lvar)))
-        ;; Check that the value hasn't been flushed somehow.
-        (when (lvar-uses lvar)
-          (cond ((lvar-good-for-dx-p lvar dynamic-extent)
-                 (find-stack-allocatable-parts lvar dynamic-extent)
-                 (unless (or (dynamic-extent-info dynamic-extent)
-                             (null (dynamic-extent-cleanup dynamic-extent)))
-                   (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
-                (t
-                 (setf (lvar-dynamic-extent lvar) nil)))))))
+        (setf (lvar-dynamic-extent lvar) nil)
+        (find-stack-allocatable-parts lvar dynamic-extent)
+        (when (lvar-dynamic-extent lvar)
+          (unless (or (dynamic-extent-info dynamic-extent)
+                      (null (dynamic-extent-cleanup dynamic-extent)))
+            (setf (dynamic-extent-info dynamic-extent) (make-lvar)))))))
   (dolist (lambda (component-lambdas component))
     (let ((fun (if (functional-kind-eq lambda optional)
                    (lambda-optional-dispatch lambda)
