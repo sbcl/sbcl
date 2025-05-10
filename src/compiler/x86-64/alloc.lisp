@@ -155,9 +155,8 @@
   (when (instrument-alloc-policy-p node)
     (when (tn-p size)
       (aver (not (location= size temp))))
-    ;; CAUTION: the logic for RAX-SAVE is entirely untested
-    ;; as it never gets exercised, and can not be, until R12 ceases
-    ;; to have its wired use as the GC card table base register.
+    ;; CAUTION: the logic for RAX-SAVE is entirely untested, due to R12 being
+    ;; unusable by register allocator currently
     (binding* (((data rax-save) (if (location= temp r12-tn)
                                     (values rax-tn t)
                                     (values temp nil)))

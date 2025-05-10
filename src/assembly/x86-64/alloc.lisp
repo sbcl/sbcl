@@ -110,14 +110,11 @@
           (inst pop (object-slot-ea number 1 other-pointer-lowtag))
           (inst ret)))
      (define (op)
-       ;; R12 is not usable for the time being.
        ;; R13 is usually the thread register, but might not be
        `(progn
-          ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
-                               r8 r9 r10 r11
-                               ;; the register allocator will never select r12
-                               #+gs-seg r13
-                               r14 r15)
+        ,@(loop for reg in ; can't cons into card-table or thread register
+                (remove (intern (aref +qword-register-names+ card-table-reg))
+                        '(rax rcx rdx rbx rsi rdi r8 r9 r10 r11 r12 #+gs-seg r13 r14 r15))
                   collect `(,op ,reg)))))
   (define from-digits)
   (define from-digits-unsigned)

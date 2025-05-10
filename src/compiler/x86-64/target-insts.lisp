@@ -117,7 +117,7 @@
                            (+ 16 -4 num) ; legacy high-byte register
                            num))))
     (when (and note
-               (= (reg-num reg) sb-vm::card-table-reg))
+               (= (reg-num reg) sb-vm:card-table-reg))
       (note "NIL" dstate))
     (if stream
         (princ (reg-name reg) stream)
@@ -468,7 +468,7 @@
     ;; Assembler routines were already handled above (not really sure why)
     ;; so now we have to figure out everything else.
     #+sb-safepoint
-    (when (and (eql (machine-ea-base value) sb-vm::card-table-reg)
+    (when (and (eql (machine-ea-base value) sb-vm:card-table-reg)
                (eql (machine-ea-disp value) sb-vm::nil-static-space-end-offs))
       (return-from print-mem-ref (note "safepoint" dstate)))
 
@@ -504,7 +504,7 @@
 
     ;; Recognize [R12-disp] as a linkage table use (lisp or alien)
     #-immobile-space
-    (when (and (eq (machine-ea-base value) sb-vm::card-table-reg)
+    (when (and (eq (machine-ea-base value) sb-vm:card-table-reg)
                (not (machine-ea-index value))
                (minusp (machine-ea-disp value)))
       (let* ((alien-end (- sb-vm::nil-value-offset))
@@ -535,7 +535,7 @@
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
 
-    (when (and (eql base-reg sb-vm::card-table-reg) (typep disp '(integer 0 127)) (not index-reg))
+    (when (and (eql base-reg sb-vm:card-table-reg) (typep disp '(integer 0 127)) (not index-reg))
       ;; Possibly a static-space trailer constant
       (multiple-value-bind (quo rem) (floor (- disp 41) n-word-bytes)
         (when (and (eql rem 0) (< quo (length sb-vm::+static-space-trailer-constants+)))
@@ -558,7 +558,7 @@
             (return-from print-mem-ref
               (note (lambda (s) (princ sym s)) dstate))))))
 
-    (when (and disp (eq base-reg sb-vm::card-table-reg) (not index-reg))
+    (when (and disp (eq base-reg sb-vm:card-table-reg) (not index-reg))
       (let* ((ptr (sap+ (int-sap sb-vm:nil-value) disp))
              (contents (sap-ref-word ptr 0))
              (name (sb-disassem::find-assembler-routine contents)))
@@ -593,7 +593,7 @@
                  ;; symbol header that provides an offset into TLS.
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
-            ((and (eql base-reg sb-vm::card-table-reg)
+            ((and (eql base-reg sb-vm:card-table-reg)
                   (not index-reg))
              (let ((static (find disp +static-symbols+ :key #'static-symbol-offset)))
                (when static

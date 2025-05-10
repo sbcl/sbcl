@@ -80,9 +80,8 @@
 ;;; shadow memory is pointed to by this register (RAX).
 (defconstant msan-temp-reg-number 0)
 
-;;; The encoding anomaly for r12 makes it a perfect choice for the card table base.
-;;; It will seldom be used with a constant displacement. (Oops: no longer true)
-(define-symbol-macro card-table-reg 12)
+(export 'card-table-reg)
+(defconstant card-table-reg 12)
 (define-symbol-macro null-tn r12-tn)
 (define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))
 
@@ -615,7 +614,7 @@
     ;; These locations are not saved by WITH-REGISTERS-PRESERVED
     ;; because Lisp can't treat them as general purpose.
     ;; By design they are also (i.e. must be) nonvolatile aross C call.
-    (aver (not (logbitp 12 locs)))
+    (aver (not (logbitp card-table-reg locs)))
     #-gs-seg (aver (not (logbitp 13 locs)))))
 
 #+sb-xc-host
