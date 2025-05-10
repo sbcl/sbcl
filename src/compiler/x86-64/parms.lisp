@@ -184,26 +184,10 @@
 
 ;;;; static symbols
 
-;;; These symbols are loaded into static space directly after NIL so
-;;; that the system can compute their address by adding a constant
-;;; amount to NIL.
-;;;
-;;; The fdefn objects for the static functions are loaded into static
-;;; space directly after the static symbols. That way, the raw-addr
-;;; can be loaded directly out of them by indirecting relative to NIL.
-;;;
-;;; we could profitably keep these in registers on x86-64 now we have
-;;; r8-r15 as well
-;;;     Note these spaces grow from low to high addresses.
 (defvar *binding-stack-pointer*)
-
-;;; Bit indices into *CPU-FEATURE-BITS*
-(defconstant cpu-has-ymm-registers   0)
-(defconstant cpu-has-popcnt          1)
-
+;;; These symbols reside in low static space and referenced off NULL-TN
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    #+(and immobile-space (not sb-thread)) function-layout
     ;; I had trouble making alien_stack_pointer use the thread slot for #-sb-thread
     ;; because WITH-ALIEN binds SB-C:*ALIEN-STACK-POINTER* in an ordinary LET.
     ;; That being so, it has to use the #-sb-thread mechanism of placing the new value
@@ -217,6 +201,10 @@
 ;; No static-fdefns are actually needed, but #() here causes the
 ;; "recursion in known function" error to occur in ltn
 (defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
+
+;;; Bit indices into *CPU-FEATURE-BITS*
+(defconstant cpu-has-ymm-registers   0)
+(defconstant cpu-has-popcnt          1)
 
 #+sb-simd-pack
 (progn
