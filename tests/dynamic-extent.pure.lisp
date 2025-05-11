@@ -1832,6 +1832,9 @@
 (with-test (:name :auto-dx-cleaned-up-too-many-times)
   (assert (= (auto-dx-cleaned-up-too-many-times 1 #(-1 2 3)) 10)))
 
+(with-test (:name :auto-dx-with-single-ref-flet)
+  (assert-no-consing (auto-dx-cleaned-up-too-many-times 1 #(-1 2 3))))
+
 (with-test (:name :auto-dx-correct-mess-up)
   (checked-compile-and-assert
    (:allow-notes nil
@@ -2291,3 +2294,22 @@
          (case (if t 450336 v)
            (t (copy-tree v)))))
      ((1 2) '(1 . 2) :test #'equal))))
+
+(defun auto-dx-flet-several-ref (off array)
+  (let ((acc 0))
+    (flet ((positivep (num) (plusp (+ num off))))
+      (dotimes (i 10)
+        (incf acc (position-if #'positivep array)))
+      (if (plusp off)
+          (incf acc (if (positivep acc) 10 3))
+          (incf acc (position-if #'positivep array))))
+    acc))
+
+(with-test (:name :auto-dx-flet-several-ref.correct)
+  (assert (= (auto-dx-flet-several-ref 1 #(-1 2 3)) 20))
+  (assert (= (auto-dx-flet-several-ref 0 #(-1 2 3)) 11)))
+
+(with-test (:name :auto-dx-flet-several-ref.stack-allocates
+            :fails-on :sbcl)
+  (assert-no-consing (auto-dx-flet-several-ref 1 #(-1 2 3)))
+  (assert-no-consing (auto-dx-flet-several-ref 0 #(-1 2 3))))
