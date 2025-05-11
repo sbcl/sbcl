@@ -177,7 +177,7 @@
        ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.
        (proclaim '(notinline ,name))
        (let ((fun #',variant))
-         (setf (getf ,(symbolicate '+ cpu-feature '-routines+) ',name) fun)
+         (setf (getf ,(package-symbolicate "SB-VM" '+ cpu-feature '-routines+) ',name) fun)
          ;; Redefinition at run-time.
          (when (eq (%fun-name #',name) ',variant)
            (setf (%symbol-function ',name) fun))))))

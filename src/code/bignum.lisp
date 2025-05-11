@@ -539,6 +539,23 @@
       (negate-bignum-in-place result))
     (%normalize-bignum result (1+ bignum-len))))
 
+#+x86-64
+(sb-vm::def-variant multiply-bignum-and-fixnum :bmi2 (bignum fixnum)
+  (declare (type bignum bignum) (type fixnum fixnum)
+           (optimize speed (safety 0)))
+  (let* ((bignum-plus-p (bignum-plus-p bignum))
+         (fixnum-plus-p (not (minusp fixnum)))
+         (bignum (if bignum-plus-p bignum (negate-bignum-not-fully-normalized bignum)))
+         (bignum-len (%bignum-length bignum))
+         (fixnum (if fixnum-plus-p fixnum (- fixnum)))
+         (result (%allocate-bignum (1+ bignum-len))))
+    (declare (type bignum bignum result)
+             (type bignum-element-type fixnum))
+    (sb-sys:%primitive sb-vm::bignum-mulx-and-add-word-loop bignum fixnum bignum-len result)
+    (unless (eq bignum-plus-p fixnum-plus-p)
+      (negate-bignum-in-place result))
+    (%normalize-bignum result (1+ bignum-len))))
+
 (sb-c::unless-vop-existsp (:named sb-vm::*/signed=>integer)
   (defun multiply-fixnums (a b)
     (declare (fixnum a b))

@@ -140,7 +140,7 @@
   (def* (%array-atomic-incf/word (array index diff))
         (%raw-instance-atomic-incf/word (instance index diff)))
   #+(or x86 x86-64)
-  (def* (sb-vm::%cpu-identification (arg1 arg2))
+  (def* (sb-vm::%cpu-identification (eax ecx))
         (sb-vm::%vector-cas-pair (vector index old1 old2 new1 new2))
         (sb-vm::%instance-cas-pair (instance index old1 old2 new1 new2))
         (sb-vm::%cons-cas-pair (cons old1 old2 new1 new2)))

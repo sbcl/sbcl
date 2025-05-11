@@ -318,3 +318,8 @@
                               (ash 1 23)) ;; popcnt
                    ecx)
            #1#))))
+
+(def-cpu-feature :bmi2
+    (multiple-value-bind (eax ebx) (sb-vm::%cpu-identification 7 0)
+      (declare (ignore eax))
+      (logtest ebx #x100)))

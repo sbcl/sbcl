@@ -3669,6 +3669,35 @@
     (inst dec :dword length)
     (inst jmp :nz LOOP)))
 
+(define-vop (bignum-mulx-and-add-word-loop)
+  (:args (a :scs (descriptor-reg))
+         (b :scs (unsigned-reg) :target rdx)
+         (la :scs (unsigned-reg) :target length)
+         (r :scs (descriptor-reg)))
+  (:arg-types bignum unsigned-num unsigned-num bignum)
+  (:temporary (:sc unsigned-reg) length)
+  (:temporary (:sc unsigned-reg) index lo hi prev-hi)
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:generator 10
+
+    (move length la)
+    (move rdx b)
+    (zeroize prev-hi)
+    (zeroize index) ;; clears CF
+
+    LOOP
+    (inst mulx hi lo (ea #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) a index 8))
+    (inst adc lo prev-hi)
+    (move prev-hi hi)
+    (inst mov (ea #1# r index 8) lo)
+
+    (inst inc :dword index)
+    (inst dec :dword length)
+    (inst jmp :nz LOOP)
+
+    (inst adc hi 0)
+    (inst mov (ea #1# r index 8) hi)))
+
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
   (:policy :fast-safe)
@@ -3715,7 +3744,6 @@
     (inst adc edx 0)
     (move hi edx)
     (move lo eax)))
-
 
 (define-vop (bignum-mult)
   (:translate sb-bignum:%multiply)
