@@ -318,17 +318,6 @@
 
  ("src/compiler/bit-util")
 
- ("src/code/share-vm" :not-host)
-
- #+sparc ("src/code/sparc-vm" :not-host)
- #+x86   ("src/code/x86-vm"   :not-host)
- #+x86-64("src/code/x86-64-vm"   :not-host)
- #+(or ppc ppc64) ("src/code/ppc-vm" :not-host)
- #+mips  ("src/code/mips-vm" :not-host)
- #+arm   ("src/code/arm-vm" :not-host)
- #+arm64 ("src/code/arm64-vm" :not-host)
- #+riscv ("src/code/riscv-vm" :not-host)
-
  ("src/code/foreign"         :not-host)
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
@@ -503,6 +492,17 @@
  #+(and linux (not android)) ("src/code/linux-os" :not-host)
  #+haiku ("src/code/haiku-os" :not-host)
  #+win32 ("src/code/win32-os" :not-host)
+
+ ("src/code/share-vm" :not-host)
+
+ #+sparc ("src/code/sparc-vm" :not-host)
+ #+x86   ("src/code/x86-vm"   :not-host)
+ #+x86-64("src/code/x86-64-vm"   :not-host)
+ #+(or ppc ppc64) ("src/code/ppc-vm" :not-host)
+ #+mips  ("src/code/mips-vm" :not-host)
+ #+arm   ("src/code/arm-vm" :not-host)
+ #+arm64 ("src/code/arm64-vm" :not-host)
+ #+riscv ("src/code/riscv-vm" :not-host)
 
  #+(or arm64 x86-64)
  ("src/code/simd-fndb")
