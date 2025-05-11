@@ -1748,8 +1748,18 @@
 (defun trace-t/nil-symbols (static-constants visitor)
   (with-pinned-objects (static-constants)
     (let* ((sap (sap+ (vector-sap static-constants) (ash 2 word-shift)))
+           ;; TODO: this is correctly only because T is known to directly follow the
+           ;; unboxed array, but if there were other unboxed constants below T
+           ;; then something would have to be done to record where T starts.
+           ;; Or we could compute it from the host, which I really don't like.
+           ;; It's bad enough that this uses the host's value of T-NIL-OFFSET.
            (t-sap (sap+ sap (size-of sap)))
-           (nil-sap (sap+ t-sap (+ (size-of t-sap) n-word-bytes))))
+           ;; t-sap + other-pointer-lowtag + t-nil-offset - list-pointer-lowtag - 8 = nil-sap
+           ;; which is the same as saying t-sap + t-nil-offset = nil-sap
+           ;; because other-pointer-lowtag = - list-pointer-lowtag - 8
+           (nil-sap (sap+ t-sap sb-vm::t-nil-offset)))
+      (aver (= (sap-ref-8 t-sap 0) symbol-widetag))
+      (aver (= (sap-ref-8 nil-sap 0) symbol-widetag))
       (trace-symbol visitor t-sap)
       (trace-symbol visitor nil-sap))))
 

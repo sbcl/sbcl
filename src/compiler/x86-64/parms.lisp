@@ -82,8 +82,8 @@
 ;;;  +--------------+--------|--------------|-------+--------------+--------+-
 ;;;  |      |       | resv'd |              | asm   | T   | word-  |        |
 ;;;  | Lisp | Alien | for    | other        | code  |---- |  sized | Safept | GC card
-;;;  |      |       | future | static       | jmp   | NIL | consts | Trap   | table
-;;;  | 4 MB |  1 MB | use    | data         | table |     | ...    | Page   |
+;;;  |      |       | future | static       | jmp   |---- | consts | Trap   | table
+;;;  | 4 MB |  1 MB | use    | data         | table | NIL | ...    | Page   |
 ;;;  +--------------+--------+----------------------*--------------+--------+-
 ;;;                                   ^ freeptr
 
@@ -105,6 +105,18 @@
 ;;;      41FF542481       CALL [R12-127]
 ;;;   versus
 ;;;      41FF94240904F0FF CALL [R12-1047543]
+
+(defconstant non-negative-fixnum-mask #x8000000000000001) ; sign bit and tag bit
+(defconstant-eqx +popular-raw-constants+
+    `#(#xFFFFE00000000001  ; disallowed bits to match INDEX type
+       #xFFFFFFFE00000001  ; (LOGNOT (FIXNUMIZE #xFFFFFFFF))
+       #xFFFFFFFF00000000  ; (MASK-FIELD (BYTE 32 32) -1)
+       #x8000000000000000  ; (ASH 1 63)
+       #x1FFFFFFFE         ; most-positive uint32_t as a fixnum
+       #x100000000         ; (ASH 1 32)
+       #x10E6D7AF34A204E2  ; SB-INT:MIX multiplier
+       ,non-negative-fixnum-mask)
+  #'equalp)
 
 (defconstant-eqx +static-space-trailer-constants+
   #(lisp-linkage-table ; This should be first - elftool hardwires it

@@ -414,13 +414,6 @@
       (inst test :byte value fixnum-tag-mask))
     out))
 
-;;; Sign bit and fixnum tag bit.
-(defconstant non-negative-fixnum-mask-constant
-  #x8000000000000001)
-;; this magic constant resides in the word preceding the symbol header of NIL
-(defun non-negative-fixnum-mask-ea ()
-  (ea (- (ash -2 word-shift) list-pointer-lowtag) null-tn))
-
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
@@ -452,7 +445,7 @@
                           (inst test :byte value fixnum-tag-mask)
                           (inst jmp :z yep))
                          (t ;; Is it a fixnum with the sign bit clear?
-                          (inst test (non-negative-fixnum-mask-ea) value)
+                          (inst test (constantize non-negative-fixnum-mask) value)
                           (inst jmp :z yep))))
                  (%lea-for-lowtag-test temp value other-pointer-lowtag)
                  (inst test :byte temp lowtag-mask)
@@ -504,7 +497,7 @@
                    (inst test :byte value fixnum-tag-mask)
                    (inst jmp :z yep))
                   (t ;; Is it a fixnum with the sign bit clear?
-                   (inst test (non-negative-fixnum-mask-ea) value)
+                   (inst test (constantize non-negative-fixnum-mask) value)
                    (inst jmp :z yep))))
           (cond ((fixnum-or-other-pointer-tn-ref-p args t)
                  (when (and fixnum-p

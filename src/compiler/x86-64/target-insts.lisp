@@ -535,10 +535,16 @@
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
 
-    (when (and (eql base-reg sb-vm:card-table-reg) (typep disp '(integer 0 127)) (not index-reg))
-      ;; Possibly a static-space trailer constant
+    (when (and (eql base-reg sb-vm:card-table-reg) (typep disp '(signed-byte 8)) (not index-reg))
       (multiple-value-bind (quo rem) (floor (- disp 41) n-word-bytes)
-        (when (and (eql rem 0) (< quo (length sb-vm::+static-space-trailer-constants+)))
+        (when (and (eql rem 0) (<= -16 quo -8)) ; KLUDGE - raw words residing between T and NIL
+          (return-from print-mem-ref
+            (let* ((addr (+ sb-vm:nil-value disp))
+                   (data (sap-ref-word (int-sap nil-value) disp)))
+              ;; these constants don't have names
+              (note (lambda (s) (format s "[#x~x] = #x~x" addr data)) dstate))))
+        ;; and raw words residing after NIL up to the end of static space
+        (when (and (eql rem 0) (<= 0 quo (1- (length sb-vm::+static-space-trailer-constants+))))
           (let ((sym (aref sb-vm::+static-space-trailer-constants+ quo)))
             (when (and (member sym '(sb-vm::lisp-linkage-table sb-vm::alien-linkage-table))
                        (eq (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)) 'mov))

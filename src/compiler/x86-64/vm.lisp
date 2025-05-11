@@ -88,6 +88,7 @@
 (defconstant t-nil-offset ; (- NULL-TN THIS) = tagged pointer to T
   (+ (- list-pointer-lowtag other-pointer-lowtag)
      (pad-data-block symbol-size) ; size of T in bytes
+     (* (length +popular-raw-constants+) 8)
      16)) ; padding word, then NIL's symbol header word
 
 (macrolet ((defreg (name offset size)

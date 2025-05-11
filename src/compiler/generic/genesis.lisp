@@ -4042,15 +4042,17 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
   (let* ((nil-alloc-words 8)
          (t-alloc-words (align-up sb-vm:symbol-size 2)) ; = 6
          (nil-slots (make-array nil-alloc-words))
+         (raw-constants sb-vm::+popular-raw-constants+)
+         (n-const-words (length raw-constants))
          (t-slots (make-array t-alloc-words))
          (space-end (+ sb-vm:static-space-start sb-vm:static-space-size))
          (trailing-words sb-vm::n-static-trailer-constants)
          ;; NIL-ADDR is its address as a cons cell, not as a symbol
          (nil-addr (- space-end (* (+ 6 trailing-words) sb-vm:n-word-bytes)))
-         (t-addr (+ nil-addr (ash -8 sb-vm:word-shift)))
+         (t-addr (+ nil-addr (ash (- -8 n-const-words) sb-vm:word-shift)))
          (nil-des (make-random-descriptor (logior nil-addr sb-vm:list-pointer-lowtag)))
          (t-des (make-random-descriptor (logior t-addr sb-vm:other-pointer-lowtag))))
-    (setf (aref nil-slots 0) sb-vm::non-negative-fixnum-mask-constant
+    (setf (aref nil-slots 0) (ash sb-xc:most-positive-fixnum sb-vm:n-fixnum-tag-bits)
           (aref nil-slots 1) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref nil-slots 2) (descriptor-bits nil-des) ; car
           (aref nil-slots 3) (descriptor-bits nil-des) ; cdr
@@ -4070,6 +4072,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
                                 2 ; vector header
                                 asm-jump-vect-nelems
                                 t-alloc-words
+                                n-const-words
                                 nil-alloc-words
                                 trailing-words)
                              :initial-element 0))
@@ -4081,6 +4084,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
       #+immobile-code (replace words (cdr *asm-routine-vector*) :start1 ptr)
       (incf ptr asm-jump-vect-nelems)
       (replace words t-slots :start1 (prog1 ptr (incf ptr t-alloc-words)))
+      (replace words raw-constants :start1 (prog1 ptr (incf ptr n-const-words)))
       (replace words nil-slots :start1 ptr)
       ;; The trailing constants words are written as 0s into the core file
       words)))
