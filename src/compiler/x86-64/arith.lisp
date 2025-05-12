@@ -13,24 +13,28 @@
 
 
 ;;; For data collection so we can decide what to store in +POPULAR-RAW-CONSTANTS+.
-(defvar *raw-const-histogram*)
+(defvar *raw-const-histogram* nil)
 ;; If 'plausible-signed-imm32-operand-p' is true, use it; otherwise use a RIP-relative constant
 ;; or possibly return the NIL-based address of one of +POPULAR-RAW-CONSTANTS+
 (defun constantize (x)
-  (declare (notinline position))
-  (acond ((plausible-signed-imm32-operand-p x))
-         ((eql x (ash most-positive-fixnum n-fixnum-tag-bits)) ; bits of MOST-POSITIVE-FIXNUM
-          ;; A physical representation of MOST-POSITIVE-FIXNUM resides in the
-          ;; word preceding the symbol header of NIL
-          ;; TODO: should not be a special case, however CREATE-STATIC-SPACE-CONSTANTS needs to
-          ;; get +POPULAR-RAW-CONSTANTS+ to overlap the word which precedes NIL's symbol header.
-          (ea (- (ash -2 word-shift) list-pointer-lowtag) null-tn))
-         ((position (ldb (byte 64 0) x) +popular-raw-constants+) ; could be pos. or neg.
-          (ea (- (* (+ symbol-size it) n-word-bytes) t-nil-offset other-pointer-lowtag) null-tn))
-         (t
-          #+nil (let ((c (assoc x *raw-const-histogram*)))
-                  (if c (incf (cdr c)) (push (cons x 1) *raw-const-histogram*)))
-          (register-inline-constant :qword x))))
+  (awhen (plausible-signed-imm32-operand-p x)
+    (return-from constantize it))
+  ;; Since X might be a signed-word that is = to some unsigned word in memory,
+  ;; compare the bit representation, not the logical value.
+  (let ((x (ldb (byte 64 0) x)))
+    (acond ((eql x (ash most-positive-fixnum n-fixnum-tag-bits)) ; bits of MOST-POSITIVE-FIXNUM
+            ;; A physical representation of MOST-POSITIVE-FIXNUM resides in the
+            ;; word preceding the symbol header of NIL
+            ;; TODO: should not be a special case, however CREATE-STATIC-SPACE-CONSTANTS needs to
+            ;; get +POPULAR-RAW-CONSTANTS+ to overlap the word which precedes NIL's symbol header.
+            (ea (- (ash -2 word-shift) list-pointer-lowtag) null-tn))
+           ((position x +popular-raw-constants+)
+            (ea (- (* (+ symbol-size it) n-word-bytes) t-nil-offset other-pointer-lowtag)
+                null-tn))
+           (t
+            #+nil (let ((c (assoc x *raw-const-histogram*)))
+                    (if c (incf (cdr c)) (push (cons x 1) *raw-const-histogram*)))
+            (register-inline-constant :qword x)))))
 
 ;;;; unary operations
 

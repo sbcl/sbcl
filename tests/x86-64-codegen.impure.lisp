@@ -1395,3 +1395,25 @@
     (let ((lines (get-asm-lines 11)))
       (assert (loop for line in lines
                     thereis (search "REPE STOSQ" line))))))
+
+(defconstant arb-qword-const-positive #xFFF0abcdabcd0000)
+(defconstant arb-qword-const-negative (sb-disassem::sign-extend arb-qword-const-positive 64))
+(pushnew :popcnt sb-c:*backend-subfeatures*)
+(defun same-constants-after-collapsing (uw sw)
+  (declare (sb-vm:word uw) (sb-vm:signed-word sw))
+  (values (logcount (logxor uw arb-qword-const-positive))
+          (logcount (logxor sw arb-qword-const-negative))))
+(compile 'same-constants-after-collapsing)
+(defun different-constants (uw sw)
+  (declare (sb-vm:word uw) (sb-vm:signed-word sw))
+  (values (logcount (logxor uw (logior arb-qword-const-positive 1)))
+          (logcount (logxor sw arb-qword-const-negative))))
+(compile 'different-constants)
+
+(with-test (:name :constantize-equivalence)
+  ;; two raw words: jump table count word, and one user constant
+  (assert (= 16 (sb-kernel:code-n-unboxed-data-bytes
+                 (sb-kernel:fun-code-header #'same-constants-after-collapsing))))
+  ;; four raw words: jump table count word, two user data words, and a padding word
+  (assert (= 32 (sb-kernel:code-n-unboxed-data-bytes
+                 (sb-kernel:fun-code-header #'different-constants)))))

@@ -248,6 +248,12 @@
       (sb-cold:find-bootstrap-file "output/defstructs.lisp-expr" t)))))
 (sb-kernel::show-ctype-ctor-cache-metrics)
 
+(let ((s (find-symbol "*RAW-CONST-HISTOGRAM*" "SB-VM")))
+  (when (and s (boundp s) (not (null (symbol-value s))))
+    (format t "~2&uword_t constants by popularity:~%")
+    (dolist (x (sort (copy-list (symbol-value s)) #'> :key 'cdr))
+      (format t "~4d ~16,'0x~%" (cdr x) (car x)))))
+
 (defun dump-some-ctype-hashsets ()
   (flet ((cells (hs) (sb-impl::hss-cells (sb-impl::hashset-storage hs))))
     ;; It might warrant looking into that we print a lot of unknown types.
