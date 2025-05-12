@@ -85,6 +85,35 @@
 (define-symbol-macro null-tn r12-tn)
 (define-symbol-macro card-index-mask (make-fixup nil :card-table-index-mask))
 
+(defconstant most-positive-fixnum-repr
+  #+sb-xc #.most-positive-fixnum-repr ; or else error "SB-KERNEL:%MASK-FIELD is undefined"
+  #-sb-xc (mask-field (byte 62 1) -1))
+
+(defconstant non-negative-fixnum-mask
+  (ldb (byte 64 0) (lognot most-positive-fixnum-repr)))
+
+(defconstant-eqx +popular-raw-constants+
+    `#(;; disallowed bits to match INDEX type
+       ,(ldb (byte 64 0) (lognot (ash (1- sb-xc:array-dimension-limit) n-fixnum-tag-bits)))
+       #x1FFFFFFFE         ; most-positive uint32_t as a fixnum
+       ,most-positive-fixnum-repr
+       #xFFFFFFFF00000000  ; (MASK-FIELD (BYTE 32 32) -1)
+       ,non-negative-fixnum-mask
+       #x100000000         ; (ASH 1 32)
+       #x3243F6A88858B087  ; for SB-INT:MIX
+       #x10E6D7AF34A204E2  ; "
+       ,(ash 1 63))        ; bits of MOST-NEGATIVE-FIXNUM
+  #'equalp)
+
+(eval-when (:compile-toplevel)
+  ;; Proper alignment of NIL depends on there being an odd number of global raw constants
+  ;; and an even number of words to static-space-end
+  (assert (oddp (length +popular-raw-constants+)))
+  (unless (evenp n-static-trailer-constants) (error "Please check alignment of NIL"))
+  #-sb-safepoint
+  (unless (<= nil-cardtable-disp 127) ; > 1-byte disp to reach card table is undesirable
+    (error "Consider reducing the number of elements in static-space-trailer")))
+
 (defconstant t-nil-offset ; (- NULL-TN THIS) = tagged pointer to T
   (+ (- list-pointer-lowtag other-pointer-lowtag)
      (pad-data-block symbol-size) ; size of T in bytes
