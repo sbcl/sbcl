@@ -1748,7 +1748,7 @@
 (defun trace-t/nil-symbols (static-constants visitor)
   (with-pinned-objects (static-constants)
     (let* ((sap (sap+ (vector-sap static-constants) (ash 2 word-shift)))
-           ;; TODO: this is correctly only because T is known to directly follow the
+           ;; TODO: this is correct only because T is known to directly follow the
            ;; unboxed array, but if there were other unboxed constants below T
            ;; then something would have to be done to record where T starts.
            ;; Or we could compute it from the host, which I really don't like.

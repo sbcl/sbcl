@@ -14,27 +14,32 @@
 
 ;;; For data collection so we can decide what to store in +POPULAR-RAW-CONSTANTS+.
 (defvar *raw-const-histogram* nil)
+;; Return either a RIP-relative or NULL-TN-relative EA to the bits of X, disregarding sign.
+(defun ref-shared-qword-literal (x)
+  ;; Since X might be a signed-word that is = to some unsigned word in memory,
+  ;; compare the bit representation, not the logical value.
+  (let ((x (ldb (byte 64 0) x)))
+    ;; Initially I wanted to sink this logic of sharing +POPULAR-RAW-CONSTANTS+
+    ;; into REGISTER-INLINE-CONSTANT. However, REGISTER-INLINE-CONSTANT can be used to
+    ;; reference a _mutable_ raw word. An example occurs in SEH-TRAMPOLINE where the
+    ;; bits dumped happen to be -1 but are irrelevant - it is merely reserving a word in
+    ;; the unboxed data section of the asm code. I would not want that to accidentally
+    ;; see a match in +POPULAR-RAW-CONSTANTS+ (though in fact -1 is not in there).
+    ;; The perceived problem is mainly theoretical, but some benefit stems from
+    ;; having this wrapper function nonetheless.
+    #+nil (let ((c (assoc x *raw-const-histogram*)))
+            (if c (incf (cdr c)) (push (cons x 1) *raw-const-histogram*)))
+    (acond ((position x +popular-raw-constants+)
+            (ea (- (* (+ symbol-size it) n-word-bytes) t-nil-offset other-pointer-lowtag)
+                null-tn))
+           (t
+            (register-inline-constant :qword x)))))
 ;; If 'plausible-signed-imm32-operand-p' is true, use it; otherwise use a RIP-relative constant
 ;; or possibly return the NIL-based address of one of +POPULAR-RAW-CONSTANTS+
 (defun constantize (x)
   (awhen (plausible-signed-imm32-operand-p x)
     (return-from constantize it))
-  ;; Since X might be a signed-word that is = to some unsigned word in memory,
-  ;; compare the bit representation, not the logical value.
-  (let ((x (ldb (byte 64 0) x)))
-    (acond ((eql x (ash most-positive-fixnum n-fixnum-tag-bits)) ; bits of MOST-POSITIVE-FIXNUM
-            ;; A physical representation of MOST-POSITIVE-FIXNUM resides in the
-            ;; word preceding the symbol header of NIL
-            ;; TODO: should not be a special case, however CREATE-STATIC-SPACE-CONSTANTS needs to
-            ;; get +POPULAR-RAW-CONSTANTS+ to overlap the word which precedes NIL's symbol header.
-            (ea (- (ash -2 word-shift) list-pointer-lowtag) null-tn))
-           ((position x +popular-raw-constants+)
-            (ea (- (* (+ symbol-size it) n-word-bytes) t-nil-offset other-pointer-lowtag)
-                null-tn))
-           (t
-            #+nil (let ((c (assoc x *raw-const-histogram*)))
-                    (if c (incf (cdr c)) (push (cons x 1) *raw-const-histogram*)))
-            (register-inline-constant :qword x)))))
+  (ref-shared-qword-literal x))
 
 ;;;; unary operations
 
@@ -365,7 +370,7 @@
   (aver (not (integerp x)))
   (let ((constant-y (integerp y))) ; don't need to unscale Y if true
     (when (and constant-y (not (typep y '(signed-byte 32))))
-      (setq y (register-inline-constant :qword y)))
+      (setq y (ref-shared-qword-literal y)))
     (let ((reg (if (gpr-tn-p result) result temp)))
       (cond ((integerp y)
              (inst imul reg x y))
@@ -601,7 +606,7 @@
   (:vop-var vop)
   (:generator 3
     (move eax x)
-    (inst mul :qword (register-inline-constant :qword y))
+    (inst mul :qword (ref-shared-qword-literal y))
     (move r eax)))
 
 (defun wordpair-to-bignum (result flag low high node)
@@ -2702,7 +2707,7 @@
                    ;; Rather than a RIP-relative constant, load a dword (w/o sign-extend)
                    (inst mov :dword temp y)
                    (return-from ensure-not-mem+mem (values x temp))))
-           (setq y (register-inline-constant :qword y)))
+           (setq y (ref-shared-qword-literal y)))
          (cond ((or (gpr-tn-p x) (gpr-tn-p y))
                 (values x y))
                (t
@@ -2901,7 +2906,7 @@
   (:generator 4
     (when (sc-is int constant immediate) (setq int (tn-value int)))
     ;; Force INT to be a RIP-relative operand if it is a constant.
-    (let ((word (if (integerp int) (register-inline-constant :qword int) int)))
+    (let ((word (if (integerp int) (ref-shared-qword-literal int) int)))
       (unless (csubtypep (tn-ref-type bit-ref) (specifier-type '(integer 0 63)))
         (cond ((if (integerp int)
                    (typep int 'signed-word)

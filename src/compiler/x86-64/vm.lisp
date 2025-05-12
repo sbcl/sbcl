@@ -89,7 +89,10 @@
   (+ (- list-pointer-lowtag other-pointer-lowtag)
      (pad-data-block symbol-size) ; size of T in bytes
      (* (length +popular-raw-constants+) 8)
-     16)) ; padding word, then NIL's symbol header word
+     8)) ; additive fuzz factor
+(eval-when (:compile-toplevel :execute)
+  (unless (typep (- t-nil-offset) '(signed-byte 8))
+    (error "Too many raw constants for (&T - &NIL) to be imm8")))
 
 (macrolet ((defreg (name offset size)
              (declare (ignore size))

@@ -106,16 +106,24 @@
 ;;;   versus
 ;;;      41FF94240904F0FF CALL [R12-1047543]
 
-(defconstant non-negative-fixnum-mask #x8000000000000001) ; sign bit and tag bit
+(defconstant most-positive-fixnum-repr
+  #+sb-xc #.most-positive-fixnum-repr ; or else error "SB-KERNEL:%MASK-FIELD is undefined"
+  #-sb-xc (mask-field (byte 62 1) -1))
+
+(defconstant non-negative-fixnum-mask
+  (ldb (byte 64 0) (lognot most-positive-fixnum-repr)))
+
 (defconstant-eqx +popular-raw-constants+
-    `#(#xFFFFE00000000001  ; disallowed bits to match INDEX type
-       #xFFFFFFFE00000001  ; (LOGNOT (FIXNUMIZE #xFFFFFFFF))
-       #xFFFFFFFF00000000  ; (MASK-FIELD (BYTE 32 32) -1)
-       #x8000000000000000  ; (ASH 1 63)
+    `#(#-unix #xFFFFC00000000001 ; disallowed bits to match INDEX type
+       #+unix #xFFFFE00000000001
        #x1FFFFFFFE         ; most-positive uint32_t as a fixnum
+       ,most-positive-fixnum-repr
+       #xFFFFFFFF00000000  ; (MASK-FIELD (BYTE 32 32) -1)
+       ,non-negative-fixnum-mask
        #x100000000         ; (ASH 1 32)
-       #x10E6D7AF34A204E2  ; SB-INT:MIX multiplier
-       ,non-negative-fixnum-mask)
+       #x3243F6A88858B087  ; for SB-INT:MIX
+       #x10E6D7AF34A204E2  ; "
+       ,(ash 1 63))        ; bits of MOST-NEGATIVE-FIXNUM
   #'equalp)
 
 (defconstant-eqx +static-space-trailer-constants+
@@ -138,7 +146,9 @@
                                    #+sb-safepoint +backend-page-bytes+)) ; stupidly excessive
 
 (eval-when (:compile-toplevel)
-  ;; Proper alignment of NIL depends on there being an even number of words to static-space-end
+  ;; Proper alignment of NIL depends on there being an odd number of global raw constants
+  ;; and an even number of words to static-space-end
+  (assert (oddp (length +popular-raw-constants+)))
   (unless (evenp n-static-trailer-constants) (error "Please check alignment of NIL"))
   #-sb-safepoint
   (unless (<= nil-cardtable-disp 127) ; > 1-byte disp to reach card table is undesirable
