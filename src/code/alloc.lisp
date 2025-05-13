@@ -200,22 +200,16 @@
         ;; CODE needs to have a heap or TLS reference to it prior to adding it to the tree
         ;; since implicit pinning uses the tree to find pinned ojects.
         (declare (special holder))
-        (with-alien ((tlsf-alloc-codeblob (function unsigned system-area-pointer unsigned)
-                                          :extern)
+        (with-alien ((tlsf-alloc-codeblob
+                      (function unsigned system-area-pointer unsigned-int unsigned-int) :extern)
                      (tlsf-control system-area-pointer :extern))
           (with-system-mutex (*allocator-mutex* :without-gcing t)
             (unless (zerop (setq addr (alien-funcall tlsf-alloc-codeblob
-                                                     tlsf-control total-words)))
+                                                     tlsf-control total-words boxed)))
               (setf code (%make-lisp-obj (logior addr other-pointer-lowtag))
                     holder code))))
         ;; GC is allowed to run now because HOLDER references CODE
         (when code
-          (alien-funcall (extern-alien "memset" (function void system-area-pointer int unsigned))
-                         (sap+ (int-sap addr) n-word-bytes) 0 (ash (1- boxed) word-shift))
-          ;; BOXED-SIZE is a raw slot holding a byte count, but SET-SLOT takes its VALUE
-          ;; arg as a descriptor-reg, so just cleverly make it right by shifting.
-          (%primitive set-slot code (ash boxed (- word-shift n-fixnum-tag-bits))
-                      '(setf %code-boxed-size) code-boxed-size-slot other-pointer-lowtag)
           (aver (= (sap-ref-8 (int-sap addr) 0) code-header-widetag)) ; wasn't trashed
           (let ((tree *immobile-codeblob-tree*))
             (loop (when (eq tree (setq tree (cas *immobile-codeblob-tree* tree

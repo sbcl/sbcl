@@ -167,7 +167,7 @@ static const unsigned block_header_prev_free_bit = 1 << 9;
  * So there's really no need to do anything about it.
 static const unsigned block_header_oversized = 1 << 10;
 */
-void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
+void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords, unsigned boxed)
 {
     // The size we request is 1 word less, because the allocator's block header
     // counts as part of the resulting object as far as Lisp is concerned.
@@ -177,7 +177,9 @@ void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
     struct code* c = (void*)((lispobj*)tlsf_result - 1);
     gc_assert(!((uintptr_t)c & LOWTAG_MASK));
     assign_widetag(c, CODE_HEADER_WIDETAG);
-    c->boxed_size = c->debug_info = c->fixups = 0;
+    // Exactly the same as the clearing performed in alloc_code_object
+    memset((lispobj*)c + 2, 0, (1 + boxed - 2) * N_WORD_BYTES);
+    c->boxed_size = boxed * N_WORD_BYTES;
     int nwords = code_total_nwords(c);
     ((lispobj*)c)[nwords-1] = 0; // trailer word with the simple-fun table
     lispobj* end = (lispobj*)c + nwords;
