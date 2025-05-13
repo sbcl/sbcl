@@ -178,8 +178,7 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    ;; 4 byte load, ignoring serial# in the high bits
-    (inst ldr (32-bit-reg ndescr) (@ code (- 8 other-pointer-lowtag)))
+    (loadw (32-bit-reg ndescr) code code-boxed-size-slot other-pointer-lowtag)
     (inst add sap code ndescr)
     (inst sub sap sap other-pointer-lowtag)))
 
@@ -204,7 +203,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (inst ldr (32-bit-reg ndescr) (@ code (- 8 other-pointer-lowtag)))
+    (loadw (32-bit-reg ndescr) code code-boxed-size-slot other-pointer-lowtag)
     (inst add ndescr offset ndescr)
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))

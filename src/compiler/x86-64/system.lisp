@@ -240,7 +240,7 @@
   (:result-types system-area-pointer)
   (:generator 10
     ;; load boxed header size in bytes
-    (inst mov :dword sap (ea (- n-word-bytes other-pointer-lowtag) code))
+    (inst mov :dword sap (object-slot-ea code code-boxed-size-slot other-pointer-lowtag))
     (inst lea sap (ea (- other-pointer-lowtag) code sap))))
 
 (define-vop (code-trailer-ref)
@@ -270,7 +270,7 @@
   (:generator 3
     (move func offset)
     ;; add boxed header size in bytes
-    (inst add :dword func (ea (- n-word-bytes other-pointer-lowtag) code))
+    (inst add :dword func (object-slot-ea code code-boxed-size-slot other-pointer-lowtag))
     (inst lea func (ea (- fun-pointer-lowtag other-pointer-lowtag) code func))))
 
 ;;; This vop is quite magical - because 'closure-fun' is a raw program counter,
