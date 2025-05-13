@@ -177,16 +177,6 @@
      (inst movsd (ea-for-df-desc y) x)))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
-(define-vop (!copy-dfloat)
-  (:args (x :scs (descriptor-reg) :to :save))
-  (:results (copy :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) bits)
-  (:node-var node)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:generator 3
-     (alloc-other double-float-widetag double-float-size copy node nil thread-tn)
-     (loadw bits x double-float-value-slot other-pointer-lowtag)
-     (storew bits copy double-float-value-slot other-pointer-lowtag)))
 
 ;;; Move from a descriptor to a float register.
 (define-vop (move-to-single-reg)

@@ -315,7 +315,6 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                       (declare (type sb-bignum:bignum-index i))
                       (sb-bignum:%bignum-set new i (sb-bignum:%bignum-ref n i)))))
           (double-float
-           #+x86-64 (%primitive sb-vm::!copy-dfloat n)
            (%make-double-float (double-float-bits n)))
           ;; ratio is dynspace-p only if both parts are. copy everything to be safe
           (ratio (%make-ratio (truly-the integer (copy (%numerator n)))
