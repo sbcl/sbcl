@@ -281,7 +281,7 @@ true to stop searching)." *console-control-spec*)
                 (event (create-event nil t nil nil)))
            (setf (io-copier-event copier) event
                  (io-copier-overlapped copier) overlapped
-                 (io-copier-buffer copier) (make-alien char +copier-buffer+)
+                 (io-copier-buffer copier) (make-alien unsigned-char +copier-buffer+)
                  (svref result i) copier)
            (zero-alien overlapped overlapped)
            (setf (slot overlapped 'event) event)))
