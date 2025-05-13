@@ -1232,24 +1232,6 @@
            (inst movss res
                  (ea (frame-byte-offset (tn-offset bits)) rbp-tn))))))))
 
-(define-vop (make-single-float-c)
-  (:results (res :scs (single-reg single-stack descriptor-reg)))
-  (:arg-types (:constant (signed-byte 32)))
-  (:result-types single-float)
-  (:info bits)
-  (:translate make-single-float)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (sc-case res
-       (single-stack
-        (inst mov res bits))
-       (single-reg
-        (inst movss res (register-inline-constant :dword bits)))
-       (descriptor-reg
-        (inst mov res (logior (ash bits 32)
-                              single-float-widetag))))))
-
 (define-vop (make-double-float)
   (:args (hi-bits :scs (signed-reg))
          (lo-bits :scs (unsigned-reg)))
@@ -1279,17 +1261,6 @@
     (inst movd res lo-bits)
     (inst pinsrd res hi-bits 1)))
 
-(define-vop (make-double-float-c)
-  (:results (res :scs (double-reg)))
-  (:arg-types (:constant (signed-byte 32)) (:constant (unsigned-byte 32)))
-  (:result-types double-float)
-  (:info hi lo)
-  (:translate make-double-float)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (inst movsd res (register-inline-constant :qword (logior (ash hi 32) lo)))))
-
 (define-vop (%make-double-float)
   (:args (bits :scs (signed-reg)))
   (:results (res :scs (double-reg)))
@@ -1300,17 +1271,6 @@
   (:vop-var vop)
   (:generator 4
     (inst movq res bits)))
-
-(define-vop (%make-double-float-c)
-  (:results (res :scs (double-reg)))
-  (:arg-types (:constant (signed-byte 64)))
-  (:result-types double-float)
-  (:info bits)
-  (:translate make-double-float)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (inst movsd res (register-inline-constant :qword bits))))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)

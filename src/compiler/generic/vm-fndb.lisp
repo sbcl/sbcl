@@ -758,10 +758,10 @@
   (movable foldable unboxed-return))
 
 (defknown make-single-float ((signed-byte 32)) single-float
-  (movable flushable))
+  (movable flushable foldable))
 
 (defknown make-double-float ((signed-byte 32) (unsigned-byte 32)) double-float
-  (movable flushable))
+  (movable flushable foldable))
 
 (defknown single-float-bits (single-float) (signed-byte 32)
   (movable foldable flushable))
@@ -769,7 +769,7 @@
 #+64-bit
 (progn
 (defknown %make-double-float ((signed-byte 64)) double-float
-  (movable flushable))
+  (movable flushable foldable))
 (defknown double-float-bits (double-float) (signed-byte 64)
   (movable foldable flushable)))
 
