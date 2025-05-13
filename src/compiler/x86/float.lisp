@@ -1801,22 +1801,6 @@
            (with-empty-tn@fp-top(res)
               (inst fld bits))))))))
 
-(define-vop (make-single-float-c)
-  (:results (res :scs (single-reg single-stack)))
-  (:arg-types (:constant (signed-byte 32)))
-  (:result-types single-float)
-  (:info bits)
-  (:translate make-single-float)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 2
-    (sc-case res
-      (single-stack
-       (inst mov res bits))
-      (single-reg
-       (with-empty-tn@fp-top (res)
-         (inst fld (register-inline-constant :dword bits)))))))
-
 (define-vop (make-double-float)
   (:args (hi-bits :scs (signed-reg))
          (lo-bits :scs (unsigned-reg)))
@@ -1834,19 +1818,6 @@
       (with-empty-tn@fp-top(res)
         (inst fldd (make-ea :dword :base ebp-tn
                             :disp (frame-byte-offset (1+ offset))))))))
-
-(define-vop (make-double-float-c)
-  (:results (res :scs (double-reg)))
-  (:arg-types (:constant (signed-byte 32)) (:constant (unsigned-byte 32)))
-  (:result-types double-float)
-  (:info hi lo)
-  (:translate make-double-float)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 1
-    (with-empty-tn@fp-top(res)
-      (inst fldd (register-inline-constant
-                  :double-float-bits (logior (ash hi 32) lo))))))
 
 #+long-float
 (define-vop (make-long-float)
