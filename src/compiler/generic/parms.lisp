@@ -90,7 +90,6 @@
                    ;; Must be just before NIL.
                    (safepoint ,(symbol-value '+backend-page-bytes+))
                    (static ,small-space-size)
-                   #+permgen (permgen 33554432) ; 32MiB
                    #+darwin-jit (static-code ,small-space-size)))
          (ptr small-spaces-start)
          (small-space-forms
@@ -100,7 +99,7 @@
              (destructuring-bind (space size) name-and-size
                (let* ((relocatable
                        (member space `(#+relocatable-static-space ,@'(safepoint static)
-                                       permgen read-only)))
+                                       read-only)))
                       (start (prog1 ptr (incf ptr size))))
                  (list (defconstantish relocatable (symbolicate space "-SPACE-START") start)
                        ;; alien-linkage-space-size is DEFCONSTANTed outside of the loop

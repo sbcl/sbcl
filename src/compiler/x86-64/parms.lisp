@@ -149,6 +149,15 @@
                      :dynamic-space-start #x1100000000
                      #+openbsd :dynamic-space-size #+openbsd #x2fff0000)
 
+;;; The purpose of permgen is to allow apples-to-apples comparison of mutator performance
+;;; under mark-region-gc. Without permgen we would give up the ability to encode layouts
+;;; and symbols as machine instruction operands. Permgen is not garbage-collected,
+;;; hence the name.
+#+permgen
+(progn
+  (defconstant permgen-space-size 33554432) ; 32MiB
+  (defparameter permgen-space-start #x50000000))
+
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
 

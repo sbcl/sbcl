@@ -63,13 +63,6 @@
            (when barrier (emit-gengc-barrier object nil val-temp t))
            (emit-store (object-slot-ea object offset lowtag) value val-temp)))))
 
-(defun add-symbol-to-remset (vop symbol)
-  (declare (ignorable vop symbol))
-  #+permgen
-  (unless (and (sc-is symbol immediate) (static-symbol-p (tn-value symbol)))
-    (inst push symbol)
-    (invoke-asm-routine 'call 'gc-remember-symbol vop)))
-
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
          (old :scs (descriptor-reg any-reg) #|:target rax|#)
@@ -83,8 +76,10 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:vop-var vop)
   (:generator 5
-     (when (eq name 'sb-impl::cas-symbol-%info) (add-symbol-to-remset vop object))
-     (emit-gengc-barrier object nil rax (vop-nth-arg 2 vop))
+     (let ((newval-tn-ref (vop-nth-arg 2 vop)))
+       (if (eq name 'sb-impl::cas-symbol-%info)
+           (emit-symbol-write-barrier vop object rax newval-tn-ref)
+           (emit-gengc-barrier object nil rax newval-tn-ref)))
      (move rax old)
      (inst cmpxchg :lock (ea (- (* offset n-word-bytes) lowtag) object) new)
      (move result rax)))
@@ -98,8 +93,12 @@
     (inst mov result unbound-marker-widetag)))
 
 (defun emit-symbol-write-barrier (vop symbol temp newval-tn-ref)
+  (declare (ignorable vop))
+  #+permgen
   (when (require-gengc-barrier-p symbol newval-tn-ref)
-    (add-symbol-to-remset vop symbol))
+    (unless (and (sc-is symbol immediate) (static-symbol-p (tn-value symbol)))
+      (inst push symbol)
+      (invoke-asm-routine 'call 'gc-remember-symbol vop)))
   ;; IMMEDIATE sc means that the symbol is static or immobile.
   ;; Static symbols are roots, and immobile symbols use page fault handling.
   (unless (sc-is symbol immediate)
