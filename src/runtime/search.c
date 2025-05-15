@@ -122,9 +122,9 @@ struct symbol_search {
     char *name;
     bool ignore_case;
 };
-static uword_t search_symbol_aux(lispobj* start, lispobj* end, uword_t arg)
+static uword_t search_symbol_aux(lispobj* start, lispobj* end, void* arg)
 {
-    struct symbol_search* ss = (struct symbol_search*)arg;
+    struct symbol_search* ss = arg;
     return (uword_t)search_for_symbol(ss->name, (lispobj)start, (lispobj)end, ss->ignore_case);
 }
 lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool ignore_case)
@@ -140,7 +140,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, bool ignore_c
     // So if the specified range is all of dynamic space, defer to the space walker.
     if (start == DYNAMIC_SPACE_START && end == dynamic_space_highwatermark()) {
         struct symbol_search ss = {name, ignore_case};
-        return (lispobj*)walk_generation(search_symbol_aux, -1, (uword_t)&ss);
+        return (lispobj*)walk_generation(search_symbol_aux, -1, &ss);
     }
 #endif
     while (where < limit) {
@@ -193,8 +193,9 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 }
 #endif
 
-static uword_t bruteforce_findpkg_by_id(lispobj* where, lispobj* limit, uword_t id)
+static uword_t bruteforce_findpkg_by_id(lispobj* where, lispobj* limit, void* arg)
 {
+    uword_t id = (uword_t)arg;
     lispobj layout;
     for ( where = next_object(where, 0, limit) ; where ;
           where = next_object(where, object_size(where), limit) ) {
@@ -213,7 +214,7 @@ lispobj get_package_by_id(int id) {
     lispobj vector = barrier_load(&lisp_package_vector);
     if (!vector) {
         // Perform a heap walk. This should never occur except in core loading/saving.
-        lispobj result =  walk_generation(bruteforce_findpkg_by_id, -1, make_fixnum(id));
+        lispobj result =  walk_generation(bruteforce_findpkg_by_id, -1, (void*)make_fixnum(id));
         if (is_lisp_pointer(result)) return result;
         lose("get_package_by_id: no package vector");
     }

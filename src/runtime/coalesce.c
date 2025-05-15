@@ -150,9 +150,9 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * And now there's update_writeprotection() which is also ad-hoc.
  */
 
-static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
+static uword_t coalesce_range(lispobj* where, lispobj* limit, void* arg)
 {
-    struct hopscotch_table* ht = (struct hopscotch_table*)arg;
+    struct hopscotch_table* ht = arg;
     sword_t nwords, i;
 
     where = next_object(where, 0, limit);
@@ -209,26 +209,25 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 void coalesce_similar_objects()
 {
     struct hopscotch_table ht;
-    uword_t arg = (uword_t)&ht;
 
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
-    coalesce_range((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, arg);
+    coalesce_range((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, &ht);
 #ifdef T_SYMBOL_SLOTS_START
-    coalesce_range(T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, arg);
+    coalesce_range(T_SYMBOL_SLOTS_START, T_SYMBOL_SLOTS_END, &ht);
 #endif
-    coalesce_range(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, arg);
-    coalesce_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, arg);
+    coalesce_range(NIL_SYMBOL_SLOTS_START, NIL_SYMBOL_SLOTS_END, &ht);
+    coalesce_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &ht);
     if (PERMGEN_SPACE_START)
-        coalesce_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, arg);
+        coalesce_range((lispobj*)PERMGEN_SPACE_START, permgen_space_free_pointer, &ht);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);
-    coalesce_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, arg);
+    coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, &ht);
+    coalesce_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, &ht);
 #endif
 #ifdef LISP_FEATURE_GENERATIONAL
-    walk_generation(coalesce_range, -1, arg);
+    walk_generation(coalesce_range, -1, &ht);
 #else
-    coalesce_range(current_dynamic_space, get_alloc_pointer(), arg);
+    coalesce_range(current_dynamic_space, get_alloc_pointer(), &ht);
 #endif
     hopscotch_destroy(&ht);
 }

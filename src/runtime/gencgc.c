@@ -2912,8 +2912,8 @@ void free_large_object(lispobj* where, lispobj* end)
  * specified generation.
  * Stop if any invocation returns non-zero, and return that value */
 uword_t
-walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
-                generation_index_t generation, uword_t extra)
+walk_generation(uword_t (*proc)(lispobj*,lispobj*,void*),
+                generation_index_t generation, void* extra)
 {
     page_index_t i;
     int genmask = generation >= 0 ? 1 << generation : ~0;
@@ -4809,8 +4809,9 @@ static __attribute__((unused)) bool acceptable_filler_cons_p(lispobj* where)
     if (where[0] == (uword_t)-1 && where[1] == 0) return 1;
     return 0;
 }
-static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
+static uword_t verify_range(lispobj* start, lispobj* end, void* arg)
 {
+    struct verify_state* state = arg;
     lispobj* where = start;
     if (state->flags & VERIFYING_GENERATIONAL && find_page_index(start)>=0) {
         page_index_t page = find_page_index(start);
@@ -4976,8 +4977,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr, " [dynamic]");
     state.flags |= VERIFYING_GENERATIONAL;
-    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_range,
-                    -1, (uword_t)&state);
+    walk_generation(verify_range, -1, &state);
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");
  out:
     if (state.nerrors && !(flags & VERIFY_DONT_LOSE)) {

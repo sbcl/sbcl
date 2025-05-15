@@ -734,9 +734,9 @@ static bool ignorep(lispobj* base_ptr, lispobj ignored_objects)
     return 0;
 }
 
-static uword_t build_refs(lispobj* where, lispobj* end,
-                          struct scan_state* ss)
+static uword_t build_refs(lispobj* where, lispobj* end, void* arg)
 {
+    struct scan_state* ss = arg;
     lispobj layout;
     sword_t nwords, scan_limit, i;
     uword_t n_objects = 0, n_scanned_words = 0,
@@ -878,8 +878,7 @@ static void scan_spaces(struct scan_state* ss)
     show_tally(old, ss, "text");
 #endif
     old = *ss;
-    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))build_refs,
-                    -1, (uword_t)ss);
+    walk_generation(build_refs, -1, ss);
     show_tally(old, ss, "dynamic");
 }
 

@@ -504,8 +504,8 @@ unprotect_oldspace(void)
  * specified generation.
  * Stop if any invocation returns non-zero, and return that value */
 uword_t
-walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
-                generation_index_t generation, uword_t extra)
+walk_generation(uword_t (*proc)(lispobj*,lispobj*,void*),
+                generation_index_t generation, void* extra)
 {
     page_index_t i;
     int genmask = generation >= 0 ? 1 << generation : ~0;
@@ -1781,8 +1781,9 @@ static __attribute__((unused)) bool acceptable_filler_cons_p(lispobj* where)
     if (where[0] == (uword_t)-1 && where[1] == 0) return 1;
     return 0;
 }
-static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
+static uword_t verify_range(lispobj* start, lispobj* end, void* arg)
 {
+    struct verify_state* state = arg;
     lispobj* where = start;
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {
@@ -1884,30 +1885,30 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
 
 static _Atomic(uword_t) walk_halted;
 static _Atomic(uword_t) walk_cursor;
-static uword_t parallel_walk_extra;
+static void* parallel_walk_extra;
 struct span { lispobj *start; lispobj *end; };
 static uword_t table_spans;
 static struct span *span_table;
-static uword_t (*parallel_proc)(lispobj*,lispobj*,uword_t);
+static uword_t (*parallel_proc)(lispobj*,lispobj*,void*);
 
-static uword_t fill_table(lispobj *start, lispobj *end, __attribute__((unused)) uword_t unused) {
+static uword_t fill_table(lispobj *start, lispobj *end, __attribute__((unused)) void* unused) {
     span_table[table_spans++] = (struct span){start, end};
     return 0;
 }
 
 static void parallel_walk_worker() {
     /* Copy the verifier state. */
-    struct verify_state *original = (struct verify_state*)parallel_walk_extra, copy = *original;
+    struct verify_state *original = parallel_walk_extra, copy = *original;
     uword_t index;
     while ((index = atomic_fetch_add(&walk_cursor, 1)) < table_spans && !atomic_load(&walk_halted)) {
-        uword_t ret = parallel_proc(span_table[index].start, span_table[index].end, (uword_t)&copy);
+        uword_t ret = parallel_proc(span_table[index].start, span_table[index].end, &copy);
         if (ret) atomic_store(&walk_halted, ret);
     }
     atomic_fetch_add(&original->nerrors, copy.nerrors);
 }
 
-static void parallel_walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
-                                     generation_index_t generation, uword_t extra)
+static void parallel_walk_generation(uword_t (*proc)(lispobj*,lispobj*,void*),
+                                     generation_index_t generation, void* extra)
 {
     walk_halted = 0;
     walk_cursor = 0;
@@ -2006,8 +2007,7 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
     if (verbose)
         fprintf(stderr, " [dynamic]");
     state.flags |= VERIFYING_GENERATIONAL;
-    parallel_walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_range,
-                             -1, (uword_t)&state);
+    parallel_walk_generation(verify_range, -1, &state);
     check_free_pages();
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");
  out:

@@ -1008,10 +1008,10 @@ static int count_layout_occurs(lispobj x, struct cons* list)
     return ct;
 }
 
-static uword_t display_layouts(lispobj* where, lispobj* limit, uword_t arg)
+static uword_t display_layouts(lispobj* where, lispobj* limit, void* arg)
 {
     extern struct vector * classoid_name(lispobj * classoid);
-    struct layout_collection *lc = (void*)arg;
+    struct layout_collection *lc = arg;
     where = next_object(where, 0, limit); /* find first marked object */
     for ( ; where ; where = next_object(where, object_size(where), limit) ) {
         if (widetag_of(where) == INSTANCE_WIDETAG &&
@@ -1049,10 +1049,9 @@ static int layouts_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
     lc.list = 0;
     lc.ostream = io->out;
     for (lc.passno = 1; lc.passno <= 2; ++lc.passno) {
-        walk_generation(display_layouts, -1, (uword_t)&lc);
+        walk_generation(display_layouts, -1, &lc);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        display_layouts((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer,
-                        (uword_t)&lc);
+        display_layouts((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, &lc);
 #endif
     }
     struct cons* l = lc.list;

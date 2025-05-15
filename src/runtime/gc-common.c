@@ -3457,7 +3457,7 @@ static void verify_hash_table_if_possible(struct hash_table* ht, bool fix_bad)
     maybe_fix_hash_table(ht, fix_bad);
 }
 
-static uword_t verify_tables_in_range(lispobj* start, lispobj* end, uword_t fix_bad)
+static uword_t verify_tables_in_range(lispobj* start, lispobj* end, void* fix_bad)
 {
     lispobj* where = next_object(start, 0, end); /* find first marked object */
     lispobj layout;
@@ -3465,16 +3465,16 @@ static uword_t verify_tables_in_range(lispobj* start, lispobj* end, uword_t fix_
         if (widetag_of(where) == INSTANCE_WIDETAG &&
             (layout = instance_layout(where)) != 0 &&
             layout_depth2_id(LAYOUT(layout)) == HASH_TABLE_LAYOUT_ID)
-            verify_hash_table_if_possible((struct hash_table*)where, fix_bad);
+            verify_hash_table_if_possible((struct hash_table*)where, (uintptr_t)fix_bad);
         sword_t nwords = object_size(where);
         where = next_object(where, nwords, end);
     }
     return 0;
 }
 
-void verify_hash_tables(bool fix_bad)
+void verify_hash_tables(uintptr_t fix_bad)
 {
-    walk_generation(verify_tables_in_range, -1, fix_bad);
+    walk_generation(verify_tables_in_range, -1, (void*)fix_bad);
 }
 #endif
 

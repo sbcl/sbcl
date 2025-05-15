@@ -159,9 +159,9 @@ struct pair {
     uword_t data;
 };
 
-static uword_t walk_range_wrapper(lispobj* where, lispobj* limit, uword_t arg)
+static uword_t walk_range_wrapper(lispobj* where, lispobj* limit, void* arg)
 {
-    struct pair* pair = (void*)arg;
+    struct pair* pair = arg;
     walk_range(where, limit, pair->func, pair->data);
     return 0;
 }
@@ -182,7 +182,7 @@ static void walk_all_gc_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
     if (TEXT_SPACE_START)
         walk_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, fun, arg);
     struct pair pair = {fun, arg};
-    walk_generation(walk_range_wrapper, -1, (uword_t)&pair);
+    walk_generation(walk_range_wrapper, -1, &pair);
 }
 
 static lispobj readonlyize(lispobj* obj)
