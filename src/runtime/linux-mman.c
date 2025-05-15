@@ -59,7 +59,7 @@ __attribute__((unused)) static void* try_find_hole(os_vm_size_t len)
         }
         if (high >= TWO_GB_LIM) break;
         previous_high = high;
-        char ch;
+        int ch;
         while ((ch = getc(f)) != EOF && ch != '\n') {} // skip to newline
     }
     fclose(f);
