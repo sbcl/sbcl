@@ -201,10 +201,6 @@
        (declare (ignorable ,(car lambda-list)))
        (sb-assem:assemble ()
          ,@body))))
-
-(defglobal *sc-vop-slots*
-    '((:move . sc-move-vops)
-      (:move-arg . sc-move-arg-vops)))
 
 ;;;; primitive type definition
 
@@ -400,8 +396,9 @@
 (defmacro define-move-vop (name kind &rest scs)
   (when (or (oddp (length scs)) (null scs))
     (error "malformed SCs spec: ~S" scs))
-  (let ((accessor (or (cdr (assoc kind *sc-vop-slots*))
-                      (error "unknown kind ~S" kind))))
+  (let ((accessor (ecase kind
+                    (:move 'sc-move-vops)
+                    (:move-arg 'sc-move-arg-vops))))
     `(progn
        ,@(when (eq kind :move)
            `((eval-when (:compile-toplevel :load-toplevel :execute)
