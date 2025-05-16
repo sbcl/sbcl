@@ -3942,6 +3942,26 @@
       (when var
         (list (list 'typep var (specifier-type '(eql 0)) t))))))
 
+;;; Multiplicative inverse using the Euclidean algorithm.
+;;; From Hacker's Delight.
+(defun mulinv (d mod)
+  (let ((x1 mod)
+        (v1 (logand (- d) mod))
+        (x2 1)
+        (v2 d)
+        (x3 0)
+        (v3 0)
+        (q 0))
+    (loop while (> v2 1)
+          do (setq q (floor v1 v2)
+                   x3 (- x1 (* q x2))
+                   v3 (- v1 (* q v2))
+                   x1 x2
+                   v1 v2
+                   x2 x3
+                   v2 v3))
+    (logand mod x2)))
+
 ;;; Return an expression to calculate the integer quotient of X and
 ;;; constant Y, using multiplication, shift and add/sub instead of
 ;;; division. Both arguments must be unsigned, fit in a machine word and
@@ -4065,6 +4085,7 @@
                          *
                          :policy (and (> speed compilation-speed)
                                       (> speed space))
+                         :result result
                          :node node
                          :important nil)
    "convert integer division to multiplication"
@@ -4091,12 +4112,32 @@
                                                         '(and sb-vm:signed-word
                                                           (not unsigned-byte)))))))
            (give-up-ir1-transform))
-      `(let* ((quot (truly-the
-                     (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
-                     ,(gen-signed-truncate-by-constant-expr y precision)))
-              (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
-                              (- x (truly-the sb-vm:signed-word (* quot ,y))))))
-         (values quot rem))))))
+       (let ((rem (and (mv-bind-unused-p result 0)
+                       (mv-bind-dest result 1))))
+         (if (and rem
+                  (oddp y)
+                  (combination-matches 'eq '(* 0) rem))
+             (let* ((max-x most-positive-word)
+                    (inv (mulinv abs-y max-x))
+                    (cmp (truncate max-x y)))
+               (setf (node-derived-type node)
+                     (values-specifier-type '(values integer boolean &optional)))
+               (erase-lvar-type result)
+               (transform-call rem
+                               `(lambda (x z)
+                                  (declare (ignore z))
+                                  x)
+                               'truncate)
+               `(values 0 (not (> (logand most-positive-word
+                                          (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
+                                             ,(ash cmp -1)))
+                                  ,cmp))))
+             `(let* ((quot (truly-the
+                            (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
+                            ,(gen-signed-truncate-by-constant-expr y precision)))
+                     (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
+                                     (- x (truly-the sb-vm:signed-word (* quot ,y))))))
+                (values quot rem))))))))
 
 ;;; The paper also has this,
 ;;; but it seems to overflow when adding to X
@@ -4115,27 +4156,6 @@
 (unless-vop-existsp (:translate %multiply-high)
                     (define-source-transform %multiply-high (x y)
                       `(values (sb-bignum:%multiply ,x ,y))))
-
-
-;;; Multiplicative inverse using the Euclidean algorithm.
-;;; From Hacker's Delight.
-(defun mulinv (d mod)
-  (let ((x1 mod)
-        (v1 (logand (- d) mod))
-        (x2 1)
-        (v2 d)
-        (x3 0)
-        (v3 0)
-        (q 0))
-    (loop while (> v2 1)
-          do (setq q (floor v1 v2)
-                   x3 (- x1 (* q x2))
-                   v3 (- v1 (* q v2))
-                   x1 x2
-                   v1 v2
-                   x2 x3
-                   v2 v3))
-    (logand mod x2)))
 
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
