@@ -4116,6 +4116,27 @@
                     (define-source-transform %multiply-high (x y)
                       `(values (sb-bignum:%multiply ,x ,y))))
 
+
+;;; Multiplicative inverse using the Euclidean algorithm.
+;;; From Hacker's Delight.
+(defun mulinv (d mod)
+  (let ((x1 mod)
+        (v1 (logand (- d) mod))
+        (x2 1)
+        (v2 d)
+        (x3 0)
+        (v3 0)
+        (q 0))
+    (loop while (> v2 1)
+          do (setq q (floor v1 v2)
+                   x3 (- x1 (* q x2))
+                   v3 (- v1 (* q v2))
+                   x1 x2
+                   v1 v2
+                   x2 x3
+                   v2 v3))
+    (logand mod x2)))
+
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
 ;;; some shifts and an addition. Calculate the remainder by a second
@@ -4129,6 +4150,7 @@
                         *
                         :policy (and (> speed compilation-speed)
                                      (> speed space))
+                        :result result
                         :node node
                         :important nil)
   "convert integer division to multiplication"
@@ -4141,11 +4163,31 @@
     ;; Division by zero, one or powers of two is handled elsewhere.
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
-    `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
-                             ,(gen-unsigned-div-by-constant-expr y max-x)))
-            (rem (truly-the (mod ,y)
-                            (- x (* quot ,y)))))
-       (values quot rem))))
+    (let ((rem (and (mv-bind-unused-p result 0)
+                    (mv-bind-dest result 1)))
+          plusp)
+      (if (and rem
+               (oddp y)
+               (or (combination-matches 'eq '(* 0) rem)
+                   (and (combination-matches '> '(* 0) rem)
+                        (setf plusp t))))
+          (let ((inv (mulinv y max-x)))
+            (setf (node-derived-type node)
+                  (values-specifier-type '(values integer boolean &optional)))
+            (erase-lvar-type result)
+            (transform-call rem
+                            `(lambda (x z)
+                               (declare (ignore z))
+                               x)
+                            'truncate)
+            `(values 0 ,(wrap-if (not plusp) '(not)
+                                 `(> (truly-the word (logand (* x ,inv) ,max-x))
+                                     ,(truncate max-x y)))))
+          `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
+                                   ,(gen-unsigned-div-by-constant-expr y max-x)))
+                  (rem (truly-the (mod ,y)
+                                  (- x (* quot ,y)))))
+             (values quot rem))))))
 
 ;;; No-op when Y is greater than X
 (deftransform truncate ((x y) (rational rational) * :important nil)
