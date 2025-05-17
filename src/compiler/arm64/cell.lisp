@@ -696,15 +696,16 @@
     (pseudo-atomic (pa-flag)
       #+immobile-space
       (progn
-        #-sb-thread
-        (error "doesn't work yet")
-        (loadw temp thread-tn thread-text-space-addr-slot)
-        (inst sub temp object temp)
-        (inst lsr card temp (1- (integer-length immobile-card-bytes)))
-        (loadw temp thread-tn thread-text-card-count-slot)
+        (load-foreign-symbol temp "TEXT_SPACE_START" :dataref t)
+        (inst ldr temp (@ temp))
+        (inst sub card object temp) ; CARD is the space-relative pointer
+        (load-foreign-symbol temp "text_space_size" :dataref t)
+        (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
         (inst cmp card temp)
         (inst b :hs try-dynamic-space)
-        (loadw temp thread-tn thread-text-card-marks-slot)
+        (load-foreign-symbol temp "text_page_touched_bits" :dataref t)
+        (inst ldr temp (@ temp))
+        (inst lsr card card (1- (integer-length immobile-card-bytes)))
 
         ;; compute &((unsigned long*)text_page_touched_bits)[page_index/64]
         (inst lsr pa-flag card 6)

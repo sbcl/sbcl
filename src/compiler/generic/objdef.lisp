@@ -474,14 +474,7 @@ during backtrace.
 (defconstant-eqx +thread-header-slot-names+
     `#(#+x86-64 ;; The following slot's existence must NOT be conditional on #+msan
        ,@'(msan-param-tls) ; = &__msan_param_tls
-       ;; These aren't actually thread-local but I needed a way to conveniently access
-       ;; them without using a register on x86-64, and that logic was copied into arm64.
-       ;; x86-64 no longer needs these
-       #+(and immobile-space (not x86-64))
-       ,@'(function-layout
-           text-space-addr
-           text-card-count
-           text-card-marks))
+       )
   #'equalp)
 
 (macrolet ((assign-header-slot-indices ()

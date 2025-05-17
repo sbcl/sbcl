@@ -999,12 +999,6 @@ alloc_thread_struct(void* spaces) {
 #endif
 
     __attribute((unused)) lispobj* tls = (lispobj*)th;
-#ifdef THREAD_TEXT_CARD_MARKS_SLOT
-    extern unsigned int* text_page_touched_bits;
-    tls[THREAD_TEXT_SPACE_ADDR_SLOT] = TEXT_SPACE_START;
-    tls[THREAD_TEXT_CARD_COUNT_SLOT] = text_space_size / IMMOBILE_CARD_BYTES;
-    tls[THREAD_TEXT_CARD_MARKS_SLOT] = (lispobj)text_page_touched_bits;
-#endif
 
     th->os_address = spaces;
     th->control_stack_start = (lispobj*)aligned_spaces;
