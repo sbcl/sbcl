@@ -4119,7 +4119,7 @@
                   (combination-matches 'eq '(* 0) rem))
              (let* ((max-x most-positive-word)
                     (inv (mulinv abs-y max-x))
-                    (cmp (truncate max-x y)))
+                    (cmp (truncate max-x abs-y)))
                (setf (node-derived-type node)
                      (values-specifier-type '(values integer boolean &optional)))
                (erase-lvar-type result)
