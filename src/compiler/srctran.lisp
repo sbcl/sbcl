@@ -4113,7 +4113,7 @@
                                                           (not unsigned-byte)))))))
            (give-up-ir1-transform))
        (let ((rem (and (mv-bind-unused-p result 0)
-                       (mv-bind-dest result 1))))
+                       (mv-bind-dest result 1 t))))
          (if (and rem
                   (oddp y)
                   (combination-matches 'eq '(* 0) rem))
@@ -4184,7 +4184,7 @@
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
     (let ((rem (and (mv-bind-unused-p result 0)
-                    (mv-bind-dest result 1)))
+                    (mv-bind-dest result 1 t)))
           plusp)
       (if (and rem
                (oddp y)

@@ -226,19 +226,24 @@
                       (pld (cast-lvar dest)))))))
     (pld lvar)))
 
-(defun let-lvar-dest (lvar)
-  (let ((dest (lvar-dest (principal-lvar lvar))))
-    (if (and (combination-p dest)
-             (eq (basic-combination-kind dest) :local))
-        (let* ((fun (combination-lambda dest))
-               (n (position-or-lose lvar
-                                    (combination-args dest)))
-               (var (nth n (lambda-vars fun)))
-               (refs (leaf-refs var)))
-          (when (and refs
-                     (not (cdr refs)))
-            (let-lvar-dest (node-lvar (car refs)))))
-        dest)))
+(defun let-lvar-dest (lvar &optional single-use)
+  (when (or (not single-use)
+            (atom (lvar-uses lvar)))
+    (let* ((lvar (principal-lvar lvar))
+           (dest (and (or (not single-use)
+                          (atom (lvar-uses lvar)))
+                      (lvar-dest lvar))))
+      (if (and (combination-p dest)
+               (eq (basic-combination-kind dest) :local))
+          (let* ((fun (combination-lambda dest))
+                 (n (position-or-lose lvar
+                                      (combination-args dest)))
+                 (var (nth n (lambda-vars fun)))
+                 (refs (leaf-refs var)))
+            (when (and refs
+                       (not (cdr refs)))
+              (let-lvar-dest (node-lvar (car refs)) single-use)))
+          dest))))
 
 (defun lvar-dest-var (lvar)
   (when lvar
@@ -271,8 +276,10 @@
                   do (return (values (lvar-dest lvar) lvar))))
           (values dest lvar)))))
 
-(defun mv-bind-dest (lvar nth-value)
-  (when lvar
+(defun mv-bind-dest (lvar nth-value &optional single-use)
+  (when (and lvar
+             (or (not single-use)
+                 (atom (lvar-uses lvar))))
     (let ((dest (lvar-dest lvar)))
       (when (and (mv-combination-p dest)
                  (eq (basic-combination-kind dest) :local))
@@ -282,7 +289,7 @@
             (when (and refs
                        (not (cdr refs)))
               (when (functional-kind-eq fun mv-let)
-                (let-lvar-dest (node-lvar (car refs)))))))))))
+                (let-lvar-dest (node-lvar (car refs)) single-use)))))))))
 
 (defun mv-bind-unused-p (lvar nth-value)
   (when lvar
