@@ -471,10 +471,7 @@ during backtrace.
 
 ;;; Define some slots that precede 'struct thread' so that each may be read
 ;;; using a small negative 1-byte displacement.
-(defconstant-eqx +thread-header-slot-names+
-    `#(#+x86-64 ;; The following slot's existence must NOT be conditional on #+msan
-       ,@'(msan-param-tls) ; = &__msan_param_tls
-       )
+(defconstant-eqx +thread-header-slot-names+ #()
   #'equalp)
 
 (macrolet ((assign-header-slot-indices ()
@@ -537,6 +534,8 @@ during backtrace.
   (cons-tlab :c-type "struct alloc_region" :length 3)
   (mixed-tlab :c-type "struct alloc_region" :length 3)
   ;; END of slots to keep near the beginning.
+
+  #+x86-64 (msan-param-tls) ; = &__msan_param_tls, unconditional wrt #+-msan
 
   ;; This is the original address at which the memory was allocated,
   ;; which may have different alignment then what we prefer to use.

@@ -62,7 +62,7 @@ int arch_os_thread_init(struct thread *thread) {
 #endif
 #ifdef MEMORY_SANITIZER
     extern __thread unsigned long __msan_param_tls[];
-    ((lispobj*)thread)[THREAD_MSAN_PARAM_TLS_SLOT] = (uword_t)&__msan_param_tls[0];
+    thread->msan_param_tls = (uword_t)&__msan_param_tls[0];
 #endif
     return 1;
 }
