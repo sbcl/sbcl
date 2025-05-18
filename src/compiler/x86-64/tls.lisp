@@ -15,6 +15,12 @@
   `(ea (- (* symbol-value-slot n-word-bytes) other-pointer-lowtag)
        ,sym))
 
+(defun emit-lea-symbol-value-slot (ea-tn symbol) ; dest, src
+  (if (sc-is symbol immediate)
+      (inst mov ea-tn (make-fixup (tn-value symbol) :immobile-symbol
+                                  (- (ash symbol-value-slot word-shift) other-pointer-lowtag)))
+      (inst lea ea-tn (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))))
+
 ;;; This does not resolve the TLS-INDEX at load-time, because we don't want to
 ;;; waste TLS indices for symbols that may never get thread-locally bound.
 ;;; So instead we make a fixup to the address of the 4-byte TLS field in the symbol.
@@ -202,6 +208,17 @@
       (inst cmp :qword temp no-tls-value-marker)
       (inst cmov :dword :e temp (symbol-value-slot-ea symbol))
       (inst cmp :byte temp unbound-marker-widetag))
+     ((and (sc-is symbol constant) (not (constant-tn-p symbol)))
+      ;; The easy way would use a second temp reg, but it's avoidable using only 1 more
+      ;; instruction that would have been needed regardless for loading another temp.
+      (inst mov :qword temp symbol)
+      (inst mov :dword temp (tls-index-of temp))
+      ;; TEMP will address the TLS area as if a symbol whose value slot is the TLS word
+      (let ((ea (object-slot-ea temp symbol-value-slot other-pointer-lowtag)))
+        (inst lea temp (ea (- (ea-disp ea)) thread-tn temp))
+        (inst cmp :qword ea no-tls-value-marker)
+        (inst cmov :qword :e temp symbol) ; change TEMP to SYMBOL if no TLS value
+        (inst cmp :byte ea unbound-marker-widetag)))
      ((symbol-always-has-tls-value-p symbol node)
       ;; check only the TLS
       (inst cmp :byte (thread-tls-ea (load-time-tls-offset (tn-value symbol)))

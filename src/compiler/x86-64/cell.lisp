@@ -149,12 +149,6 @@
                       (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))
       value val-temp)))
 
-(defun emit-lea-symbol-value-slot (ea-tn symbol) ; dest, src
-  (if (sc-is symbol immediate)
-      (inst mov ea-tn (make-fixup (tn-value symbol) :immobile-symbol
-                                  (- (ash symbol-value-slot word-shift) other-pointer-lowtag)))
-      (inst lea ea-tn (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))))
-
 #-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)

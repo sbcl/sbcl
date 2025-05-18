@@ -3520,11 +3520,9 @@ is :ANY, the function name is not checked."
                     (let ((tn (if (tn-p symbol)
                                   symbol
                                   (tn-ref-tn symbol))))
-                      (sc-case tn
-                        ((constant sb-vm::immediate)
-                         (tn-value tn))
-                        (t
-                         (return-from sb-vm::symbol-always-has-tls-value-p)))))))
+                      (if (constant-tn-p tn)
+                          (tn-value tn)
+                          (return-from sb-vm::symbol-always-has-tls-value-p))))))
     (or (typep (info :variable :wired-tls symbol)
                '(or (eql :always-thread-local) fixnum))
         (when node
