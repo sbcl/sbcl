@@ -101,14 +101,13 @@
 
 ;; This code is tested by 'codegen.impure.lisp'
 (defun emit-symeval (value symbol symbol-ref symbol-reg check-boundp vop)
-  (let* ((known-symbol-p (sc-is symbol constant immediate))
-         (known-symbol (and known-symbol-p (tn-value symbol))))
-    ;; In order from best to worst.
+  (let ((known-symbol (and (constant-tn-p symbol) (tn-value symbol))))
     (cond
       ((symbol-always-has-tls-value-p symbol-ref (sb-c::vop-node vop))
        (setq symbol-reg nil)
        (inst mov value (access-wired-tls-val known-symbol)))
       (t
+       ;; Step 1: load the TLS index and then then the slot of the thread
        (cond
          ((symbol-always-has-tls-index-p known-symbol) ; e.g. CL:*PRINT-BASE*
           ;; Known nonzero TLS index, but possibly no per-thread value.
@@ -117,32 +116,30 @@
           (when (sc-is symbol constant)
             (inst mov symbol-reg symbol))) ; = MOV Rxx, [RIP-N]
 
-         (known-symbol-p           ; unknown TLS index, possibly 0
+         ((sc-is symbol descriptor-reg)
+          (inst mov :dword symbol-reg (tls-index-of symbol))
+          (inst mov value (thread-tls-ea symbol-reg))
+          (setq symbol-reg symbol))
+
+         (t ; unknown TLS index, possibly 0
           (sc-case symbol
             (immediate
-             ;; load the TLS index from the symbol. TODO: use [RIP-n] mode
-             ;; for immobile code to make it automatically relocatable.
+             ;; load the TLS index from the symbol.
              (inst mov :dword value
                    ;; slot index 1/2 is the high half of the header word.
                    (symbol-slot-ea known-symbol 1/2))
              ;; read the TLS value using that index
              (inst mov value (thread-tls-ea value)))
             (constant
-
              ;; These reads are inextricably data-dependent
              (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
              (inst mov :dword value (tls-index-of symbol-reg))
-             (inst mov value (thread-tls-ea value)))))
+             (inst mov value (thread-tls-ea value))))))
 
-         (t                      ; SYMBOL-VALUE of a random symbol
-          (inst mov :dword symbol-reg (tls-index-of symbol))
-          (inst mov value (thread-tls-ea symbol-reg))
-          (setq symbol-reg symbol)))
-
-       ;; Load the global value if the TLS value didn't exist
+       ;; Step 2: Load VALUE from symbol's slot if TLS value didn't exist
        (inst cmp :qword value no-tls-value-marker)
        (inst cmov :e value
-             (if (and known-symbol-p (sc-is symbol immediate))
+             (if (sc-is symbol immediate)
                  (symbol-slot-ea known-symbol symbol-value-slot) ; MOV Rxx, imm32
                  (symbol-value-slot-ea symbol-reg)))))
 
