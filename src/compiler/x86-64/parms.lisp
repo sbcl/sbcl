@@ -98,14 +98,6 @@
 ;;; are barrier instructions. So whether you measure execution or just code size,
 ;;; it's better to encode the safepoint trap more compactly.
 
-;;; TODOs:
-;;; - if the asm routine indirection vector is filled downward and the ALLOC-TRAMP addresses
-;;;   are in the highest cells, it may be possible to shorten their CALL encodings
-;;;   to use imm8 displacement from NULL-TN, hypothetically:
-;;;      41FF542481       CALL [R12-127]
-;;;   versus
-;;;      41FF94240904F0FF CALL [R12-1047543]
-
 (defconstant-eqx +static-space-trailer-constants+
   #(lisp-linkage-table ; This should be first - elftool hardwires it
     alien-linkage-table

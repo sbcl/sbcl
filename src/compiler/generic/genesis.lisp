@@ -1919,15 +1919,11 @@ core and return a descriptor to it."
     (setq *t-descriptor* t-symbol)
     (cold-set t-symbol t-symbol))
 
-  ;; Establish the value of SB-VM:FUNCTION-LAYOUT and **PRIMITIVE-OBJECT-LAYOUTS**
+  ;; Establish the value of **PRIMITIVE-OBJECT-LAYOUTS**
   #+x86-64
   (cold-set '**primitive-object-layouts**
             (make-random-descriptor
              (logior sb-vm:static-space-start sb-vm:other-pointer-lowtag)))
-  #+compact-instance-header
-  (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
-                         sb-vm:symbol-value-slot
-                         (ash (cold-layout-descriptor-bits 'function) 32))
 
   ;; Dynamic-space code can't use "call rel32" to reach the assembly code
   ;; in a single instruction if too far away. The solution is to have a static-space

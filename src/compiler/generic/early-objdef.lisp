@@ -455,13 +455,6 @@
 (defconstant stable-hash-required-flag 8)
 (defconstant hash-slot-present-flag    9)
 
-#+immobile-space
-(progn
-  ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the
-  ;; low half of a closure header to form the full header word.
-  #-sb-thread
-  (defglobal function-layout 0))        ; set by genesis
-
 ;;; These regions occupy the initial words of static space.
 #-sb-thread
 (progn
