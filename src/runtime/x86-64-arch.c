@@ -857,17 +857,18 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
     extern int lisp_code_in_elf();
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-# define LINKAGE_TABLE_CONTAINER IMMOBILE_TEXT_CORE_SPACE_ID
-#else
-# define LINKAGE_TABLE_CONTAINER STATIC_CORE_SPACE_ID
-#endif
     if (!lisp_code_in_elf()) { // a normal core
-        if (space_id == LINKAGE_TABLE_CONTAINER)
+        if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID)
             extra_below = LISP_LINKAGE_SPACE_SIZE + ALIEN_LINKAGE_SPACE_SIZE;
     } else { // code-in-ELF core
         if (space_id == STATIC_CORE_SPACE_ID)
             extra_below = ALIEN_LINKAGE_SPACE_SIZE;
     }
+#else
+    if (space_id == STATIC_CORE_SPACE_ID)
+        extra_below = LISP_LINKAGE_SPACE_SIZE + ALIEN_LINKAGE_SPACE_SIZE;
+#endif
+
     if (space_id == STATIC_CORE_SPACE_ID) {
         extra_above =
 # ifdef LISP_FEATURE_SB_SAFEPOINT // should just add 1 OS page but instead

@@ -4129,7 +4129,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
 
       ;; Write the function linkage table first. If present it'll be utilized when
       ;; loading the directory. It's not in the directory because it doesn't allocate
-      ;; a space in the usual way: it's either random or contiguous with text space.
+      ;; a space in the usual way: it abuts alien linkage space which is contiguous
+      ;; with either static or text space depending on +/- immobile-space.
       #+linkage-space (setq data-page (output-linkage-table data-page core-file))
 
      ;; x86-64: The constants T and NIL are at the highest end of static space

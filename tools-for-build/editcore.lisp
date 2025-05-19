@@ -315,13 +315,19 @@
 (defun make-core (spacemap code-bounds fixedobj-bounds &key enable-pie linkage-space-info)
   (let* ((linkage-bounds
           (let ((text-space (get-space immobile-text-core-space-id spacemap)))
-            (if (and text-space (/= (space-addr text-space) 0))
+            (if (and text-space (/= (space-addr text-space) 0)
+                     ;; this is an elf-sans-immmobile core if fixedobj does not exist
+                     #+x86-64 (get-space immobile-fixedobj-core-space-id spacemap))
                 (let ((linkage-spaces-size
                        (+ #+linkage-space (ash 1 (+ n-linkage-index-bits word-shift))
                           alien-linkage-space-size))
                       (text-addr (space-addr text-space)))
                   (make-bounds (- text-addr linkage-spaces-size) text-addr))
-                (make-bounds 0 0))))
+                (let* ((static (get-space static-core-space-id spacemap))
+                       (alien-linkage-start (- (space-addr static) alien-linkage-space-size)))
+                  (make-bounds
+                   (- alien-linkage-start (ash 1 (+ n-linkage-index-bits word-shift)))
+                   alien-linkage-start)))))
          (alien-linkage-entry-size
           (symbol-global-value
            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"

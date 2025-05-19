@@ -1342,6 +1342,9 @@
 (define-instruction x66 (segment)
   (:printer x66 () nil :print-name nil))
 
+(define-instruction cs (segment)
+  (:printer byte ((op #x2e :prefilter (lambda (dstate value) (declare (ignore value dstate)))))
+            nil :print-name nil))
 (define-instruction fs (segment)
   (:printer byte ((op #x64 :prefilter (lambda (dstate value)
                                         (declare (ignore value))

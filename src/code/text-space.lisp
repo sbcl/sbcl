@@ -126,33 +126,28 @@
                ;; If the jump is to FUN-ENTRY, change it to a linkage space indirection
                (let ((disp (truly-the (signed-byte 32) (near-jump-displacement chunk dstate))))
                  (when (= (+ disp (dstate-next-addr dstate)) fun-entry)
-                   (let ((sap (int-sap (dstate-cur-addr dstate)))
-                         (cell (sap+ sb-vm::*linkage-table* (ash index word-shift))))
-                     (declare (ignorable cell))
+                   (let ((sap (int-sap (dstate-cur-addr dstate))))
                      #+immobile-space
-                     (cond ((eq inst jmp)
-                            (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
-                            (setf (sap-ref-16 sap 0) #x25ff  ; JMP [RIP+n]
-                                  (signed-sap-ref-32 sap 2) (sap- cell (sap+ sap 6))))
-                           (t
-                            (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
-                            (setf (sap-ref-16 sap -1) #x15ff   ; CALL [RIP+n]
-                                  (signed-sap-ref-32 sap 1) (sap- cell (sap+ sap 5)))))
+                     (let ((cell (sap+ sb-vm::*linkage-table* (ash index word-shift))))
+                       (cond ((eq inst jmp)
+                              (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
+                              (setf (sap-ref-16 sap 0) #x25ff  ; JMP [RIP+n]
+                                    (signed-sap-ref-32 sap 2) (sap- cell (sap+ sap 6))))
+                             (t
+                              (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
+                              (setf (sap-ref-16 sap -1) #x15ff   ; CALL [RIP+n]
+                                    (signed-sap-ref-32 sap 1) (sap- cell (sap+ sap 5))))))
                      #-immobile-space
-                     (cond ((eq inst jmp)
-                            ;; Manually specifying bytes to match is such a horrible hack, but I don't have a
-                            ;; great alternative. This calculation could be done at compile-time, wiring in the
-                            ;; correct to take into account where we're actually getting the linkage table
-                            ;; base from. Of course, I want the linkage-table to be placed below NIL now,
-                            ;; so these instructions are subject to change anyway.
-                            (aver (= (sap-ref-32 sap -4) #xF8458B49)) ; MOV RAX, [R13-8]
-                            (aver (= (sap-ref-8 sap 5) #x90)) ; NOP
-                            (setf (sap-ref-16 sap 0) #xa0ff   ; JMP [RAX+n]
-                                  (signed-sap-ref-32 sap 2) (ash index word-shift)))
-
-                           (t
-                            (aver (= (sap-ref-32 sap -5) #xF8458B49)) ; MOV RAX, [R13-8]
-                            (aver (= (sap-ref-8 sap -1) #x40)) ; REX (no bits)
-                            (setf (sap-ref-16 sap -1) #x90ff   ; CALL [RAX+n]
-                                  (signed-sap-ref-32 sap 1) (ash index word-shift)))))))))
+                     (let ((disp (- (ash index word-shift)
+                                    (ash 1 (+ sb-vm:n-linkage-index-bits sb-vm:word-shift))
+                                    sb-vm:alien-linkage-space-size
+                                    sb-vm::nil-value-offset)))
+                       (cond ((eq inst jmp)
+                              (aver (= (ldb (byte 24 0) (sap-ref-32 sap 5)) #x001F0F)) ; NOP
+                              (setf (sap-ref-32 sap 0) #x24A4FF41))  ; JMP [R12+disp]
+                             (t
+                              (aver (= (sap-ref-32 sap -3) #xE82E2E2E)) ; CS: CS: CS: CALL rel32
+                              (setf sap (sap+ sap -3))
+                              (setf (sap-ref-32 sap 0) #x2494FF41))) ; CALL [R12+disp]
+                       (setf (signed-sap-ref-32 sap 4) disp)))))))
            seg dstate)))))))
