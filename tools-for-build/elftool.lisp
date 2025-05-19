@@ -1586,13 +1586,15 @@ lisp_fun_linkage_space: .zero ~:*~D
             (#.(sb-impl::package-id (find-package "CL"))
              ;; Users like to encapsulate this apparently
              (string= str "FIND-PACKAGE"))
-            ;; Functions below alway get redefined on startup
+            ;; Functions below sometimes get redefined on startup
             (#.(sb-impl::package-id (find-package "SB-BIGNUM"))
              (string= str "MULTIPLY-BIGNUM-AND-FIXNUM"))
             (#.(sb-impl::package-id (find-package "SB-VM"))
              (member str '(sb-vm::simd-reverse32 sb-vm::simd-reverse8
                            sb-vm::simd-nreverse32 sb-vm::simd-nreverse8
+                           #+sb-unicode
                            sb-vm::simd-copy-utf8-crlf-to-character-string
+                           #+sb-unicode
                            sb-vm::simd-copy-utf8-crlf-to-base-string
                            sb-vm::simd-copy-character-string-to-utf8
                            sb-vm::simd-position32 sb-vm::simd-position32-from-end
