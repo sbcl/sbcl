@@ -126,6 +126,7 @@
     (:translate symbol-value)
     (:args (symbol :scs (descriptor-reg) :to :save
                    :load-if (not (and (sc-is symbol constant)
+                                      (constant-tn-p symbol)
                                       (let ((pkg (sb-xc:symbol-package (tn-value symbol))))
                                         (or (and pkg (system-package-p pkg))
                                             (eq pkg *cl-package*)))))))
@@ -135,7 +136,8 @@
     (:variant t)
     (:node-var node)
     (:generator 9
-      (let* ((known-symbol-p (sc-is symbol constant))
+      (let* ((known-symbol-p (and (sc-is symbol constant)
+                                  (constant-tn-p symbol)))
              (known-symbol (and known-symbol-p (tn-value symbol)))
              (fixup (and known-symbol
                          (make-fixup known-symbol :symbol-tls-index))))
