@@ -3962,6 +3962,13 @@
                    v2 v3))
     (logand mod x2)))
 
+(defun count-trailing-zeros (integer)
+  (declare (type (unsigned-byte 64) integer))
+  (loop for i below 64
+        until (logbitp 0 integer)
+        do (setf integer (ash integer -1))
+        finally (return i)))
+
 ;;; Return an expression to calculate the integer quotient of X and
 ;;; constant Y, using multiplication, shift and add/sub instead of
 ;;; division. Both arguments must be unsigned, fit in a machine word and
@@ -4114,30 +4121,50 @@
            (give-up-ir1-transform))
        (let ((rem (and (mv-bind-unused-p result 0)
                        (mv-bind-dest result 1 t))))
-         (if (and rem
-                  (oddp y)
-                  (combination-matches 'eq '(* 0) rem))
-             (let* ((max-x most-positive-word)
-                    (inv (mulinv abs-y max-x))
-                    (cmp (truncate max-x abs-y)))
-               (setf (node-derived-type node)
-                     (values-specifier-type '(values integer boolean &optional)))
-               (erase-lvar-type result)
-               (transform-call rem
-                               `(lambda (x z)
-                                  (declare (ignore z))
-                                  x)
-                               'truncate)
-               `(values 0 (not (> (logand most-positive-word
-                                          (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                             ,(ash cmp -1)))
-                                  ,cmp))))
-             `(let* ((quot (truly-the
-                            (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
-                            ,(gen-signed-truncate-by-constant-expr y precision)))
-                     (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
-                                     (- x (truly-the sb-vm:signed-word (* quot ,y))))))
-                (values quot rem))))))))
+         (or
+          (when (and rem
+                     (combination-matches 'eq '(* 0) rem))
+            (cond ((oddp y)
+                   (let* ((max-x most-positive-word)
+                          (inv (mulinv abs-y max-x))
+                          (cmp (truncate max-x abs-y)))
+                     (setf (node-derived-type node)
+                           (values-specifier-type '(values integer boolean &optional)))
+                     (erase-lvar-type result)
+                     (transform-call rem
+                                     `(lambda (x z)
+                                        (declare (ignore z))
+                                        x)
+                                     'truncate)
+                     `(values 0 (not (> (logand most-positive-word
+                                                (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
+                                                   ,(ash cmp -1)))
+                                        ,cmp)))))
+                  ((when-vop-existsp (:translate rotate-right-word)
+                     (let* ((max-x most-positive-word)
+                            (zeros (count-trailing-zeros abs-y))
+                            (odd (ash abs-y (- zeros)))
+                            (inv (mulinv odd max-x))
+                            (cmp (truncate max-x abs-y)))
+                       (setf (node-derived-type node)
+                             (values-specifier-type '(values integer boolean &optional)))
+                       (erase-lvar-type result)
+                       (transform-call rem
+                                       `(lambda (x z)
+                                          (declare (ignore z))
+                                          x)
+                                       'truncate)
+                       `(values 0 (not (> (rotate-right-word (logand most-positive-word
+                                                                     (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
+                                                                        ,(truncate (ash max-x -1) odd)))
+                                                             ,zeros)
+                                          ,cmp))))))))
+          `(let* ((quot (truly-the
+                         (integer ,(- (truncate max-x abs-y)) ,(truncate max-x abs-y))
+                         ,(gen-signed-truncate-by-constant-expr y precision)))
+                  (rem (truly-the (integer ,(- 1 abs-y) ,(1- abs-y))
+                                  (- x (truly-the sb-vm:signed-word (* quot ,y))))))
+             (values quot rem))))))))
 
 ;;; The paper also has this,
 ;;; but it seems to overflow when adding to X
@@ -4186,29 +4213,46 @@
     (let ((rem (and (mv-bind-unused-p result 0)
                     (mv-bind-dest result 1 t)))
           plusp)
-      (if (and rem
-               (oddp y)
-               (or (combination-matches 'eq '(* 0) rem)
-                   (and (combination-matches '> '(* 0) rem)
-                        (setf plusp t))))
-          (let* ((max-x (1- (ash 1 (integer-length max-x))))
-                 (inv (mulinv y max-x)))
-            (setf (node-derived-type node)
-                  (values-specifier-type '(values integer boolean &optional)))
-            (erase-lvar-type result)
-            (transform-call rem
-                            `(lambda (x z)
-                               (declare (ignore z))
-                               x)
-                            'truncate)
-            `(values 0 ,(wrap-if (not plusp) '(not)
-                                 `(> (truly-the word (logand (* x ,inv) ,max-x))
-                                     ,(truncate max-x y)))))
-          `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
-                                   ,(gen-unsigned-div-by-constant-expr y max-x)))
-                  (rem (truly-the (mod ,y)
-                                  (- x (* quot ,y)))))
-             (values quot rem))))))
+      (or
+       (when (and rem
+                  (or (combination-matches 'eq '(* 0) rem)
+                      (and (combination-matches '> '(* 0) rem)
+                           (setf plusp t))))
+         (cond ((oddp y)
+                (let* ((max-x (1- (ash 1 (integer-length max-x))))
+                       (inv (mulinv y max-x)))
+                  (setf (node-derived-type node)
+                        (values-specifier-type '(values integer boolean &optional)))
+                  (erase-lvar-type result)
+                  (transform-call rem
+                                  `(lambda (x z)
+                                     (declare (ignore z))
+                                     x)
+                                  'truncate)
+                  `(values 0 ,(wrap-if (not plusp) '(not)
+                                       `(> (truly-the word (logand (* x ,inv) ,max-x))
+                                           ,(truncate max-x y))))))
+               ((when-vop-existsp (:translate rotate-right-word)
+                  (let* ((max-x most-positive-word)
+                         (zeros (count-trailing-zeros y))
+                         (inv (mulinv (ash y (- zeros)) max-x)))
+                    (setf (node-derived-type node)
+                          (values-specifier-type '(values integer boolean &optional)))
+                    (erase-lvar-type result)
+                    (transform-call rem
+                                    `(lambda (x z)
+                                       (declare (ignore z))
+                                       x)
+                                    'truncate)
+                    `(values 0 ,(wrap-if (not plusp) '(not)
+                                         `(> (rotate-right-word (truly-the word (logand (* x ,inv) ,max-x))
+                                                                ,zeros)
+                                             ,(truncate max-x y)))))))))
+       `(let* ((quot (truly-the (integer 0 ,(truncate max-x y))
+                                ,(gen-unsigned-div-by-constant-expr y max-x)))
+               (rem (truly-the (mod ,y)
+                               (- x (* quot ,y)))))
+          (values quot rem))))))
 
 ;;; No-op when Y is greater than X
 (deftransform truncate ((x y) (rational rational) * :important nil)

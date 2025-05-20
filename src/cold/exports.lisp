@@ -1585,6 +1585,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MEMBER-TEST"
            "%MEMBER-TEST-NOT"
            "%MULTIPLY-HIGH" "%SIGNED-MULTIPLY-HIGH"
+           "ROTATE-RIGHT-WORD"
            "%NEGATE" "%POW"
            "%NEW-INSTANCE"
            "%OTHER-POINTER-WIDETAG"

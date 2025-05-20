@@ -690,13 +690,6 @@
          (not (logtest (1+ ones) ;; Turns #b111 into #b1000
                        ones))))) ;; And when ANDed will produce 0
 
-(defun count-trailing-zeros (integer)
-  (declare (type (unsigned-byte 64) integer))
-  (loop for i below 64
-        until (logbitp 0 integer)
-        do (setf integer (ash integer -1))
-        finally (return i)))
-
 (defun find-pattern (integer &optional (width 64))
   (declare (type (unsigned-byte 64) integer)
            (type (member 32 64) width)
@@ -724,7 +717,7 @@
              (values (ldb (byte 1 6) size) ;; 64-bit patterns need to set the N bit to 1
                      (cond ((sequence-of-ones-p pattern)
                             ;; Simple case of consecutive ones, just needs shifting right
-                            (mod (- size (count-trailing-zeros pattern)) size))
+                            (mod (- size (sb-c::count-trailing-zeros pattern)) size))
                            ;; Invert the pattern and find consecutive ones there
                            ((not (sequence-of-ones-p (ldb (byte size 0)
                                                           (lognot pattern))))

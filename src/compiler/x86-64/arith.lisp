@@ -4531,3 +4531,18 @@
           (inst xor res res)
           (inst test arg arg)
           (inst set :nz res)))))
+
+(define-vop ()
+  (:policy :fast-safe)
+  (:translate rotate-right-word)
+  (:args (integer :scs (unsigned-reg) :target result))
+  (:info count)
+  (:arg-types unsigned-num (:constant (mod 64)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (aver (not (= count 0)))
+    (move result integer)
+    (inst ror result count)))
+
+

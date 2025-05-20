@@ -392,11 +392,14 @@
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 
-(defknown multiply-fixnums (fixnum fixnum) integer
-  (movable foldable flushable no-verify-arg-count))
-
 (defknown %signed-multiply-high (sb-vm:signed-word sb-vm:signed-word) sb-vm:signed-word
     (movable foldable flushable))
+
+(defknown rotate-right-word (word (mod #.sb-vm:n-word-bits)) word
+    (movable foldable flushable always-translatable))
+
+(defknown multiply-fixnums (fixnum fixnum) integer
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown (mod rem) (real real) real
     (movable foldable flushable))
