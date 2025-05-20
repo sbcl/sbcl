@@ -1116,6 +1116,8 @@
   ;; environment that the TN is live throughout.
   (environment nil :type (or environment null))
   ;; Used by pack-iterative
+  ;; Aliased TNs have :ALIAS there temporarily, to detected any extra
+  ;; writers.
   (vertex nil))
 
 (declaim (freeze-type tn))

@@ -308,6 +308,7 @@
                        :alias (tn-primitive-type tn) nil)))
     (setf (tn-save-tn res) tn
           (tn-type res) (tn-type tn))
+    (setf (tn-vertex tn) :alias)
     (push-in tn-next res
              (ir2-component-alias-tns component))
     res))

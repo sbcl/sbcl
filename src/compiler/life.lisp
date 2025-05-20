@@ -936,6 +936,7 @@
     (let ((original (tn-save-tn tn)))
       (ensure-global-tn tn)
       (ensure-global-tn original)
+      (setf (tn-vertex original) nil)
       (let ((conf (tn-global-conflicts tn))
             (oconf (tn-global-conflicts original))
             (oprev nil))
