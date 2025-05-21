@@ -217,6 +217,9 @@ symbol designates a variable. May enter the symbol into the linkage-table."
   (setf *runtime-dlhandle* (dlopen-or-lose))
   #+os-provides-dlopen
   (setf *shared-objects* nil))
+;;; Other than above, +required-foreign-symbols+ is not for Lisp to see.
+;;; But warn if you try to reassign it.
+(setf (info :variable :kind 'sb-vm::+required-foreign-symbols+) :constant)
 
 ;;; Helpers for defining error-signalling NOP's for "not supported
 ;;; here" operations.
