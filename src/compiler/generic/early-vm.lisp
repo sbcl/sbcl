@@ -191,6 +191,5 @@
   (deftype %char-code () `(integer 0 (,sb-xc:char-code-limit))))
 
 ;;; Convince some usage sites to perform fixnum arithmetic
-(declaim (ftype (sfunction (symbol)
-                           (or (mod #.(length +static-symbols+)) boolean))
+(declaim (ftype (sfunction (t) (or (mod #.(length +static-symbols+)) boolean))
                 static-symbol-p))
