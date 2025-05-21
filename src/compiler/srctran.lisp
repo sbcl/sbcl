@@ -4145,7 +4145,9 @@
                             (zeros (count-trailing-zeros abs-y))
                             (odd (ash abs-y (- zeros)))
                             (inv (mulinv odd max-x))
-                            (cmp (truncate max-x abs-y)))
+                            (add (dpb 0 (byte zeros 0)
+                                      (truncate (ash max-x -1) odd)))
+                            (cmp (ash add (- 1 zeros))))
                        (setf (node-derived-type node)
                              (values-specifier-type '(values integer boolean &optional)))
                        (erase-lvar-type result)
@@ -4156,8 +4158,7 @@
                                        'truncate)
                        `(values 0 (not (> (rotate-right-word (logand most-positive-word
                                                                      (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                                                        ,(dpb 0 (byte zeros 0)
-                                                                              (truncate (ash max-x -1) odd))))
+                                                                        ,add))
                                                              ,zeros)
                                           ,cmp))))))))
           `(let* ((quot (truly-the
