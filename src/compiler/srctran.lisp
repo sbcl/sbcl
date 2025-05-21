@@ -4156,7 +4156,8 @@
                                        'truncate)
                        `(values 0 (not (> (rotate-right-word (logand most-positive-word
                                                                      (+ (logand most-positive-word (* (logand most-positive-word x) ,inv))
-                                                                        ,(truncate (ash max-x -1) odd)))
+                                                                        ,(dpb 0 (byte zeros 0)
+                                                                              (truncate (ash max-x -1) odd))))
                                                              ,zeros)
                                           ,cmp))))))))
           `(let* ((quot (truly-the
