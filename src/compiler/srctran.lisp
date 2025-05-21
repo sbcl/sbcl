@@ -4256,6 +4256,15 @@
                                (- x (* quot ,y)))))
           (values quot rem))))))
 
+(deftransform truncate ((x y) (word (and sb-vm:signed-word (integer * 0))) * :important nil)
+  (when (or (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
+            (and (constant-lvar-p y)
+                 (or (zerop (lvar-value y))
+                     (= (logcount (- (lvar-value y))) 1))))
+    (give-up-ir1-transform))
+  `(multiple-value-bind (q r) (truncate x (- y))
+     (values (- q) r)))
+
 ;;; No-op when Y is greater than X
 (deftransform truncate ((x y) (rational rational) * :important nil)
   (flet ((strip (x)
