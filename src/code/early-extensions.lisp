@@ -13,6 +13,16 @@
 
 (in-package "SB-IMPL")
 
+;;; Default evaluator mode (interpreter / compiler)
+
+(declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
+               *evaluator-mode*))
+(defparameter *evaluator-mode* :compile
+  "Toggle between different evaluator implementations. If set to :COMPILE,
+an implementation of EVAL that calls the compiler will be used. If set
+to :INTERPRET, an interpreter will be used.")
+(declaim (always-bound *evaluator-mode*))
+
 ;;; Like DEFUN, but hides itself in the backtrace. This is meant for
 ;;; trivial functions which just do some argument parsing and call
 ;;; ERROR for real. Hence, having them and their locals in the

@@ -126,7 +126,6 @@
  ("src/code/ansi-stream" :not-host)
  ("src/code/restart" :not-host)
  ("src/code/early-pprint" :not-host)
- ("src/code/early-impl" :not-host)
 
  ;; Needed before the first use of WITH-SINGLE-PACKAGE-LOCKED-ERROR.
  ("src/code/early-package" :not-host)

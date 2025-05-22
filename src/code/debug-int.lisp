@@ -1001,6 +1001,7 @@
     '(sb-vm::current-thread-offset-sap sb-vm::thread-current-catch-block-slot)))
 #-(or x86-64 (and (or riscv arm64) sb-thread))
 (progn
+  (declaim (special sb-vm::*current-unwind-protect-block* *current-catch-block*))
   (defmacro current-uwp-block-sap () '(descriptor-sap sb-vm::*current-unwind-protect-block*))
   (defmacro current-catch-block-sap () '(descriptor-sap *current-catch-block*)))
 

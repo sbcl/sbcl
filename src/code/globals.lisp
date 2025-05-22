@@ -86,5 +86,31 @@
                   #+sb-thread *stop-for-gc-pending*
                   *posix-argv*
                   *default-external-format*
-                  *default-source-external-format*))
+                  *default-source-external-format*
+                  *free-interrupt-context-index*))
 (declaim (always-bound *default-external-format* *default-source-external-format*))
+
+;;; A unique GC id. This is supplied for code that needs to detect
+;;; whether a GC has happened since some earlier point in time. For
+;;; example:
+;;;
+;;;   (let ((epoch *gc-epoch*))
+;;;      ...
+;;;      (unless (eql epoch *gc-epoch)
+;;;        ....))
+;;;
+;;; This isn't just a fixnum counter since then we'd have theoretical
+;;; problems when exactly 2^29 GCs happen between epoch
+;;; comparisons. Unlikely, but the cost of using a cons instead is too
+;;; small to measure. -- JES, 2007-09-30
+(declaim (type cons sb-kernel::*gc-epoch*))
+(define-load-time-global sb-kernel::*gc-epoch* '(nil . nil))
+
+;;; Stores the code coverage instrumentation results. The CAR is a
+;;; hashtable. The CDR is a list of weak pointers to code objects
+;;; having coverage marks embedded in the unboxed constants. Keys in
+;;; the hashtable are namestrings, the value is a list of (CONS PATH
+;;; VISITED).
+(define-load-time-global *code-coverage-info*
+    (list (make-hash-table :test 'equal :synchronized t)))
+(declaim (type (cons hash-table) *code-coverage-info*))

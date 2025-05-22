@@ -25,6 +25,8 @@
        ;; hit.
        ((sb-pcl::*cache-miss-values-stack* nil)
         (sb-pcl::*dfun-miss-gfs-on-stack* nil))
+     (declare (special sb-pcl::*cache-miss-values-stack*
+                       sb-pcl::*dfun-miss-gfs-on-stack*))
      ,@body))
 
 (defun unblock-deferrable-signals ()

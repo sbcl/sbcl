@@ -388,6 +388,7 @@ with that condition (or with no condition) will be returned."
                    (find type-err-layout (layout-inherits layout)))))
            ;; avoid full calls to STACK-ALLOCATED-P here
            (stackp (x)
+             (declare (special sb-vm:*control-stack-start* sb-vm:*control-stack-end*))
              (let ((addr (get-lisp-obj-address x)))
                (and (sb-vm:is-lisp-pointer addr)
                     (<= (get-lisp-obj-address sb-vm:*control-stack-start*) addr)

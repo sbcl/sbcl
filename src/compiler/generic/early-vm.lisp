@@ -190,6 +190,12 @@
   ;; is not defined by then.
   (deftype %char-code () `(integer 0 (,sb-xc:char-code-limit))))
 
+(declaim (inline sb-vm:is-lisp-pointer))
+(defun sb-vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
+  #-64-bit (oddp addr)
+  #+ppc64 (= (logand addr #b101) #b100)
+  #+(and 64-bit (not ppc64)) (not (logtest (logxor addr 3) 3)))
+
 ;;; Convince some usage sites to perform fixnum arithmetic
 (declaim (ftype (sfunction (t) (or (mod #.(length +static-symbols+)) boolean))
                 static-symbol-p))
