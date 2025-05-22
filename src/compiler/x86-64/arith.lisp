@@ -1922,6 +1922,70 @@
     DONE
     (move quo eax)))
 
+(define-vop (fast-truncate/signed-unsigned=>signed fast-safe-arith-op)
+  (:translate truncate)
+  (:args (x :scs (signed-reg (immediate
+                              (minusp (tn-value tn)))) :to :result)
+         (y :scs (unsigned-reg unsigned-stack) :to :result))
+  (:arg-refs x-ref y-ref)
+  (:arg-types signed-num unsigned-num)
+  (:temporary (:sc signed-reg :offset rax-offset) eax)
+  (:temporary (:sc signed-reg :offset rdx-offset) edx)
+  (:results (quo :scs (signed-reg))
+            (rem :scs (signed-reg)))
+  (:result-types signed-num signed-num)
+  (:optional-results quo rem)
+  (:note "inline (signed-byte 64) arithmetic")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 34
+    (if (sc-is x immediate)
+        (inst mov eax (- (tn-value x)))
+        (move eax x))
+    (zeroize edx)
+    (let ((zero (when (types-equal-or-intersect (tn-ref-type y-ref)
+                                                (specifier-type '(eql 0)))
+                  (generate-error-code+
+                   (when (sc-is x immediate)
+                     (lambda ()
+                       (inst neg eax)))
+                   vop 'division-by-zero-error eax))))
+     (cond
+       ((csubtypep (tn-ref-type x-ref) (specifier-type '(integer * 0)))
+        (unless (sc-is x immediate)
+          (inst neg eax))
+        (when zero
+          (if (sc-is y unsigned-reg)
+              (inst test y y)
+              (inst cmp y 0))
+          (inst jmp :eq zero))
+        (inst div y))
+       (t
+        (assemble ()
+          (inst test eax eax)
+          (inst jmp :ge POS1)
+          (inst neg eax)
+          POS1
+          (when zero
+            (if (sc-is y unsigned-reg)
+                (inst test y y)
+                (inst cmp y 0))
+            (inst jmp :eq zero))
+          (inst div y)
+
+          (inst test x x)
+          (inst jmp :ge POS2)))))
+
+    (unless (eq (tn-kind quo) :unused)
+      (inst neg eax))
+    (unless (eq (tn-kind rem) :unused)
+         (inst neg edx))
+    POS2
+    (unless (eq (tn-kind quo) :unused)
+      (move quo eax))
+    (unless (eq (tn-kind rem) :unused)
+      (move rem edx))))
+
 (defun power-of-two-p (x)
   (and (typep x 'signed-word)
        (let ((abs (abs x)))
