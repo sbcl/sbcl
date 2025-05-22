@@ -4256,11 +4256,12 @@
                                (- x (* quot ,y)))))
           (values quot rem))))))
 
-(deftransform truncate ((x y) (word (and sb-vm:signed-word (integer * 0))) * :important nil)
+(deftransform truncate ((x y) (word (and sb-vm:signed-word (integer * 0))) * :node node :important nil)
   (when (or (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
             (and (constant-lvar-p y)
                  (<= (logcount (- (lvar-value y))) 1)))
     (give-up-ir1-transform))
+  (delay-ir1-transform node :ir1-phases)
   `(multiple-value-bind (q r) (truncate x (- y))
      (values (- q) r)))
 
