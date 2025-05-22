@@ -430,10 +430,12 @@
 
 (define-vop (fast-truncate/signed-unsigned=>signed fast-safe-arith-op)
   (:translate truncate)
-  (:args (x :scs (signed-reg) :to :result)
+  (:args (x :scs (signed-reg (immediate
+                              (minusp (tn-value tn))))
+            :to :result)
          (y :scs (unsigned-reg) :to :result))
   (:arg-types signed-num unsigned-num)
-  (:arg-refs nil y-ref)
+  (:arg-refs x-ref y-ref)
   (:results (quo :scs (signed-reg) :from :eval)
             (rem :scs (signed-reg) :from :eval))
   (:optional-results rem)
@@ -442,14 +444,32 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 34
-    (when (types-equal-or-intersect (tn-ref-type y-ref)
-                                    (specifier-type '(eql 0)))
-      (let ((zero (generate-error-code vop 'division-by-zero-error x)))
-        (inst cbz y zero)))
-    (inst cmp x 0)
-    (inst csneg tmp-tn x x :ge)
-    (inst udiv quo tmp-tn y)
-    (inst csneg quo quo quo :ge)
+    (let ((zero (when (types-equal-or-intersect (tn-ref-type y-ref)
+                                                (specifier-type '(eql 0)))
+                  (let ((error-x x))
+                    (generate-error-code+
+                     (when (sc-is x immediate)
+                       (setf error-x (make-random-tn (sc-or-lose 'signed-reg)
+                                                     (tn-offset tmp-tn)))
+                       (lambda ()
+                         (inst neg tmp-tn tmp-tn)))
+                     vop 'division-by-zero-error error-x)))))
+
+      (cond ((csubtypep (tn-ref-type x-ref) (specifier-type '(integer * 0)))
+             (if (sc-is x immediate)
+                 (load-immediate-word tmp-tn (- (tn-value x)))
+                 (inst neg tmp-tn x))
+             (when zero
+               (inst cbz y zero))
+             (inst udiv quo tmp-tn y)
+             (inst neg quo quo))
+            (t
+             (when zero
+               (inst cbz y zero))
+             (inst cmp x 0)
+             (inst csneg tmp-tn x x :ge)
+             (inst udiv quo tmp-tn y)
+             (inst csneg quo quo quo :ge))))
     (unless (eq (tn-kind rem) :unused)
       (inst msub rem quo y x))))
 
