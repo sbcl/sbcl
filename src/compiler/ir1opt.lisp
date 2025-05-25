@@ -2974,7 +2974,8 @@
            (flet ((transform (use)
                     (cond ((ref-p use)
                            (delete-ref use)
-                           (replace-node use `(values ,@(constant-value (ref-leaf use)))))
+                           (replace-node use `(values ,@(loop for v in (constant-value (ref-leaf use))
+                                                              collect (list 'quote v)))))
                           (t
                            (change-ref-leaf (lvar-uses (combination-fun use))
                                             (find-free-fun 'values "VALUES-LIST"))
