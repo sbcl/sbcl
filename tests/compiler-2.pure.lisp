@@ -4779,3 +4779,13 @@
   (let ((f (compile nil '(lambda (x) (typep x '(cons (eql t)))))))
     (assert (eq (funcall f '(t)) t))
     (assert (eq (funcall f '(1)) nil))))
+
+(with-test (:name :apply-list-if)
+  (let ((f (compile nil '(lambda (p) (apply #'list (if p '(a b) '(c d)))))))
+    (assert (equal (funcall f t) '(a b)))
+    (assert (equal (funcall f nil) '(c d)))))
+
+(with-test (:name :values-list-if)
+  (let ((f (compile nil '(lambda (p) (values-list (if p '(a) ()))))))
+    (multiple-value-call (lambda (x) (assert (eql x 'a))) (funcall f t))
+    (multiple-value-call (lambda () t) (funcall f nil))))
