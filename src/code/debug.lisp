@@ -2169,7 +2169,9 @@ forms that explicitly control this kind of evaluation.")
             (flush)
             (setq prev-location code-location  prev-num this-num))
 
-          (incf this-num))))
+          (incf this-num))
+
+        (flush)))
 
     (when (location-in-list *default-breakpoint-debug-fun*
                             *breakpoints*

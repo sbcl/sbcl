@@ -963,6 +963,9 @@
    "     (IF (ZEROP N)"
    "         1"
    "         (* N (! (1- N)))))"
+   "7: (IF (ZEROP N)"
+   "       1"
+   "       (* N (! (1- N))))"
    "0]"))
 
 (with-test (:name (:debugger :breakpoint-and-step)
