@@ -385,6 +385,8 @@
           ;; It sorta kinda works to have both, but there should be no need,
           ;; and it's not really supported.
           "At most one interpreter can be selected")
+         ("(and immobile-space permgen)"
+          ":IMMOBILE-SPACE and :PERMGEN are mutually exclusive options")
          ("(and compact-instance-header (not (or permgen immobile-space)))"
           ":COMPACT-INSTANCE-HEADER requires :IMMOBILE-SPACE feature")
          ("(and immobile-code (not immobile-space))"

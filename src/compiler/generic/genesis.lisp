@@ -1347,8 +1347,6 @@ core and return a descriptor to it."
 (defvar *vacuous-slot-table*)
 (defun cold-layout-gspace ()
   (cond ((boundp '*permgen*) *permgen*)
-        ;; arm64 with immobile space uses immobile symbols (though doesn't really benefit),
-        ;; however it does NOT use immobile layouts or compact headers.
         #+compact-instance-header ((boundp '*immobile-fixedobj*) *immobile-fixedobj*)
         (t *dynamic*)))
 (declaim (ftype (function (symbol layout-depthoid integer index integer descriptor)
@@ -3008,6 +3006,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (push (cons space type) types))))
       (check sb-vm:read-only-space-start sb-vm:read-only-space-end :read-only)
       (check sb-vm:static-space-start (+ sb-vm:static-space-start sb-vm:static-space-size) :static)
+      #+permgen
+      (check sb-vm:permgen-space-start (+ sb-vm:permgen-space-start sb-vm:permgen-space-size)
+             :permgen)
       (check sb-vm:dynamic-space-start
              (+ sb-vm:dynamic-space-start sb-vm::default-dynamic-space-size)
              :dynamic)
@@ -4216,6 +4217,8 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
     (do-all-symbols (sym)
       (remprop sym 'cold-intern-info))
 
+    ;; FIXME: why get all the way through make-host-2 to signal an error about
+    ;; space overlap when it can be detected by GC-SPACE-SETUP or thereabouts?
     (check-spaces)
 
     (let  ((*load-time-value-counter* 0)

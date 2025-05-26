@@ -148,7 +148,7 @@
 #+permgen
 (progn
   (defconstant permgen-space-size 33554432) ; 32MiB
-  (defparameter permgen-space-start #x50000000))
+  (defparameter permgen-space-start #x50100000))
 
 (defconstant alien-linkage-table-growth-direction :up)
 (defconstant alien-linkage-table-entry-size 16)
