@@ -415,9 +415,9 @@ Other commands:
              (decf *number-of-steps*)
              (set-step-breakpoint current-frame))
             ((and step-hit-info (= 1 *number-of-steps*))
-             (build-string "*Step*")
-             (%break 'break
-                     (make-condition 'step*-condition :format-control string)))
+             (build-string (format nil "~&*Step*"))
+             (format *debug-io* "~A" string)
+             (%break 'break (make-condition 'step*-condition)))
             (step-hit-info
              (decf *number-of-steps*)
              (set-step-breakpoint current-frame))
