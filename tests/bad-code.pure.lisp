@@ -989,3 +989,13 @@
               (checked-compile `(lambda (x)
                                   (check-type x (values t)))
                                :allow-warnings t))))
+
+(with-test (:name :constant-modification-functions-debug)
+  (assert (nth-value 2
+                     (checked-compile
+                      '(lambda ()
+                        (declare (optimize (debug 2)))
+                        (let ((l '((0) 0 0)))
+                          (incf (car (car l)))
+                          l))
+                      :allow-warnings t))))

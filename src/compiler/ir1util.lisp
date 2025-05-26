@@ -3249,7 +3249,8 @@ is :ANY, the function name is not checked."
                                  (or
                                   (lambda-var-ref-lvar ref)
                                   (node-lvar ref)))))
-                     lvar)))
+                     lvar))
+           (uses (lvar-uses lvar)))
       (cond ((constant-lvar-p lvar)
              (values :values (list (lvar-value lvar))))
             ((constant-lvar-uses-p lvar)
