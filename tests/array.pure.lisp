@@ -936,3 +936,6 @@
                        (aref v 3 2))
                      nil))
              0)))
+
+(with-test (:name :make-simple-array-not-displaced)
+  (assert (not (array-displacement (funcall (checked-compile `(lambda (d) (make-array d))) '(1 2))))))

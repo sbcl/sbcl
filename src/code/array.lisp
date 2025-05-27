@@ -541,6 +541,7 @@
                (setf (%array-available-elements array) total-size)
                (setf (%array-data array) data)
                (setf (%array-displaced-from array) nil)
+               (setf (%array-displaced-p array) nil)
                (populate-dimensions array dimensions array-rank)
                array))))))
 
