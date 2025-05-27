@@ -613,8 +613,7 @@
  ("src/code/late-globaldb" :not-host))
 
 ;;; make-target-2 build steps
-(("src/code/early-ntrace" ; lets PCL hook into tracing
-  "src/code/room" ; for MAP-ALLOCATED-OBJECTS
+(("src/code/room" ; for MAP-ALLOCATED-OBJECTS
   #+x86-64 "src/code/text-space" ; needs src/code/room
   "src/code/warm-error"
   ;; Redefine some functions that contributed to far too numerous
