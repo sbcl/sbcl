@@ -7,7 +7,7 @@ changes relative to sbcl-2.5.4:
     ** On Linux, the system is better at negotiating with the kernel to find
        locations for Lisp memory spaces, succeeding more often than
        previously.
-  * bug fix: resolve signed/unsigned char mismatch in RUN-PROGRAM.
+  * bug fix: resolve signed/unsigned char mismatch in RUN-PROGRAM on Windows.
     (lp#2110525, reported by awlygj)
   * bug fix: compiler confusion given sufficiently complex derived type
     constraints.  (lp#2109902)
@@ -20,7 +20,7 @@ changes relative to sbcl-2.5.4:
   * optimization: some micro-improvements to bignum operations, particularly
     on x86-64 and arm64
   * optimization: allow the result of MAKE-STRING to be allocated on the stack
-    given appropriate declarations.
+    when :element-type is unknown.
   * optimization: the compiler will recognize the use of ZEROP on the results
     of LENGTH and REM (on suitable operands) to avoid full computation of the
     intermediate result.
