@@ -1,5 +1,30 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.4:
+  * minor incompatible change: the output from TRACE is now prefixed by a
+    FRESH-LINE on *TRACE-OUTPUT*.
+  * platform support:
+    ** On Linux, the system is better at negotiating with the kernel to find
+       locations for Lisp memory spaces, succeeding more often than
+       previously.
+  * bug fix: resolve signed/unsigned char mismatch in RUN-PROGRAM.
+    (lp#2110525, reported by awlygj)
+  * bug fix: compiler confusion given sufficiently complex derived type
+    constraints.  (lp#2109902)
+  * bug fix: compiler inconsistency in low-level representation leading to
+    inconsistent transformations.  (lp#2109837)
+  * bug fix: return NIL from calls to DOCUMENTATION on illegal function names.
+  * bug fix: calls to APPLY or VALUES-LIST on some combinations of constant
+    arguments could lose the constant nature after transformation.  (thanks to
+    Hayley Patton)
+  * optimization: some micro-improvements to bignum operations, particularly
+    on x86-64 and arm64
+  * optimization: allow the result of MAKE-STRING to be allocated on the stack
+    given appropriate declarations.
+  * optimization: the compiler will recognize the use of ZEROP on the results
+    of LENGTH and REM (on suitable operands) to avoid full computation of the
+    intermediate result.
+
 changes in sbcl-2.5.4 relative to sbcl-2.5.3:
   * enhancement: :FUN-END breakpoints now support the known values return
     convention when DEBUG > 0. This means that tracing local functions works
