@@ -712,8 +712,6 @@
          (nt "Breakpoint trap"))
         (#.fun-end-breakpoint-trap
          (nt "Function end breakpoint trap"))
-        (#.after-breakpoint-trap
-         (nt "After breakpoint trap"))
         (#.single-step-around-trap
          (nt "Single step around trap"))
         (#.single-step-before-trap

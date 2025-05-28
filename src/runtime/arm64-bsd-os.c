@@ -39,6 +39,8 @@
 #include "validate.h"
 
 int arch_os_thread_cleanup(struct thread *thread) {
+    if (thread->breakpoint_misc)
+        os_deallocate((os_vm_address_t) thread->breakpoint_misc, getpagesize());
     return 1;                   /* success */
 }
 

@@ -83,31 +83,11 @@ void arch_remove_breakpoint(void *pc, unsigned int orig_inst)
     THREAD_JIT_WP(1);
 }
 
-static unsigned int *skipped_break_addr, displaced_after_inst;
-static sigset_t orig_sigmask;
-
 #define N_BIT 31
 #define Z_BIT 30
 #define C_BIT 29
 #define V_BIT 28
 
-/*
- * Perform the instruction that we overwrote with a breakpoint.  As we
- * don't have a single-step facility, this means we have to:
- * - put the instruction back
- * - put a second breakpoint at the following instruction,
- *   set after_breakpoint and continue execution.
- *
- * When the second breakpoint is hit (very shortly thereafter, we hope)
- * sigtrap_handler gets called again, but follows the AfterBreakpoint
- * arm, which
- * - puts a bpt back in the first breakpoint place (running across a
- *   breakpoint shouldn't cause it to be uninstalled)
- * - replaces the second bpt with the instruction it was meant to be
- * - carries on
- *
- * Clear?
- */
 static bool
 condition_holds(os_context_t *context, unsigned int cond)
 {
@@ -137,24 +117,23 @@ static sword_t sign_extend(uword_t word, int n_bits) {
   return (sword_t)(word<<(N_WORD_BITS-n_bits)) >> (N_WORD_BITS-n_bits);
 }
 
+#define BREAKPOINT_TEMP_REG reg_NL9
+
+/* In order to do the displaced instruction, we do the following:
+ *
+ * - For instructions which depend on the current PC, such as
+ *   PC-relative loads or branch instructions, we try to simulate the
+ *   instruction directly and continue execution normally.
+ *
+ * - Otherwise, we copy the instruction into a trampoline which
+ *   branches back to the right place and continue execution at the
+ *   trampoline.
+ */
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned int *next_pc = pc;
 
-    orig_sigmask = *os_context_sigmask_addr(context);
-    sigaddset_blockable(os_context_sigmask_addr(context));
-
-    /* Put the original instruction back. */
-    arch_remove_breakpoint(pc, orig_inst);
-    skipped_break_addr = pc;
-
-    /* Figure out where we will end up after running the displaced
-     * instruction by defaulting to the next instruction in the stream
-     * and then checking for branch instructions.  FIXME: This will
-     * probably screw up if it attempts to step a trap instruction. */
-
-    /* Figure out where it goes. */
     if ((orig_inst >> 24) == 0b01010100) {
         // Cond branch
         if (condition_holds(context, orig_inst & 0b1111))
@@ -208,15 +187,75 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
         else
             next_pc += 1;
     }
-    else {
+    else if (((orig_inst >> 31) & 0b1) == 0b0) {
+        // LDR (literal)
+        bool size_is_64 = (orig_inst >> 30) & 0b1;
+        int rt = orig_inst & 0b11111;
+        int offset = sign_extend((orig_inst >> 5) & ~(1 << 19), 19);
+        if (!size_is_64) lose("Size must be 64 bits.");
+        *os_context_register_addr(context, rt) = *((lispobj*)(pc + offset));
         next_pc += 1;
     }
-    displaced_after_inst = *next_pc;
-    THREAD_JIT_WP(0);
-    *next_pc = (0x6a1 << 21) | (trap_AfterBreakpoint << 5);
+    else if (((orig_inst >> 24) & 0b11111) == 0b10000) {
+        // ADR(P)
+        bool op = (orig_inst >> 31) & 0b1;
+        int rd = orig_inst & 0b11111;
+        int imm = sign_extend(((orig_inst >> 5) & ~(1 << 19)) |
+                              ((orig_inst >> 29) & ~(1 << 2)), 21);
+        if (op) // ADRP
+            *os_context_register_addr(context, rd) = ((uword_t)pc & ~(1 << 12)) + (imm << 12);
+        else // ADR
+            *os_context_register_addr(context, rd) = (uword_t)pc + imm;
+        next_pc += 1;
+    }
+    else {
+        // Do orig_inst by copying it into a trampoline.
+        size_t size = getpagesize();
+        // Allocate the thread-local trampoline on-demand.
+        struct thread *th = get_sb_vm_thread();
+        unsigned int *trampoline = (unsigned int*)th->breakpoint_misc;
 
-    os_flush_icache((os_vm_address_t) next_pc, sizeof(unsigned int));
-    THREAD_JIT_WP(1);
+        if (!trampoline) {
+          trampoline = mmap(NULL, size,
+                            PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANONYMOUS,
+                            -1, 0);
+          th->breakpoint_misc = trampoline;
+        }
+        else
+          os_protect((os_vm_address_t)trampoline, size, PROT_READ | PROT_WRITE);
+
+        unsigned int *inst_ptr = trampoline;
+        unsigned int inst;
+
+        next_pc += 1;
+
+        *inst_ptr++ = orig_inst;
+
+        /*
+          ldr reg,=address
+          br  reg
+          address
+        */
+
+        // ldr reg, =address
+        inst = 0x58000000 | 2 << 5 | BREAKPOINT_TEMP_REG;
+        *inst_ptr++ = inst;
+
+        // br reg
+        inst = 0xD61F0000 | BREAKPOINT_TEMP_REG << 5;
+        *inst_ptr++ = inst;
+
+        // address
+        *(unsigned long *)inst_ptr++ = (unsigned long)next_pc;
+        OS_CONTEXT_PC(context) = (uword_t)trampoline;
+        os_flush_icache((os_vm_address_t) trampoline, (char*) inst_ptr - (char*)trampoline);
+        os_protect((os_vm_address_t)trampoline, size, PROT_READ | PROT_EXEC);
+        return;
+    }
+
+    // If we get here, the instruction has been simulated and we just continue execution at the next pc.
+    OS_CONTEXT_PC(context) = (uword_t)next_pc;
 }
 
 void
@@ -229,15 +268,6 @@ void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
     OS_CONTEXT_PC(context) = (uword_t) handle_fun_end_breakpoint(context);
-}
-
-void
-arch_handle_after_breakpoint(os_context_t *context)
-{
-    arch_install_breakpoint(skipped_break_addr);
-    skipped_break_addr = NULL;
-    arch_remove_breakpoint((unsigned int *)OS_CONTEXT_PC(context), displaced_after_inst);
-    *os_context_sigmask_addr(context) = orig_sigmask;
 }
 
 void

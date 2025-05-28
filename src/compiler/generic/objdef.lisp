@@ -575,6 +575,8 @@ during backtrace.
   (sprof-data)
   ;;
   (arena)
+  ;; Miscellaneous arch-specific thread-local state for breakpoints.
+  (breakpoint-misc :c-type "void *" :pointer t)
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)

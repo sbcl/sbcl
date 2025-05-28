@@ -174,6 +174,22 @@
     (assert (search "returned 1" output))
     (assert (search "returned 120" output))))
 
+(with-test (:name (trace :encapsulate nil :recursive :threads)
+            :broken-on (:not :arm64))
+  (with-traced-function (trace-fact :encapsulate nil)
+    (let ((threads '()))
+      (dotimes (repeat 4)
+        (push (sb-thread:make-thread
+               (lambda ()
+                 (let ((output
+                         (with-output-to-string (*trace-output*)
+                           (assert (= 120 (trace-fact 5))))))
+                   (assert (search "TRACE-FACT" output))
+                   (assert (search "returned 1" output))
+                   (assert (search "returned 120" output)) )))
+              threads))
+      (mapc #'sb-thread:join-thread threads))))
+
 (defun trace-and-fmakunbound-this (x)
   x)
 
