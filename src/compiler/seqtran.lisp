@@ -3985,7 +3985,7 @@
     ((array index &optional offset))
   array)
 
-(defoptimizer (nth constants) ((index list))
+(defoptimizers constants (nth nthcdr) ((index list))
   list)
 (defoptimizers constants (car cdr) ((cons))
   cons)
