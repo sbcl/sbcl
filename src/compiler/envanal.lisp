@@ -435,14 +435,17 @@
                 (recurse (let-var-initial-value leaf))))
              (clambda
               (aver (functional-kind-eq leaf external))
-              (when (and (null (rest (leaf-refs leaf)))
-                         (environment-closure (get-lambda-environment leaf))
-                         ;; To make sure the allocation is in the same
-                         ;; stack frame as the dynamic extent.
-                         (eq (node-home-lambda (xep-enclose leaf))
-                             (node-home-lambda dynamic-extent)))
-                (aver (eq use (first (leaf-refs leaf))))
-                (let ((fun (functional-entry-fun leaf)))
+              (let ((fun (functional-entry-fun leaf)))
+                (when (and (null (rest (leaf-refs leaf)))
+                           ;; Prevent transitively closed over
+                           ;; multiple refs via local calls.
+                           (null (rest (leaf-refs fun)))
+                           (environment-closure (get-lambda-environment leaf))
+                           ;; To make sure the allocation is in the same
+                           ;; stack frame as the dynamic extent.
+                           (eq (node-home-lambda (xep-enclose leaf))
+                               (node-home-lambda dynamic-extent)))
+                  (aver (eq use (first (leaf-refs leaf))))
                   (setf (enclose-dynamic-extent (functional-enclose fun))
                         dynamic-extent)
                   (setf (lvar-dynamic-extent lvar) dynamic-extent)
