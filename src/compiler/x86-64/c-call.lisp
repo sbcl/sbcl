@@ -385,11 +385,8 @@
 
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
 
-  ;; From immobile space we use the "CALL rel32" format to the linkage
-  ;; table jump, and from dynamic space we use "CALL [ea]" format
-  ;; where ea is the address of the linkage table entry's operand.
-  ;; So while the former is a jump to a jump, we can optimize out
-  ;; one jump in an ELF executable.
+  ;; Immobile code uses "CALL rel32" to reach the linkage table entry,
+  ;; but movable code computes the linkage entry address into RBX first.
   ;; N.B.: if you change how the call is emitted, you will also have to adjust
   ;; the UNDEFINED-ALIEN-TRAMP lisp asm routine to recognize the various shapes
   ;; this instruction sequence can take.
