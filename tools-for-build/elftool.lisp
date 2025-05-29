@@ -1121,8 +1121,10 @@ lisp_fun_linkage_space: .zero ~:*~D
                 ;; is for a dynamic space object]
                 (scanptrs 0 (%code-entry-point obj i) 2 5))
               (scanptrs vaddr obj 1 (1- (code-header-words obj))))
-             ;; boxed objects that can reference code/simple-funs
-             ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag)
+             (#.symbol-widetag ; HASH is a raw slot, skip it
+              (scanptrs vaddr obj 2 (1- nwords)))
+             ;; other boxed objects that can reference code/simple-funs
+             ((#.value-cell-widetag #.weak-pointer-widetag)
               (scanptrs vaddr obj 1 (1- nwords))))))
       (dolist (space (cdr spacemap))
         (unless (= (space-id space) immobile-text-core-space-id)
@@ -1198,9 +1200,9 @@ lisp_fun_linkage_space: .zero ~:*~D
           (case id
             (#.build-id-core-entry-type-code
              (when verbose
-               (incf ptr 3)
-               (let ((string (make-string (%vector-raw-bits core-header ptr)
-                                          :element-type 'base-char)))
+               (let* ((ptr (+ ptr 3))
+                      (string (make-string (%vector-raw-bits core-header ptr)
+                                           :element-type 'base-char)))
                  (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
                  (format t "Build ID [~a]~%" string))))
             (#.directory-core-entry-type-code
