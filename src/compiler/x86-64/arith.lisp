@@ -3694,6 +3694,43 @@
     (inst adc sign-digit-a sign-digit-b)
     (inst mov (ea #1# r index 8) sign-digit-a)))
 
+(define-vop (word-sub-bignum-loop)
+  (:args (a :scs (unsigned-reg))
+         (b :scs (descriptor-reg))
+         (lb :scs (unsigned-reg))
+         (r :scs (descriptor-reg)))
+  (:arg-types unsigned-num bignum unsigned-num bignum)
+  (:temporary (:sc unsigned-reg) length)
+  (:temporary (:sc unsigned-reg) n index sign-digit-a sign-digit-b)
+  (:generator 10
+    (inst mov n a)
+    ;; Compute the signs first to not affect CF later
+    (inst mov sign-digit-b (ea (- #1=(- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) 8) b lb 8))
+    (inst mov sign-digit-a a)
+    (inst sar sign-digit-a 63)
+    (inst sar sign-digit-b 63)
+
+    (inst sub n (ea #1# b))
+    (inst mov (ea #1# r) n)
+    (inst mov index 1)
+
+    (move length lb)
+    (inst dec length)
+    (inst jmp :z DONE)
+
+    LOOP
+    (move n sign-digit-a)
+    (inst sbb n (ea #1# b index 8))
+    (inst mov (ea #1# r index 8) n)
+
+    (inst inc index)
+    (inst dec length)
+    (inst jmp :nz LOOP)
+
+    DONE
+    (inst sbb sign-digit-a sign-digit-b)
+    (inst mov (ea #1# r index 8) sign-digit-a)))
+
 (define-vop (bignum-negate-loop)
   (:args (a :scs (descriptor-reg) :to :save)
          (l :scs (unsigned-reg) :target length)
@@ -4608,5 +4645,3 @@
     (aver (not (= count 0)))
     (move result integer)
     (inst ror result count)))
-
-
