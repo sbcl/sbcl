@@ -347,16 +347,10 @@
                        (ref-p use)
                        (lambda-p (ref-leaf use))
                        (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
-              (let ((enclose (xep-enclose (ref-leaf use))))
-                (cond ((and enclose
-                            (enclose-dynamic-extent enclose))
-                       (setf (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))
-                             t))
-                      (t
-                       (unless dynamic-extent
-                         (setq dynamic-extent (insert-dynamic-extent node)))
-                       (setf (lvar-dynamic-extent arg) dynamic-extent)
-                       (push arg (dynamic-extent-values dynamic-extent))))))))))))
+              (unless dynamic-extent
+                (setq dynamic-extent (insert-dynamic-extent node)))
+              (setf (lvar-dynamic-extent arg) dynamic-extent)
+              (push arg (dynamic-extent-values dynamic-extent)))))))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe
 ;;; or whose result is that value and ends up being discarded.

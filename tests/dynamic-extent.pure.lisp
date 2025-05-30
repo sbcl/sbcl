@@ -2315,20 +2315,38 @@
   (assert-no-consing (auto-dx-flet-several-ref 0 #(-1 2 3))))
 
 (defun auto-dx-xep-and-local-call (set)
-  (let ((seq nil))
+  (let ((elt nil))
     (labels ((add (e)
-               (push e seq))
+               (setf elt e))
              (visit (item)
                (add item)))
       (map nil #'add set)
       (map nil #'visit set)
-      seq)))
+      elt)))
 
 (with-test (:name :auto-dx-xep-and-local-call.correct)
-  (assert (equal (auto-dx-xep-and-local-call '(1)) '(1 1))))
+  (assert (equal (auto-dx-xep-and-local-call '(1)) 1)))
 
 ;;; Morally similar to several xep references, just hidden under a
 ;;; transitive local call.
 (with-test (:name :auto-dx-xep-and-local-call
             :fails-on :sbcl)
   (assert-no-consing (auto-dx-xep-and-local-call '(1))))
+
+(defun auto-dx-xep-and-local-call-escape (set)
+  (let ((seq nil))
+    (labels ((add (e)
+                (push e seq))
+             (visit (item)
+               (add item)))
+      (declare (dynamic-extent #'visit))
+      (map nil #'add set)
+      (map nil #'visit set)
+      (values seq
+              #'add))))
+
+(with-test (:name :auto-dx-xep-and-local-call-escape.correct)
+  (multiple-value-bind (value fun)
+      (auto-dx-xep-and-local-call-escape '(1))
+    (assert (equal value '(1 1)))
+    (assert (not (sb-ext:stack-allocated-p fun)))))
