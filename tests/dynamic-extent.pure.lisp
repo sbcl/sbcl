@@ -2030,6 +2030,36 @@
      ((nil 2) nil)
      ((t 2) nil))))
 
+(with-test (:name :dynamic-extent-setq-local-calls.interleave)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (x y)
+       (labels ((f (a b)
+                  (declare (dynamic-extent a b))
+                  (let ((z (cons a b)))
+                    (declare (dynamic-extent z))
+                    (setq a (cons x y))
+                    (print-nothing z))
+                  (let ((z (cons a b)))
+                    (declare (dynamic-extent z))
+                    (print-nothing z))
+                  (assert (sb-ext:stack-allocated-p a))
+                  (assert (equal a (cons x y)))
+                  (setq b (vector x y))
+                  (assert (sb-ext:stack-allocated-p b))
+                  (assert (equal a (cons x y)))
+                  (assert (equalp b (vector x y)))))
+         (dotimes (i 4)
+           (cond (x
+                  (f nil nil)
+                  (print-nothing x))
+                 (t
+                  (f t t)
+                  (print-nothing y))))))
+     ((nil 2) nil)
+     ((t 2) nil))))
+
 (with-test (:name :dynamic-extent-setq-different-environments)
   (let ((sb-c::*check-consistency* t))
     (checked-compile-and-assert

@@ -1807,8 +1807,7 @@
                             (:copier nil))
   ;; the values explicitly declared with this dynamic extent.
   (values nil :type list)
-  ;; the cleanup for this extent. NULL indicates that this dynamic
-  ;; extent is over the environment and hence needs no cleanup code.
+  ;; the cleanup for this extent.
   (cleanup nil :type (or cleanup null))
   ;; some kind of info used by the back end
   (info nil)

@@ -455,15 +455,27 @@
   ;; For each dynamic extent declared variable, each value that the
   ;; variable can take on is also dynamic extent.
   (dolist (lambda (component-lambdas component))
-    (dolist (var (lambda-vars lambda))
-      (when (leaf-dynamic-extent var)
-        (let ((values (mapcar #'set-value (basic-var-sets var))))
-          (when values
-            ;; This dynamic extent is over the whole environment and
-            ;; needs no cleanup code.
-            (let ((dynamic-extent (make-dynamic-extent values)))
-              (push dynamic-extent (lambda-dynamic-extents lambda))
+    (let* ((bind (lambda-bind lambda))
+           (lexenv (node-lexenv bind))
+           dynamic-extent)
+      (dolist (var (lambda-vars lambda))
+        (when (leaf-dynamic-extent var)
+          (let ((values (mapcar #'set-value (basic-var-sets var))))
+            (when values
+              ;; This dynamic extent is over the whole environment.
+              (unless dynamic-extent
+                (setf (node-lexenv bind) (make-lexenv :default lexenv))
+                (setq dynamic-extent
+                      (with-ir1-environment-from-node bind
+                        (make-dynamic-extent)))
+                (insert-node-after bind dynamic-extent)
+                (let ((cleanup (make-cleanup :dynamic-extent dynamic-extent)))
+                  (setf (dynamic-extent-cleanup dynamic-extent) cleanup)
+                  (aver (null (lexenv-cleanup lexenv)))
+                  (setf (lexenv-cleanup lexenv) cleanup))
+                (push dynamic-extent (lambda-dynamic-extents lambda)))
               (dolist (value values)
+                (push value (dynamic-extent-values dynamic-extent))
                 (setf (lvar-dynamic-extent value) dynamic-extent)))))))
     (dolist (let (lambda-lets lambda))
       (dolist (var (lambda-vars let))
