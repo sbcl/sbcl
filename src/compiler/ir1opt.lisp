@@ -1744,6 +1744,9 @@
   (declare (type combination call) (list res))
   (aver (and (legal-fun-name-p source-name)
              (not (eql source-name '.anonymous.))))
+  ;; Try and DXify downward funargs before any transformation happens
+  ;; so that we get the right scoping information.
+  (dxify-downward-funargs call)
   (node-ends-block call)
   (setf (combination-lexenv call)
         (make-lexenv :default (combination-lexenv call)

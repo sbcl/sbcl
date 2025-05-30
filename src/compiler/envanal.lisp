@@ -437,10 +437,8 @@
               (aver (functional-kind-eq leaf external))
               (when (and (null (rest (leaf-refs leaf)))
                          (environment-closure (get-lambda-environment leaf))
-                         ;; To make sure the allocation is in the same
-                         ;; stack frame as the dynamic extent.
-                         (eq (node-home-lambda (xep-enclose leaf))
-                             (node-home-lambda dynamic-extent)))
+                         (lexenv-contains-lambda leaf
+                                                 (node-lexenv dynamic-extent)))
                 (aver (eq use (first (leaf-refs leaf))))
                 (let ((fun (functional-entry-fun leaf)))
                   (setf (enclose-dynamic-extent (functional-enclose fun))

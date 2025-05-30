@@ -651,8 +651,8 @@
            (propagate-lvar-dx (let-var-initial-value leaf) old-lvar)))
         (clambda
          (when (and (null (rest (leaf-refs leaf)))
-                    (eq (node-home-lambda (xep-enclose leaf))
-                        (node-home-lambda dynamic-extent)))
+                    (lexenv-contains-lambda leaf
+                                            (node-lexenv dynamic-extent)))
            (let ((fun (functional-entry-fun leaf)))
              (setf (enclose-dynamic-extent (functional-enclose fun))
                    dynamic-extent)
