@@ -145,7 +145,10 @@
       (do-nodes (node lvar block)
         (let ((dynamic-extent
                 (typecase node
-                  (enclose (enclose-dynamic-extent node))
+                  (enclose (or (enclose-dynamic-extent node)
+                               ;; They all share the same stack lvar.
+                               (first
+                                (enclose-derived-dynamic-extents node))))
                   (cdynamic-extent node)
                   (t (and lvar (lvar-dynamic-extent lvar))))))
           (when dynamic-extent

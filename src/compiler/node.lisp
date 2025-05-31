@@ -1793,7 +1793,11 @@
   (funs nil :type list)
   ;; The dynamic extent for this enclose if any of its functionals are
   ;; declared dynamic extent.
-  (dynamic-extent nil :type (or null cdynamic-extent)))
+  (dynamic-extent nil :type (or null cdynamic-extent))
+  ;; The union of all dynamic extents inferred by the compiler for
+  ;; this enclose's functionals. NULL when there is a declared dynamic
+  ;; extent.
+  (derived-dynamic-extents () :type list))
 (defprinter (enclose :identity t)
   funs)
 

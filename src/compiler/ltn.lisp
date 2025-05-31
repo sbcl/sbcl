@@ -513,7 +513,7 @@
   (declare (type cdynamic-extent node))
   (let ((lvar (dynamic-extent-info node))
         (2comp (component-info (node-component node))))
-    (when lvar
+    (when (and lvar (not (lvar-info lvar)))
       (setf (ir2-component-stack-allocates-p 2comp) t)
       (setf (lvar-dest lvar) node)
       (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
