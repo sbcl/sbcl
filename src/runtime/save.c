@@ -243,7 +243,7 @@ static void unwind_binding_stack(struct thread* th)
     write_TLS(CURRENT_CATCH_BLOCK, 0, th); // If set to 0 on start, why here too?
     write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
     char symbol_name[] = "+SAVE-LISP-CLOBBERED-GLOBALS+";
-    lispobj* sym = find_symbol(symbol_name, get_package_by_id(PACKAGE_ID_KERNEL));
+    lispobj* sym = find_symbol(symbol_name, get_package_by_id(PACKAGE_ID_SB_KERNEL));
     lispobj value;
     int i;
     if (!sym || !simple_vector_p(value = ((struct symbol*)sym)->value))

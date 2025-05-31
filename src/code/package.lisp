@@ -36,14 +36,6 @@
 ;;;       symbol whose name is spelled "NIL" have the identical strange hash
 ;;;       so that the hash is a pure function of the name's characters.
 
-(defconstant package-id-bits 16)
-(defconstant +package-id-overflow+ (1- (ash 1 package-id-bits)))
-(defconstant +package-id-none+     0)
-(defconstant +package-id-lisp+     1)
-(defconstant +package-id-keyword+  2)
-(defconstant +package-id-user+     3)
-(defconstant +package-id-kernel+   4)
-
 (sb-xc:defstruct (symtbl-magic (:conc-name "SYMTBL-")
                   (:copier nil)
                   (:predicate nil)
@@ -97,6 +89,7 @@
 
 ;;;; the PACKAGE structure
 
+(defconstant package-id-bits 16)
 (sb-xc:defstruct (package
                   (:constructor %make-package
                                 (internal-symbols external-symbols))
@@ -174,3 +167,7 @@ body. Body can begin with declarations."
   (let ((string (string string-designator)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (setq *package* (find-undeleted-package-or-lose ,string)))))
+
+(defconstant +package-id-overflow+ (1- (ash 1 package-id-bits)))
+(defconstant +package-id-none+     0)
+(defconstant +package-id-keyword+  1)

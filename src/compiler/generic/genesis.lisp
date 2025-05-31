@@ -1588,8 +1588,19 @@ core and return a descriptor to it."
 (declaim (type hash-table *cold-package-symbols*))
 (defvar *package-graph*)
 
-;;; preincrement on use. the first non-preassigned ID is 5
-(defvar *package-id-count* 4)
+;; These fixed IDs have no use in lisp code, but we need known values
+;; for C to find packages easily
+(defconstant +package-id-lisp+      2)
+(defconstant +package-id-user+      3)
+(defconstant +package-id-sb-kernel+ 4)
+(defconstant +package-id-sb-ext+    5)
+(defconstant +package-id-sb-int+    6)
+(defvar *package-id-count* 6) ; pre-incremented on use
+(defun package-id-generator (name)
+  (cond ((string= name "SB-KERNEL") +package-id-sb-kernel+)
+        ((string= name "SB-INT") +package-id-sb-int+)
+        ((string= name "SB-EXT") +package-id-sb-ext+)
+        (t (incf *package-id-count*))))
 
 ;;; Initialize the cold package named by NAME. The information is
 ;;; usually derived from the host package of the same name, except
@@ -1600,7 +1611,7 @@ core and return a descriptor to it."
       (cond ((string= name "COMMON-LISP")
              (values '("CL")
                      "public: home of symbols defined by the ANSI language specification"
-                     sb-impl::+package-id-lisp+
+                     +package-id-lisp+
                      '()
                      '()))
             ((string= name "KEYWORD")
@@ -1612,7 +1623,7 @@ core and return a descriptor to it."
             ((string= name "COMMON-LISP-USER")
              (values '("CL-USER")
                      "public: the default package for user code and data"
-                     sb-impl::+package-id-user+
+                     +package-id-user+
                      '()
                      ;; ANSI encourages us to put extension packages in
                      ;; the USE list of COMMON-LISP-USER.
@@ -1622,9 +1633,7 @@ core and return a descriptor to it."
              (let ((package (find-package name)))
                (values (package-nicknames package)
                        (documentation package t)
-                       (if (string= name "SB-KERNEL")
-                           sb-impl::+package-id-kernel+
-                           (incf *package-id-count*))
+                       (package-id-generator name)
                        (sort (package-shadowing-symbols package) #'string<)
                        ;; SB-COREFILE is not actually part of
                        ;; the use list for SB-FASL. It's
@@ -1861,7 +1870,7 @@ core and return a descriptor to it."
         #-64-bit ; 64-bit depends on address
         (write-wordindexed/raw des (+ 1 sb-vm:symbol-hash-slot) (symhash-bits "NIL" des))
         (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
-        (set-symbol-pkgid des sb-impl::+package-id-lisp+ 1)
+        (set-symbol-pkgid des +package-id-lisp+ 1)
         (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)))
     nil))
 
@@ -3146,11 +3155,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                 (let ((value (symbol-value symbol)))
                   (when (integerp value)
                     (record (c-symbol-name symbol) 4/5 symbol ""))))))))
-      (dolist (c '(sb-impl::+package-id-none+
-                   sb-impl::+package-id-keyword+
-                   sb-impl::+package-id-lisp+
-                   sb-impl::+package-id-user+
-                   sb-impl::+package-id-kernel+))
+      (dolist (c '(sb-impl::+package-id-none+ sb-impl::+package-id-keyword+
+                   +package-id-lisp+ +package-id-user+ +package-id-sb-kernel+
+                   +package-id-sb-int+ +package-id-sb-ext+))
         (record (c-symbol-name c) 3/2 #| arb |# c ""))
       ;; Other constants that aren't necessarily grouped into families.
       (dolist (c '(sb-bignum:maximum-bignum-length
@@ -4052,7 +4059,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
          (t-addr (- nil-addr (ash (+ const-alloc-words nil-alloc-words) sb-vm:word-shift)))
          (t-des (make-random-descriptor (logior t-addr sb-vm:other-pointer-lowtag))))
     (setf (aref nil-slots 0) :error ; fail if attempting to write this element out
-          (aref nil-slots 1) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
+          (aref nil-slots 1) (logior (ash +package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref nil-slots 2) (descriptor-bits nil-des) ; car
           (aref nil-slots 3) (descriptor-bits nil-des) ; cdr
           (aref nil-slots 4) 0 ; function
@@ -4061,7 +4068,7 @@ INDEX   LINK-ADDR       FNAME    FUNCTION  NAME
           ;; I had some difficulty getting 'struct static_trailer_constants' to begin
           ;; at this word because math is hard. Just zero the slot.
           (aref nil-slots 7) 0) ; available for use
-    (setf (aref t-slots 0) (logior (ash sb-impl::+package-id-lisp+ 8) sb-vm:symbol-widetag)
+    (setf (aref t-slots 0) (logior (ash +package-id-lisp+ 8) sb-vm:symbol-widetag)
           (aref t-slots sb-vm:symbol-hash-slot) (symhash-bits "T" t-des)
           (aref t-slots sb-vm:symbol-value-slot) (descriptor-bits t-des)
           (aref t-slots sb-vm:symbol-fdefn-slot) 0
