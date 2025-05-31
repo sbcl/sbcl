@@ -391,7 +391,7 @@ created and old ones may exit at any time."
 (defvar *session*)
 
 ;;; Not uncoincidentally, the variables assigned here are also
-;;; listed in SB-KERNEL::*SAVE-LISP-CLOBBERED-GLOBALS*
+;;; listed in SB-KERNEL::+SAVE-LISP-CLOBBERED-GLOBALS+
 (defun init-main-thread ()
   (/show0 "Entering INIT-MAIN-THREAD")
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")

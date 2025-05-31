@@ -66,8 +66,8 @@
 ;;; This variable is accessed by C code when saving. Export it to survive tree-shaker.
 ;;; The symbols in this set are clobbered just in time to avoid saving them to the core
 ;;; but not so early that we kill the running image.
-(export 'sb-kernel::*save-lisp-clobbered-globals* 'sb-kernel)
-(define-load-time-global sb-kernel::*save-lisp-clobbered-globals*
+(export 'sb-kernel::+save-lisp-clobbered-globals+ 'sb-kernel)
+(defconstant-eqx sb-kernel::+save-lisp-clobbered-globals+
     '#(sb-impl::*exit-lock*
        sb-vm::*allocator-mutex*
        sb-thread::*make-thread-lock*
@@ -78,7 +78,8 @@
        sb-thread::*joinable-threads*
        sb-thread::*all-threads*
        sb-thread::*session*
-       sb-kernel::*gc-epoch*))
+       sb-kernel::*gc-epoch*)
+  #'equalp)
 
 (defun start-lisp (toplevel callable-exports)
   (if callable-exports
