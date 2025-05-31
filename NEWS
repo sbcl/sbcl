@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.4:
+changes in sbcl-2.5.5 relative to sbcl-2.5.4:
   * minor incompatible change: the output from TRACE is now prefixed by a
     FRESH-LINE on *TRACE-OUTPUT*.
   * platform support:
