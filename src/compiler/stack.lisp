@@ -51,15 +51,7 @@
 ;;; An LVAR is live at the end iff it is live at any of blocks which
 ;;; BLOCK can transfer control to, or it is a stack lvar kept live
 ;;; within the extent of its cleanup. There are two kind of control
-;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.  We also
-;;; preserve any stack lvars on the stack when an lvar in a
-;;; PRESERVE-INFO set (representing a stack allocated object, not
-;;; necessarily a stack lvar) gets pushed on the stack. PUSHED does
-;;; not track this set because it only tracks stack lvars to make
-;;; liveness analysis feasible with conditional stack allocation. We
-;;; must do this because stack allocated objects can't move; object
-;;; identity must be preserved and we can't in general track all
-;;; references.
+;;; transfers: normal, expressed with BLOCK-SUCC, and NLX.
 (defun update-lvar-live-sets (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
@@ -77,13 +69,9 @@
                                target-stack)))
           (setq end (union end next-stack))))
       (when (eq (cleanup-kind cleanup) :dynamic-extent)
-        (let* ((dynamic-extent (cleanup-mess-up cleanup))
-               (info (dynamic-extent-info dynamic-extent)))
+        (let ((info (dynamic-extent-info (cleanup-mess-up cleanup))))
           (when info
-            (pushnew info end))
-          (dolist (preserve (dynamic-extent-preserve-info dynamic-extent))
-            (when (memq preserve (ir2-block-stack-mess-up 2block))
-              (pushnew preserve end))))))
+            (pushnew info end)))))
 
     (setf (ir2-block-end-stack 2block) end)
 
@@ -153,7 +141,6 @@
   (declare (type cblock block) (list stack))
   (unless (block-flag block)
     (setf (block-flag block) t)
-    (setf (ir2-block-stack-mess-up (block-info block)) stack)
     (let ((2comp (component-info (block-component block))))
       (do-nodes (node lvar block)
         (let ((dynamic-extent
@@ -166,19 +153,21 @@
               (when info
                 (cond
                   ((eq info (first stack)))
-                  ;; Preserve any intervening dynamic-extents.
+                  ;; Preserve any intervening dynamic-extents by
+                  ;; sharing the stack lvar (and hence the lifetime).
+                  ;; We must do this because stack allocated objects
+                  ;; can't move; object identity must be preserved and
+                  ;; we can't in general track all references.
                   ((memq info stack)
-                   (do ((cleanup (node-enclosing-cleanup node)
-                                 (node-enclosing-cleanup
-                                  (cleanup-mess-up cleanup))))
-                       ((null cleanup))
+                   (do-nested-cleanups (cleanup node)
                      (when (eq (cleanup-kind cleanup) :dynamic-extent)
                        (let ((mess-up (cleanup-mess-up cleanup)))
                          (when (eq dynamic-extent mess-up)
                            (return))
-                         (let ((preserve (dynamic-extent-info mess-up)))
-                           (pushnew preserve
-                                    (dynamic-extent-preserve-info dynamic-extent)))))))
+                         (let ((old (dynamic-extent-info mess-up)))
+                           (when old
+                             (setf (ir2-lvar-kind (lvar-info old)) :unused)
+                             (setf (dynamic-extent-info mess-up) info)))))))
                   (t
                    (pushnew block (ir2-component-stack-mess-ups 2comp))
                    (setf (ctran-next (node-prev node)) nil)

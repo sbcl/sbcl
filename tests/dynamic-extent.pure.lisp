@@ -2236,6 +2236,23 @@
          (car digits)))
      (() 0))))
 
+(with-test (:name :stack-analysis-preserve.setq-nested-loop)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda ()
+       (let (y)
+         (declare (dynamic-extent y))
+         (loop for i to 10
+               do (let ((j (list 1 2 3)))
+                    (declare (dynamic-extent j))
+                    (print-nothing j)
+                    (assert (sb-ext:stack-allocated-p j))
+                    (push (- i) y)))
+         (assert (sb-ext:stack-allocated-p y))
+         (list-length y)))
+     (() 11))))
+
 (with-test (:name :encode-error-break-large-immediate)
   (disassemble '(lambda ()
                  (sb-int:dx-let ((v (make-array 65536

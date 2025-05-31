@@ -1810,8 +1810,7 @@
   ;; the cleanup for this extent.
   (cleanup nil :type (or cleanup null))
   ;; some kind of info used by the back end
-  (info nil)
-  (preserve-info nil))
+  (info nil))
 
 (defprinter (cdynamic-extent :conc-name dynamic-extent-
                              :identity t)

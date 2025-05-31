@@ -1947,10 +1947,11 @@
 (defoptimizer (%dynamic-extent-start ir2-convert) (() node block)
   (let* ((lvar (node-lvar node))
          (2lvar (lvar-info lvar)))
-    (aver (eq (ir2-lvar-kind 2lvar) :stack))
-    (when (leaf-refs (find-constant lvar))
-      (vop current-stack-pointer node block
-           (first (ir2-lvar-locs 2lvar))))))
+    (unless (eq (ir2-lvar-kind 2lvar) :unused)
+      (aver (eq (ir2-lvar-kind 2lvar) :stack))
+      (when (leaf-refs (find-constant lvar))
+        (vop current-stack-pointer node block
+             (first (ir2-lvar-locs 2lvar)))))))
 
 ;;;; special binding
 
