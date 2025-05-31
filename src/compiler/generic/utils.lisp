@@ -55,6 +55,24 @@
            (- list-pointer-lowtag)))
       0))
 
+;; Return T if SYMBOL will have a nonzero TLS index at load time or sooner.
+;; True of all specials exported from CL:, all which expose slots of the thread
+;; structure, and any symbol that the compiler decides will eventually have a
+;; nonzero TLS index due to compiling a dynamic binding of it.
+;; A reason why you should prefer eager TLS assignment (for a slight reduction
+;; in number of instructions executed) - is that in well-crafted code, the user
+;; ought to have used DEFGLOBAL (or -LOAD-TIME) to define specials which are NOT
+;; thread-locally bound. Therefore all other special vars must have the expectation
+;; of at some point getting thread-locally bound. Assuming that to be the case,
+;; it is advantageous to wire in the TLS index for all non-globals.
+;; However, some applications - those which create symbols as data - create too
+;; many symbols to eagerly assign TLS indices, and so the default is NIL.
+(defparameter *eager-tls-assignment* nil)
+(defun symbol-always-has-tls-index-p (symbol)
+  (if *eager-tls-assignment*
+      (not (static-symbol-p symbol))
+      (not (null (info :variable :wired-tls symbol)))))
+
 (symbol-macrolet ((space-end (+ alien-linkage-space-start alien-linkage-space-size)))
 ;;; the address of the linkage table entry for table index I.
 (defun alien-linkage-table-entry-address (i)

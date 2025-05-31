@@ -158,6 +158,7 @@ sb-kernel::
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
+                            (sb-vm::*eager-tls-assignment* t)
                             (sb-c::*force-system-tlab*
                              (or (search "src/pcl" stem)
                                  (search "src/code/aprof" stem)))

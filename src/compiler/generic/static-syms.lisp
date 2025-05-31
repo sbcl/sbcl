@@ -12,9 +12,20 @@
 ;;;; routines for dealing with static symbols
 ;;;; These functions get recompiled in warm build
 
+#-sb-xc
 (defun static-symbol-p (symbol)
-  #+sb-xc (declare (notinline position))
   (if symbol (position symbol +static-symbols+) t))
+
+#+sb-xc ; this less-than-ideal replica of the above achieves 2 things:
+;; 1. causes STATIC-SYMBOL-P to be usable in cold-init right away,
+;;    before named constants have been patched in. Otherwise there would
+;;    be sensitivity to the order in which you're allowed to call this.
+;; 2. NOTINLINE avoids producing an xperfecthash entry (I don't like that
+;;    adding/removing a static symbol cuased the oracle files to change)
+;; This function gets recompiled in warm build using the #-sb-xc above.
+(defun static-symbol-p (symbol)
+  (declare (notinline position))
+  (if symbol (position symbol '#.+static-symbols+) t))
 
 (defconstant-eqx +all-static-fdefns+
     #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)

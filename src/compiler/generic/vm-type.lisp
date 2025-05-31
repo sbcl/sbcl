@@ -365,13 +365,6 @@
             (push null-type remainder))))
       (values widetags remainder))))
 
-;; Return T if SYMBOL will have a nonzero TLS index at load time or sooner.
-;; True of all specials exported from CL:, all which expose slots of the thread
-;; structure, and any symbol that the compiler decides will eventually have a
-;; nonzero TLS index due to compiling a dynamic binding of it.
-(defun sb-vm::symbol-always-has-tls-index-p (symbol)
-  (not (null (info :variable :wired-tls symbol))))
-
 #+(or x86 x86-64)
 (defun sb-vm::displacement-bounds (lowtag element-size data-offset)
   (let* (;; The minimum immediate offset in a memory-referencing instruction.
