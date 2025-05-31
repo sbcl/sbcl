@@ -2426,9 +2426,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                           (funcall set-elt object seq iterator))
                         (setf iterator (funcall step seq iterator from-end))
                      finally (return i)))))
-    (declare (dynamic-extent #'compute-read-function
-                             #'read-list #'read-vector/fast #'read-vector
-                             #'read-generic-sequence))
     (cond
       ((typep seq 'list)
        (read-list (compute-read-function nil)))
@@ -2525,9 +2522,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                        for object = (funcall element seq iterator)
                        do (funcall write-function stream object)
                           (setf iterator (funcall step seq iterator from-end))))))
-      (declare (dynamic-extent #'compute-write-function
-                               #'write-element/bivalent #'write-list
-                               #'write-vector  #'write-generic-sequence))
+      (declare (dynamic-extent #'write-element/bivalent))
       (etypecase seq
         (list
          (write-list (compute-write-function nil)))

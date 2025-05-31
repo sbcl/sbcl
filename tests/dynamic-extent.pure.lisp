@@ -1403,8 +1403,9 @@
   (funcall pred (funcall key arg)))
 
 (defun autodxclosure1 (&optional (x 4))
-  ;; Calling a higher-order function will only implicitly DXify a funarg
-  ;; if the callee is trusted (a CL: function) or the caller is unsafe.
+  ;; Calling a higher-order function will only implicitly
+  ;; stack-allocate a funarg if the callee is trusted (a CL: function)
+  ;; or the caller is unsafe.
   (declare (optimize speed (safety 0) (debug 0)))
   (trivial-hof (lambda (a b) (+ a b x)) 92))
 
@@ -2356,8 +2357,7 @@
   (assert (= (auto-dx-flet-several-ref 1 #(-1 2 3)) 20))
   (assert (= (auto-dx-flet-several-ref 0 #(-1 2 3)) 11)))
 
-(with-test (:name :auto-dx-flet-several-ref.stack-allocates
-            :fails-on :sbcl)
+(with-test (:name :auto-dx-flet-several-ref.stack-allocates)
   (assert-no-consing (auto-dx-flet-several-ref 1 #(-1 2 3)))
   (assert-no-consing (auto-dx-flet-several-ref 0 #(-1 2 3))))
 
@@ -2412,3 +2412,53 @@
 (with-test (:name :auto-dx-xep-and-local-call.shared-flet-cleanup.stack-allocates)
   (assert-no-consing (auto-dx-xep-and-local-call.shared-flet-cleanup '(1))))
 
+(defun auto-dx-monster (x seq)
+  (map nil
+       (if x
+           (flet ((f (e)
+                    (setq x e)))
+             (map nil (if x
+                          #'f
+                          (lambda (e)
+                            (setq x e)))
+                  seq)
+             #'f)
+           (flet ((g (e)
+                    (setq x e)))
+             (map nil #'g seq)
+             #'g))
+       seq)
+  x)
+
+(with-test (:name :auto-dx-monster)
+  (assert (equal (auto-dx-monster 3 #(1 2 3)) 3))
+  (assert-no-consing (auto-dx-monster 3 #(1 2 3))))
+
+(defun auto-dx-recursive-ref (seq)
+  (labels ((f (x)
+             (when (member x seq)
+               (return-from f))
+             (map nil #'f (cdr seq))))
+    (f seq)))
+
+(with-test (:name :auto-dx-recursive-ref.correct)
+  (assert (equal (auto-dx-recursive-ref '(1 2 3 4)) nil)))
+
+(with-test (:name :auto-dx-recursive-ref.stack-allocates
+            :fails-on :sbcl)
+  (assert-no-consing (auto-dx-recursive-ref '(1 2 3 4))))
+
+(defun auto-dx-recursive-ref-2 (seq)
+  (labels ((f (x)
+             (when (member x seq)
+               (return-from f))
+             (map nil #'f (cdr seq))))
+    (map nil #'f seq)
+    (f seq)))
+
+(with-test (:name :auto-dx-recursive-ref-2.correct)
+  (assert (equal (auto-dx-recursive-ref-2 '(1 2 3 4)) nil)))
+
+(with-test (:name :auto-dx-recursive-ref-2.stack-allocates
+            :fails-on :sbcl)
+  (assert-no-consing (auto-dx-recursive-ref-2 '(1 2 3 4))))

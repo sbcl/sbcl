@@ -339,18 +339,20 @@
         (when (integerp arg-spec)
           (let* ((arg (or (nth arg-spec (combination-args node))
                           (return-from dxify-downward-funargs)))
-                 (use (principal-lvar-use arg)))
-            (when (and (not (lvar-dynamic-extent arg))
-                       ;; We check that the use is a lambda so
-                       ;; that we don't end up getting notes about
-                       ;; not being able to allocate later.
-                       (ref-p use)
-                       (lambda-p (ref-leaf use))
-                       (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use)))))
-              (unless dynamic-extent
-                (setq dynamic-extent (insert-dynamic-extent node)))
-              (setf (lvar-dynamic-extent arg) dynamic-extent)
-              (push arg (dynamic-extent-values dynamic-extent)))))))))
+                 (lvar (principal-lvar arg)))
+            (do-uses (use lvar)
+              (when (and (not (lvar-dynamic-extent arg))
+                         (ref-p use)
+                         (lambda-p (ref-leaf use))
+                         (not (leaf-dynamic-extent (functional-entry-fun (ref-leaf use))))
+                         ;; TODO: we need to do this because we don't
+                         ;; have enough smarts yet.
+                         (eq (node-home-lambda (xep-enclose (ref-leaf use)))
+                             (node-home-lambda node)))
+                (unless dynamic-extent
+                  (setq dynamic-extent (insert-dynamic-extent node)))
+                (setf (lvar-dynamic-extent arg) dynamic-extent)
+                (push arg (dynamic-extent-values dynamic-extent))))))))))
 
 ;;; Check that REF delivers a value to a combination which is DX safe
 ;;; or whose result is that value and ends up being discarded.
@@ -431,13 +433,21 @@
               (aver (functional-kind-eq leaf external))
               (let* ((fun (functional-entry-fun leaf))
                      (enclose (functional-enclose fun)))
-                (when (and (null (rest (leaf-refs leaf)))
-                           (environment-closure (get-lambda-environment leaf))
+                (when (and (environment-closure (get-lambda-environment leaf))
                            ;; To make sure the allocation is in the same
                            ;; stack frame as the dynamic extent.
                            (eq (node-home-lambda enclose)
-                               (node-home-lambda dynamic-extent)))
-                  (aver (eq use (first (leaf-refs leaf))))
+                               (node-home-lambda dynamic-extent))
+                           ;; Check the other refs are good. At this
+                           ;; point, DXIFY-DOWNWARD-FUNARGS should
+                           ;; have marked the plvars of all good refs.
+                           (dolist (ref (leaf-refs leaf) t)
+                             (unless (eq use ref)
+                               (multiple-value-bind (dest lvar)
+                                   (principal-lvar-end (node-lvar ref))
+                                 (unless (lvar-dynamic-extent lvar)
+                                   (return nil))
+                                 (aver (combination-p dest))))))
                   (unless (enclose-dynamic-extent enclose)
                     (pushnew dynamic-extent
                              (enclose-derived-dynamic-extents enclose)))

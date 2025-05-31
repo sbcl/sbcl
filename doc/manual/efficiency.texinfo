@@ -232,6 +232,49 @@ suprising ways with the otherwise inaccessible parts criterion:
    ...)
 @end lisp
 
+SBCL also performs sophisticated escape analysis to enable automatic
+stack allocation of local functions without any bound dynamic extent
+declarations in many situations where the compiler can prove that no
+uses escape (traditional Lisp terminology names this situation ``all
+uses are downward funargs''). For example, in the following function,
+the local function @code{#'predicatep} is stack allocated, because the
+compiler understands that the built-in function @code{#'position-if}
+only uses its first argument as a downward funarg:
+
+@lisp
+(let ((acc 0))
+  (flet ((predicatep (num) (plusp (+ num off))))
+    (dotimes (i 10)
+      (incf acc (position-if #'predicatep array)))
+    (if (plusp off)
+        (incf acc (if (positivep acc) 10 3))
+        (incf acc (position-if #'predicatep array))))
+  acc)
+@end lisp
+
+Users can also declare that their own functions take downward funargs by
+adding bound dynamic extent declarations on the function arguments.
+
+@lisp
+(defun trivial-hof (fun arg)
+  (declare (dynamic-extent fun))
+  (funcall fun 3 arg))
+@end lisp
+
+Currently, such dynamic extent declarations only cause stack allocation
+of downward funargs at call sites on sufficiently unsafe policy. This is
+partly because the compiler is currently not able to detect incorrect
+usage of dynamic extent declarations.
+
+@lisp
+(defun autodxclosure1 (&optional (x 4))
+  ;; Calling a higher-order function will only implicitly
+  ;; stack-allocate a funarg if the callee is trusted (a CL: function)
+  ;; or the caller is unsafe.
+  (declare (optimize speed (safety 0) (debug 0)))
+  (trivial-hof (lambda (a b) (+ a b x)) 92))
+@end lisp
+
 @node  Modular arithmetic
 @comment  node-name,  next,  previous,  up
 @section Modular arithmetic

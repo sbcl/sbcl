@@ -1086,6 +1086,7 @@ The result is not guaranteed to have the same length as the input."
 
 (macrolet ((def (name extendedp)
              `(defun ,name (function string)
+                (declare (dynamic-extent function))
                 (do* ((length (length string))
                       (start 0)
                       (end 1 (1+ end))
@@ -1098,7 +1099,6 @@ The result is not guaranteed to have the same length as the input."
                      ((>= end length)
                       (if (= end length) (progn (funcall function string start end) nil)))
                   (flet ((brk () (funcall function string start end) (setf start end)))
-                    (declare (dynamic-extent #'brk))
                     (shiftf char1 char2 (char string end))
                     (shiftf c1 c2 (grapheme-break-class char2))
                     (if (eql c2 :regional-indicator) (incf nri) (setf nri 0))

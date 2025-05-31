@@ -75,7 +75,7 @@
 ;; 2) and for which the restart test returns non-NIL for CONDITION.
 ;; When CALL-TEST-P is non-NIL, all restarts are processed.
 (defun map-restarts (function &optional condition (call-test-p t))
-  (declare (function function))
+  (declare (function function) (dynamic-extent function))
   (let ((stack *restart-test-stack*))
     (dolist (restart-cluster *restart-clusters*)
       (dolist (restart restart-cluster)
@@ -110,8 +110,6 @@ restarts associated with CONDITION (or with no condition) will be returned."
          (named-restart-p (restart)
            (when (eq identifier (restart-name restart))
              (return-from %find-restart restart))))
-    ;; KLUDGE: can the compiler infer this dx automatically?
-    (declare (dynamic-extent #'eq-restart-p #'named-restart-p))
     (if (typep identifier 'restart)
         ;; The code under #+previous-... below breaks the abstraction
         ;; introduced by MAP-RESTARTS, but is about twice as

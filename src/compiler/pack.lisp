@@ -1386,7 +1386,8 @@
 (declaim (inline %call-with-target-tns))
 (defun %call-with-target-tns (tn callee
                               &key (limit 10) (reads t) (writes t))
-  (declare (type tn tn) (type function callee) (type index limit))
+  (declare (type tn tn) (type function callee) (type index limit)
+           (dynamic-extent callee))
   (flet ((frob-slot (slot-function)
            (declare (type function slot-function))
            (let ((count limit)
@@ -1413,11 +1414,10 @@
                           &rest keys &key limit reads writes)
                          &body body)
   (declare (ignore limit reads writes))
-  (let ((callback (gensym "CALLBACK")))
-    `(flet ((,callback (,target-variable)
-              ,@body))
-       (declare (dynamic-extent #',callback))
-       (%call-with-target-tns ,source-tn #',callback ,@keys))))
+  `(%call-with-target-tns ,source-tn
+                          (lambda (,target-variable)
+                            ,@body)
+                          ,@keys))
 
 (defun find-ok-target-offset (tn sc)
   (declare (type tn tn) (type storage-class sc))

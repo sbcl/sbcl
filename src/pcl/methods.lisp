@@ -274,7 +274,6 @@
                  (aver (= specializer-count (length other-specializers)))
                  (and (equal qualifiers (safe-method-qualifiers other-method))
                       (every #'same-specializer-p specializers other-specializers)))))
-        (declare (dynamic-extent #'congruentp))
         (cond ((find-if #'congruentp methods))
               ((null errorp) nil)
               (t
