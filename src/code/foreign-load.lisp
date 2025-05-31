@@ -25,10 +25,6 @@
   "~S is unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT."
   (load-1-foreign))
 
-(defvar *runtime-dlhandle*)
-
-(defvar *shared-objects*)
-
 (defstruct (shared-object (:copier nil)) pathname namestring handle dont-save)
 (declaim (freeze-type shared-object))
 

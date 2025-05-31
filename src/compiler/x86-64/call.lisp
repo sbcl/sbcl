@@ -764,7 +764,7 @@
                                  :from (:argument 0)
                                  :to :eval)
                                 ,name))
-                 *register-arg-names* *register-arg-offsets*))
+                 register-arg-names *register-arg-offsets*))
 
      ,@(when (eq return :tail)
          '((:temporary (:sc unsigned-reg :from (:argument 1) :to (:argument 2))
@@ -794,7 +794,7 @@
                  ;; Move the necessary args to registers,
                  ;; this moves them all even if they are
                  ;; not all needed.
-                 ,@(loop for name in *register-arg-names*
+                 ,@(loop for name in register-arg-names
                          for index downfrom -1
                          collect `(loadw ,name new-fp ,index)))
                '((cond ((listp nargs)) ;; no-verify-arg-count

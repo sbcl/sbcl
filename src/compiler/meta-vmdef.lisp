@@ -1484,9 +1484,9 @@
 
 ;;;; setting up VOP-INFO
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *slot-inherit-alist*
-    '((:generator-function . vop-info-generator-function))))
+(defconstant-eqx +slot-inherit-alist+
+    '((:generator-function . vop-info-generator-function))
+  #'equal)
 
 ;;; This is something to help with inheriting VOP-INFO slots. We
 ;;; return a keyword/value pair that can be passed to the constructor.
@@ -1498,7 +1498,7 @@
 ;;; the FORM so that the slot is recomputed.
 (defmacro inherit-vop-info (slot parse test form)
   `(if (and ,parse ,test)
-       (list ,slot `(,',(or (cdr (assoc slot *slot-inherit-alist*))
+       (list ,slot `(,',(or (cdr (assoc slot +slot-inherit-alist+))
                             (error "unknown slot ~S" slot))
                      (template-or-lose ',(vop-parse-name ,parse))))
        (list ,slot ,form)))

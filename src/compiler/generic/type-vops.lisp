@@ -11,7 +11,7 @@
 (in-package "SB-VM")
 
 
-(defvar *other-pointer-type-vops*
+(defglobal *other-pointer-type-vops*
   ;; A special case due to NIL
   `(symbolp (,symbol-widetag)))
 

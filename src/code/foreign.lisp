@@ -208,8 +208,9 @@ symbol designates a variable. May enter the symbol into the linkage-table."
     ;; static foreign symbols (and *linkage-info*, for that matter).
     ))
 
+;;; There 2 vars are not defglobal, as defglobal implies always-bound.
+(declaim (global *runtime-dlhandle* *shared-objects*))
 (defun !foreign-cold-init ()
-  (declare (special *runtime-dlhandle* *shared-objects*))
   (loop for table-offset from 0
         and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
         do (setf (gethash reference (car *linkage-info*)) table-offset))

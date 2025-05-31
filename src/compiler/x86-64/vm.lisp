@@ -191,8 +191,7 @@
   ;; the number of arguments/return values passed in registers
   (defconstant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defparameter *register-arg-names* '(rdx rdi rsi)))
+  (defconstant-eqx register-arg-names '(rdx rdi rsi) #'equal)
   (defregset    *register-arg-offsets* rdx rdi rsi)
   #-win32
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
@@ -473,7 +472,7 @@
 (define-load-time-global *register-arg-tns*
   (mapcar (lambda (register-arg-name)
             (symbol-value (symbolicate register-arg-name "-TN")))
-          *register-arg-names*))
+          register-arg-names))
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

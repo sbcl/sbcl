@@ -86,7 +86,7 @@
 
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
- (defparameter register-arg-names '(a0 a1 a2 a3)))
+ (defconstant-eqx register-arg-names '(a0 a1 a2 a3) #'equal))
 
 
 
@@ -296,7 +296,7 @@
 
 ;;; A list of TN's describing the register arguments.
 ;;;
-(defparameter *register-arg-tns*
+(define-load-time-global *register-arg-tns*
   (mapcar #'(lambda (n)
               (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))

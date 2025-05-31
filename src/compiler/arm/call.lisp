@@ -840,7 +840,7 @@
                                    :offset ,offset
                                    :to :eval)
                          ,name))
-                 *register-arg-names* *register-arg-offsets*))
+                 register-arg-names *register-arg-offsets*))
      ,@(when (eq return :fixed)
          '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
            (:temporary (:sc non-descriptor-reg :from :eval :offset ocfp-offset) ocfp-temp)))
@@ -892,7 +892,7 @@
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp
                                                     ,(incf index)))
-                                           *register-arg-names*))
+                                           register-arg-names))
                                (storew cfp-tn new-fp ocfp-save-offset))
                              '((load-immediate-word nargs-pass (fixnumize nargs)))))
                       ,@(if (eq return :tail)

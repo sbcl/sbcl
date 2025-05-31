@@ -59,7 +59,7 @@
   (defconstant register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2)
-  (defparameter *register-arg-names* '(r0 r1 r2)))
+  (defconstant-eqx register-arg-names '(r0 r1 r2) #'equal))
 
 
 ;;;; SB and SC definition:
@@ -255,7 +255,7 @@
 
 ;;; A list of TN's describing the register arguments.
 ;;;
-(defparameter *register-arg-tns*
+(define-load-time-global *register-arg-tns*
   (mapcar #'(lambda (n)
               (make-random-tn (sc-or-lose 'descriptor-reg) n))
           *register-arg-offsets*))

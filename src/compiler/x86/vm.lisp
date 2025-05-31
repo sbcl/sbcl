@@ -84,8 +84,7 @@
   ;; the number of arguments/return values passed in registers
   (defconstant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defparameter *register-arg-names* '(edx edi esi)))
+  (defconstant-eqx register-arg-names '(edx edi esi) #'equal)
   (defregset    *register-arg-offsets* edx edi esi))
 
 ;;;; SB definitions
@@ -314,10 +313,10 @@
   (def-misc-reg-tns single-reg fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7))
 
 ;;; TNs for registers used to pass arguments
-(defparameter *register-arg-tns*
+(define-load-time-global *register-arg-tns*
   (mapcar (lambda (register-arg-name)
             (symbol-value (symbolicate register-arg-name "-TN")))
-          *register-arg-names*))
+          register-arg-names))
 
 ;;; FIXME: doesn't seem to be used in SBCL
 #|

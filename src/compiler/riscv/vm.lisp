@@ -261,7 +261,7 @@
 (defconstant ra-save-offset 1)
 (defconstant nfp-save-offset 2)
 
-(defparameter *register-arg-tns*
+(define-load-time-global *register-arg-tns*
   (let ((drsc (sc-or-lose 'descriptor-reg)))
     (flet ((make (n) (make-random-tn drsc n)))
       (mapcar #'make *register-arg-offsets*))))

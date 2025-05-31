@@ -231,13 +231,15 @@ where a is the intended low-order byte and d the high-order byte."
 ;;; Section 3.4:  Table T
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *t* (make-array 64 :element-type 'ub32
+  (sb-int:defconstant-eqx +t+
+      (make-array 64 :element-type 'ub32
                                 :initial-contents
                                 (loop for i from 1 to 64
                                       collect
                                       (truncate
                                        (* 4294967296
-                                          (abs (sin (float i 0.0d0)))))))))
+                                          (abs (sin (float i 0.0d0)))))))
+    #'equalp))
 
 ;;; Section 3.4:  Helper Macro for single round definitions
 
@@ -247,7 +249,7 @@ where a is the intended low-order byte and d the high-order byte."
         collect
         `(setq ,a (mod32+ ,b (rol32 (mod32+ (mod32+ ,a (,op ,b ,c ,d))
                                             (mod32+ (ub32-aref ,block ,k)
-                                                    ,(aref *t* (1- i))))
+                                                    ,(aref +t+ (1- i))))
                                     ,s)))
         into result
         finally
