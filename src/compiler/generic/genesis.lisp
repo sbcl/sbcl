@@ -1590,7 +1590,6 @@ core and return a descriptor to it."
 
 ;; These fixed IDs have no use in lisp code, but we need known values
 ;; for C to find packages easily
-(defconstant +package-id-lisp+      2)
 (defconstant +package-id-user+      3)
 (defconstant +package-id-sb-kernel+ 4)
 (defconstant +package-id-sb-ext+    5)

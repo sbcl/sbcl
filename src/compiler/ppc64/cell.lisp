@@ -57,7 +57,7 @@
    (inst lhz result symbol (- #+big-endian 4 #+little-endian 2
                               other-pointer-lowtag))
    (inst bne done)
-   (inst lr result 1) ; SB-IMPL::+PACKAGE-ID-LISP+
+   (inst lr result sb-fasl::+package-id-lisp+)
    DONE))
 
 (define-vop (set-slot)

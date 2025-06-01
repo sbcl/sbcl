@@ -171,3 +171,6 @@ body. Body can begin with declarations."
 (defconstant +package-id-overflow+ (1- (ash 1 package-id-bits)))
 (defconstant +package-id-none+     0)
 (defconstant +package-id-keyword+  1)
+;; only ppc64 needs this constant at compile-time. The others don't.
+;; The package of this constant is sb-fasl for convenience in genesis.
+(defconstant sb-fasl::+package-id-lisp+ 2)
