@@ -2462,3 +2462,22 @@
 (with-test (:name :auto-dx-recursive-ref-2.stack-allocates
             :fails-on :sbcl)
   (assert-no-consing (auto-dx-recursive-ref-2 '(1 2 3 4))))
+
+;;; Even though #'f's direct references do not escape, it is closed
+;;; over by #'g which does escape, counting as an implicit escaping
+;;; reference, so #'f must not be stack allocated.
+(defun auto-dx-recursive-closes-over (seq)
+  (let ((z (car seq)))
+    (labels ((f (x)
+               (when (member x seq)
+                 (return-from f z))
+               (map nil #'f (cdr seq)))
+             (g ()
+               (map nil #'f (cdr seq))))
+      (values (f seq) #'g))))
+
+(with-test (:name :auto-dx-recursive-closes-over)
+  (multiple-value-bind (val g)
+      (auto-dx-recursive-closes-over '(1 2 3 4))
+    (assert (eq val nil))
+    (assert (eq (funcall g) nil))))
