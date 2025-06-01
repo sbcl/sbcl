@@ -117,8 +117,8 @@ static inline lispobj canonical_ptr(lispobj pointer)
     return pointer;
 }
 
-sword_t fixedobj_index_bit_bias, text_index_bit_bias;
-uword_t *fullcgcmarks;
+static __attribute__((unused)) sword_t fixedobj_index_bit_bias, text_index_bit_bias;
+static uword_t *fullcgcmarks;
 static size_t markbits_size;
 static inline sword_t ptr_to_bit_index(lispobj pointer) {
     if (pointer == NIL) return -1;
