@@ -3285,9 +3285,8 @@ is :ANY, the function name is not checked."
                    (when constants
                      (multiple-value-bind (kind constants)
                          (recurse constants seen)
-                       (declare (ignore kind))
                        (when constants
-                         (values :values constants))))))))))))
+                         (values kind constants))))))))))))
 
 (defun lambda-var-original-name (leaf)
   (let ((home (lambda-var-home leaf)))

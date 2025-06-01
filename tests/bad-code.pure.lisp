@@ -998,4 +998,11 @@
                         (let ((l '((0) 0 0)))
                           (incf (car (car l)))
                           l))
-                      :allow-warnings t))))
+                      :allow-warnings t)))
+  (checked-compile
+   `(lambda ()
+      (flet ((x (x)
+               (when x
+                 (setf (cadr x) 10))))
+        (x nil)
+        (x (list 1 2))))))
