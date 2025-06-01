@@ -2149,6 +2149,17 @@
      ((0) 3)
      ((1) 0))))
 
+(with-test (:name :dynamic-extent-interleave.bogus-unused)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     '(lambda (as xs)
+       (flet ((pred (a)
+                (print-nothing xs)
+                a))
+         (mapcar #'print-nothing (remove-if #'pred as))))
+     (('(1 2 3) '(3 4 5)) nil))))
+
 (with-test (:name :dynamic-extent-preserve.heap-exhaustion)
   (let ((sb-c::*check-consistency* t))
     (checked-compile-and-assert

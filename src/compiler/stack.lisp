@@ -168,7 +168,7 @@
                          (when (eq dynamic-extent mess-up)
                            (return))
                          (let ((old (dynamic-extent-info mess-up)))
-                           (when old
+                           (when (and old (not (eq info old)))
                              (setf (ir2-lvar-kind (lvar-info old)) :unused)
                              (setf (dynamic-extent-info mess-up) info)))))))
                   (t
