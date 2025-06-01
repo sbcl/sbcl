@@ -430,29 +430,30 @@
                                (return nil)))))
                 (recurse (let-var-initial-value leaf))))
              (clambda
-              (aver (functional-kind-eq leaf external))
-              (let* ((fun (functional-entry-fun leaf))
-                     (enclose (functional-enclose fun)))
-                (when (and (environment-closure (get-lambda-environment leaf))
-                           ;; To make sure the allocation is in the same
-                           ;; stack frame as the dynamic extent.
-                           (eq (node-home-lambda enclose)
-                               (node-home-lambda dynamic-extent))
-                           ;; Check the other refs are good. At this
-                           ;; point, DXIFY-DOWNWARD-FUNARGS should
-                           ;; have marked the plvars of all good refs.
-                           (dolist (ref (leaf-refs leaf) t)
-                             (unless (eq use ref)
-                               (multiple-value-bind (dest lvar)
-                                   (principal-lvar-end (node-lvar ref))
-                                 (unless (lvar-dynamic-extent lvar)
-                                   (return nil))
-                                 (aver (combination-p dest))))))
-                  (unless (enclose-dynamic-extent enclose)
-                    (pushnew dynamic-extent
-                             (enclose-derived-dynamic-extents enclose)))
-                  (setf (lvar-dynamic-extent lvar) dynamic-extent)
-                  (setf (leaf-dynamic-extent fun) t)))))))))))
+              (when (functional-kind-eq leaf external)
+                (let* ((fun (functional-entry-fun leaf))
+                       (enclose (functional-enclose fun)))
+                  (when (and (environment-closure (get-lambda-environment leaf))
+                             ;; To make sure the allocation is in the same
+                             ;; stack frame as the dynamic extent.
+                             (eq (node-home-lambda enclose)
+                                 (node-home-lambda dynamic-extent))
+                             ;; Check the other refs are good. At this
+                             ;; point, DXIFY-DOWNWARD-FUNARGS and
+                             ;; PROPAGATE-REF-DX should have marked
+                             ;; the p-lvar-ends of all good refs.
+                             (dolist (ref (leaf-refs leaf) t)
+                               (unless (eq use ref)
+                                 (multiple-value-bind (dest lvar)
+                                     (principal-lvar-end (node-lvar ref))
+                                   (declare (ignore dest))
+                                   (unless (lvar-dynamic-extent lvar)
+                                     (return nil))))))
+                    (unless (enclose-dynamic-extent enclose)
+                      (pushnew dynamic-extent
+                               (enclose-derived-dynamic-extents enclose)))
+                    (setf (lvar-dynamic-extent lvar) dynamic-extent)
+                    (setf (leaf-dynamic-extent fun) t))))))))))))
 
 ;;; Find all stack allocatable values in COMPONENT, setting
 ;;; appropriate dynamic extents for any lvar which may take on a stack

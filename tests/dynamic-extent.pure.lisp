@@ -1769,6 +1769,39 @@
        (funcall x)))
    ((3) 3)))
 
+(with-test (:name :dx-flet-substitution-multiple-refs)
+  (checked-compile-and-assert
+   ()
+   '(lambda (z)
+     (flet ((y (a)
+              (incf z a)))
+       (let ((x #'y))
+         (declare (dynamic-extent x))
+         (funcall x 5)
+         (funcall x 6)
+         (assert (sb-ext:stack-allocated-p x))
+         (funcall x 7))
+       (map nil #'y '(1 2 3))
+       z))
+   ((3) 27)))
+
+(with-test (:name :dx-flet-substitution-different-frame)
+  (checked-compile-and-assert
+   ()
+   '(lambda (z)
+     (labels ((y (a)
+                (incf z a))
+              (g ()
+                (let ((x #'y))
+                  (declare (dynamic-extent x))
+                  (funcall x 5)
+                  (print-nothing x)
+                  (funcall x 6))))
+       (map nil #'y '(1 2 3))
+       (g)
+       (g)))
+   ((3) 31)))
+
 (with-test (:name :dx-anonymous-closure-otherwise-inaccessible)
   (checked-compile-and-assert
    ()
@@ -2492,3 +2525,26 @@
       (auto-dx-recursive-closes-over '(1 2 3 4))
     (assert (eq val nil))
     (assert (eq (funcall g) nil))))
+
+(defun auto-dx-anonymous-closure-single-ref (x)
+  (let ((y (lambda (a) (incf x a))))
+    (map nil y '(1 2 3))
+    x))
+
+(with-test (:name :auto-dx-anonymous-closure-single-ref.correct)
+  (assert (= (auto-dx-anonymous-closure-single-ref 5) 11)))
+
+(with-test (:name :auto-dx-anonymous-closure-single-ref.stack-allocates)
+  (assert-no-consing (auto-dx-anonymous-closure-single-ref 5)))
+
+(defun auto-dx-anonymous-closure-multiple-ref (x)
+  (let ((y (lambda (a) (incf x a))))
+    (map nil y '(1 2 3))
+    (map nil y '(2 3 4))
+    x))
+
+(with-test (:name :auto-dx-anonymous-closure-multiple-ref.correct)
+  (assert (= (auto-dx-anonymous-closure-multiple-ref 5) 20)))
+
+(with-test (:name :auto-dx-anonymous-closure-multiple-ref.stack-allocates)
+  (assert-no-consing (auto-dx-anonymous-closure-multiple-ref 5)))
