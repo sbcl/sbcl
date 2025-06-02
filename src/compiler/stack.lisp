@@ -162,7 +162,7 @@
                   ;; can't move; object identity must be preserved and
                   ;; we can't in general track all references.
                   ((memq info stack)
-                   (do-nested-cleanups (cleanup node)
+                   (do-nested-cleanups (cleanup block)
                      (when (eq (cleanup-kind cleanup) :dynamic-extent)
                        (let ((mess-up (cleanup-mess-up cleanup)))
                          (when (eq dynamic-extent mess-up)

@@ -2298,11 +2298,33 @@
          (list-length y)))
      (() 11))))
 
+(declaim (inline nested.make))
+(defun nested.make (&optional (x nil))
+  (let* ((name (if (stringp x)
+                   nil
+                   (print x)))
+         (set (list 1)))
+    (declare (ignore name))
+    (flet ((add (element)
+             (setq element set)))
+      (map nil #'add x))
+    set))
+
+(with-test (:name :stack-analysis-preserve.nested-inline)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda ()
+       (let* ((v (make-array 3))
+              (set (nested.make)))
+         (declare (dynamic-extent v set))
+         (print (list v set (lambda ())))
+         3)))))
+
 (with-test (:name :encode-error-break-large-immediate)
   (disassemble '(lambda ()
                  (sb-int:dx-let ((v (make-array 65536
                                                 :element-type '(unsigned-byte 8))))
-                  (opaque-identity v)))
+                   (opaque-identity v)))
                :stream (make-broadcast-stream)))
 
 (with-test (:name :make-list-large-immediate)
