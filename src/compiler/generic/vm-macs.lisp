@@ -105,10 +105,13 @@
           ((name &key lowtag widetag alloc-trans (type t)
                       (size (symbolicate name "-SIZE")))
            &rest slot-specs)
+  (declare (notinline coerce)) ; problem in make-host-2 if inlined
   (collect ((slots) (specials) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
           (variable-length-p nil))
-      (dolist (spec slot-specs)
+      (dolist (spec ; flatten vectors in slot-specs before processing them
+               (mapcan (lambda (x) (if (vectorp x) (coerce x 'list) (list x)))
+                       slot-specs))
         (when variable-length-p
           (error "No more slots can follow a :rest-p slot."))
         (destructuring-bind

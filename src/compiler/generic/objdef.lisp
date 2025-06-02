@@ -209,12 +209,12 @@ during backtrace.
               :ref-trans %code-debug-info)
   (constants :rest-p t))
 
-#-linkage-space
 (define-primitive-object (fdefn :type fdefn
                                 :lowtag other-pointer-lowtag
                                 :widetag fdefn-widetag)
-  (name :ref-trans fdefn-name)
-  (fun :type (or function null) :ref-trans fdefn-fun)
+  #-linkage-space
+  #((name :ref-trans fdefn-name)
+    (fun :type (or function null) :ref-trans fdefn-fun)
   ;; raw-addr is used differently by the various backends:
   ;; - Sparc, ARM, and RISC-V store the same object as 'fun'
   ;;   unless the function is non-simple, in which case
@@ -222,14 +222,11 @@ during backtrace.
   ;;   pointer to the closure tramp
   ;; - all others store a native pointer to the function entry address
   ;;   or closure tramp.
-  (raw-addr :c-type "char *"))
-#+linkage-space
-(define-primitive-object (fdefn :type fdefn
-                                :lowtag other-pointer-lowtag
-                                :widetag fdefn-widetag)
-  (name :ref-trans fdefn-name)
-  (unused)
-  (fun :type (or function null)))
+    (raw-addr :c-type "char *"))
+  #+linkage-space
+  #((name :ref-trans fdefn-name)
+    (unused)
+    (fun)))
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
@@ -285,8 +282,7 @@ during backtrace.
   ;; were the LAYOUT to intrude between the instructions and the FUNCTION,
   ;; then the instruction bytes would depend on whether #+compact-instance-header
   ;; is enabled, which is an extra and unnecessary complication.
-  #+executable-funinstances (instword1)
-  #+executable-funinstances (instword2)
+  #+executable-funinstances #(instword1 instword2)
   (function :type function
             :ref-known (flushable) :ref-trans %funcallable-instance-fun
             :set-known () :set-trans (setf %funcallable-instance-fun))
@@ -330,37 +326,27 @@ during backtrace.
   (cfp :c-type "lispobj *")
   #-(or x86 x86-64 arm64) code
   entry-pc
-  #+(and win32 x86) next-seh-frame
-  #+(and win32 x86) seh-frame-handler
-  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
-  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
-  #+unbind-in-unwind bsp
-  #+unbind-in-unwind current-catch)
+  #+(and win32 x86) #(next-seh-frame seh-frame-handler)
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) #(nfp nsp)
+  #+unbind-in-unwind #(bsp current-catch))
 
 (define-primitive-object (catch-block)
   (uwp :c-type "struct unwind_block *")
   (cfp :c-type "lispobj *")
   #-(or x86 x86-64 arm64) code
   entry-pc
-  #+(and win32 x86) next-seh-frame
-  #+(and win32 x86) seh-frame-handler
-  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
-  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
+  #+(and win32 x86) #(next-seh-frame seh-frame-handler)
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) #(nfp nsp)
   #+unbind-in-unwind bsp
   (previous-catch :c-type "struct catch_block *")
   tag)
 
 ;;;; symbols
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *symbol-primobj-defn-properties*
-    '(:lowtag other-pointer-lowtag
-      :widetag symbol-widetag
-      :alloc-trans %alloc-symbol
-      :type symbol)))
-
-#+64-bit
-(define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
+(define-primitive-object (symbol :lowtag other-pointer-lowtag
+                                 :widetag symbol-widetag
+                                 :alloc-trans %alloc-symbol
+                                 :type symbol)
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons
   ;; ( NIL . NIL ), living in the first two slots of NIL-the-symbol
@@ -374,21 +360,22 @@ during backtrace.
   ;; using lisp code equivalent to "native_pointer(ptr)[1]".
   ;; This improves the code for CASE and ECASE over symbols
   ;; regardless of whether the object being tested is known to be a symbol.
-  (hash)
-  (value :init :unbound)
+  #+64-bit
+  #((hash)
+    (value :init :unbound)
   ;; Symbols either store an fdefn or a function. The better way is a function.
   ;; This slot *MUST* coincide with the FDEFN-FUN slot. (This is AVERed)
   ;; The slot name is "FDEFN" even it holds a function. This makes some C code
   ;; (notably trace-object.inc and traceroot) unchanged for +/- linkage-space.
-  #+linkage-space (fdefn)
-  #-linkage-space (fdefn :ref-trans %symbol-fdefn :ref-known ()
-                         :cas-trans cas-symbol-fdefn)
+    #+linkage-space (fdefn)
+    #-linkage-space (fdefn :ref-trans %symbol-fdefn :ref-known ()
+                           :cas-trans cas-symbol-fdefn)
   ;; The private accessor for INFO reads the slot verbatim.
   ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
   ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
   ;; of the user's PLIST and a PACKED-INFO or just a PACKED-INFO.
   ;; It can't hold a PLIST alone without wrapping in an extra cons cell.
-  (info :ref-trans symbol-%info :ref-known (flushable)
+    (info :ref-trans symbol-%info :ref-known (flushable)
         ;; IR2-CONVERT-CASSER only knows the arg order as (OBJECT OLD NEW),
         ;; so as much as I'd like to name this (CAS SYMBOL-%INFO),
         ;; it can't be that, because it'd need args of (OLD NEW OBJECT).
@@ -396,25 +383,24 @@ during backtrace.
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :ref-trans symbol-name :init :arg))
+    (name :ref-trans symbol-name :init :arg))
 
-#-64-bit
-(define-primitive-object (symbol . #.*symbol-primobj-defn-properties*)
   ;; As described in the comments above for #+64-bit, the first two slots of SYMBOL
   ;; have to work for NIL-as-cons, so they have to be NIL and NIL, which have to
   ;; also be the correct value when reading the slot of NIL-as-symbol.
-  (fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
-  (value :init :unbound)
-  (info :ref-trans symbol-%info :ref-known (flushable)
+  #-64-bit
+  #((fdefn :ref-trans %symbol-fdefn :ref-known () :cas-trans cas-symbol-fdefn)
+    (value :init :unbound)
+    (info :ref-trans symbol-%info :ref-known (flushable)
         :cas-trans sb-impl::cas-symbol-%info
         :type (or instance list)
         :init :null)
-  (name :init :arg :ref-trans symbol-name)
-  ;; The remaining slots can be ignored by GC
-  (hash)
-  (package-id :type index ; actually 16 bits. (Could go in the header)
-              :ref-trans symbol-package-id
-              :set-trans sb-impl::set-symbol-package-id :set-known ())
+    (name :init :arg :ref-trans symbol-name)
+    ;; The remaining slots can be ignored by GC
+    (hash)
+    (package-id :type index ; actually 16 bits. (Could go in the header)
+                :ref-trans symbol-package-id
+                :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
   ;; For the 32-bit architectures, reading this slot as a descriptor
   ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
@@ -425,20 +411,17 @@ during backtrace.
   ;; * (sb-vm:hexdump nil)
   ;;   1100008: 0110000B = NIL ; looks like NIL's TLS index is 0x110
   ;;   110000C: 0110000B = NIL
-  #+sb-thread
-  (tls-index :type (and fixnum unsigned-byte) ; too generous still?
-             :ref-known (flushable)
-             :ref-trans %symbol-tls-index))
+    #+sb-thread
+    (tls-index :type (and fixnum unsigned-byte) ; too generous still?
+               :ref-known (flushable)
+               :ref-trans %symbol-tls-index)))
 
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-single-float-widetag)
-  #+64-bit
-  (data :c-type "struct { float data[2]; } ")
-  #-64-bit
-  (real :c-type "float")
-  #-64-bit
-  (imag :c-type "float"))
+  #+64-bit (data :c-type "struct { float data[2]; } ")
+  #-64-bit #((real :c-type "float")
+             (imag :c-type "float")))
 
 (define-primitive-object (complex-double-float
                           :lowtag other-pointer-lowtag
@@ -518,9 +501,8 @@ during backtrace.
                          :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
   #+(or x86-64 (and (or riscv arm64) sb-thread))
-  (current-catch-block :special *current-catch-block*)
-  #+(or x86-64 (and (or riscv arm64) sb-thread))
-  (current-unwind-protect-block :special *current-unwind-protect-block*)
+  #((current-catch-block :special *current-catch-block*)
+    (current-unwind-protect-block :special *current-unwind-protect-block*))
   ;; BUG: fundamentally a pseudo-atomic code sequence does not use these bits
   ;; with #+sb-safepoint so why does this slot need to be defined at all in that case?
   #+(or sb-thread sparc ppc x86-64)
