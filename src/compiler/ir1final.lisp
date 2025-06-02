@@ -336,7 +336,12 @@
                          (make-single-value-type (single-value-type (node-derived-type combination)))))))))
           ((and (eq (combination-kind combination) :full)
                 (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
-           (let ((specialized (info :function :specialized-xep combination-name)))
+           (let ((specialized (or (info :function :specialized-xep combination-name)
+                                  (let ((specialized (assoc 'sb-impl::specialized-xep
+                                                            (lexenv-user-data (node-lexenv combination)))))
+                                    (when (eq (cadr specialized) combination-name)
+                                      (cddr specialized))))))
+
              (when (and specialized
                         (= (length args)
                            (length (first specialized))))

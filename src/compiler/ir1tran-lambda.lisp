@@ -968,6 +968,9 @@
              (res (progn
                     (when (fun-type-p ftype)
                       (add-ftype vars ftype explicit-check))
+                    (when (typep source-name '(cons (eql sb-impl::specialized-xep)))
+                      (push source-name
+                            (lexenv-user-data *lexenv*)))
                     (if (or (find-if #'lambda-var-arg-info vars) keyp)
                         (ir1-convert-hairy-lambda forms vars keyp
                                                   allow-other-keys
