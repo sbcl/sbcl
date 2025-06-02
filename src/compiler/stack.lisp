@@ -61,13 +61,12 @@
         (setq end (union end succ-start))))
     (do-nested-cleanups (cleanup block)
       (dolist (nlx-info (cleanup-nlx-info cleanup))
-        (let* ((target-stack (ir2-block-start-stack
-                              (block-info (nlx-info-target nlx-info))))
-               (exit-lvar (nlx-info-lvar nlx-info))
-               (next-stack (if exit-lvar
-                               (remove exit-lvar target-stack)
-                               target-stack)))
-          (setq end (union end next-stack))))
+        (let* ((target (nlx-info-target nlx-info))
+               (target-start (ir2-block-start-stack (block-info target)))
+               (exit-lvar (node-lvar (block-last target))))
+          (setq end (union end (if exit-lvar
+                                   (remove exit-lvar target-start)
+                                   target-start)))))
       (when (eq (cleanup-kind cleanup) :dynamic-extent)
         (let ((info (dynamic-extent-info (cleanup-mess-up cleanup))))
           (when info

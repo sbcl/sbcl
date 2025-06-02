@@ -2624,10 +2624,6 @@ is :ANY, the function name is not checked."
       (when (and (eq (nlx-info-block nlx) block)
                  (eq (nlx-info-cleanup nlx) cleanup))
         (return nlx)))))
-
-(defun nlx-info-lvar (nlx)
-  (declare (type nlx-info nlx))
-  (node-lvar (block-last (nlx-info-target nlx))))
 
 ;;;; functional hackery
 
