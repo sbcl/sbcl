@@ -2320,6 +2320,32 @@
          (print (list v set (lambda ())))
          3)))))
 
+(with-test (:name :stack-analysis-preserve.nested-inline.2)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda (b c d)
+       (restart-bind nil
+         (case (catch 'ct7 55)
+           ((2258)
+            (reduce
+             (lambda (x y) y (progv nil b x))
+             (list
+              (block b5
+                (restart-bind nil
+                  (return-from b5 (- d c)))))))))))))
+
+(with-test (:name :stack-analysis-preserve.nested-inline.3)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda ()
+       (let* ((x (vector))
+              (y (vector))
+              (z (prog1 (vector)
+                   (mapcar #'identity nil))))
+         (declare (dynamic-extent x y z))
+         (print-nothing (list x y z))
+         nil)))))
+
 (with-test (:name :encode-error-break-large-immediate)
   (disassemble '(lambda ()
                  (sb-int:dx-let ((v (make-array 65536

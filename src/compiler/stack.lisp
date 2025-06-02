@@ -152,16 +152,17 @@
                   (t (and lvar (lvar-dynamic-extent lvar))))))
           (when dynamic-extent
             (let ((info (dynamic-extent-info dynamic-extent)))
-              (when info
-                (cond
-                  ((eq info (first stack)))
-                  ;; Preserve any intervening dynamic-extents by
-                  ;; sharing the stack lvar (and hence the lifetime).
-                  ;; We must do this because stack allocated objects
-                  ;; can't move; object identity must be preserved and
-                  ;; we can't in general track all references.
-                  ((memq info stack)
-                   (do-nested-cleanups (cleanup block)
+              (cond
+                ((null info))
+                ((eq info (first stack)))
+                ;; Preserve any intervening dynamic-extents by sharing
+                ;; the stack lvar (and hence the lifetime). We must do
+                ;; this because stack allocated objects can't move;
+                ;; object identity must be preserved and we can't in
+                ;; general track all references.
+                ((memq info stack)
+                 (unless (dynamic-extent-p node)
+                   (do-nested-cleanups (cleanup node)
                      (when (eq (cleanup-kind cleanup) :dynamic-extent)
                        (let ((mess-up (cleanup-mess-up cleanup)))
                          (when (eq dynamic-extent mess-up)
@@ -169,16 +170,16 @@
                          (let ((old (dynamic-extent-info mess-up)))
                            (when (and old (not (eq info old)))
                              (setf (ir2-lvar-kind (lvar-info old)) :unused)
-                             (setf (dynamic-extent-info mess-up) info)))))))
-                  (t
-                   (pushnew block (ir2-component-stack-mess-ups 2comp))
-                   (setf (ctran-next (node-prev node)) nil)
-                   (let ((ctran (make-ctran)))
-                     (with-ir1-environment-from-node node
-                       (ir1-convert (node-prev node) ctran info
-                                    '(%dynamic-extent-start)))
-                     (link-node-to-previous-ctran node ctran))
-                   (push info stack)))))))
+                             (setf (dynamic-extent-info mess-up) info))))))))
+                (t
+                 (pushnew block (ir2-component-stack-mess-ups 2comp))
+                 (setf (ctran-next (node-prev node)) nil)
+                 (let ((ctran (make-ctran)))
+                   (with-ir1-environment-from-node node
+                     (ir1-convert (node-prev node) ctran info
+                                  '(%dynamic-extent-start)))
+                   (link-node-to-previous-ctran node ctran))
+                 (push info stack))))))
         (when (entry-p node)
           (dolist (nlx-info (cleanup-nlx-info (entry-cleanup node)))
             (stack-mess-up-walk (nlx-info-target nlx-info) stack)))))
