@@ -14,14 +14,6 @@
 
 ;;;; cleanup hackery
 
-(defun delete-lexenv-enclosing-cleanup (lexenv)
-  (declare (type lexenv lexenv))
-  (do ((lexenv2 lexenv
-                (lambda-call-lexenv (lexenv-lambda lexenv2))))
-      ((null lexenv2) nil)
-    (when (lexenv-cleanup lexenv2)
-      (setf (lexenv-cleanup lexenv2) nil))))
-
 ;;; Return the innermost cleanup enclosing NODE, or NIL if there is
 ;;; none in its function. If NODE has no cleanup, but is in a LET,
 ;;; then we must still check the environment that the call is in.
