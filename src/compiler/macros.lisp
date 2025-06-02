@@ -607,11 +607,17 @@
            while ,node-var
            do (progn ,@body))))
 
-(defmacro do-nested-cleanups ((cleanup-var block &optional return-value)
+;;; Walk up the cleanup nesting starting from the cleanup in effect at
+;;; BLOCK-OR-NODE, binding CLEANUP-VAR to each cleanup.
+(defmacro do-nested-cleanups ((cleanup-var block-or-node &optional return-value)
                               &body body)
-  `(block nil
-     (map-nested-cleanups
-      (lambda (,cleanup-var) ,@body) ,block ,return-value)))
+  (once-only ((block-or-node block-or-node))
+    `(do ((,cleanup-var (if (node-p ,block-or-node)
+                            (node-enclosing-cleanup ,block-or-node)
+                            (block-end-cleanup ,block-or-node))
+                        (node-enclosing-cleanup (cleanup-mess-up ,cleanup-var))))
+         ((not ,cleanup-var) ,return-value)
+       ,@body)))
 
 ;;; Bind the IR1 context variables to the values associated with NODE,
 ;;; so that IR1 conversion can be done after the main conversion pass

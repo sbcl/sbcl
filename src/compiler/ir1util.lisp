@@ -25,15 +25,6 @@
     (let ((cup (lexenv-cleanup lexenv)))
       (when cup (return cup)))))
 
-(defun map-nested-cleanups (function block-or-node &optional return-value)
-  (declare (type (or node cblock) block-or-node))
-  (do ((cleanup (if (node-p block-or-node)
-                    (node-enclosing-cleanup block-or-node)
-                    (block-end-cleanup block-or-node))
-                (node-enclosing-cleanup (cleanup-mess-up cleanup))))
-      ((not cleanup) return-value)
-    (funcall function cleanup)))
-
 ;;; Convert the FORM in a block inserted between BLOCK1 and BLOCK2 as
 ;;; an implicit MV-PROG1. The inserted block is returned. NODE is used
 ;;; for IR1 context when converting the form. Note that the block is
