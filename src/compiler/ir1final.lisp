@@ -30,7 +30,14 @@
             (compiler-notify "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
                              note (first what) (rest what)))
            ((valid-fun-use node what
-                           :argument-test #'types-equal-or-intersect
+                           :argument-test (lambda (arg-type type)
+                                            ;; Don't bother with LIST not matching (OR NULL ...)
+                                            (unless (and (eq arg-type (specifier-type 'list))
+                                                         (neq type (specifier-type 'list))
+                                                         (and (union-type-p type)
+                                                              (find (specifier-type 'null)
+                                                                    (union-type-types type))))
+                                              (types-equal-or-intersect arg-type type)))
                            :result-test #'values-types-equal-or-intersect)
             (collect ((messages))
               (flet ((give-grief (string &rest stuff)

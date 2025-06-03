@@ -4789,3 +4789,10 @@
   (let ((f (compile nil '(lambda (p) (values-list (if p '(a) ()))))))
     (multiple-value-call (lambda (x) (assert (eql x 'a))) (funcall f t))
     (multiple-value-call (lambda () t) (funcall f nil))))
+
+(with-test (:name :no-notes-list-vs-or-null)
+  (checked-compile `(lambda (l)
+                      (declare (list l)
+                               (optimize speed))
+                      (coerce l 'vector))
+                   :allow-notes nil))
