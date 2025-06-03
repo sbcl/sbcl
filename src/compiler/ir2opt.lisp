@@ -802,6 +802,10 @@
                  (t
                   (return)))))
 
+(defoptimizer (vop-optimize current-stack-pointer) (vop)
+  (unless (tn-reads (tn-ref-tn (vop-results vop)))
+    (delete-vop vop)))
+
 ;;; Load the WIDETAG once for a series of type tests.
 (when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
   (defoptimizer (vop-optimize %other-pointer-subtype-p) (vop)
