@@ -294,10 +294,8 @@
 (declaim (freeze-type stmt))
 (defmethod print-object ((stmt stmt) stream)
   (print-unreadable-object (stmt stream :type t :identity t)
-    (awhen (stmt-labels stmt)
-      (princ it stream)
-      (write-char #\space stream))
-    (princ (stmt-mnemonic stmt) stream)))
+    (format stream "~@[~A ~]~A ~:S"
+            (stmt-labels stmt) (stmt-mnemonic stmt) (stmt-operands stmt))))
 
 ;;; A section is just a doubly-linked list of statements with a head and
 ;;; tail pointer to allow insertion anywhere,
@@ -1397,9 +1395,11 @@
   (defun extract-prefix-keywords (x) x)
   (defun decode-prefix (args) args))
 
-(defun dump-symbolic-asm (section stream &aux last-vop all-labels (n 0))
+(defun dump-symbolic-asm (start stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
-  (do ((statement (stmt-next (section-start section)) (stmt-next statement))
+  (when (eq (stmt-mnemonic start) :ignore)
+    (setq start (stmt-next start))) ; Skip dummy head of statement list
+  (do ((statement start (stmt-next statement))
        (*print-pretty* nil))
       ((null statement))
     (incf n)
@@ -1474,7 +1474,7 @@
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (when (and sb-c::*compiler-trace-output*
                (memq :symbolic-asm sb-c::*compile-trace-targets*))
-      (dump-symbolic-asm section sb-c::*compiler-trace-output*))
+      (dump-symbolic-asm (section-start section) sb-c::*compiler-trace-output*))
     (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
         ((null statement))
       (awhen (stmt-vop statement) (setq *current-vop* it))
