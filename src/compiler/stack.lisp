@@ -57,16 +57,12 @@
   (let* ((2block (block-info block))
          (end (ir2-block-end-stack 2block)))
     (dolist (succ (block-succ block))
-      (let ((succ-start (ir2-block-start-stack (block-info succ))))
-        (setq end (union end succ-start))))
+      (let ((2succ (block-info succ)))
+        (setq end (union end (ir2-block-start-stack 2succ)))))
     (do-nested-cleanups (cleanup block)
       (dolist (nlx-info (cleanup-nlx-info cleanup))
-        (let* ((target (nlx-info-target nlx-info))
-               (target-start (ir2-block-start-stack (block-info target)))
-               (exit-lvar (node-lvar (block-last target))))
-          (setq end (union end (if exit-lvar
-                                   (remove exit-lvar target-start)
-                                   target-start)))))
+        (let ((2target (block-info (nlx-info-target nlx-info))))
+          (setq end (union end (ir2-block-start-stack 2target)))))
       (when (eq (cleanup-kind cleanup) :dynamic-extent)
         (let ((info (dynamic-extent-info (cleanup-mess-up cleanup))))
           (when info
@@ -74,11 +70,9 @@
 
     (setf (ir2-block-end-stack 2block) end)
 
-    (let ((start (union
-                  (set-difference end (ir2-block-pushed 2block))
-                  (ir2-block-popped 2block))))
-      (when *check-consistency*
-        (aver (subsetp (ir2-block-start-stack 2block) start)))
+    (let ((start (union (set-difference end (ir2-block-pushed 2block))
+                        (ir2-block-popped 2block))))
+      (aver (subsetp (ir2-block-start-stack 2block) start))
       (cond ((subsetp start (ir2-block-start-stack 2block))
              nil)
             (t
