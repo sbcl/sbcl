@@ -28,6 +28,7 @@
                   (make-fixup ,name :linkage-cell))))
 
 (defun call-static-fun (fun arg-count &optional (optimize t))
+  (declare (ignorable optimize))
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 2))
@@ -38,6 +39,7 @@
   (inst pop rbp-tn))
 
 (defun tail-call-static-fun (fun arg-count &optional (optimize t))
+  (declare (ignorable optimize))
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn n-word-bytes)
