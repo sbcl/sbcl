@@ -189,12 +189,6 @@
   (if stack-allocate-p
       (assemble ()
         (cond ((aligned-stack-p stack-allocate-p)
-               (assemble ()
-                 (inst tst csp-tn lowtag-mask)
-                 (inst b :eq skip)
-                 (inst add csp-tn csp-tn 8)
-                 (error-call nil 'sb-kernel::unreachable-error)
-                 skip)
                (move tmp-tn csp-tn)
                (inst add csp-tn csp-tn (add-sub-immediate size result-tn))
                (inst add result-tn tmp-tn lowtag))
