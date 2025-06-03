@@ -12,17 +12,7 @@
 (in-package "SB-VM")
 
 #-sb-assembling ; avoid redefinition warning
-(macrolet ((static-fun-addr (name)
-             #-immobile-code `(ea (make-fixup ,name :linkage-cell) null-tn)
-             ;; Caution: this looks like it jumps to the linkage cell's address,
-             ;; and that is indeed what it would do if it were not for the fact that
-             ;; genesis recognizes that this isn't right, and instead does what you mean.
-             ;; i.e. genesis resolves a :LINKAGE-CELL fixup differently in asm code.
-             ;; Though a new fixup flavor would be technically correct, it would not
-             ;; be generally usable after self-build because we don't have direct jumps
-             ;; between simple-funs. (However, editcore can and will cause it to occur)
-             #+immobile-code `(make-fixup ,name :linkage-cell)))
-
+(progn
 (defun both-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst or :dword temp y)
@@ -31,26 +21,7 @@
 (defun some-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst and :dword temp y)
-  (inst test :byte temp fixnum-tag-mask))
-
-(defun call-static-fun (fun arg-count)
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn (* n-word-bytes 2))
-  (inst mov (ea rsp-tn) rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst mov rcx-tn (fixnumize arg-count))
-  (inst call (static-fun-addr fun))
-  (inst pop rbp-tn))
-
-(defun tail-call-static-fun (fun arg-count)
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn n-word-bytes)
-  (inst push (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
-  (inst mov rcx-tn (fixnumize arg-count))
-  (inst jmp (static-fun-addr fun))))
-
+  (inst test :byte temp fixnum-tag-mask)))
 
 ;;;; addition, subtraction, and multiplication
 

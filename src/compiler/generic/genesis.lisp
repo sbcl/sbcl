@@ -2897,10 +2897,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
       ;; at assembly time, they can all be sorted at this point.
       ;; We used to combine them with some magic in genesis.
       (setq *asm-routine-alist* (sort table #'< :key #'cdr)))
+    (setf *asm-deferred-fixups* nil)
     (let ((stack (%fasl-input-stack (fasl-input))))
-      (setf *asm-deferred-fixups*
-            (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts)
-                          n-fixup-elts t)))
+      (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts)
+                    n-fixup-elts t))
     #+(or x86 x86-64) ; fill in the indirect call table
     (let ((base (code-header-words asm-code))
           (index 0))
@@ -2935,7 +2935,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defun apply-fixups (code-obj fixups index count &optional asm-code
                      &aux (end (1- (+ index count)))
                           (retained-fixups (svref fixups index))
-                          deferred-fixups
                           callees)
   (declare (ignorable callees asm-code))
   (incf index)
@@ -2956,12 +2955,17 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (base-string-from-core name))))
       (cond
         #+(and x86-64 immobile-space)
-        ((and asm-code (eq flavor :linkage-cell))
+        ((and asm-code (eq flavor :linkage-cell)
          ;; asm routines that call Lisp can jump directly to a simple-fun entrypoint,
          ;; bypassing the linkage table. The function's address is not known yet though.
          ;; Loading all asm code first makes resolving lisp-to-asm calls simpler,
          ;; at the expense of asm-to-lisp resolution being deferred.
-         (push (list kind offset name) deferred-fixups))
+              (member (sap-ref-8 (code-instructions code-obj) (1- offset))
+                      ;; Alter the address only if the call/jmp operand is of
+                      ;; rel32 form, not [ea] form. The byte preceding the operand
+                      ;; determines which instruction flavor we're looking at.
+                      '(#xE8 #xE9)))
+         (push (list kind offset name) *asm-deferred-fixups*))
         (t
          (cold-fixup
            code-obj offset
@@ -2995,7 +2999,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                       (sb-c::join-varint-streams (sb-c:pack-code-fixup-locs callees)
                                                  (host-object-from-core retained-fixups)))
                      #-linkage-space retained-fixups)
-  deferred-fixups)
+  t)
 
 ;;;; sanity checking space layouts
 

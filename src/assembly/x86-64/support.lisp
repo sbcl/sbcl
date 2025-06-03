@@ -9,6 +9,42 @@
 
 (in-package "SB-VM")
 
+(macrolet ((static-fun-addr (name optimize)
+             (declare (ignorable optimize))
+             #-immobile-code `(ea (make-fixup ,name :linkage-cell) null-tn)
+             ;; With immobile code, there is a choice of calling to the simple-fun
+             ;; entrypoint ("optimized"), or through the linkage cell ("deoptimized").
+             ;; Only the latter is TRACEable.
+             #+immobile-code
+             `(if (not ,optimize)
+                  (rip-relative-ea (make-fixup ,name :linkage-cell))
+                  ;; Caution: this looks like it jumps to the linkage cell's address,
+                  ;; and that is indeed what it would do if it were not for the fact that
+                  ;; genesis recognizes that this isn't right, and instead does what you mean.
+                  ;; i.e. genesis resolves a :LINKAGE-CELL fixup differently in asm code.
+                  ;; Though a new fixup flavor would be technically correct, it would not
+                  ;; be generally usable after self-build because we don't have direct jumps
+                  ;; between simple-funs. (However, editcore can and will cause it to occur)
+                  (make-fixup ,name :linkage-cell))))
+
+(defun call-static-fun (fun arg-count &optional (optimize t))
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst sub rsp-tn (* n-word-bytes 2))
+  (inst mov (ea rsp-tn) rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst mov rcx-tn (fixnumize arg-count))
+  (inst call (static-fun-addr fun optimize))
+  (inst pop rbp-tn))
+
+(defun tail-call-static-fun (fun arg-count &optional (optimize t))
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst sub rsp-tn n-word-bytes)
+  (inst push (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
+  (inst mov rcx-tn (fixnumize arg-count))
+  (inst jmp (static-fun-addr fun optimize))))
+
 (defun test-cpu-feature (bit-number)
   (multiple-value-bind (byte bit) (floor bit-number n-byte-bits)
     (inst test :byte (static-constant-ea cpu-feature-bits byte) (ash 1 bit))))
