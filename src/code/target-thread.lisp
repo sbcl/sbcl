@@ -726,18 +726,18 @@ returns NIL each time."
 
 (defun %try-mutex (mutex)
   (declare (type mutex mutex) (optimize (speed 3)))
-  (cond #+sb-futex
-        (t
+
+  #+sb-futex
          ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
          (let ((id (current-vmthread-id)))
            (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
                   (setf (mutex-%owner mutex) id)
                   t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
                  ((= (mutex-%owner mutex) id)
-                  (error "Recursive lock attempt ~S." mutex)))))
-        #-sb-futex
-        (t
-         (barrier (:read))
+                  (error "Recursive lock attempt ~S." mutex))))
+
+  #-sb-futex
+  (progn (barrier (:read))
          (let ((old (mutex-%owner mutex)))
            (when (= (current-vmthread-id) old)
              (error "Recursive lock attempt ~S." mutex))
@@ -747,7 +747,7 @@ returns NIL each time."
            (and (zerop old)
                 ;; Don't even bother to try to CAS if it looks bad.
                 (zerop (sb-ext:compare-and-swap (mutex-%owner mutex) 0
-                                                (current-vmthread-id))))))))
+                                                (current-vmthread-id)))))))
 
 ;;; memory aid: this is "pthread_mutex_timedlock" without the pthread
 ;;; and no messing about with *DEADLINE* or deadlocks. It's just locking.
@@ -756,9 +756,6 @@ returns NIL each time."
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (declare (ignorable to-sec to-usec))
-  (cond
-   #+sb-futex
-   (t
     ;; This is a fairly direct translation of the Mutex 2 algorithm from
     ;; "Futexes are Tricky" by Ulrich Drepper.
     ;;
@@ -771,7 +768,8 @@ returns NIL each time."
     ;;    } while ((c = cmpxchg(val, 0, 2)) != 0);
     ;; }
     ;;
-    (symbol-macrolet ((val (mutex-state mutex)))
+  #+sb-futex
+  (symbol-macrolet ((val (mutex-state mutex)))
       (let ((c (sb-ext:cas val 0 1))) ; available -> taken
         (unless (= c 0) ; Got it right off the bat?
           (nlx-protect
@@ -800,10 +798,10 @@ returns NIL each time."
            (with-pinned-objects (mutex)
              (futex-wake (mutex-state-address mutex) 1)))))
       (setf (mutex-%owner mutex) (current-vmthread-id))
-      t))
-   #-sb-futex
-   (t
-    (flet ((cas ()
+      t)
+
+  #-sb-futex
+  (flet ((cas ()
            (loop repeat 100
                  when (and (progn (barrier (:read))
                                   (zerop (mutex-%owner mutex)))
@@ -816,7 +814,7 @@ returns NIL each time."
            ;; Check for pending interrupts.
            (with-interrupts nil)))
       (declare (dynamic-extent #'cas))
-      (%%wait-for #'cas stop-sec stop-usec)))))
+      (%%wait-for #'cas stop-sec stop-usec)))
 
 #+ultrafutex
 (progn
@@ -1109,10 +1107,8 @@ IF-NOT-OWNER is :FORCE)."
       (without-interrupts
         (nlx-protect-futex
          (unwind-protect
-              (cond
                 #+sb-futex
-                (t
-                 (with-pinned-objects (queue)
+                (with-pinned-objects (queue)
                    (setf (waitqueue-token queue) (my-kernel-thread-id))
                    (release-mutex mutex)
                    ;; Now we go to sleep using futex-wait. If anyone else
@@ -1135,9 +1131,9 @@ IF-NOT-OWNER is :FORCE)."
                             ;; -1 = EWOULDBLOCK, possibly spurious wakeup
                             ;;  0 = normal wakeup
                             ;;  2 = EINTR, a spurious wakeup
-                            :ok)))))
+                            :ok))))
                 #-sb-futex
-                (t
+                (progn
                  (%with-cas-lock ((waitqueue-%owner queue))
                    (%waitqueue-enqueue me queue))
                  (release-mutex mutex)
@@ -1149,7 +1145,7 @@ IF-NOT-OWNER is :FORCE)."
                              (declare (dynamic-extent #'wakeup))
                              (allow-with-interrupts
                                (%%wait-for #'wakeup stop-sec stop-usec)))
-                           :timeout))))
+                           :timeout)))
            #-sb-futex
            (%with-cas-lock ((waitqueue-%owner queue))
              (if (eq queue (thread-waiting-for me))
@@ -1268,14 +1264,10 @@ associated data:
 
 IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
 must be held by this thread during this call."
-  #-sb-thread
-  (declare (ignore queue n))
-  #-sb-thread
-  (error "Not supported in unithread builds.")
-  #+sb-thread
-  (cond
-   #+sb-futex
-   (t
+  (declare (ignorable queue n))
+  #-sb-thread (error "Not supported in unithread builds.")
+  #+sb-futex
+  (progn
       ;; No problem if >1 thread notifies during the comment in condition-wait:
       ;; as long as the value in queue-data isn't the waiting thread's id, it
       ;; matters not what it is. We rely on kernel thread ID being nonzero.
@@ -1288,11 +1280,8 @@ must be held by this thread during this call."
       (with-pinned-objects (queue)
         (futex-wake (waitqueue-token-address queue) n))
       nil)
-   #-sb-futex
-   (t
-    (with-cas-lock ((waitqueue-%owner queue))
-      (%waitqueue-wakeup queue n)))))
-
+  #+(and sb-thread (not sb-futex))
+  (with-cas-lock ((waitqueue-%owner queue)) (%waitqueue-wakeup queue n)))
 
 (declaim (ftype (sfunction (waitqueue) null) condition-broadcast))
 (defun condition-broadcast (queue)
