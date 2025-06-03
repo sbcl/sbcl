@@ -2320,7 +2320,7 @@
          (print (list v set (lambda ())))
          3)))))
 
-(with-test (:name :stack-analysis-preserve.nested-inline.2)
+(with-test (:name :stack-analysis-preserve.dx-node)
   (let ((sb-c::*check-consistency* t))
     (checked-compile
      '(lambda (b c d)
@@ -2334,7 +2334,7 @@
                 (restart-bind nil
                   (return-from b5 (- d c)))))))))))))
 
-(with-test (:name :stack-analysis-preserve.nested-inline.3)
+(with-test (:name :stack-analysis-preserve.dx-node-1)
   (let ((sb-c::*check-consistency* t))
     (checked-compile
      '(lambda ()
@@ -2345,6 +2345,18 @@
          (declare (dynamic-extent x y z))
          (print-nothing (list x y z))
          nil)))))
+
+(with-test (:name :stack-analysis-preserve.functional-ref)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile
+     '(lambda (v)
+       (loop repeat 2
+             collect
+             (flet ((l (x)
+                      x
+                      v))
+               (mapcar #'l v)
+               (map nil #'l v)))))))
 
 (with-test (:name :encode-error-break-large-immediate)
   (disassemble '(lambda ()

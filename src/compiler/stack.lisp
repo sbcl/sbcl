@@ -161,7 +161,7 @@
                 ;; object identity must be preserved and we can't in
                 ;; general track all references.
                 ((memq info stack)
-                 (unless (dynamic-extent-p node)
+                 (when (or (enclose-p node) (combination-p node))
                    (do-nested-cleanups (cleanup node)
                      (when (eq (cleanup-kind cleanup) :dynamic-extent)
                        (let ((mess-up (cleanup-mess-up cleanup)))
