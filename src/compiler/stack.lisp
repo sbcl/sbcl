@@ -35,8 +35,7 @@
               (when (and 2lvar
                          (or (and (not (eq (node-block dest) block))
                                   (eq (ir2-lvar-kind 2lvar) :unknown)
-                                  (not (and (basic-combination-p node)
-                                            (node-tail-p node))))
+                                  (not (node-tail-p node)))
                              (eq (ir2-lvar-kind 2lvar) :stack)))
                 (aver (or saw-last (not last-pop)))
                 (pushed lvar))))))

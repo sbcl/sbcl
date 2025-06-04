@@ -661,8 +661,8 @@
             (when (and (immediately-used-p result use)
                        (not (and (combination-p use)
                                  (lvar-fun-is (combination-fun use) '(break))))
+                       (basic-combination-p use)
                        (or (not (eq (node-derived-type use) *empty-type*))
-                           (not (basic-combination-p use))
                            ;; This prevents external entry points from
                            ;; showing up in the backtrace: we always
                            ;; want tail calls inside XEPs to the
