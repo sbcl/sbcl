@@ -572,6 +572,10 @@ unregister_thread(struct thread *th,
     for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
         CloseHandle(thread_private_events(th,i));
 #endif
+    /* Thread structs are reused and their guard pages are not
+     * reestablished. */
+    if (!th->state_word.control_stack_guard_page_protected)
+        reset_thread_control_stack_guard_page(th);
 
     /* Undo the association of the current pthread to its `struct thread',
      * such that we can call get_sb_vm_thread() later in this
