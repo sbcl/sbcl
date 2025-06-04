@@ -166,12 +166,11 @@
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
 
-(define-vop (move-from-double)
+(define-allocator (move-from-double)
   (:args (x :scs (double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
   (:node-var node)
   (:note "float to pointer coercion")
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:generator 13
      (alloc-other double-float-widetag double-float-size y node nil thread-tn)
      (inst movsd (ea-for-df-desc y) x)))
@@ -221,10 +220,9 @@
 
 ;;; Move from complex float to a descriptor reg. allocating a new
 ;;; complex float object in the process.
-(define-vop (move-from-complex-single)
+(define-allocator (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
@@ -233,10 +231,9 @@
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
-(define-vop (move-from-complex-double)
+(define-allocator (move-from-complex-double)
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13

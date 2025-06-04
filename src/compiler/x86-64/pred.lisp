@@ -263,7 +263,6 @@
   (:generator 3
     (let* ((x (tn-value x-tn))
            (y (tn-value y-tn))
-           #+gs-seg (thread-tn nil)
            (hint (computable-from-flags-p res x y flags))
            (flag (car (conditional-flags-flags flags))))
       (ecase hint

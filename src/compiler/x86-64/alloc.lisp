@@ -411,7 +411,7 @@
   (when result
     (finish-list alloc result)))
 
-(define-vop (cons)
+(define-allocator (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
          (cdr :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
@@ -421,7 +421,6 @@
   (:temporary (:unused-if (not (consing-singleton-nil-p car cdr)) :sc sse-reg)
               xmmtemp)
   (:results (result :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:vop-var vop)
   (:node-var node)
   (:generator 10
@@ -481,14 +480,13 @@
 ;;; Also: Since alists tend to be persistent storage structures, there is probably
 ;;; not a lot of benefit to ACONS recognizing DX, though it couldn't hurt to have it,
 ;;; perhaps to temporarily add a key to a mapping.
-(define-vop (acons)
+(define-allocator (acons)
   (:args (key :scs (any-reg descriptor-reg constant immediate control-stack))
          (val :scs (any-reg descriptor-reg constant immediate control-stack))
          (tail :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
   (:temporary (:sc unsigned-reg :to (:result 0)) temp)
   (:results (result :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:translate acons)
   (:policy :fast-safe)
@@ -504,7 +502,7 @@
 
 ;;; CONS-2 is similar to ACONS, except that instead of producing
 ;;;  ((X . Y) . Z) it produces (X Y . Z)
-(define-vop (cons-2)
+(define-allocator (cons-2)
   (:args (car :scs (any-reg descriptor-reg constant immediate control-stack))
          (cadr :scs (any-reg descriptor-reg constant immediate control-stack))
          (cddr :scs (any-reg descriptor-reg constant immediate control-stack)))
@@ -513,7 +511,6 @@
                :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
               temp)
   (:results (result :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:vop-var vop)
   (:node-var node)
   (:generator 10
@@ -537,11 +534,10 @@
            (storew temp alloc cons-cdr-slot 0)
            (init-list alloc temp result #(0 2 3) (list car cadr cddr))))))))
 
-(define-vop (list)
+(define-allocator (list)
   (:args (things :more t :scs (descriptor-reg any-reg constant immediate)))
   (:temporary (:sc unsigned-reg) temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -699,7 +695,7 @@
                 (inst shl temp 4)
                 (inst mov (ea (- 8 other-pointer-lowtag) ,vector) temp))))
 
-  (define-vop (allocate-vector-on-heap)
+  (define-allocator (allocate-vector-on-heap)
     #+ubsan (:info poisoned)
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
@@ -710,7 +706,6 @@
     (:arg-types #+ubsan (:constant t)
                 positive-fixnum positive-fixnum positive-fixnum)
     (:temporary (:sc unsigned-reg) temp)
-    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
@@ -927,7 +922,7 @@
         (storew null-tn tail cons-cdr-slot list-pointer-lowtag))
       done))
 
-  (define-vop (allocate-list-on-heap)
+  (define-allocator (allocate-list-on-heap)
     (:args (length :scs (any-reg immediate))
            ;; Too bad we don't have an SC that implies actually a CPU immediate
            ;; i.e. fits in an imm32 operand
@@ -937,7 +932,6 @@
     (:policy :fast-safe)
     (:node-var node)
     (:temporary (:sc descriptor-reg) tail next limit)
-    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:generator 20
       (multiple-value-bind (size scale)
           ;; Multiply by 8 in ALLOCATION, not here, if possible.
@@ -975,21 +969,19 @@
          ALLOC-DONE))
       done))) ; label needed by calc-size-in-bytes
 
-(define-vop (make-fdefn)
+(define-allocator (make-fdefn)
   (:policy :fast-safe)
   (:translate make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:results (result :scs (descriptor-reg) :from :argument))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 37
     (alloc-other fdefn-widetag fdefn-size result node nil thread-tn
       (lambda () (storew name result fdefn-name-slot other-pointer-lowtag)))))
 
-(define-vop (make-closure)
+(define-allocator (make-closure)
   (:info label length stack-allocate-p)
   (:temporary (:sc any-reg) temp)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:vop-var vop)
@@ -1030,11 +1022,10 @@
     (inst lea result (rip-relative-ea label fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
-(define-vop (make-value-cell)
+(define-allocator (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg) :to :result
                 :load-if (not (reg-or-legal-imm32-p value))))
   (:results (result :scs (descriptor-reg) :from :eval))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 10
     (alloc-other value-cell-widetag value-cell-size result node nil thread-tn
@@ -1085,11 +1076,10 @@
       (inst or :byte result lowtag))))
   ;; DX is strictly redundant in these 2 vops, but they're written this way
   ;; so that backends can choose to use a single vop for both.
-  (define-vop (fixed-alloc)
+  (define-allocator (fixed-alloc)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg) alloc-temp)
-    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
     (:vop-var vop)
     (:node-var node)
     (:generator 50 (alloc vop name words type lowtag dx result alloc-temp node)))
@@ -1107,7 +1097,7 @@
 ;;;  INSTANCE             (%MAKE-INSTANCE,%MAKE-INSTANCE/MIXED)
 ;;; WORDS accounts for the mandatory slots *including* the header.
 ;;; EXTRA is the variable payload, also measured in words.
-(define-vop (var-alloc)
+(define-allocator (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:info name words type lowtag stack-allocate-p)
@@ -1116,7 +1106,6 @@
   (:temporary (:sc unsigned-reg :from :eval :to :result) header)
   ;; KLUDGE: wire to RAX so that it doesn't get R12
   (:temporary (:sc unsigned-reg :offset 0) alloc-temp)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:vop-var vop)
   (:generator 50

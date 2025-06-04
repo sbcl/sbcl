@@ -61,7 +61,7 @@
 
 ;;;; allocator for the array header
 
-(define-vop (make-array-header)
+(define-allocator (make-array-header)
   (:translate make-array-header)
   (:policy :fast-safe)
   (:args (type :scs (any-reg))
@@ -70,7 +70,6 @@
   (:temporary (:sc any-reg :to :eval) bytes)
   (:temporary (:sc any-reg :to :result) header)
   (:temporary (:sc unsigned-reg) temp)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 13

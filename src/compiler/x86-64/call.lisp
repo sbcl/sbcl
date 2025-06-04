@@ -1313,7 +1313,7 @@
 ;;; as a boxed payload of specified length. It will be implicitly pinned
 ;;; (if conservative) or transported as a whole (if precise). Then when the CAR
 ;;; of the first cons is overwritten, the object changes to a linked list.
-(define-vop ()
+(define-allocator (%listify-rest-args)
   (:translate %listify-rest-args)
   (:policy :safe)
   ;; CONTEXT is used throughout the copying loop
@@ -1327,7 +1327,6 @@
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 1)) rcx)
   ;; Note that DST conflicts with RESULT because we use both as temps
   (:temporary (:sc unsigned-reg) value dst)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20

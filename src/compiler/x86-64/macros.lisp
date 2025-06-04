@@ -217,6 +217,11 @@
       #-int1-breakpoints (inst break pending-interrupt-trap))
       OUT)))
 
+(defmacro define-allocator (name &body body)
+  `(define-vop ,name
+     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+     ,@body))
+
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.

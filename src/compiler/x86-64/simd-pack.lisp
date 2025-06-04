@@ -83,10 +83,9 @@
 (macrolet ((define-move-from-sse (type tag &rest scs)
              (let ((name (symbolicate "MOVE-FROM-SSE/" type)))
                `(progn
-                  (define-vop (,name)
+                  (define-allocator (,name)
                     (:args (x :scs ,scs))
                     (:results (y :scs (descriptor-reg)))
-                    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
                     (:node-var node)
                     (:arg-types ,type)
                     (:note "AVX2 to pointer coercion")
@@ -186,7 +185,7 @@
   (:generator 1
     (inst pextrq dst x 1)))
 
-(define-vop (%make-simd-pack)
+(define-allocator (%make-simd-pack)
   (:translate %make-simd-pack)
   (:policy :fast-safe)
   (:args (tag :scs (any-reg))
@@ -195,7 +194,6 @@
   (:arg-types tagged-num unsigned-num unsigned-num)
   (:results (dst :scs (descriptor-reg) :from :load))
   (:result-types t)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:generator 13
     (alloc-other simd-pack-widetag simd-pack-size dst node nil thread-tn)
