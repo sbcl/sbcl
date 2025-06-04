@@ -247,6 +247,7 @@
       ,(maybe "SB-IMPL" "*RUN-GC-HOOKS*")
       ,(maybe "SB-VM" "*FNAME-MAP-AVAILABLE-ELTS*")
       ,(maybe "SB-VM" "*FNAME-MAP-OBSERVED-GC-EPOCH*")
+      ,(maybe "SB-UNIX" "*SIGHANDLER-THREAD*")
       sb-impl::**finalizer-store**
       sb-impl::*finalizer-rehashlist*
       sb-impl::*finalizers-triggered*

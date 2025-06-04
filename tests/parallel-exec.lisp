@@ -26,7 +26,7 @@
 
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
-#+(and x86-64 linux sb-thread)
+#+(and x86-64 linux sb-thread (not sb-safepoint))
   (unless (or (find :mark-region-gc sb-impl:+internal-features+)
               ;; %LISTIFY-REST-ARGS has a problem with profiling because it uses
               ;; the JRCXZ instruction, which can only take an 8-bit signed disp.
