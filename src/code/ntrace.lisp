@@ -440,7 +440,9 @@
                        nil))
             (values-list vals)))))))
 
-(defun sb-pcl::maybe-trace-method (gf method fun fmf-p)
+;;; Want to avoid a redef warning, but can't fmakunbound this for
+;;; even a second, or you'll lose big.
+(defun maybe-trace-method (gf method fun fmf-p)
   (let ((m-name (when (plusp (hash-table-count sb-debug::*traced-funs*))
                   ;; FIXME: We no longer need this test for bootstrap
                   ;; reasons, but rather that a bunch of tests fail
@@ -460,6 +462,7 @@
           (lambda (&rest args)
             (apply #'trace-method-call info fun fmf-p args))
           fun))))
+(setf (symbol-function 'sb-pcl::maybe-trace-method) #'maybe-trace-method)
 
 ;;; Trace one function according to the specified options. We copy the
 ;;; trace info (it was a quoted constant), fill in the functions, and
