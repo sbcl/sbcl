@@ -28,9 +28,8 @@
   (:args (sap :scs (sap-reg) :to :result))
   (:results (res :scs (descriptor-reg) :from :argument))
   (:note "SAP to pointer coercion")
-  (:node-var node)
   (:generator 20
-    (alloc-other sap-widetag sap-size res node nil thread-tn)
+    (alloc-other sap-widetag sap-size res)
     (storew sap res sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))

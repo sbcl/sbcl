@@ -169,10 +169,9 @@
 (define-allocator (move-from-double)
   (:args (x :scs (double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (alloc-other double-float-widetag double-float-size y node nil thread-tn)
+     (alloc-other double-float-widetag double-float-size y)
      (inst movsd (ea-for-df-desc y) x)))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
@@ -223,10 +222,9 @@
 (define-allocator (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (alloc-other complex-single-float-widetag complex-single-float-size y node nil thread-tn)
+     (alloc-other complex-single-float-widetag complex-single-float-size y)
      (inst movlps (ea-for-csf-data-desc y) x)))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -234,10 +232,9 @@
 (define-allocator (move-from-complex-double)
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (alloc-other complex-double-float-widetag complex-double-float-size y node nil thread-tn)
+     (alloc-other complex-double-float-widetag complex-double-float-size y)
      (inst movapd (ea-for-cdf-data-desc y) x)))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))

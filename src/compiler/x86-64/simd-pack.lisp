@@ -86,11 +86,10 @@
                   (define-allocator (,name)
                     (:args (x :scs ,scs))
                     (:results (y :scs (descriptor-reg)))
-                    (:node-var node)
                     (:arg-types ,type)
                     (:note "AVX2 to pointer coercion")
                     (:generator 13
-                      (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
+                      (alloc-other simd-pack-widetag simd-pack-size y)
                       (storew (fixnumize ,tag)
                               y simd-pack-tag-slot other-pointer-lowtag)
                       (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
@@ -194,9 +193,8 @@
   (:arg-types tagged-num unsigned-num unsigned-num)
   (:results (dst :scs (descriptor-reg) :from :load))
   (:result-types t)
-  (:node-var node)
   (:generator 13
-    (alloc-other simd-pack-widetag simd-pack-size dst node nil thread-tn)
+    (alloc-other simd-pack-widetag simd-pack-size dst)
       ;; see +simd-pack-element-types+
     (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
     (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)

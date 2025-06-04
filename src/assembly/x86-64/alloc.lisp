@@ -28,11 +28,13 @@
 ;;;;      is zeroized to ensure that the result is a positive bignum.
 #+sb-assembling
 (macrolet
-    ((signed (reg)
+    ((alloc-other (&rest rest)
+       `(emit-alloc-other nil thread-tn ,@rest))
+     (signed (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
-          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number)
           (popw number bignum-digits-offset other-pointer-lowtag)))
      (unsigned (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
@@ -42,11 +44,11 @@
           (inst push number)
           (inst jmp :ns one-word-bignum)
           ;; Two word bignum
-          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number)
           (popw number bignum-digits-offset other-pointer-lowtag)
           (inst ret)
           ONE-WORD-BIGNUM
-          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) number)
           (popw number bignum-digits-offset other-pointer-lowtag)))
      (from-digits (reg)
        ;; stack args:
@@ -57,12 +59,12 @@
             ((:temp result unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst test :byte result result) ; is-two-digit flag
           (inst jmp :z one-word-bignum)
-          (alloc-other bignum-widetag (+ bignum-digits-offset 2) result nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) result)
           (inst movdqu float0-tn (ea 8 rsp-tn))
           (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
-          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result)
           (inst movq float0-tn (ea 8 rsp-tn))
           (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16)))
@@ -79,7 +81,7 @@
           (inst jmp :z one-word-bignum)
           ;; Since 2 digits and 3 digits consume the same number of bytes
           ;; due to padding, they can share the allocation request.
-          (alloc-other bignum-widetag (+ bignum-digits-offset 3) result nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 3) result)
           (inst movdqu float0-tn (ea 8 rsp-tn))
           (inst movdqu (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           ;; don't assume prezeroed unboxed pages. (zeroize word even if 2-digit result)
@@ -93,7 +95,7 @@
           SKIP
           (inst ret 16) ; pop args
           ONE-WORD-BIGNUM
-          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 1) result)
           (inst movq float0-tn (ea 8 rsp-tn))
           (inst movq (object-slot-ea result 1 other-pointer-lowtag) float0-tn)
           (inst ret 16)))
@@ -105,7 +107,7 @@
           (inst set :c number)
           (inst movzx '(:byte :dword) number number)
           (inst push number)
-          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
+          (alloc-other bignum-widetag (+ bignum-digits-offset 2) number)
           (inst pop (object-slot-ea number 2 other-pointer-lowtag))
           (inst pop (object-slot-ea number 1 other-pointer-lowtag))
           (inst ret)))

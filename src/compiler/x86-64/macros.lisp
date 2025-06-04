@@ -217,10 +217,17 @@
       #-int1-breakpoints (inst break pending-interrupt-trap))
       OUT)))
 
-(defmacro define-allocator (name &body body)
+(defmacro define-allocator (name &body body &aux (g (cdr (assoc :generator body))))
   `(define-vop ,name
      #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-     ,@body))
+     ,@(remove :generator body :key 'car)
+     (:node-var node)
+     (:generator ,(car g) ; cost
+       (macrolet
+           ((instrument-alloc (&rest args) `(emit-instrument-alloc node thread-tn ,@args))
+            (allocation (&rest args) `(emit-allocation node thread-tn ,@args))
+            (alloc-other (&rest args) `(emit-alloc-other node thread-tn ,@args)))
+         (assemble () ,@(cdr g)))))) ; forms
 
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,

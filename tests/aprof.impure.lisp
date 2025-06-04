@@ -70,9 +70,9 @@ sb-vm::
     (let* ((bytes large-object-size) ; payload + header total
            (temp sb-vm::r11-tn)
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
-      (instrument-alloc nil bytes node temp)
+      (emit-instrument-alloc node thread-tn nil bytes temp)
       (pseudo-atomic ()
-       (allocation nil bytes 0 result node temp nil)
+       (emit-allocation node sb-vm::thread-tn nil bytes 0 result temp)
        (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
        (storew* (fixnumize words) result vector-length-slot 0 t)
        (inst or :byte result other-pointer-lowtag)))))

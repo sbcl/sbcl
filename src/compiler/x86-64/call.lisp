@@ -1302,17 +1302,8 @@
     done))
 
 ;;; Turn more arg (context, count) into a list.
-;;; Cons cells will be filled in right-to-left.
-;;; This has a slight advantage in code size, and eliminates an initial
-;;; forward jump into the loop. it also admits an interesting possibility
-;;; to reduce the scope of the pseudo-atomic section so as not to
-;;; encompass construction of the list. To do that, we will need to invent
-;;; a new widetag for "contiguous CONS block" which has a header conveying
-;;; the total payload length. Initially we would store that into the CAR of the
-;;; first cons cell. Upon seeing such header, GC shall treat that entire object
-;;; as a boxed payload of specified length. It will be implicitly pinned
-;;; (if conservative) or transported as a whole (if precise). Then when the CAR
-;;; of the first cons is overwritten, the object changes to a linked list.
+;;; Cons cells will be filled in right-to-left which has a minor advantage
+;;; in code size.
 (define-allocator (%listify-rest-args)
   (:translate %listify-rest-args)
   (:policy :safe)
@@ -1328,7 +1319,6 @@
   ;; Note that DST conflicts with RESULT because we use both as temps
   (:temporary (:sc unsigned-reg) value dst)
   (:results (result :scs (descriptor-reg)))
-  (:node-var node)
   (:generator 20
 #|
     ;; TODO: if instrumenting, just revert to the older way of precomputing
@@ -1350,7 +1340,7 @@
            (inst jmp :z done)))
     (when (and (not (node-stack-allocate-p node)) (instrument-alloc-policy-p node))
       (inst shl :dword rcx word-shift) ; compute byte count
-      (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn)
+      (instrument-alloc +cons-primtype+ rcx (list value dst))
       (inst shr :dword rcx word-shift)) ; undo the computation
     (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
@@ -1362,7 +1352,7 @@
                     (stack-allocation rcx 0 dst)
                     1)
                    (t
-                    (allocation +cons-primtype+ rcx 0 dst node value thread-tn
+                    (allocation +cons-primtype+ rcx 0 dst value
                        :scale 8
                        :overflow
                        (lambda ()

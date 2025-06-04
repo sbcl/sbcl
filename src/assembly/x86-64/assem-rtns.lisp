@@ -549,9 +549,9 @@
   (inst jmp DONE)
   GROW
   ;; if temps regs were needed here, RAX or RBX would be fine to use and reload
-  (allocation simple-vector-widetag (ash remset-vector-words word-shift)
-              ;; lowtag, result-tn, node, allocation-temp
-              0 rcx-tn nil nil thread-tn :systemp t)
+  (emit-allocation nil thread-tn simple-vector-widetag (ash remset-vector-words word-shift)
+                   ;; lowtag, result-tn, allocation-temp
+                   0 rcx-tn nil :systemp t)
   ;; ASSUMPTION: pre-zeroed memory
   (inst mov :byte (object-slot-ea rcx-tn 0 0) simple-vector-widetag) ; header
   (inst mov :byte (object-slot-ea rcx-tn vector-length-slot 0) remset-vector-len)
