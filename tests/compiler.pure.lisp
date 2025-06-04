@@ -4349,26 +4349,6 @@
                       x)
                    :allow-style-warnings t))
 
-(with-test (:name (compile :bug-959687))
-  (flet ((test (form)
-           (multiple-value-bind (fun failure-p warnings style-warnings)
-               (checked-compile form :allow-failure t :allow-style-warnings t)
-             (declare (ignore warnings))
-             (assert (and failure-p style-warnings))
-             (assert-error(funcall fun t)))))
-    (test `(lambda (x)
-             (case x
-               (t
-                :its-a-t)
-               (otherwise
-                :somethign-else))))
-    (test `(lambda (x)
-             (case x
-               (otherwise
-                :its-an-otherwise)
-               (t
-                :somethign-else))))))
-
 (with-test (:name (compile :bug-924276))
   (assert (nth-value
            3 (checked-compile `(lambda (a)

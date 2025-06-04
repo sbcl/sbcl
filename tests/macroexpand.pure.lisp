@@ -360,10 +360,6 @@
                           (otherwise :bad)))
           '(:good :good :good :good))))
 
-(with-test (:name :typecase-nonfinal-otherwise-errs)
-  (assert-error
-   (macroexpand-1 '(typecase x (cons 1) (otherwise 2) (t 3)))))
-
 (with-test (:name :dolist-type-decls-better)
   (checked-compile
    '(lambda (input &aux (r 0))

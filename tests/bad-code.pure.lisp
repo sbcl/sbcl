@@ -1016,3 +1016,50 @@
     (assert fail)
     (assert warn)
     (assert (= (funcall fun 1) 1))))
+
+(with-test (:name :case-duplicate-t-no-runtime-error)
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       '(lambda (x)
+         (case x
+           (t 1)
+           (t 2)))
+       :allow-warnings t)
+    (assert fail)
+    (assert warn)
+    (assert (= (funcall fun 1) 1)))
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       '(lambda (x)
+         (case x
+           (otherwise 1)
+           (t 2)))
+       :allow-warnings t)
+    (assert fail)
+    (assert warn)
+    (assert (= (funcall fun 1) 1)))
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       '(lambda (x)
+         (typecase x
+           (otherwise 1)
+           (otherwise 2)))
+       :allow-warnings t)
+    (assert fail)
+    (assert warn)
+    (assert (= (funcall fun 1) 1)))
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       '(lambda (x)
+         (case x
+           ()
+           (t 1)))
+       :allow-warnings t)
+    (assert fail)
+    (assert warn)
+    (assert (= (funcall fun 1) 1))))
+
+(with-test (:name :typecase-nonfinal-otherwise-warns)
+  (assert-signal
+      (macroexpand-1 '(typecase x (cons 1) (otherwise 2) (t 3)))
+      warning))

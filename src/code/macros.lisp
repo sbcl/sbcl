@@ -1103,7 +1103,8 @@ invoked. In that case it will store into PLACE and start over."
                        ,(if (and (eq test 'eql) (self-evaluating-p k)) k `',k))))
         (unless (list-of-length-at-least-p clause 1)
           (with-current-source-form (cases)
-            (error "~S -- bad clause in ~S" clause name)))
+            (warn "~S -- bad clause in ~S" clause name)
+            (go next)))
         (with-current-source-form (clause)
           ;; https://sourceforge.net/p/sbcl/mailman/message/11863996/ contains discussion
           ;; of whether to warn when seeing OTHERWISE in a normal-clause position, but
@@ -1123,24 +1124,32 @@ invoked. In that case it will store into PLACE and start over."
                    (cond ((null (cdr cases))
                           (push `(t ,@forms) clauses))
                          ((eq name 'case)
-                          (error 'simple-reference-error
-                                 :format-control
-                            "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
+                          (push `(t ,@forms) clauses)
+                          (setf specified-clauses
+                                (ldiff specified-clauses (cdr cases)))
+                          (warn 'simple-reference-warning
+                                :format-control
+                                "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
                            designator only in the final otherwise-clause, not in a ~
                            normal-clause. Use (~S) instead, or move the clause to the ~
                            correct position.~:@>"
-                            :format-arguments (list 'case clause keyoid keyoid)
-                            :references `((:ansi-cl :macro case))))
+                                :format-arguments (list 'case clause keyoid keyoid)
+                                :references `((:ansi-cl :macro case)))
+                          (return))
                          (t
+                          (push `(t ,@forms) clauses)
+                          (setf specified-clauses
+                                (ldiff specified-clauses (cdr cases)))
                           ;; OTHERWISE is a redundant bit of the behavior of TYPECASE
                           ;; since T is the universal type. OTHERWISE could not legally
                           ;; be DEFTYPEed so this _must_ be a misplaced clause.
-                          (error 'simple-reference-error
+                          (warn 'simple-reference-warning
                                      :format-control
                             "~@<~IBad ~S clause:~:@_  ~S~:@_~S is allowed only in the final clause. ~
                            Use T instead, or move the clause to the correct position.~:@>"
                             :format-arguments (list 'typecase clause keyoid)
-                            :references `((:ansi-cl :macro typecase))))))
+                            :references `((:ansi-cl :macro typecase)))
+                          (return))))
                   ((and (listp keyoid) (eq test 'eql))
                    (unless (proper-list-p keyoid) ; REVERSE would err with unclear message
                      (error "~S is not a proper list" keyoid))
@@ -1170,7 +1179,8 @@ invoked. In that case it will store into PLACE and start over."
                               (setq case-clauses nil)))))
                    (push keyoid keys)
                    (check-clause (list keyoid))
-                   (push `(,(testify keyoid) ,@forms) clauses)))))))
+                   (push `(,(testify keyoid) ,@forms) clauses))))))
+      next)
     (when (eq errorp :none)
       (setq errorp nil))
 
