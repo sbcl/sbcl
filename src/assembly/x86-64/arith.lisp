@@ -30,7 +30,7 @@
   (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag))
         (nbytes #+bignum-assertions 32 #-bignum-assertions 16))
     (emit-instrument-alloc nil thread-tn bignum-widetag nbytes alloc-tn)
-    (pseudo-atomic ()
+    (allocating ()
       (emit-allocation nil thread-tn bignum-widetag nbytes 0 alloc-tn nil)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)

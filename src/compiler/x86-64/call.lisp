@@ -1342,7 +1342,7 @@
       (inst shl :dword rcx word-shift) ; compute byte count
       (instrument-alloc +cons-primtype+ rcx (list value dst))
       (inst shr :dword rcx word-shift)) ; undo the computation
-    (pseudo-atomic (:elide-if (node-stack-allocate-p node) :thread-tn thread-tn)
+    (allocating (:elide-if (node-stack-allocate-p node))
        ;; Produce an untagged pointer into DST
       (let ((scale
              (cond ((node-stack-allocate-p node)

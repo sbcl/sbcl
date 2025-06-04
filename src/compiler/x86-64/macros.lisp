@@ -229,18 +229,39 @@
             (alloc-other (&rest args) `(emit-alloc-other node thread-tn ,@args)))
          (assemble () ,@(cdr g)))))) ; forms
 
-;;; This macro is purposely unhygienic with respect to THREAD-TN,
-;;; which is either a global symbol macro, or a LET-bound variable,
-;;; depending on #+gs-seg.
-(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if (default-exit t))
+(defmacro pseudo-atomic ((&key elide-if (default-exit t))
                          &body forms)
-  (declare (ignorable thread))
   `(macrolet ((exit-pseudo-atomic () '(emit-end-pseudo-atomic)))
      (unless ,elide-if
        (emit-begin-pseudo-atomic))
      (assemble () ,@forms)
      (when (and ,default-exit (not ,elide-if))
        (exit-pseudo-atomic))))
+
+;;; For now, ALLOCATING is synonymous with PSEUDO-ATOMIC, however there are
+;;; a few distinguishing factors rendering it not exactly the same:
+;;; 1. It could automatically insert a binding of a thread temp register, should
+;;;    we decide that R13 is not permanently wired to the current thread.
+;;; 2. It will have a yielding behavior that is neither like sb-safepoint
+;;;    nor the current pseudo-atomic, when new-and-improved yieldpoint patches
+;;;    (work in progress) are completed.
+;;; 3. It separates pseudo-atomicity for the purpose of object creation from
+;;;    any other reason which it might be required. Consider that for allocation
+;;;    a behavior might be: if there is room in the TLAB, then fulfill the request;
+;;;    otherwise, induce GC to run immediately and then resume the request.
+;;; [Like sb-safepoint, yieldpoints avoid using flag bits in the thread struct,
+;;; but unlike sb-safepoint, ALLOCATING will not emit a trapping instruction
+;;; at the end of every consing operation. Instead, if and only if it calls
+;;; into C due to TLAB overflow might it yield. This makes sense because we
+;;; give GC the opportunity to run exactly there if the region is exhausted,
+;;; or else there will necessarily be a later yieldpoint based on control flow.
+;;; Note that this is not simply a re-statement of point 3 above which suggests
+;;; that it _will_ cause GC to run; but in general ALLOCATION _may_ let GC run.
+;;; Whereas pseudo-atomic never permits GC to run.
+;;; Also note that "yieldpoints" and "safepoints" are more-or-less the same,
+;;; but a new approach to whatever the concept is demands a different name]
+(defmacro allocating (options &body body)
+  `(pseudo-atomic ,options ,@body))
 
 ;;;; indexed references
 
