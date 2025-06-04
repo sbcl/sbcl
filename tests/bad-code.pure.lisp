@@ -1006,3 +1006,13 @@
                  (setf (cadr x) 10))))
         (x nil)
         (x (list 1 2))))))
+
+(with-test (:name :the-bad-type-no-runtime-error)
+  (multiple-value-bind (fun fail warn)
+      (checked-compile
+       '(lambda (x)
+         (the (nil) x))
+       :allow-warnings t)
+    (assert fail)
+    (assert warn)
+    (assert (= (funcall fun 1) 1))))

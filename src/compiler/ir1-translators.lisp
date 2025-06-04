@@ -1046,11 +1046,7 @@ other."
                      type)
                     ((compiler-values-specifier-type type))
                     (t
-                     (ir1-convert start next result
-                                  `(progn
-                                     ,value
-                                     (error "Bad type specifier: ~a"
-                                            ',type)))
+                     (ir1-convert start next result value)
                      (return-from the-in-policy)))))
     (cond ((or (eq type *wild-type*)
                (eq type *universal-type*)
