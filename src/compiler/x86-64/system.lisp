@@ -297,28 +297,21 @@
   (:generator 1
     (inst break pending-interrupt-trap)))
 
-(define-vop (current-thread-offset-sap/c)
-  (:results (sap :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:translate current-thread-offset-sap)
-  (:info n)
-  (:arg-types (:constant signed-byte))
-  (:policy :fast-safe)
-  (:generator 1
-    #-gs-seg (inst mov sap (if (= n thread-this-slot) thread-tn (thread-slot-ea n)))
-    #+gs-seg (inst mov sap (thread-slot-ea n))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
-  (:args (index :scs (any-reg) :target sap))
+  (:args (index :scs (any-reg immediate) :target sap))
   (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
     (let (#+gs-seg (thread-tn nil))
       (inst mov sap
-            (ea thread-segment-reg thread-tn
-                index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
+            (if (sc-is index immediate)
+                (let ((n (tn-value index)))
+                  (if (or #-gs-seg (= n thread-this-slot)) thread-tn (thread-slot-ea n)))
+                (ea thread-segment-reg thread-tn
+                    index (ash 1 (- word-shift n-fixnum-tag-bits))))))))
 
 (define-vop (halt)
   (:generator 1

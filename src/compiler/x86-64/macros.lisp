@@ -90,6 +90,18 @@
   (cond (symbol `(inst lea ,reg (ea ,(static-symbol-offset symbol) null-tn)))
         (t `(inst mov ,reg null-tn))))
 
+;;; Access a thread slot at a fixed index. If GPR-TN is provided,
+;;; then it points to 'struct thread', which is relevant only if #+gs-seg.
+(defun thread-slot-ea (slot-index &optional gpr-tn)
+  (declare (type (signed-byte 16) slot-index)) ; arbitrary
+  (if gpr-tn
+      (ea (ash slot-index word-shift) gpr-tn)
+      ;; Otherwise do something depending on #[-+]gs-seg
+      (let (#+gs-seg (thread-tn nil))
+        (ea thread-segment-reg (ash slot-index word-shift) thread-tn))))
+
+;;; Similar to thread-slot-ea, but INDEX in this case does not signify the Nth slot {0,1,2,..}
+;;; but rather the displacement into the thread's storage, added to the thread base address.
 (defun thread-tls-ea (index)
   #+gs-seg (ea :gs index) ; INDEX is either a DISP or a BASE of the EA
   ;; Whether index is an an integer or a register, the EA constructor
@@ -114,16 +126,6 @@
   (aver (<= (1+ thread-boxed-tlab-slot) 15))
   (aver (<= (1+ thread-mixed-tlab-slot) 15))
   (aver (<= (1+ thread-cons-tlab-slot) 15)))
-
-;;; Access a thread slot at a fixed index. If GPR-TN is provided,
-;;; then it points to 'struct thread', which is relevant only if
-;;; #+gs-seg.
-(defun thread-slot-ea (slot-index &optional gpr-tn)
-  (if gpr-tn
-      (ea (ash slot-index word-shift) gpr-tn)
-      ;; Otherwise do something depending on #[-+]gs-seg
-      (let (#+gs-seg (thread-tn nil))
-        (ea thread-segment-reg (ash slot-index word-shift) thread-tn))))
 
 (defmacro load-tl-symbol-value (reg symbol)
   `(inst mov ,reg (thread-slot-ea ,(symbol-thread-slot symbol))))
