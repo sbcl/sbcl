@@ -1772,6 +1772,40 @@ void reset_thread_control_stack_guard_page(struct thread *th)
 }
 #endif
 
+void lower_thread_alien_stack_guard_page(struct thread *th)
+{
+    protect_alien_stack_guard_page(0, th);
+    protect_alien_stack_return_guard_page(1, th);
+
+    th->state_word.alien_stack_guard_page_protected = 0;
+    fprintf(stderr, "INFO: Alien stack guard page unprotected\n");
+}
+
+void reset_thread_alien_stack_guard_page(struct thread *th)
+{
+    protect_alien_stack_guard_page(1, NULL);
+    protect_alien_stack_return_guard_page(0, NULL);
+    th->state_word.alien_stack_guard_page_protected = 1;
+    fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
+}
+
+void lower_thread_binding_stack_guard_page(struct thread *th)
+{
+    protect_binding_stack_guard_page(0, th);
+    protect_binding_stack_return_guard_page(1, th);
+
+    th->state_word.binding_stack_guard_page_protected = 0;
+    fprintf(stderr, "INFO: Binding stack guard page unprotected\n");
+}
+
+void reset_thread_binding_stack_guard_page(struct thread *th)
+{
+    protect_binding_stack_guard_page(1, NULL);
+    protect_binding_stack_return_guard_page(0, NULL);
+    th->state_word.binding_stack_guard_page_protected = 1;
+    fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
+}
+
 bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
     struct thread *th = get_sb_vm_thread();
@@ -1843,15 +1877,12 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= BINDING_STACK_GUARD_PAGE(th) &&
             addr < BINDING_STACK_GUARD_PAGE(th) + os_vm_page_size) {
-        protect_binding_stack_guard_page(0, NULL);
-        protect_binding_stack_return_guard_page(1, NULL);
 
         if (lose_on_corruption_p) {
             fake_foreign_function_call(context);
             lose("Binding stack exhausted");
         }
-
-        fprintf(stderr, "INFO: Binding stack guard page unprotected\n");
+        lower_thread_binding_stack_guard_page(th);
 
         /* For the unfortunate case, when the binding stack is
          * exhausted in a signal handler. */
@@ -1862,9 +1893,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= BINDING_STACK_RETURN_GUARD_PAGE(th) &&
             addr < BINDING_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
-        protect_binding_stack_guard_page(1, NULL);
-        protect_binding_stack_return_guard_page(0, NULL);
-        fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
+        reset_thread_binding_stack_guard_page(th);
         return 1;
     }
     else if(addr >= ALIEN_STACK_HARD_GUARD_PAGE(th) &&
@@ -1873,9 +1902,7 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= ALIEN_STACK_GUARD_PAGE(th) &&
             addr < ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size) {
-        protect_alien_stack_guard_page(0, NULL);
-        protect_alien_stack_return_guard_page(1, NULL);
-        fprintf(stderr, "INFO: Alien stack guard page unprotected\n");
+        lower_thread_alien_stack_guard_page(th);
 
         /* For the unfortunate case, when the alien stack is
          * exhausted in a signal handler. */
@@ -1886,9 +1913,8 @@ bool handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
     }
     else if(addr >= ALIEN_STACK_RETURN_GUARD_PAGE(th) &&
             addr < ALIEN_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
-        protect_alien_stack_guard_page(1, NULL);
-        protect_alien_stack_return_guard_page(0, NULL);
-        fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
+        reset_thread_alien_stack_guard_page(th);
+
         return 1;
     }
     else if (addr >= undefined_alien_address &&

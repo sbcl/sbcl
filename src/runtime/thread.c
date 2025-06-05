@@ -577,6 +577,10 @@ unregister_thread(struct thread *th,
     if (!th->state_word.control_stack_guard_page_protected)
         reset_thread_control_stack_guard_page(th);
 #endif
+    if (!th->state_word.alien_stack_guard_page_protected)
+        reset_thread_alien_stack_guard_page(th);
+    if (!th->state_word.binding_stack_guard_page_protected)
+        reset_thread_binding_stack_guard_page(th);
 
     /* Undo the association of the current pthread to its `struct thread',
      * such that we can call get_sb_vm_thread() later in this
@@ -1038,6 +1042,8 @@ alloc_thread_struct(void* spaces) {
     }
 
     th->state_word.control_stack_guard_page_protected = 1;
+    th->state_word.alien_stack_guard_page_protected = 1;
+    th->state_word.binding_stack_guard_page_protected = 1;
     th->alien_stack_start=
         (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
     set_binding_stack_pointer(th,th->binding_stack_start);

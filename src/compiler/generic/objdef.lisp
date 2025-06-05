@@ -552,7 +552,8 @@ during backtrace.
   (next :c-type "struct thread *" :pointer t)
   ;; a struct containing {starting, running, suspended, dead}
   ;; and some other state fields.
-  (state-word :c-type "struct thread_state_word")
+  (state-word :c-type "struct thread_state_word"
+              :length #.(/ 64 sb-vm:n-word-bits))
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
   ;;
