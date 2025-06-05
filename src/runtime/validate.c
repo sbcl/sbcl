@@ -147,6 +147,10 @@ DEF_PROTECT_PAGE(control_stack_guard_page,
                  CONTROL_STACK_GUARD_PAGE, OS_VM_PROT_READ)
 DEF_PROTECT_PAGE(control_stack_return_guard_page,
                  CONTROL_STACK_RETURN_GUARD_PAGE, OS_VM_PROT_READ)
+#else
+void protect_control_stack_return_guard_page (__attribute__((unused)) int protect_p,
+                                              __attribute__((unused)) struct thread *thread) {
+}
 #endif
 
 DEF_PROTECT_PAGE(binding_stack_hard_guard_page,

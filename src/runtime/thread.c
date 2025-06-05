@@ -571,12 +571,11 @@ unregister_thread(struct thread *th,
     int i;
     for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
         CloseHandle(thread_private_events(th,i));
-#else
+#endif
     /* Thread structs are reused and their guard pages are not
      * reestablished. */
     if (!th->state_word.control_stack_guard_page_protected)
         reset_thread_control_stack_guard_page(th);
-#endif
     if (!th->state_word.alien_stack_guard_page_protected)
         reset_thread_alien_stack_guard_page(th);
     if (!th->state_word.binding_stack_guard_page_protected)

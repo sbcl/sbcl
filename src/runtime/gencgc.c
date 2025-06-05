@@ -3849,6 +3849,11 @@ collect_garbage(generation_index_t last_gen)
         th->remset = 0;
 #endif
     }
+
+    th = get_sb_vm_thread();
+    if (!th->state_word.control_stack_guard_page_protected)
+        protect_control_stack_return_guard_page(0, th);
+
 #ifdef LISP_FEATURE_PERMGEN
     // transfer the remsets from threads that exited
     remset_union(remset_transfer_list);
@@ -4029,6 +4034,10 @@ collect_garbage(generation_index_t last_gen)
     large_allocation = 0;
  finish:
     write_protect_immobile_space();
+
+    if (!th->state_word.control_stack_guard_page_protected)
+        protect_control_stack_return_guard_page(1, th);
+
     gc_active_p = 0;
 
 #ifdef COLLECT_GC_STATS

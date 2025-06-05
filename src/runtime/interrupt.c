@@ -1433,6 +1433,10 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
     event0("stop_for_gc");
 
+    if (!thread->state_word.control_stack_guard_page_protected) {
+        protect_control_stack_return_guard_page(0, thread);
+    }
+
     /* Not PA and GC not inhibited -- we can stop now. */
 
     was_in_lisp = !foreign_function_call_active_p(thread);
@@ -1497,6 +1501,10 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     extern void thread_accrue_stw_time(struct thread*,struct timespec*,struct timespec*);
     thread_accrue_stw_time(thread, &t_beginpause, 0);
 #endif
+
+    if (!thread->state_word.control_stack_guard_page_protected) {
+        protect_control_stack_return_guard_page(1, thread);
+    }
 
     event0("resumed");
 
@@ -1753,24 +1761,28 @@ undefined_alien_function(void)
 }
 #endif
 
-#ifndef LISP_FEATURE_WIN32
-void lower_thread_control_stack_guard_page(struct thread *th)
+
+void lower_thread_control_stack_guard_page(__attribute__((unused)) struct thread *th)
 {
+#ifndef LISP_FEATURE_WIN32
     protect_control_stack_guard_page(0, th);
     protect_control_stack_return_guard_page(1, th);
     th->state_word.control_stack_guard_page_protected = 0;
     fprintf(stderr, "INFO: Control stack guard page unprotected\n");
+#endif
 }
 
-void reset_thread_control_stack_guard_page(struct thread *th)
+void reset_thread_control_stack_guard_page(__attribute__((unused)) struct thread *th)
 {
+#ifndef LISP_FEATURE_WIN32
     memset(CONTROL_STACK_GUARD_PAGE(th), 0, os_vm_page_size);
     protect_control_stack_guard_page(1, th);
     protect_control_stack_return_guard_page(0, th);
     th->state_word.control_stack_guard_page_protected = 1;
     fprintf(stderr, "INFO: Control stack guard page reprotected\n");
-}
 #endif
+}
+
 
 void lower_thread_alien_stack_guard_page(struct thread *th)
 {
