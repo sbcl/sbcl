@@ -13,6 +13,6 @@
 #include <stdio.h>
 extern bool more_p(char **ptr);
 extern char *parse_token(char **ptr);
-extern int parse_lispobj(char **ptr, lispobj *output);
+extern int parse_lispobj(char **ptr, lispobj *output, FILE*);
 extern int parse_addr(char **ptr, bool safely, char **output, FILE*);
-extern int parse_number(char **ptr, int *output);
+extern int parse_number(char **ptr, int *output, FILE*);

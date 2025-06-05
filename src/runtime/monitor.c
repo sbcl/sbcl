@@ -387,7 +387,7 @@ static int findpath_cmd(char **ptr, iochannel_t io) {
     struct weak_pointer* wp =
       (void*)(wp_mem + (((uword_t)wp_mem & LOWTAG_MASK) ? N_WORD_BYTES : 0));
     wp->header = ((WEAK_POINTER_SIZE-1)<<N_WIDETAG_BITS)|WEAK_POINTER_WIDETAG;
-    if (parse_lispobj(ptr, &wp->value)) {
+    if (parse_lispobj(ptr, &wp->value, io->out)) {
         list.car = make_lispobj(wp, OTHER_POINTER_LOWTAG);
         list.cdr = NIL;
         result.header = SIMPLE_VECTOR_WIDETAG;
@@ -429,10 +429,10 @@ static int verify_cmd(char __attribute__((unused)) **ptr,
     unsuspend_other_threads();
     return 0;
 }
-static int gc_cmd(char **ptr, __attribute__((unused)) iochannel_t io) {
+static int gc_cmd(char **ptr, iochannel_t io) {
     int last_gen = 0;
     extern generation_index_t verify_gens;
-    if (more_p(ptr)) parse_number(ptr, &last_gen);
+    if (more_p(ptr)) parse_number(ptr, &last_gen, io->out);
     gencgc_verbose = 2;
     pre_verify_gen_0 = 1;
     verify_gens = 0;
@@ -525,7 +525,7 @@ static int NO_SANITIZE_MEMORY dump_cmd(char **ptr, iochannel_t io)
         }
         if (!parse_addr(ptr, !force, &addr, io->out)) return 0;
 
-        if (more_p(ptr) && !parse_number(ptr, &count)) return 0;
+        if (more_p(ptr) && !parse_number(ptr, &count, io->out)) return 0;
     }
 
     if (count == 0) {
@@ -620,7 +620,7 @@ static int NO_SANITIZE_MEMORY dump_cmd(char **ptr, iochannel_t io)
 static int print_cmd(char **ptr, iochannel_t io)
 {
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) print_to_iochan(obj, io);
+    if (parse_lispobj(ptr, &obj, io->out)) print_to_iochan(obj, io);
     return 0;
 }
 
@@ -695,7 +695,7 @@ int verify_lisp_hashtable(__attribute__((unused)) struct hash_table* ht,
 static int hashtable_cmd(char **ptr, iochannel_t io)
 {
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) {
+    if (parse_lispobj(ptr, &obj, io->out)) {
         int errors = verify_lisp_hashtable((void*)native_pointer(obj),
                                            io->out);
         if (errors) fprintf(io->out, "Errors: %d\n", errors);
@@ -707,7 +707,7 @@ static int pte_cmd(char **ptr, iochannel_t io)
 {
     extern void gc_show_pte(lispobj, FILE*);
     lispobj obj;
-    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj, io->out);
+    if (parse_lispobj(ptr, &obj, io->out)) gc_show_pte(obj, io->out);
     return 0;
 }
 
@@ -740,7 +740,7 @@ static int regs_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
 static int call_cmd(char **ptr, iochannel_t io)
 {
     lispobj thing;
-    parse_lispobj(ptr, &thing);
+    parse_lispobj(ptr, &thing, io->out);
     lispobj function, args[3];
     lispobj result = NIL;
 
@@ -784,7 +784,7 @@ static int call_cmd(char **ptr, iochannel_t io)
             fprintf(io->out, "too many arguments (no more than 3 supported)\n");
             return 0;
         }
-        parse_lispobj(ptr, &args[numargs++]);
+        parse_lispobj(ptr, &args[numargs++], io->out);
     }
 
     switch (numargs) {
@@ -876,7 +876,7 @@ static int print_context_cmd(char **ptr, iochannel_t io)
     if (more_p(ptr)) {
         int index;
 
-        if (!parse_number(ptr, &index)) return 0;
+        if (!parse_number(ptr, &index, f)) return 0;
 
         if ((index >= 0) && (index < free_ici)) {
             fprintf(f, "There are %d interrupt contexts.\n", free_ici);
@@ -902,7 +902,7 @@ static int backtrace_cmd(char **ptr, iochannel_t io)
     int n;
 
     if (more_p(ptr)) {
-        if (!parse_number(ptr, &n)) return 0;
+        if (!parse_number(ptr, &n, io->out)) return 0;
     } else
         n = 100;
 

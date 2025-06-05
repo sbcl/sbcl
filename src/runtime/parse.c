@@ -149,13 +149,13 @@ char *parse_token(char **ptr)
 }
 
 /// Return 1 for successful parse
-int parse_number(char **ptr, int *output)
+int parse_number(char **ptr, int *output, FILE* errstream)
 {
     char *token = parse_token(ptr);
     uword_t result;
 
     if (token == NULL) {
-        printf("expected a number\n");
+        fprintf(errstream, "expected a number\n");
         return 0;
     }
     if (string_to_long(token, &result)) {
@@ -165,7 +165,7 @@ int parse_number(char **ptr, int *output)
         *output = result;
         return 1;
     }
-    printf("invalid number: ``%s''\n", token);
+    fprintf(errstream, "invalid number: ``%s''\n", token);
     return 0;
 }
 
@@ -259,7 +259,7 @@ static int parse_regnum(char *s)
     }
 }
 
-int parse_lispobj(char **ptr, lispobj *output)
+int parse_lispobj(char **ptr, lispobj *output, FILE* errstream)
 {
     struct thread *thread = get_sb_vm_thread();
     char *token = parse_token(ptr);
@@ -268,7 +268,7 @@ int parse_lispobj(char **ptr, lispobj *output)
     uword_t value;
 
     if (token == NULL) {
-        printf("expected an object\n");
+        fprintf(errstream, "expected an object\n");
         return 0;
     }
     if (token[0] == '$') {
@@ -280,7 +280,8 @@ int parse_lispobj(char **ptr, lispobj *output)
             free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
             if (free_ici == 0) {
-                printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
+                fprintf(errstream,
+                        "Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
                 return 0;
             }
 
@@ -288,13 +289,13 @@ int parse_lispobj(char **ptr, lispobj *output)
 
             regnum = parse_regnum(token);
             if (regnum < 0) {
-                printf("bogus register: ``%s''\n", token);
+                fprintf(errstream, "bogus register: ``%s''\n", token);
                 return 0;
             }
 
             result = *os_context_register_addr(context, regnum);
         } else if (!lookup_variable(token+1, &result)) {
-            printf("unknown variable: ``%s''\n", token);
+            fprintf(errstream, "unknown variable: ``%s''\n", token);
             return 0;
         }
     } else if (token[0] == '@') {
@@ -306,12 +307,12 @@ int parse_lispobj(char **ptr, lispobj *output)
             if (gc_managed_addr_p(pointer))
                 result = *(lispobj *)pointer;
             else {
-                printf("invalid Lisp-level address: ``%s''\n", token+1);
+                fprintf(errstream, "invalid Lisp-level address: ``%s''\n", token+1);
                 return 0;
             }
         }
         else {
-            printf("invalid address: ``%s''\n", token+1);
+            fprintf(errstream, "invalid address: ``%s''\n", token+1);
             return 0;
         }
     }
@@ -320,7 +321,7 @@ int parse_lispobj(char **ptr, lispobj *output)
     else if ((result = lookup_symbol(token)) != 0)
         ;
     else {
-        printf("invalid Lisp object: ``%s''\n", token);
+        fprintf(errstream, "invalid Lisp object: ``%s''\n", token);
         return 0;
     }
 
