@@ -1714,6 +1714,11 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_register_addr(context,reg_RBP) = (os_context_register_t)(sp-2);
     *os_context_register_addr(context,reg_RSP) = (os_context_register_t)(sp-18);
 #else
+
+#ifdef LISP_FEATURE_ARM64
+    *os_context_lr_addr(context) = os_context_pc(context);
+#endif
+
     /* this much of the calling convention is common to all
        non-x86 ports */
     set_os_context_pc(context, (os_context_register_t)(unsigned long)code);
