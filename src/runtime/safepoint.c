@@ -15,16 +15,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#ifndef LISP_FEATURE_WIN32
-#include <sched.h>
-#endif
 #include <signal.h>
 #include <stddef.h>
 #include <errno.h>
 #include <sys/types.h>
-#ifndef LISP_FEATURE_WIN32
-#include <sys/wait.h>
-#endif
 #include "runtime.h"
 #include "validate.h"
 #include "thread.h"
@@ -464,7 +458,6 @@ thread_register_gc_trigger()
     }
 }
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
 static inline int
 thread_may_thrupt(os_context_t *ctx)
 {
@@ -563,7 +556,6 @@ check_pending_thruptions(os_context_t *ctx)
 
     return 1;
 }
-#endif
 
 int
 on_stack_p(struct thread *th, void *esp)
@@ -573,7 +565,7 @@ on_stack_p(struct thread *th, void *esp)
         < (void *)th->control_stack_end;
 }
 
-#ifndef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_UNIX
 /* (Technically, we still allocate an altstack even on Windows.  Since
  * Windows has a contiguous stack with an automatic guard page of
  * user-configurable size instead of an alternative stack though, the
@@ -592,7 +584,7 @@ assert_on_stack(struct thread *th, void *esp)
 {
     if (on_stack_p(th, esp))
         return;
-#ifndef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_UNIX
     if (on_altstack_p(th, esp))
         lose("thread %p: esp on altstack: %p", th, esp);
 #endif
@@ -720,9 +712,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
      * SUB-GC.  Phase is either GC_QUIET or GC_NONE. */
     if (check_gc_and_thruptions) {
         check_pending_gc();
-#ifdef LISP_FEATURE_SB_SAFEPOINT
         while(check_pending_thruptions(ctxptr));
-#endif
     }
 }
 
@@ -778,11 +768,9 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             }
         }
     }
-#ifdef LISP_FEATURE_SB_SAFEPOINT
     if (was_in_alien) {
         while(check_pending_thruptions(ctxptr));
     }
-#endif
 }
 
 #ifdef LISP_FEATURE_WIN32
@@ -806,9 +794,7 @@ void thread_interrupted(os_context_t *ctxptr)
         }
     }
     check_pending_gc();
-#ifdef LISP_FEATURE_SB_SAFEPOINT
     while(check_pending_thruptions(ctxptr));
-#endif
 }
 #endif
 
@@ -1040,9 +1026,8 @@ void* os_get_csp(struct thread* th)
 }
 
 
-#ifndef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_UNIX
 
-# ifdef LISP_FEATURE_SB_SAFEPOINT
 /* This is basically what 'low_level_maybe_now_maybe_later' was (which doesn't exist),
  * but with a different name, and different way of deciding to defer the signal */
 void thruption_handler(__attribute__((unused)) int signal,
@@ -1067,7 +1052,6 @@ void thruption_handler(__attribute__((unused)) int signal,
     thread_in_lisp_raised(ctx);
     csp_around_foreign_call(self) = (intptr_t) transition_sp;
 }
-# endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 /* Trap trampolines are in target-assem.S so that they pick up the
@@ -1109,7 +1093,7 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
     /* not a safepoint */
     return 0;
 }
-#endif /* LISP_FEATURE_WIN32 */
+#endif /* LISP_FEATURE_UNIX */
 
 void
 vodxprint_fun(const char *fmt, va_list args)
