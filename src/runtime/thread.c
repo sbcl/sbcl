@@ -1152,6 +1152,7 @@ alloc_thread_struct(void* spaces) {
     thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
 #endif
     th->stepping = 0;
+    th->card_table = (lispobj)gc_card_mark;
     return th;
 }
 #ifdef LISP_FEATURE_SB_THREAD
