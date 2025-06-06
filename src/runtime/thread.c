@@ -144,7 +144,7 @@ char* vm_thread_name(struct thread* th)
 #define get_thread_state(thread) \
  (int)__sync_val_compare_and_swap(&thread->state_word.state, -1, -1)
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
 
 void
 set_thread_state(struct thread *thread,
@@ -401,7 +401,7 @@ void create_main_lisp_thread(lispobj function) {
 #endif
     ASSOCIATE_OS_THREAD(th);
     ASSIGN_CURRENT_THREAD(th);
-#if defined THREADS_USING_GCSIGNAL && \
+#if THREADS_USING_GCSIGNAL && \
     (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
     unblock_gc_stop_signal();
@@ -561,7 +561,7 @@ unregister_thread(struct thread *th,
 #ifdef LISP_FEATURE_UNIX
     os_sem_destroy(&semaphores->sprof_sem);
 #endif
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
@@ -759,7 +759,7 @@ static void attach_os_thread(init_thread_data *scribble)
     void* recycled_memory = get_recyclebin_item();
     struct thread *th = alloc_thread_struct(recycled_memory);
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
     /* FIXME: could be done using a single call to pthread_sigmask
        together with blocking the deferrable signals above. */
@@ -842,7 +842,7 @@ static void detach_os_thread(init_thread_data *scribble)
      *  - but STOP_FOR_GC is pending because it was in the blocked set.
      * Bad things happen unless we clear the pending GC signal.
      */
-#if !defined LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
     sigset_t pending;
     sigpending(&pending);
     if (sigismember(&pending, SIG_STOP_FOR_GC)) {
@@ -931,8 +931,8 @@ callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2)
  *     /   ___ aligned_spaces
  *    /   /
  *  (0) (1)       (2)       (3)       (4)    (5)          (6)
- *   |   | CONTROL | BINDING |  ALIEN  |  CSP | thread     |          |
- *   |   |  STACK  |  STACK  |  STACK  | PAGE | structure  | altstack |
+ *   |   | CONTROL | BINDING |  ALIEN  | Trap | thread     |          |
+ *   |   |  STACK  |  STACK  |  STACK  | page | structure  | altstack |
  *   |...|------------------------------------------------------------|
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
@@ -1243,7 +1243,7 @@ int sb_thread_kill (pthread_t thread, int sig) {
 /*
  * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
  */
-#if !defined LISP_FEATURE_SB_SAFEPOINT && !defined STANDALONE_LDB
+#if HAVE_GC_STW_SIGNAL && !defined STANDALONE_LDB
 
 /* To avoid deadlocks when gc stops the world all clients of each
  * mutex must enable or disable SIG_STOP_FOR_GC for the duration of

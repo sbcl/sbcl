@@ -42,7 +42,7 @@ void
 darwin_reinit() {
 #ifdef LISP_FEATURE_SB_THREAD
     struct extra_thread_data *extra_data = thread_extra_data(get_sb_vm_thread());
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
     os_sem_init(&extra_data->state_sem, 1);
     os_sem_init(&extra_data->state_not_running_sem, 0);
     os_sem_init(&extra_data->state_not_stopped_sem, 0);

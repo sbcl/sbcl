@@ -24,16 +24,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
-# define THREADS_USING_GCSIGNAL 1
-#endif
-
-#if defined LISP_FEATURE_GENERATIONAL && !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-# define GENCGC_IS_PRECISE 1
-#else
-# define GENCGC_IS_PRECISE 0
-#endif
-
 extern void gc_init(void);
 extern void collect_garbage(generation_index_t last_gen);
 

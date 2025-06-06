@@ -3071,6 +3071,18 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (format t "LISP_FEATURE_~A=1~%" target-feature-name)))
 
 (defun write-config-h (*standard-output*)
+  ;; It's not great to have a bunch of expressions computing derived features
+  ;; in random .h files, because if you forget which #include file defines a
+  ;; mystery feature, then your code is wrong. These #defines were formerly in
+  ;; gc.h but now they're in sbcl.h which is hard to forget to include.
+  ;; Also it's preferable to always define as {0,1} rather than use #ifdef
+  ;; because it's far too easy to let "#ifndef BAD_SPELING" go unnoticed.
+  (let* ((have-stw-signal #-sb-safepoint t)
+         (threads-stw-signal #+sb-thread have-stw-signal)
+         (precise #+(and generational (not c-stack-is-control-stack)) t))
+    (format t "#define HAVE_GC_STW_SIGNAL ~D~%" (if have-stw-signal 1 0))
+    (format t "#define THREADS_USING_GCSIGNAL ~D~%" (if threads-stw-signal 1 0))
+    (format t "#define GENCGC_IS_PRECISE ~D~%" (if precise 1 0)))
   ;; propagating SB-XC:*FEATURES* into C-level #define's
   (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb-xc:*features*)
                                      #'string<))

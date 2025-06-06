@@ -2255,7 +2255,7 @@ bool maybe_gc(os_context_t *context)
      * A kludgy alternative is to propagate the sigmask change to the
      * outer context.
      */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
     unblock_gc_stop_signal();
 #endif
@@ -2293,7 +2293,7 @@ bool maybe_gc(os_context_t *context)
              * post-GC code. Except that we do it while the interrupt context
              * is still on the stack */
             thread_sigmask(SIG_SETMASK, context_sigmask, 0);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if HAVE_GC_STW_SIGNAL
             check_gc_signals_unblocked_or_lose(0);
 #endif
 #endif

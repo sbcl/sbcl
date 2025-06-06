@@ -47,7 +47,7 @@ struct extra_thread_data
 
     // Data from here down are never looked at from Lisp.
     struct interrupt_data interrupt_data;
-#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
+#if THREADS_USING_GCSIGNAL
     // 'state_sem' is a binary semaphore used just like a mutex.
     // I guess we figure that semaphores are OK to use in signal handlers (which is
     // technically false), whereas a mutex would be more certainly wrong?

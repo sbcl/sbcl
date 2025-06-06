@@ -9,10 +9,6 @@
  * files for more information.
  */
 
-#ifndef GENCGC_IS_PRECISE
-#error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
-#endif
-
 /* One bit of page_words_t is the need_zerofill flag.
  * That leaves 15 bits to store page_words_used. This can represent
  * a page size of up to 64KiB on 32-bit and 128KiB on 64-bit.
