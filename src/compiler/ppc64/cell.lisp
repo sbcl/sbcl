@@ -530,13 +530,11 @@
   (:temporary (:scs (non-descriptor-reg)) temp card)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 10
-    ;; Load mark table base
-    (inst ld temp thread-base-tn (ash thread-card-table-slot word-shift))
     (pseudo-atomic (pa-flag)
       ;; Compute card mark index
       (inst rldicl card object (- 64 gencgc-card-shift) (make-fixup nil :card-table-index-mask))
       ;; Touch the card mark byte.
-      (inst stbx thread-base-tn temp card) ; THREAD-TN's low byte is 0
+      (inst stbx thread-base-tn card-table-base-tn card) ; THREAD-TN's low byte is 0
       ;; set 'written' flag in the code header
       ;; If two threads get here at the same time, they'll write the same byte.
       (let ((byte (- #+big-endian 4 #+little-endian 3 other-pointer-lowtag)))

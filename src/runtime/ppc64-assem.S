@@ -111,6 +111,10 @@ Low Address
 	ld 0, 16(sp) ; mtlr 0       /* Restore LR  */ ; \
 	lwz 0, 8(sp) ; mtcr 0       /* Restore CR */
 
+        .section ".toc","aw"
+.LC0:
+        .quad gc_card_mark
+
 	.text
 
 #define BEGIN_PSEUDO_ATOMIC stb reg_NULL,THREAD_PSEUDO_ATOMIC_BITS_OFFSET(reg_THREAD)
@@ -126,6 +130,12 @@ Low Address
 
 	GFUNCDEF(call_into_lisp)
 	C_FULL_PROLOG
+/* compute TOC register? C compilers seem to insert this in every function prologue,
+ * but the register value looks correct to me before the calculation.
+ * If someone smart wants to optimize it out, that would probably be fine */
+0:	addis 2,12,.TOC.-0b@ha
+	addi 2,2,.TOC.-0b@l
+
 	/* NL0 - function, NL1 - frame pointer, NL2 - nargs. */
 	// Copy ABI TLS value of current_thread into lisp thread base
 	addis reg_THREAD,13,current_thread@tprel@ha
@@ -167,8 +177,10 @@ Low Address
 	ld reg_A2,16(reg_CFP)
 	ld reg_A3,24(reg_CFP)
 
-        /* load card table base */
-        ld reg_CARDTABLE, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
+	/* load gc_card_mark */
+	addis reg_CARDTABLE, reg_TOC, .LC0@toc@ha
+	ld reg_CARDTABLE, .LC0@toc@l(reg_CARDTABLE)
+	ld reg_CARDTABLE, 0(reg_CARDTABLE)
 
 	/* Calculate LRA */
 	lis reg_LRA,lra@h
