@@ -280,6 +280,9 @@ static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd, hashtable_cmd;
 static cmd backtrace_cmd, threadbt_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
+#ifdef ATOMIC_LOGGING
+static cmd events_cmd;
+#endif
 
 extern void gc_stop_the_world(), gc_start_the_world();
 static void suspend_other_threads() {
@@ -468,6 +471,9 @@ static struct cmd {
     {"context", "Print interrupt context number I.", print_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
     {"d", "(an alias for dump)", dump_cmd},
+#ifdef ATOMIC_LOGGING
+    {"events", "Dump signal-related event log", events_cmd},
+#endif
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"findpath", "Find path to an object.", findpath_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
@@ -1128,6 +1134,51 @@ static int monitor_loop(struct iochannel io)
         }
     }
 }
+
+#ifdef ATOMIC_LOGGING
+#include "atomiclog.inc"
+static void dump_eventlog(int fd)
+{
+    int i = 0;
+    uword_t *e = eventdata;
+    char buf[1024];
+    int nc, nc1; // number of chars in buffer
+    // Define buflen to be smaller than 'buf' so that we can prefix it
+    // with thread pointer and suffix it with a newline
+    // without too much hassle.
+#define buflen (sizeof buf-20)
+    nc = snprintf(buf, buflen, "Event log: used %d elements of %d max\n", n_logevents, EVENTBUFMAX);
+    write(fd, buf, nc);
+    while (i<n_logevents) { // FIXME: crashes if n_logevents exceeds max
+        char *fmt = (char*)e[i+1];
+        uword_t prefix = e[i];
+        int nargs = prefix & 7;
+        void* thread_pointer = (void*)(prefix & ~7);
+        extern char* thread_name_from_pthread(void*);
+        char* name = thread_name_from_pthread(thread_pointer);
+        if (name) nc = sprintf(buf, "%s: ", name); else nc = sprintf(buf, "%p: ", thread_pointer);
+        switch (nargs) {
+        default: printf("busted event log"); return;
+        case 0: nc1 = snprintf(buf+nc, buflen, fmt, 0); break; // the 0 inhibits a warning
+        case 1: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2]); break;
+        case 2: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3]); break;
+        case 3: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4]); break;
+        case 4: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5]); break;
+        case 5: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6]); break;
+        case 6: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6],
+                               e[i+7]); break;
+        }
+#undef buflen
+        buf[nc+nc1] = '\n';
+        write(fd, buf, 1+nc+nc1);
+        i += nargs + 2;
+    }
+}
+static int events_cmd(__attribute__((unused)) char **ptr, iochannel_t io) {
+    dump_eventlog(fileno(io->out));
+    return 0;
+}
+#endif
 
 #ifdef START_LDB_SERVICE_THREAD
 #include <sys/socket.h>

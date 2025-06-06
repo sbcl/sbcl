@@ -276,50 +276,6 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
  * arch_os_get_context(..) function. -- CSR, 2002-07-23
  */
 #ifdef ATOMIC_LOGGING
-void dump_eventlog()
-{
-    int i = 0;
-    uword_t *e = eventdata;
-    char buf[1024];
-    int nc, nc1; // number of chars in buffer
-    // Define buflen to be smaller than 'buf' so that we can prefix it
-    // with thread pointer and suffix it with a newline
-    // without too much hassle.
-#define buflen (sizeof buf-20)
-    nc = snprintf(buf, buflen, "Event log: used %d elements of %d max\n", n_logevents, EVENTBUFMAX);
-    write(2, buf, nc);
-    while (i<n_logevents) {
-        char *fmt = (char*)e[i+1];
-        uword_t prefix = e[i];
-        int nargs = prefix & 7;
-        void* thread_pointer = (void*)(prefix & ~7);
-        extern char* thread_name_from_pthread(void*);
-        char* name = thread_name_from_pthread(thread_pointer);
-        if (name) nc = sprintf(buf, "%s: ", name); else nc = sprintf(buf, "%p: ", thread_pointer);
-        switch (nargs) {
-        default: printf("busted event log"); return;
-        case 0: nc1 = snprintf(buf+nc, buflen, fmt, 0); break; // the 0 inhibits a warning
-        case 1: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2]); break;
-        case 2: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3]); break;
-        case 3: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4]); break;
-        case 4: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5]); break;
-        case 5: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6]); break;
-        case 6: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6],
-                               e[i+7]); break;
-        }
-#undef buflen
-        buf[nc+nc1] = '\n';
-        write(2, buf, 1+nc+nc1);
-        i += nargs + 2;
-    }
-}
-void sigdump_eventlog(int __attribute__((unused)) signal,
-                      siginfo_t __attribute__((unused)) *info,
-                      os_context_t *context)
-{
-    dump_eventlog();
-}
-
 static void record_signal(int sig, void* context)
 {
     event2("got signal %d @ pc=%p", sig, os_context_pc(context));
@@ -2104,9 +2060,6 @@ interrupt_init(void)
     // we assume that there is room to record an event with up to 8 arguments
     // which means the prefix, the format string, and the arguments.
     eventdata = calloc(EVENTBUFMAX+10, N_WORD_BYTES);
-    void sigdump_eventlog(int, siginfo_t*, os_context_t*);
-    // pick anything not used. SIGPWR is also a good choice
-    ll_install_handler(SIGINFO, sigdump_eventlog);
 #endif
     int __attribute__((unused)) i;
     sigemptyset(&deferrable_sigset);

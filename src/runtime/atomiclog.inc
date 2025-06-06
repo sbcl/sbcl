@@ -10,7 +10,7 @@
 #define event6(fmt,a,b,c,d,e,f)
 #else
 
-#define EVENTBUFMAX 40000
+#define EVENTBUFMAX 400000
 extern uword_t *eventdata;
 extern int n_logevents;
 
