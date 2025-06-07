@@ -1055,9 +1055,10 @@ alloc_thread_struct(void* spaces) {
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
     struct extra_thread_data *extra_data = thread_extra_data(th);
+    // thread_interrupt_data(th) gets cleared by this memset
     memset(extra_data, 0, sizeof *extra_data);
 
-#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_SB_SAFEPOINT
+#if THREADS_USING_GCSIGNAL
     os_sem_init(&extra_data->state_sem, 1);
     os_sem_init(&extra_data->state_not_running_sem, 0);
     os_sem_init(&extra_data->state_not_stopped_sem, 0);
@@ -1065,7 +1066,6 @@ alloc_thread_struct(void* spaces) {
 #if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
     os_sem_init(&extra_data->sprof_sem, 0);
 #endif
-    extra_data->sprof_lock = 0;
     th->sprof_data = 0;
 
     th->state_word.state = STATE_RUNNING;
@@ -1119,11 +1119,6 @@ alloc_thread_struct(void* spaces) {
     access_control_frame_pointer(th)=0;
 #endif
 
-    thread_interrupt_data(th).pending_handler = 0;
-    thread_interrupt_data(th).gc_blocked_deferrables = 0;
-#if HAVE_ALLOCATION_TRAP_CONTEXT
-    thread_interrupt_data(th).allocation_trap_context = 0;
-#endif
 #if defined LISP_FEATURE_PPC64
     /* Storing a 0 into code coverage mark bytes or GC card mark bytes
      * can be done from the low byte of the thread base register.
