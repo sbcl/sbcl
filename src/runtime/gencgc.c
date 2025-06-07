@@ -3851,7 +3851,7 @@ collect_garbage(generation_index_t last_gen)
     }
 
     th = get_sb_vm_thread();
-    if (!th->state_word.control_stack_guard_page_protected)
+    if (th && !th->state_word.control_stack_guard_page_protected)
         protect_control_stack_return_guard_page(0, th);
 
 #ifdef LISP_FEATURE_PERMGEN
@@ -4035,7 +4035,7 @@ collect_garbage(generation_index_t last_gen)
  finish:
     write_protect_immobile_space();
 
-    if (!th->state_word.control_stack_guard_page_protected)
+    if (th && !th->state_word.control_stack_guard_page_protected)
         protect_control_stack_return_guard_page(1, th);
 
     gc_active_p = 0;
