@@ -250,12 +250,7 @@
                                              ;; it will check default values too, but
                                              ;; FTYPEs are for calls and not definitions.
                                              (leaf-defined-type var))
-                                            ((and (not info)
-                                                  (neq (leaf-type var) *universal-type*))
-                                             ;; Check required
-                                             ;; arguments here too, or
-                                             ;; each optional entry
-                                             ;; will be checking them
+                                            ((neq (leaf-type var) *universal-type*)
                                              (leaf-type var))))
                       when type
                       collect

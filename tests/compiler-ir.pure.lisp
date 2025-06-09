@@ -504,3 +504,12 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
+
+(with-test (:name :optional-type-checks)
+  (assert (= (count 'sb-c::%type-check-error/c
+                    (ir-calls
+                     `(lambda (&optional x y)
+                        (declare (list x))
+                        (values x y)))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
