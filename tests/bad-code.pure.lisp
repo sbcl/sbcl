@@ -1063,3 +1063,11 @@
   (assert-signal
       (macroexpand-1 '(typecase x (cons 1) (otherwise 2) (t 3)))
       warning))
+
+(with-test (:name :important-result-through-casts)
+  (assert
+   (nth-value 3
+              (checked-compile `(lambda (x y)
+                                  (the sequence (delete x y))
+                                  10)
+                               :allow-style-warnings t))))

@@ -1151,8 +1151,9 @@
                       validate-call-type recognize-known-call))
 
 (defun check-important-result (node info)
-  (when (and (null (node-lvar node))
-             (ir1-attributep (fun-info-attributes info) important-result)
+  (when (and (ir1-attributep (fun-info-attributes info) important-result)
+             (or (null (node-lvar node))
+                 (null (principal-lvar-end (node-lvar node))))
              ;; A constant might be propagated directly, disconnecting the lvar
              (not (type-singleton-p (single-value-type (node-derived-type node))))
              (neq (combination-info node) :important-result-discarded))
