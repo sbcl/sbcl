@@ -35,7 +35,9 @@
              ;; And ir1-transforms suffer from this because
              ;; they expect LVAR-VALUE to be of a restricted type.
              (or (not (lvar-reoptimize principal-lvar))
-                 (ctypep (constant-value leaf) type)))
+                 (or (ctypep (constant-value leaf) type)
+                     ;; Don't return T for type-singleton-p, it may still mismatch.
+                     (return-from constant-lvar-p))))
         ;; check for EQL types and singleton numeric types
         (values (type-singleton-p type)))))
 
