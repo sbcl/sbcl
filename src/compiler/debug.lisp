@@ -1502,6 +1502,14 @@ is replaced with replacement."
   (do-conset-elements (con conset)
     (print-constraint con kind)))
 
+(defun print-conset-difference (set1 set2)
+  (let ((diff1 (conset-difference (copy-conset set1) set2))
+        (diff2 (conset-difference (copy-conset set2) set1)))
+    (format t "Not in set1~%")
+    (print-conset diff1)
+    (format t "Not in set2~%")
+    (print-conset diff2)))
+
 (defun print-constraints (component &optional kind)
   (do-blocks (block component)
     (handler-case (progn

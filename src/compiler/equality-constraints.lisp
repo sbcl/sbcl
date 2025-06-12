@@ -733,26 +733,30 @@
                                       ((vector-constraint-eq-p (constraint-y con) x)
                                        (and (vector-constraint-eq-p (constraint-x con) y)
                                             (normalize-not (invert-operator (equality-constraint-operator con))
-                                                           (equality-constraint-not-p con))))))
-                              (find-constraint (var1 var2 ref)
-                                (block nil
-                                  (let ((constraints (block-out (node-block ref))))
-                                    (when constraints
-                                      (do-conset-constraints-intersection (con (constraints
-                                                                                (lambda-var-equality-constraints var1)))
-                                        (multiple-value-bind (op not)
-                                            (relations var1 var2 con)
-                                          (when op
-                                            (return (values op not))))))))))
-                       (let ((op1 (find-constraint var1 var2 ref1))
-                             (op2 (find-constraint var2 var1 ref2)))
-                         (case op1
-                           ((< <=) (and (memq op2 '(<= <))
-                                        (push (list '<= var1) r)
-                                        (push (list '<= var2) r)))
-                           ((> >=) (and (memq op2 '(> >=))
-                                        (push (list '>= var1) r)
-                                        (push (list '>= var2) r))))))))
+                                                           (equality-constraint-not-p con)))))))
+                       (let ((constraints1 (block-out (node-block ref1)))
+                             (constraints2 (block-out (node-block ref2))))
+                         (when (and constraints1 constraints2)
+                           (block nil
+                             (do-conset-constraints-intersection (con (constraints1
+                                                                       (lambda-var-equality-constraints var1)))
+                               (let ((op1 (relations var1 var2 con)))
+                                 (when op1
+                                   (do-conset-constraints-intersection (con (constraints2
+                                                                             (lambda-var-equality-constraints var2)))
+                                     (let ((op2 (relations var2 var1 con)))
+                                       (when op2
+                                         (case op1
+                                           ((< <=)
+                                            (when (memq op2 '(<= <))
+                                              (push (list '<= var1) r)
+                                              (push (list '<= var2) r)
+                                              (return)))
+                                           ((> >=)
+                                            (when (memq op2 '(> >=))
+                                              (push (list '>= var1) r)
+                                              (push (list '>= var2) r)
+                                              (return))))))))))))))))
 
                  r)))))))
 
