@@ -155,7 +155,10 @@
          (lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar)))
          mv-vars
-         (n-required (length (values-type-required dtype))))
+         (n-required (if (values-type-p dtype)
+                         (length (values-type-required dtype))
+                         (return-from cast-check-types
+                           (values :simple (aver (eq dtype *empty-type*)))))))
     (aver (not (eq ctype *wild-type*)))
     (cond ((and (null (values-type-optional dtype))
                 (not (values-type-rest dtype)))
