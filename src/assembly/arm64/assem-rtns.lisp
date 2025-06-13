@@ -305,7 +305,8 @@
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw
-                          (:return-style :full-call-no-return))
+                          (:return-style :full-call-no-return)
+                          (:save-p :compute-only))
     ((:arg target descriptor-reg r0-offset)
      (:arg start any-reg r9-offset)
      (:arg count any-reg nargs-offset)
@@ -317,19 +318,7 @@
 
   LOOP
 
-  (let ((error (gen-label)))
-    (assemble (:elsewhere)
-      (emit-label error)
-
-      ;; Fake up a stack frame so that backtraces come out right.
-      (inst mov ocfp-tn cfp-tn)
-      (inst mov cfp-tn csp-tn)
-      (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
-
-      (emit-error-break nil error-trap
-                        (error-number-or-lose 'unseen-throw-tag-error)
-                        (list target)))
-    (inst cbz catch error))
+  (inst cbz catch (generate-error-code nil 'unseen-throw-tag-error target))
 
   (loadw-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot catch)
   (inst cmp tag target)
@@ -343,7 +332,8 @@
 (define-assembly-routine (unwind
                           (:translate %unwind)
                           (:policy :fast-safe)
-                          (:return-style :none))
+                          (:return-style :full-call-no-return)
+                          (:save-p :compute-only))
     ((:arg block (any-reg descriptor-reg) r0-offset)
      (:arg start (any-reg descriptor-reg) r9-offset)
      (:arg count (any-reg descriptor-reg) nargs-offset)
@@ -356,8 +346,7 @@
      (:temp symbol descriptor-reg r2-offset)
      (:temp value descriptor-reg r3-offset))
   AGAIN
-  (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst cbz block error))
+  (inst cbz block (generate-error-code nil 'invalid-unwind-error))
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-uwp-slot)
   (inst cmp cur-uwp ocfp)

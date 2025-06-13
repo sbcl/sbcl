@@ -1091,13 +1091,21 @@
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
-    (let ((code (code-object-from-context context)))
+    (let* ((pc (context-pc context))
+           (code (code-object-from-context context)))
       (/noshow0 "got CODE")
+      #+arm64
+      (when (eq code sb-fasl:*assembler-routines*)
+        (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
+                      '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
+                        sb-vm::return-values-list sb-vm::call-symbol))
+          (setf pc (int-sap (- (sb-vm::return-machine-address context) 4))
+                code (code-header-from-pc pc))))
       (when (symbolp code)
         (return (values code 0 context)))
       (multiple-value-bind
             (pc-offset valid-p code-size)
-          (context-code-pc-offset context code)
+          (code-pc-offset pc code)
         (unless valid-p
           ;; We were in an assembly routine.
           (multiple-value-bind (new-pc-offset computed-return)
@@ -1282,6 +1290,14 @@ register."
       #+ppc64 (function (make-bogus-debug-fun "trampoline"))
       ((eql :bpt-lra)
        (make-bogus-debug-fun "function end breakpoint")))))
+
+(defun assembly-routine-name-from-pc (component pc)
+  (let ((info (%code-debug-info component)))
+    (typecase info
+      ((or hash-table (cons hash-table))
+       (dohash ((name pc-range) (if (listp info) (car info) info))
+         (when (<= (car pc-range) pc (cadr pc-range))
+           (return name)))))))
 
 ;;; This returns a code-location for the COMPILED-DEBUG-FUN,
 ;;; DEBUG-FUN, and the pc into its code vector. If we stopped at a

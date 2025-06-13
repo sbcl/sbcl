@@ -288,6 +288,7 @@
                             &optional (two-arg
                                        (find-symbol (format nil "TWO-ARG-~A" fun)
                                                     "SB-KERNEL")))
+             (declare (ignorable predicate))
              (let ((test-name (make-symbol (format nil "TEST-~A" fun))))
                `(flet ((,test-name (x y)
                          ;; make sure it's not in tail position

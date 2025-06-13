@@ -134,23 +134,15 @@
                           (:translate %data-vector-and-index/check-bound)
                           (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
-                          (:result-types t positive-fixnum))
+                          (:result-types t positive-fixnum)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg r0-offset)
      (:arg index any-reg r1-offset)
      (:res result descriptor-reg r0-offset)
      (:res offset any-reg r1-offset))
   (declare (ignore result offset))
   (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst mov ocfp-tn cfp-tn)
-            (inst mov cfp-tn csp-tn)
-            (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'invalid-array-index-error)
-                              (list array tmp-tn index))
-            (progn error))))
+          (generate-error-code nil 'invalid-array-index-error array tmp-tn index)))
     (assemble ()
 
       (inst ldrb tmp-tn (@ array (- other-pointer-lowtag)))
@@ -187,22 +179,13 @@
                           (:translate %data-vector-pop)
                           (:policy :fast-safe)
                           (:arg-types t)
-                          (:result-types t positive-fixnum))
+                          (:result-types t positive-fixnum)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg r0-offset)
      (:res result descriptor-reg r0-offset)
      (:res offset any-reg r1-offset))
   (declare (ignore result))
-  (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst mov ocfp-tn cfp-tn)
-            (inst mov cfp-tn csp-tn)
-            (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'fill-pointer-error)
-                              (list array))
-            (progn error))))
+  (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
       (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
       (inst tbnz tmp-tn (1- (integer-length (ash sb-vm:+array-fill-pointer-p+
@@ -235,22 +218,13 @@
                           (:translate %data-vector-push)
                           (:policy :fast-safe)
                           (:arg-types t)
-                          (:result-types t t))
+                          (:result-types t t)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg r0-offset)
      (:res result descriptor-reg r0-offset)
      (:res offset descriptor-reg r1-offset))
   (declare (ignore result))
-  (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst mov ocfp-tn cfp-tn)
-            (inst mov cfp-tn csp-tn)
-            (inst stp ocfp-tn lr-tn (@ csp-tn 16 :post-index))
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'fill-pointer-error)
-                              (list array))
-            (progn error))))
+  (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
 
       (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
