@@ -932,18 +932,18 @@ typedef uint8_t  ub1;\n");
     mem_stream_printf(f, infix ? "};\n\n" : ")))\n");
     ++extra_parens;
   }
-  int indent = 0, newline = 0;
+  int indent = 0, newline = 0, more_indent = (blen>0)*2;
   char *comment = 0;
   for (i=0; i<final->used; ++i) {
     char* line = final->line[i];
     if (!line[0]) continue; // empty line
     if (newline) mem_stream_printf(f,"\n");
     newline = 0;
-    int j; for(j=0;j<indent;++j) mem_stream_printf(f," ");
-    mem_stream_printf(f, "  ");
+    int j; for(j=0;j<indent+more_indent;++j) mem_stream_printf(f," ");
 
     comment = strchr(line, ';');
     if (comment && !form->comments) { // strip the comment
+        if (comment[-1] == ' ') --comment;
         mem_stream_printf(f, "%.*s", comment-line, line);
         comment = 0;
     } else
