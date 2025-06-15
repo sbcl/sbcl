@@ -54,7 +54,6 @@
             (loadw reg reg))))))
 
 (defun generate-call-sequence (name style vop options)
-  (declare (ignore options vop))
   (ecase style
     ((:none :raw :full-call-no-return)
      (let ((lr (gensym)))
@@ -63,7 +62,9 @@
             ,lr
             ,@(if (eq style :none)
                   `((invoke-asm-routine ',name tmp-tn :tail t))
-                  `((invoke-asm-routine ',name ,lr)))))
+                  `((invoke-asm-routine ',name ,lr)))
+            ,@(when (assoc :save-p options)
+                `((note-this-location ,vop :single-value-return)))))
         `((:temporary (:sc non-descriptor-reg :from (:eval 0) :to (:eval 1) :offset lr-offset)
                       ,lr)))))))
 

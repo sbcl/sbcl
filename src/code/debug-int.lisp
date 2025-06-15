@@ -1111,17 +1111,19 @@
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
     (let ((pc (context-pc context))
-          (code (code-object-from-context context)))
+          (code (code-object-from-context context))
+          assembly-routine-p)
       (/noshow0 "got CODE")
       #+arm64
       (when (eq code sb-fasl:*assembler-routines*)
         (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
                       '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
                         sb-vm::return-values-list sb-vm::call-symbol))
-          (setf pc (int-sap (- (sb-vm::return-machine-address context) 4))
+          (setf assembly-routine-p t
+                pc (int-sap (sb-vm::return-machine-address context))
                 code (code-header-from-pc pc))))
       (when (symbolp code)
-        (return (values code 0 context)))
+        (return (values code 0 context nil nil)))
       (multiple-value-bind
             (pc-offset valid-p code-size)
           (code-pc-offset pc code)
@@ -1159,7 +1161,7 @@
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
           #+(or riscv arm64)
-          (values code pc-offset context)
+          (values code pc-offset context nil assembly-routine-p)
           #-(or riscv arm64)
           (if (eq (%code-debug-info code) :bpt-lra)
               (let ((real-lra (code-header-ref code real-lra-slot)))
