@@ -1160,15 +1160,14 @@
               (setf pc-offset 0))))
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
-          #+(or riscv arm64)
-          (values code pc-offset context nil assembly-routine-p)
-          #-(or riscv arm64)
-          (if (eq (%code-debug-info code) :bpt-lra)
-              (let ((real-lra (code-header-ref code real-lra-slot)))
-                (values (lra-code-header real-lra)
-                        (get-header-data real-lra)
-                        nil))
-              (values code pc-offset context)))))))
+          (cond #-(or riscv arm64)
+                ((eq (%code-debug-info code) :bpt-lra)
+                 (let ((real-lra (code-header-ref code real-lra-slot)))
+                   (values (lra-code-header real-lra)
+                           (get-header-data real-lra)
+                           nil nil nil)))
+                (t
+                 (values code pc-offset context nil assembly-routine-p))))))))
 
 #-(or x86 x86-64)
 (defun find-pc-from-assembly-fun (code scp)
