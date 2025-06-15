@@ -256,31 +256,21 @@
 
 
 (define-assembly-routine (throw
-                          (:return-style :full-call-no-return))
-                         ((:arg target (descriptor-reg any-reg) rdx-offset)
-                          (:arg start any-reg rbx-offset)
-                          (:arg count any-reg rcx-offset)
-                          (:temp bsp-temp any-reg r11-offset)
-                          (:temp catch any-reg rax-offset))
+                             (:return-style :full-call-no-return)
+                           (:save-p :compute-only))
+    ((:arg target (descriptor-reg any-reg) rdx-offset)
+     (:arg start any-reg rbx-offset)
+     (:arg count any-reg rcx-offset)
+     (:temp bsp-temp any-reg r11-offset)
+     (:temp catch any-reg rax-offset))
 
   (declare (ignore start count bsp-temp))
 
   (load-tl-symbol-value catch *current-catch-block*)
   LOOP
 
-  (let ((error (gen-label)))
-    (assemble (:elsewhere)
-      (emit-label error)
-
-      ;; Fake up a stack frame so that backtraces come out right.
-      (inst push rbp-tn)
-      (inst mov rbp-tn rsp-tn)
-
-      (emit-error-break nil error-trap
-                        (error-number-or-lose 'unseen-throw-tag-error)
-                        (list target)))
-    (inst test catch catch)             ; check for NULL pointer
-    (inst jmp :z error))
+  (inst test catch catch)               ; check for NULL pointer
+  (inst jmp :z (generate-error-code nil 'unseen-throw-tag-error target))
 
   (inst cmp target (object-slot-ea catch catch-block-tag-slot 0))
   ;; Here RAX points to catch block containing symbol pointed to by RDX.
@@ -301,7 +291,8 @@
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %unwind)
-                          (:policy :fast-safe))
+                          (:policy :fast-safe)
+                          (:save-p :compute-only))
                          ((:arg block (any-reg descriptor-reg) rax-offset)
                           (:arg start (any-reg descriptor-reg) rbx-offset)
                           (:arg count (any-reg descriptor-reg) rcx-offset)
@@ -313,9 +304,9 @@
                           (:temp bsp-temp unsigned-reg r11-offset)
                           (:temp zero complex-double-reg float0-offset))
   AGAIN
-  (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst test block block)             ; check for NULL pointer
-    (inst jmp :z error))
+
+  (inst test block block)               ; check for NULL pointer
+  (inst jmp :z (generate-error-code nil 'invalid-unwind-error))
 
   (load-tl-symbol-value uwp *current-unwind-protect-block*)
 

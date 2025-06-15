@@ -160,23 +160,15 @@
                           (:translate %data-vector-and-index/check-bound)
                           (:policy :fast-safe)
                           (:arg-types t positive-fixnum)
-                          (:result-types t positive-fixnum))
+                          (:result-types t positive-fixnum)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg rdx-offset)
      (:arg index any-reg rdi-offset)
      (:temp temp any-reg rcx-offset)
      (:res result descriptor-reg rdx-offset)
      (:res offset any-reg rdi-offset))
   (declare (ignore result offset))
-  (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'invalid-array-index-error)
-                              (list array temp index))
-            (progn error))))
+  (let ((error (generate-error-code nil 'invalid-array-index-error array temp index)))
     (assemble ()
       (inst mov :byte temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp simple-array-widetag)
@@ -210,22 +202,14 @@
                           (:translate %data-vector-pop)
                           (:policy :fast-safe)
                           (:arg-types t)
-                          (:result-types t positive-fixnum))
+                          (:result-types t positive-fixnum)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg rdx-offset)
      (:temp temp any-reg rcx-offset)
      (:res result descriptor-reg rdx-offset)
      (:res offset any-reg rdi-offset))
   (declare (ignore result))
-  (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'fill-pointer-error)
-                              (list array))
-            (progn error))))
+  (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
       (inst mov :dword temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp complex-base-string-widetag)
@@ -258,22 +242,14 @@
                           (:translate %data-vector-push)
                           (:policy :fast-safe)
                           (:arg-types t)
-                          (:result-types t t))
+                          (:result-types t t)
+                          (:save-p :compute-only))
     ((:arg array descriptor-reg rdx-offset)
      (:temp temp any-reg rcx-offset)
      (:res result descriptor-reg rdx-offset)
      (:res offset descriptor-reg rdi-offset))
   (declare (ignore result))
-  (let ((error
-          (assemble (:elsewhere)
-            error
-            ;; Fake up a stack frame so that backtraces come out right.
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (emit-error-break nil error-trap
-                              (error-number-or-lose 'fill-pointer-error)
-                              (list array))
-            (progn error))))
+  (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
       (inst mov :dword temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp complex-base-string-widetag)
@@ -293,7 +269,6 @@
       SKIP
       (inst lea temp (ea (fixnumize 1) offset))
       (storew temp array array-fill-pointer-slot other-pointer-lowtag)
-
 
       LOOP
       (inst add offset (object-slot-ea array array-displacement-slot other-pointer-lowtag))

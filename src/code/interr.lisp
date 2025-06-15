@@ -300,8 +300,9 @@
     (when (listp tag)
       (binding* ((frame (find-interrupted-frame))
                  (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
-                 (down (and (eq name 'throw) ; is this tautological ?
-                            (sb-di:frame-down frame)) :exit-if-null))
+                 (down (if (eq name 'throw)
+                           (sb-di:frame-down frame)
+                           frame)))
         (case (sb-di:debug-fun-name (sb-di:frame-debug-fun down))
          ((return-from)
           (setq text "attempt to RETURN-FROM an exited block: ~S"

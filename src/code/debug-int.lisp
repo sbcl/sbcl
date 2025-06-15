@@ -941,7 +941,7 @@
   (declare (type system-area-pointer caller #-(or arm64 riscv) ra))
   (when (control-stack-pointer-valid-p caller)
     ;; First check for an escaped frame.
-    (multiple-value-bind (code pc-offset escaped off-stack)
+    (multiple-value-bind (code pc-offset escaped off-stack assembly-routine-p)
         (find-escaped-frame caller)
       (cond (code
              ;; If it's escaped it may be a function end breakpoint trap.
@@ -969,7 +969,15 @@
                       (make-bogus-debug-fun
                        "bogus stack frame"))
                      (t
-                      (debug-fun-from-pc code pc-offset escaped)))))
+                      (debug-fun-from-pc code pc-offset
+                                         ;; Assembly routines share the frame
+                                         ;; but still use call/return,
+                                         ;; and debug-fun-from-pc will
+                                         ;; match the correct location
+                                         ;; if it's at the end of a
+                                         ;; debug-fun
+                                         (unless assembly-routine-p
+                                           escaped))))))
         (make-compiled-frame caller up-frame d-fun
                              (code-location-from-pc d-fun pc-offset
                                                     escaped)
@@ -1066,16 +1074,27 @@
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
-    (let ((code (code-object-from-context context)))
+    (let ((pc (context-pc context))
+          (code (code-object-from-context context))
+          assembly-routine-p)
       (/noshow0 "got CODE")
+      #+x86-64
+      (when (eq code sb-fasl:*assembler-routines*)
+        (unless (memq (assembly-routine-name-from-pc code (code-pc-offset pc code))
+                      '(sb-vm::undefined-tramp sb-vm::undefined-alien-tramp
+                        sb-vm::return-values-list sb-vm::call-symbol
+                        sb-vm::unwind))
+          (let* ((sp (context-register context sb-vm::rsp-offset))
+                 (return (sap-ref-word (int-sap sp) 0)))
+            (setf assembly-routine-p t
+                  pc (int-sap return)
+                  code (code-header-from-pc pc)))))
       (when (null code)
         ;; KLUDGE: Detect undefined functions by a range-check
         ;; against the trampoline address and the following
         ;; function in the runtime.
-        (return (values code 0 context)))
-      (multiple-value-bind
-            (pc-offset valid-p)
-          (context-code-pc-offset context code)
+        (return (values code 0 context nil nil)))
+      (multiple-value-bind (pc-offset valid-p) (code-pc-offset pc code)
         (unless valid-p
           ;; We were in an assembly routine. Therefore, use the
           ;; LRA as the pc.
@@ -1085,14 +1104,14 @@
                   pc-offset code))
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
-          (values code pc-offset context))))))
+          (values code pc-offset context nil assembly-routine-p))))))
 
 #-(or x86 x86-64)
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
-    (let* ((pc (context-pc context))
-           (code (code-object-from-context context)))
+    (let ((pc (context-pc context))
+          (code (code-object-from-context context)))
       (/noshow0 "got CODE")
       #+arm64
       (when (eq code sb-fasl:*assembler-routines*)
