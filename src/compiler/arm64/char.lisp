@@ -91,13 +91,29 @@
     (inst lsr res code n-fixnum-tag-bits)))
 
 (define-vop (character-compare)
-  (:args (x :scs (character-reg))
-         (y :scs (character-reg)))
+  (:args (x :scs (character-reg any-reg))
+         (y :scs (character-reg any-reg)))
   (:arg-types character character)
   (:policy :fast-safe)
   (:note "inline comparison")
+  (:variant-vars invert-condition)
+  (:vop-var vop)
   (:generator 3
-    (inst cmp x y)))
+    (sc-case x
+      (character-reg
+       (sc-case y
+         (character-reg
+          (inst cmp x y))
+         (any-reg
+          (inst cmp x (asr y 8)))))
+      (any-reg
+       (sc-case y
+         (any-reg
+          (inst cmp x y))
+         (character-reg
+          (when invert-condition
+            (change-vop-flags vop invert-condition))
+          (inst cmp y (asr x 8))))))))
 
 (define-vop (fast-char=/character character-compare)
   (:translate char=)
@@ -105,11 +121,13 @@
 
 (define-vop (fast-char>/character character-compare)
   (:translate char>)
-  (:conditional :gt))
+  (:conditional :gt)
+  (:variant '(:lt)))
 
 (define-vop (fast-char</character character-compare)
   (:translate char<)
-  (:conditional :lt))
+  (:conditional :lt)
+  (:variant '(:gt)))
 
 (defun char-immediate-p (char)
   (and (characterp char)
