@@ -4733,7 +4733,15 @@
        (dolist (x x)
          (when (eql x n)
            (return x)))))
-   (or list (integer 1 2))))
+   (or list (integer 1 2)))
+  (assert-type
+   (lambda (n)
+     (declare (optimize (debug 2)))
+     (let ((x '(1 2 3)))
+       (dolist (x x)
+         (when (eql x n)
+           (return x)))))
+   (or (integer 1 3) null)))
 
 (with-test (:name :test-headers-lowtag-only)
   (checked-compile-and-assert
