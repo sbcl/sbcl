@@ -13,6 +13,15 @@
 
 ;;;; Type frobbing VOPs
 
+(define-vop (descriptor-hash32)
+  (:translate descriptor-hash32)
+  (:args (arg :scs (any-reg descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst rlwinm res arg 0 1 29)))
+
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)

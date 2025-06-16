@@ -330,14 +330,30 @@
 (setf (info :function :compiler-macro-function 'uint32-modularly)
       #'sb-c::optimize-for-calc-phash)
 
+;;; Construct a form which computes a 32-bit hash from OBJ whose value
+;;; should be - but might not be - one of the choices in KEYS.
+;;; If it is not, the expression's result should be irrelevant.
+;;; (Calling code has to do some kind of "hit" test)
+;;; The 32-bit hash is then fed into a perfect hash expression.
+(defun prehash-expr-for-perfect-hash (obj keys)
+  (if (notany #'symbolp keys)
+      `(descriptor-hash32 ,obj)
+      (multiple-value-bind (guard hashval)
+          (if (vop-existsp :translate hash-as-if-symbol-name)
+              (values `(pointerp ,obj) `(hash-as-if-symbol-name ,obj))
+              ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
+              ;; which accepts NIL along with OTHER-POINTER objects.
+              (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,obj)
+                      `(symbol-name-hash (truly-the symbol ,obj))))
+        `(if ,guard
+             ,hashval
+             ,(if (every #'symbolp keys) 0 `(descriptor-hash32 ,obj))))))
+
 ;;; The CASE macro can use this predicate to decide whether to expand in a way
 ;;; that selects a clause via a perfect hash versus the customary expansion
 ;;; as a sequence of IFs.
 (defun perfectly-hashable (objects)
-  (flet ((hash (x)
-           (cond ((fixnump x) (ldb (byte 32 0) x))
-                 ((symbolp x) (symbol-name-hash x))
-                 ((characterp x) (char-code x)))))
+  (flet ((hash (x) (if (symbolp x) (symbol-name-hash x) (descriptor-hash32 x))))
     (let* ((n (length objects))
            (hashes (make-array n :element-type '(unsigned-byte 32))))
       (loop for o in objects

@@ -96,6 +96,9 @@
 
 ;;;; miscellaneous "sub-primitives"
 
+(defknown descriptor-hash32 (t) #+64-bit (unsigned-byte 32) #-64-bit (unsigned-byte 29)
+          (flushable always-translatable))
+
 (defknown %sp-string-compare
   (simple-string simple-string index (or null index) index (or null index))
   (values index fixnum)

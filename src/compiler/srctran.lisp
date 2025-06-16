@@ -8022,7 +8022,7 @@
   (let* ((phash-lexpr (or (perfectly-hashable keys)
                           (return-from expand-hash-case-for-jump-table (values nil nil))))
          (temp '#1=#:key)               ; GENSYM considered harmful
-         (object-hash (prehash-for-perfect-hash temp keys))
+         (object-hash (prehash-expr-for-perfect-hash temp keys))
          (hashfn
            (compile-perfect-hash
             `(lambda (,temp) (,phash-lexpr ,object-hash))

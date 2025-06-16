@@ -13,6 +13,16 @@
 
 ;;;; Type frobbing VOPs
 
+(define-vop (descriptor-hash32)
+  (:translate descriptor-hash32)
+  (:args (arg :scs (any-reg descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst bic res arg fixnum-tag-mask)
+    (inst bic res res #x80000000))) ; clear sign bit
+
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)

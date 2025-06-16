@@ -13,6 +13,21 @@
 
 ;;;; Type frobbing VOPs
 
+(define-vop (descriptor-hash32)
+  (:translate descriptor-hash32)
+  (:args (arg :scs (any-reg descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst andi res arg (lognot fixnum-tag-mask))
+    ;; now shift left and shift right so that:
+    ;;   on 32-bit, the sign bit is clear, yielding 29 bits of precision
+    ;;   on 64-bit, the upper 31 bits are clear, yielding 32 bits of precision
+    (let ((amount #+64-bit 31 #-64-bit 1))
+      (inst slli res res amount)
+      (inst srli res res amount))))
+
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)

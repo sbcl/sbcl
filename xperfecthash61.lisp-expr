@@ -154,26 +154,6 @@
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 31) 30)))
     (^ a (aref tab b))))))")
-(#(A 3C 3F 5B 7B)
- "(#\\? #\\{ #\\[ #\\< #\\Newline)"
- "((let ((tab #a((4) (unsigned-byte 8) 5 0 0 0)))
-  (let ((b (& val #x3)))
-   (let ((a (>> (<< val 25) 30)))
-    (^ a (aref tab b))))))")
-(#(23 27 2B 2C 2D 3A 40 56 76)
- "(#\\@ #\\: #\\, #\\' #\\# #\\V #\\v #\\- #\\+)"
- "((let ((tab #a((8) (unsigned-byte 8) 0 2 0 0 4 0 10 0)))
-  (+= val #x1679e37f)
-  (^= val (>> val 4))
-  (let ((b (& val #x7)))
-   (let ((a (>> (u32+ val (<< val 25)) 29)))
-    (^ a (aref tab b))))))")
-(#(44 45 46 4C 52 53)
- "(#\\R #\\L #\\D #\\F #\\S #\\E)"
- "((let ((tab #a((4) (unsigned-byte 8) 4 3 0 3)))
-  (let ((b (& val #x3)))
-   (let ((a (>> (<< val 27) 30)))
-    (^ a (aref tab b))))))")
 (#(89 8D 91 95 99 9D A1 A5 A9 AD B1 B5 B9 BD C1 C5 C9 CD D1 D5 D9 DD E1 E5)
  "(137 221 217 205 201 197 193 189 185 181 177 173 169 165 161 157 153 149 145 141 213 209 229 225)"
  "((let ((tab #a((16) (unsigned-byte 8) 31 24 0 13 0 13 0 13 1 12 16 22 16 18 21 22)))
@@ -193,6 +173,26 @@
  "((let ((tab #a((8) (unsigned-byte 8) 13 0 0 8 4 1 4 0)))
   (let ((b (& (>> val 2) #x7)))
    (let ((a (>> (<< val 25) 29)))
+    (^ a (aref tab b))))))")
+(#(14A 78A 7EA B6A F6A)
+ "(#\\? #\\{ #\\[ #\\< #\\Newline)"
+ "((let ((tab #a((4) (unsigned-byte 8) 5 0 0 0)))
+  (let ((b (& (>> val 5) #x3)))
+   (let ((a (>> (<< val 20) 30)))
+    (^ a (aref tab b))))))")
+(#(46A 4EA 56A 58A 5AA 74A 80A ACA ECA)
+ "(#\\@ #\\: #\\, #\\' #\\# #\\V #\\v #\\- #\\+)"
+ "((let ((tab #a((8) (unsigned-byte 8) 13 5 0 4 7 0 6 0)))
+  (+= val #xeb2f8376)
+  (^= val (>> val 4))
+  (let ((b (& (>> val 1) #x7)))
+   (let ((a (>> (u32+ val (<< val 18)) 29)))
+    (^ a (aref tab b))))))")
+(#(88A 8AA 8CA 98A A4A A6A)
+ "(#\\R #\\L #\\D #\\F #\\S #\\E)"
+ "((let ((tab #a((4) (unsigned-byte 8) 4 3 0 3)))
+  (let ((b (& (>> val 5) #x3)))
+   (let ((a (>> (<< val 22) 30)))
     (^ a (aref tab b))))))")
 (#(1000 2000 4000 6000 8000 A000 C000)
  "(4096 40960 49152 32768 24576 16384 8192)"

@@ -13,6 +13,19 @@
 
 ;;;; type frobbing VOPs
 
+(define-vop (descriptor-hash32)
+  (:translate descriptor-hash32)
+  (:args (arg :scs (any-reg descriptor-reg) :target res))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:policy :fast-safe)
+  (:generator 1
+    ;; This produces 31 bits of significance which is fine- it avoids a raw constant
+    ;; (bit index 31 of the result can be on, which is still a positive fixnum because the
+    ;; lispword size is 64 bits, so we're only losing the fixnum tag)
+    (move res arg :dword)
+    (inst and :dword res (lognot fixnum-tag-mask))))
+
 ;;; For non-list pointer descriptors, return the header's widetag byte.
 ;;; For lists and non-pointers, return the low 8 descriptor bits.
 ;;; We need not return exactly list-pointer-lowtag for lists - the high 4 bits

@@ -624,3 +624,5 @@
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
 (clear-info :function :inlining-data '%sxhash-simple-substring/truncating)
+
+(defun descriptor-hash32 (x) (descriptor-hash32 x))

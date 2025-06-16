@@ -1948,6 +1948,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "PARSE-UNKNOWN-TYPE"
            "PARSE-UNKNOWN-TYPE-SPECIFIER"
            "PATHNAME-DESIGNATOR" "PATHNAME-COMPONENT-CASE"
+           "DESCRIPTOR-HASH32"
            "POINTERP"
            #+(or x86 x86-64) "*PSEUDO-ATOMIC-BITS*"
            "PUNT-PRINT-IF-TOO-LONG"
