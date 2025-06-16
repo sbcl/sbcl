@@ -213,6 +213,13 @@
                                   union))))))))
         (type-array-element-type (lvar-type sequence)))))
 
+(defmacro xc-typecase (arg &rest clauses)
+  #+sb-xc-host
+  `(cond ,@(mapcar (lambda (clause)
+                     `((sb-xc:typep ,arg ',(car clause)) . ,(cdr clause)))
+                   clauses))
+  #-sb-xc-host `(typecase ,arg . ,clauses))
+
 (defun derive-aref-type (array)
   (or (let ((constant (lvar-constant array))
             min
@@ -274,7 +281,7 @@
                                              give-up)
                                   (declare (ignorable symbols set-symbols))
                                   ;; ctype-of gives too much detail
-                                  (typecase elt
+                                  (xc-typecase elt
                                     (integer
                                      (funcall set-min
                                               (if min
