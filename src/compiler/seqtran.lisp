@@ -3241,31 +3241,24 @@
 ;;; enough though it should be equivalent to (CAR (ASSOC x '((:s1 . val1) ...))).
 (defun try-perfect-find/position-map (fun-name conditional lvar-type items from-end node)
   (declare (type (member find position member assoc rassoc) fun-name))
-  ;; It's certainly not worth doing a hash calculation for 2 keys.
-  ;; And it's usually not worth it for 3 keys. At least for the MEMBER operation, the code size
-  ;; is not smaller using a hash, and there are still 3 conditional jumps: one to test whether
-  ;; the arg is POINTERP, one to see if the perfect hash is 0..2, and one to see if there was a
-  ;; hit in the key vector. Straightforwardly testing takes 3 jumps, so just do that.
-  (when (< (length items) (if (eq fun-name 'member) 4 3))
-    (return-from try-perfect-find/position-map))
-  (let ((hashable
-          ;; TODO: allow (OR CHARACTER FIXNUM) also
-          (every (lambda (item)
-                   (case fun-name
-                     (assoc (and (listp item)
-                                 (symbolp (car item))))
-                     (rassoc (and (listp item)
-                                  (symbolp (cdr item))))
-                     (t (symbolp item))))
-                 items)))
-    (unless hashable
-      (return-from try-perfect-find/position-map)))
   ;; alists can contain NIL which does not represent a pair at all.
   ;; (Why is such a seemingly random stipulation even part of the language?)
   (when (member fun-name '(assoc rassoc))
     (setf items (remove-if #'null items)))
+  ;; First, verify that the key set could potentially be hashed for purposes
+  ;; of this transform.
+  (unless (every (lambda (item)
+                   (typep (case fun-name
+                            (assoc (if (listp item) (car item) (make-unbound-marker)))
+                            (rassoc (if (listp item) (cdr item) (make-unbound-marker)))
+                            (t item))
+                          '(or symbol character fixnum)))
+                 items)
+      (return-from try-perfect-find/position-map))
   (let ((alistp) ; T if an alist, :SYNTHETIC if we avoid using conses in the mapping
-        (map (make-hash-table)))
+        (map (make-hash-table))
+        keys
+        certainp)
     ;; Optimize out the CDR operation in (CDR (ASSOC ...)) respectively
     ;; the CAR in (CAR (RASSOC ...)).
     ;; CADR and SECOND would have been converted as (CAR (CDR ...)
@@ -3281,41 +3274,38 @@
                           (lvar-has-single-use-p arg)
                           (eq (lvar-use arg) node))))
           (setq alistp :synthetic))))
-    (cond ((vectorp items)
-           (dotimes (position (length items))
-             (let ((elt (svref items position)))
-               ;; FROM-END will replace an entry already in MAP, as doing so exhibits
-               ;; the desired behavior of using the rightmost match.
-               ;; Otherwise, when *not* FROM-END, take only the leftmost occurrence.
-               (when (or from-end (not (gethash elt map)))
-                 (setf (gethash elt map) position)))))
-          (t
-           (aver (not from-end))
-           (do ((list items (cdr list)))
-               ((endp list))
-             (ecase fun-name
-               (member
-                (let ((elt (car list)))
-                  (unless (gethash elt map) (setf (gethash elt map) list))))
-               (assoc
-                (let* ((pair (car list)) (key (car pair)))
-                  (unless (gethash key map)
-                    (setf (gethash key map) (if (eq alistp t) pair (cdr pair))))))
-               (rassoc
-                (let* ((pair (car list)) (key (cdr pair)))
-                  (unless (gethash key map)
-                    (setf (gethash key map) (if (eq alistp t) pair (car pair))))))))))
-    (flet () ; XXX: reindent from here down
-      ;; Sort to avoid sensitivity to the hash-table iteration order when cross-compiling.
-      ;; Not necessary for the target but not worth a #+/- either.
-      ;; TODO: rather than sorting, compute KEYS from the originally-specified ITEMS after
-      ;; removing duplicates. If we permit keys to be (OR CHARACTER SYMBOL FIXNUM)
-      ;; there is not really a good sort order on a mixture of those, though I suppose
-      ;; we could sort by the hash, since that has to be unique or the transform fails.
-      (binding* ((keys (sort (loop for k being each hash-key of map collect k) #'string<))
-                 (hashes (map '(simple-array (unsigned-byte 32) (*)) #'symbol-name-hash keys))
+    (flet ((insert (key val &aux (present (gethash key map)))
+             (unless present (push key keys))
+             ;; FROM-END will replace an entry already in MAP, as doing so exhibits
+             ;; the desired behavior of using the rightmost match.
+             ;; Otherwise, when *not* FROM-END, take only the leftmost occurrence.
+             (when (or (not present) from-end)
+               (setf (gethash key map) val))))
+      (cond ((eq fun-name 'member) (mapl (lambda (x) (insert (car x) x)) items))
+            ((vectorp items) ; it's FIND or POSITION
+             (dotimes (position (length items))
+               (insert (elt items position) position)))
+            (t (dolist (pair items)
+                 (ecase fun-name
+                   (rassoc (insert (cdr pair) (if (eq alistp t) pair (car pair))))
+                   (assoc (insert (car pair) (if (eq alistp t) pair (cdr pair)))))))))
+    ;; It's not worth doing a hash calculation for 2 keys.
+    ;; And it's usually not worth it for 3 keys. At least for the MEMBER operation, the code size
+    ;; is not smaller using a hash, and there are still 3 conditional jumps: one to test whether
+    ;; the arg is POINTERP, one to see if the perfect hash is 0..2, and one to see if there was a
+    ;; hit in the key vector. Straightforwardly testing takes 3 jumps, so just do that.
+    (when (< (hash-table-count map) (if (eq fun-name 'member) 4 3))
+      (return-from try-perfect-find/position-map))
+    (setq certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
+    (when certainp
+      (when conditional
+        (aver (eq fun-name 'member)) ; return whatever expression CONDITIONAL is
+        (return-from try-perfect-find/position-map conditional))
+      (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
+        (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
+    (flet ((hash (x) (if (symbolp x) (symbol-name-hash x) (descriptor-hash32 x))))
+      (binding* ((hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
                  (n (length hashes))
-                 (certainp (csubtypep lvar-type (specifier-type `(member ,@keys))))
                  (pow2size (power-of-two-ceiling n))
                  ;; FIXME: I messed up the minimal/non-minimal thing that was
                  ;; trying to simplify the calculation at the expense of a few extra cells.
@@ -3338,13 +3328,8 @@
                         ((eq alistp t) domain)
                         (t (sb-xc:make-array keyspace-size))))
                  (phashfun (sb-c::compile-perfect-hash lambda hashes)))
-        (when certainp
-          (when conditional
-            (aver (eq fun-name 'member)) ; return whatever expression CONDITIONAL is
-            (return-from try-perfect-find/position-map conditional))
-          (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
-            (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
-        (maphash (lambda (key val &aux (phash (funcall phashfun (symbol-name-hash key))))
+        ;; Iteration order doesn't matter here
+        (maphash (lambda (key val &aux (phash (funcall phashfun (hash key))))
                    (cond ((eq alistp t)
                           (setf (aref domain phash) val)) ; VAL is the (key . val) pair
                          (t
@@ -3383,7 +3368,7 @@
                                              'key)
                                             (t
                                              `(aref ,range phash)))))))
-                   ;; An unexpected symbol-hash fed into a minimal perfect hash function
+                   ;; An unexpected 32-bit prehash fed into a minimal perfect hash function
                    ;; can produce garbage out, so we have to bounds-check it.
                    ;; Otherwise, with a non-minimal hash function, the table size is
                    ;; exactly right for the number of bits of output of the function

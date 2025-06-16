@@ -103,3 +103,43 @@
              (assert-error (funcall f 1 'z)))))
     (try '(cdr a (assoc b '((x) (y) (z)))))
     (try '(cdr (assoc b '((x) (y) (z))) 1))))
+
+(defglobal *my-alist* '((#\a . c) (#\b . :b) (#\c . see)
+                        (#\d . d) (1 . foo) (foo . 32) (-4 . hello)))
+(defun assoc-mixed-keytypes (x) (cdr (assoc x '#.*my-alist*)))
+(defun rassoc-mixed-keytypes (x) (car (rassoc x '#.*my-alist*)))
+(compile 'assoc-mixed-keytypes)
+(compile 'rassoc-mixed-keytypes)
+
+(with-test (:name :assoc-mixed-keytypes)
+  (let ((c (ctu:find-code-constants #'assoc-mixed-keytypes)))
+    (assert (typep (car c) '(simple-vector 7)))
+    (assert (typep (cadr c) '(simple-vector 7)))
+    (assert (not (cddr c))))
+
+  (let ((c (ctu:find-code-constants #'rassoc-mixed-keytypes)))
+    (assert (typep (car c) '(simple-vector 7)))
+    (assert (typep (cadr c) '(simple-vector 7)))
+    (assert (not (cddr c))))
+
+  (dolist (pair *my-alist*)
+    (assert (eql (assoc-mixed-keytypes (car pair)) (cdr pair)))
+    (assert (eql (rassoc-mixed-keytypes (cdr pair)) (car pair)))))
+
+(defglobal *my-pos-testvector*
+    #(a #\_ :cmonkey nil :key 2 #\z #\space :zook -1 2 500))
+(defun fast-rpos-mixed-keytypes (x)
+  (position x #.*my-pos-testvector* :from-end t))
+(compile 'fast-rpos-mixed-keytypes)
+(with-test (:name :pos-mixed-keytypes)
+  (let ((c (delete-if (lambda (x) (typep x '(vector * 8)))
+                      (ctu:find-code-constants #'fast-rpos-mixed-keytypes))))
+    (assert (typep (car c) '(simple-vector 11)))
+    (assert (typep (cadr c) '(vector (unsigned-byte 8) 11)))
+    (assert (not (cddr c))))
+  (dotimes (i (length *my-pos-testvector*))
+    (let* ((k (aref *my-pos-testvector* i))
+           (p (fast-rpos-mixed-keytypes k)))
+      (if (eql k 2) ; duplicated
+          (assert (= p 10))
+          (assert (= p i))))))

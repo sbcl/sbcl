@@ -1,6 +1,9 @@
 (
+(#(0 1 2 3)
+ "((:NEAREST . 0) (:ZERO . 1) (:POSITIVE-INFINITY . 2) (:NEGATIVE-INFINITY . 3))"
+ "((& val 3))")
 (#(0 1 2 4 5 6 C 10 14 18 1F)
- "(1 5 0 2 24 12 6 4 20 16 31)"
+ "((:T . 31) (:LT . 16) (:LE . 20) (:EQ . 4) (:LNG . 6) (:GE . 12) (:NE . 24) (:NG . 20) (:LLT . 2) (:F . 0) (:LLE . 6) (:LGE . 5) (:LGT . 1) (:LNL . 5))"
  "((let ((tab #a((8) (unsigned-byte 8) 0 8 2 0 0 8 11 0)))
   (let ((b (& val #x7)))
    (let ((a (>> (<< val 27) 29)))
@@ -121,6 +124,9 @@
 (#(0 C49039A2 DB6D6FD7 E487643D F5B1443E)
  "(SIMPLE-VECTOR VECTOR CONS LIST NIL)"
  "((& (+ (>> val 4) (>> val 19)) 7))")
+(#(1 2 3 4 5 6 7 8)
+ "((2 FLOATING-POINT-OVERFLOW) (1 DIVISION-BY-ZERO) (3 DIVISION-BY-ZERO 4227858415) (4 FLOATING-POINT-OVERFLOW 4026531775) (5 FLOATING-POINT-UNDERFLOW 4160749535) (6 FLOATING-POINT-INEXACT 4261412855) (7 FLOATING-POINT-INVALID-OPERATION 3758096255) (8 FLOATING-POINT-EXCEPTION))"
+ "((& val 7))")
 (#(1 2 8 10 40)
  "(64 16 8 2 1)"
  "((& (+ (>> val 0) (>> val 1) (>> val 5)) 7))")
@@ -154,6 +160,10 @@
   (let ((b (& (>> val 1) #x3)))
    (let ((a (>> (<< val 31) 30)))
     (^ a (aref tab b))))))")
+(#(8 10 20 40)
+ "(8 16 32 64)"
+ "((let ((b (& (>> val 5) 1)))
+ (^ (& (>> val 3) 3) b (<< b 1))))")
 (#(89 8D 91 95 99 9D A1 A5 A9 AD B1 B5 B9 BD C1 C5 C9 CD D1 D5 D9 DD E1 E5)
  "(137 221 217 205 201 197 193 189 185 181 177 173 169 165 161 157 153 149 145 141 213 209 229 225)"
  "((let ((tab #a((16) (unsigned-byte 8) 31 24 0 13 0 13 0 13 1 12 16 22 16 18 21 22)))
@@ -169,11 +179,14 @@
    (let ((a (>> (u32+ val (<< val 26)) 30)))
     (^ a (aref tab b))))))")
 (#(8D 91 95 9D A5 AD B9 BD C1 C5 CD E1 E5)
- "(205 197 193 189 185 173 165 157 149 145 229 225 141)"
+ "(141 225 229 145 149 157 165 173 185 189 193 197 205)"
  "((let ((tab #a((8) (unsigned-byte 8) 13 0 0 8 4 1 4 0)))
   (let ((b (& (>> val 2) #x7)))
    (let ((a (>> (<< val 25) 29)))
     (^ a (aref tab b))))))")
+(#(13E 154 1BE 1D4)
+ "(318 446 340 468)"
+ "((& (>> val 6) 3))")
 (#(14A 78A 7EA B6A F6A)
  "(#\\? #\\{ #\\[ #\\< #\\Newline)"
  "((let ((tab #a((4) (unsigned-byte 8) 5 0 0 0)))
@@ -187,6 +200,12 @@
   (^= val (>> val 4))
   (let ((b (& (>> val 1) #x7)))
    (let ((a (>> (u32+ val (<< val 18)) 29)))
+    (^ a (aref tab b))))))")
+(#(4AA 4CA 50A 52A 76A 7CA 92A A8A BEA F8A FCA)
+ "#(#\\I #\\T #\\% #\\& #\\| #\\_ #\\( #\\) #\\; #\\> #\\~)"
+ "((let ((tab #a((8) (unsigned-byte 8) 11 4 0 2 13 7 0 1)))
+  (let ((b (& (>> val 5) #x7)))
+   (let ((a (>> (<< val 20) 29)))
     (^ a (aref tab b))))))")
 (#(88A 8AA 8CA 98A A4A A6A)
  "(#\\R #\\L #\\D #\\F #\\S #\\E)"
