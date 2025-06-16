@@ -856,6 +856,9 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
     // Defragment and set all objects' generations to pseudo-static
     prepare_immobile_space_for_save(verbose);
 
+#ifdef LISP_FEATURE_PPC64
+    NIL_SYMBOL_SLOTS_START[-1] = 0;
+#endif
 #ifdef LISP_FEATURE_X86_64
     untune_asm_routines_for_microarch();
 #endif
