@@ -93,7 +93,7 @@
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
 (!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
   :type (complex double-float))
-#+sb-simd-pack
+#+(and sb-simd-pack x86-64)
 (progn
   (/show0 "about to !DEF-PRIMITIVE-TYPE SIMD-PACK")
   (!def-primitive-type simd-pack-single (single-sse-reg descriptor-reg)
@@ -115,6 +115,40 @@
   (!def-primitive-type simd-pack-sb32 (int-sse-reg descriptor-reg)
     :type (simd-pack (signed-byte 32)))
   (!def-primitive-type simd-pack-sb64 (int-sse-reg descriptor-reg)
+    :type (simd-pack (signed-byte 64)))
+  (!def-primitive-type-alias simd-pack
+   '(:or simd-pack-single
+         simd-pack-double
+         simd-pack-ub8
+         simd-pack-ub16
+         simd-pack-ub32
+         simd-pack-ub64
+         simd-pack-sb8
+         simd-pack-sb16
+         simd-pack-sb32
+         simd-pack-sb64)))
+#+(and sb-simd-pack arm64)
+(progn
+  (/show0 "about to !DEF-PRIMITIVE-TYPE SIMD-PACK")
+  (!def-primitive-type simd-pack-single (single-neon-reg descriptor-reg)
+    :type (simd-pack single-float))
+  (!def-primitive-type simd-pack-double (double-neon-reg descriptor-reg)
+    :type (simd-pack double-float))
+  (!def-primitive-type simd-pack-ub8 (int-neon-reg descriptor-reg)
+    :type (simd-pack (unsigned-byte 8)))
+  (!def-primitive-type simd-pack-ub16 (int-neon-reg descriptor-reg)
+    :type (simd-pack (unsigned-byte 16)))
+  (!def-primitive-type simd-pack-ub32 (int-neon-reg descriptor-reg)
+    :type (simd-pack (unsigned-byte 32)))
+  (!def-primitive-type simd-pack-ub64 (int-neon-reg descriptor-reg)
+    :type (simd-pack (unsigned-byte 64)))
+  (!def-primitive-type simd-pack-sb8 (int-neon-reg descriptor-reg)
+    :type (simd-pack (signed-byte 8)))
+  (!def-primitive-type simd-pack-sb16 (int-neon-reg descriptor-reg)
+    :type (simd-pack (signed-byte 16)))
+  (!def-primitive-type simd-pack-sb32 (int-neon-reg descriptor-reg)
+    :type (simd-pack (signed-byte 32)))
+  (!def-primitive-type simd-pack-sb64 (int-neon-reg descriptor-reg)
     :type (simd-pack (signed-byte 64)))
   (!def-primitive-type-alias simd-pack
    '(:or simd-pack-single

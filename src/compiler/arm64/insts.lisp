@@ -22,6 +22,11 @@
             ldr-str-offset-encodable ldp-stp-offset-p
             extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
   ;; Imports from SB-VM into this package
+  #+sb-simd-pack
+  (import '(sb-vm::neon-reg
+            sb-vm::int-neon-reg
+            sb-vm::double-neon-reg
+            sb-vm::single-neon-reg))
   (import '(sb-vm::*register-names*
             sb-vm::add-sub-immediate
             sb-vm::32-bit-reg sb-vm::single-reg sb-vm::double-reg
@@ -114,6 +119,7 @@
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
   (define-arg-type simd-dup-reg :printer #'print-simd-dup-reg)
   (define-arg-type simd-float-reg :printer #'print-simd-float-reg)
+  (define-arg-type simd-dup-float-reg :printer #'print-simd-dup-float-reg)
 
   (define-arg-type simd-immh-reg :printer #'print-simd-immh-reg)
   (define-arg-type simd-immh-shift-left :printer #'print-simd-immh-shift-left)
@@ -162,6 +168,23 @@
 (defun fp-register-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'sb-vm::float-registers)))
+
+(defun single-register-p (thing)
+  (and (tn-p thing)
+       (eq (sc-name (tn-sc thing)) 'sb-vm::single-reg)))
+
+(defun double-register-p (thing)
+  (and (tn-p thing)
+       (eq (sc-name (tn-sc thing)) 'sb-vm::double-reg)))
+
+(defun vector-register-p (thing)
+  (declare (ignorable thing))
+  #+sb-simd-pack
+  (and (tn-p thing)
+       (member (sc-name (tn-sc thing))
+               '(sb-vm::neon-reg sb-vm::int-neon-reg
+                 sb-vm::single-neon-reg sb-vm::double-neon-reg)
+               :test #'eq)))
 
 (defun reg-size (tn)
   (if (sc-is tn 32-bit-reg)
@@ -1521,7 +1544,11 @@
                  0))
          (size (cond (fp
                       (sc-case dst
-                        (complex-double-reg
+                        ((#+sb-simd-pack neon-reg
+                          #+sb-simd-pack sb-vm::int-neon-reg
+                          #+sb-simd-pack sb-vm::double-neon-reg
+                          #+sb-simd-pack sb-vm::single-neon-reg
+                          complex-double-reg)
                          (setf opc (logior #b10 opc))
                          #b00)
                         (t
@@ -2522,7 +2549,11 @@
      0)
     ((double-reg complex-single-reg)
      1)
-    (complex-double-reg
+    ((#+sb-simd-pack neon-reg
+      #+sb-simd-pack int-neon-reg
+      #+sb-simd-pack double-neon-reg
+      #+sb-simd-pack single-neon-reg
+      complex-double-reg)
      #b10)))
 
 (def-emitter fp-compare
@@ -3039,7 +3070,12 @@
               (emit-ldr-literal segment
                                 (sc-case dest
                                   ((32-bit-reg single-reg) #b00)
-                                  (complex-double-reg #b10)
+                                  ((#+sb-simd-pack neon-reg
+                                    #+sb-simd-pack sb-vm::int-neon-reg
+                                    #+sb-simd-pack sb-vm::double-neon-reg
+                                    #+sb-simd-pack sb-vm::single-neon-reg
+                                    complex-double-reg)
+                                   #b10)
                                   (t #b01))
                                 (if (fp-register-p dest)
                                     1
@@ -3375,18 +3411,34 @@
   (rn :fields (list (byte 5 5) (byte 5 16) (byte 4 11)) :type 'simd-copy-reg)
   (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
 
+(define-instruction-format (simd-copy-from-general 32
+                            :include simd-copy
+                            :default-printer '(:name :tab rd ", " rn))
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'sized-reg)
+  (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-copy-reg))
+
 (define-instruction ins (segment rd index1 rn index2 size)
   (:printer simd-copy ((q 1) (op 1)))
+  (:printer simd-copy-from-general ((q 1) (op 0) (imm4 #b0011)))
   (:emitter
    (let ((size (position size '(:B :H :S :D))))
-     (emit-simd-copy segment
-                     1
-                     1
-                     (logior (ash index1 (1+ size))
-                             (ash 1 size))
-                     (ash index2 size)
-                     (fpr-offset rn)
-                     (fpr-offset rd)))))
+     (if index2
+         (emit-simd-copy segment
+                         1
+                         1
+                         (logior (ash index1 (1+ size))
+                                 (ash 1 size))
+                         (ash index2 size)
+                         (fpr-offset rn)
+                         (fpr-offset rd))
+         (emit-simd-copy segment
+                         1
+                         0
+                         (logior (ash index1 (1+ size))
+                                 (ash 1 size))
+                         #b0011
+                         (gpr-offset rn)
+                         (fpr-offset rd))))))
 
 (define-instruction-format (simd-copy-to-general 32
                             :include simd-copy
@@ -3412,29 +3464,88 @@
   (def umov 0 #b0111 (:d))
   (def smov 0 #b0101 (:d :s)))
 
-(define-instruction dup (segment rd rn size)
-  (:printer simd-copy-to-general
-            ((op 0) (imm4 1)
-                    (rn nil :fields (list (byte 5 5) (byte 1 30) (byte 5 16))
-                            :type 'simd-dup-reg))
-            '(:name :tab rn ", " rd))
+(define-instruction-format (simd-dup-from-general 32
+                            :include simd-copy
+                            :default-printer '(:name :tab rd ", " rn))
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'sized-reg)
+  (rd :fields (list (byte 5 0) (byte 1 30) (byte 5 16)) :type 'simd-dup-reg))
+
+(define-instruction-format (simd-dup 32
+                            :include simd-copy
+                            :default-printer '(:name :tab rd ", " rn))
+  (rn :fields (list (byte 5 5) (byte 5 16)) :type 'simd-copy-reg)
+  (rd :fields (list (byte 5 0) (byte 1 30) (byte 5 16)) :type 'simd-dup-reg))
+
+(define-instruction-format (simd-dup-extract 32
+                            :include simd-copy
+                            :default-printer '(:name :tab rd ", " rn))
+  (op4 :field (byte 8 21) :value #b11110000)
+  (rn :fields (list (byte 5 5) (byte 5 16)) :type 'simd-copy-reg)
+  (rd :fields (list (byte 5 0) (byte 5 16)) :type 'simd-dup-float-reg))
+
+(def-emitter simd-dup-extract
+  (#b0 1 31)
+  (q 1 30)
+  (op 1 29)
+  (#b11110000 8 21)
+  (imm5 5 16)
+  (#b0 1 15)
+  (imm4 4 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+;; DUP (general):         DUP <Vd>.<T>, <R><n>
+;; DUP (element, vector): DUP <Vd>.<T>, <Vn>.<Ts>[<index>]
+;; DUP (element, scalar): DUP <V><d>, <Vn>.<Ts>[<index>]
+(define-instruction dup (segment rd rn size &optional lane)
+  (:printer simd-dup-from-general ((op 0) (imm4 1)))
+  (:printer simd-dup ((op 0) (imm4 0)))
+  (:printer simd-dup-extract ((op 0) (imm4 0)))
   (:emitter
-   (multiple-value-bind (q imm)
-       (ecase size
-         (:8b (values 0 #b1))
-         (:16b (values 1 #b1))
-         (:4h (values 0 #b10))
-         (:8h (values 1 #b10))
-         (:2s (values 0 #b100))
-         (:4s (values 1 #b100))
-         (:2d (values 1 #b1000)))
-     (emit-simd-copy segment
-                     q
-                     0
-                     imm
-                     1
-                     (gpr-offset rn)
-                     (fpr-offset rd)))))
+   (cond ((or (vector-register-p rd)
+              (sc-is rd complex-double-reg))
+          (multiple-value-bind (q imm shift)
+              (ecase size
+                (:8b (values 0 #b1 1))
+                (:16b (values 1 #b1 1))
+                (:4h (values 0 #b10 2))
+                (:8h (values 1 #b10 2))
+                (:2s (values 0 #b100 3))
+                (:4s (values 1 #b100 3))
+                (:2d (values 1 #b1000 4)))
+            (cond ((register-p rn)
+                   (assert (null lane))
+                   (emit-simd-copy segment
+                                   q
+                                   0
+                                   imm
+                                   1
+                                   (gpr-offset rn)
+                                   (fpr-offset rd)))
+                  (t
+                   (emit-simd-copy segment
+                                   q
+                                   0
+                                   (logior imm (ash (or lane 0) shift))
+                                   0
+                                   (fpr-offset rn)
+                                   (fpr-offset rd))))))
+         (t
+          (assert (null size)) ; implicit from the dest width
+          (multiple-value-bind (imm shift)
+              (cond ((single-register-p rd)
+                     (values #b00100 3))
+                    ((double-register-p rd)
+                     (values #b01000 4))
+                    (t (error "Unsupported dup dest ~a" rn)))
+            (emit-simd-dup-extract segment
+                                   1 ; q
+                                   0 ; op
+                                   (logior imm (ash (or lane 0) shift))
+                                   0 ; imm4
+                                   (fpr-offset rn)
+                                   (fpr-offset rd)))))))
 
 (def-emitter simd-across-lanes
     (#b0 1 31)
@@ -4090,6 +4201,11 @@
        (setf constant (list :fixup (cdr first))))
       (single-float (setf constant (list :single-float first)))
       (double-float (setf constant (list :double-float first)))
+      #+(and sb-simd-pack (not sb-xc-host))
+      (simd-pack
+       (setq constant
+             (list :oword (logior (%simd-pack-low first)
+                                  (ash (%simd-pack-high first) 64)))))
       .
       #+sb-xc-host
       ((complex

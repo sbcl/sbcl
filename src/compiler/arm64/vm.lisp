@@ -106,7 +106,6 @@
   ;; Non-immediate contstants in the constant pool
   (constant constant)
 
-  ;; Anything else that can be an immediate.
   (immediate immediate-constant)
 
   ;; **** The stacks.
@@ -147,6 +146,12 @@
   (double-stack non-descriptor-stack) ; double floats.
   (complex-single-stack non-descriptor-stack)
   (complex-double-stack non-descriptor-stack :element-size 2 :alignment 2)
+  #+sb-simd-pack
+  (int-neon-stack non-descriptor-stack :element-size 2)
+  #+sb-simd-pack
+  (double-neon-stack non-descriptor-stack :element-size 2)
+  #+sb-simd-pack
+  (single-neon-stack non-descriptor-stack :element-size 2)
 
   ;; **** Things that can go in the integer registers.
 
@@ -207,6 +212,30 @@
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
+  ;; temporary only
+  #+sb-simd-pack
+  (neon-reg float-registers
+           :locations #.*float-regs*)
+  ;; regular values
+  #+sb-simd-pack
+  (int-neon-reg float-registers
+                :locations #.*float-regs*
+                :constant-scs (fp-immediate)
+                :save-p t
+                :alternate-scs (int-neon-stack))
+  #+sb-simd-pack
+  (double-neon-reg float-registers
+                   :locations #.*float-regs*
+                   :constant-scs (fp-immediate)
+                   :save-p t
+                   :alternate-scs (double-neon-stack))
+  #+sb-simd-pack
+  (single-neon-reg float-registers
+                   :locations #.*float-regs*
+                   :constant-scs (fp-immediate)
+                   :save-p t
+                   :alternate-scs (single-neon-stack))
+
   (catch-block control-stack :element-size catch-block-size)
   (unwind-block control-stack :element-size unwind-block-size)
   (zero immediate-constant))
@@ -254,7 +283,10 @@
      fp-immediate-sc-number)
     (structure-object
      (when (eq value sb-lockless:+tail+)
-       immediate-sc-number))))
+       immediate-sc-number))
+    #+(and sb-simd-pack (not sb-xc-host))
+    (simd-pack
+     fp-immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
@@ -297,7 +329,12 @@
                (sc-case tn
                  (single-reg "S")
                  ((double-reg complex-single-reg) "D")
-                 (complex-double-reg "Q"))
+                 ((#+sb-simd-pack neon-reg
+                   #+sb-simd-pack int-neon-reg
+                   #+sb-simd-pack double-neon-reg
+                   #+sb-simd-pack single-neon-reg
+                   complex-double-reg)
+                  "V"))
                offset)))))
 
 (defun primitive-type-indirect-cell-type (ptype)

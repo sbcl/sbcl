@@ -507,26 +507,29 @@
               (#b10 "D"))
             offset)))
 
+(defun q-and-size-to-element-width (q size)
+  (cond ((and (= size 0)
+              (= q 0))
+         "8B")
+        ((and (= size 0)
+              (= q 1))
+         "16B")
+        ((and (= size 1)
+              (= q 0))
+         "4H")
+        ((and (= size 1)
+              (= q 1))
+         "8H")
+        ((and (= size 2)
+              (= q 1))
+         "4S")))
+
 (defun print-vx.t (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (q size offset) value
     (format stream "V~d.~a"
             offset
-            (cond ((and (= size 0)
-                        (= q 0))
-                   "8B")
-                  ((and (= size 0)
-                        (= q 1))
-                   "16B")
-                  ((and (= size 1)
-                        (= q 0))
-                   "4H")
-                  ((and (= size 1)
-                        (= q 1))
-                   "8H")
-                  ((and (= size 2)
-                        (= q 1))
-                   "4S")))))
+            (q-and-size-to-element-width q size))))
 
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
@@ -541,24 +544,20 @@
                  (ash imm4 (- index))
                  (ash imm5 (- (1+ index))))))))
 
+(defun print-simd-dup-float-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (offset imm5) value
+    (let ((index (lowest-set-bit-index imm5)))
+      (format stream "~a~d"
+              (char "BHSD" index)
+              offset))))
+
 (defun print-simd-dup-reg (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (offset q imm5) value
-    (format stream "V~d.~a" offset
-            (cond ((= imm5 #b1)
-                   (if (zerop q)
-                       "8B"
-                       "16B"))
-                  ((= imm5 #b10)
-                   (if (zerop q)
-                       "4H"
-                       "8H"))
-                  ((= imm5 #b100)
-                   (if (zerop q)
-                       "2S"
-                       "4S"))
-                  ((= imm5 #b1000)
-                   "2D")))))
+    (let ((size (lowest-set-bit-index imm5)))
+      (format stream "V~d.~a" offset
+              (q-and-size-to-element-width q size)))))
 
 (defun print-simd-float-reg (value stream dstate)
   (declare (ignore dstate))
