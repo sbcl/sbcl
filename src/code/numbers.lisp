@@ -361,8 +361,8 @@
 (declaim (maybe-inline truncate floor ceiling round fround))
 
 (defun truncate (number &optional (divisor 1))
-  "Return number (or number/divisor) as an integer, rounded toward 0.
-  The second returned value is the remainder."
+  "Return number/divisor as an integer, rounded toward 0.
+The second returned value is the remainder."
   (declare (explicit-check)
            (maybe-inline truncate))
   (macrolet ((truncate-float (rtype)
@@ -427,8 +427,8 @@
        (truncate-float (dispatch-type divisor))))))
 
 (defun floor (number &optional (divisor 1))
-  "Return the greatest integer not greater than number, or number/divisor.
-  The second returned value is (mod number divisor)."
+  "Return number/divisor as an integer, rounded toward negative infinity.
+The second returned value is the remainder."
   (declare (explicit-check)
            (maybe-inline floor))
   (macrolet ((truncate-float (rtype)
@@ -508,8 +508,8 @@
        (truncate-float (dispatch-type divisor))))))
 
 (defun ceiling (number &optional (divisor 1))
-  "Return number (or number/divisor) as an integer, rounded toward 0.
-  The second returned value is the remainder."
+  "Return number/divisor as an integer, rounded toward positive infinity.
+The second returned value is the remainder."
   (declare (explicit-check)
            (maybe-inline ceiling))
   (macrolet ((truncate-float (rtype)
