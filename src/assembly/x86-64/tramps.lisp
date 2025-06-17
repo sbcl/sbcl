@@ -112,6 +112,7 @@
       #-system-tlabs (inst break halt-trap)
       #+system-tlabs (call-c "switch_to_arena" #+win32 rdi-tn #+win32 rsi-tn))))
 
+#+system-tlabs
 (define-assembly-routine (handle-arena-request) ()
   ;; we're pseudo-atomic. End it and handle a trap if necessary.
   (emit-end-pseudo-atomic)
@@ -138,7 +139,9 @@
 
                     ,vars ,@code))))
            (test-arena-exhausted (units)
+             (declare (ignorable units))
              ;; UNITS qualfies what the first arg to the handler measures.
+             #+system-tlabs
              `(progn (inst test rax-tn rax-tn)
                      (inst jmp :nz SUCCESS)
                      ,(ecase units

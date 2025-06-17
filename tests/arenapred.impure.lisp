@@ -1,5 +1,6 @@
 #+(or gc-stress
-      (not x86-64) interpreter) (invoke-restart 'run-tests::skip-file)
+      (not (and x86-64 system-tlabs)) interpreter)
+(invoke-restart 'run-tests::skip-file)
 
 (defvar *allocation-nbytes*)
 

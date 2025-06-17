@@ -325,7 +325,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 ;;;   give the application enough working memory to clean up without accidentally
 ;;;   creating heap-to-arena pointers, as might happen if it were to allocate
 ;;;   to the heap unexpectedly.
-#+x86-64
+#+(and x86-64 system-tlabs)
 (progn
 (defun default-arena-extension-test (arena pending-allocation proposed-total-size)
   (declare (ignore pending-allocation))
