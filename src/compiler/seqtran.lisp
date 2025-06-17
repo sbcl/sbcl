@@ -3306,23 +3306,24 @@
     (binding* ((hashfn (prehash-function-for-mph-generator
                         (minperfhash-key-universe-type keys)))
                (hashes (map '(simple-array (unsigned-byte 32) (*)) hashfn keys))
-               (n (length hashes))
-               (pow2size (power-of-two-ceiling n))
+               (keycount (length hashes))
+               (pow2size (power-of-two-ceiling keycount))
                  ;; FIXME: I messed up the minimal/non-minimal thing that was
                  ;; trying to simplify the calculation at the expense of a few extra cells.
                  ;; Minimal will always be right.
                (minimal t)
                (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
-               (keyspace-size (if minimal n pow2size))
+               (keyspace-size (if minimal keycount pow2size))
                (domain (sb-xc:make-array keyspace-size :initial-element 0))
                (range
                   (cond ((eq fun-name 'position)
-                         (sb-xc:make-array keyspace-size
+                         (let ((n (length items)))
+                           (sb-xc:make-array keyspace-size
                                            :element-type
                                            (cond ((<= n #x100) '(unsigned-byte 8))
                                                  ((<= n #x10000) '(unsigned-byte 16))
                                                  (t '(unsigned-byte 32)))
-                                           :initial-element 0))
+                                           :initial-element 0)))
                         ((or conditional (eq fun-name 'find)) nil)
                         ;; if ALISTP=T then use a single array of cons cells,
                         ;; which the user wants (or seems to)
@@ -3335,7 +3336,8 @@
                           (setf (aref domain phash) val)) ; VAL is the (key . val) pair
                          (t
                           (setf (svref domain phash) key)
-                          (when range (setf (aref range phash) val)))))
+                          (when range
+                            (setf (aref range phash) val)))))
                  map)
         (when (eq alistp :synthetic)
           (let* ((car/cdr (node-dest node))
@@ -3349,6 +3351,7 @@
             ;; return a value that is not based on the input list directly.
             (derive-node-type node (specifier-type 't) :from-scratch t)
             (reoptimize-node car/cdr)))
+
         ;; TRULY-THE around PHASH is warranted when CERTAINP because while the compiler can
         ;; derive the type of the final LOGAND, it's a complete mystery to it that the range
         ;; of the perfect hash is smaller than 2^N.
@@ -3357,7 +3360,7 @@
          `(let* ((hash ,(prehash-expr-for-perfect-hash 'item keys))
                  (phash (,lambda hash)))
             ,(if certainp
-                 `(aref ,range (truly-the (mod ,n) phash))
+                 `(aref ,range (truly-the (mod ,keycount) phash))
                  (let* ((key-expr (if (eq alistp t)
                                       `(,(if (eq fun-name 'assoc) 'car 'cdr) key)
                                       'key))
@@ -3374,7 +3377,7 @@
                    ;; Otherwise, with a non-minimal hash function, the table size is
                    ;; exactly right for the number of bits of output of the function
                    (if minimal
-                       `(if (< phash ,n)
+                       `(if (< phash ,keycount)
                             ,expr)
                        expr))))))))
 

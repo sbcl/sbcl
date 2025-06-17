@@ -143,3 +143,31 @@
       (if (eql k 2) ; duplicated
           (assert (= p 10))
           (assert (= p i))))))
+
+(sb-int:defconstant-eqx +averylongstring+
+    (map 'base-string 'code-char
+          '(94 44 61 78 122 124 90 68 104 113 63 90 111 49 101 89 96 106 116 39 81 82 54
+            52 66 100 123 78 95 51 55 124 111 83 124 110 40 39 124 115 94 42 105 102 102
+            78 56 126 81 10 94 117 103 53 40 88 119 104 90 48 75 48 68 88 78 50 65 41 115
+            117 120 51 63 72 63 96 33 32 112 70 106 43 94 96 50 101 88 66 87 88 60 76 99
+            91 90 45 87 89 90 102 10 85 115 102 57 51 107 54 125 81 44 57 38 66 91 64 71
+            119 101 103 51 42 34 125 55 122 42 65 36 66 85 92 65 58 46 84 41 98 53 101 95
+            104 40 71 78 108 105 126 54 116 93 59 108 61 60 37 43 111 72 85 108 109 90 65
+            73 50 97 45 103 62 102 49 52 90 56 119 77 107 93 111 69 114 125 64 55 96 122
+            119 108 69 92 106 65 73 55 67 122 87 74 111 46 36 103 109 103 115 75 106 74
+            113 62 63 86 55 89 69 84 35 115 49 67 106 54 68 110 47 114 95 44 90 41 59 88
+            94 34 33 63 10 56 109 103 60 105 40 53 125 40 51 42 91 100 47 67 46 96 89 118))
+  #'equal)
+
+(with-test (:name :position-in-very-long-string)
+  ;; This function should not crash the compiler.
+  ;; The element type for the output array was getting choosen too restrictively.
+  ;; Due to dup chars in the string, the vector of possible answers is only
+  ;; as long as (length (remove-duplicates +averylongstring+)) but the element
+  ;; is as large as (1- (length +averylongstring+)) inclusive.
+  (let ((f (compile nil '(lambda (c) (position c +averylongstring+)))))
+    (declare (notinline position))
+    ;; the function should work
+    (dotimes (i (or #+sb-unicode 1000 256))
+      (assert (eql (position (code-char i) +averylongstring+)
+                   (funcall f (code-char i)))))))
