@@ -330,36 +330,69 @@
 (setf (info :function :compiler-macro-function 'uint32-modularly)
       #'sb-c::optimize-for-calc-phash)
 
+;;; Decide what types are in OBJECTS and return {FIXNUM|SYMBOL|CHARACTER|T}.
+;;; Perhaps alternatively this could return an OR over types so the consumer
+;;; could decide to expand differently in various situations such as
+;;; (OR SYMBOL FIXNUM). Because maybe the hash function should be:
+;;;  (if (symbolp x) (f x) (ldb (byte 32 0) (get-lisp-obj-address)))
+;;; which contains exactly 1 type test, and if not symbol, there is no
+;;; hazard in extracting low bits of a random descriptor.
+;;; On the other hand, that's pretty darn near what happens anyway.
+(defun minperfhash-key-universe-type (objects)
+  (let ((types 0))
+    (dolist (object objects (case types
+                              (#b001 'fixnum)
+                              (#b010 'symbol)
+                              (#b100 'character)
+                              (0 'nil) ; if OBJECTS is NIL
+                              (t 't)))
+      (setq types (logior (typecase object
+                            (sb-xc:fixnum #b001)
+                            (symbol       #b010)
+                            (character    #b100)
+                            (t (return nil)))
+                          types)))))
+
 ;;; Construct a form which computes a 32-bit hash from OBJ whose value
 ;;; should be - but might not be - one of the choices in KEYS.
 ;;; If it is not, the expression's result should be irrelevant.
 ;;; (Calling code has to do some kind of "hit" test)
+;;; TODO: consider putting in a "miss" label that this code bail out to
+;;; if there is an unexpected object type.
 ;;; The 32-bit hash is then fed into a perfect hash expression.
 (defun prehash-expr-for-perfect-hash (obj keys)
-  (if (notany #'symbolp keys)
-      `(descriptor-hash32 ,obj)
-      (multiple-value-bind (guard hashval)
-          (if (vop-existsp :translate hash-as-if-symbol-name)
-              (values `(pointerp ,obj) `(hash-as-if-symbol-name ,obj))
-              ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
-              ;; which accepts NIL along with OTHER-POINTER objects.
-              (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,obj)
-                      `(symbol-name-hash (truly-the symbol ,obj))))
-        `(if ,guard
-             ,hashval
-             ,(if (every #'symbolp keys) 0 `(descriptor-hash32 ,obj))))))
+  (let ((type (minperfhash-key-universe-type keys)))
+    (ecase type
+      ((t symbol) ; most general hasher or just symbol
+       (multiple-value-bind (guard hash)
+           (if (vop-existsp :translate hash-as-if-symbol-name)
+               (values `(pointerp ,obj) `(hash-as-if-symbol-name ,obj))
+               ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
+               ;; which accepts NIL along with OTHER-POINTER objects.
+               (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,obj)
+                       `(symbol-name-hash (truly-the symbol ,obj))))
+         `(if ,guard ,hash ,(if (eq type 't) `(descriptor-hash32 ,obj) 0))))
+      (character
+       `(if (characterp ,obj) (char-code (truly-the character ,obj)) 0))
+      (fixnum
+       `(if (fixnump ,obj) (ldb (byte 32 0) (truly-the fixnum ,obj)) 0)))))
+;;; This is for use at compile-time, to build the array of uint32_t inputs
+;;; to the MPH generator after choosing the manner of prehashing.
+(defun prehash-function-for-mph-generator (type)
+  (case type
+    ((t symbol) ; most general hasher or just symbol
+     (lambda (x)
+       (etypecase x
+         (symbol (symbol-name-hash x))
+         ((or sb-xc:fixnum character) (descriptor-hash32 x)))))
+    (character #'char-code)
+    (t (lambda (x) (ldb (byte 32 0) (the sb-xc:fixnum x))))))
 
 ;;; The CASE macro can use this predicate to decide whether to expand in a way
 ;;; that selects a clause via a perfect hash versus the customary expansion
 ;;; as a sequence of IFs.
 (defun perfectly-hashable (objects)
-  (flet ((hash (x) (if (symbolp x) (symbol-name-hash x) (descriptor-hash32 x))))
-    (let* ((n (length objects))
-           (hashes (make-array n :element-type '(unsigned-byte 32))))
-      (loop for o in objects
-            for i from 0
-            do (let ((h (hash o)))
-                 (if h
-                     (setf (aref hashes i) h)
-                     (return-from perfectly-hashable nil))))
-      (make-perfect-hash-lambda hashes objects))))
+  (binding* ((type (minperfhash-key-universe-type objects) :exit-if-null)
+             (hashfn (prehash-function-for-mph-generator type))
+             (hashes (map '(simple-array (unsigned-byte 32) 1) hashfn objects)))
+    (make-perfect-hash-lambda hashes objects)))

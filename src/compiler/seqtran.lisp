@@ -3303,18 +3303,19 @@
         (return-from try-perfect-find/position-map conditional))
       (when (eq fun-name 'find) ; nothing to do. Wasted some time, no big deal
         (return-from try-perfect-find/position-map 'item))) ; transform arg is always named ITEM
-    (flet ((hash (x) (if (symbolp x) (symbol-name-hash x) (descriptor-hash32 x))))
-      (binding* ((hashes (map '(simple-array (unsigned-byte 32) (*)) #'hash keys))
-                 (n (length hashes))
-                 (pow2size (power-of-two-ceiling n))
+    (binding* ((hashfn (prehash-function-for-mph-generator
+                        (minperfhash-key-universe-type keys)))
+               (hashes (map '(simple-array (unsigned-byte 32) (*)) hashfn keys))
+               (n (length hashes))
+               (pow2size (power-of-two-ceiling n))
                  ;; FIXME: I messed up the minimal/non-minimal thing that was
                  ;; trying to simplify the calculation at the expense of a few extra cells.
                  ;; Minimal will always be right.
-                 (minimal t)
-                 (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
-                 (keyspace-size (if minimal n pow2size))
-                 (domain (sb-xc:make-array keyspace-size :initial-element 0))
-                 (range
+               (minimal t)
+               (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
+               (keyspace-size (if minimal n pow2size))
+               (domain (sb-xc:make-array keyspace-size :initial-element 0))
+               (range
                   (cond ((eq fun-name 'position)
                          (sb-xc:make-array keyspace-size
                                            :element-type
@@ -3327,9 +3328,9 @@
                         ;; which the user wants (or seems to)
                         ((eq alistp t) domain)
                         (t (sb-xc:make-array keyspace-size))))
-                 (phashfun (sb-c::compile-perfect-hash lambda hashes)))
+               (phashfun (sb-c::compile-perfect-hash lambda hashes)))
         ;; Iteration order doesn't matter here
-        (maphash (lambda (key val &aux (phash (funcall phashfun (hash key))))
+        (maphash (lambda (key val &aux (phash (funcall phashfun (funcall hashfn key))))
                    (cond ((eq alistp t)
                           (setf (aref domain phash) val)) ; VAL is the (key . val) pair
                          (t
@@ -3375,7 +3376,7 @@
                    (if minimal
                        `(if (< phash ,n)
                             ,expr)
-                       expr)))))))))
+                       expr))))))))
 
 (macrolet ((define-find-position (fun-name values-index)
              `(deftransform ,fun-name ((item sequence &key
