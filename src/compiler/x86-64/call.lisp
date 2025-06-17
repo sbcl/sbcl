@@ -1356,8 +1356,8 @@
                        :scale 8
                        :overflow
                        (lambda ()
-                         (inst push rcx)
                          (inst push context)
+                         (inst push rcx)
                          (invoke-asm-routine
                           'call (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest)
                           node)

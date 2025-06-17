@@ -252,6 +252,8 @@
   ;; Arena allocation parameters
   (original-size 0 :type word)
   (growth-amount 0 :type word) ; additive
+  ;; size above which an object gets its own allocation block
+  (huge-object-threshold 0 :type word)
   ;; Maximum we'll allow the arena to grow to, accounting for extension blocks
   ;; and huge object blocks.
   (size-limit 0 :type word)
@@ -260,9 +262,13 @@
   ;; Sum of unusable bytes resulting from discarding the tail of the
   ;; most recently claimed chunk when switching from the arena to the heap.
   (bytes-wasted 0 :type word)
+  ;; if T, allocations overflowed the size limit and the area is
+  ;; operating in its emergency fallback regime.
+  (exhausted nil :type boolean)
   ;; Small integer identifier starting from 0
   (index 0 :type fixnum)
   ;; T if all memory has been protected with PROT_NONE (for debugging)
+  ;; NIL if visible. 0 if hiding is not allowed.
   hidden
   ;; a counter that increments on each rewind, and which can be used by a threads
   ;; in a pool to detect that their cached TLAB pointers are invalid

@@ -329,7 +329,7 @@ NO_SANITIZE_MEMORY lispobj alloc_funinstance(sword_t nbytes)
 /* Make a list that couldn't be inline-allocated. Break it up into contiguous
  * blocks of conses not to exceed one GC page each. */
 NO_SANITIZE_MEMORY lispobj
-make_list(lispobj element, sword_t nelts, int sys) {
+make_list(sword_t nelts, lispobj element, int sys) {
     // Technically this overflow handler could permit garbage collection
     // between separate allocation. For now the entire thing is pseudo-atomic.
     struct thread *self = get_sb_vm_thread();
@@ -339,6 +339,7 @@ make_list(lispobj element, sword_t nelts, int sys) {
     do {
         if (nbytes < partial_request) partial_request = nbytes;
         struct cons* c = (void*)lisp_alloc(sys, region, partial_request, PAGE_TYPE_CONS, self);
+        if (!c) { gc_assert(self->arena); return 0; }
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;
@@ -358,7 +359,7 @@ make_list(lispobj element, sword_t nelts, int sys) {
 /* Convert a &MORE context to a list. Split it up like make_list if we have to */
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 NO_SANITIZE_MEMORY lispobj
-listify_rest_arg(lispobj* context, sword_t nelts, int sys) {
+listify_rest_arg(sword_t nelts, lispobj* context, int sys) {
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
     sword_t nbytes = nelts << WORD_SHIFT; // fixnum input
@@ -367,6 +368,7 @@ listify_rest_arg(lispobj* context, sword_t nelts, int sys) {
     do {
         if (nbytes < partial_request) partial_request = nbytes;
         struct cons* c = (void*)lisp_alloc(sys, region, partial_request, PAGE_TYPE_CONS, self);
+        if (!c) { gc_assert(self->arena); return 0; }
         *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
         int ncells = partial_request >> (1+WORD_SHIFT);
         nbytes -= N_WORD_BYTES * 2 * ncells;

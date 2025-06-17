@@ -14,6 +14,10 @@
 #include "genesis/instance.h"
 #include "graphvisit.h"
 
+#ifdef LISP_FEATURE_X86_64
+#define ARENA_USER_EXTENSION_PREDICATE
+#endif
+
 extern lispobj * component_ptr_from_pc(char *pc);
 
 // Arena memory block. At least one is associated with each arena,
@@ -50,7 +54,7 @@ void ARENA_DISPOSE_MEMORY(void* addr, size_t size)
 
 #define CHUNK_ALIGN 4096
 
-lispobj sbcl_new_arena(size_t size)
+lispobj sbcl_new_arena(size_t size, int hidable)
 {
     // First 3 objects in the arena:
     //   Arena
@@ -79,15 +83,17 @@ lispobj sbcl_new_arena(size_t size)
     // a multiple of 4k. In this manner it is possible to mprotect
     // all user allocations instead of having to skip the first batch
     // so that the arena struct always remains accessible.
-    char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
+    uword_t alignment = hidable ? CHUNK_ALIGN : 2*N_WORD_BYTES;
+    char* aligned_mem_base = PTR_ALIGN_UP(mem_base, alignment);
     block->freeptr = block->allocator_base = aligned_mem_base;
     char *limit = (char*)arena + size;
-    char *aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
+    char *aligned_limit = PTR_ALIGN_DOWN(limit, alignment);
     block->limit = aligned_limit;
     block->next = NULL;
     arena->uw_original_size = size;
     arena->uw_length = size;
     arena->uw_current_block = arena->uw_first_block = (uword_t)block;
+    arena->hidden = hidable ? NIL : 0;
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
 }
 
@@ -97,17 +103,20 @@ static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
 
 #define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
 #define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
+#define ARENA(x) ((struct arena*)INSTANCE(x))
 
 /* Release successor blocks of this arena, keeping only the first */
 /* TODO: in debug mode, assert that no threads are using the arena */
 void arena_release_memblks(lispobj arena_taggedptr)
 {
-    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    struct arena* arena = ARENA(arena_taggedptr);
     // Avoid a race with GC in scavenge_arenas(). We're messing up the chain
     // of blocks and can't have anything else looking at them.
-    __attribute__((unused)) lispobj old_hidden
-      = __sync_val_compare_and_swap(&arena->hidden, NIL, LISP_T);
-    gc_assert(old_hidden == NIL);
+    if (arena->hidden) { // 0 = non-hidable, nonzero = hideable and possibly hidden
+        __attribute__((unused)) lispobj old_hidden
+            = __sync_val_compare_and_swap(&arena->hidden, NIL, LISP_T);
+        gc_assert(old_hidden == NIL);
+    }
     ARENA_MUTEX_ACQUIRE(arena);
     struct arena_memblk* first = (void*)arena->uw_first_block;
     struct arena_memblk* block = first->next;
@@ -128,14 +137,14 @@ void arena_release_memblks(lispobj arena_taggedptr)
     }
     arena->uw_huge_objects = 0;
     arena->uw_length = arena->uw_original_size;
-    arena->hidden = NIL;
+    if (arena->hidden == LISP_T) arena->hidden = NIL;
     ARENA_MUTEX_RELEASE(arena);
 }
 
 void sbcl_delete_arena(lispobj arena_taggedptr)
 {
     arena_release_memblks(arena_taggedptr);
-    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    struct arena* arena = ARENA(arena_taggedptr);
 #ifdef LISP_FEATURE_WIN32
     DeleteCriticalSection(arena_mutex(arena));
 #elif defined LISP_FEATURE_SB_THREAD
@@ -174,7 +183,7 @@ int inhibit_arena_use = 0;
 void switch_to_arena(lispobj arena_taggedptr)
 {
     if (inhibit_arena_use) return;
-    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    struct arena* arena = (void*)native_pointer(arena_taggedptr); // could be nullptr
     struct thread* th = get_sb_vm_thread();
     struct extra_thread_data *extra_data = thread_extra_data(th);
     if (arena) { // switching from the dynamic space to an arena
@@ -210,7 +219,7 @@ void switch_to_arena(lispobj arena_taggedptr)
     } else { // finished with the arena
         gc_assert(th->arena); // must have been an arena in use
 #if 0
-        struct arena* old_arena = (void*)native_pointer(th->arena);
+        struct arena* old_arena = ARENA(th->arena);
         int arena_index = fixnum_value(old_arena->index);
         // Ensure that this thread has enough space in its save area for the arena index.
         if (arena_index > extra_data->arena_count) {
@@ -238,8 +247,71 @@ void switch_to_arena(lispobj arena_taggedptr)
     th->arena = arena_taggedptr;
 }
 
+void* extend_lisp_arena(struct arena* a, long request, int oversized)
+{
+    bool hidable = a->hidden == NIL;
+    long alloc_size = request;
+    char* new_mem;
+    // For a huge object, ensure that there will be adequate space after aligning
+    // the bounds. Don't worry about it for a regular extension block though
+    // because there's no chance that the current request won't fit.
+    // Moreover, use malloc() for oversized objects instead of the macro
+    // because we don't actually remember the originally requested size
+    // to pass to ARENA_DISPOSE_MEMORY in arena_release_memblks
+    if (oversized) {
+        alloc_size = hidable ? (request + 3*CHUNK_ALIGN) :
+                     (long)(request + sizeof (struct arena_memblk)
+                            + 2*N_WORD_BYTES);
+        new_mem = malloc(alloc_size);
+    } else {
+        gc_assert(request == (long)a->uw_growth_amount);
+        new_mem = ARENA_GET_OS_MEMORY(request);
+        alloc_size = request;
+    }
+    if (new_mem == 0) {
+        ARENA_MUTEX_RELEASE(a);
+        lose("Fatal: arena memory exhausted and could not obtain more memory");
+    }
+    struct arena_memblk* extension= (void*)new_mem;
+    char* mem_base = new_mem + sizeof (struct arena_memblk);
+    // Alignment serves the needs of hide/unhide because mprotect()
+    // operates only on boundaries as dictated by the OS and/or CPU.
+    uword_t alignment = hidable ? CHUNK_ALIGN : 2*N_WORD_BYTES;
+    char* aligned_mem_base = PTR_ALIGN_UP(mem_base, alignment);
+    extension->freeptr = extension->allocator_base = aligned_mem_base;
+    char* limit = new_mem + alloc_size;
+    char* aligned_limit = PTR_ALIGN_DOWN(limit, alignment);
+    extension->limit = aligned_limit;
+    // tally up the total length
+    // For huge objects, count only the directly requested space,
+    // not the "bookends" (alignment chunks)
+    a->uw_length += request;
+    if (oversized) {
+        long usable_space = aligned_limit - aligned_mem_base;
+        // This should assert() because it's very bad, but assertions can be
+        // disabled, so explicitly lose() if it happens.
+        if (request > usable_space) lose("alignment glitch");
+        extension->next = (void*)a->uw_huge_objects;
+        a->uw_huge_objects = (uword_t)extension;
+        // Ok to release the mutex before zero-filling. This is pseudo-atomic
+        // so we won't stop for GC (which could allowing GC to see junk)
+        ARENA_MUTEX_RELEASE(a);
+        // A huge object needs to be zero-filled. It probably was, because it
+        // probably just got mmapped() but there's no way to know.
+        memset(aligned_mem_base, 0, request);
+        return aligned_mem_base;
+    }
+    extension->next = NULL;
+    struct arena_memblk* current = (void*)a->uw_current_block;
+    current->next = extension;
+    // Other threads can start using the new block already
+    a->uw_current_block = (lispobj)extension;
+    ARENA_MUTEX_RELEASE(a);
+    return 0;
+}
+
 static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
-                                   sword_t nbytes, int filler)
+                                   sword_t nbytes, int page_type)
 {
     char* where = mem->freeptr;
     while (1) {
@@ -250,96 +322,33 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
             // due to a->current_block being speculatively loaded w/o the mutex.
             struct arena_memblk* actual_current_block = (void*)a->uw_current_block;
             if (mem != actual_current_block) { // oops - looking at the wrong memblk
-                mem = actual_current_block;
-                // fall into the mutex release and restart below
-            } else { // potentially extend
-                // An object occupying strictly more than 1/512th of an extension is separately allocated.
-                int oversized = nbytes > (sword_t)(a->uw_growth_amount >> 9);
-                long request = oversized ? nbytes : (sword_t)a->uw_growth_amount;
-                if (a->uw_length + request > a->uw_size_limit) { // limit reached
-                    ARENA_MUTEX_RELEASE(a);
-                     lose("Fatal: won't add arena %s block. Arena %p length=%#lx request=%#lx max=%#lx",
-                          oversized ? "huge-object" : "extension", a,
-                         (long)a->uw_length, (long)request, (long)a->uw_size_limit);
-                }
-                // For a huge object, ensure that there will be adequate space after aligning
-                // the bounds. Don't worry about it for a regular extension block though
-                // because there's no chance that the current request won't fit.
-                // Moreover, use malloc() for oversized objects instead of the macro
-                // because we don't actually remember the originally requested size
-                // to pass to ARENA_DISPOSE_MEMORY in arena_release_memblks
-                long actual_request;
-                char* new_mem;
-                if (oversized) {
-                    actual_request = request + 3*CHUNK_ALIGN;
-                    new_mem = malloc(actual_request);
-                } else {
-                    actual_request = request;
-                    new_mem = ARENA_GET_OS_MEMORY(actual_request);
-                }
-                if (new_mem == 0) {
-                    ARENA_MUTEX_RELEASE(a);
-                    lose("Fatal: arena memory exhausted and could not obtain more memory");
-                }
-                struct arena_memblk* extension= (void*)new_mem;
-                char* mem_base = new_mem + sizeof (struct arena_memblk);
-                // Alignment serves the needs of hide/unhide because mprotect()
-                // operates only on boundaries as dictated by the OS and/or CPU.
-                char* aligned_mem_base = PTR_ALIGN_UP(mem_base, CHUNK_ALIGN);
-                extension->freeptr = extension->allocator_base = aligned_mem_base;
-                char* limit = new_mem + actual_request;
-                char* aligned_limit = PTR_ALIGN_DOWN(limit, CHUNK_ALIGN);
-                extension->limit = aligned_limit;
-                extension->next = NULL;
-                // tally up the total length
-                // For huge objects, count only the directly requested space,
-                // not the "bookends" (alignment chunks)
-                a->uw_length += request;
-                if (oversized) {
-                    long usable_space = aligned_limit - aligned_mem_base;
-                    // This should assert() because it's very bad, but assertions can be
-                    // disabled, so explicitly lose() if it happens.
-                    if (nbytes > usable_space) lose("alignment glitch");
-                    extension->next = (void*)a->uw_huge_objects;
-                    a->uw_huge_objects = (uword_t)extension;
-                    // A huge object needs to be zero-filled. It probably was, because it
-                    // probably just got mmapped() but there's no way to know.
-                    memset(aligned_mem_base, 0, nbytes);
-                    ARENA_MUTEX_RELEASE(a);
-                    return aligned_mem_base;
-                }
-                mem->next = extension;
-                // Other threads can start using the new block already
-                a->uw_current_block = (lispobj)extension;
-                mem = extension;
+                ARENA_MUTEX_RELEASE(a);
+                // C compiler should self-tail-call in optimized build
+                return memblk_claim_subrange(a, actual_current_block, nbytes, page_type);
             }
-            ARENA_MUTEX_RELEASE(a);
-            // C compiler should self-tail-call in optimized build
-            return memblk_claim_subrange(a, mem, nbytes, filler);
+#ifdef ARENA_USER_EXTENSION_PREDICATE
+            // Keeping the mutex held, return failure, and allow Lisp to decide
+            // how to proceed. Mutex forces exactly one thread to decide.
+            return 0;
+#else
+            int oversized = page_type != PAGE_TYPE_CONS && (uword_t)nbytes > a->uw_huge_object_threshold;
+            long request = oversized ? nbytes : (sword_t)a->uw_growth_amount;
+            if (a->uw_length + request > a->uw_size_limit) { // limit reached
+                ARENA_MUTEX_RELEASE(a);
+                lose("Fatal: won't add arena %s block. Arena %p length=%#lx request=%#lx max=%#lx",
+                     oversized ? "huge-object" : "extension", a,
+                     (long)a->uw_length, (long)request, (long)a->uw_size_limit);
+            }
+            void* result = extend_lisp_arena(a, request, oversized);
+            if (oversized) return result;
+            // get new current_block
+            return memblk_claim_subrange(a, (void*)a->uw_current_block, nbytes, page_type);
+#endif
         }
         char* old = __sync_val_compare_and_swap(&mem->freeptr, where, new_freeptr);
         if (old == where) break;
         where = old;
     }
-    memset(where, filler, nbytes);
-    return where;
-}
-static void* claim_new_subrange(struct arena* a, sword_t nbytes, int filler) {
-    return memblk_claim_subrange(a, (void*)a->uw_current_block, nbytes, filler);
-}
-
-lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
-                            int page_type, sword_t nbytes)
-{
-    /* Todo: can we keep this code in Lisp and make it parameterizable?
-     * Calling into C has to spill all FPRs which is just too much.
-     *  - if the TLAB is for type CONS and has less than K1 (arb) bytes more,
-     *    or non-cons and has less than K2 (arb) bytes more,
-     *    then discard that whole TLAB and start a new one.
-     *  - AND allocate the current request directly from the arena.
-     */
-    int avail = (char*)region->end_addr - (char*)region->free_pointer;
-    int min_keep = (page_type == PAGE_TYPE_CONS) ? 4*CONS_SIZE*N_WORD_BYTES : 128;
     /* What's the point of a different filler for CONS? Well, once upon a time
      * I figured that an ambiguous pointer having LIST-POINTER-LOWTAG could be excluded
      * if it points to (uword_t)-1 because no valid cons can hold those bits in the CAR.
@@ -352,6 +361,25 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
 #else
     int filler = (page_type == PAGE_TYPE_CONS) ? 255 : 0;
 #endif
+    memset(where, filler, nbytes);
+    return where;
+}
+
+static void* claim_new_subrange(struct arena* a, sword_t nbytes, int page_type) {
+    return memblk_claim_subrange(a, (void*)a->uw_current_block, nbytes, page_type);
+}
+
+lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
+                            int page_type, sword_t nbytes)
+{
+    /*  - if the TLAB is for type CONS and has less than K1 (arb) bytes more,
+     *    or non-cons and has less than K2 (arb) bytes more,
+     *    then discard that whole TLAB and start a new one.
+     *  - AND allocate the current request directly from the arena.
+     */
+    int avail = (char*)region->end_addr - (char*)region->free_pointer;
+    int min_keep = (page_type == PAGE_TYPE_CONS) ? 4*CONS_SIZE*N_WORD_BYTES : 128;
+
     /* Precondition: free space in the TLAB was not enough to satisfy the request.
      * We want to do exactly one claim_new_subrange operation. There are 2 cases:
      *
@@ -367,25 +395,33 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
      *  2. amount remaining in the TLAB is worth keeping.
      *     Don't refill the TLAB; just make the new object as a discrete claim.
      */
+    struct arena* in_use_arena = ARENA(th->arena);
     if (avail < min_keep && nbytes <= 65536) { // case 1
-        struct arena* in_use_arena = (void*)native_pointer(th->arena);
         __sync_fetch_and_add(&in_use_arena->uw_bytes_wasted, avail);
         long total_request = nbytes + 8192;
-        region->start_addr = claim_new_subrange((void*)native_pointer(th->arena),
-                                                total_request, filler);
-        region->end_addr = (char*)region->start_addr + total_request;
-        lispobj* object = region->start_addr;
-        region->free_pointer = (char*)region->start_addr + nbytes;
-        return object;
+        char* object = claim_new_subrange(in_use_arena, total_request, page_type);
+#ifdef ARENA_USER_EXTENSION_PREDICATE
+        if (!object) return NULL;
+#endif
+        region->start_addr = object;
+        region->end_addr = object + total_request;
+        region->free_pointer = object + nbytes;
+        return (lispobj*)object;
     }
     // case 2
-    return claim_new_subrange((void*)native_pointer(th->arena), nbytes, filler);
+    return claim_new_subrange(in_use_arena, nbytes, page_type);
+}
+
+// When denying a request to grow the arena, it must be unlocked first
+// to unblock any othe threads trying to extend. They'll fail too of course.
+void release_lisp_arena_lock(struct arena* arena) {
+    ARENA_MUTEX_RELEASE(arena);
 }
 
 long arena_bytes_used(lispobj arena_taggedptr)
 {
     long sum = 0;
-    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    struct arena* arena = ARENA(arena_taggedptr);
     ARENA_MUTEX_ACQUIRE(arena);
     struct arena_memblk* block = (void*)arena->uw_first_block;
     do {
@@ -416,7 +452,7 @@ void gc_scavenge_arenas()
         do {
             // Trace all objects below the free pointer, unless hidden
             struct arena* a = (void*)native_pointer(chain);
-            if (a->hidden == NIL) {
+            if (a->hidden != LISP_T) {
                 struct arena_memblk* block = (void*)a->uw_first_block;
                 do {
                     if (gencgc_verbose)
@@ -455,7 +491,7 @@ lispobj find_containing_arena(lispobj ptr) {
     if (!arena_chain) return 0;
     lispobj chain = arena_chain;
     do {
-        struct arena* arena = (void*)INSTANCE(chain);
+        struct arena* arena = ARENA(chain);
         struct arena_memblk* block = (void*)arena->uw_first_block;
         do {
             if ((lispobj)block <= ptr && (char*)ptr < block->freeptr) return chain;
@@ -588,7 +624,7 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
 
 static int count_arena_objects(lispobj arena, int *pnchunks)
 {
-    struct arena* a = (void*)native_pointer(arena);
+    struct arena* a = ARENA(arena);
     struct arena_memblk* blk = (void*)a->uw_first_block;
     int nobjects = 0;
     int nchunks = 0;
@@ -622,7 +658,7 @@ void arena_mprotect(lispobj arena, int option)
     }
     // PROT_EXEC is not needed. Code blobs always go to dynamic or immobile space
     int prot = option ? PROT_NONE : (PROT_READ|PROT_WRITE /*|PROT_EXEC*/);
-    struct arena* a = (void*)native_pointer(arena);
+    struct arena* a = ARENA(arena);
     struct arena_memblk* blk = (void*)a->uw_first_block;
     do {
         char* base = PTR_ALIGN_UP((char*)blk + sizeof (struct arena_memblk), CHUNK_ALIGN);
@@ -637,7 +673,7 @@ void arena_mprotect(lispobj arena, int option)
 
 lispobj arena_find_containing_object(lispobj arena, char* ptr)
 {
-    struct arena* a = (void*)native_pointer(arena);
+    struct arena* a = ARENA(arena);
     struct arena_memblk* blk = (void*)a->uw_first_block;
     do {
         lispobj* where = (void*)ALIGN_UP(((uword_t)blk + sizeof (struct arena_memblk)),
@@ -679,7 +715,7 @@ int diagnose_arena_fault(os_context_t* context, char *addr)
         fflush(stderr);
         return 0; // not handled
     }
-    int hidden = ((struct arena*)native_pointer(arena))->hidden == LISP_T;
+    int hidden = ARENA(arena)->hidden == LISP_T;
     fprintf(stderr, "fault in arena %p [%s]\n", (void*)arena, (hidden ? "HIDDEN" : "visible"));
     fflush(stderr);
     if (!hidden) return 0;

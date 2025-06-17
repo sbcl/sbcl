@@ -2395,6 +2395,15 @@ PROCEED WITH CAUTION."
 you did not expect to see this message, please report it."
                  'heap-exhausted-error)))))
 
+(define-condition arena-exhausted-error (storage-condition)
+  ((arena :initarg :arena)
+   (request :initarg :request))
+  (:report
+   (lambda (condition stream)
+     (format stream "Arena ~A exhausted: ~D bytes requested."
+             (slot-value condition 'arena)
+             (slot-value condition 'request)))))
+
 (define-condition system-condition (condition)
   ((address :initarg :address :reader system-condition-address :initform nil)
    (context :initarg :context :reader system-condition-context :initform nil)))

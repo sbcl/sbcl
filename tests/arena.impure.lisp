@@ -577,7 +577,7 @@
         (exit-if-no-arenas))
       (assert (= n-deleted n-arenas)))))
 
-(defvar *another-arena* (new-arena 131072))
+(defvar *another-arena* (new-arena 131072 131072 10 :hidable t))
 (defun g (n) (make-array (the integer n) :initial-element #\z))
 (defun f (a n) (with-arena (a) (g n)))
 

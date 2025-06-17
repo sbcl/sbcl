@@ -942,10 +942,8 @@
                      :overflow
                      (lambda ()
                        ;; Push C call args right-to-left
-                       (inst push (if (integerp size)
-                                      (constantize (fixnumize (tn-value length)))
-                                      length))
-                       (inst push (if (sc-is element immediate) (tn-value element) element))
+                       (list-ctor-push-elt element limit)
+                       (list-ctor-push-elt length limit)
                        (invoke-asm-routine
                         'call (if (system-tlab-p 0 node) 'sys-make-list 'make-list) node)
                        (inst pop result)

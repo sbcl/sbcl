@@ -23,10 +23,10 @@
   (defmacro without-arena (&body body)
     #-system-tlabs `(progn ,@body)
     #+system-tlabs
-    `(let ((arena (thread-current-arena)))
-       (when (%instancep arena) (switch-to-arena 0))
+    `(let ((.arena. (thread-current-arena)))
+       (when (%instancep .arena.) (switch-to-arena 0))
        (unwind-protect (progn ,@body)
-         (when (%instancep arena) (switch-to-arena arena)))))
+         (when (%instancep .arena.) (switch-to-arena .arena.)))))
   #+system-tlabs
   (progn
     (defun switch-to-arena (a)

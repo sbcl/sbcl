@@ -112,6 +112,19 @@
       #-system-tlabs (inst break halt-trap)
       #+system-tlabs (call-c "switch_to_arena" #+win32 rdi-tn #+win32 rsi-tn))))
 
+(define-assembly-routine (handle-arena-request) ()
+  ;; we're pseudo-atomic. End it and handle a trap if necessary.
+  (emit-end-pseudo-atomic)
+  ;; Registers that weren't already spilled by (WITH-REGISTERS-PRESERVED (c) ...)
+  (let ((save (list rbx-tn r12-tn r13-tn r14-tn r15-tn)))
+    (dolist (reg save) (inst push reg))
+    ;; count of bytes or elements (always at RBP+16) into 2nd arg
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (call-static-fun 'handle-arena-request 2)
+    (inst mov rax-tn rdx-tn) ; Lisp result reg into C result reg
+    (dolist (reg (reverse save)) (inst pop reg)))
+  (emit-begin-pseudo-atomic))
+
 (macrolet ((def-routine-pair (name&options vars &body code)
              `(progn
                 (symbol-macrolet ((system-tlab-p 0))
@@ -122,27 +135,53 @@
                 (symbol-macrolet ((system-tlab-p 2))
                   (define-assembly-routine
                       (,(symbolicate "SYS-" (car name&options)) . ,(cdr name&options))
-                    ,vars ,@code)))))
+
+                    ,vars ,@code))))
+           (test-arena-exhausted (units)
+             ;; UNITS qualfies what the first arg to the handler measures.
+             `(progn (inst test rax-tn rax-tn)
+                     (inst jmp :nz SUCCESS)
+                     ,(ecase units
+                        (:list-elts '(zeroize rdx-tn))
+                        (:bytes-non-list '(inst mov rdx-tn (fixnumize 1)))
+                        (:bytes-list '(inst mov rdx-tn (fixnumize 2))))
+                     (inst call (make-fixup 'handle-arena-request :assembly-routine))
+                     ;; if an oversized object which the predicate determined should be allocated
+                     ;; then it was in fact already allocated, and its address is in rax.
+                     (inst test rax-tn rax-tn)
+                     (inst jmp :z RESTART))))
 
 (def-routine-pair (alloc-tramp) ()
   (with-registers-preserved (c)
+    RESTART
     (call-c "alloc" (ea 16 rbp-tn) system-tlab-p)
+    (test-arena-exhausted :bytes-non-list)
+    SUCCESS
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
   (with-registers-preserved (c)
+    RESTART
     (call-c "alloc_list" (ea 16 rbp-tn) system-tlab-p)
+    (test-arena-exhausted :bytes-list)
+    SUCCESS
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (def-routine-pair (listify-&rest (:return-style :none)) ()
   (with-registers-preserved (c)
+    RESTART
     (call-c "listify_rest_arg" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
+    (test-arena-exhausted :list-elts)
+    SUCCESS
     (inst mov (ea 24 rbp-tn) rax-tn))   ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
 (def-routine-pair (make-list (:return-style :none)) ()
   (with-registers-preserved (c)
+    RESTART
     (call-c "make_list" (ea 16 rbp-tn) (ea 24 rbp-tn) system-tlab-p)
+    (test-arena-exhausted :list-elts)
+    SUCCESS
     (inst mov (ea 24 rbp-tn) rax-tn)) ; result
   (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 )

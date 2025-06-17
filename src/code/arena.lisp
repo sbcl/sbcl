@@ -1,6 +1,7 @@
 (in-package sb-vm)
 
-(export '(arena
+(export '(*arena-exhaustion-handler*
+          arena
           arena-p
           arena-bytes-used
           arena-bytes-wasted
@@ -55,9 +56,10 @@
          (bug "Arena token overflow. Need to implement double-precision count"))
         ((eql (arena-link arena) 0)) ; never used - do nothing
         (t
-         (aver (not (arena-hidden arena)))
+         (aver (not (eq (arena-hidden arena) t)))
          (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
                         (get-lisp-obj-address arena))
+         (setf (arena-exhausted arena) nil)
          (setf (arena-bytes-wasted arena) 0)
          (incf (arena-token arena))))
   arena)
@@ -68,36 +70,38 @@
 ;;; an arena, obtained via malloc(). Allocations within a block are
 ;;; contiguous but the blocks can be discontiguous.
 #+system-tlabs
-(declaim (ftype (sfunction (fixnum &optional fixnum fixnum) arena) new-arena))
-(defun new-arena (size &optional (growth-amount size) (max-extensions 7))
-  (declare (ignorable growth-amount max-extensions))
+(declaim (ftype (sfunction (fixnum &optional fixnum fixnum &key (:hidable boolean))
+                           arena) new-arena))
+(defun new-arena (size &optional (growth-amount size) (max-extensions 7)
+                       &key hidable)
+  (declare (ignorable growth-amount max-extensions hidable))
   (assert (>= size 65536))
+  (assert (>= growth-amount 32768))
   "Create a new arena of SIZE bytes which can be grown additively by GROWTH-AMOUNT
 one or more times, not to exceed MAX-EXTENSIONS times"
   #-system-tlabs :placeholder
   #+system-tlabs
-  (let ((layout (load-time-value (find-layout 'arena) t))
+  (let ((huge ; a request exceeding strictly this size gets separately allocated
+         (cond ((>= size 2097152) (ash size -9)) ; 1/512th = .19% of the total arena size
+               ((>= size 524288) (ash size -8))  ; 1/256th = .39%
+               ((>= size 131072) (ash size -7))  ; 1/128th = .78%
+               (t (ash size -6))))               ;  1/64th = 1.6%
+        (size-limit (+ size (the fixnum (* max-extensions growth-amount))))
         (index (with-system-mutex (*arena-lock*) (incf *arena-index-generator*)))
-        (arena (truly-the instance
-                          (%make-lisp-obj
-                           (alien-funcall (extern-alien "sbcl_new_arena" (function unsigned unsigned))
-                                          size)))))
-    (%set-instance-layout arena layout)
-    ;; Arena growth amount < 8MiB is failure-prone. The reason has to do with the test
-    ;; for whether an allocation is "oversized" - see the logic in claim_subrange where it checks
-    ;; "nbytes > (sword_t)(a->uw_growth_amount >> 9)" and the logic for adding a default
-    ;; amount of slack to any claim at "long total_request = nbytes + 8192".
-    ;; If the amount to grow by is too small, then a single cons cell plus the default slack
-    ;; can exceed the threshold for being oversized. But if a cons cell goes in a standalone
-    ;; (oversized) block, scavenging goes haywire, and I don't really want to change how it works.
-    (let ((growth-amount (max growth-amount (* 8 1024 1024))))
-      (setf (arena-size-limit (truly-the arena arena))
-            (+ size (the fixnum (* max-extensions growth-amount)))
-            (arena-growth-amount arena) growth-amount
-            (arena-index arena) index
-            (arena-hidden arena) nil
-            (arena-token arena) 1
-            (arena-userdata arena) nil))
+        (arena (truly-the arena
+                (%make-lisp-obj
+                 (alien-funcall (extern-alien "sbcl_new_arena"
+                                              (function unsigned unsigned int))
+                                size (if hidable 1 0))))))
+    (%set-instance-layout arena (load-time-value (find-layout 'arena) t))
+    (setf (arena-size-limit arena) size-limit
+          (arena-growth-amount arena) growth-amount
+          (arena-huge-object-threshold  arena) huge
+          (arena-exhausted arena) nil
+          (arena-index arena) index
+          (arena-hidden arena) (if hidable nil 0)
+          (arena-token arena) 1
+          (arena-userdata arena) nil)
     arena))
 
 ;;; Destroy memory associated with ARENA, unlinking it from the global chain.
@@ -196,7 +200,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 ;; with the next auto-triggered GC in between unhide + rewind, beacause any pointers
 ;; in the un-hidden arena may point to garbage.
 (defun unhide-arena (arena)
-  (aver (arena-hidden arena))
+  (aver (eq (arena-hidden arena) t))
   (arena-mprotect arena nil)
   ;; Inform GC as of now that it can look in the arena
   (setf (arena-hidden arena) nil)
@@ -268,9 +272,12 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 
 (defmethod print-object ((self arena) stream)
   (print-unreadable-object (self stream :type t :identity t)
-    (format stream "id=~D used=~D waste=~D"
+    ;; Don't compute and display bytes-used, as doing so acquires the lock,
+    ;; and that's an impolite thing to do in a print-object method.
+    ;; (Perhaps this could _try_ to acquire the lock, computing usage when it can)
+    (format stream "id=~D size=~D waste=~D"
             (arena-index self)
-            (arena-bytes-used self)
+            (arena-length self)
             (arena-bytes-wasted self))))
 
 (defun copy-number-to-heap (n)
@@ -281,6 +288,8 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                  (dynamic-space-obj-p n)))
         n
         (typecase n
+          ;; can't use copy-bignum because that uses the active tlab
+          ;; nor bignum-replace because it's a not-yet-defined macro.
           (bignum (let* ((len (sb-bignum:%bignum-length n))
                          (new (sb-bignum:%allocate-bignum len)))
                     (dotimes (i len new)
@@ -298,3 +307,97 @@ one or more times, not to exceed MAX-EXTENSIONS times"
            (%make-complex (truly-the rational (copy (%realpart n)))
                           (truly-the rational (copy (%imagpart n)))))
           (t (bug "~S is not a number" n))))))
+
+;;; This variable is bound to a function of three args: arena, current request,
+;;; and desired new total space consumption of the arena. It is called prior to
+;;; any attempt to add an extension block to the indicated arena. During evaluation
+;;; of the predicate, allocations are directed to the heap, not the arena.
+;;; * If the predicate returns non-NIL, then the arena is extended by its
+;;;   predetermined extension amount, regardless of the initially specified maximum
+;;;   size of this arena. i.e. the predicate subsumes any given size limit.
+;;; * If NIL, then we signal an uncontinuable error. The arena is _not_ in-use
+;;;   during the error signaling.
+;;; * Finally, nonlocal exit should bail out of whatever computation consumed
+;;;   too much space, and will automatically terminate the pending allocation,
+;;;   relinquishing exclusive use of the arena. The arena _will_ be in-use
+;;;   during the unwind, in an "emergency overflow" mode. Further allocation
+;;;   requests will not call the handler, but will succeed. The intent is to
+;;;   give the application enough working memory to clean up without accidentally
+;;;   creating heap-to-arena pointers, as might happen if it were to allocate
+;;;   to the heap unexpectedly.
+#+x86-64
+(progn
+(defun default-arena-extension-test (arena pending-allocation proposed-total-size)
+  (declare (ignore pending-allocation))
+  (<= proposed-total-size (arena-size-limit arena)))
+
+(declaim (function *arena-exhaustion-handler*))
+(sb-ext:define-load-time-global *arena-exhaustion-handler*
+  #'default-arena-extension-test)
+
+(defun handle-arena-request (units count)
+  (flet ((release-lock (arena)
+           (alien-funcall (extern-alien "release_lisp_arena_lock" (function void unsigned))
+                          (logandc2 (get-lisp-obj-address arena) lowtag-mask))))
+    ;; Using WITHOUT-ARENA here wouldn't necessarily be right- we have to decide
+    ;; whether to restore the thread's arena on exit from this.
+    (let* ((arena (thread-current-arena))
+           (nbytes (if (eq units 0) ; count = N cons cells, already a fixnum
+                       (* (the fixnum count) 16)
+                       ;; Otherwise COUNT is bytes, but the SC of the arg
+                       ;; is unsigned-reg so it needs shifting to correct it.
+                       (ash (the fixnum count) n-fixnum-tag-bits)))
+           (hugep (and (> nbytes (arena-huge-object-threshold arena)) (= units 1)))
+           (request (if hugep ; non-list oversized object will gets its own extension block
+                        nbytes
+                        (arena-growth-amount arena)))
+           (new-size (+ request (arena-length arena)))
+           (allowp nil)
+           (abort t))
+      (aver (%instancep arena))
+      (switch-to-arena 0)
+      #+nil
+      (format t "~&Arena-handler ~S ~D ~D bytes=~D len=~x ex=~D~%"
+              arena units count nbytes (arena-length arena) (arena-exhausted arena))
+      (unwind-protect
+           (setq allowp (or (arena-exhausted arena) ; always allow!
+                            (funcall *arena-exhaustion-handler* arena nbytes new-size))
+                 abort nil)
+        (when (or abort (not allowp))
+          ;; If predicate performed THROW to a higher frame (abort remained T),
+          ;; or said to fail the request then release the arena lock.
+          (release-lock arena)
+          ;; User's cleanup path may not expect that allocations go to the heap,
+          ;; therefore we switch back to the arena.
+          (when abort
+            (setf (arena-exhausted arena) t)
+            (switch-to-arena arena)))) ; and we're out
+      ;; Only a normal return of the predicate reaches this point.
+      ;; The user either wants to extend the arena or fail, signaling overflow.
+      (cond (allowp
+             ;; Growing the arena releases the mutex. Return the result of grow_arena
+             ;; which is the allocated address if the allocation was a huge object.
+             (prog1
+                 (%make-lisp-obj
+                  (alien-funcall (extern-alien "extend_lisp_arena"
+                                               (function unsigned unsigned unsigned int))
+                                 (logandc2 (get-lisp-obj-address arena) lowtag-mask)
+                                 request (if hugep 1 0)))
+               (switch-to-arena arena)))
+            (t
+             (release-lock arena)
+             ;; There's no way to continue this because the predicate already had
+             ;; a chance to do whatever it needed to do to proceed.
+             ;; In this case, we do NOT set the exhausted flag, because we want
+             ;; the error to persist if you attempt again to use the arena.
+             ;; With the default predicate which imposes a strict bound on size,
+             ;; once the error occurs, you don't get a "free pass" to use the arena
+             ;; forever after. The user _must_ override the predicate to have the new
+             ;; behavior of utilizing a overgrown arena in their cleanup routine.
+             (unwind-protect
+                  (error 'sb-kernel::arena-exhausted-error :arena arena :request request)
+               ;; The arena _should_ remain in use on exit, because presuming existence
+               ;; of WITH-ARENA at an outer level, it would fail the assertion in
+               ;; switch_to_arena trying to unuse it.
+               (switch-to-arena arena))))))) ; and we're out
+) ; end PROGN
