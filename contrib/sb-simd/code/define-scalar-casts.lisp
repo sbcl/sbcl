@@ -5,8 +5,20 @@
 ;;; signal an error.
 
 (macrolet
-    ((define-scalar-cast (scalar-cast-record-name)
-       (with-accessors ((name scalar-cast-record-name))
+    ((call-vop (instruction-record-name &rest arguments)
+       (with-accessors ((instruction-set instruction-record-instruction-set)
+                        (vop instruction-record-vop))
+           (find-function-record instruction-record-name)
+         (if (instruction-set-available-p instruction-set)
+             `(,vop ,@arguments)
+             `(progn
+                (missing-instruction
+                 (load-time-value
+                  (find-function-record ',instruction-record-name)))
+                (touch ,@arguments)))))
+     (define-scalar-cast (scalar-cast-record-name)
+       (with-accessors ((name scalar-cast-record-name)
+                        (instruction-set scalar-cast-record-instruction-set))
            (find-function-record scalar-cast-record-name)
          (let ((err (mksym (symbol-package name) "CANNOT-CONVERT-TO-" name)))
            `(progn
@@ -17,33 +29,34 @@
                 :overwrite-fndb-silently t)
               (sb-c:deftransform ,name ((x) (,name) *)
                 'x)
-              ,@(case name
-                  (sb-simd:f32
-                   `((sb-c:deftransform ,name ((x) (double-float) *)
-                       '(coerce x 'single-float))))
-                  (sb-simd:f64
-                   `((sb-c:deftransform ,name ((x) (single-float) *)
-                       '(coerce x 'double-float))))
-                  (sb-simd-sse:f32
-                   `((sb-c:deftransform ,name ((x) (double-float) *)
-                       '(sb-kernel:%single-float x))
-                     (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                       '(sb-simd-sse::f32-from-s64 x))))
-                  (sb-simd-sse2:f64
-                   `((sb-c:deftransform ,name ((x) (single-float) *)
-                       '(sb-simd-sse2::f64-from-f32 x))
-                     (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                       '(sb-simd-sse2::f64-from-s64 x))))
-                  (sb-simd-avx:f32
-                   `((sb-c:deftransform ,name ((x) (double-float) *)
-                       '(sb-simd-avx::f32-from-f64 x))
-                     (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                       '(sb-simd-avx::f32-from-s64 x))))
-                  (sb-simd-avx:f64
-                   `((sb-c:deftransform ,name ((x) (single-float) *)
-                       '(sb-simd-avx::f64-from-f32 x))
-                     (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
-                       '(sb-simd-avx::f64-from-s64 x)))))
+              ,@(when (instruction-set-available-p instruction-set)
+                  (case name
+                    (sb-simd:f32
+                     `((sb-c:deftransform ,name ((x) (double-float) *)
+                         '(coerce x 'single-float))))
+                    (sb-simd:f64
+                     `((sb-c:deftransform ,name ((x) (single-float) *)
+                         '(coerce x 'double-float))))
+                    (sb-simd-sse:f32
+                     `((sb-c:deftransform ,name ((x) (double-float) *)
+                         '(sb-kernel:%single-float x))
+                       (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
+                         '(sb-simd-sse::f32-from-s64 x))))
+                    (sb-simd-sse2:f64
+                     `((sb-c:deftransform ,name ((x) (single-float) *)
+                         '(sb-simd-sse2::f64-from-f32 x))
+                       (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
+                         '(sb-simd-sse2::f64-from-s64 x))))
+                    (sb-simd-avx:f32
+                     `((sb-c:deftransform ,name ((x) (double-float) *)
+                         '(sb-simd-avx::f32-from-f64 x))
+                       (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
+                         '(sb-simd-avx::f32-from-s64 x))))
+                    (sb-simd-avx:f64
+                     `((sb-c:deftransform ,name ((x) (single-float) *)
+                         '(sb-simd-avx::f64-from-f32 x))
+                       (sb-c:deftransform ,name ((x) ((signed-byte 64)) *)
+                         '(sb-simd-avx::f64-from-s64 x))))))
               (defun ,name (x)
                 (typecase x
                   (,name x)
@@ -56,19 +69,19 @@
                          (real (coerce x ',name))))
                       (sb-simd-sse:f32
                        `((double-float (sb-kernel:%single-float x))
-                         (sb-simd-sse:s64 (sb-simd-sse::%f32-from-s64 x))
+                         (sb-simd-sse:s64 (call-vop sb-simd-sse::f32-from-s64 x))
                          (real (coerce x ',name))))
                       (sb-simd-sse2:f64
-                       `((sb-simd-sse2:f32 (sb-simd-sse2::%f64-from-f32 x))
-                         (sb-simd-sse2:s64 (sb-simd-sse2::%f64-from-s64 x))
+                       `((sb-simd-sse2:f32 (call-vop sb-simd-sse2::f64-from-f32 x))
+                         (sb-simd-sse2:s64 (call-vop sb-simd-sse2::f64-from-s64 x))
                          (real (coerce x ',name))))
                       (sb-simd-avx:f32
-                       `((sb-simd-avx:f64 (sb-simd-avx::%f32-from-f64 x))
-                         (sb-simd-avx:s64 (sb-simd-avx::%f32-from-s64 x))
+                       `((sb-simd-avx:f64 (call-vop sb-simd-avx::f32-from-f64 x))
+                         (sb-simd-avx:s64 (call-vop sb-simd-avx::f32-from-s64 x))
                          (real (coerce x ',name))))
                       (sb-simd-avx:f64
-                       `((sb-simd-avx:f32 (sb-simd-avx::%f64-from-f32 x))
-                         (sb-simd-avx:s64 (sb-simd-avx::%f64-from-s64 x))
+                       `((sb-simd-avx:f32 (call-vop sb-simd-avx::f64-from-f32 x))
+                         (sb-simd-avx:s64 (call-vop sb-simd-avx::f64-from-s64 x))
                          (real (coerce x ',name)))))
                   (otherwise (,err x))))))))
      (define-scalar-casts ()

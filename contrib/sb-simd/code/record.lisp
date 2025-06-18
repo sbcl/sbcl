@@ -181,13 +181,22 @@
 (defun scalar-record-p (x)
   (typep x '(and value-record (not simd-record))))
 
+#-simd-pack-256
+(progn
+  (defstruct phony-simd-pack-256)
+  (deftype simd-pack-256 (&optional element-type)
+    (declare (ignore element-type))
+    'phony-simd-pack-256))
+
 (defmethod decode-record-definition ((_ (eql 'simd-record)) expr):w
   (destructuring-bind (name scalar-record-name bits primitive-type scs) expr
     (let ((simd-pack-type
             (let ((base-type
                     (ecase bits
                       (128 (find-symbol "SIMD-PACK" "SB-EXT"))
-                      (256 (find-symbol "SIMD-PACK-256" "SB-EXT")))))
+                      (256 (or (find-symbol "SIMD-PACK-256" "SB-EXT")
+                               #-simd-pack-256
+                               'simd-pack-256)))))
               (cond ((not base-type) 't)
                     ((not scalar-record-name) base-type)
                     (t `(,base-type ,scalar-record-name))))))

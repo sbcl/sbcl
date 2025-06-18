@@ -7,31 +7,33 @@
                         (argument-records sb-simd-internals:instruction-record-argument-records)
                         (result-records sb-simd-internals:instruction-record-result-records)
                         (cost sb-simd-internals:instruction-record-cost)
-                        (encoding sb-simd-internals:instruction-record-encoding))
+                        (encoding sb-simd-internals:instruction-record-encoding)
+                        (instruction-set sb-simd-internals:instruction-record-instruction-set))
            (sb-simd-internals:find-function-record name)
          (assert (eq encoding :custom))
-         (labels ((find-clauses (key)
-                    (remove key clauses :test-not #'eq :key #'first))
-                  (find-clause (key)
-                    (let ((found (find-clauses key)))
-                      (assert (= 1 (length found)))
-                      (rest (first found)))))
-           `(sb-c:define-vop (,vop)
-              (:translate ,vop)
-              (:policy :fast-safe)
-              (:arg-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type argument-records))
-              (:result-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type result-records))
-              (:args
-               ,@(loop for arg in (find-clause :args)
-                       for argument-record in argument-records
-                       collect `(,@arg :scs ,(sb-simd-internals:value-record-scs argument-record))))
-              ,@(find-clauses :info)
-              ,@(find-clauses :temporary)
-              (:results
-               ,@(loop for result in (find-clause :results)
-                       for result-record in result-records
-                       collect `(,@result :scs ,(sb-simd-internals:value-record-scs result-record))))
-              (:generator ,cost ,@(find-clause :generator)))))))
+         (when (sb-simd-internals:instruction-set-available-p instruction-set)
+           (labels ((find-clauses (key)
+                      (remove key clauses :test-not #'eq :key #'first))
+                    (find-clause (key)
+                      (let ((found (find-clauses key)))
+                        (assert (= 1 (length found)))
+                        (rest (first found)))))
+             `(sb-c:define-vop (,vop)
+                (:translate ,vop)
+                (:policy :fast-safe)
+                (:arg-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type argument-records))
+                (:result-types ,@(mapcar #'sb-simd-internals:value-record-primitive-type result-records))
+                (:args
+                 ,@(loop for arg in (find-clause :args)
+                         for argument-record in argument-records
+                         collect `(,@arg :scs ,(sb-simd-internals:value-record-scs argument-record))))
+                ,@(find-clauses :info)
+                ,@(find-clauses :temporary)
+                (:results
+                 ,@(loop for result in (find-clause :results)
+                         for result-record in result-records
+                         collect `(,@result :scs ,(sb-simd-internals:value-record-scs result-record))))
+                (:generator ,cost ,@(find-clause :generator))))))))
   ;; SSE
   (macrolet ((def (name cmp)
                `(define-custom-vop ,name

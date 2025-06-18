@@ -7,6 +7,7 @@
 ;;; variants of the VOP - one for the general case, and one for the case
 ;;; where the index is a compile-time constant.
 
+#+(or x86 x86-64)
 (macrolet
     ((define-vref-vop (vref-record-name)
        (with-accessors ((name sb-simd-internals:vref-record-name)
