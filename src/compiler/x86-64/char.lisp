@@ -167,13 +167,15 @@
   (:conditional :a))
 
 (define-vop (character-compare/c)
-  (:args (x :scs (character-reg character-stack)))
+  (:args (x :scs (any-reg character-reg character-stack)))
   (:arg-types character (:constant character))
   (:info y)
   (:policy :fast-safe)
   (:note "inline constant comparison")
   (:generator 2
-    (inst cmp :dword x (char-code y))))
+    (inst cmp :dword x (if (sc-is x any-reg)
+                           (get-lisp-obj-address y)
+                           (char-code y)))))
 
 (define-vop (fast-char=/character/c character-compare/c)
   (:translate char=)
