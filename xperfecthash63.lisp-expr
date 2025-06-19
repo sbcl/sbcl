@@ -1553,5 +1553,26 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
+(#(8D 91 95 9D A5 AD B9 BD C1 C5 CD E1)
+ "(141 225 145 149 157 165 173 185 189 193 197 205)"
+ "((let ((tab #a((8) (unsigned-byte 8) 12 5 0 0 4 2 5 8)))
+  (let ((b (& (>> val 2) #x7)))
+   (let ((a (>> (<< val 25) 29)))
+    (^ a (aref tab b))))))")
+(#(0 B445B28 1A7E09AF 2EF3F4BC 4A8C210D 72E2CBDA 80D0C591 9BAC0C5C A8892768 AC841474 C6B4780F D0BE7277 E331CAB8 E48D4754)
+ "(NIL COMPLEX INTEGER MOD SINGLE-FLOAT DOUBLE-FLOAT SIGNED-BYTE UNSIGNED-BYTE FIXNUM BIT CHARACTER STANDARD-CHAR BASE-CHAR T)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 13 11 2 0 8 5 3)))
+  (let ((b (& (>> val 4) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(0 1 2 23 24)
+ "(35 2 36 1 0)"
+ "((& val 7))")
+(#(89 8D 91 95 99 9D A1 A5 A9 AD B1 B5 B9 BD C1 C5 C9 CD D1 D5 D9 DD E1)
+ "(137 221 217 205 201 197 193 189 185 181 177 173 169 165 161 157 153 149 145 141 213 209 225)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 24 0 13 0 13 0 13 1 21 16 22 16 18 7 21)))
+  (let ((b (& (>> val 2) #xf)))
+   (let ((a (>> (<< val 25) 28)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

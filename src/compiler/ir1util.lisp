@@ -2522,6 +2522,8 @@ is :ANY, the function name is not checked."
                (labels ((descend (x)
                           (do ((y x (cdr y)))
                               ((atom y) (atom-colesce-p y))
+                            ;; FIXME: there's no such function as file-coalesce-p any more.
+                            ;; So what should this comment say instead?
                             ;; Don't just call file-coalesce-p, because
                             ;; it'll invoke COALESCE-TREE-P repeatedly
                             (let ((car (car y)))

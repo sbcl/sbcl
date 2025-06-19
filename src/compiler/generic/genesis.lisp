@@ -1900,6 +1900,14 @@ core and return a descriptor to it."
               nil
               offset-found
               offset-wanted))))
+  #+x86-64 ; reserve space for two empty strings
+  (progn
+    ;; simple-character-string is not 0-terminated. While there is a convention for UTF-8
+    ;; to be possibly null-terminated, UCS4 not so, as far as my understanding goes.
+    (allocate-vector #+sb-unicode sb-vm:simple-character-string-widetag
+                     #-sb-unicode sb-vm:simple-array-unsigned-byte-32-widetag
+                     0 0 *static*)
+    (allocate-vector sb-vm:simple-base-string-widetag 0 1 *static*))
   ;; Reserve space for SB-LOCKLESS:+TAIL+ which is conceptually like NIL
   ;; but tagged with INSTANCE-POINTER-LOWTAG.
   (setq *lflist-tail-atom*

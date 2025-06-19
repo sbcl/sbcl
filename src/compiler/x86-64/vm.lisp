@@ -477,6 +477,7 @@
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
+  (declare (notinline sb-c::producing-fasl-file))
   (typecase value
     ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
@@ -492,8 +493,7 @@
                (if (immobile-space-obj-p value)
                    (or (= (generation-of value) +pseudo-static-generation+)
                        ;; If compiling to memory, the symbol's address alone suffices.
-                       (locally (declare (notinline sb-c::producing-fasl-file))
-                         (not (sb-c::producing-fasl-file))))))
+                       (not (sb-c::producing-fasl-file)))))
        immediate-sc-number))
     #+compact-instance-header (layout immediate-sc-number)
     (single-float
@@ -512,6 +512,14 @@
     ;; are host structs. Or we could implement and use something like SB-XC:TYPECASE
     (structure-object
      (when (eq value sb-lockless:+tail+)
+       immediate-sc-number))
+    ((simple-string 0) ; Reference static empty string only when compiling to file
+     ;; or, if compiling to memory, the string is EQ to a baked-in static string,
+     ;; otherwise CLHS 3.2.4 is potentially violated
+     (when (or (sb-c::producing-fasl-file)
+               #-sb-xc-host (and (eq (heap-allocated-p value) :static)
+                                 (< (get-lisp-obj-address value)
+                                    (get-lisp-obj-address sb-lockless:+tail+))))
        immediate-sc-number))
     #+(and sb-simd-pack (not sb-xc-host))
     (simd-pack
@@ -537,7 +545,15 @@
      ;; Skip over all static symbols except T which isn't in low static space
      (* (1- (length +static-symbols+)) (pad-data-block symbol-size))
      (ash 258 word-shift) ; **PRIMITIVE-OBJECT-LAYOUTS**
+     (ash 6 word-shift) ; 0-length simple-base-string and simple-character-string
      instance-pointer-lowtag))
+
+(define-symbol-macro offset-of-static-simple-base-string-0
+    (+ lflist-tail-value-nil-offset (- instance-pointer-lowtag)
+       (ash -4 word-shift) other-pointer-lowtag))
+(define-symbol-macro offset-of-static-simple-ucs4-string-0
+    (+ lflist-tail-value-nil-offset (- instance-pointer-lowtag)
+       (ash -6 word-shift) other-pointer-lowtag))
 
 ;;; Return the bits (descriptor or raw as specified) representing the CPU's
 ;;; view of TN which is in the IMMEDIATE storage class. If the bits can only
@@ -561,6 +577,14 @@
          (if tag
              (dpb bits (byte 32 32) single-float-widetag)
              bits)))
+      ((simple-string 0)
+       ;; objects following static symbols in memory:
+       ;;    (simple-character-string 0)
+       ;;    (simple-base-string 0)
+       ;;    lockfree list tail
+       (if (sb-xc:typep val 'base-string)
+           (nil-relative offset-of-static-simple-base-string-0)
+           (nil-relative offset-of-static-simple-ucs4-string-0)))
       (structure-object
        (if (eq val sb-lockless:+tail+)
            (progn (aver tag) (nil-relative lflist-tail-value-nil-offset))

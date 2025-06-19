@@ -565,6 +565,12 @@
               (note (lambda (s) (princ sym s)) dstate))))))
 
     (when (and disp (eq base-reg sb-vm:card-table-reg) (not index-reg))
+      ;; (can all these hacks could be brought together under one roof less hackily?)
+      (let ((addr (+ sb-vm:nil-value disp)))
+        (when (or (= addr (+ sb-vm:nil-value sb-vm::offset-of-static-simple-base-string-0))
+                  (= addr (+ sb-vm:nil-value sb-vm::offset-of-static-simple-ucs4-string-0)))
+          (return-from print-mem-ref
+            (note (lambda (s) (write-string "\"\"" s)) dstate))))
       (let* ((ptr (sap+ (int-sap sb-vm:nil-value) disp))
              (contents (sap-ref-word ptr 0))
              (name (sb-disassem::find-assembler-routine contents)))
