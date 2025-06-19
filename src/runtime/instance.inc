@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #include <stddef.h> // for offsetof()
 #include "align.h"
 

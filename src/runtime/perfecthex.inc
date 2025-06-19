@@ -1,3 +1,4 @@
+/* -*- Mode: C -*- */
 /*
 ------------------------------------------------------------------------------
 perfhex.c: code to generate code for a hash for perfect hashing.

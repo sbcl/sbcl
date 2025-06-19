@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #define FORWARDING_HEADER 1
 
 inline static bool

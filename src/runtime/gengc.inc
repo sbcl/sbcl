@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 static void trigger_gc(__attribute__((unused)) struct thread* thread)
 {
         /* Don't flood the system with interrupts if the need to gc is

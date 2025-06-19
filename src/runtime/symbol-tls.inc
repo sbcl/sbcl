@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #include "align.h"
 #include "genesis/vector.h"
 struct vector *symbol_name(struct symbol*);
