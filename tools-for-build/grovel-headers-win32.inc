@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 {
     printf("(in-package \"SB-WIN32\")\n\n");
 
