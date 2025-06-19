@@ -65,12 +65,10 @@
 
 (defun allocate-standard-funcallable-instance (wrapper name)
   (declare (layout wrapper))
-  (let* ((hash (if name
-                   ;; Named functions have a predictable hash
-                   (mix (sxhash name) (symbol-hash :generic-function)) ; arb. constant
-                   (sb-kernel::quasi-random-address-based-hash
+  (declare (ignore name))
+  (let* ((hash (sb-kernel::quasi-random-address-based-hash
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
-                    most-positive-fixnum)))
+                    most-positive-fixnum))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (truly-the funcallable-instance
                          (%make-standard-funcallable-instance
