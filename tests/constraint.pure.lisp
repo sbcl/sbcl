@@ -1886,7 +1886,7 @@
      (declare (optimize debug))
      (when (typep (nth-value 1 (truncate x 1)) 'float)
        x))
-   (or null real)))
+   (or null float)))
 
 (with-test (:name :not-eq-eql)
   (assert-type
@@ -1990,3 +1990,13 @@
        (foo 1)
        (foo 2)))
    (or (integer 1 2) symbol)))
+
+(with-test (:name :back-through-casts)
+  (assert-type
+   (lambda (x)
+     (when (typep (nth-value 1 (the (or float (integer 1)) (truncate x 1))) 'float) x))
+   (or float null))
+  (assert-type
+   (lambda (x)
+     (when (typep (the (or float (rational (-1/2) (1))) (nth-value 1 (truncate x 1))) 'float) x))
+   (or float null)))
