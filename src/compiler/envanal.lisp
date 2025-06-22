@@ -520,28 +520,25 @@
           (unless (or (dynamic-extent-info dynamic-extent)
                       (null (dynamic-extent-cleanup dynamic-extent)))
             (setf (dynamic-extent-info dynamic-extent) (make-lvar)))))))
-  (dolist (lambda (component-lambdas component))
-    (let ((fun (if (functional-kind-eq lambda optional)
-                   (lambda-optional-dispatch lambda)
-                   lambda)))
-      (when (leaf-dynamic-extent fun)
-        (let ((xep (functional-entry-fun fun)))
-          ;; We need to have a closure environment to dynamic-extent
-          ;; allocate.
-          (when (and xep (environment-closure (get-lambda-environment xep)))
-            (let* ((enclose (functional-enclose fun))
-                   (dynamic-extent (enclose-dynamic-extent enclose))
-                   (derived-dynamic-extents
-                     (enclose-derived-dynamic-extents enclose)))
-              (cond (dynamic-extent
-                     (aver (null derived-dynamic-extents))
-                     (unless (dynamic-extent-info dynamic-extent)
-                       (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
-                    (derived-dynamic-extents
-                     (aver (null (enclose-dynamic-extent enclose)))
-                     (let ((lvar (make-lvar)))
-                       (dolist (dynamic-extent derived-dynamic-extents)
-                         (setf (dynamic-extent-info dynamic-extent) lvar)))))))))))
+  (dolist (xep (component-lambdas component))
+    (when (and (functional-kind-eq xep external)
+               (leaf-dynamic-extent (functional-entry-fun xep))
+               ;; We need to have a closure environment to
+               ;; stack allocate.
+               (environment-closure (get-lambda-environment xep)))
+      (let* ((enclose (xep-enclose xep))
+             (dynamic-extent (enclose-dynamic-extent enclose))
+             (derived-dynamic-extents
+               (enclose-derived-dynamic-extents enclose)))
+        (cond (dynamic-extent
+               (aver (null derived-dynamic-extents))
+               (unless (dynamic-extent-info dynamic-extent)
+                 (setf (dynamic-extent-info dynamic-extent) (make-lvar))))
+              (derived-dynamic-extents
+               (aver (null (enclose-dynamic-extent enclose)))
+               (let ((lvar (make-lvar)))
+                 (dolist (dynamic-extent derived-dynamic-extents)
+                   (setf (dynamic-extent-info dynamic-extent) lvar))))))))
   (values))
 
 ;;;; cleanup emission
