@@ -4805,3 +4805,14 @@
                                (optimize speed))
                       (coerce l 'vector))
                    :allow-notes nil))
+
+(with-test (:name :flushable-combination-args-p-lost-annotation)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (declare (vector b))
+         (let ((j))
+           (find 1 b :key (lambda (x)
+                            (setf j x)))
+           j))
+    ((#(2)) 2)))
