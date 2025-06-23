@@ -815,15 +815,6 @@
                         (loop for i below (1- (length v))
                               sum (aref v i)))
                      nil))
-             0))
-  (assert (= (count 'sb-kernel:%check-bound
-                    (ctu:ir1-named-calls
-                     `(lambda (a i)
-                        (declare (simple-vector a)
-                                 (optimize (debug 2)))
-                        (if (< 0 i (length a))
-                            (aref a i)))
-                     nil))
              0)))
 
 

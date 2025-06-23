@@ -251,6 +251,18 @@
                 (conset-add-equality-constraint consequent operator x y nil amount)
                 (when alternative
                   (conset-add-equality-constraint alternative operator x y t amount))))
+         (do-eql-vars (eql-x ((constraint-var x) constraints))
+           (let ((x (replace-var x eql-x)))
+             (when (neq y-type *universal-type*)
+               (add x y-type :amount 0))
+             (if (lambda-var/vector-length-p y)
+                 (do-eql-vars (eql-y ((constraint-var y) constraints))
+                   (let ((y (replace-var y eql-y)))
+                     (add x y)
+                     (when (neq x-type *universal-type*)
+                       (add x-type y :amount 0))))
+                 (add x y))
+             (add x y)))
          (flet ((inherit (x y x-type operator)
                   (when (lambda-var/vector-length-p y)
                     (do-equality-constraints (in-y in-op in-not-p in-amount) y constraints
@@ -271,35 +283,21 @@
                           (add operator consequent-constraints)
                           (when alternative-constraints
                             (add (not-operator operator) alternative-constraints))))))))
-           (do-eql-vars (eql-x ((constraint-var x) constraints))
-             (let ((x (replace-var x eql-x)))
-               (when (neq y-type *universal-type*)
-                 (add x y-type :amount 0))
-               (cond ((lambda-var/vector-length-p y)
-                      (do-eql-vars (eql-y ((constraint-var y) constraints))
-                        (let ((y (replace-var y eql-y)))
-                          (add x y)
-                          (inherit x y x-type operator)
-                          (inherit y x y-type (invert-operator operator))
-                          (when (neq x-type *universal-type*)
-                            (add x-type y :amount 0)))))
-                     (t
-                      (add x y)
-                      (inherit x y x-type operator)
-                      (inherit y x y-type (invert-operator operator)))))))
-         (when (lvar-p y)
-           (loop for (in-op in-lvar in-min-amount) in (lvar-result-constraints y constraints)
-                 do
-                 (unless (eq in-lvar first)
-                   (flet ((add (operator target)
-                            (multiple-value-bind (inherit inherit-amount)
-                                (inherit-equality-p operator in-op nil min-amount max-amount in-min-amount)
-                              (when inherit
-                                (add-equality-constraint inherit x in-lvar
-                                                         constraints target nil inherit-amount)))))
-                     (add operator consequent-constraints)
-                     (when alternative-constraints
-                       (add (not-operator operator) alternative-constraints)))))))))))
+           (inherit x y x-type operator)
+           (inherit y x y-type (invert-operator operator))
+           (when (lvar-p y)
+             (loop for (in-op in-lvar in-min-amount) in (lvar-result-constraints y constraints)
+                   do
+                   (unless (eq in-lvar first)
+                     (flet ((add (operator target)
+                              (multiple-value-bind (inherit inherit-amount)
+                                  (inherit-equality-p operator in-op nil min-amount max-amount in-min-amount)
+                                (when inherit
+                                  (add-equality-constraint inherit x in-lvar
+                                                           constraints target nil inherit-amount)))))
+                       (add operator consequent-constraints)
+                       (when alternative-constraints
+                         (add (not-operator operator) alternative-constraints))))))))))))
 
 (defun add-equality-constraints (operator args constraints
                                  consequent-constraints
