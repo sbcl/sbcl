@@ -36,7 +36,7 @@ static void __attribute__((unused)) acquire_lock(lock_t *l) {
     do {
       if (c == 2 || cmpxchg(l, 1, 2) != 0)
         futex_wait((int*)&l->grabbed, 2, -1, 0);
-    } while ((c = cmpxchg(l, 0, 2) != 0) != 0);
+    } while ((c = cmpxchg(l, 0, 2)) != 0);
   }
 }
 static void __attribute__((unused)) release_lock(lock_t* l) {
