@@ -1,5 +1,5 @@
-#+(or gc-stress
-      (not (and x86-64 system-tlabs)) interpreter)
+#+(or gc-stress interpreter
+      (not (and x86-64 system-tlabs (not sb-safepoint))))
 (invoke-restart 'run-tests::skip-file)
 
 (defvar *allocation-nbytes*)
@@ -94,10 +94,10 @@
 
 (test-util:with-test (:name :expand-and-fail)
   (assert (eq (handler-case (expand-many-times)
-                (storage-condition (c) :ok))
+                (storage-condition (c) c :ok))
               :ok))
   (assert (eq (handler-case (expand-many-times)
-                (storage-condition (c) :ok))
+                (storage-condition (c) c :ok))
               :ok)))
 
 ;; This predicate allows allocating arbitrarily many small objects

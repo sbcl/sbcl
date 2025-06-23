@@ -335,14 +335,18 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 (sb-ext:define-load-time-global *arena-exhaustion-handler*
   #'default-arena-extension-test)
 
-(defun handle-arena-request (units count)
+(defun handle-arena-request (units count &aux (arena (thread-current-arena)))
+  ;; Get off the arena as soon as possible, just in case some of the code below conses
+  ;; (There are 5 calls to asm routines with -BIGNUM- in their name, and while they should
+  ;; not actually be invoked, better safe than sorry)
+  ;; Using WITHOUT-ARENA here wouldn't necessarily be right- we have to decide
+  ;; whether to restore the thread's arena on exit from this.
+  (aver (%instancep arena))
+  (switch-to-arena 0)
   (flet ((release-lock (arena)
            (alien-funcall (extern-alien "release_lisp_arena_lock" (function void unsigned))
                           (logandc2 (get-lisp-obj-address arena) lowtag-mask))))
-    ;; Using WITHOUT-ARENA here wouldn't necessarily be right- we have to decide
-    ;; whether to restore the thread's arena on exit from this.
-    (let* ((arena (thread-current-arena))
-           (nbytes (if (eq units 0) ; count = N cons cells, already a fixnum
+    (let* ((nbytes (if (eq units 0) ; count = N cons cells, already a fixnum
                        (* (the fixnum count) 16)
                        ;; Otherwise COUNT is bytes, but the SC of the arg
                        ;; is unsigned-reg so it needs shifting to correct it.
@@ -354,8 +358,6 @@ one or more times, not to exceed MAX-EXTENSIONS times"
            (new-size (+ request (arena-length arena)))
            (allowp nil)
            (abort t))
-      (aver (%instancep arena))
-      (switch-to-arena 0)
       #+nil
       (format t "~&Arena-handler ~S ~D ~D bytes=~D len=~x ex=~D~%"
               arena units count nbytes (arena-length arena) (arena-exhausted arena))
@@ -377,12 +379,16 @@ one or more times, not to exceed MAX-EXTENSIONS times"
       (cond (allowp
              ;; Growing the arena releases the mutex. Return the result of grow_arena
              ;; which is the allocated address if the allocation was a huge object.
+             ;; (the call to extend could go in the HANDLE-ARENA-REQUEST asm routine,
+             ;; but I find this flow to be natural and easily understandable)
              (prog1
                  (%make-lisp-obj
-                  (alien-funcall (extern-alien "extend_lisp_arena"
-                                               (function unsigned unsigned unsigned int))
-                                 (logandc2 (get-lisp-obj-address arena) lowtag-mask)
-                                 request (if hugep 1 0)))
+                  ;; MUST NOT stop for GC while holding the arena mutex
+                  (with-pseudo-atomic-foreign-calls
+                   (alien-funcall (extern-alien "extend_lisp_arena"
+                                                (function unsigned unsigned unsigned int))
+                                  (logandc2 (get-lisp-obj-address arena) lowtag-mask)
+                                  request (if hugep 1 0))))
                (switch-to-arena arena)))
             (t
              (release-lock arena)

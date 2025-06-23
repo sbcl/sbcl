@@ -14,8 +14,21 @@
 #include "genesis/instance.h"
 #include "graphvisit.h"
 
-#ifdef LISP_FEATURE_X86_64
+static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
+    return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
+}
+
+#if defined LISP_FEATURE_SB_FUTEX && !defined LISP_FEATURE_SB_SAFEPOINT \
+  && defined LISP_FEATURE_X86_64
+#include "tiny-lock.h"
 #define ARENA_USER_EXTENSION_PREDICATE
+#define ARENA_MUTEX_ACQUIRE(a) acquire_lock(arena_mutex(a))
+#define ARENA_MUTEX_RELEASE(a) release_lock(arena_mutex(a))
+#define ARENA_MUTEX_ACQUIRE_GC_MAYBE(a) acquire_lock_allowing_gc(arena_mutex(a))
+#else
+#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
+#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
+#define ARENA_MUTEX_ACQUIRE_GC_MAYBE(a) ARENA_MUTEX_ACQUIRE(a)
 #endif
 
 extern lispobj * component_ptr_from_pc(char *pc);
@@ -72,6 +85,9 @@ lispobj sbcl_new_arena(size_t size, int hidable)
 #ifdef LISP_FEATURE_WIN32
     CRITICAL_SECTION *mutex = (void*)block;
     InitializeCriticalSection(mutex);
+#elif defined ARENA_USER_EXTENSION_PREDICATE
+    lock_t *mutex = (void*)block; // tiny lock
+    mutex->grabbed = 0;
 #else
     pthread_mutex_t* mutex = (void*)block;
     pthread_mutex_init(mutex, 0);
@@ -97,12 +113,6 @@ lispobj sbcl_new_arena(size_t size, int hidable)
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
 }
 
-static __attribute__((unused)) inline void* arena_mutex(struct arena* a) {
-    return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
-}
-
-#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
-#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
 #define ARENA(x) ((struct arena*)INSTANCE(x))
 
 /* Release successor blocks of this arena, keeping only the first */
@@ -147,7 +157,7 @@ void sbcl_delete_arena(lispobj arena_taggedptr)
     struct arena* arena = ARENA(arena_taggedptr);
 #ifdef LISP_FEATURE_WIN32
     DeleteCriticalSection(arena_mutex(arena));
-#elif defined LISP_FEATURE_SB_THREAD
+#elif defined LISP_FEATURE_SB_THREAD && !defined ARENA_USER_EXTENSION_PREDICATE
     pthread_mutex_destroy(arena_mutex(arena));
 #endif
     if (arena->link) {
@@ -317,7 +327,7 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
     while (1) {
         char* new_freeptr = where + nbytes;
         if (new_freeptr > mem->limit) {
-            ARENA_MUTEX_ACQUIRE(a);
+            ARENA_MUTEX_ACQUIRE_GC_MAYBE(a);
             // It's possible somebody already extended this and we're late to notice,
             // due to a->current_block being speculatively loaded w/o the mutex.
             struct arena_memblk* actual_current_block = (void*)a->uw_current_block;
@@ -414,7 +424,7 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
 
 // When denying a request to grow the arena, it must be unlocked first
 // to unblock any othe threads trying to extend. They'll fail too of course.
-void release_lisp_arena_lock(struct arena* arena) {
+void release_lisp_arena_lock(__attribute__((unused)) struct arena* arena) {
     ARENA_MUTEX_RELEASE(arena);
 }
 

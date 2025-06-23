@@ -117,6 +117,8 @@
   ;; we're pseudo-atomic. End it and handle a trap if necessary.
   (emit-end-pseudo-atomic)
   ;; Registers that weren't already spilled by (WITH-REGISTERS-PRESERVED (c) ...)
+  ;; (There's no technical reason to push THREAD-TN and NULL-TN. It's purely pragmatic
+  ;; in that they should be changeable without adding a bunch of #+/- here)
   (let ((save (list rbx-tn r12-tn r13-tn r14-tn r15-tn)))
     (dolist (reg save) (inst push reg))
     ;; count of bytes or elements (always at RBP+16) into 2nd arg
