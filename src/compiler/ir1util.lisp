@@ -1058,9 +1058,9 @@
   (block nil
     (map-combination-args-and-types
      (lambda (arg type lvars &optional annotation)
-       (declare (ignore lvars))
+       (declare (ignore type lvars))
        (case (car annotation)
-         (function-designator
+         ((function-designator function)
           (let ((fun (or (lvar-fun-name arg t)
                          (and (constant-lvar-p arg)
                               (lvar-value arg)))))
@@ -1073,12 +1073,7 @@
                          (constant-lvar-p arg)
                          (memq (lvar-value arg) except))
               (return))
-            nil))
-         (t
-          ;; A function-designator annotation has been lost.
-          (when (or (eq type (specifier-type 'function))
-                    (eq type (specifier-type 'function-designator)))
-            (return)))))
+            nil))))
      combination
      :info info)
     t))
