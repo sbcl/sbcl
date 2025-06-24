@@ -1,5 +1,5 @@
 #+(or gc-stress interpreter
-      (not (and x86-64 system-tlabs (not sb-safepoint))))
+      (not (and x86-64 system-tlabs sb-futex (not sb-safepoint))))
 (invoke-restart 'run-tests::skip-file)
 
 (defvar *allocation-nbytes*)
