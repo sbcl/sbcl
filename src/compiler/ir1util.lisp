@@ -1061,12 +1061,19 @@
        (declare (ignore type lvars))
        (case (car annotation)
          ((function-designator function)
-          (let ((fun (or (lvar-fun-name arg t)
-                         (and (constant-lvar-p arg)
-                              (lvar-value arg)))))
-            (unless (and fun
-                         (flushable-callable-arg-p fun (length (cadr annotation))))
-              (return))))
+          (flet ((flushable-fun-p (fun)
+                   (unless (and fun
+                                (flushable-callable-arg-p fun (length (cadr annotation))))
+                     (return))))
+            (let ((uses (lvar-uses arg)))
+              (if (consp uses)
+                  (loop for use in uses
+                        do (flushable-fun-p (and (ref-p use)
+                                                 (ref-fun-name use t))))
+                  (flushable-fun-p
+                   (or (lvar-fun-name arg t)
+                       (and (constant-lvar-p arg)
+                            (lvar-value arg))))))))
          (inhibit-flushing
           (let* ((except (cddr annotation)))
             (unless (and except
@@ -2682,6 +2689,16 @@ is :ANY, the function name is not checked."
   (declare (type functional fun))
   (functional-kind-eq fun external toplevel))
 
+(defun ref-fun-name (ref &optional notinline-ok)
+  (let ((leaf (ref-leaf ref)))
+    (if (and (global-var-p leaf)
+             (eq (global-var-kind leaf) :global-function)
+             (or (not (defined-fun-p leaf))
+                 (not (eq (defined-fun-inlinep leaf) 'notinline))
+                 notinline-ok))
+        (leaf-source-name leaf)
+        nil)))
+
 ;;; If LVAR's only use is a non-notinline global function reference,
 ;;; then return the referenced symbol, otherwise NIL. If NOTINLINE-OK
 ;;; is true, then we don't care if the leaf is NOTINLINE.
@@ -2689,14 +2706,7 @@ is :ANY, the function name is not checked."
   (declare (type lvar lvar))
   (let ((use (principal-lvar-use lvar)))
     (if (ref-p use)
-        (let ((leaf (ref-leaf use)))
-          (if (and (global-var-p leaf)
-                   (eq (global-var-kind leaf) :global-function)
-                   (or (not (defined-fun-p leaf))
-                       (not (eq (defined-fun-inlinep leaf) 'notinline))
-                       notinline-ok))
-              (leaf-source-name leaf)
-              nil))
+        (ref-fun-name use notinline-ok)
         nil)))
 
 ;;; As above, but allow a quoted symbol also,

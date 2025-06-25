@@ -513,3 +513,11 @@
                         (values x y)))
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
+
+
+(with-test (:name :flush-multiple-callables)
+  (assert (not (ir-full-calls
+                `(lambda (a b c)
+                   (declare (vector b))
+                   (find a b :test (if c #'eq #'eql))
+                   10)))))
