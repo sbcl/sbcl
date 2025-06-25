@@ -17,6 +17,10 @@ static void dumpmaps()
         while (fgets(line, sizeof line, maps))
             ignore_value(write(2, line, strlen(line)));
         fclose(maps);
+    } else { // couldn't read that virtual file? just wow
+      char msg[40];
+      int n = snprintf(msg, sizeof msg, "errno %d opening maps\n", errno);
+      write(2, msg, n);
     }
 }
 
@@ -47,9 +51,10 @@ __attribute__((unused)) static void* try_find_hole(os_vm_size_t len)
         uintptr_t high = strtoul(endptr1+1, &endptr2, 16);
         if (*endptr1 != '-' || *endptr2 != ' ') break; // didn't parse correctly
         size_t gap = low - previous_high;
-        if (gap >= len && previous_high != 0) { // attempt it
-            void* actual = sbcl_mmap((void*)previous_high, len, PROT_READ|PROT_WRITE,
-                                     flags, -1, 0);
+        if (gap >= len) { // attempt it
+            void* addr = !previous_high ? (char*)low - len // 1st line of maps file, try below
+                         : (void*)previous_high; // other lines, try above previous range
+            void* actual = sbcl_mmap(addr, len, PROT_READ|PROT_WRITE, flags, -1, 0);
             if (actual != MAP_FAILED && (uword_t)actual + len <= TWO_GB_LIM) {
                 fclose(f);
                 return actual;
@@ -83,7 +88,8 @@ os_alloc_gc_space(int __attribute__((unused)) space_id,
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (actual == MAP_FAILED && space_id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID)
-        actual = try_find_hole(len);
+        if ((actual = try_find_hole(len)) == 0)
+            errno = ENOMEM, actual = MAP_FAILED; // Ensure printing of maps file
 #endif
 
     if (actual == MAP_FAILED) {
