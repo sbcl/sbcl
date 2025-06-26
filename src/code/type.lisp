@@ -6273,7 +6273,9 @@ expansion happened."
                                    (high-ge-high-p high2 high1))
                             (return))
                           (incf i1 2)))))))))
+
 (defun member-rational (members)
+  (declare (inline !compute-numtype-aspect-id))
   (if members
       (let ((result)
             (mask 0))
@@ -6295,6 +6297,7 @@ expansion happened."
       *empty-type*))
 
 (defun member-float (type members)
+  (declare (inline !compute-numtype-aspect-id))
   (if members
       (let ((result))
         (labels ((join-p (left-high right-low)
