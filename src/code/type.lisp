@@ -3881,7 +3881,10 @@ expansion happened."
   ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
   ;;  literal symbol *, and does not represent an unspecified value."
   (if members
-      (let ((xset (alloc-xset)) fp-zeros other-reals characters)
+      (let ((xset (alloc-xset)) fp-zeros characters
+            rationals
+            double-floats
+            single-floats)
         ;; Calling REMOVE-DUPLICATES up front as used to be done is wasteful because the XSET can't
         ;; have dups in it. Elements that don't go in the XSET have to be de-duplicated.
         ;; There are at most 4 fp-zeros, so calling PUSHNEW is fine. For the rest, we can suppose
@@ -3890,12 +3893,22 @@ expansion happened."
         (dolist (m members)
           (typecase m
             (character (push m characters))
-            (real (if (fp-zero-p m) (pushnew m fp-zeros) (push m other-reals)))
+            (double-float
+             (if (fp-zero-p m)
+                 (pushnew m fp-zeros)
+                 (push m double-floats)))
+            (single-float
+             (if (fp-zero-p m)
+                 (pushnew m fp-zeros)
+                 (push m single-floats)))
+            (rational (push m rationals))
             (t (add-to-xset m xset))))
-        (apply #'type-union
-               (make-member-type xset fp-zeros)
-               (character-set-type-from-characters characters)
-               (mapcar #'ctype-of-number (delete-duplicates other-reals))))
+        (type-union
+         (make-member-type xset fp-zeros)
+         (character-set-type-from-characters characters)
+         (member-rational rationals)
+         (member-float 'double-float double-floats)
+         (member-float 'single-float single-floats)))
       *empty-type*))
 (defun make-eql-type (elt)
   ;; Start by looking in the hash-table, there's no reason not to.
@@ -6260,6 +6273,61 @@ expansion happened."
                                    (high-ge-high-p high2 high1))
                             (return))
                           (incf i1 2)))))))))
+(defun member-rational (members)
+  (if members
+      (let ((result)
+            (mask 0))
+        (flet ((store (run low high)
+                 (setf (values result mask)
+                       (store-rational-range low high run mask result))))
+          (loop for member in (sort (copy-list members) #'<)
+                do (store (if (integerp member)
+                              range-integer-run
+                              range-ratio-run)
+                          member member))
+          (new-ctype numeric-union-type 0
+                     (get-numtype-aspects :real
+                                          (case mask
+                                            (#.range-integer-run 'integer)
+                                            (t 'rational))
+                                          nil)
+                     (coerce (reverse result) 'vector))))
+      *empty-type*))
+
+(defun member-float (type members)
+  (if members
+      (let ((result))
+        (labels ((join-p (left-high right-low)
+                   (cond ((not right-low)
+                          t)
+                         ((not left-high)
+                          t)
+                         ((let ((open-left-high (if (consp left-high)
+                                                    (car left-high)
+                                                    left-high))
+                                (open-right-low (if (consp right-low)
+                                                    (car right-low)
+                                                    right-low)))
+                            (if (and (consp left-high)
+                                     (consp right-low))
+                                (sb-xc:< open-right-low open-left-high)
+                                (sb-xc:<= open-right-low open-left-high))))))
+                 (store (low high)
+                   (let ((last-high (car result)))
+                     (cond ((and result
+                                 (high-ge-high-p last-high high)))
+                           ((and result
+                                 (join-p last-high low))
+                            (setf (car result) high))
+                           (t
+                            (push low result)
+                            (push high result))))))
+          (loop for member in (sort (copy-list members) #'sb-xc:<)
+                do (store member member))
+          (new-ctype numeric-union-type 0
+                     (get-numtype-aspects :real 'float type)
+                     (coerce (reverse result) 'vector))))
+      *empty-type*))
 
 (define-type-method (numeric-union :simple-union2) (type1 type2)
   (declare (inline !compute-numtype-aspect-id))
