@@ -85,14 +85,14 @@
                              :node node)
     (cond ((always-bound-struct-accessor-p object slot-name) t)
           (t (delay-ir1-transform node :constraint)
-             `(sb-pcl::accessor-slot-boundp object ',(lvar-value slot-name)))))
+             `(sb-pcl::%accessor-slot-boundp object ',(lvar-value slot-name)))))
 
   (deftransform slot-makunbound ((object slot-name) (t (constant-arg symbol)) *
                                  :node node)
     (cond ((always-bound-struct-accessor-p object slot-name)
            `(error "Cannot make slot ~S in ~S unbound." ',object ',slot-name))
           (t (delay-ir1-transform node :constraint)
-             `(sb-pcl::accessor-slot-makunbound object ',(lvar-value slot-name)))))
+             `(sb-pcl::%accessor-slot-makunbound object ',(lvar-value slot-name)))))
 
   ;; this transform is tried LAST because we like to make things unintuitive
   (deftransform slot-value ((object slot-name) (structure-object symbol) *
@@ -106,7 +106,7 @@
             `(,(dsd-accessor-name it) object))
            (t
             (delay-ir1-transform node :constraint)
-            `(sb-pcl::accessor-slot-value object ',(lvar-value slot-name)))))
+            `(sb-pcl::%accessor-slot-value object ',(lvar-value slot-name)))))
 
   (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
                                         (t (constant-arg symbol) t)
@@ -119,5 +119,5 @@
             (give-up-ir1-transform "cannot use optimized accessor in safe code"))
            (t
             (delay-ir1-transform node :constraint)
-            `(sb-pcl::accessor-set-slot-value object ',(lvar-value slot-name)
-                                              new-value)))))
+            `(sb-pcl::%accessor-set-slot-value object ',(lvar-value slot-name)
+                                               new-value)))))
