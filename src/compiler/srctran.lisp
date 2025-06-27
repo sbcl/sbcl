@@ -3900,7 +3900,7 @@
         (cond (zerop
                (setf (node-derived-type node)
                      (values-specifier-type '(values integer unsigned-byte &optional)))
-               (erase-lvar-type result)
+               (erase-lvar-type result 1)
                `(values
                  (values (truncate x y))
                  (logand x ,mask)))

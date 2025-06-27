@@ -300,7 +300,7 @@
                             (and (constant-lvar-p arg)
                                  (eql (lvar-value arg) arg-m))))))))
 
-(defun erase-lvar-type (lvar)
+(defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
     (labels ((erase (lvar)
                (when lvar
@@ -317,14 +317,16 @@
                                (not (memq dest seen)))
                           (push dest seen)
                           (let ((fun (combination-lambda dest)))
-                            (flet ((erase (var)
+                            (flet ((erase-var (var)
                                      (setf (lambda-var-type var) *universal-type*)
                                      (loop for ref in (leaf-refs var)
                                            do (derive-node-type ref *wild-type* :from-scratch t)
                                               (erase (node-lvar ref)))))
                               (if (functional-kind-eq fun mv-let)
-                                  (mapc #'erase (lambda-vars fun))
-                                  (erase
+                                  (if nth-value
+                                      (erase-var (nth nth-value (lambda-vars fun)))
+                                      (mapc #'erase-var (lambda-vars fun)))
+                                  (erase-var
                                    (nth (position-or-lose lvar
                                                           (basic-combination-args dest))
                                         (lambda-vars fun)))))))

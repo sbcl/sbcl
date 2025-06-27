@@ -729,3 +729,12 @@
          (integer-length c))
     ((-1) 0)
     ((-2) 1)))
+
+(with-test (:name :truncate-rem-zerop-types)
+  (checked-compile `(sb-int:named-lambda f (start end)
+                      (declare (optimize (speed 3))
+                               (type (unsigned-byte 8) start end))
+                      (let ((half (/ (+ end start) 2)))
+                        (f start half)
+                        half))
+                   :allow-notes nil))
