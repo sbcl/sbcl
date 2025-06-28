@@ -1,5 +1,46 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes in sbcl-2.5.6 relative to sbcl-2.5.5:
+  * minor incompatible change: optimization notes for a variable declared to
+    be of type LIST will not be emitted for various transforms which are
+    defined to operate on (OR NULL VECTOR).
+  * minor incompatible change: some forms, including a THE form with an
+    invalid type specifier, or a CASE form with bad entries, no longer produce
+    a runtime error.  (They continue to provide a full warning at
+    compile-time).
+  * platform support
+    ** on arm64, breakpoint-based stepping is now thread-safe.
+    ** on arm64, backtraces after interrupts should be more correct.
+    ** on x86-64 with the immobile-space feature, calling from assembly
+       routines to lisp routines is more efficient.
+    ** if arenas are enabled, users can define a lisp function to act as a
+       handler to customize behaviour on arena exhaustion.
+  * bug fix: address several bugs related to dynamic-extent declarations,
+    inference, and stack allocation.
+  * bug fix: the stack return page protection is temporarily disabled during
+    GC, so that GC can complete even if it needs to write in the return page.
+  * bug fix: the compiler generates code to the right entry point for specialized
+    functions.  (lp#2111876, reported by Matt Kaufmann)
+  * bug fix: the compiler's constraint derivation would sometimes not terminate.
+    (lp#2113747)
+  * bug fix: when the runtime structure representing a thread is re-used, the
+    stack guard pages are restored.
+  * bug fix: type checks for &OPTIONAL arguments are done only once.
+  * bug fix: CEILING's docstring was wrong.  (reported by Dave Tenny)
+  * bug fix: APPLY could be called with too many arguments when parsing MEMBER
+    type specifications.  (reported by Zach Beane)
+  * bug fix: the compiler could allow constant values of bad types to trigger
+    optimzations.  (lp#2113977)
+  * bug fix: internal compiler error when attempting to write out a type check
+    for a value already proved to never exist (i.e. be of type NIL).
+    (lp#2112475)
+  * optimization: better division for signed-word dividends and unsigned-word
+    divisors on arm64 and x86-64.
+  * optimization: improvements to subtraction involving bignums and words on
+    x86-64.
+  * optimization: perfect-hash-based transformations are applied to sequence
+    functions with keys including fixnums and characters as well as symbols.
+
 changes in sbcl-2.5.5 relative to sbcl-2.5.4:
   * minor incompatible change: the output from TRACE is now prefixed by a
     FRESH-LINE on *TRACE-OUTPUT*.
