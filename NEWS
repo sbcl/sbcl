@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes in sbcl-2.5.6 relative to sbcl-2.5.5:
+changes relative to sbcl-2.5.5:
   * enhancement: the compiler now recognizes when local functions (both named
     and anonymous) are used only as downward funargs in many situations and
     can stack allocate such closures even without explicit dynamic extent
