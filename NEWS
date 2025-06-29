@@ -35,7 +35,7 @@ changes in sbcl-2.5.6 relative to sbcl-2.5.5:
   * bug fix: APPLY could be called with too many arguments when parsing MEMBER
     type specifications.  (reported by Zach Beane)
   * bug fix: the compiler could allow constant values of bad types to trigger
-    optimzations.  (lp#2113977)
+    optimizations.  (lp#2113977)
   * bug fix: internal compiler error when attempting to write out a type check
     for a value already proved to never exist (i.e. be of type NIL).
     (lp#2112475)
