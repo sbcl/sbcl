@@ -1549,8 +1549,9 @@
   (cond ((and (lvar-matches seq2 :fun-names '(reverse sb-impl::list-reverse))
               ;; Nothing should be modifying the original sequence
               (almost-immediately-used-p seq2 (lvar-use seq2)
-                                         :flushable t))
-         (splice-fun-args seq2 :any 1)
+                                         :flushable t)
+              (splice-fun-args seq2 :any 1 nil))
+
          `(when seq1
             (let* ((list-length (length seq2))
                    (vector-length (length seq1))
