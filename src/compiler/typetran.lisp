@@ -713,6 +713,49 @@
                        (or (check a b)
                            (check b a)))))))))
 
+(defun transform-frozen-struct-union-typep (object types)
+  ;; If at least 4 sealed structs (before accounting for hierarchy), try to use
+  ;; a test based on layout-clos-hash.
+  (when (< (count-if (lambda (type)
+                       (and (structure-classoid-p type)
+                            (eq (classoid-state type) :sealed)))
+                     types)
+           4)
+    (return-from transform-frozen-struct-union-typep nil))
+  (collect ((structs) (other))
+    (dolist (type types)
+      (labels ((add-descendants (classoid &optional layout)
+                 (declare (ignore layout))
+                 (unless (member classoid (structs))
+                   (structs classoid)
+                   (sb-kernel::call-with-subclassoids #'add-descendants classoid))))
+        (if (and (structure-classoid-p type) (eq (classoid-state type) :sealed))
+            (add-descendants type)
+            (other type))))
+    (flet ((typehash (x) (ldb (byte 32 0) (layout-clos-hash (classoid-layout x)))))
+      (let* ((hashes (map '(array (unsigned-byte 32) 1) #'typehash (structs)))
+             (lexpr (or (make-perfect-hash-lambda hashes (mapcar 'classoid-name (structs)))
+                        (return-from transform-frozen-struct-union-typep nil)))
+             (phashfun (compile-perfect-hash lexpr hashes))
+             (min-size (length (structs)))
+             (pow2-size (power-of-two-ceiling min-size))
+             (deficit (- pow2-size min-size))
+             ;; number of elts we're willing to waste in the table to avoid a range check
+             (rangecheck (> deficit 2)) ; probably should base this on percentage of min-size
+             (array (make-array (if rangecheck min-size pow2-size) :initial-element 0)))
+        (dolist (type (structs))
+          (let ((h (funcall phashfun (typehash type))))
+            (setf (aref array h) (classoid-layout type))))
+        (let ((test `(and (%instancep ,object)
+                          (let* ((l (%instance-layout ,object))
+                                 (h (,lexpr (ldb (byte 32 0) (layout-clos-hash l)))))
+                            ,(if rangecheck
+                                 `(and (< h ,(length array)) (eq (aref ,array h) l))
+                                 `(eq (aref ,array h) l))))))
+          (if (other)
+              `(or ,test (typep ,object (or ',@(mapcar #'type-specifier (other)))))
+              test))))))
+
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
@@ -754,6 +797,7 @@
            `(or (symbolp ,object)
                 (typep ,object
                        '(or ,@(mapcar #'type-specifier (remove (specifier-type 'symbol) types))))))
+          ((transform-frozen-struct-union-typep object types))
           ((group-vector-type-length-tests object types))
           ((group-vector-length-type-tests object types))
           ((source-transform-union-numeric-typep object types))
