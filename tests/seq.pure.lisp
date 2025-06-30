@@ -985,3 +985,12 @@
    (lambda (x)
      (length (the (or null (simple-string 10)) x)))
    (or (integer 0 0) (integer 10 10))))
+
+(with-test (:name :replace-vector-list)
+  (checked-compile-and-assert
+      ()
+      `(lambda (l)
+         (let ((v (copy-seq #(1 2))))
+           (replace v (the list l))
+           v))
+    (('(a)) #(a 2) :test #'equalp)))

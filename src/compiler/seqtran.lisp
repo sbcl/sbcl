@@ -1567,6 +1567,7 @@
         (t
          `(when seq1
             (loop for i below (length seq1)
+                  while seq2
                   do (setf (aref seq1 i)
                            (pop seq2)))
             seq1))))
