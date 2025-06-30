@@ -1542,7 +1542,6 @@
                (transform-replace t node)))
          (give-up-ir1-transform)))))
 
-;;; replace + reverse
 (deftransform replace ((seq1 seq2)
                        ((or null (simple-array * (*))) list) *
                        :node node)
@@ -1566,7 +1565,11 @@
                     do (setf (aref seq1 i) elt))
               seq1)))
         (t
-         (give-up-ir1-transform))))
+         `(when seq1
+            (loop for i below (length seq1)
+                  do (setf (aref seq1 i)
+                           (pop seq2)))
+            seq1))))
 
 #+sb-unicode
 (progn
