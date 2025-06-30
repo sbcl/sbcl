@@ -1457,6 +1457,15 @@ code to be loaded.
                        (loop-for-across var `(list-reverse-into-vector-cddr ,(second val)) data-type))
                       ((not stepper)
                        (loop-for-across var `(list-reverse-into-vector ,(second val)) data-type))))))
+        ((and (typep val '(cons (eql sort) (cons (cons (eql copy-list) (cons t null)) cons)))
+              (not (sb-c::fun-lexically-notinline-p 'copy-list
+                                                    (macro-environment *loop*)))
+              (let ((stepper (and (loop-tequal (car (source-code *loop*)) :by)
+                                  (source-code *loop*))))
+                (cond ((not stepper)
+                       (destructuring-bind (sort (copy-list list) &rest args) val
+                         (declare (ignore sort copy-list))
+                         (loop-for-across var `(sort (coerce (the list ,list) 'vector) ,@args) data-type)))))))
         (t
          (multiple-value-bind (list constantp list-value)
              (loop-constant-fold-if-possible val)
