@@ -250,16 +250,25 @@
 ;;; otherwise the new encapsulation goes to the front of the chain.
 (defun encapsulate (name type function)
   (let ((underlying-fun (name->fun name)))
-    (when (macro/special-guard-fun-p underlying-fun)
+    ;; No error is signaled when encapsulating a nonexistent function, however
+    ;; the wrapper will receive as its first arg a function that signals an error.
+    (when (or (and underlying-fun (macro/special-guard-fun-p underlying-fun))
+              (not name))
       (error "~S can not be encapsulated" name))
     (when (typep underlying-fun 'generic-function)
       (return-from encapsulate
         (encapsulate-generic-function underlying-fun type function)))
     (multiple-value-bind (existing predecessor) (has-encap underlying-fun type)
       ;; If TYPE existed, the new DEFINITION comes from the existing
-      (when existing
-        (setf underlying-fun (encapsulation-info-definition existing)))
-      (let* ((info (make-encapsulation-info type underlying-fun))
+      (let* ((info (if (not existing)
+                       (make-encapsulation-info
+                        type
+                        (or underlying-fun
+                            (lambda (&rest args)
+                              (declare (sb-c::lambda-list ($undef$)))
+                              (declare (ignore args))
+                              (error "~S is undefined" name))))
+                       (copy-structure existing)))
              (specialized-xep (info :function :specialized-xep name))
              (closure (named-lambda encapsulation (&rest args)
                         (apply function (encapsulation-info-definition info)
@@ -286,10 +295,11 @@
           (when existing
             (let* ((next (encapsulation-info-definition existing))
                    (specialized-xep (encapsulation-info-specialized-xep existing)))
-              (if predecessor
-                  (setf (encapsulation-info-definition predecessor) next)
-                  ;; It's the first one, so change the fdefn object.
-                  (fset name next))
+              (cond (predecessor
+                     (setf (encapsulation-info-definition predecessor) next))
+                    ;; It's the first one, so change the fdefn object.
+                    ((equal (%fun-lambda-list next) '($undef$)) (fmakunbound name))
+                    (t (fset name next)))
               (when specialized-xep
                 (fset (%fun-name specialized-xep) specialized-xep)))))))))
 
