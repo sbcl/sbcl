@@ -68,14 +68,57 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
-(flet ((always-bound-struct-accessor-p (object slot-name)
+(flet ((union-of-known-slot-p (slot-name objtype)
+         ;; handle an either-or of two structure classoids
+         ;; (This could accept N types in the union but it's tricky)
+         (binding* ((c1 (car (union-type-types objtype)))
+                    (c2 (cadr (union-type-types objtype)))
+                    (dd1 (find-defstruct-description (classoid-name c1)))
+                    (dd2 (find-defstruct-description (classoid-name c2)))
+                    (dsd1 (find slot-name (dd-slots dd1) :key #'dsd-name))
+                    (dsd2 (find slot-name (dd-slots dd2) :key #'dsd-name))
+                    ;; If one type is frozen, prefer TYPEP on it as the discriminator
+                    ;; since the test is quicker than a hierarchical test.
+                    ((discriminator then else)
+                     (cond ((or (not dsd1) (not dsd2))
+                            (return-from union-of-known-slot-p nil))
+                           ((and (eq (classoid-state c2) :sealed)
+                                 (neq (classoid-state c1) :sealed))
+                            (values c2 dsd2 dsd1))
+                           (t
+                            (values c1 dsd1 dsd2))))
+                    (test `(typep object ',(classoid-name discriminator))))
+           (if (and (eq (dsd-raw-type dsd1) (dsd-raw-type dsd2))
+                    (type= (specifier-type (dsd-type dsd1))
+                           (specifier-type (dsd-type dsd2)))
+                    ;; If the slots don't have the same dsd-index, there would be an IF
+                    ;; as the argument to %instance-ref which is actually worse (it seems)
+                    ;; than putting the IF around the two accessors. That's too bad,
+                    ;; because I thought it was clever to put the IF inside. It's possible
+                    ;; to improve asm codegen to handle it- a layout comparison which sets
+                    ;; flags, and a CMOV, essentially reading both slots but choosing one
+                    ;; result. Both structs need to be sufficiently long to avoid overrun.
+                    (= (dsd-index dsd1) (dsd-index dsd2)))
+               ;; Two _unrelated_ structures with essentially the same slot.
+               ;; (If one was an ancestor of the other, this would not be a UNION type)
+               (let ((i (if (= (dsd-index dsd1) (dsd-index dsd2)) ; ALWAYS TRUE (for now)
+                            (dsd-index dsd1) ; same word of the structure
+                            `(if ,test ,(dsd-index then) ,(dsd-index else)))))
+                 ;; I blindly copied this expansion from that of a typical DEFSTRUCT's
+                 ;; accessor. I don't claim to understand the use of THE*.
+                 `(the* (,(dsd-type dsd1) :derive-type-only t)
+                        (,(dsd-reader dsd1 nil) object ,i)))
+               ;; slots differ in physical representation and/or lisp type
+               `(if ,test
+                    (,(dsd-accessor-name then) object)
+                    (,(dsd-accessor-name else) object)))))
+       (always-bound-struct-accessor-p (object slot-name)
          (let ((c-slot-name (lvar-value slot-name)))
            (unless (interned-symbol-p c-slot-name)
              (give-up-ir1-transform "slot name is not an interned symbol"))
            (let* ((type (lvar-type object))
                   (dd (when (structure-classoid-p type)
-                        (find-defstruct-description
-                         (sb-kernel::structure-classoid-name type))))
+                        (find-defstruct-description (classoid-name type))))
                   (dsd (when dd
                          (find c-slot-name (dd-slots dd) :key #'dsd-name))))
              (when (and dsd (dsd-always-boundp dsd))
@@ -98,7 +141,13 @@
   (deftransform slot-value ((object slot-name) (structure-object symbol) *
                             ;; safety 3 should check slot-unbound on structures
                             :policy (< safety 3))
-    `(sb-pcl::structure-slot-value object slot-name))
+    (cond ((and (constant-lvar-p slot-name)
+                (let ((objtype (lvar-type object)))
+                  (and (union-type-p objtype)
+                       (not (cddr (union-type-types objtype))) ; 2-way choice
+                       (union-of-known-slot-p (lvar-value slot-name) objtype)))))
+          (t
+           `(sb-pcl::structure-slot-value object slot-name))))
 
   (deftransform slot-value ((object slot-name) (t (constant-arg symbol)) *
                             :node node)
