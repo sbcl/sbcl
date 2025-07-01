@@ -299,28 +299,28 @@
                      #-(or x86-64 arm64)
                      (entry (make-load-time-constant-tn :entry xep))
                      (env (node-environment node))
-                     (leaf-dx-p (leaf-dynamic-extent fun)))
+                     (stack-allocate-p (leaf-dynamic-extent fun)))
                 (aver (entry-info-offset entry-info))
                 (vop make-closure node ir2-block #-(or x86-64 arm64) entry
                      (entry-info-offset entry-info) (length closure)
-                     leaf-dx-p tn)
+                     stack-allocate-p tn)
                 (loop for what in closure and n from 0 do
                   (if (lambda-p what)
                       (unless (functional-kind-eq what deleted)
                         (delayed (list tn (find-in-environment what env) n
-                                       leaf-dx-p)))
+                                       stack-allocate-p)))
                       (unless (and (lambda-var-p what)
                                    (null (leaf-refs what)))
                         (let ((initial-value (closure-initial-value what env nil)))
                           (if initial-value
                               (vop closure-init node ir2-block tn initial-value n
-                                   leaf-dx-p)
+                                   stack-allocate-p)
                               ;; An initial-value of NIL means to
                               ;; stash the frame pointer... which
                               ;; requires a different VOP.
                               (vop closure-init-from-fp node ir2-block tn n))))))))))))
-    (loop for (tn what n leaf-dx-p) in (delayed)
-          do (vop closure-init node ir2-block tn what n leaf-dx-p)))
+    (loop for (tn what n stack-allocate-p) in (delayed)
+          do (vop closure-init node ir2-block tn what n stack-allocate-p)))
   (values))
 
 ;;; Convert a SET node. If the NODE's LVAR is annotated, then we also
