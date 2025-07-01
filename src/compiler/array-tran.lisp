@@ -2326,8 +2326,12 @@
                          `index
                          (check-bound-code 'array '(vector-length array) 'index index)))
               (bare-form
-                `(data-vector-ref array ,index)))
-         (if (type= declared-element-ctype element-ctype)
+                `(data-vector-ref array ,index))
+              (cast (node-dest node)))
+         (if (or (type= declared-element-ctype element-ctype)
+                 ;; Don't check if there's a TRULY-THE around the aref.
+                 (and (cast-p cast)
+                      (type= (cast-asserted-type cast) declared-element-ctype)))
              bare-form
              `(the ,declared-element-ctype ,bare-form))))
       ((policy node (zerop insert-array-bounds-checks))
