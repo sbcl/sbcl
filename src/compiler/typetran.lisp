@@ -713,25 +713,58 @@
                        (or (check a b)
                            (check b a)))))))))
 
+;; If TYPE is a strict subtype of a frozen classoid specified as
+;; (AND someclassoid (NOT somesubclassoid)) then return the "exact" set
+;; of classoids is is. i.e. pretend that membership in the resulting set
+;; is determined by the classoid of an object being EQ to one of the classoids
+;; and that the SUBTYPEP relation is irrelevant. Practically speaking: the
+;; instance-layout of a candidate object must be EQ to the layout for one
+;; of the classoids in the answer.  The consumer of this output should not
+;; take a union of the set for purposes of constructing a type.
+(defun frozen-struct-classoid-carve-out (type)
+  (flet ((matchp (a b) ; does this type match (AND (NOT a) B)
+           (and (negation-type-p a)
+                (structure-classoid-p b)
+                (structure-classoid-p (negation-type-type a))
+                (eq (classoid-state (negation-type-type a)) :sealed)
+                (eq (classoid-state b) :sealed)
+                ;; I think this has gotta be true. Why would the type algebra
+                ;; leave it in if it weren't possible? It would just delete the
+                ;; negation, and not represent it as an intersection at all.
+                (csubtypep (negation-type-type a) b)))
+         (difference (super sub)
+           (set-difference (classoid-all-subclassoids super)
+                           (classoid-all-subclassoids (negation-type-type sub)))))
+    (when (intersection-type-p type)
+      (let ((types (compound-type-types type)))
+        ;; We could try to match C - c1 - c2 - ... cN but I don't care to do it.
+        (when (= (length types) 2)
+          (let ((first (first types)) (second (second types)))
+            ;; intersection is commutative so try both ways
+            (cond ((matchp first second) (difference second first))
+                  ((matchp second first) (difference first second)))))))))
+
 (defun transform-frozen-struct-union-typep (object types)
   ;; If at least 4 sealed structs (before accounting for hierarchy), try to use
   ;; a test based on layout-clos-hash.
-  (when (< (count-if (lambda (type)
-                       (and (structure-classoid-p type)
-                            (eq (classoid-state type) :sealed)))
-                     types)
-           4)
-    (return-from transform-frozen-struct-union-typep nil))
-  (collect ((structs) (other))
+  (let ((count 0))
     (dolist (type types)
-      (labels ((add-descendants (classoid &optional layout)
-                 (declare (ignore layout))
-                 (unless (member classoid (structs))
-                   (structs classoid)
-                   (sb-kernel::call-with-subclassoids #'add-descendants classoid))))
-        (if (and (structure-classoid-p type) (eq (classoid-state type) :sealed))
-            (add-descendants type)
-            (other type))))
+      (incf count
+            (if (and (structure-classoid-p type) (eq (classoid-state type) :sealed))
+                1
+                (length (frozen-struct-classoid-carve-out type)))))
+    (when (< count 4)
+      (return-from transform-frozen-struct-union-typep nil)))
+  (collect ((structs) (other))
+    (flet ((add (list)
+             (dolist (type list)
+               (unless (member type (structs)) (structs type)))))
+      (dolist (type types)
+        (acond ((and (structure-classoid-p type) (eq (classoid-state type) :sealed))
+                (add (classoid-all-subclassoids type)))
+               ((frozen-struct-classoid-carve-out type)
+                (add it))
+               (t (other type)))))
     (flet ((typehash (x) (ldb (byte 32 0) (layout-clos-hash (classoid-layout x)))))
       (let* ((hashes (map '(array (unsigned-byte 32) 1) #'typehash (structs)))
              (lexpr (or (make-perfect-hash-lambda hashes (mapcar 'classoid-name (structs)))
@@ -1593,7 +1626,7 @@
                    dimensions-removed)
                (dolist (type types)
                  (unless (or (hairy-type-p type)
-                             (sb-kernel::negation-type-p type))
+                             (negation-type-p type))
                    (multiple-value-bind (type et upgraded dimensions) (simplify type)
                      (push type array-types)
                      (push et element-types)

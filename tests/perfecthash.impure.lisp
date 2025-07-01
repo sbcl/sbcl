@@ -18,6 +18,40 @@
                (^ A (AREF TAB B))))))))
 |#
 
+(defstruct root)
+(defstruct (parent (:include root)))
+(defstruct (kid (:include root)))
+(defstruct (otherkid (:include root)))
+(defstruct foo)
+(defstruct bar)
+(defstruct baz)
+(declaim (freeze-type root foo bar baz))
+
+(defvar *transform-result*)
+(sb-int:encapsulate 'sb-c::transform-frozen-struct-union-typep 'check-if-called
+ (lambda (realfun &rest args)
+   (setf *transform-result* (apply realfun args))))
+
+(defun typecheck-almost-branchlessly (x)
+  (declare (optimize (sb-c::verify-arg-count 0)))
+  ;; the check for NIL and %instancep are the only branches
+  (values t (the (or null foo bar baz (and root (not otherkid))) x)))
+(compile 'typecheck-almost-branchlessly)
+
+(with-test (:name :structure-union-typep)
+  (assert *transform-result*)
+  ;; assert correct types accepted, some of them unrelated
+  (dolist (ctor '(make-root make-parent make-kid
+                  make-foo make-bar make-baz))
+    (assert (typecheck-almost-branchlessly (funcall ctor))))
+  (assert (typecheck-almost-branchlessly nil))
+  (assert-error (typecheck-almost-branchlessly (make-otherkid)))
+  (assert-error (typecheck-almost-branchlessly #p"zook"))
+  #+x86-64 ; assert only 3 conditional jumps needed
+  (let* ((model (get-simple-fun-instruction-model #'typecheck-almost-branchlessly))
+         (jmps (count-if (lambda (x) (string= (second x) "JMP")) model)))
+    (assert (= jmps 3))))
+
 (with-test (:name :minimal-vs-non-minimal)
   (let* ((symbols
           ;; Not sure why INTERN would randomly occur in SB-WALKER but it did,

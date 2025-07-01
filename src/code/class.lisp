@@ -347,6 +347,17 @@ between the ~A definition and the ~A definition"
                table))
   nil)
 
+;;; Recursively expand classoid-subclasses. Classoid should probably be a sealed
+;;; classoid for the answer to be meaningful, otherwise the true answer is unbounded.
+(defun classoid-all-subclassoids (classoid &aux result)
+  (labels ((add-descendants (classoid &optional layout)
+             (declare (ignore layout))
+             (unless (member classoid result)
+               (push classoid result)
+               (sb-kernel::call-with-subclassoids #'add-descendants classoid))))
+    (add-descendants classoid)
+    result))
+
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
 ;;; layout for a class in the type system, clobbering any old layout.
