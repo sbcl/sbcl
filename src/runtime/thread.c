@@ -380,6 +380,8 @@ void asan_lisp_thread_cleanup() {
     ignore_value(mutex_release(&all_threads_lock));
 }
 
+static void unregister_thread(struct thread *, init_thread_data *);
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -439,14 +441,10 @@ void create_main_lisp_thread(lispobj function) {
 #else
     funcall0(function);
 #endif
-    // If we end up returning, clean up the initial thread.
+    // If we end up returning (when used as shared library), clean up the initial thread.
 #ifdef LISP_FEATURE_SB_THREAD
-    unlink_thread(th);
-#else
-    all_threads = NULL;
+    unregister_thread(th, NULL);
 #endif
-    arch_os_thread_cleanup(th);
-    ASSIGN_CURRENT_THREAD(NULL);
 }
 
 void sb_posix_after_fork() { // for use by sb-posix:fork
@@ -542,7 +540,8 @@ unregister_thread(struct thread *th,
 #endif
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    pop_gcing_safety(&scribble->safety);
+    if (scribble)
+      pop_gcing_safety(&scribble->safety);
 #else
     /* This state change serves to "acknowledge" any stop-the-world
      * signal received while the STOP_FOR_GC signal is blocked */
