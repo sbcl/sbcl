@@ -2577,3 +2577,16 @@
 
 (with-test (:name :auto-dx-anonymous-closure-multiple-ref.stack-allocates)
   (assert-no-consing (auto-dx-anonymous-closure-multiple-ref 5)))
+
+(with-test (:name :push+dx+mv-call
+            :broken-on :sbcl)
+  (checked-compile-and-assert
+   ()
+   '(lambda (f)
+     (let (j)
+       (declare (dynamic-extent j))
+       (print (multiple-value-call #'list (funcall f)
+                (progn (push 1 j)
+                       (funcall f))))
+       (copy-list j)))
+   (((constantly t)) '(1) :test #'equal)))
