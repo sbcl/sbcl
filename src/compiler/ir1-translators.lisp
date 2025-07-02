@@ -944,10 +944,10 @@ also processed as top level forms."
 ;;; then the body is converted as usual.
 ;;;
 ;;; When one of these FUNS is declared dynamic extent, we make a
-;;; cleanup with the ENCLOSE as the MESS-UP node and introduce it into
-;;; the lexical environment to convert the body in. We force NEXT to
-;;; start a block outside of this cleanup, causing cleanup code to be
-;;; emitted when the scope is exited.
+;;; cleanup with a dynamic extent node as the mess-up and introduce it
+;;; into the lexical environment to convert the body in. We force NEXT
+;;; to start a block outside of this cleanup, causing cleanup code to
+;;; be emitted when the scope is exited.
 (defun ir1-convert-fbindings (start next result funs body)
   (let ((enclose-ctran (make-ctran)))
     (enclose start enclose-ctran funs)
