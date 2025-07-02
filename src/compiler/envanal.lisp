@@ -389,7 +389,7 @@
     (return-from find-stack-allocatable-parts))
   (flet ((recurse (subpart)
            (find-stack-allocatable-parts subpart dynamic-extent)
-           (when (lvar-dynamic-extent subpart)
+           (when (eq (lvar-dynamic-extent subpart) dynamic-extent)
              (setf (lvar-dynamic-extent lvar) dynamic-extent))))
     (do-uses (use lvar)
       (typecase use
@@ -407,7 +407,7 @@
                (recurse result-arg))
              (when (and stack-alloc-res (funcall stack-alloc-res use))
                (setf (lvar-dynamic-extent lvar) dynamic-extent))
-             (when (and (lvar-dynamic-extent lvar)
+             (when (and (eq (lvar-dynamic-extent lvar) dynamic-extent)
                         ;; Don't propagate through &REST, for sanity.
                         (not (eq (combination-fun-source-name use nil)
                                  '%listify-rest-args)))

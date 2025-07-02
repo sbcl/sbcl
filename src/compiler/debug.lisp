@@ -1098,7 +1098,12 @@
                    (write-string "}"))))
              (write-char #\space)))
           (cdynamic-extent
-           (format t "dynamic extent ~S" (dynamic-extent-values node))))
+           (format t "dynamic extent ~S" (dynamic-extent-values node))
+           (let ((info (dynamic-extent-info node)))
+             (write-string " {info: ")
+             (when info
+               (print-lvar info))
+             (write-string "}"))))
         (when (and *debug-print-types*
                    (valued-node-p node))
           (write-char #\space)

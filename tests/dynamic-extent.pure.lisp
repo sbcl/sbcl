@@ -2590,3 +2590,28 @@
                        (funcall f))))
        (copy-list j)))
    (((constantly t)) '(1) :test #'equal)))
+
+(with-test (:name :dynamic-extent-lp2113935)
+  (checked-compile-and-assert
+   (:optimize '(:debug 2))
+   '(lambda (a)
+     (let ((x (cons nil a)))
+       (declare (dynamic-extent x))
+       (print-nothing x)
+       (let* ((g
+                (cons
+                 (let ((v3
+                         (let ((q 0))
+                           (declare (special q))
+                           2)))
+                   (declare (dynamic-extent v3))
+                   v3)
+                 (progn
+                   (let ((g (lambda () x)))
+                     (declare (dynamic-extent g))
+                     (print-nothing g))
+                   0))))
+         (declare (dynamic-extent g))
+         (print-nothing g)
+         0)))
+   ((2) 0)))
