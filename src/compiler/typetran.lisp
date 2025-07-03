@@ -786,7 +786,7 @@
                                  `(and (< h ,(length array)) (eq (aref ,array h) l))
                                  `(eq (aref ,array h) l))))))
           (if (other)
-              `(or ,test (typep ,object (or ',@(mapcar #'type-specifier (other)))))
+              `(or ,test (typep ,object '(or ,@(mapcar #'type-specifier (other)))))
               test))))))
 
 ;;; Do source transformation for TYPEP of a known union type. If a
