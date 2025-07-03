@@ -214,6 +214,14 @@
   ;; for classes named by a symbol, otherwise a pseudo-random value.
   ;; Must be acceptable as an argument to SB-INT:MIX
   (clos-hash (missing-arg) :type (and fixnum unsigned-byte))
+  ;; Vtable could be used to store the per-layout implementation of the combined methods for
+  ;; any single-dispatch function. The trick is to dynamically figure out when it would make
+  ;; sense to claim a unique index into the vtable. Certainly for a function that has about half
+  ;; as many methods as there are classes e.g. #<STANDARD-GENERIC-FUNCTION CL-PROTOBUFS:CLEAR (2017)>
+  ;; when there are 4000 classes. A PCL cache (key = layout, value = method) would take up double
+  ;; the space at least, plus all the unused cells required to make the probing strategy work.
+  ;; And it wouldn't be as quick as a direct lookup.
+  (vtable)
   ;; the class that this is a layout for
   (classoid (missing-arg) :type classoid)
   ;; The value of this slot can be:
