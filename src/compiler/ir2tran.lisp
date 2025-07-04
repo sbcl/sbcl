@@ -1252,17 +1252,11 @@
   (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
-           (unboxed-return (or (let ((info (combination-fun-info node)))
-                                 (and info
-                                      (ir1-attributep (fun-info-attributes info) unboxed-return)))
-                               (unboxed-specialized-return-p
-                                (lvar-fun-name (basic-combination-fun node)))))
+           (unboxed-return (unboxed-return-p node))
            (locs (and lvar
                       (if unboxed-return
-                          (let ((state (sb-vm::make-fixed-call-args-state))
-                                (returns (fun-type-returns (info :function :type
-                                                                 (combination-fun-source-name node)))))
-                            (loop for type in (values-type-required returns)
+                          (let ((state (sb-vm::make-fixed-call-args-state)))
+                            (loop for type in (values-type-required unboxed-return)
                                   collect (sb-vm::fixed-call-arg-location type state)))
                           (loop for loc in (ir2-lvar-locs (lvar-info lvar))
                                 for i from 0
@@ -1325,11 +1319,7 @@
 ;;; Do full call when unknown values are desired.
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (let ((unboxed-return (or (let ((info (combination-fun-info node)))
-                              (and info
-                                   (ir1-attributep (fun-info-attributes info) unboxed-return)))
-                            (unboxed-specialized-return-p
-                             (lvar-fun-name (basic-combination-fun node))))))
+  (let ((unboxed-return (unboxed-return-p node)))
     (if unboxed-return
         (ir2-convert-fixed-full-call node block)
         (multiple-value-bind (fp args arg-locs nargs fixed-args-p)

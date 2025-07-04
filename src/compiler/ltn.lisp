@@ -186,11 +186,19 @@
 
 (defun unboxed-specialized-return-p (name)
   (and (typep name '(cons (eql sb-impl::specialized-xep)))
-       (let ((type (fun-type-returns (specifier-type `(function ,@(cddr name))))))
+       (let ((type (values-specifier-type (cadddr name))))
          (and (values-type-p type)
               (not (or (values-type-optional type)
                        (values-type-rest type)))
               type))))
+
+(defun unboxed-return-p (combination)
+  (let ((fun (basic-combination-fun combination)))
+    (or (let ((info (basic-combination-fun-info combination)))
+          (and info
+               (ir1-attributep (fun-info-attributes info) unboxed-return)
+               (fun-type-returns (lvar-type fun))))
+        (unboxed-specialized-return-p (lvar-fun-name fun)))))
 
 ;;; If TAIL-P is true, then we check to see whether the call can
 ;;; really be a tail call by seeing if this function's return
@@ -202,10 +210,7 @@
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
                     (lambda-tail-set (node-home-lambda call))))
-        (unboxed-return (or (let ((info (basic-combination-fun-info call)))
-                              (and info
-                                   (ir1-attributep (fun-info-attributes info) unboxed-return)))
-                            (unboxed-specialized-return-p (lvar-fun-name (basic-combination-fun call))))))
+        (unboxed-return (unboxed-return-p call)))
     (cond ((not tails))
           ((eq (return-info-kind (tail-set-info tails))
                (if unboxed-return
