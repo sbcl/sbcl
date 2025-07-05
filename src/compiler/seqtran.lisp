@@ -472,10 +472,12 @@
       ;; whether all keys are acceptable.
       (when (and (slow-findhash-allowed node) (proper-list-p items))
         (let* ((conditional (if-p (node-dest node)))
-               (expr (try-perfect-find/position-map
-                      name
-                      (if conditional ''(t)) ; returned value if present in the mapping
-                      (lvar-type item) items nil node)))
+               (expr (unless (and conditional
+                                  (or-eq-transform-p items))
+                       (try-perfect-find/position-map
+                        name
+                        (if conditional ''(t)) ; returned value if present in the mapping
+                        (lvar-type item) items nil node))))
           ;; Give the user a way to realize that the compiler didn't do what they might have
           ;; expected it to. What's particularly sad about this is that we had complete
           ;; freedom to pick any hash function to avoid collisions, so in the case of fixnums,
