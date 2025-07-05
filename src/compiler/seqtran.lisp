@@ -485,7 +485,9 @@
                      (policy node (= speed 3))
                      ;; ASSOC/RASSOC cost more than MEMBER to do 1 test
                      (> (length items) (if (eq name 'member) 10 7))) ; arbitrary
-            (compiler-style-warn "Hash collisions prevent converting ~S to O(1) search" name)
+            (compiler-notify 'perfect-hash-generator-failed
+                             :format-control "Hash collisions prevent converting ~S to O(1) search"
+                             :format-arguments (list name))
             (setq expr nil))
           (when expr
             ;; The value delivered to an IF node must be a list because MEMBER and MEMQ

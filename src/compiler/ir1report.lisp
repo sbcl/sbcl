@@ -461,6 +461,7 @@ a STYLE-WARNING (or any more serious condition)."))
    "A condition type signalled when the compiler deletes code that the user
 has written, having proved that it is unreachable."))
 (define-condition unknown-typep-note (simple-compiler-note) ())
+(define-condition perfect-hash-generator-failed (simple-compiler-note) ())
 
 (define-condition compiler-macro-application-missed-warning
     (style-warning)

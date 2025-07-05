@@ -855,14 +855,17 @@ After:
   (assert (eq (f340 0) nil)))
 
 (with-test (:name :assoc-warn-list-seek-not-optimized)
-  (assert (nth-value 1
-   (compile nil
-    '(lambda (x)
-      (declare (optimize speed))
-      (assoc x '((0 . #\f) (1 . #\b) (100 . #\a) (600 . #\w) (601 . #\h) (700 . #\z)
-                 (#xffffffff . 0) (#x1ffffffff . 1)))))))
-  (assert (nth-value 1
-   (compile nil
-    '(lambda (x)
-      (declare (optimize speed))
-      (member x '(0 1 100 600 601 700 #xffffffff #x1ffffffff foo 3 4)))))))
+  (let ((*error-output* (make-string-output-stream)) (note 0))
+    (handler-bind ((sb-c::perfect-hash-generator-failed
+                    (lambda (c) (declare (ignore c)) (incf note))))
+      (compile nil
+       '(lambda (x)
+         (declare (optimize speed))
+         (assoc x '((0 . #\f) (1 . #\b) (100 . #\a) (600 . #\w) (601 . #\h) (700 . #\z)
+                    (#xffffffff . 0) (#x1ffffffff . 1)))))
+      (assert (= note 1))
+      (compile nil
+       '(lambda (x)
+         (declare (optimize speed))
+         (member x '(0 1 100 600 601 700 #xffffffff #x1ffffffff foo 3 4))))
+      (assert (= note 2)))))
