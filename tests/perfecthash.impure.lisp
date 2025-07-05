@@ -854,7 +854,8 @@ After:
 (with-test (:name :lp-2056341)
   (assert (eq (f340 0) nil)))
 
-(with-test (:name :assoc-warn-list-seek-not-optimized)
+(with-test (:name :assoc-warn-list-seek-not-optimized
+                  :skipped-on (not :64-bit))
   (let ((*error-output* (make-string-output-stream)) (note 0))
     (handler-bind ((sb-c::perfect-hash-generator-failed
                     (lambda (c) (declare (ignore c)) (incf note))))

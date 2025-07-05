@@ -481,13 +481,13 @@
           ;; freedom to pick any hash function to avoid collisions, so in the case of fixnums,
           ;; we could have chosen something other than the low 32 bits if that worked better.
           ;; But I think this is better than feigning ignorance of a problem.
-          (when (and (eq expr :fail)
-                     (policy node (= speed 3))
-                     ;; ASSOC/RASSOC cost more than MEMBER to do 1 test
-                     (> (length items) (if (eq name 'member) 10 7))) ; arbitrary
-            (compiler-notify 'perfect-hash-generator-failed
-                             :format-control "Hash collisions prevent converting ~S to O(1) search"
-                             :format-arguments (list name))
+          (when (eq expr :fail)
+            (when (and (policy node (= speed 3))
+                       ;; ASSOC/RASSOC cost more than MEMBER to do 1 test
+                       (> (length items) (if (eq name 'member) 10 7))) ; arbitrary
+              (compiler-notify 'perfect-hash-generator-failed
+                               :format-control "Hash collisions prevent converting ~S to O(1) search"
+                               :format-arguments (list name)))
             (setq expr nil))
           (when expr
             ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
