@@ -476,6 +476,17 @@
                       name
                       (if conditional ''(t)) ; returned value if present in the mapping
                       (lvar-type item) items nil node)))
+          ;; Give the user a way to realize that the compiler didn't do what they might have
+          ;; expected it to. What's particularly sad about this is that we had complete
+          ;; freedom to pick any hash function to avoid collisions, so in the case of fixnums,
+          ;; we could have chosen something other than the low 32 bits if that worked better.
+          ;; But I think this is better than feigning ignorance of a problem.
+          (when (and (eq expr :fail)
+                     (policy node (= speed 3))
+                     ;; ASSOC/RASSOC cost more than MEMBER to do 1 test
+                     (> (length items) (if (eq name 'member) 10 7))) ; arbitrary
+            (compiler-style-warn "Hash collisions prevent converting ~S to O(1) search" name)
+            (setq expr nil))
           (when expr
             ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
             ;; are declared in fndb to return a list. If it were just the symbol T,
@@ -3244,11 +3255,14 @@
 ;;; This can optimize out one CAR or CDR operation in CDR of ASSOC or CAR of ASSOC,
 ;;; but (TODO) it can't completely optimize out CADR in (CADR (ASSOC x '((:s1 val1) ...)))
 ;;; enough though it should be equivalent to (CAR (ASSOC x '((:s1 . val1) ...))).
-(defun try-perfect-find/position-map (fun-name conditional lvar-type items from-end node)
+(defun try-perfect-find/position-map
+    (fun-name conditional lvar-type items from-end node
+     ;; alistp gets set to :SYNTHETIC if conses in the mapping are avoidable
+     &aux (alistp (if (member fun-name '(assoc rassoc)) t nil)))
   (declare (type (member find position member assoc rassoc) fun-name))
   ;; alists can contain NIL which does not represent a pair at all.
   ;; (Why is such a seemingly random stipulation even part of the language?)
-  (when (member fun-name '(assoc rassoc))
+  (when alistp
     (setf items (remove-if #'null items)))
   ;; First, verify that the key set could potentially be hashed for purposes
   ;; of this transform.
@@ -3260,16 +3274,14 @@
                           '(or symbol character fixnum)))
                  items)
       (return-from try-perfect-find/position-map))
-  (let ((alistp) ; T if an alist, :SYNTHETIC if we avoid using conses in the mapping
-        (map (make-hash-table))
+  (let ((map (make-hash-table))
         keys
         certainp)
     ;; Optimize out the CDR operation in (CDR (ASSOC ...)) respectively
     ;; the CAR in (CAR (RASSOC ...)).
     ;; CADR and SECOND would have been converted as (CAR (CDR ...)
     ;; so it works for those also.
-    (when (member fun-name '(assoc rassoc))
-      (setq alistp t)
+    (when alistp
       (let ((expect (if (eq fun-name 'assoc) '(cdr) '(car)))
             (dest (node-dest node)))
         (when (and (combination-p dest)
@@ -3317,7 +3329,11 @@
                  ;; trying to simplify the calculation at the expense of a few extra cells.
                  ;; Minimal will always be right.
                (minimal t)
-               (lambda (make-perfect-hash-lambda hashes items minimal) :exit-if-null)
+               (lambda (or (make-perfect-hash-lambda hashes items minimal)
+                           (return-from try-perfect-find/position-map
+                             ;; TRANSFORM-LIST-ITEM-SEEK is prepared to see :FAIL.
+                             ;; FIND/POSITION transforms don't understand that
+                             (if (or alistp (eq fun-name 'member)) :fail))))
                (keyspace-size (if minimal keycount pow2size))
                (domain (sb-xc:make-array keyspace-size :initial-element 0))
                (range
@@ -3413,8 +3429,7 @@
                   ;; the sequence itself to compare elements.
                   ;; There are two transforms to try in this situation:
                   ;; 1) If we can make a perfect map of N symbols, then do that. No upper bound
-                  ;;    on N. This could be enhanced to take fixnums and characters- any objects for
-                  ;;    which the hash values are computable at compile-time.
+                  ;;    on N.
                   ;; 2) Otherwise, use COND, not to exceed some length limit.
                   (when (and const-seq
                              (member effective-test '(eql eq char= char-equal))
