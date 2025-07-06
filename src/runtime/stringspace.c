@@ -16,6 +16,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
+#include "genesis/sap.h"
 #include "globals.h"
 #include "validate.h"
 #include <stdio.h>
@@ -318,6 +319,14 @@ static void undo_rospace_ptrs(lispobj* obj, uword_t arg) {
     visit_pointer_words(obj, follow_shadow_fp, arg);
 }
 
+static void nuke_fd_stream_buffer(lispobj* where, uword_t nullsap)
+{
+    if (widetag_of(where) != INSTANCE_WIDETAG) return;
+    lispobj layout = instance_layout(where);
+    if (layout && layout_depth2_id(LAYOUT(layout)) == FD_STREAM_BUFFER_LAYOUT_ID)
+        ((struct instance*)where)->slots[INSTANCE_DATA_START] = nullsap;
+}
+
 void move_rospace_to_dynamic(__attribute__((unused)) int print)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -340,11 +349,20 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
         memcpy(new, where, nwords*N_WORD_BYTES);
         *shadow_cursor = make_lispobj(new, OTHER_POINTER_LOWTAG);
     }
+    // Make a SAP pointing to null which will become the buffer sap of any fd-stream
+    // that did not become garbage in the final GC passes prior to image dump.
+    struct sap* nullsap = gc_general_alloc(unboxed_region, SAP_SIZE*N_WORD_BYTES, PAGE_TYPE_UNBOXED);
+    SET_ALLOCATED_BIT(nullsap);
+    nullsap->header = (1 << N_WIDETAG_BITS) | SAP_WIDETAG;
+    nullsap->pointer = 0;
     ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
     os_deallocate((void*)READ_ONLY_SPACE_START, READ_ONLY_SPACE_END - READ_ONLY_SPACE_START);
     walk_all_gc_spaces(undo_rospace_ptrs, (uword_t)shadow_base);
     // Set it empty
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
+    // Once more visit dynamic space clobbering file stream buffer SAPs
+    struct pair pair = {nuke_fd_stream_buffer, (uword_t)nullsap};
+    walk_generation(walk_range_wrapper, -1, (void*)&pair);
 }
 
 /* This kludge is only for the hide-packages test after it invokes move_rospace_to_dynamic().
