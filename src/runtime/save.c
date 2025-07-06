@@ -807,11 +807,11 @@ gc_and_save(char *filename, bool prepend_runtime, bool purify,
      * work. */
     collect_garbage(0);
 #endif
+    save_lisp_gc_iteration = 1;
     move_rospace_to_dynamic(0);
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc(thread);
 
-    save_lisp_gc_iteration = 1;
 #ifndef LISP_FEATURE_MARK_REGION_GC
     gencgc_alloc_start_page = next_free_page;
 #endif

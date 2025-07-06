@@ -361,8 +361,10 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
     // Set it empty
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
     // Once more visit dynamic space clobbering file stream buffer SAPs
-    struct pair pair = {nuke_fd_stream_buffer, (uword_t)nullsap};
-    walk_generation(walk_range_wrapper, -1, (void*)&pair);
+    if (save_lisp_gc_iteration == 1) {
+        struct pair pair = {nuke_fd_stream_buffer, (uword_t)nullsap};
+        walk_generation(walk_range_wrapper, -1, (void*)&pair);
+    }
 }
 
 /* This kludge is only for the hide-packages test after it invokes move_rospace_to_dynamic().
