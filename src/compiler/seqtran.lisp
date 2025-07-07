@@ -470,7 +470,9 @@
       ;; if list is not a proper list." This optimization can't do that.
       ;; TRY-mumble will figure out based on what function it is trying to transform
       ;; whether all keys are acceptable.
-      (when (and (slow-findhash-allowed node) (proper-list-p items))
+      (when (and (slow-findhash-allowed node)
+                 (proper-list-p items)
+                 (policy node (> jump-table 0)))
         (let* ((conditional (if-p (node-dest node)))
                (expr (unless (and conditional
                                   (or-eq-transform-p items))
@@ -484,9 +486,7 @@
           ;; we could have chosen something other than the low 32 bits if that worked better.
           ;; But I think this is better than feigning ignorance of a problem.
           (when (eq expr :fail)
-            (when (and (policy node (= speed 3))
-                       ;; ASSOC/RASSOC cost more than MEMBER to do 1 test
-                       (> (length items) (if (eq name 'member) 10 7))) ; arbitrary
+            (when (policy node (> jump-table 1))
               (compiler-notify 'perfect-hash-generator-failed
                                :format-control "Hash collisions prevent converting ~S to O(1) search"
                                :format-arguments (list name)))
