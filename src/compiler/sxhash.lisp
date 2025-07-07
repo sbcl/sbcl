@@ -330,26 +330,18 @@
 (setf (info :function :compiler-macro-function 'uint32-modularly)
       #'sb-c::optimize-for-calc-phash)
 
-;;; Decide what types are in OBJECTS and return {FIXNUM|SYMBOL|CHARACTER|T}.
-;;; Perhaps alternatively this could return an OR over types so the consumer
-;;; could decide to expand differently in various situations such as
-;;; (OR SYMBOL FIXNUM). Because maybe the hash function should be:
-;;;  (if (symbolp x) (f x) (ldb (byte 32 0) (get-lisp-obj-address)))
-;;; which contains exactly 1 type test, and if not symbol, there is no
-;;; hazard in extracting low bits of a random descriptor.
-;;; On the other hand, that's pretty darn near what happens anyway.
+;;; Compute a bitmask over the possible types in OBJECTS
+(defconstant mph-keys-have-symbol 1)
+(defconstant mph-keys-have-fixnum 2)
+(defconstant mph-keys-have-char   4)
+(defconstant mph-keys-have-other  8)
 (defun minperfhash-key-universe-type (objects)
   (let ((types 0))
-    (dolist (object objects (case types
-                              (#b001 'fixnum)
-                              (#b010 'symbol)
-                              (#b100 'character)
-                              (0 'nil) ; if OBJECTS is NIL
-                              (t 't)))
+    (dolist (object objects (if (/= types 0) types))
       (setq types (logior (typecase object
-                            (sb-xc:fixnum #b001)
-                            (symbol       #b010)
-                            (character    #b100)
+                            (sb-xc:fixnum mph-keys-have-fixnum)
+                            (symbol       mph-keys-have-symbol)
+                            (character    mph-keys-have-char)
                             (t (return nil)))
                           types)))))
 
@@ -362,31 +354,44 @@
 ;;; The 32-bit hash is then fed into a perfect hash expression.
 (defun prehash-expr-for-perfect-hash (obj keys)
   (let ((type (minperfhash-key-universe-type keys)))
-    (ecase type
-      ((t symbol) ; most general hasher or just symbol
-       (multiple-value-bind (guard hash)
+    (cond
+      #-64-bit ; avoid working with raw 32 bit quantities if we can
+      ((= type mph-keys-have-char)
+       `(if (characterp ,obj) (char-code (truly-the character ,obj)) 0))
+      ((logtest type mph-keys-have-symbol) ; some symbol in the keyset
+        (multiple-value-bind (guard hash)
            (if (vop-existsp :translate hash-as-if-symbol-name)
                (values `(pointerp ,obj) `(hash-as-if-symbol-name ,obj))
                ;; NON-NULL-SYMBOL-P is the less expensive test as it omits the OR
                ;; which accepts NIL along with OTHER-POINTER objects.
                (values `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,obj)
                        `(symbol-name-hash (truly-the symbol ,obj))))
-         `(if ,guard ,hash ,(if (eq type 't) `(descriptor-hash32 ,obj) 0))))
-      (character
-       `(if (characterp ,obj) (char-code (truly-the character ,obj)) 0))
-      (fixnum
-       `(if (fixnump ,obj) (ldb (byte 32 0) (truly-the fixnum ,obj)) 0)))))
+         `(if ,guard
+              ,hash
+              ;; If the only accepted inputs are symbols, then any non-symbol can
+              ;; get 0 for its hash
+              ,(if (= type mph-keys-have-symbol) 0 `(descriptor-hash32 ,obj)))))
+      (t
+       ;; LDB is a nop-op for 32-bit word size
+       `(ldb (byte 32 0) (get-lisp-obj-address ,obj))))))
+
 ;;; This is for use at compile-time, to build the array of uint32_t inputs
 ;;; to the MPH generator after choosing the manner of prehashing.
+;;; TODO: the prehash suld be rejiggered to use UNSIGNED-REG consistently, because the
+;;; symbol-name hash vop returns unsigned-reg, and since we're willing to lose bits of precison
+;;; in DESCRIPTOR-HASH32 there is really no reason to clear the fixnum tag mask.
+;;; So just take 32 bits either from the symbol, or the low 32 descriptor bits as-is.
+;;; However, to be even more flexible, then if there are hash collisions on the low 32 bits of
+;;; the descriptor, we could look for any chunk of 32 bits that works out well.
 (defun prehash-function-for-mph-generator (type)
-  (case type
-    ((t symbol) ; most general hasher or just symbol
+  (cond
+    #-64-bit ((= type mph-keys-have-char) #'char-code)
+    ((logtest type mph-keys-have-symbol)
      (lambda (x)
        (etypecase x
          (symbol (symbol-name-hash x))
          ((or sb-xc:fixnum character) (descriptor-hash32 x)))))
-    (character #'char-code)
-    (t (lambda (x) (ldb (byte 32 0) (the sb-xc:fixnum x))))))
+    (t (lambda (x) (ldb (byte 32 0) (get-lisp-obj-address x))))))
 
 ;;; The CASE macro can use this predicate to decide whether to expand in a way
 ;;; that selects a clause via a perfect hash versus the customary expansion

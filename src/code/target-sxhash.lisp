@@ -625,4 +625,6 @@
 (clear-info :function :inlining-data '%sxhash-simple-substring)
 (clear-info :function :inlining-data '%sxhash-simple-substring/truncating)
 
+;; interpreter stubs that are needed as soon as possible in warm build
+(defun get-lisp-obj-address (x) (get-lisp-obj-address x))
 (defun descriptor-hash32 (x) (descriptor-hash32 x))
