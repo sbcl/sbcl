@@ -17,7 +17,7 @@
   (defun process-data (x)
     (funcall (dispatch x) x)))
 (compile 'process-data)
-(with-test (:name :phase-typecase-array-of-values)
+(with-test (:name :phash-typecase-array-of-values)
   ;; should compile to an array index, not a jump table.
   ;; The resulting code used to be over 1KiB in size, now it's 180 bytes or so
   (assert (= (sb-kernel:code-jump-table-words (sb-kernel:fun-code-header #'process-data))
