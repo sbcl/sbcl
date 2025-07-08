@@ -242,9 +242,8 @@
 (define-vop (symbol-name-hash symbol-hash)
   (:translate symbol-name-hash hash-as-if-symbol-name)
   (:generator 1 ; ASSUMPTION: little-endian
-    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst eor res null-tn res)
-    (inst lsr res res 32)))
+    (inst ldr (32-bit-reg res) (@ symbol (- (+ (ash symbol-hash-slot 3) 4) other-pointer-lowtag)))
+    (inst eor res res (lsr null-tn 32))))
 
 (define-vop ()
   (:args (symbol :scs (descriptor-reg)))
