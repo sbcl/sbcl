@@ -987,7 +987,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;; In fact as far as I can tell, redefining a standard class doesn't require a new hash
 ;;; because the obsolete layout always gets clobbered to 0, and cache lookups always check
 ;;; for a match on both the hash and the layout.
-(defun expand-struct-typecase (keyform normal-clauses type-specs default errorp)
+(defun expand-struct-typecase (keyform normal-clauses type-specs default errorp env)
   (let* ((n (length type-specs))
          (n-base-types 0)
          (layout-lists (make-array n))
@@ -1039,6 +1039,30 @@ invoked. In that case it will store into PLACE and start over."
       ;; I don't know if these criteria are sane: Use hashing only if either all sealed,
       ;; or very large? Why is this an additional restriction beyond the above heuristics?
       (when (or all-sealed (>= n-base-types 8))
+        (when all-sealed
+          (let ((i -1) (consts (make-array (length normal-clauses))))
+            (dolist (clause normal-clauses)
+              (let ((expr `(progn ,@(cdr clause)))
+                    value)
+                ;; This could allow more constant types, but there are inevitably complications
+                ;; arising from creating arrays of constants the user didn't ask for, such as when
+                ;; the value of a form is a self-evaluating object lacking a make-load-form.
+                (cond ((and (constantp expr env)
+                            (sb-xc:typep (setq value (constant-form-value expr env))
+                                         '(or symbol number)))
+                       (setf (aref consts (incf i)) value))
+                      (t
+                       (setq consts nil)
+                       (return)))))
+            (when consts ; use an array of values
+              (return-from expand-struct-typecase
+                `(let* ((,temp ,keyform)
+                        (#1=#:index (sb-kernel::%typecase-index ,layout-lists ,temp t)))
+                   (if (eq #1# 0)
+                       ,(if errorp
+                            `(etypecase-failure ,temp ',type-specs)
+                            `(progn ,@(cdr default)))
+                       (svref ,consts (1- #1#))))))))
         `(let ((,temp ,keyform))
            (case (sb-kernel::%typecase-index ,layout-lists ,temp ,all-sealed)
              ,@(loop for i from 1 for clause in normal-clauses
@@ -1235,7 +1259,7 @@ invoked. In that case it will store into PLACE and start over."
         ;; depending on constant-ness of results.
         (cond ((eq test 'typep)
                (awhen (expand-struct-typecase keyform normal-clauses keys
-                                              default errorp)
+                                              default errorp lexenv)
                  (return-from case-body it))))))
 
     (setq clauses (nreverse clauses))
