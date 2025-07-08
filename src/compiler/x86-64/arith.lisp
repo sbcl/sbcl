@@ -4649,7 +4649,9 @@
     ;; days to produce a perfect hash function of 2 billion keys.
     (let* ((step (svref steps (1- (length steps))))
            (tn (second step)))
-      (inst lea :dword res (ea tn tn)))))
+      (if (location= res tn)
+          (inst add :dword res tn)
+          (inst lea :dword res (ea tn tn))))))
 
 (defknown zero-or-one ((unsigned-byte 32))
     (integer 0 1)
