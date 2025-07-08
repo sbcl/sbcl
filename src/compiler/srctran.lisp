@@ -7816,7 +7816,7 @@
 (defun slow-findhash-allowed (node)
   (policy node (>= speed compilation-speed)))
 
-(defun or-eq-to-aref (keys key-lists targets last-if chains otherwise)
+(defun or-eq-to-aref (keys key-lists targets last-if chains otherwise &optional direct)
   (let (constant-targets
         constant-refs
         constant-target
@@ -7845,19 +7845,58 @@
                      (push ref constant-refs))
                    (push (constant-value constant) constant-targets)))))
     (when constant-targets
-      (let ((code (and (slow-findhash-allowed last-if)
-                       (expand-hash-case-for-jump-table keys key-lists nil
-                                                   (coerce (nreverse constant-targets) 'vector)
-                                                   otherwise))))
+      (let ((code (if direct
+                      (let ((default (next-node (if-alternative last-if) :strict t)))
+                        (when (ref-p default)
+                          (let ((constant (ref-leaf default)))
+                            (when (and (constant-p constant)
+                                       (typep (constant-value constant)
+                                              '(or symbol number character (and array (not (array t))))))
+                              constant))))
+                      (and (slow-findhash-allowed last-if)
+                           (expand-hash-case-for-jump-table keys key-lists nil
+                                                            (coerce (nreverse constant-targets) 'vector)
+                                                            otherwise)))))
         (when code
           (replace-chain (reduce #'append chains)
-                         `(lambda (key b)
-                            (declare (ignore b))
-                            (to-lvar ,(node-lvar ref)
-                                     ,(or constant-target
-                                          (node-ends-block ref))
-                                     (the* (,(lvar-type (node-lvar ref)) :truly t)
-                                           ,code)))
+                         (if direct
+                             (let* ((indexes (if (characterp (first keys))
+                                                 (mapcar #'char-code keys)
+                                                 keys))
+                                    (min (reduce #'min indexes))
+                                    (max (reduce #'max indexes))
+                                    (results (make-array (1+ (- max min))
+                                                         :initial-element (constant-value code))))
+                               (loop for index in indexes
+                                     for target in constant-targets
+                                     do
+                                     (setf (aref results (- index min)) target))
+                               (decf max min)
+                               `(lambda (key b)
+                                  (declare (ignore b))
+                                  (to-lvar ,(node-lvar ref)
+                                           ,(or constant-target
+                                                (node-ends-block ref))
+                                           (the* (,(lvar-type (node-lvar ref)) :truly t)
+                                                 (let* ((index ,(if (characterp (first keys))
+                                                                    `(if-to-blocks (characterp key)
+                                                                                   (char-code (truly-the character key))
+                                                                                   ,(if-alternative last-if))
+                                                                    `(if-to-blocks (fixnump key)
+                                                                                   (truly-the fixnum key)
+                                                                                   ,(if-alternative last-if))))
+                                                        (index (- index ,min)))
+                                                   (if-to-blocks
+                                                    (<= 0 index ,max)
+                                                    (aref ,(coerce-to-smallest-eltype results) (truly-the (integer 0 ,max) index))
+                                                    ,(if-alternative last-if)))))))
+                             `(lambda (key b)
+                                (declare (ignore b))
+                                (to-lvar ,(node-lvar ref)
+                                         ,(or constant-target
+                                              (node-ends-block ref))
+                                         (the* (,(lvar-type (node-lvar ref)) :truly t)
+                                               ,code))))
                          t)
           (loop for ref in constant-refs
                 do
@@ -7891,26 +7930,28 @@
                      (not (key-lists-for-or-eq-transform-p key-lists))))
            nil)
           ((suitable-jump-table-keys-p node keys)
-           (replace-chain (reduce #'append chains)
-                          `(lambda (key b)
-                             (declare (ignore b))
-                             (jump-table ,(if (characterp (first keys))
-                                              `(if-to-blocks (characterp key)
-                                                             (char-code (truly-the character key))
-                                                             ,(if-alternative last-if))
-                                              `(if-to-blocks (fixnump key)
-                                                             (truly-the fixnum key)
-                                                             ,(if-alternative last-if)))
-                                         ,@(loop for group in key-lists
-                                                 for target in targets
-                                                 append (loop for key in group
-                                                              collect (cons (if (characterp key)
-                                                                                (char-code key)
-                                                                                key)
-                                                                            target)))
+           (or
+            (or-eq-to-aref keys key-lists targets last-if chains otherwise t)
+            (replace-chain (reduce #'append chains)
+                           `(lambda (key b)
+                              (declare (ignore b))
+                              (jump-table ,(if (characterp (first keys))
+                                               `(if-to-blocks (characterp key)
+                                                              (char-code (truly-the character key))
+                                                              ,(if-alternative last-if))
+                                               `(if-to-blocks (fixnump key)
+                                                              (truly-the fixnum key)
+                                                              ,(if-alternative last-if)))
+                                          ,@(loop for group in key-lists
+                                                  for target in targets
+                                                  append (loop for key in group
+                                                               collect (cons (if (characterp key)
+                                                                                 (char-code key)
+                                                                                 key)
+                                                                             target)))
 
-                                         (otherwise . ,otherwise)))
-                          t)
+                                          (otherwise . ,otherwise)))
+                           t))
            t)
           ((let ((diff (type-difference (lvar-type lvar)
                                         (specifier-type `(member ,@keys)))))

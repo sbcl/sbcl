@@ -468,20 +468,41 @@
   (declare (type sequence seq))
   (let ((max-positive 0)
         (max-negative 0)
-        (length 0))
-    (flet ((frob (x)
-             (typecase x
-               ((integer 0)
-                (when (>= x max-positive)
-                  (setf max-positive x)))
-               ((integer * -1)
-                (let ((abs (- x)))
-                  (when (>= abs max-negative)
-                    (setf max-negative abs))))
-               (t
-                (return-from coerce-to-smallest-eltype
-                  (logically-readonlyize
-                   (coerce seq 'simple-vector)))))))
+        (length 0)
+        (character t))
+    (labels ((t-vector ()
+               (return-from coerce-to-smallest-eltype
+                 (logically-readonlyize
+                  (coerce seq 'simple-vector))))
+             (frob (x)
+               (typecase x
+                 ((integer 0)
+                  (when character
+                    (unless (eq character t)
+                      (t-vector))
+                    (setf character nil))
+                  (when (>= x max-positive)
+                    (setf max-positive x)))
+                 ((integer * -1)
+                  (when character
+                    (unless (eq character t)
+                      (t-vector))
+                    (setf character nil))
+                  (setf character nil)
+                  (let ((abs (- x)))
+                    (when (>= abs max-negative)
+                      (setf max-negative abs))))
+                 (base-char
+                  (unless character
+                    (t-vector))
+                  (when (eq character t)
+                    (setf character 'base-char)))
+                 (character
+                  (unless character
+                    (t-vector))
+                  (setf character 'character))
+                 (t
+                  (t-vector)))))
       (if (listp seq)
           (dolist (i seq)
             (incf length)     ; so not to traverse again to compute it
@@ -493,9 +514,10 @@
           (logically-readonlyize
            (coerce seq
                    `(simple-array
-                     ,(smallest-element-type (max max-positive
-                                                  (1- max-negative))
-                                             (plusp max-negative))
+                     ,(or character
+                          (smallest-element-type (max max-positive
+                                                      (1- max-negative))
+                                                 (plusp max-negative)))
                      1)))))))
 
 (defun compact-vector (sequence)
