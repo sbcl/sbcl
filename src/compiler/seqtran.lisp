@@ -2684,7 +2684,7 @@
                                    (when (good-lvar-p lvar)
                                      (setf leaf next-leaf)))))))))
                   (loop for set in (lambda-var-sets leaf)
-                        for combination = (principal-lvar-ref-use (set-value set))
+                        for combination = (principal-lvar-ref-use (set-value set) t)
                         always (and (combination-is combination '(cdr))
                                     (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
                                       (when ref

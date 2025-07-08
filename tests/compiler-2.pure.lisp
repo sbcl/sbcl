@@ -4744,6 +4744,15 @@
            (return x)))))
    (or (integer 1 3) null))
   (assert-type
+   (lambda (x)
+     (do ((cdr '(1 2 3) (cdr cdr)))
+         ((null cdr))
+       (declare (list cdr))
+       (let ((car (car cdr)))
+         (when (eq car x)
+           (return car)))))
+   (or (integer 1 3) null))
+  (assert-type
    (lambda (j)
      (declare (optimize (debug 2)))
      (let ((x nil))

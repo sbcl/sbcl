@@ -2210,7 +2210,7 @@
 
 ;;; Try to invoke the type deriver of FUNCTION in (setf x (function x))
 (defun set-type-of-combination (var set initial-type)
-  (let ((combination (principal-lvar-ref-use (set-value set))))
+  (let ((combination (principal-lvar-ref-use (set-value set) t)))
     (when (and (combination-p combination)
                (eq (combination-kind combination) :known))
       (let* ((info (combination-fun-info combination))
