@@ -182,6 +182,7 @@
            ((-28 -41 -38 -99 -110 -81) 0)
            (t 1)))
     (() 1))
+  #-sb-unicode
   (checked-compile
    `(lambda (p1)
       (declare (type character p1))
