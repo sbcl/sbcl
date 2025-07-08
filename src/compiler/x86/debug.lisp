@@ -96,7 +96,7 @@
 (define-vop (get-lisp-obj-address)
   (:policy :fast-safe)
   (:translate sb-di::get-lisp-obj-address)
-  (:args (thing :scs (descriptor-reg control-stack) :target result))
+  (:args (thing :scs (any-reg descriptor-reg control-stack) :target result))
   (:results (result :scs (unsigned-reg)
                     :load-if (not (and (sc-is thing descriptor-reg)
                                        (sc-is result unsigned-stack)))))
