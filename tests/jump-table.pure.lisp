@@ -1,4 +1,4 @@
-(unless (gethash 'sb-c:jump-table sb-c::*backend-parsed-vops*)
+(unless (gethash 'sb-c:jump-table sb-c::*backend-template-names*)
   (invoke-restart 'run-tests::skip-file))
 
 (with-test (:name :symbol-case-as-jump-table)
@@ -113,7 +113,7 @@
     (a 'is-a)
     (b 'is-b)
     (c 'is-c)
-    ((or d e) 'is-d-or-e)
+    ((or d e) (print 'is-d-or-e))
     (f 'is-f))))
   (defun typecase-jump-table (x) (guts))
   (defun typecase-no-jump-table (x)
