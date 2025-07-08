@@ -4742,7 +4742,18 @@
        (dolist (x x)
          (when (eql x n)
            (return x)))))
-   (or (integer 1 3) null)))
+   (or (integer 1 3) null))
+  (assert-type
+   (lambda (j)
+     (declare (optimize (debug 2)))
+     (let ((x nil))
+       (labels ((f ()
+                  (pop x)))
+         (when j
+           (f)
+           (f)))
+       x))
+   null))
 
 (with-test (:name :test-headers-lowtag-only)
   (checked-compile-and-assert
