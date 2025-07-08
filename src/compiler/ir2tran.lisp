@@ -708,7 +708,10 @@
          (sparse (and (policy node (= jump-table 3))
                       int
                       (>= (interval-low int) 0)
-                      (interval-high int)))
+                      (interval-high int)
+                      (< (- (interval-high int) (interval-low int)
+                            (length targets))
+                         1000)))
          (min (cond (sparse
                      0)
                     ((and int
@@ -720,7 +723,8 @@
                      (1- min))
                     (t
                      min)))
-         (max (cond (sparse)
+         (max (cond (sparse
+                     (interval-high int))
                     ((and int
                           (eql (interval-low int) min)
                           (eql (interval-high int) (1+ max)))
