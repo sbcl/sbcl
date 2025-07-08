@@ -7845,18 +7845,19 @@
                      (push ref constant-refs))
                    (push (constant-value constant) constant-targets)))))
     (when constant-targets
-      (let ((code (if direct
-                      (let ((default (next-node (if-alternative last-if) :strict t)))
-                        (when (ref-p default)
-                          (let ((constant (ref-leaf default)))
-                            (when (and (constant-p constant)
-                                       (typep (constant-value constant)
-                                              '(or symbol number character (and array (not (array t))))))
-                              constant))))
-                      (and (slow-findhash-allowed last-if)
-                           (expand-hash-case-for-jump-table keys key-lists nil
-                                                            (coerce (nreverse constant-targets) 'vector)
-                                                            otherwise)))))
+      (let* ((constant-targets (coerce (nreverse constant-targets) 'vector))
+             (code (if direct
+                       (let ((default (next-node (if-alternative last-if) :strict t)))
+                         (when (ref-p default)
+                           (let ((constant (ref-leaf default)))
+                             (when (and (constant-p constant)
+                                        (typep (constant-value constant)
+                                               '(or symbol number character (and array (not (array t))))))
+                               constant))))
+                       (and (slow-findhash-allowed last-if)
+                            (expand-hash-case-for-jump-table keys key-lists nil
+                                                             constant-targets
+                                                             otherwise)))))
         (when code
           (replace-chain (reduce #'append chains)
                          (if direct
@@ -7867,10 +7868,15 @@
                                     (max (reduce #'max indexes))
                                     (results (make-array (1+ (- max min))
                                                          :initial-element (constant-value code))))
-                               (loop for index in indexes
-                                     for target in constant-targets
+                               (loop for keys in key-lists
+                                     for target across constant-targets
                                      do
-                                     (setf (aref results (- index min)) target))
+                                     (loop for key in keys
+                                           for index = (if (characterp key)
+                                                           (char-code key)
+                                                           key)
+                                           do
+                                           (setf (aref results (- index min)) target)))
                                (decf max min)
                                `(lambda (key b)
                                   (declare (ignore b))

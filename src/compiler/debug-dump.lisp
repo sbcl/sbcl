@@ -492,6 +492,7 @@
                   (let ((abs (- x)))
                     (when (>= abs max-negative)
                       (setf max-negative abs))))
+                 #+sb-unicode
                  (base-char
                   (unless character
                     (t-vector))
