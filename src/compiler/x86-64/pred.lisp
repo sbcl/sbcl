@@ -386,6 +386,37 @@
              instance)
          (encode-value-if-immediate x))))
 
+(define-vop (%instance-types=)
+  (:args (a :scs (descriptor-reg))
+         (b :scs (descriptor-reg)))
+  (:arg-refs args)
+  (:translate %instance-types=)
+  (:temporary (:sc unsigned-reg) temp)
+  (:conditional :e)
+  (:policy :fast-safe)
+  (:generator 1
+    (let* ((t1 (tn-ref-type args))
+           (t2 (tn-ref-type (tn-ref-across args)))
+           (check1 (not (csubtypep t1 (specifier-type 'instance))))
+           (check2 (not (csubtypep t2 (specifier-type 'instance)))))
+      ;; Since we know that at least one arg is STRUCTURE-OBJECT, then if both are INSTANCE,
+      ;; no lowtag check is required on either arg. Just read and compare layouts
+      (cond ((and check1 check2) (bug "~S on two unknowns" '%instance-types=))
+            ((or check1 check2)
+             ;; Whichever is not INSTANCE, check it. INSTANCEP has an interesting capability
+             ;; that can't be replicated, which is that if the object is known to be
+             ;; a pointer, then a bit test can reject incorrect lowtags.
+             ;; To do that, it changes the conditional flags which won't work here.
+             (inst lea :dword temp (ea (- instance-pointer-lowtag) (if check2 b a)))
+             (inst test :byte temp lowtag-mask)
+             (inst jmp :ne OUT))))
+    (multiple-value-bind (operand-size disp)
+        #+compact-instance-header (values :dword (- 4 instance-pointer-lowtag))
+        #-compact-instance-header (values :qword (- 8 instance-pointer-lowtag))
+      (inst mov operand-size temp (ea disp a))
+      (inst cmp operand-size temp (ea disp b)))
+    OUT))
+
 ;;; See comment below about ASSUMPTIONS
 (eval-when (:compile-toplevel)
   (assert (eql other-pointer-lowtag #b1111))

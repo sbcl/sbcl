@@ -4870,7 +4870,7 @@
                                        ((and y-sfp (not x-sfp))
                                         (do-float 'y 'x 'single-float-p 'single-float)))))))))))))))
 
-(deftransform eq ((x y) * *)
+(deftransform eq ((x y) * * :node node)
   "Simple equality transform"
   (let ((use (lvar-uses x))
         arg)
@@ -4892,6 +4892,16 @@
             (typep (lvar-value arg) '(unsigned-byte 16)))
        (splice-fun-args x '%instance-ref 2)
        `(lambda (obj i val) (%instance-ref-eq obj i val)))
+      ((can-optimize-eq-types-of node x y)
+       (splice-fun-args x :any 1)
+       (splice-fun-args y :any 1)
+       (if (vop-existsp :translate %instance-types=)
+           '(lambda (a b) (%instance-types= a b))
+           '(lambda (a b)
+             ;; One or both %INSTANCEP tests might drop out, this is just easiest
+             (and (%instancep a)
+                  (%instancep b)
+                  (eq (%instance-layout a) (%instance-layout b))))))
       ((transform-eq-on-words 'eq x y))
       (t (give-up-ir1-transform)))))
 

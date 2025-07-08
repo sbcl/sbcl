@@ -2013,7 +2013,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SYMBOL-TLS-INDEX"
            "SYMBOLS-DESIGNATOR"
            "%INSTANCE-LENGTH"
-           "%INSTANCE-REF" "%INSTANCE-REF-EQ"
+           "%INSTANCE-REF" "%INSTANCE-REF-EQ" "%INSTANCE-TYPES="
            "%INSTANCE-SET"
            "TESTABLE-TYPE-P"
            "TLS-EXHAUSTED-ERROR"

@@ -236,6 +236,10 @@
   (flushable always-translatable))
 (defknown (%instance-ref-eq) (instance index t) boolean
   (flushable always-translatable))
+;; This predicates sounds as though the argument restriction would be INSTANCE,
+;; but it's lenient because it can perform a lowtag test on one (but not both) args.
+(defknown (%instance-types=) (t t) boolean
+  (flushable always-translatable))
 (defknown %instance-set (instance index t) (values) (always-translatable))
 (defknown update-object-layout (t) layout)
 

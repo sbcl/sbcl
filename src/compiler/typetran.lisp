@@ -1957,3 +1957,47 @@
 
 (deftransform sequencep ((x) ((not extended-sequence)))
   `(typep x '(or list vector)))
+
+;;; See if we can strength-reduce (EQ (TYPE-OF A) (TYPE-OF B)) on structure-objects.
+;;; This transform is not valid if the objects could be STANDARD-OBJECT because
+;;; an obsolete instance should invoke the obsolete trap.
+(defun can-optimize-eq-types-of (node x y)
+  (let ((require (specifier-type 'structure-object))
+        (x-use (lvar-uses x))
+        (y-use (lvar-uses y))
+        (x-fun)
+        (y-fun))
+    (unless (and (combination-p x-use) (combination-p y-use))
+      (return-from can-optimize-eq-types-of nil))
+    (setq x-fun (combination-fun x-use)
+          y-fun (combination-fun y-use))
+    (unless (and (or (and (lvar-fun-is x-fun '(class-of)) (lvar-fun-is y-fun '(class-of)))
+                     (and (lvar-fun-is x-fun '(type-of)) (lvar-fun-is y-fun '(type-of))))
+                 ;; At least 1 arg has to be the required type. Ideally both are
+                 (or (csubtypep (lvar-type (first (combination-args x-use))) require)
+                     (csubtypep (lvar-type (first (combination-args y-use))) require))
+                 ;; X is not immediately used, because a call to TYPE-OF on Y intercedes
+                 ;; between TYPE-OF X and calling EQ, and it's not an "uninteresting node"
+                 ;; so after some more tests, we check if X,X-USE is acceptable.
+                 (almost-immediately-used-p y y-use))
+      (return-from can-optimize-eq-types-of nil))
+    ;;
+    ;; look for the following shape of IR
+    ;; + combination +    +--- Ref ---+    +- Ref -+    + combination +    + combination -+
+    ;; |             |    |           |    |       |    |             |    |              |
+    ;; |             | -> | #'type-of | -> |   ?   | -> |  lv2,lv3    | -> |  lv?,lv1,lv4 |
+    ;  | (type-of )  |    |           |    |       |    |  (type-of ) |    |  (eq ...)    |
+    ;; +-------------+    +-----------+    +-------+    +-------------+    +--------------+
+    ;;   \                  \               \             \
+    ;;    -> lv1=X           -> lv2          -> lv3        -> lv4=Y
+    ;;
+    ;; This could probably be slightly more relaxed but it's cautiously correct
+    (flet ((successor (node) (ctran-next (node-next node))))
+      (let ((next (successor x-use)) next2 next3)
+        (unless (and (eq (lvar-uses (combination-fun y-use)) next)
+                     (eq (lvar-uses (first (combination-args y-use)))
+                         (setq next2 (successor next)))
+                     (eq y-use (setq next3 (successor next2)))
+                     (eq node (successor next3)))
+          (return-from can-optimize-eq-types-of nil))))
+    t))
