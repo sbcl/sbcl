@@ -2757,7 +2757,7 @@
             "sequence type not known at compile time")))))
 
 ;;; %FIND-POSITION-IF and %FIND-POSITION-IF-NOT for LIST data
-(defun %find/position-if-list-expansion (sense from-end start end node)
+(defun %find/position-if-list-expansion (sense sequence from-end start end node)
   (declare (ignore from-end))
   ;; Circularity detection slows things down. It is permissible not to.
   ;; In fact, FIND is given as an archetypal example of a function that
@@ -2773,7 +2773,11 @@
                     (constant-lvar-p start)
                     (eql (lvar-value start) 0)
                     (lvar-value-is end nil))))
-        (check-bounds-p (policy node (plusp insert-array-bounds-checks))))
+        (check-bounds-p (policy node (plusp insert-array-bounds-checks)))
+        (length-type (multiple-value-bind (min max) (sequence-lvar-dimensions sequence)
+                       (if (eql min max)
+                           `(mod ,min)
+                           `(mod ,(1- array-dimension-limit))))))
     `(let ((find nil)
            (position nil))
        (flet (,@(and check-bounds-p
@@ -2792,11 +2796,11 @@
                                   (and end (> end index)))
                               (bounds-error))
                             '(progn))
-                      (return (values find (truly-the (or (mod #.(1- array-dimension-limit)) null)
+                      (return (values find (truly-the (or ,length-type null)
                                                       position)))))
                     ,@(when indexed
-                        '(((and end (>= index end))
-                           (return (values find (truly-the (or (mod #.(1- array-dimension-limit)) null)
+                        `(((and end (>= index end))
+                           (return (values find (truly-the (or ,length-type null)
                                                            position))))))
                     ,@(when safe
                         '(((eq slow fast)
@@ -2826,7 +2830,7 @@
                                 position ,(and indexed 'index))
                           (return (values element
                                           ,(and indexed
-                                                '(truly-the (mod #.(1- array-dimension-limit)) index)))))))))))))
+                                                `(truly-the ,length-type index)))))))))))))
 
 (macrolet ((def (name condition)
              `(deftransform ,name ((predicate sequence from-end start end key)
@@ -2835,7 +2839,7 @@
                                    :node node
                                    :policy (> speed space))
                 "expand inline"
-                (%find/position-if-list-expansion ',condition
+                (%find/position-if-list-expansion ',condition sequence
                                                   from-end start end node))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
