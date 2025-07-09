@@ -2001,3 +2001,11 @@
                      (eq node (successor next3)))
           (return-from can-optimize-eq-types-of nil))))
     t))
+
+(deftransform type-of ((object) (structure-object) * :node node :important nil)
+  (delay-ir1-transform node :ir1-phases)
+  `(classoid-name (layout-classoid (%instance-layout object))))
+
+(deftransform class-of ((object) (structure-object) * :node node :important nil)
+  (delay-ir1-transform node :ir1-phases)
+  `(classoid-pcl-class (layout-classoid (%instance-layout object))))

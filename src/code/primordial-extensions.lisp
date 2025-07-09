@@ -176,7 +176,7 @@
   ;; Perhaps it's possible for *PACKAGE* to be set to a non-package in some
   ;; host Lisp, but in SBCL it isn't, and the PACKAGEP test below would be
   ;; elided unless forced to be NOTINLINE.
-  (declare (notinline packagep))
+  (declare (notinline packagep type-of))
   (let* ((maybe-package *package*)
          (packagep (packagep maybe-package)))
     ;; And if we don't also always check for deleted packages - as was true

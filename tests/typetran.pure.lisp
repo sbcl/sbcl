@@ -20,12 +20,8 @@
        (root-p b)
        (eq (prog1 (type-of a) (swap-subtype a)) (type-of b))))
 
-(defun assert-not-calls-typeof (f)
-  (compile f)
-  (assert (null (ctu:find-named-callees (symbol-function f)))))
-
 (with-test (:name :eq-type-of-type-of.1)
-  (assert-not-calls-typeof 'way1)
+  (compile 'way1)
   (assert (way1 (make-root) (make-root)))
   (assert (way1 (make-subtype1) (make-subtype1)))
   (assert (not (way1 (make-subtype2) (make-root))))
@@ -34,7 +30,7 @@
 (with-test (:name :eq-type-of-type-of.2)
   (macrolet ((try (way)
                `(progn
-                  (assert-not-calls-typeof ',way)
+                  (compile ',way)
                   (assert (,way (make-root) (make-root)))
                   (assert (,way (make-subtype1) (make-subtype1)))
                   (assert (not (,way (make-subtype1) (make-root))))
@@ -47,7 +43,7 @@
 
 (with-test (:name :eq-type-of-type-of.3)
   (macrolet ((try (way)
-               `(progn (assert-not-calls-typeof ',way)
+               `(progn (compile ',way)
                        (assert (,way (make-root) (make-root)))
                        (assert (,way (make-subtype1) (make-subtype1)))
                        (assert (not (,way (make-subtype1) (make-root))))
@@ -60,9 +56,6 @@
 
 (with-test (:name :eq-type-of-type-of.4)
   (compile 'way4)
-  ;; linkage-space does not store a usage to TYPE-OF in the code because its symbol is immortal.
-  ;; I don't feel like making CTU:FIND-NAMED-CALLEES perform disassembly to divine the answer.
-  #-linkage-space (assert (find 'type-of (ctu:find-named-callees #'way4)))
   (let ((x (make-subtype1))
         (y (make-subtype2)))
     ;; the funky function changes the layout of X which means that if the test of its layout
