@@ -2962,30 +2962,35 @@
          ;; from IMMEDIATE-CONSTANT-SC. This is only an issue for vops which don't
          ;; take a codegen info for the constant.
          ;; IMMEDIATE is always allowed and pertains to fixnum-sized constants.
-         (int :scs (constant signed-reg signed-stack unsigned-reg unsigned-stack)
-              :load-if nil))
+         (int :scs (constant immediate signed-reg signed-stack unsigned-reg unsigned-stack)))
   (:arg-refs bit-ref)
   (:arg-types untagged-num untagged-num)
-  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if (csubtypep (tn-ref-type bit-ref) (specifier-type '(mod 64))))
+              temp)
   (:generator 4
-    (when (sc-is int constant immediate) (setq int (tn-value int)))
+    (when (sc-is int constant immediate)
+      (setq int (tn-value int)))
     ;; Force INT to be a RIP-relative operand if it is a constant.
     (let ((word (if (integerp int) (ref-shared-qword-literal int) int)))
-      (unless (csubtypep (tn-ref-type bit-ref) (specifier-type '(integer 0 63)))
-        (cond ((if (integerp int)
-                   (typep int 'signed-word)
-                   (sc-is word signed-reg signed-stack))
-               (inst mov temp 63)
-               (inst cmp bit temp)
+      (cond ((eq (tn-kind temp) :unused)) ;; already (mod 64)
+            ((if (integerp int)
+                 (typep int 'signed-word)
+                 (sc-is word signed-reg signed-stack))
+             (inst mov temp 63)
+             (inst cmp bit temp)
 
-               (inst cmov :na temp bit)
-               (setf bit temp))
-              (t
-               (zeroize temp)
-               (inst cmp bit 63)
-               (inst cmov :na temp word)
-               (setf word temp))))
-      (inst bt word bit))))
+             (inst cmov :na temp bit)
+             (setf bit temp))
+            (t
+             (zeroize temp)
+             (inst cmp bit 63)
+             (inst cmov :na temp word)
+             (setf word temp)))
+      (inst bt (if (csubtypep (tn-ref-type bit-ref) (specifier-type '(mod 32)))
+                   :dword
+                   :qword)
+            word bit))))
 
 (define-vop (logbitp/c fast-safe-arith-op)
   (:translate logbitp)
