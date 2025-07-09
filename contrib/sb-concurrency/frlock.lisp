@@ -126,6 +126,8 @@ Example:
                b y
                c (+ x y)))))
 "
+  .
+  #-new-frlock (
   (mutex (make-mutex :name "FRLock mutex") :type mutex :read-only t)
   ;; Using FIXNUM counters makes sure we don't need to cons a bignum
   ;; for the return value, ever.
@@ -135,6 +137,12 @@ Example:
   ;; an epoch marker to keep track of that.
   (epoch (list t) :type cons)
   (name nil))
+
+  #+new-frlock (
+  (mutex (make-mutex :name "FRLock mutex") :type mutex :read-only t)
+  (counter 0 :type sb-vm:word)
+  (name nil)))
+
 (declaim (sb-ext:freeze-type frlock))
 
 (setf (documentation 'frlock-name 'function)
@@ -145,6 +153,41 @@ Example:
   "Returns a new FRLOCK with NAME."
   (%make-frlock name))
 
+#+new-frlock
+(progn
+(defmacro frlock-write ((frlock) &body body)
+  "Executes BODY while holding FRLOCK for writing."
+  (let ((the-frlock (make-symbol "FRLOCK")))
+    `(let ((,the-frlock (the frlock ,frlock)))
+       (with-system-mutex ((frlock-mutex ,the-frlock))
+         (atomic-incf (frlock-counter ,the-frlock))
+         (sb-thread:barrier (:write))
+         ,@body
+         (sb-thread:barrier (:write))
+         (atomic-incf (frlock-counter ,the-frlock)))
+       (values))))
+(defmacro frlock-read ((frlock) &body value-forms)
+  "Evaluates VALUE-FORMS under FRLOCK until a consistent state
+is observed, and return the results as multiple values."
+  (let ((syms (make-gensym-list (length value-forms)))
+        (the-frlock (make-symbol "FRLOCK"))
+        (stamp (make-symbol "STAMP")))
+    `(let ((,the-frlock (the frlock ,frlock)))
+       (loop
+        (let ((,stamp (frlock-counter ,the-frlock)))
+          ;; Evaluate results only if state is potentially consistent,
+          ;; i.e. not in the middle of a write. A write may subsequently
+          ;; start, but that is detected after evaluating the forms.
+          (unless (logtest ,stamp 1)
+            (barrier (:read))
+            (let ,(mapcar 'list syms value-forms)
+              (barrier (:compiler)) ; probably effectless?
+              (barrier (:read))
+              (when (= (frlock-counter ,the-frlock) ,stamp)
+                (return (values ,@syms)))))))))))
+
+#-new-frlock
+(progn
 (declaim (inline frlock-read-begin))
 (defun frlock-read-begin (frlock)
   "Start a read sequence on FRLOCK. Returns a read-token and an epoch to be
@@ -252,3 +295,4 @@ instead is recommended."
                   (with-local-interrupts ,@body))
              (when ,got-it
                (release-frlock-write-lock ,frlock))))))))
+) ; end PROGN
