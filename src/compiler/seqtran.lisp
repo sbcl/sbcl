@@ -89,7 +89,8 @@
                                 (cdr (last ,last)) result)))))))
              (:list
               (let ((temp (gensym))
-                    (map-result (gensym)))
+                    (map-result (gensym))
+                    (zeroed (sb-vm::target-heap-prezeroed-p)))
                 `(let ((,map-result
                         ;; MUFFLE- is not injected when cross-compiling.
                         ;; See top of file for explanation.
@@ -101,7 +102,8 @@
                             (no-debug ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest
-                      (%rplacd ,temp nil) ;; replace the 0
+                      ,@(when zeroed
+                          `((%rplacd ,temp nil))) ;; replace the 0
                       (truly-the list (cdr ,map-result)))
                      (declare (no-debug ,temp))
 
@@ -110,7 +112,7 @@
                      ;; This is for effect, not value, so makes no difference.
                      (%rplacd ,temp (setq ,temp
                                           ;; 0 is not written to the heap
-                                          (cons ,call 0)))))))
+                                          (cons ,call ,(if zeroed 0 nil))))))))
              ((nil)
               `(let ((,n-first ,(first arglists)))
                  (do-anonymous ,(do-clauses)
