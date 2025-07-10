@@ -2760,6 +2760,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                                     :input t :output t :buffering :line
                                     :external-format (stdstream-external-format tty)
                                     :serve-events t
+                                    :dual-channel-p t
                                     :auto-close t)
                 (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))
