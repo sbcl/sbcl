@@ -2659,7 +2659,8 @@
 
 ;;; Find a possible CAR type a variable bound to a constant list with
 ;;; all sets in the form of (setf x (cdr x))
-(defun cons-var-car-type (lvar)
+
+(defun cons-var-type (lvar)
   (let ((ref (principal-lvar-use lvar))
         constant-lvar
         value)
@@ -2689,10 +2690,24 @@
                                     (let ((ref (principal-lvar-ref (car (combination-args combination)) t)))
                                       (when ref
                                         (eq (ref-leaf ref) leaf))))))))
-      (let ((type (sequence-elements-type constant-lvar)))
-        (if (cdr (last value))
-            type
-            (type-union type (specifier-type 'null)))))))
+      (values constant-lvar value))))
+
+(defun cons-var-car-type (lvar)
+  (multiple-value-bind (constant-lvar value) (cons-var-type lvar)
+    (when constant-lvar
+      (if value
+          (let ((type (sequence-elements-type constant-lvar)))
+            (if (or (cdr (last value))
+                    (csubtypep (lvar-type lvar) (specifier-type 'cons)))
+                type
+                (type-union type (specifier-type 'null))))
+          (specifier-type 'null)))))
+
+(defun cons-var-cdr-type (lvar)
+  (multiple-value-bind (constant-lvar value) (cons-var-type lvar)
+    (when (and constant-lvar
+               (null value))
+      (specifier-type 'null))))
 
 (defoptimizer (car derive-type) ((cons))
   ;; This and CDR needs to use LVAR-CONSERVATIVE-TYPE because type inference
@@ -2717,23 +2732,24 @@
                      finally (return (sb-kernel::%type-union cars))))))))
 
 (defoptimizer (cdr derive-type) ((cons))
-  (let ((type (lvar-conservative-type cons))
-        (null-type (specifier-type 'null)))
-    (cond ((eq type null-type)
-           null-type)
-          ((cons-type-p type)
-           (cons-type-cdr-type type))
-          ((union-type-p type)
-           (loop with cdrs
-                 for type in (union-type-types type)
-                 do (cond
-                      ((eq type null-type)
-                       (push type cdrs))
-                      ((cons-type-p type)
-                       (push (cons-type-cdr-type type) cdrs))
-                      (t
-                       (return)))
-                 finally (return (sb-kernel::%type-union cdrs)))))))
+  (or (cons-var-cdr-type cons)
+      (let ((type (lvar-conservative-type cons))
+            (null-type (specifier-type 'null)))
+        (cond ((eq type null-type)
+               null-type)
+              ((cons-type-p type)
+               (cons-type-cdr-type type))
+              ((union-type-p type)
+               (loop with cdrs
+                     for type in (union-type-types type)
+                     do (cond
+                          ((eq type null-type)
+                           (push type cdrs))
+                          ((cons-type-p type)
+                           (push (cons-type-cdr-type type) cdrs))
+                          (t
+                           (return)))
+                     finally (return (sb-kernel::%type-union cdrs))))))))
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 

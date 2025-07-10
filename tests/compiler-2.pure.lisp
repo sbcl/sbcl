@@ -4715,13 +4715,13 @@
    (lambda ()
      (let ((x '(1 2 3)))
        (values (pop x) (pop x))))
-   (values (or null (integer 1 3)) (or null (integer 1 3)) &optional))
+   (values (integer 1 3) (or null (integer 1 3)) &optional))
   (assert-type
    (lambda ()
      (declare (optimize speed (debug 1)))
      (destructuring-bind (a b) '(1 2)
        (values a b)))
-   (values (or null (integer 1 2)) (or null (integer 1 2)) &optional))
+   (values (integer 1 2) (or null (integer 1 2)) &optional))
   (assert-type
    (lambda (n)
      (loop for x in '(a b c)
@@ -4762,7 +4762,19 @@
            (f)
            (f)))
        x))
-   null))
+   null)
+  (assert-type
+   (lambda (j)
+     (block nil
+       (map nil (lambda (x) (when j (return x))) '(1 2 3))
+       0))
+   (integer 0 3))
+  (assert-type
+   (lambda (j)
+     (block nil
+       (map nil (lambda (x) (when j (return (+ x 1)))) nil)
+       0))
+   (eql 0)))
 
 (with-test (:name :test-headers-lowtag-only)
   (checked-compile-and-assert
