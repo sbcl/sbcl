@@ -37,6 +37,9 @@
                           *datatypes*)))
              data)))
 
+(unless (gethash 'sb-c:jump-table sb-c::*backend-template-names*)
+  (invoke-restart 'run-tests::skip-file))
+
 (with-test (:name :phash-typecase-array-of-symbols)
   ;; should compile to an array index, not a jump table.
   ;; The resulting code used to be over 1KiB in size, now it's 180 bytes or so
