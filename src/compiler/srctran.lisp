@@ -8188,12 +8188,12 @@
             when (ref-p use)
             do (let ((leaf (ref-leaf use)))
                  (when (and (constant-p leaf)
+                            (symbolp (constant-value leaf))
                             (or (internal-name-p (constant-value leaf))
                                 (almost-immediately-used-p fun use)))
                    (let ((name (constant-value leaf)))
                      (record-late-xref :calls name use)
-                     (change-ref-leaf use (find-global-fun name t) :recklessly t)))))))
-  nil)
+                     (change-ref-leaf use (find-global-fun name t) :recklessly t))))))))
 
 (defoptimizer (open derive-type) ((filename
                                    &key
