@@ -1042,15 +1042,17 @@ invoked. In that case it will store into PLACE and start over."
         (when all-sealed
           (let ((i -1) (consts (make-array (length normal-clauses))))
             (dolist (clause normal-clauses)
-              (let ((expr `(progn ,@(cdr clause)))
-                    value)
-                ;; This could allow more constant types, but there are inevitably complications
-                ;; arising from creating arrays of constants the user didn't ask for, such as when
-                ;; the value of a form is a self-evaluating object lacking a make-load-form.
+              (let ((expr `(progn ,@(cdr clause))))
+                ;; If compiling to file, the constants allowed are restricted because
+                ;; there are inevitably complications arising from creating arrays of
+                ;; constants the user didn't ask for, such as when the value of a form
+                ;; is a self-evaluating object lacking a make-load-form.
                 (cond ((and (constantp expr env)
-                            (sb-xc:typep (setq value (constant-form-value expr env))
-                                         '(or symbol number)))
-                       (setf (aref consts (incf i)) value))
+                            (let ((val (setf (aref consts (incf i))
+                                             (constant-form-value expr env))))
+                              (if (sb-c::producing-fasl-file)
+                                  (sb-xc:typep val '(or symbol number))
+                                  t))))
                       (t
                        (setq consts nil)
                        (return)))))
