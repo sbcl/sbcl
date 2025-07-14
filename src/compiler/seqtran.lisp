@@ -3188,28 +3188,34 @@
                                      from-end start end key test)))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
-                              (t string t t t function function)
+                              (t (or null string) t t t function function)
                               *
                               :policy (> speed space))
-  (if (eq '* (upgraded-element-type-specifier sequence))
-      `(with-array-data ((sequence sequence :offset-var offset)
-                         (start start)
-                         (end end)
-                         :check-fill-pointer t)
-         (sb-impl::string-dispatch ((simple-array character (*))
-                                    (simple-array base-char (*)))
-                                   sequence
-           (multiple-value-bind (result position)
-               (locally (declare (optimize (insert-array-bounds-checks 0)))
-                 (%find-position item sequence from-end start end key test))
-             (if position
-                 (values result (truly-the index (- position offset)))
-                 (values nil nil)))))
-      ;; The type is known exactly, other transforms will take care of it.
-      (give-up-ir1-transform)))
+  (when (eq (lvar-type sequence) (specifier-type 'null))
+    (give-up-ir1-transform))
+  (let ((null-p (types-equal-or-intersect (lvar-type sequence)
+                                          (specifier-type 'null))))
+    (if (eq '* (upgraded-element-type-specifier sequence))
+        (wrap-if null-p
+                 '(if (not sequence) (values nil nil))
+                 `(with-array-data ((sequence sequence :offset-var offset)
+                                    (start start)
+                                    (end end)
+                                    :check-fill-pointer t)
+                    (sb-impl::string-dispatch ((simple-array character (*))
+                                               (simple-array base-char (*)))
+                                              sequence
+                      (multiple-value-bind (result position)
+                          (locally (declare (optimize (insert-array-bounds-checks 0)))
+                            (%find-position item sequence from-end start end key test))
+                        (if position
+                            (values result (truly-the index (- position offset)))
+                            (values nil nil))))))
+        ;; The type is known exactly, other transforms will take care of it.
+        (give-up-ir1-transform))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
-                              (t bit-vector t t t t t)
+                              (t (or null bit-vector) t t t t t)
                               * :node node)
   (when (and test (lvar-fun-is test '(eq eql equal)))
     (setf test nil))
@@ -3217,28 +3223,34 @@
     (setf key nil))
   (when (or test key)
     (give-up-ir1-transform "non-trivial :KEY or :TEST"))
-  (block not-a-bit
-    `(with-array-data ((bits sequence :offset-var offset)
-                       (start start)
-                       (end end)
-                       :check-fill-pointer t)
-       (let ((p ,(let* ((dir (cond ((not (constant-lvar-p from-end)) 0) ; unknown
-                                   ((lvar-value from-end) 2) ; reverse
-                                   (t 1))) ; forward
-                        (from-end-arg (if (eql dir 0) '(from-end) '())))
-                   (if (constant-lvar-p item)
-                       (case (lvar-value item)
-                         (0 `(,(elt #(%bit-position/0 %bit-pos-fwd/0 %bit-pos-rev/0) dir)
-                              bits ,@from-end-arg start end))
-                         (1 `(,(elt #(%bit-position/1 %bit-pos-fwd/1 %bit-pos-rev/1) dir)
-                              bits ,@from-end-arg start end))
-                         (otherwise (return-from not-a-bit `(values nil nil))))
-                       `(,(elt #(%bit-position %bit-pos-fwd %bit-pos-rev) dir)
-                         item bits ,@from-end-arg start end)))))
-         (truly-the ,(node-derived-type node)
-                    (if p
-                        (values item (the index (- (truly-the index p) offset)))
-                        (values nil nil)))))))
+  (when (eq (lvar-type sequence) (specifier-type 'null))
+    (give-up-ir1-transform))
+  (let ((null-p (types-equal-or-intersect (lvar-type sequence)
+                                          (specifier-type 'null))))
+    (block not-a-bit
+      (wrap-if null-p
+               '(if (not sequence) (values nil nil))
+               `(with-array-data ((bits sequence :offset-var offset)
+                                  (start start)
+                                  (end end)
+                                  :check-fill-pointer t)
+                  (let ((p ,(let* ((dir (cond ((not (constant-lvar-p from-end)) 0) ; unknown
+                                              ((lvar-value from-end) 2) ; reverse
+                                              (t 1))) ; forward
+                                   (from-end-arg (if (eql dir 0) '(from-end) '())))
+                              (if (constant-lvar-p item)
+                                  (case (lvar-value item)
+                                    (0 `(,(elt #(%bit-position/0 %bit-pos-fwd/0 %bit-pos-rev/0) dir)
+                                         bits ,@from-end-arg start end))
+                                    (1 `(,(elt #(%bit-position/1 %bit-pos-fwd/1 %bit-pos-rev/1) dir)
+                                         bits ,@from-end-arg start end))
+                                    (otherwise (return-from not-a-bit `(values nil nil))))
+                                  `(,(elt #(%bit-position %bit-pos-fwd %bit-pos-rev) dir)
+                                    item bits ,@from-end-arg start end)))))
+                    (truly-the ,(node-derived-type node)
+                               (if p
+                                   (values item (the index (- (truly-the index p) offset)))
+                                   (values nil nil)))))))))
 
 ;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
 ;;; POSITION-IF, etc.
