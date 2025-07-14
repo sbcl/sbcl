@@ -1098,7 +1098,8 @@ invoked. In that case it will store into PLACE and start over."
 ;;; and gets the compiled code that the host produced in make-host-1.
 ;;; If recompiled, you do not want an interpreted definition that might come
 ;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
-(defun case-body (whole lexenv test errorp
+(defun parse-case-clauses
+    (whole lexenv test errorp
                   &aux (clauses ())
                        (case-clauses (if (eq test 'typep) '(0))) ; generalized boolean
                        (keys))
@@ -1210,44 +1211,58 @@ invoked. In that case it will store into PLACE and start over."
     (when (eq errorp :none)
       (setq errorp nil))
 
+    ;; For a TYPECASE, attempt to inform the user if a later clause is shadowed by
+    ;; an earlier one, unless converting to CASE which will warn about it as well.
+    ;; However, this seems not to do exactly what it attempts to.
+    ;; single-float followed by short-float avoids warning, but the opposite order warns.
+    ;; Same for double then long does not warn; flipped warns.
+    (when (and (eq test 'typep) (not case-clauses))
+      (loop with types = nil
+            for clause in specified-clauses
+            do
+        (with-current-source-form (clause)
+          (let* ((key (car clause))
+                 (type (unless (eq key 'otherwise) (specifier-type key))))
+            (when (and type (neq type *empty-type*))
+              (let ((existing
+                     (loop for (prev . spec) in types
+                           when
+                           (and (csubtypep type prev)
+                                (not (or (and (eq prev (specifier-type 'single-float))
+                                              (eq key 'short-float))
+                                         #-long-float
+                                         (and (eq prev (specifier-type 'double-float))
+                                              (eq key 'long-float))
+                                         (and (csubtypep type (specifier-type 'array))
+                                              ;; Ignore due to upgrading
+                                              (sb-kernel::ctype-array-any-specialization-p prev)))))
+                           return spec)))
+                (if existing
+                    (style-warn "Clause ~s is shadowed by ~s" key existing)
+                    (push (cons type key) types))))))))
+    (list* keyform-value keys errorp
+           (if case-clauses
+               (list t (append (cdr (reverse case-clauses)) ; 1st elt was a boolean flag
+                               (when (eq (caar clauses) t) (list (car clauses)))))
+               (list nil clauses)))))
+
+(defun case-body (whole lexenv test errorp)
+  (destructuring-bind (keyform-value keys errorp expand-as-case clauses
+                              &aux (name (car whole))
+                                   (keyform (cadr whole)))
+      (parse-case-clauses whole lexenv test errorp)
     ;; [EC]CASE has an advantage over [EC]TYPECASE in that we readily notice when
     ;; the expansion can use symbol-hash to pick the clause.
-    (when case-clauses
+    (when expand-as-case
       (return-from case-body
         `(,(cond ((not errorp) 'case) ((eq name 'ctypecase) 'ccase) (t 'ecase))
-           ,keyform
-          ,@(cdr (reverse case-clauses)) ; 1st elt was a boolean flag
-          ,@(when (eq (caar clauses) t) (list (car clauses))))))
+          ,keyform ,@clauses)))
 
     (setq keys
           (nreverse (mapcon (lambda (tail)
                               (unless (member (car tail) (cdr tail))
                                 (list (car tail))))
                             keys)))
-    (when (eq test 'typep)
-      (let (types)
-        (loop for key in keys
-              for clause in specified-clauses
-              do
-              (with-current-source-form (clause)
-                (let ((type (specifier-type key)))
-                  (when (and type
-                             (neq type *empty-type*))
-                    (let ((existing (loop for (prev . spec) in types
-                                          when (and (csubtypep type prev)
-                                                    (not (or (and (eq prev (specifier-type 'single-float))
-                                                                  (eq key 'short-float))
-                                                             #-long-float
-                                                             (and (eq prev (specifier-type 'double-float))
-                                                                  (eq key 'long-float))
-                                                             (and (csubtypep type (specifier-type 'array))
-                                                                  ;; Ignore due to upgrading
-                                                                  (sb-kernel::ctype-array-any-specialization-p prev)))))
-                                          return spec)))
-                      (if existing
-                          (style-warn "Clause ~s is shadowed by ~s"
-                                      key existing)
-                          (push (cons type key) types)))))))))
     ;; Try hash-based dispatch only if expanding for the compiler
     (when (and (neq errorp 'cerror)
                (sb-c::compiling-p lexenv)
