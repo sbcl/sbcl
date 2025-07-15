@@ -41,7 +41,7 @@
         ;; check for EQL types and singleton numeric types
         (values (type-singleton-p type)))))
 
-(defun lvar-constant (lvar)
+(defun lvar-constant (lvar &optional ignore-types)
   (declare (type lvar lvar))
   (let ((type (lvar-type lvar)))
     (labels ((process-lvar (lvar)
@@ -52,6 +52,7 @@
                    (when (ref-p principal-use)
                      (if (constant-p (setf leaf (ref-leaf principal-use)))
                          (when (or (not (lvar-reoptimize principal-lvar))
+                                   ignore-types
                                    (ctypep (constant-value leaf) type))
                            leaf)
                          (process-lvar (lambda-var-ref-lvar principal-use))))))))
@@ -59,13 +60,13 @@
 
 (defun constant-lvar-ignore-types-p (lvar &optional (singleton-types t))
   (declare (type lvar lvar))
-  (let ((use (principal-lvar-use lvar)))
-    (or (and (ref-p use)
-             (constant-p (ref-leaf use))
-             (not (typep (constant-value (ref-leaf use)) '(and array (not simple-array)))))
-        ;; check for EQL types and singleton numeric types
-        (and singleton-types
-             (values (type-singleton-p (lvar-type lvar)))))))
+  (or (let ((constant (lvar-constant lvar t)))
+        (and constant
+             ;; non-simple arrays will become simple when saving to a fasl.
+             (not (typep (constant-value constant) '(and array (not simple-array))))))
+      ;; check for EQL types and singleton numeric types
+      (and singleton-types
+           (values (type-singleton-p (lvar-type lvar))))))
 
 ;;; Are all the uses constant?
 (defun constant-lvar-uses-p (lvar)
@@ -88,15 +89,12 @@
 
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
-(defun lvar-value (lvar)
+(defun lvar-value (lvar &optional ignore-types)
   (declare (type lvar lvar))
-  (let ((use  (principal-lvar-use lvar))
-        (type (lvar-type lvar))
-        leaf)
-    (if (and (ref-p use)
-             (constant-p (setf leaf (ref-leaf use))))
-        (values (constant-value leaf) leaf)
-        (multiple-value-bind (constantp value) (type-singleton-p type)
+  (let ((constant (lvar-constant lvar ignore-types)))
+    (if constant
+        (values (constant-value constant) constant)
+        (multiple-value-bind (constantp value) (type-singleton-p (lvar-type lvar))
           (unless constantp
             (error "~S used on non-constant LVAR ~S" 'lvar-value lvar))
           (values value (find-constant value))))))
@@ -1924,7 +1922,7 @@
                (let ((name (lvar-fun-name lvar t)))
                  (if name
                      (fdefinition name)
-                     (lvar-value lvar)))
+                     (lvar-value lvar t)))
                lvar)))
     (let* ((fun-name (lvar-fun-name (combination-fun call) t))
            (type (info :function :type fun-name))

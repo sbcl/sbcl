@@ -4848,3 +4848,11 @@
                             (setf j x)))
            j))
     ((#(2)) 2)))
+
+(with-test (:name :constant-fold-variables)
+  (assert-type
+   (lambda ()
+     (declare (optimize (debug 2)))
+     (let ((x #(a b)))
+       (aref x 0)))
+   (eql a)))

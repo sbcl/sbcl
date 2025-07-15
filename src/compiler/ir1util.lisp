@@ -2850,9 +2850,6 @@ is :ANY, the function name is not checked."
   (declare (type (or symbol function) function)
            (type list args))
   (handler-case (values (multiple-value-list (apply function args)) t)
-    ;; When cross-compiling, being "careful" is the wrong thing - our code should
-    ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
-    #-sb-xc-host
     (error (condition)
       (values condition nil))))
 
