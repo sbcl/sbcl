@@ -9,6 +9,9 @@
  * files for more information.
  */
 
+#ifdef ATOMIC_LOGGING
+#define _GNU_SOURCE
+#endif
 #include "genesis/sbcl.h"
 #include "lispobj.h"
 
@@ -1137,6 +1140,15 @@ static int monitor_loop(struct iochannel io)
 
 #ifdef ATOMIC_LOGGING
 #include "atomiclog.inc"
+char* thread_name_from_pthread(pthread_t thread) {
+    static char name[64];
+#if defined LISP_FEATURE_LINUX || defined LISP_FEATURE_DARWIN
+    // doesn't seem to actualy work on macos?
+    __attribute__((unused)) int r = pthread_getname_np(thread, name, sizeof name);
+    return name;
+#endif
+}
+
 static void dump_eventlog(int fd)
 {
     int i = 0;
@@ -1154,8 +1166,7 @@ static void dump_eventlog(int fd)
         uword_t prefix = e[i];
         int nargs = prefix & 7;
         void* thread_pointer = (void*)(prefix & ~7);
-        extern char* thread_name_from_pthread(void*);
-        char* name = thread_name_from_pthread(thread_pointer);
+        char* name = thread_name_from_pthread((pthread_t)thread_pointer);
         if (name) nc = sprintf(buf, "%s: ", name); else nc = sprintf(buf, "%p: ", thread_pointer);
         switch (nargs) {
         default: printf("busted event log"); return;

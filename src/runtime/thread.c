@@ -339,22 +339,6 @@ void reset_gc_stats() { // after sb-posix:fork
 }
 #endif
 
-#ifdef ATOMIC_LOGGING
-#define THREAD_NAME_MAP_MAX 20 /* KLUDGE */
-struct {
-  pthread_t thread;
-  char *name; // strdup'ed
-} thread_name_map[THREAD_NAME_MAP_MAX];
-int thread_name_map_count;
-
-char* thread_name_from_pthread(pthread_t pointer){
-    int i;
-    for(i=0; i<thread_name_map_count; ++i)
-        if (thread_name_map[i].thread == pointer) return thread_name_map[i].name;
-    return 0;
-}
-#endif
-
 /* This function is seemingly unused by the C runtime, but DO NOT DELETE.
  * It's needed when the C runtime is compiled with --fsanitize=address, because the sanitizer
  * falsely reports that all the threads running at exit have leaked their zstd_dcontext.
@@ -695,13 +679,6 @@ void sb_set_os_thread_name(char* name)
 #endif
 #if defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_AVOID_PTHREAD_SETNAME_NP
     if (vector_len(v) < 64) pthread_setname_np(name);
-#endif
-#ifdef ATOMIC_LOGGING
-      char* string = strdup(name);
-      int index = __sync_fetch_and_add(&thread_name_map_count, 1);
-      gc_assert(index < THREAD_NAME_MAP_MAX);
-      thread_name_map[index].thread = pthread_self();
-      thread_name_map[index].name = string;
 #endif
 }
 
