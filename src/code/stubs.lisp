@@ -170,7 +170,9 @@
   #+x86-64
   (def single-float-copysign (float float2))
   #+x86-64
-  (def single-float-sign))
+  (def single-float-sign)
+  #+64-bit
+  (def %make-double-float))
 
 #+sb-simd-pack
 (macrolet ((def (name)
