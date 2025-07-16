@@ -214,3 +214,9 @@
   (setq sb-c::*undefined-warnings* nil))
 
 (setf (fdefinition 'unaligned-dx-cons) #'list)
+
+(defun rotate-right-word (n count)
+  (dpb
+   n
+   (byte count (- sb-vm:n-word-bits count))
+   (ash n (- count))))
