@@ -271,7 +271,7 @@
   (value +sharp-equal-marker+))
 (declaim (freeze-type sharp-equal-wrapper))
 
-(defun sharp-equal-visit (tree processor visitor)
+(defun sharp-equal-visit (tree processor visitor &optional (type-check t))
   (declare (inline alloc-xset))
   (dx-let ((circle-table (alloc-xset)))
     (named-let recurse ((tree tree))
@@ -310,7 +310,9 @@
                         ;; here implies traversing the slot's value
                         ;; twice if it does contain a circularity
                         ;; marker.
-                        (if (or (eq type t) (not (contains-marker (%instance-ref tree i))))
+                        (if (or (eq type t)
+                                (not type-check)
+                                (not (contains-marker (%instance-ref tree i))))
                             (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv)))
                             (process (%instance-ref tree i) (lambda (nv d) (%instance-set d i nv))
                                      (lambda ()
@@ -370,7 +372,7 @@
             (visit (value)
               (when (sharp-equal-wrapper-p value)
                 (return-from contains-marker t))))
-    (sharp-equal-visit tree #'process #'visit)
+    (sharp-equal-visit tree #'process #'visit nil)
     nil))
 
 ;; This function is kind of like NSUBLIS, but checks for circularities and

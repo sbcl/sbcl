@@ -435,5 +435,7 @@
     (dotimes (i 5)
       (assert (eql (aref displacement i) array)))))
 
-
-;;; success
+(with-test (:name (:sharp= :circular-mismatch))
+  (assert-error
+      (read-from-string "#S(NODE :NEXT (#1=#S(NODE :NEXT #1#)))")
+      type-error))
