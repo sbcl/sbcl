@@ -3046,44 +3046,76 @@
         (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
         (specifier-type 'unsigned-byte))))
 
+(defun related-byte-spec (size posn)
+  (let ((size-use (principal-lvar-use size))
+        (posn-use (principal-lvar-use posn)))
+    (when (and (ref-p size-use)
+               (combination-is posn-use '(-)))
+      (when (= (length (combination-args posn-use)) 2)
+       (destructuring-bind (a b) (combination-args posn-use)
+         (let ((a-use (principal-lvar-use a))
+               (b-use (principal-lvar-use b)))
+           (when (and (ref-p a-use)
+                      (ref-p b-use)
+                      (same-ref-p size-use b-use))
+             (type-approximate-interval (lvar-type a)))))))))
+
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
   ;; (let ((mask (lognot (ash -1 size))))
   ;;        (logior (ash (logand newbyte mask) posn)
   ;;                (logandc2 int (ash mask posn))))
-  (block nil
-    (let* ((minus-one (specifier-type '(eql -1)))
-           (mask
-             (or (one-arg-derive-type size
-                                      (lambda (x)
-                                        (lognot-derive-type-aux
-                                         (ash-derive-type-aux minus-one x nil)))
-                                      (lambda (x)
-                                        (lognot (ash -1 x))))
-                 (return)))
-           (mask-shifted
-             (or (%two-arg-derive-type mask (lvar-type posn)
-                                       #'ash-derive-type-aux #'ash)
-                 (return)))
-           (int
-             (or (%two-arg-derive-type (lvar-type int) mask-shifted
-                                       (lambda (int mask same)
-                                         (declare (ignore same))
-                                         (%two-arg-derive-type
-                                          int
-                                          (lognot-derive-type-aux mask)
-                                          #'logand-derive-type-aux
-                                          #'logand))
-                                       (lambda (int mask)
-                                         (logandc2 int mask)))
-                 (return)))
-           (new-masked (or (%two-arg-derive-type mask (lvar-type newbyte)
-                                                 #'logand-derive-type-aux #'logand)
-                           (return)))
-           (new
-             (or (%two-arg-derive-type new-masked (lvar-type posn)
-                                       #'ash-derive-type-aux #'ash)
-                 (return))))
-      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
+  (let ((computed (block nil
+                    (let* ((minus-one (specifier-type '(eql -1)))
+                           (mask
+                             (or (one-arg-derive-type size
+                                                      (lambda (x)
+                                                        (lognot-derive-type-aux
+                                                         (ash-derive-type-aux minus-one x nil)))
+                                                      (lambda (x)
+                                                        (lognot (ash -1 x))))
+                                 (return)))
+                           (mask-shifted
+                             (or (%two-arg-derive-type mask (lvar-type posn)
+                                                       #'ash-derive-type-aux #'ash)
+                                 (return)))
+                           (int
+                             (or (%two-arg-derive-type (lvar-type int) mask-shifted
+                                                       (lambda (int mask same)
+                                                         (declare (ignore same))
+                                                         (%two-arg-derive-type
+                                                          int
+                                                          (lognot-derive-type-aux mask)
+                                                          #'logand-derive-type-aux
+                                                          #'logand))
+                                                       (lambda (int mask)
+                                                         (logandc2 int mask)))
+                                 (return)))
+                           (new-masked (or (%two-arg-derive-type mask (lvar-type newbyte)
+                                                                 #'logand-derive-type-aux #'logand)
+                                           (return)))
+                           (new
+                             (or (%two-arg-derive-type new-masked (lvar-type posn)
+                                                       #'ash-derive-type-aux #'ash)
+                                 (return))))
+                      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
+        (int-interval (type-approximate-interval (lvar-type int))))
+    (or
+     (when (and int-interval
+                (and (typep (interval-low int-interval) 'unsigned-byte)
+                     (typep (interval-high int-interval) 'integer)))
+       ;; Handle (dpb j (byte count (- 64 count)) word)
+       (let ((posn-minuend-interval (related-byte-spec size posn))
+             (size-interval (type-approximate-interval (lvar-type size))))
+         (when (and posn-minuend-interval
+                    size-interval
+                    (typep (interval-high posn-minuend-interval) 'unsigned-byte))
+           (type-intersection (make-numeric-type :class 'integer
+                                                 :low 0
+                                                 :high
+                                                 (max (interval-high int-interval)
+                                                      (1- (ash 1 (interval-high posn-minuend-interval)))))
+                              computed))))
+     computed)))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
   ;; (let ((mask (ash (lognot (ash -1 size)) posn)))
@@ -3189,7 +3221,7 @@
                     `(logior int
                              (ash new posn))))))
       `(let ((mask (ldb (byte size 0) -1)))
-         (logior (ash (logand new mask) posn)
+         (logior (truly-the word (ash (logand new mask) posn))
                  (logandc2 int (ash mask posn))))))
 
 (deftransform %deposit-field ((new size posn int) (:or (* word)

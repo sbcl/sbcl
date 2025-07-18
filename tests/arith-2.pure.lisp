@@ -738,3 +738,29 @@
                         (f start half)
                         half))
                    :allow-notes nil))
+
+(with-test (:name :dpb-computed-posn)
+  (assert-type
+   (lambda (n j count)
+     (declare ((unsigned-byte 64) n))
+     (dpb
+      j
+      (byte count (- 64 count))
+      n))
+   (unsigned-byte 64))
+  (assert-type
+   (lambda (n j count)
+     (declare ((unsigned-byte 32) n))
+     (dpb
+      j
+      (byte count (- 64 count))
+      n))
+   (unsigned-byte 64))
+  (assert-type
+   (lambda (n j count)
+     (declare ((unsigned-byte 54) n))
+     (dpb
+      j
+      (byte count (- 32 count))
+      n))
+   (unsigned-byte 54)))
