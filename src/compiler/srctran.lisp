@@ -1946,20 +1946,19 @@
 (defoptimizer (/ derive-type) ((x y))
   (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/))
 
+(defconstant +left-shift-derive-type-cutoff+ 256)
+
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
   (flet ((ash-outer (n s)
            (when (and (fixnump s)
-                      (<= s 64)
+                      (<= s +left-shift-derive-type-cutoff+)
                       (> s most-negative-fixnum))
              (ash n s)))
-         ;; KLUDGE: The bare 64's here should be related to
-         ;; symbolic machine word size values somehow.
-
          (ash-inner (n s)
            (if (and (fixnump s)
                     (> s most-negative-fixnum))
-               (ash n (min s 64))
+               (ash n (min s +left-shift-derive-type-cutoff+))
                (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))
              (csubtypep shift (specifier-type 'integer))
@@ -3022,21 +3021,33 @@
 
 (defoptimizer (%ldb derive-type) ((size posn num))
   ;; (logand (ash num (- posn)) (lognot (ash -1 size)))
-  (let* ((shifted (two-arg-derive-type num posn
-                                       (lambda (num posn same)
-                                         (declare (ignore same))
-                                         (ash-derive-type-aux num (%negate-derive-type-aux posn) nil))
-                                       (lambda (num posn)
-                                         (ash num (- posn)))))
-         (minus-one (specifier-type '(eql -1)))
-         (mask (one-arg-derive-type size
-                                    (lambda (x)
-                                      (lognot-derive-type-aux
-                                       (ash-derive-type-aux minus-one x nil)))
-                                    (lambda (x)
-                                      (lognot (ash -1 x))))))
-    (when (and shifted mask)
-      (%two-arg-derive-type shifted mask #'logand-derive-type-aux #'logand))))
+  (let ((computed
+          (let* ((shifted (two-arg-derive-type num posn
+                                               (lambda (num posn same)
+                                                 (declare (ignore same))
+                                                 (ash-derive-type-aux num (%negate-derive-type-aux posn) nil))
+                                               (lambda (num posn)
+                                                 (ash num (- posn)))))
+                 (minus-one (specifier-type '(eql -1)))
+                 (mask (one-arg-derive-type size
+                                            (lambda (x)
+                                              (lognot-derive-type-aux
+                                               (ash-derive-type-aux minus-one x nil)))
+                                            (lambda (x)
+                                              (lognot (ash -1 x))))))
+            (when (and shifted mask)
+              (%two-arg-derive-type shifted mask #'logand-derive-type-aux #'logand))))
+        ;; Handle (ldb (byte y (- 64 y)) x)
+        (minuend (related-byte-spec size posn)))
+    (if (and minuend
+             (<= (interval-high minuend)
+                 +left-shift-derive-type-cutoff+))
+        (type-intersection (make-numeric-type :class 'integer
+                                              :low 0
+                                              :high
+                                              (1- (ash 1 (interval-high minuend))))
+                           (or computed *universal-type*))
+        computed)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
   (let ((size-high (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
@@ -3058,7 +3069,10 @@
            (when (and (ref-p a-use)
                       (ref-p b-use)
                       (same-ref-p size-use b-use))
-             (type-approximate-interval (lvar-type a)))))))))
+             (let ((int (type-approximate-interval (lvar-type a))))
+               (when (and int
+                          (interval-high int))
+                 int)))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
   ;; (let ((mask (lognot (ash -1 size))))
@@ -3107,14 +3121,13 @@
        (let ((posn-minuend-interval (related-byte-spec size posn))
              (size-interval (type-approximate-interval (lvar-type size))))
          (when (and posn-minuend-interval
-                    size-interval
-                    (typep (interval-high posn-minuend-interval) 'unsigned-byte))
+                    size-interval)
            (type-intersection (make-numeric-type :class 'integer
                                                  :low 0
                                                  :high
                                                  (max (interval-high int-interval)
                                                       (1- (ash 1 (interval-high posn-minuend-interval)))))
-                              computed))))
+                              (or computed *universal-type*)))))
      computed)))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))

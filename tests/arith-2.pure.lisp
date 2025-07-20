@@ -764,3 +764,9 @@
       (byte count (- 32 count))
       n))
    (unsigned-byte 54)))
+
+(with-test (:name :ldb-computed-posn)
+  (assert-type
+   (lambda (x y)
+     (ldb (byte y (- 32 y)) x))
+   (unsigned-byte 32)))
