@@ -3389,6 +3389,27 @@
   (defun ash-inverted (integer amount)
     (ash integer (- amount)))
 
+  (deftransform ash ((integer amount) (word (integer * 0)) *
+                     :node node
+                     :important nil)
+    (when (csubtypep (lvar-type amount) (specifier-type 'sb-vm:signed-word))
+      (give-up-ir1-transform))
+    (delay-ir1-transform node :ir1-phases)
+    `(if (<= amount ,(- sb-vm:n-word-bits))
+         0
+         (ash integer (truly-the (integer (,(- sb-vm:n-word-bits)) 0) amount))))
+
+
+  (deftransform ash ((integer amount) (sb-vm:signed-word (integer * 0)) *
+                     :node node
+                     :important nil)
+    (when (csubtypep (lvar-type amount) (specifier-type 'sb-vm:signed-word))
+      (give-up-ir1-transform))
+    (delay-ir1-transform node :ir1-phases)
+    `(ash integer (if (<= amount ,(- sb-vm:n-word-bits))
+                      ,(- 1 sb-vm:n-word-bits)
+                      (truly-the (integer (,(- sb-vm:n-word-bits)) 0) amount))))
+
   (deftransform ash ((integer amount) (word t) *
                      :important nil :node node)
     (when (constant-lvar-p amount)
@@ -3408,9 +3429,16 @@
                                                     (:or word
                                                          sb-vm:signed-word)))
              (splice-fun-args amount '%negate 1)
-             (if truly-type
-                 `(truly-the word (ash-inverted integer amount))
-                 `(ash-inverted integer amount)))
+             (wrap-if truly-type
+                      `(truly-the word)
+                      `(ash-inverted integer amount)))
+            ((combination-typed-p use %negate (:not (integer * 0)))
+             (splice-fun-args amount '%negate 1)
+             (wrap-if truly-type
+                      `(truly-the word)
+                      `(if (>= amount sb-vm:n-word-bits)
+                           0
+                           (ash-inverted integer (truly-the (mod ,sb-vm:n-word-bits) amount)))))
             (t
              (give-up-ir1-transform)))))
 
@@ -3433,9 +3461,16 @@
                                                     (:or word
                                                          sb-vm:signed-word)))
              (splice-fun-args amount '%negate 1)
-             (if truly-type
-                 `(truly-the sb-vm:signed-word (ash-inverted integer amount))
-                 `(ash-inverted integer amount)))
+             (wrap-if truly-type
+                      `(truly-the sb-vm:signed-word)
+                      `(ash-inverted integer amount)))
+            ((combination-typed-p use %negate (:not (integer * 0)))
+             (splice-fun-args amount '%negate 1)
+             (wrap-if truly-type
+                      `(truly-the sb-vm:signed-word)
+                      `(ash-inverted integer (if (>= amount ,sb-vm:n-word-bits)
+                                                 ,(1- sb-vm:n-word-bits)
+                                                 (truly-the (mod ,sb-vm:n-word-bits) amount)))))
             (t
              (give-up-ir1-transform))))))
 
