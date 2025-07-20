@@ -769,4 +769,7 @@
   (assert-type
    (lambda (x y)
      (ldb (byte y (- 32 y)) x))
-   (unsigned-byte 32)))
+   (unsigned-byte 32))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (ldb (byte y (- 32 y)) x))))))
+

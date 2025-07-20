@@ -3164,12 +3164,29 @@
                     (return))))
       (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
 
+(defmacro min-or-nil (&rest numbers-or-nil)
+  (let ((min-sym (gensym "MIN")))
+   `(let ((,min-sym))
+      ,@(loop for number in numbers-or-nil
+              collect
+              `(let ((n ,number))
+                 (when n
+                   (unless (and ,min-sym
+                                (> n ,min-sym))
+                     (setf ,min-sym n)))))
+      ,min-sym)))
+
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word :node node)
   "convert to inline logical operations"
   (let* ((size-max (nth-value 1 (integer-type-numeric-bounds (lvar-type size))))
          (posn-max (nth-value 1 (integer-type-numeric-bounds (lvar-type posn))))
-         (width (and size-max posn-max
-                     (+ size-max posn-max))))
+         (width (min-or-nil
+                 (and size-max posn-max
+                      (+ size-max posn-max))
+                 ;; (ldb (byte y (- 64 y)) x) uses the first 64 bits
+                 (let ((minuend (related-byte-spec size posn)))
+                   (when minuend
+                     (interval-high minuend))))))
     (cond
       ((or (csubtypep (lvar-type int) (specifier-type 'sb-vm:signed-word))
            (csubtypep (lvar-type int) (specifier-type 'word)))
