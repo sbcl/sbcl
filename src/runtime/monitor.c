@@ -1072,7 +1072,7 @@ static int layouts_cmd(char __attribute__((unused)) **ptr, iochannel_t io)
     return 0;
 }
 
-static int monitor_loop(struct iochannel);
+static int monitor_loop(char *(*)(char*, int, FILE*), struct iochannel);
 extern FILE *gc_activitylog_file;
 void
 ldb_monitor(void)
@@ -1092,9 +1092,10 @@ ldb_monitor(void)
 #endif
     }
 
-    if (!monitor_loop(io)) exit(1);
+    if (!monitor_loop(fgets, io)) exit(1);
 }
-static int monitor_loop(struct iochannel io)
+static int monitor_loop(char *(*getline_fun)(char*, int, FILE*),
+                        struct iochannel io)
 {
     struct cmd *cmd, *found;
     char buf[256];
@@ -1104,7 +1105,7 @@ static int monitor_loop(struct iochannel io)
     while (1) {
         fprintf(io.out, "ldb> ");
         fflush(io.out);
-        line = fgets(buf, sizeof(buf), io.in);
+        line = getline_fun(buf, sizeof(buf), io.in);
         if (line == NULL) {
             return 0;
         }
@@ -1212,7 +1213,7 @@ static void* ldb_service_main(__attribute__((unused)) void* arg) {
         setlinebuf(stream);
         fprintf(stream, "LDB connected\n");
         struct iochannel io = {stream, stream};
-        monitor_loop(io);
+        monitor_loop(fgets_unlocked, io);
         fclose(stream);
     }
     return 0;
@@ -1235,6 +1236,7 @@ void init_ldb_service()
     sigaddset(&mask, SIGCHLD);
     pthread_sigmask(SIG_BLOCK, &mask, &oldmask);
     pthread_create(&ldb_service_thread, &thr_attr, ldb_service_main, 0);
+    pthread_setname_np(ldb_service_thread, "ldbsvc");
     getsockname(listener, (struct sockaddr*)&sin, &addrlen);
     ldb_service_port = ntohs(sin.sin_port);
     fprintf(stderr, "NOTE: ldb service on port %d\n", ldb_service_port);
