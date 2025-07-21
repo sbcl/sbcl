@@ -1,5 +1,33 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.6:
+  * enhancement: the encapsulate mechanism can be used to wrap functions that
+    are currently not FBOUNDP.
+  * bug fix: internal compiler error in a failure of stack analysis during
+    propagation of dynamic-extent.  (lp#2113935)
+  * bug fix: address regression in type inference for TRUNCATE and other
+    division-related operators.  (lp#2115305, reported by Vasiliy Postnicov)
+  * bug fix: cleanup of the main thread is performed more carefully when SBCL
+    is used as a shared library.  (lp#2115669, reported by Fedorov Alexander)
+  * bug fix: the compiler does not lose track of the types of specialized
+    external entry points for user-defined functions.  (lp#2115955, reported
+    by Matt Kaufmann)
+  * bug fix: adjust compiler template argument acceptability for increased
+    usage scope.  (lp#2116150)
+  * bug fix: provide a stub for ROTATE-RIGHT-WORD for constant-folding during
+    compilation.  (lp#2117080)
+  * bug fix: provide a stub for %MAKE-DOUBLE-FLOAT for constant-folding during
+    compilation.  (reported by Eric Marsden)
+  * bug fix: don't loop infinitely in the presence of type-mismatching
+    circular #S read syntax.  (reported by Bohong Huang)
+  * optimization: calls to SLOT-VALUE (and related functions) within methods,
+    on values that are not a specialized argument to those methods, are
+    optimized similarly to calls to SLOT-VALUE in non-method code.
+  * optimization: calls to REPLACE with VECTOR first argument and LIST second
+    argument are improved.
+  * optimization: TYPECASE over a set of structure types known not to be
+    extensible is converted to an array lookup.
+
 changes in sbcl-2.5.6 relative to sbcl-2.5.5:
   * enhancement: the compiler now recognizes when local functions (both named
     and anonymous) are used only as downward funargs in many situations and
