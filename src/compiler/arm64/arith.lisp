@@ -3471,7 +3471,7 @@
                                      (t
                                       (inst tst x fixnum-tag-mask)
                                       (inst ccmn x (ccmp-immediate (- lo)) :eq))))
-                              ((eq lo ,(fixnumize most-positive-fixnum))
+                              ((eq lo ,(fixnumize most-negative-fixnum))
                                (change-vop-flags vop '(:le))
                                (cond (tbz-label
                                       (inst tbnz* x 0 tbz-label)
