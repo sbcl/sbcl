@@ -76,7 +76,7 @@
 ;;; by RESTART-BIND.
 (define-thread-local *restart-clusters* nil)
 
-(define-load-time-global sb-kernel::**initial-handler-clusters** '(nil))
+(define-load-time-global sb-kernel::**initial-handler-clusters** (list nil))
 ;;; a list of handlers maintained by HANDLER-BIND
 (define-thread-local *handler-clusters* sb-kernel::**initial-handler-clusters**)
 
