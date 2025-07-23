@@ -681,10 +681,10 @@
            (:unsigned
             (cond ((csubtypep (tn-ref-type amount-ref)
                               (specifier-type `(integer -63 *)))
-                   (inst csel result number zr-tn :lo)
-                   (inst lsr result result temp))
+                   (inst lsr result number temp))
                   (t
-                   (inst lsr result number temp))))))
+                   (inst csel result number zr-tn :lo)
+                   (inst lsr result result temp))))))
         (t
          (inst neg temp amount)
          (inst cmp temp n-word-bits)

@@ -884,6 +884,14 @@
     (((1- (expt 2 64)) -63) 1)
     (((1- (expt 2 64)) -64) 0)))
 
+(with-test (:name :ash-cut-unsafe)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x b)
+         (truly-the fixnum (ash (the (unsigned-byte 64) x) (the (integer -1000 1000) b))))
+    (((1- (expt 2 64)) -63) 1)
+    (((1- (expt 2 64)) -64) 0)))
+
 (with-test (:name :bogus-modular-fun-widths)
   (checked-compile-and-assert
       ()
