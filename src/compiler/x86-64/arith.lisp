@@ -2341,55 +2341,18 @@
   (:result-types signed-num)
   (:variant nil t))
 
-(define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
-  (:translate ash-modfx)
-  (:policy :fast-safe)
-  (:args (number :scs (signed-reg unsigned-reg) :to :save)
-         (amount :scs (signed-reg) :target ecx))
-  (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (any-reg) :from (:argument 0)))
-  (:arg-refs nil amount-ref)
-  (:result-types tagged-num)
-  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) ecx)
-  (:note "inline ASH")
-  (:generator 3
-    (move result number)
-    (move ecx amount)
-    (inst test ecx ecx)
-    (inst jmp :ns POSITIVE)
-    (inst neg ecx)
-    (unless (csubtypep (tn-ref-type amount-ref)
-                       (specifier-type `(integer -63 *)))
-      (inst cmp ecx 63)
-      (inst jmp :be OKAY)
-      (sc-case number
-        (signed-reg
-         (inst or ecx 63))
-        (unsigned-reg
-         (zeroize result))))
-    OKAY
-    (sc-case number
-      (signed-reg
-       (inst sar result :cl))
-      (unsigned-reg
-       (inst shr result :cl)))
-    (inst jmp DONE)
-
-    POSITIVE
-    (unless (csubtypep (tn-ref-type amount-ref)
-                       (specifier-type `(integer * 63)))
-      (inst cmp ecx 63)
-      (inst jmp :be STILL-OKAY)
-      (zeroize result))
-    STILL-OKAY
-    (inst shl result :cl)
-    DONE
-    (inst shl result n-fixnum-tag-bits)))
-
 (define-vop (fast-ash-modfx/signed=>signed
              fast-ash/signed=>signed)
   (:variant t t)
   (:translate ash-modfx))
+
+(define-vop (fast-ash-modfx/unsigned=>signed
+             fast-ash/unsigned=>unsigned)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:variant t nil)
+  (:translate ash-modfx)
+  (:variant-cost 6))
 
 (define-vop (fast-ash-mod64/unsigned=>unsigned
              fast-ash/unsigned=>unsigned)

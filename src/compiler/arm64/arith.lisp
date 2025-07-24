@@ -745,6 +745,7 @@
          (inst lsl result number temp))))
     done))
 
+#+nil
 (define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
   (:note "inline ASH")
   (:translate ash-modfx)
@@ -792,7 +793,7 @@
 
 (define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
   (:args (number :scs (signed-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
+         (amount :scs (signed-reg) :to :save))
   (:arg-types signed-num signed-num)
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
@@ -902,6 +903,16 @@
 (define-vop (fast-ash-modfx/signed=>signed
              fast-ash/signed=>signed)
   (:translate ash-modfx))
+
+(define-vop (fast-ash-modfx/unsigned=>signed fast-ash/signed/unsigned)
+  (:args (number :scs (unsigned-reg) :to :save)
+         (amount :scs (signed-reg) :to :save))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate ash-modfx)
+  (:variant :unsigned)
+  (:variant-cost 6))
 
 (define-vop (fast-ash-mod64/signed=>unsigned
              fast-ash/signed=>signed)
