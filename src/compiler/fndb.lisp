@@ -967,11 +967,11 @@
   :derive-type #'result-type-first-arg)
 
 ;;;; from the "Manipulating List Structure" chapter:
-(defknown (cdr first rest)
+(defknown (cdr rest)
   (list)
   t
   (foldable flushable))
-(defknown car
+(defknown (car first)
   ((read-only list))
   t
   (foldable flushable))
