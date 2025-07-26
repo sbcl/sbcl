@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.6:
+changes in sbcl-2.5.7 relative to sbcl-2.5.6:
   * enhancement: the encapsulate mechanism can be used to wrap functions that
     are currently not FBOUNDP.
   * bug fix: internal compiler error in a failure of stack analysis during
