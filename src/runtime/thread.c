@@ -224,46 +224,11 @@ int thread_wait_until_not(int undesired_state,
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
-#ifdef LISP_FEATURE_WIN32
-#define sb_GetTID() GetCurrentThreadId()
-#elif defined __linux__
-// gettid() was added in glibc 2.30 but we support older glibc
-int sb_GetTID() { return syscall(SYS_gettid); }
-#elif defined __DragonFly__
-#include <sys/lwp.h>
-lwpid_t sb_GetTID() { return lwp_gettid(); }
-#elif defined __FreeBSD__
-#include <sys/thr.h>
-int sb_GetTID()
-{
-    long id;
-    thr_self(&id);
-    // man thr_self(2) says: the thread identifier is an integer in the range
-    // from PID_MAX + 2 (100001) to INT_MAX. So casting to int is safe.
-    return (int)id;
-}
-#elif defined __OpenBSD__
-int sb_GetTID()
-{
-    return getthrid();
-}
-#elif defined __APPLE__ && defined LISP_FEATURE_SB_THREAD
-int sb_GetTID() {
-    return pthread_mach_thread_np(pthread_self());
-}
-#elif defined __HAIKU__ && defined LISP_FEATURE_SB_THREAD
-int sb_GetTID() {
-    return get_pthread_thread_id(pthread_self());
-}
-#else
-#define sb_GetTID() 0
-#endif
-
 /* Our futex-based lisp mutex needs an OS-assigned unique ID.
- * Why not use pthread_self? I think the reason is that that on linux,
- * the TID is 4 bytes, and the futex lock word is 4 bytes.
- * If the unique ID needed 8 bytes, there could be spurious aliasing
- * that would make the code behave incorrectly. */
+ * A futex lock word is 4 bytes on our supported platforms, and so is the thread ID,
+ * so this works out fine. The pthread ID is not an acceptable substitute.
+ * (#+win32 can have WaitOnAddress use an 8-byte value, but we don't)
+ */
 static int get_nonzero_tid()
 {
     int tid = sb_GetTID();

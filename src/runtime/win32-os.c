@@ -83,6 +83,8 @@ typedef WCHAR console_char;
 typedef CHAR console_char;
 #endif
 
+int sb_GetTID() { return GetCurrentThreadId(); }
+
 /* The exception handling function looks like this: */
 EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
                                        struct lisp_exception_frame *,

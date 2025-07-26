@@ -24,6 +24,8 @@
 
 #include "gc.h"
 
+int sb_GetTID() { return 0; } // this doesn't affect anything
+
 void os_init() {}
 
 os_vm_address_t os_alloc_gc_space(int __attribute__((unused)) space_id,

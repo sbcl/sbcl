@@ -385,6 +385,26 @@ static void freebsd_init()
 #endif
 }
 
+#if defined __DragonFly__
+#include <sys/lwp.h>
+lwpid_t sb_GetTID() { return lwp_gettid(); }
+#elif defined __FreeBSD__
+#include <sys/thr.h>
+int sb_GetTID()
+{
+    long id;
+    thr_self(&id);
+    // man thr_self(2) says: the thread identifier is an integer in the range
+    // from PID_MAX + 2 (100001) to INT_MAX. So casting to int is safe.
+    return (int)id;
+}
+#elif defined __OpenBSD__
+int sb_GetTID()
+{
+    return getthrid();
+}
+#endif
+
 #ifdef LISP_FEATURE_SB_FUTEX
 int
 futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)

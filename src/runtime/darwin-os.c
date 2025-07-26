@@ -27,6 +27,8 @@
 #include <dlfcn.h>
 #include <pthread.h>
 
+int sb_GetTID() { return pthread_mach_thread_np(pthread_self()); }
+
 char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];

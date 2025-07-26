@@ -5,7 +5,10 @@
 #include "interrupt.h" // for sig_stop_for_gc_handler
 #include "gc.h" // for gencgc_handle_wp_violation
 #include <image.h>
+#include <pthread.h>
 #include <stdio.h>
+
+int sb_GetTID() { return get_pthread_thread_id(pthread_self()); }
 
 os_vm_address_t
 os_alloc_gc_space(int __attribute__((unused)) space_id,

@@ -50,6 +50,9 @@
 #include <fcntl.h>
 #include <sys/prctl.h>
 
+// gettid() was added in glibc 2.30 but we support older glibc
+int sb_GetTID() { return syscall(SYS_gettid); }
+
 #ifdef LISP_FEATURE_X86
 /* Prototype for personality(2). Done inline here since the header file
  * for this isn't available on old versions of glibc. */
