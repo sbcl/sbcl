@@ -346,13 +346,13 @@ function value."
 (in-package "SB-THREAD")
 #+sb-thread
 (defun enter-foreign-callback (index return arguments)
-  (let ((thread (init-thread-local-storage (make-foreign-thread))))
-    (dx-let ((startup-info (vector nil ; trampoline is n/a
-                                   nil ; cell in *STARTING-THREADS* is n/a
-                                   #'sb-alien::enter-alien-callback
-                                   (list index return arguments)
-                                   nil nil))) ; sigmask + fpu state bits
+  (dx-let ((startup-info (vector nil ; trampoline is not applicable
+                                 nil ; cell in *STARTING-THREADS* is not applicable
+                                 nil ; *SESSION* is not applicable
+                                 #'sb-alien::enter-alien-callback
+                                 (list index return arguments)
+                                 nil nil))) ; sigmask + fpu state bits
+    (let ((thread (init-thread-local-storage (make-foreign-thread startup-info))))
       (copy-primitive-thread-fields thread)
-      (setf (thread-startup-info thread) startup-info)
       (update-all-threads (thread-primitive-thread thread) thread)
       (run))))

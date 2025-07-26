@@ -213,9 +213,10 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
   ;; If NIL or non-base-string, just leave the OS thread name alone
   #+sb-thread
   `(with-alien ((sb-set-os-thread-name (function void system-area-pointer) :extern))
-     (when (simple-base-string-p ,str)
-       (with-pinned-objects (,str)
-         (alien-funcall sb-set-os-thread-name (vector-sap ,str))))))
+     (let ((str ,str))
+       (when (simple-base-string-p str)
+         (with-pinned-objects (str)
+           (alien-funcall sb-set-os-thread-name (vector-sap str)))))))
 
 (declaim (inline thread-name))
 (defun thread-name (thread)
@@ -1872,6 +1873,8 @@ session."
 ;;; Remove thread from its session, if it has one, and from *all-threads*.
 ;;; Also clobber the pointer to the primitive thread
 ;;; which makes THREAD-ALIVE-P return false hereafter.
+;;; Note that in the case of a native (foreign) thread calling into Lisp,
+;;; this isn't really "thread exit" - it's just the end of Lisp's execution.
 (defmacro handle-thread-exit ()
   '(let* ((thread *current-thread*)
            ;; use the "funny fixnum" representation
@@ -1962,12 +1965,19 @@ session."
         ;; on a condition var. (Good luck trying to make this many threads)
         (signal-semaphore sem 1000000))))
 
+;; STARTUP-INFO = #(c-trampoline thread-cell *SESSION* function arglist sigmask fp-modes)
+;; thread-cell is a cons in *STARTING-THREADS* which informs GC what to pin
+(defmacro startup-info-thread-cell (th) `(svref (thread-startup-info ,th) 1))
+(defmacro startup-info-session (th) `(svref (thread-startup-info ,th) 2))
+(defmacro startup-info-function (th) `(svref (thread-startup-info ,th) 3))
+(defmacro startup-info-arglist (th) `(svref (thread-startup-info ,th) 4))
+(defmacro startup-info-sigmask (th) `(svref (thread-startup-info ,th) 5))
+(defmacro startup-info-fp-modes (th) `(svref (thread-startup-info ,th) 6))
+
 (defun run (); All threads other than the initial thread start via this function.
   (set-thread-control-stack-slots *current-thread*)
-  (let ((name (thread-%name *current-thread*)))
-    (try-set-os-thread-name name))
   (flet ((unmask-signals ()
-           (let ((mask (svref (thread-startup-info *current-thread*) 4)))
+           (let ((mask (startup-info-sigmask *current-thread*)))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,
                       ;; then restore exactly that mask.
@@ -2015,12 +2025,10 @@ session."
                                 (unwind-protect
                                      (catch '%return-from-thread
                                        (sb-c::inspect-unwinding
-                                        ;; STARTUP-INFO =
-                                        ;;   #(c-trampoline starting-thread-cell func args sigmask fp-modes)
                                         ;; Clobbering STARTUP-INFO prevents garbage retention,
                                         ;; but is there some significance to using the value 0?
-                                        (apply (svref (thread-startup-info *current-thread*) 2)
-                                               (prog1 (svref (thread-startup-info *current-thread*) 3)
+                                        (apply (startup-info-function *current-thread*)
+                                               (prog1 (startup-info-arglist *current-thread*)
                                                  (setf (thread-startup-info *current-thread*) 0)))
                                         #'sb-di::catch-runaway-unwind))
                                   (when (and *exit-in-progress*
@@ -2064,8 +2072,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
             (arguments)
             "Argument passed to ~S, ~S, is an improper list."
             'make-thread arguments)
-    (start-thread (sb-vm:without-arena "make-thread"
-                      (%make-thread name nil (make-semaphore :name name)))
+    (start-thread (sb-vm:without-arena (%make-thread name nil (make-semaphore :name name)))
                   (coerce function 'function)
                   (ensure-list arguments))))
 
@@ -2093,7 +2100,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
               ;; *STARTING-THREADS* list which occurs lazily on the next MAKE-THREAD.
               ;; To avoid unnecessary GC work meanwhile, smash the cell in *STARTING-THREADS*
               ;; that points to NEW-THREAD. That cell is pointed to by the startup-info.
-              (rplaca (svref (thread-startup-info new-thread) 1) 0)
+              (rplaca (startup-info-thread-cell new-thread) 0)
               (init-thread-local-storage new-thread) ; assign *CURRENT-THREAD*
               ;; Expose this thread in *ALL-THREADS*.
               ;; Why not set this before calling pthread_create() ? If it fails there should
@@ -2104,8 +2111,13 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
               ;; Foreign threads don't pass the saved FP modes, so the modes have to be
               ;; restored here and not in RUN.
               #+(or win32 darwin freebsd)
-              (setf (sb-vm:floating-point-modes)
-                    (svref (thread-startup-info *current-thread*) 5)))
+              (setf (sb-vm:floating-point-modes) (startup-info-fp-modes new-thread))
+              (try-set-os-thread-name (thread-%name new-thread))
+              ;; Join creator's session if there was one
+              (let ((session (startup-info-session new-thread)))
+                (declare (sb-c::tlab :system))
+                (when session
+                  (sb-ext:atomic-push thread (session-new-enrollees session)))))
             (run)))
          (saved-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
@@ -2139,7 +2151,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                (cell (locally (declare (sb-c::tlab :system))
                        (list thread)))
                (startup-info
-                (vector trampoline cell function arguments
+                (vector trampoline cell *session* function arguments
                         (if (position 1 child-sigmask) ; if there are any signals masked
                             (copy-seq child-sigmask) ; heap-allocate to pass to the new thread
                             nil) ; otherwise, don't pass the saved mask
@@ -2154,9 +2166,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       ;; (LIST-ALL-THREADS) until a POSIX thread is successfully started.
       (setf (thread-%visible thread) 0)
       (update-all-threads (sap-int thread-sap) thread)
-      (when *session*
-        (locally (declare (sb-c::tlab :system))
-          (sb-ext:atomic-push thread (session-new-enrollees *session*))))
       ;; Absence of the startup semaphore notwithstanding, creation is synchronized
       ;; so that we can prevent new threads from starting, typically in SB-POSIX:FORK
       ;; or SAVE-LISP-AND-DIE.
@@ -2192,13 +2201,10 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
             (sb-thread::call-with-system-mutex #'thunk *make-thread-lock*)))
       (unless created ; Remove side-effects of trying to create
         (delete-from-all-threads (sap-int thread-sap))
-        (when *session*
-          (%delete-thread-from-session thread))
         (free-thread-struct thread-sap)))
     (with-pinned-objects (saved-sigmask)
       (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
     (if created thread (error "Could not create new OS thread."))))
-
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values

@@ -123,7 +123,7 @@ in future versions."
   ;; At the beginning of the thread's life, this is a vector of data required
   ;; to start the user code. At the end, is it pointer to the 'struct thread'
   ;; so that it can be either freed or reused.
-  (startup-info 0 :type (or fixnum (simple-vector 6)))
+  (startup-info 0 :type (or fixnum (simple-vector 7)))
   ;; Whether this thread should be returned in LIST-ALL-THREADS.
   ;; This is almost-but-not-quite the same as what formerly
   ;; might have been known as the %ALIVE-P flag.
@@ -169,7 +169,7 @@ in future versions."
 (sb-xc:defstruct (foreign-thread
                   (:copier nil)
                   (:include thread (%name "callback"))
-                  (:constructor make-foreign-thread ())
+                  (:constructor make-foreign-thread (startup-info))
                   (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
