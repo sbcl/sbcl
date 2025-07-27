@@ -1467,19 +1467,27 @@ on this semaphore, then N of them is woken up."
 
 ;;;; Job control, independent listeners
 
-(defstruct (session (:copier nil))
-  ;; New threads are atomically pushed into NEW-ENROLLEES without acquiring the
-  ;; session lock. Any operation on the session that transfers ownership of the
-  ;; foreground must move the enrollees into THREADS while holding the lock.
-  (new-enrollees)
-  (lock (make-mutex :name "session lock"))
-  ;; If we wanted to get fancy, these next 2 lists might become lockfree linked lists
-  ;; so that it would be possible for threads to exit without acquiring the lock.
-  ;; It might be tricky (i.e. too much trouble) to figure out how to reimplement
-  ;; the various operations on a session though.
-  (threads nil)
-  (interactive-threads nil)
-  (interactive-threads-queue (make-waitqueue :name "session")))
+(defstruct (session (:copier nil)
+                    (:constructor make-session (interactive-threads)))
+  ;; A thread can enter into and leave from the session without using a mutex
+  ;; except when leaving as the foreground thread
+  (threads (sb-lockless:make-ordered-list
+            :sort (lambda (a b)
+                    ;; Sort order is arbitrary, but if threads are allocated at increasing
+                    ;; addresses, then new threads go to the front of the list by defining <
+                    ;; "backwards" which can require slightly less work to insert.
+                    (> (thread-primitive-thread a) (thread-primitive-thread b)))
+            :test #'eq)
+   :read-only t)
+  ;; Interactive threads are maintained in an ordinary list, the first element indicating
+  ;; which thread owns the foreground.
+  ;; This list can contain NILs for threads which left the session
+  ;; (Users who read this via the internal symbol may be unpleasantly surprised,
+  ;; but why are they doing that when there is an exported accessor?)
+  ;; The NILs get culled whenever control over the foreground changes.
+  (interactive-threads nil :type list)
+  (lock (make-mutex :name "session lock") :read-only t)
+  (condvar (make-waitqueue :name "session") :read-only t))
 (declaim (sb-ext:freeze-type session))
 
 ;;; The debugger itself tries to acquire the session lock, don't let
@@ -1491,43 +1499,27 @@ on this semaphore, then N of them is woken up."
 ;;; FIXME: It might be good to have a way to enforce lock ordering invariants
 (defmacro with-session-lock ((session) &body body)
   `(with-system-mutex ((session-lock ,session) :allow-with-interrupts t)
-     (%enroll-new-threads ,session)
      ,@body))
 
-;;; Move new enrollees into SESSION-THREADS. The session lock must be held.
-;;; The reason this can be lazy is that a thread is never an interactive thread
-;;; just by joining a session, so it doesn't involve itself with the waitqueue;
-;;; it can't cause a thread waiting on the condition to wake.
-;;; i.e. even if a newly created thread were required to obtain the lock to insert
-;;; itself into the session, it would not and could not have any effect on any other
-;;; thread in the session.
-(defun %enroll-new-threads (session)
-  (declare (sb-c::tlab :system))
-  (loop (let ((thread (sb-ext:atomic-pop (session-new-enrollees session))))
-          (cond ((not thread) (return))
-                ((thread-alive-p thread)
-                 ;; Can it become dead immediately upon insertion into THREADS?
-                 ;; No, because to become dead, it must acquire the session lock.
-                 (push thread (session-threads session)))))))
+
+(defun enroll-thread-in-session (thread session)
+  (when session
+    (sb-vm:without-arena (sb-lockless:lfl-insert (session-threads session) thread t)))
+  session)
 
 (defun new-session (thread)
-  (make-session :threads (list thread)
-                :interactive-threads (list thread)))
+  (enroll-thread-in-session thread (make-session (list thread))))
 
 (defun %delete-thread-from-session (thread &aux (session *session*))
-  (with-session-lock (session)
-    ;; One of two things about THREAD must be true, either:
-    ;; - it was transferred from SESSION-NEW-ENROLLEES to SESSION-THREADS
-    ;; - it was NOT yet transferred from SESSION-NEW-ENROLLEES.
-    ;; There can't be an "in flight" state of having done the atomic-pop from
-    ;; SESSION-NEW-ENROLLEES but not the push into THREADS, because anyone manipulating
-    ;; the THREADS list must be holding the session lock.
-    (let ((was-foreground (eq thread (foreground-thread session))))
-      (setf (session-threads session) (delq1 thread (session-threads session))
-            (session-interactive-threads session)
-            (delq1 thread (session-interactive-threads session)))
-      (when was-foreground
-        (condition-notify (session-interactive-threads-queue session))))))
+  (sb-lockless:lfl-delete (session-threads session) thread)
+  ;; If THREAD is not the foreground thread, no locking occurs.
+  (if (neq thread (foreground-thread session))
+      (nsubstitute nil thread (session-interactive-threads session) :count 1)
+      (flet ((deletep (x) (or (null x) (eq x thread)))) ; cull deleted threads
+        (with-session-lock (session)
+          (setf (session-interactive-threads session)
+                (delete-if #'deletep (session-interactive-threads session)))
+          (condition-notify (session-condvar session))))))
 
 (defun call-with-new-session (fn)
   (%delete-thread-from-session *current-thread*)
@@ -1621,7 +1613,7 @@ thread is not the foreground thread."
                          (session-threads session)))))
     ;; do the kill after dropping the mutex; unwind forms in dying
     ;; threads may want to do session things
-    (dolist (thread to-kill)
+    (dolist (thread (sb-lockless:lfl-keys to-kill))
       (unless (eq thread *current-thread*)
         ;; terminate the thread but don't be surprised if it has
         ;; exited in the meantime
@@ -1657,18 +1649,17 @@ SB-THREAD:RELEASE-FOREGROUND has to be called in ~s~%for this thread to enter th
      (with-session-lock (session)
        (symbol-macrolet
            ((interactive-threads (session-interactive-threads session)))
+         (setf interactive-threads (delete nil interactive-threads))
          (cond
            ((null interactive-threads)
             (setf was-foreground nil
                   interactive-threads (list *current-thread*)))
-           ((not (eq (first interactive-threads) *current-thread*))
+           ((neq (first interactive-threads) *current-thread*)
             (setf was-foreground nil)
             (unless (member *current-thread* interactive-threads)
               (setf interactive-threads
                     (append interactive-threads (list *current-thread*))))
-            (condition-wait
-             (session-interactive-threads-queue session)
-             (session-lock session)))
+            (condition-wait (session-condvar session) (session-lock session)))
            (t
             (unless was-foreground
               (format *query-io* "Resuming thread ~A~%" *current-thread*))
@@ -1684,22 +1675,27 @@ have the foreground next."
     (with-session-lock (session)
       (symbol-macrolet
           ((interactive-threads (session-interactive-threads session)))
-        (setf interactive-threads
-              (delete *current-thread* interactive-threads))
+        (flet ((deletep (x) (or (null x) (eq x *current-thread*))))
+          (setf interactive-threads (delete-if #'deletep interactive-threads)))
+        ;; Is it user error if NEXT is not in SESSION-THREADS of this session?
         (when (and next (thread-alive-p next))
-          (setf interactive-threads
-                (list* next (delete next interactive-threads))))
-        (condition-notify (session-interactive-threads-queue session))))))
+          (setf interactive-threads (list* next (delq1 next interactive-threads))))
+        (condition-notify (session-condvar session))))))
 
 (defun interactive-threads (&optional (session *session*))
   "Return the interactive threads of SESSION defaulting to the current
 session."
-  (session-interactive-threads session))
+  ;; A thread which left the session when not the foreground gets replaced
+  ;; by NIL, which we don't want to expose in the interface.
+  (remove nil (session-interactive-threads session)))
 
 (defun foreground-thread (&optional (session *session*))
   "Return the foreground thread of SESSION defaulting to the current
 session."
-  (first (interactive-threads session)))
+  ;; naively this is (FIRST (INTERACTIVE-THREADS session)))
+  ;; but it's more efficient to avoid the call to REMOVE.
+  (declare (optimize speed)) ; inlines into finding the first non-nil item
+  (find-if #'identity (session-interactive-threads session)))
 
 #-win32
 (defun make-listener-thread (tty-name)
@@ -1888,6 +1884,7 @@ session."
       ;; They must not participate in shutting other threads down.
       (when (and *exit-in-progress* (not (thread-ephemeral-p thread)))
         (%exit))
+      (when *session* (%delete-thread-from-session thread))
       ;; If collecting allocator metrics, transfer them to the global list
       ;; so that we can summarize over exited threads.
       #+allocator-metrics
@@ -1924,11 +1921,6 @@ session."
             ;; Operation on the global list must be atomic.
             (sb-ext:atomic-push (cons sprof-data thread) *sprof-data*)))
         (barrier (:write)))
-      ;; After making the thread dead, remove from session. If this were done first,
-      ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
-      ;; only to remove it right away.
-      (when *session*
-        (%delete-thread-from-session thread))
       (cond
         ;; If possible, logically remove from *ALL-THREADS* by flipping a bit.
         ;; Foreign threads remove themselves. They don't have an exit semaphore,
@@ -2078,6 +2070,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; System-internal use only
 #+sb-thread
+(progn
 (defun make-system-thread (name function arguments symbol)
   (let ((thread (%make-thread name t (make-semaphore :name name))))
     (when symbol
@@ -2085,41 +2078,38 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       (set symbol thread))
     (start-thread thread function arguments)))
 
-#+sb-thread
+;;; The native thread start procedure calls this function with one arg which is the
+;;; pointer to the thread instance without tag bits.
+(defun threadstartfun (arg)
+  ;; If an error occurs prior to getting the thread into a consistent lisp state,
+  ;; there's no chance of debugging anything anyway.
+  (declare (optimize (safety 0)))
+  (let ((new-thread (%make-lisp-obj (logior (get-lisp-obj-address arg)
+                                            sb-vm:instance-pointer-lowtag))))
+    ;; Now that this thread is known to GC, NEW-THREAD is either implicitly
+    ;; pinned (on conservative gc) or movable. It can hance be deleted from
+    ;; *STARTING-THREADS* list which occurs lazily on the next MAKE-THREAD.
+    ;; To avoid unnecessary GC work meanwhile, smash the cell in *STARTING-THREADS*
+    ;; that points to NEW-THREAD. That cell is pointed to by the startup-info.
+    (rplaca (startup-info-thread-cell new-thread) 0)
+    (init-thread-local-storage new-thread) ; assign *CURRENT-THREAD*
+    ;; Foreign threads don't pass the saved FP modes, so the modes have to be
+    ;; restored here and not in RUN.
+    #+(or win32 darwin freebsd)
+    (setf (sb-vm:floating-point-modes) (startup-info-fp-modes new-thread))
+    ;; Join creator's session if there was one
+    (enroll-thread-in-session new-thread (startup-info-session new-thread))
+    (try-set-os-thread-name (thread-%name new-thread))
+    ;; Expose this thread in *ALL-THREADS*.
+    ;; Why not set this before calling pthread_create() ? If it fails there should
+    ;; be no transient effect on the list of all threads. But it's indeterminate
+    ;; whether the creating or created thread will make progress first,
+    ;; so they both do this assignment.
+    (setf (thread-%visible new-thread) 1))
+  (run))
+
 (defun start-thread (thread function arguments)
-  (let* ((trampoline
-          (lambda (arg)
-            ;; If an error occurs prior to getting the thread into a consistent lisp state,
-            ;; there's no chance of debugging anything anyway.
-            (declare (optimize (safety 0)))
-            (let ((new-thread
-                   (%make-lisp-obj (logior (get-lisp-obj-address arg)
-                                           sb-vm:instance-pointer-lowtag))))
-              ;; Now that this thread is known to GC, NEW-THREAD is either implicitly
-              ;; pinned (on conservative gc) or movable. It can hance be deleted from
-              ;; *STARTING-THREADS* list which occurs lazily on the next MAKE-THREAD.
-              ;; To avoid unnecessary GC work meanwhile, smash the cell in *STARTING-THREADS*
-              ;; that points to NEW-THREAD. That cell is pointed to by the startup-info.
-              (rplaca (startup-info-thread-cell new-thread) 0)
-              (init-thread-local-storage new-thread) ; assign *CURRENT-THREAD*
-              ;; Expose this thread in *ALL-THREADS*.
-              ;; Why not set this before calling pthread_create() ? If it fails there should
-              ;; be no transient effect on the list of all threads. But it's indeterminate
-              ;; whether the creating or created thread will make progress first,
-              ;; so they both do this assignment.
-              (setf (thread-%visible new-thread) 1)
-              ;; Foreign threads don't pass the saved FP modes, so the modes have to be
-              ;; restored here and not in RUN.
-              #+(or win32 darwin freebsd)
-              (setf (sb-vm:floating-point-modes) (startup-info-fp-modes new-thread))
-              (try-set-os-thread-name (thread-%name new-thread))
-              ;; Join creator's session if there was one
-              (let ((session (startup-info-session new-thread)))
-                (declare (sb-c::tlab :system))
-                (when session
-                  (sb-ext:atomic-push thread (session-new-enrollees session)))))
-            (run)))
-         (saved-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
+  (let* ((saved-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
          (child-sigmask (make-array (* sb-unix::sizeof-sigset_t sb-vm:n-byte-bits)
                                     :element-type 'bit :initial-element 0))
@@ -2151,7 +2141,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                (cell (locally (declare (sb-c::tlab :system))
                        (list thread)))
                (startup-info
-                (vector trampoline cell *session* function arguments
+                (vector #'threadstartfun cell *session* function arguments
                         (if (position 1 child-sigmask) ; if there are any signals masked
                             (copy-seq child-sigmask) ; heap-allocate to pass to the new thread
                             nil) ; otherwise, don't pass the saved mask
@@ -2205,6 +2195,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (with-pinned-objects (saved-sigmask)
       (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
     (if created thread (error "Could not create new OS thread."))))
+) ; end PROGN
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values

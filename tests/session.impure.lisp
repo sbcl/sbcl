@@ -135,6 +135,8 @@
     (sb-thread:release-foreground thread)
     (get-foreground-quietly)))
 
+(defun session-threads (x) (sb-lockless:lfl-keys (sb-thread::session-threads x)))
+
 (with-test (:name :new-session)
   (let ((old-session sb-thread::*session*))
     (sb-thread:with-new-session ()
@@ -142,6 +144,6 @@
         (assert (not (eq old-session new-session)))
         ;; this thread should not be in session-threads of the old session
         (assert (not (member sb-thread:*current-thread*
-                             (sb-thread::session-threads old-session))))
+                             (session-threads old-session))))
         (assert (member sb-thread:*current-thread*
-                        (sb-thread::session-threads new-session)))))))
+                        (session-threads new-session)))))))
