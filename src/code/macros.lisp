@@ -1734,7 +1734,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; SB-EXT:COMPARE-AND-SWAP is the public API for now.
 ;;;;
 ;;;; Internally our interface has CAS, GET-CAS-EXPANSION,
-;;;; DEFCAS, and #'(CAS ...) functions.
+;;;; and #'(CAS ...) functions.
 
 (defun expand-structure-slot-cas (info name place)
   (let* ((dd (car info))
