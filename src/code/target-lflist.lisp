@@ -17,9 +17,9 @@
 
 (in-package "SB-LOCKLESS")
 
-(export '(lfl-find
+(export '(make-ordered-list lfl-insert lfl-delete lfl-find
           lfl-insert*/t lfl-delete*/t lfl-find*/t
-          do-lockfree-list make-marked-ref))
+          do-lockfree-list lfl-keys make-marked-ref))
 
 ;;; The changes to GC to support this code were as follows:
 ;;;

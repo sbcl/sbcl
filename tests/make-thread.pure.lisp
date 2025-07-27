@@ -134,12 +134,6 @@
    (make-thread (make-a-closure-nontail (make-big-structure :x 0))
                 :arguments (list 1 (make-other-big-structure)))))
 
-;;; If the finalizer thread isn't stopped, and there is a lockfree list node pointing
-;;; to the it, and such node happens to be in gen0, and was manipulated by LFL-INSERT
-;;; when adding a new thread to *SESSION*, then this test could spuriously fail.
-;;; Of course that has nothing to do with why it may have failed when session-threads
-;;; was just a list, but it doesn't seem important now.
-(sb-impl::finalizer-thread-stop)
 ;;; Test that reusing memory from an exited thread does not point to junk.
 ;;; In fact, assert something stronger: there are no young objects
 ;;; between the current SP and end of stack.
@@ -152,17 +146,14 @@
                            (eq x (sb-kernel:fun-code-header #'actually-get-stack-roots))))
                      (tryit :print nil))))
     ;; should be not many things pointed to by the stack
-    (assert (< (length list) 44))
-    ;; No young object is pointed to by the stack in its freshly born state.
-    ;; This test is only sensible if CORE_PAGE_GENERATION has its default value
-    ;; of PSEUDO_STATIC_GENERATION
-    (when (= (sb-kernel:generation-of #'car) sb-vm:+pseudo-static-generation+)
-      (let ((gens (mapcar #'sb-kernel:generation-of list)))
-        (when (find 0 gens)
-          (format t "Unexpected generation 0 objects:~%")
-          (mapc (lambda (x g) (when (eql g 0) (format t "g~d ~s~%" g x)))
-                list gens)
-          (error "test failed"))))))
+    (assert (< (length list) #+x86    38   ; more junk, I don't know why
+                             #+x86-64 30   ; less junk, I don't know why
+                             #-(or x86 x86-64) 44)) ; even more junk
+    ;; Either no objects are in GC generation 0, or all are, depending on
+    ;; whether CORE_PAGE_GENERATION has been set to 0 for testing.
+    (let ((n-objects-in-g0 (count 0 list :key #'sb-kernel:generation-of)))
+      (assert (or (= n-objects-in-g0 0)
+                  (= n-objects-in-g0 (length list)))))))
 
 ;; lp#1595699
 (test-util:with-test (:name :start-thread-in-without-gcing

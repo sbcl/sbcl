@@ -3624,7 +3624,6 @@ package is deprecated in favour of SB-MOP.")
   (:documentation "internal: lockfree lists")
   (:use "CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")
   (:export "+TAIL+" "%NODE-NEXT" "GET-NEXT"
-           "MAKE-ORDERED-LIST" "LFL-INSERT" "LFL-DELETE" "LFL-KEYS"
            "MAKE-SO-SET/STRING" "MAKE-SO-SET/FIXNUM" "MAKE-SO-SET/ADDR"
            "MAKE-SO-MAP/STRING" "MAKE-SO-MAP/FIXNUM" "MAKE-SO-MAP/ADDR"
            "MULTIPLICATIVE-HASH"
