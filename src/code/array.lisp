@@ -528,6 +528,13 @@
                                 the vector length is ~W."
          content-length length))
 
+(defun initial-contents-list-error (list length)
+  (if (proper-list-p list)
+      (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+                                the vector length is ~W."
+             (length list) length)
+      (error ":INITIAL-CONTENTS is not a proper list.")))
+
 (defun %make-simple-array (dimensions widetag n-bits)
   (declare (explicit-check dimensions))
   (multiple-value-bind (array-rank total-size) (rank-and-total-size-from-dims dimensions)
