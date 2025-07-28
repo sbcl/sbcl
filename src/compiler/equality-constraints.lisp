@@ -630,8 +630,10 @@
                (block nil
                  (map-equality-constraints (make-vector-length-constraint array-var) index gen
                                            (lambda (op not-p)
-                                             (when (and (eq op '>)
-                                                        (not not-p))
+                                             (when (or (and (eq op '>)
+                                                            (not not-p))
+                                                       (and (eq op '<=)
+                                                            not-p))
                                                (return t))))))
       (reoptimize-node node)
       (setf (combination-info node) 'array-in-bounds-p)))

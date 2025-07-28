@@ -795,6 +795,13 @@
                         (when (< x (length y))
                           (svref y x)))
                      nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x y)
+                        (unless (>= x (length y))
+                          (svref y x)))
+                     nil))
              0)))
 
 (with-test (:name :bounds-check-length)
