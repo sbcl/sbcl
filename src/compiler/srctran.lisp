@@ -303,7 +303,7 @@
                 (args (loop for arg in args
                             if (and subseq
                                     (or
-                                     (and (lvar-matches arg :fun-names '(vector-subseq* subseq))
+                                     (and (lvar-matches arg :fun-names '(vector-subseq subseq))
                                           ;; Nothing should be modifying the original sequence
                                           (almost-immediately-used-p arg (lvar-use arg) :flushable t))
                                      (lvar-matches arg :fun-names '(list vector))))

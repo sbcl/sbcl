@@ -533,7 +533,7 @@
 ;;;; so we worry about dealing with END being supplied or defaulting
 ;;;; to NIL at this level.
 
-(defun vector-subseq* (sequence start end)
+(defun vector-subseq (sequence start end)
   (declare (type vector sequence))
   (declare (type index start)
            (type (or null index) end)
@@ -551,7 +551,7 @@
                     :force-inline t)
     (vector-subseq-dispatch data start end)))
 
-(defun list-subseq* (sequence start end)
+(defun list-subseq (sequence start end)
   (declare (type list sequence)
            (type unsigned-byte start)
            (type (or null unsigned-byte) end))
@@ -605,8 +605,8 @@
    START and continuing to the end of SEQUENCE or the optional END."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
-    (list-subseq* sequence start end)
-    (vector-subseq* sequence start end)
+    (list-subseq sequence start end)
+    (vector-subseq sequence start end)
     (sb-sequence:subseq sequence start end)))
 
 ;;;; COPY-SEQ
@@ -615,18 +615,18 @@
   "Return a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking sequence
-    (list-copy-seq* sequence)
-    (vector-subseq* sequence 0 nil)
+    (list-copy-seq sequence)
+    (vector-subseq sequence 0 nil)
     ;; Copying an extended sequence has to return an extended-sequence
     ;; and not just any SEQUENCE.
     (the extended-sequence (values (sb-sequence:copy-seq sequence)))))
 
-(defun list-copy-seq* (sequence)
+(defun list-copy-seq (sequence)
   (copy-list-macro sequence :check-proper-list t))
 
 ;;;; FILL
 
-(defun list-fill* (sequence item start end)
+(defun list-fill (sequence item start end)
   (declare (type list sequence)
            (type index start)
            (type (or null index) end))
@@ -681,14 +681,14 @@
                                             ,value-transform)
                                          '#'identity))))
                         else do
-                          ;; vector-fill* depends on this assertion
+                          ;; vector-fill depends on this assertion
                           (assert (member et '(t (complex double-float)
                                                #-64-bit (complex single-float)
                                                #-64-bit double-float)
                                           :test #'equal))))))
   (init-fill-bashers))
 
-(defun vector-fill* (vector item start end)
+(defun vector-fill (vector item start end)
   (declare (type index start) (type (or index null) end)
            (optimize speed))
   (with-array-data ((vector vector)
@@ -737,7 +737,7 @@
                    (fill-float (complex double-float))))))))
   vector)
 
-(defun string-fill* (sequence item start end)
+(defun string-fill (sequence item start end)
   (declare (string sequence))
   (with-array-data ((data sequence)
                     (start start)
@@ -761,8 +761,8 @@
   "Replace the specified elements of SEQUENCE with ITEM."
   (declare (explicit-check sequence :result))
   (seq-dispatch-checking=>seq sequence
-   (list-fill* sequence item start end)
-   (vector-fill* sequence item start end)
+   (list-fill sequence item start end)
+   (vector-fill sequence item start end)
    (sb-sequence:fill sequence item
                      :start start
                      :end (%check-generic-sequence-bounds sequence start end))))

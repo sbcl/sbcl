@@ -756,7 +756,7 @@
 
 (deftransform fill ((seq item &key (start 0) (end nil))
                     (list t &key (:start t) (:end t)))
-  '(list-fill* seq item start end))
+  '(list-fill seq item start end))
 
 (defun find-basher (saetp &optional item node)
   (let* ((element-type (sb-vm:saetp-specifier saetp))
@@ -879,7 +879,7 @@
                   (find-saetp-by-ctype element-ctype))))
     (cond ((eq *wild-type* element-ctype)
            (delay-ir1-transform node :constraint)
-           `(vector-fill* seq item start end))
+           `(vector-fill seq item start end))
           ((and (csubtypep type (specifier-type 'simple-base-string))
                 (not start)
                 (not end)
@@ -1030,9 +1030,9 @@
             ;; into the vector in safe code. -- CSR, 2002-07-05
             `((declare (type ,element-type item)))))
           ((csubtypep type (specifier-type 'string))
-           '(string-fill* seq item start end))
+           '(string-fill seq item start end))
           (t
-           '(vector-fill* seq item start end)))))
+           '(vector-fill seq item start end)))))
 
 (deftransform fill ((seq item &key (start 0) (end nil))
                     ((and sequence (not vector) (not list)) t &key (:start t) (:end t)))
@@ -1363,7 +1363,7 @@
   (check-sequence-ranges sequence1 start1 end1 node :suffix 1 :name 'sequence1)
   (check-sequence-ranges sequence2 start2 end2 node :suffix 2 :name 'sequence2))
 
-(defoptimizers ir2-hook (vector-subseq* list-subseq*) ((sequence start end) node)
+(defoptimizers ir2-hook (vector-subseq list-subseq) ((sequence start end) node)
   (check-sequence-ranges sequence start end node))
 
 (defoptimizers ir2-hook (%member-key-test)
@@ -1689,7 +1689,7 @@
   (check-sequence-ranges seq start end node)
   (check-sequence-item new seq node "Can't substitute ~a into ~a"))
 
-(defoptimizer (vector-fill* ir2-hook) ((seq item start end) node)
+(defoptimizer (vector-fill ir2-hook) ((seq item start end) node)
   (check-sequence-ranges seq start end node)
   (check-sequence-item item seq node "Can't fill ~a into ~a"))
 
@@ -1958,11 +1958,11 @@
                                               'result 0 'size element-type)
               result))))
       (t
-       '(vector-subseq* seq start end)))))
+       '(vector-subseq seq start end)))))
 
 (deftransform subseq ((seq start &optional end)
                       (list t &optional t))
-  `(list-subseq* seq start end))
+  `(list-subseq seq start end))
 
 (deftransform subseq ((seq start &optional end)
                       ((and sequence (not vector) (not list)) t &optional t))
@@ -1977,10 +1977,10 @@
                 ,(maybe-expand-copy-loop-inline 'seq 0 'result 0 'length element-type)
                 result)))
           (t
-           '(vector-subseq* seq 0 nil)))))
+           '(vector-subseq seq 0 nil)))))
 
 (deftransform copy-seq ((seq) (list))
-  '(list-copy-seq* seq))
+  '(list-copy-seq seq))
 
 (deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
   '(sb-sequence:copy-seq seq))
@@ -2535,7 +2535,7 @@
                                   `(incf (truly-the index .pos.) ,(length value))))
                             (gen-replace))
                         fills))
-                      ((and (lvar-matches lvar :fun-names '(vector-subseq* subseq))
+                      ((and (lvar-matches lvar :fun-names '(vector-subseq subseq))
                             ;; Nothing should be modifying the original sequence
                             (almost-immediately-used-p lvar (lvar-use lvar) :flushable t))
                        (destructuring-bind (sequence start &optional end) (combination-args (lvar-uses lvar))

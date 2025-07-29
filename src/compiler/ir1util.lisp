@@ -737,7 +737,7 @@
                                                                                copy-tree
                                                                                copy-seq
                                                                                subseq
-                                                                               vector-subseq*))
+                                                                               vector-subseq))
                                     (and (lvar-fun-is (combination-fun allocator) '(sb-vm::splat))
                                          (let ((allocator (principal-lvar-ref-use
                                                            (principal-lvar (first (combination-args allocator))))))

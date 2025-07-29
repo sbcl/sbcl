@@ -24,9 +24,9 @@
   )
 ;; These each check their input sequence for type-correctness,
 ;; but not the output type specifier, because MAKE-SEQUENCE will do that.
-(defknown list-to-vector* (list type-specifier) vector (no-verify-arg-count))
-(defknown vector-to-vector* (vector type-specifier) vector (no-verify-arg-count))
-
+(defknown list-to-vector (list type-specifier) vector (no-verify-arg-count))
+(defknown vector-to-vector (vector type-specifier) vector (no-verify-arg-count))
+(defknown vector-to-list (vector) list (no-verify-arg-count))
 ;; FIXME: Is this really FOLDABLE? A counterexample seems to be:
 ;;  (LET ((S :S)) (VALUES (TYPE-OF S) (UNINTERN S 'KEYWORD) (TYPE-OF S) S))
 ;; Anyway, the TYPE-SPECIFIER type is more inclusive than the actual
@@ -570,17 +570,17 @@
 (defknown subseq ((read-only proper-sequence) index &optional sequence-end) consed-sequence
   (flushable foldable-read-only))
 
-(defknown vector-subseq* ((read-only vector) index sequence-end) (simple-array * (*))
+(defknown vector-subseq ((read-only vector) index sequence-end) (simple-array * (*))
   (flushable foldable-read-only no-verify-arg-count))
 
-(defknown list-subseq* ((read-only list) index sequence-end) list
+(defknown list-subseq ((read-only list) index sequence-end) list
   (flushable foldable-read-only no-verify-arg-count))
 
 (defknown copy-seq ((read-only proper-sequence)) consed-sequence
   (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
-(defknown list-copy-seq* ((read-only proper-list)) list
+(defknown list-copy-seq ((read-only proper-list)) list
   (flushable foldable-read-only)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 

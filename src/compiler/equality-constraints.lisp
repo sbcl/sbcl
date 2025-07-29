@@ -922,7 +922,7 @@
                   h))
         (values 0 nil))))
 
-(defoptimizer (vector-subseq* constraint-propagate-result) ((sequence start end) node gen)
+(defoptimizer (vector-subseq constraint-propagate-result) ((sequence start end) node gen)
   (let (c
         (null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null))))
     (when (eql (lvar-type start) (specifier-type '(eql 0)))
