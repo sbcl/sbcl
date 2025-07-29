@@ -3998,3 +3998,10 @@
   list)
 (defoptimizers constants (car cdr) ((cons))
   cons)
+
+(deftransform vector-to-list ((vector)
+                              * *
+                              :policy (> speed space))
+  (upgraded-element-type-specifier-or-give-up vector t)
+  `(loop for e across vector
+         collect e))

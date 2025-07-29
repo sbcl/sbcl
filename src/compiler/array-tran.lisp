@@ -16,12 +16,15 @@
 ;;; Return UPGRADED-ARRAY-ELEMENT-TYPE for LVAR, or do
 ;;; GIVE-UP-IR1-TRANSFORM if the upgraded element type can't be
 ;;; determined.
-(defun upgraded-element-type-specifier-or-give-up (lvar)
-  (let ((element-type-specifier (upgraded-element-type-specifier lvar)))
-    (if (eq element-type-specifier '*)
-        (give-up-ir1-transform
-         "upgraded array element type not known at compile time")
-        element-type-specifier)))
+(defun upgraded-element-type-specifier-or-give-up (lvar &optional string)
+  (if (and string
+           (csubtypep (lvar-type lvar) (specifier-type 'string)))
+      (specifier-type 'character)
+      (let ((element-type-specifier (upgraded-element-type-specifier lvar)))
+        (if (eq element-type-specifier '*)
+            (give-up-ir1-transform
+             "upgraded array element type not known at compile time")
+            element-type-specifier))))
 
 (defun upgraded-element-type-specifier (lvar)
   (type-specifier (array-type-upgraded-element-type (type-intersection (lvar-type lvar)
