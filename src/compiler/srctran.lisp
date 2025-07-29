@@ -7955,7 +7955,9 @@
       (let* ((constant-targets (coerce (nreverse constant-targets) 'vector))
              (code (if direct
                        (let ((default (next-node (if-alternative last-if) :strict t)))
-                         (when (ref-p default)
+                         (when (and (ref-p default)
+                                    (eq (node-lvar default)
+                                        (node-lvar ref)))
                            (let ((constant (ref-leaf default)))
                              (when (and (constant-p constant)
                                         (typep (constant-value constant)
