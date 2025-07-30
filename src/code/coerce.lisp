@@ -35,20 +35,14 @@
   (def sequence-to-vector (make-sequence type length) aref sequence))
 
 (defun vector-to-list (object)
-  (let* ((result (unaligned-dx-cons nil))
-         (splice result))
-    (declare (dynamic-extent result)
-             (sb-c::no-debug result splice))
+  (let (result)
     (with-array-data ((object object)
                       (start)
                       (end) :check-fill-pointer t)
       (cond-dispatch (simple-vector-p object)
-        (do ((index start (1+ index)))
-            ((>= index end)
-             (cdr result))
-          (let ((cell (list (aref object index))))
-            (setf (cdr splice) cell
-                  splice cell)))))))
+        (loop for i from (1- end) downto start
+              do (setf result (cons (aref object i) result)))))
+    result))
 
 (defun sequence-to-list (sequence)
   (declare (type sequence sequence))
