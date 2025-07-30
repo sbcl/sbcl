@@ -820,7 +820,7 @@ The second returned value is the remainder."
 (macrolet ((def (name)
              `(defun ,name (x mode)
                 (ecase mode
-                  ,@(loop for m in '(#-round-float :round :floor :ceiling :truncate)
+                  ,@(loop for m in '(#+round-float :round :floor :ceiling :truncate)
                           collect `(,m (,name x ,m)))))))
 
 
