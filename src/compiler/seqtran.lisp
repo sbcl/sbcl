@@ -3999,6 +3999,10 @@
 (defoptimizers constants (car cdr) ((cons))
   cons)
 
+(defoptimizer (vector-to-list derive-type) ((vector))
+  (when (typep (nth-value 1 (sequence-lvar-dimensions vector)) '(integer 1))
+    (specifier-type 'cons)))
+
 (deftransform vector-to-list ((vector)
                               * *
                               :policy (> speed space))

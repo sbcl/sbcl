@@ -994,3 +994,16 @@
            (replace v (the list l))
            v))
     (('(a)) #(a 2) :test #'equalp)))
+
+(with-test (:name :coerce-to-list-type)
+  (assert-type
+   (lambda (x)
+     (declare ((simple-string 10) x))
+     (coerce x 'list))
+   cons)
+  (assert-type
+   (lambda (x)
+     (declare (optimize speed)
+              ((simple-string 10) x))
+     (coerce x 'list))
+   cons))
