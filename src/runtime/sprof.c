@@ -286,16 +286,28 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
     }
 #else
     if (gc_managed_heap_space_p(pc) && component_ptr_from_pc((void*)pc)) {
-        // If the PC was in lisp code, then the frame register is probably correct,
-        // and so it's probably the case that 'frame->saved_lra' is a tagged PC
-        // in the caller. Unfortunately it is not 100% reliable in a signal handler,
-        // so we don't try to walk back more than one frame.
+        // If the PC was in lisp code, then the frame register is
+        // probably correct, and so it's probably the case that
+        // 'frame->saved_lra' is a tagged PC in the
+        // caller. Unfortunately it is not 100% reliable in a signal
+        // handler, so we don't try to walk back more than one frame,
+        // unless we are on ARM64 where precise backtraces are
+        // available.
         struct call_frame* frame = (void*)(*os_context_register_addr(context, reg_CFP));
-        if (in_stack_range((uword_t)frame, thread)
-            && lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
-            && component_ptr_from_pc((void*)frame->saved_lra)) {
-            STORE_PC(*trace, len, frame->saved_lra);
-            ++len;
+        for (;;) {
+            frame = (void*)(frame->old_cont);
+            if (in_stack_range((uword_t)frame, thread)
+#ifdef reg_LRA
+                && lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
+#endif
+                && component_ptr_from_pc((void*)frame->saved_lra)) {
+                STORE_PC(*trace, len, frame->saved_lra);
+                if (++len == limit) break;
+            }
+#ifdef LISP_FEATURE_ARM64
+            else
+#endif
+                break;
         }
     }
 #endif
