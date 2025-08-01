@@ -1046,6 +1046,12 @@ and no value was provided for it." name)))))))))))
                          :kind (car annotation)))))
      (assert-lvar-type arg type policy context))))
 
+(defun inline-expansion-explicit-check-p (fun)
+  (when (and (defined-fun-p fun)
+             (eq (defined-fun-inlinep fun) 'inline))
+    (loop for decls in (nth-value 1 (parse-body (cddr (defined-fun-inline-expansion fun)) t))
+          thereis (find 'explicit-check (cdr decls) :key #'car))))
+
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
@@ -1071,25 +1077,30 @@ and no value was provided for it." name)))))))))))
                               (lvar-has-single-use-p lvar))))
             (when (assert-node-type call returns policy 'ftype-context)
               (reoptimize-lvar lvar)))))
-    (let* ((name (lvar-fun-name (combination-fun call) t))
+    (let* ((fun (combination-fun call))
+           (name (lvar-fun-name fun t))
            (info (and name
                       (info :function :info name))))
-      (if (and info
-               (fun-info-call-type-deriver info))
-          (funcall (fun-info-call-type-deriver info) call trusted)
-          (map-combination-args-and-types
-           (lambda (arg type lvars &optional annotation)
-             (when (and
-                    (apply-type-annotation name arg type
-                                           lvars policy annotation
-                                           (and (not trusted)
-                                                'ftype-context))
-                    (not trusted))
-               (reoptimize-lvar arg)))
-           call
-           :info info
-           :defined-here t
-           :type type))))
+      (cond #+(or sb-devel sb-xc-host)
+            ((and info
+                  (inline-expansion-explicit-check-p (ref-leaf (principal-lvar-use fun)))))
+            ((and info
+                  (fun-info-call-type-deriver info))
+             (funcall (fun-info-call-type-deriver info) call trusted))
+            (t
+             (map-combination-args-and-types
+              (lambda (arg type lvars &optional annotation)
+                (when (and
+                       (apply-type-annotation name arg type
+                                              lvars policy annotation
+                                              (and (not trusted)
+                                                   'ftype-context))
+                       (not trusted))
+                  (reoptimize-lvar arg)))
+              call
+              :info info
+              :defined-here t
+              :type type)))))
   (values))
 
 ;;;; FIXME: Move to some other file.
