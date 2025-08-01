@@ -295,7 +295,6 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         // available.
         struct call_frame* frame = (void*)(*os_context_register_addr(context, reg_CFP));
         for (;;) {
-            frame = (void*)(frame->old_cont);
             if (in_stack_range((uword_t)frame, thread)
 #ifdef reg_LRA
                 && lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
@@ -308,6 +307,7 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
             else
 #endif
                 break;
+            frame = (void*)(frame->old_cont);
         }
     }
 #endif
