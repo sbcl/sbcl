@@ -596,6 +596,8 @@
 (defknown (list-reverse-into-vector list-reverse-into-vector-cddr)
     (proper-list) simple-vector
   (flushable no-verify-arg-count))
+(defknown sb-impl::vector-nreverse (vector) vector (important-result no-verify-arg-count)
+  :result-arg 0)
 
 (defknown make-sequence (type-specifier index
                                         &key

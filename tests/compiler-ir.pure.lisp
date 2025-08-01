@@ -521,3 +521,12 @@
                    (declare (vector b))
                    (find a b :test (if c #'eq #'eql))
                    10)))))
+
+(with-test (:name :stack-allocate-make-array-reverse)
+  (let ((vops (ir2-vops `(lambda (l)
+                           (let ((j (make-array 5 :initial-contents (nreverse l))))
+                             (declare (dynamic-extent j))
+                             (opaque-identity j)
+                             10)))))
+    (assert (= (count 'sb-vm::allocate-vector-on-stack vops) 1))
+    (assert (= (count 'sb-vm::allocate-vector-on-heap vops) 0))))
