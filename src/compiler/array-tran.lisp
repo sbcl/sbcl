@@ -1343,66 +1343,72 @@
             ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
              (delay-ir1-transform call :constraint)
-             (let ((listp (csubtypep (lvar-type initial-contents) (specifier-type 'list))))
-               `(progn
-                  ,@(unless listp
-                      `((let ((content-length (length initial-contents)))
-                          (unless (= content-length ,(or c-length 'dims))
-                            (sb-vm::initial-contents-error content-length  ,(or c-length 'dims))))))
-                  ,(wrap
-                    (cond ((and (lvar-matches initial-contents :fun-names '(reverse nreverse
-                                                                            sb-impl::list-reverse
-                                                                            sb-impl::vector-reverse
-                                                                            sb-impl::list-nreverse
-                                                                            sb-impl::vector-nreverse))
-                                ;; Nothing should be modifying the original sequence
-                                (almost-immediately-used-p initial-contents (lvar-use initial-contents)
-                                                           :flushable t))
-                           (let* ((reverse (lvar-use initial-contents))
-                                  (initial-contents-type (lvar-type (car (combination-args reverse)))))
-                             (splice-fun-args initial-contents :any 1)
-                             (cond ((csubtypep initial-contents-type (specifier-type 'list))
-                                    `(let ((data ,data-alloc-form)
-                                           (list initial-contents))
-                                       (tagbody
-                                          (go init)
-                                        ERROR
-                                          (sb-vm::initial-contents-list-error initial-contents ,(or c-length 'dims))
-                                        INIT
-                                          (loop for i from (1- ,(or c-length 'dims)) downto 0
-                                                do
-                                                (when (atom list)
-                                                  (go error))
-                                                (setf (aref data i) (pop list)))
-                                          (when list
-                                            (go error)))
-                                       data))
-                                   ((csubtypep initial-contents-type (specifier-type 'simple-vector))
-                                    `(let ((data ,data-alloc-form))
-                                       (loop for i from (1- ,(or c-length 'dims)) downto 0
-                                             for j from 0
-                                             do (setf (aref data i) (aref initial-contents j)))
-                                       data))
-                                   (t
-                                    `(nreverse (replace ,data-alloc-form initial-contents))))))
-                          (listp
-                           `(let ((data ,data-alloc-form)
-                                  (list initial-contents))
-                              (tagbody
-                                 (go init)
-                               ERROR
-                                 (sb-vm::initial-contents-list-error initial-contents ,(or c-length 'dims))
-                               INIT
-                                 (loop for i below ,(or c-length 'dims)
-                                       do
-                                       (when (atom list)
-                                         (go error))
-                                       (setf (aref data i) (pop list)))
-                                 (when list
-                                   (go error)))
-                              data))
-                          (t
-                           `(replace ,data-alloc-form initial-contents)))))))))))
+             (let* ((listp (csubtypep (lvar-type initial-contents) (specifier-type 'list)))
+                    (inline-fill (cond ((and (lvar-matches initial-contents :fun-names '(reverse nreverse
+                                                                                         sb-impl::list-reverse
+                                                                                         sb-impl::vector-reverse
+                                                                                         sb-impl::list-nreverse
+                                                                                         sb-impl::vector-nreverse))
+                                             ;; Nothing should be modifying the original sequence
+                                             (almost-immediately-used-p initial-contents (lvar-use initial-contents)
+                                                                        :flushable t))
+                                        (let* ((reverse (lvar-use initial-contents))
+                                               (initial-contents-type (lvar-type (car (combination-args reverse)))))
+                                          (splice-fun-args initial-contents :any 1)
+                                          (cond ((csubtypep initial-contents-type (specifier-type 'list))
+                                                 `(let ((data ,data-alloc-form)
+                                                        (list initial-contents))
+                                                    (tagbody
+                                                       (go init)
+                                                     ERROR
+                                                       (sb-vm::initial-contents-list-error initial-contents ,(or c-length 'dims))
+                                                     INIT
+                                                       (loop for i from (1- ,(or c-length 'dims)) downto 0
+                                                             do
+                                                             (when (atom list)
+                                                               (go error))
+                                                             (setf (aref data i) (pop list)))
+                                                       (when list
+                                                         (go error)))
+                                                    data))
+                                                ((csubtypep initial-contents-type (specifier-type 'simple-vector))
+                                                 `(let ((data ,data-alloc-form))
+                                                    (loop for i from (1- ,(or c-length 'dims)) downto 0
+                                                          for j from 0
+                                                          do (setf (aref data i) (aref initial-contents j)))
+                                                    data))
+                                                (t
+                                                 `(nreverse (replace ,data-alloc-form initial-contents))))))
+                                       (listp
+                                        `(let ((data ,data-alloc-form)
+                                               (list initial-contents))
+                                           (tagbody
+                                              (go init)
+                                            ERROR
+                                              (sb-vm::initial-contents-list-error initial-contents ,(or c-length 'dims))
+                                            INIT
+                                              (loop for i below ,(or c-length 'dims)
+                                                    do
+                                                    (when (atom list)
+                                                      (go error))
+                                                    (setf (aref data i) (pop list)))
+                                              (when list
+                                                (go error)))
+                                           data))
+                                       ((csubtypep (lvar-type initial-contents) (specifier-type 'array))
+                                        `(replace ,data-alloc-form initial-contents)))))
+               (if inline-fill
+                   `(progn
+                      ,@(unless listp
+                          `((let ((content-length (length initial-contents)))
+                              (unless (= content-length ,(or c-length 'dims))
+                                (sb-vm::initial-contents-error content-length  ,(or c-length 'dims))))))
+                      ,(wrap inline-fill))
+                   (wrap
+                    `(,(if (eq elt-ctype (specifier-type 't))
+                           'sb-vm::fill-vector-t-initial-contents
+                           'sb-vm::fill-vector-initial-contents)
+                      ,(or c-length 'dims) ,data-alloc-form initial-contents)))))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
 ;;; specific must come first, otherwise suboptimal transforms will result for

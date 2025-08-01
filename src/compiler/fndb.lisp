@@ -1283,6 +1283,11 @@
     (flushable foldable recursive no-verify-arg-count))
 
 (defknown (sb-vm::initial-contents-list-error sb-vm::initial-contents-error) (t t) nil (no-verify-arg-count))
+(defknown sb-vm::fill-vector-initial-contents (t t sequence) t (no-verify-arg-count)
+  :result-arg 1)
+(defknown (sb-vm::fill-vector-t-initial-contents) (t simple-vector sequence) simple-vector (no-verify-arg-count)
+  :result-arg 1)
+
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)
 

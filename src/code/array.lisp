@@ -535,6 +535,44 @@
              (length list) length)
       (error ":INITIAL-CONTENTS is not a proper list.")))
 
+(declaim (inline fill-vector-initial-contents))
+(defun fill-vector-initial-contents (length vector initial-contents)
+  (declare (index length)
+           (explicit-check initial-contents)
+           (optimize (sb-c:insert-array-bounds-checks 0)))
+  (if (listp initial-contents)
+      (let ((list initial-contents))
+        (tagbody
+           (go init)
+         ERROR
+           (sb-vm::initial-contents-list-error initial-contents length)
+         INIT
+           (loop for i below length
+                 do
+                 (when (atom list)
+                   (go error))
+                 (setf (aref vector i) (pop list)))
+           (when list
+             (go error)))
+        vector)
+      (cond-dispatch (vectorp initial-contents)
+        (let ((content-length (length initial-contents)))
+          (unless (= content-length length)
+            (sb-vm::initial-contents-error content-length length))
+          (replace vector initial-contents)))))
+
+(defun fill-vector-t-initial-contents (length vector initial-contents)
+  (declare (index length)
+           (inline fill-vector-initial-contents)
+           (explicit-check initial-contents))
+  (fill-vector-initial-contents length vector initial-contents))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(fill-vector-initial-contents))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))
+
 (defun %make-simple-array (dimensions widetag n-bits)
   (declare (explicit-check dimensions))
   (multiple-value-bind (array-rank total-size) (rank-and-total-size-from-dims dimensions)
