@@ -7,10 +7,9 @@
     (return-multiple
      (:return-style :none))
 
-    ;; These four are really arguments.
+    ;; These are really arguments.
     ((:temp nvals any-reg nargs-offset)
      (:temp vals any-reg nl1-offset)
-     (:temp old-fp any-reg nl2-offset)
      (:temp lra non-descriptor-reg lr-offset)
 
      ;; These are just needed to facilitate the transfer
@@ -64,11 +63,10 @@
 
   ;; Deallocate the unused stack space.
   (move ocfp-tn cfp-tn)
-  (move cfp-tn old-fp)
-  (inst add csp-tn ocfp-tn (lsl nvals (- word-shift n-fixnum-tag-bits)))
+  (inst add csp-tn cfp-tn (lsl nvals (- word-shift n-fixnum-tag-bits)))
 
   ;; Return.
-  (lisp-return lra :multiple-values))
+  (lisp-return lra :multiple-values t))
 
 (define-assembly-routine
     (return-values-list

@@ -295,19 +295,34 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         // available.
         struct call_frame* frame = (void*)(*os_context_register_addr(context, reg_CFP));
         for (;;) {
-            if (in_stack_range((uword_t)frame, thread)
+            if (!in_stack_range((uword_t)frame, thread))
+                break;
+
+#ifdef LISP_FEATURE_ARM64
+            lispobj lr;
+            unsigned inst = ((unsigned *) pc)[0];
+
+            if (inst == 0xF900075EU || // STR LR, [CFP, #8]
+                inst == 0xD65F03C0U) // RET
+                lr = (lispobj)*os_context_register_addr(context, reg_LR);
+            else
+                lr = frame->saved_lra;
+            if (!component_ptr_from_pc((char*)lr))
+                break;
+            STORE_PC(*trace, len, lr);
+            if (++len == limit) break;
+            frame = (void*)frame->old_cont;
+#else
+            if (
 #ifdef reg_LRA
-                && lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
+                lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
 #endif
                 && component_ptr_from_pc((void*)frame->saved_lra)) {
                 STORE_PC(*trace, len, frame->saved_lra);
-                if (++len == limit) break;
             }
-#ifdef LISP_FEATURE_ARM64
-            else
-#endif
                 break;
-            frame = (void*)(frame->old_cont);
+#endif
+
         }
     }
 #endif

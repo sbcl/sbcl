@@ -95,7 +95,7 @@
      (inst add ,lr ,lr 4)
      (inst br ,lr)))
 
-(defmacro lisp-return (lr return-style)
+(defmacro lisp-return (lr return-style &optional load-cfp-lr)
   "Return to RETURN-PC."
   `(progn
      ;; Indicate a single-valued return by clearing the Z flag
@@ -103,6 +103,8 @@
          (:single-value '((inst cmp null-tn 0)))
          (:multiple-values '((inst cmp zr-tn zr-tn)))
          (:known))
+     ,@(and load-cfp-lr
+            `((loadw-pair cfp-tn ocfp-save-offset ,lr lra-save-offset cfp-tn)))
      (inst ret ,lr)))
 
 ;;;; Stack TN's

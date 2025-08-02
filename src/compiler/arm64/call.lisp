@@ -1247,11 +1247,7 @@
     ;; Interrupts leave two words of space for the new frame, so it's safe
     ;; to deallocate the frame before accessing OCFP/LR.
     (move csp-tn cfp-tn)
-    (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
-    ;; Clear the control stack, and restore the frame pointer.
-
-    ;; Out of here.
-    (lisp-return lr :single-value)))
+    (lisp-return lr :single-value t)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the
@@ -1289,15 +1285,11 @@
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
-           (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
-           ;; Out of here.
-           (lisp-return lr :single-value))
+           (lisp-return lr :single-value t))
           (t
            ;; Establish the values pointer.
            (move val-ptr cfp-tn)
-           ;; restore the frame pointer and clear as much of the control
-           ;; stack as possible.
-           (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
+           ;; clear as much of the control stack as possible.
            (inst add csp-tn val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            ;; Establish the values count.
            (load-immediate-word nargs (fixnumize nvals))
@@ -1306,7 +1298,7 @@
              (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return lr :multiple-values)))))
+           (lisp-return lr :multiple-values t)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.)  We check for the common case of a single return
@@ -1319,14 +1311,13 @@
    (lra-arg)
    (vals-arg :scs (any-reg) :target vals)
    (nvals-arg :scs (any-reg) :target nvals))
-  (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) old-fp)
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset) r0)
   (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
+  (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 13
-    (maybe-load-stack-tn lr lra-arg)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -1340,11 +1331,9 @@
     ;; Return with one value.
     (inst ldr r0 (@ vals-arg))
     (move csp-tn cfp-tn)
-    (move cfp-tn old-fp-arg)
-    (lisp-return lr :single-value)
+    (lisp-return lr :single-value t)
 
     NOT-SINGLE
-    (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
     (invoke-asm-routine 'return-multiple tmp-tn :tail t)))
