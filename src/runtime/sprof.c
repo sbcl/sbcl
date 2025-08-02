@@ -315,9 +315,9 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
 #else
             if (
 #ifdef reg_LRA
-                lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG
+                lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG &&
 #endif
-                && component_ptr_from_pc((void*)frame->saved_lra)) {
+                component_ptr_from_pc((void*)frame->saved_lra)) {
                 STORE_PC(*trace, len, frame->saved_lra);
             }
                 break;
