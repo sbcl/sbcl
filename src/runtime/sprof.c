@@ -344,7 +344,7 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         }
 #else
             STORE_PC(*trace, 0, pc);
-            if (in_stack_range((uword_t)frame, thread)
+            if (in_stack_range((uword_t)frame, thread) &&
 #ifdef reg_LRA
                 lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG &&
 #endif
