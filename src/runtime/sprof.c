@@ -301,16 +301,29 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         unsigned inst = ((unsigned *) pc)[0];
 
         /* The first frame needs be found */
-        if (inst == 0xD63F03C0) { // BLR LR
+        if (points_to_asm_code_p(pc) ||
+            (inst == 0xD65F03C0U && // RET
+             ((unsigned *) pc)[-1] == 0xA9407B5AU)) { // LDP CFP, LR, [CFP]
+            STORE_PC(*trace, 0, pc);
+            lr = (lispobj)*os_context_register_addr(context, reg_LR);
+            STORE_PC(*trace, len, lr);
+            if (++len == limit) return len;
+        }
+        else if (inst == 0xD63F03C0) { // BLR LR
             /* Use the destination address as the current PC, because
-            the new frame is not yet set up */
+               the new frame is not yet set up */
             lr = (lispobj)*os_context_register_addr(context, reg_LR);
             STORE_PC(*trace, 0, lr);
             /* And it's called by the current function */
             STORE_PC(*trace, len, pc+4);
-            if (++len == limit || !in_stack_range((uword_t)frame, thread))
-                return len;
-            frame = (void*)frame->old_cont;
+            if (++len == limit) return len;
+
+            /* Unless an asm routine is called within the same frame. */
+            if ((((unsigned *) pc)[-1] | 0x1F0000) == 0xAA1F03FAU) { // MOV CFP, Rx
+                if (!in_stack_range((uword_t)frame, thread))
+                    return len;
+                frame = (void*)frame->old_cont;
+            }
         }
         else if (inst == 0xF900075EU) {  // STR LR, [CFP, #8]
             STORE_PC(*trace, 0, pc);
@@ -320,12 +333,6 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
             if (!in_stack_range((uword_t)frame, thread))
                 return len;
             frame = (void*)frame->old_cont;
-        }
-        else if (inst == 0xD65F03C0U) { // RET
-            STORE_PC(*trace, 0, pc);
-            lr = (lispobj)*os_context_register_addr(context, reg_LR);
-            STORE_PC(*trace, len, lr);
-            if (++len == limit) return len;
         }
         else {
             STORE_PC(*trace, 0, pc);
@@ -343,15 +350,15 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
             frame = (void*)frame->old_cont;
         }
 #else
-            STORE_PC(*trace, 0, pc);
-            if (in_stack_range((uword_t)frame, thread) &&
+        STORE_PC(*trace, 0, pc);
+        if (in_stack_range((uword_t)frame, thread) &&
 #ifdef reg_LRA
-                lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG &&
+            lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG &&
 #endif
-                component_ptr_from_pc((void*)frame->saved_lra)) {
-                STORE_PC(*trace, len, frame->saved_lra);
-                ++len;
-            }
+            component_ptr_from_pc((void*)frame->saved_lra)) {
+            STORE_PC(*trace, len, frame->saved_lra);
+            ++len;
+        }
 
 #endif
     }
