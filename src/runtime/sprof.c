@@ -260,8 +260,9 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
 {
     uword_t pc = os_context_pc(context);
     int len = 1;
-    STORE_PC(*trace, 0, pc);
+
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    STORE_PC(*trace, 0, pc);
     uword_t* fp = (uword_t*)os_context_frame_pointer(context);
     uword_t* sp = (uword_t*)*os_context_sp_addr(context);
     if (fp >= sp && fp < thread->control_stack_end) { // plausible frame-pointer
@@ -294,36 +295,65 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         // unless we are on ARM64 where precise backtraces are
         // available.
         struct call_frame* frame = (void*)(*os_context_register_addr(context, reg_CFP));
+#ifdef LISP_FEATURE_ARM64
+
+        lispobj lr;
+        unsigned inst = ((unsigned *) pc)[0];
+
+        /* The first frame needs be found */
+        if (inst == 0xD63F03C0) { // BLR LR
+            /* Use the destination address as the current PC, because
+            the new frame is not yet set up */
+            lr = (lispobj)*os_context_register_addr(context, reg_LR);
+            STORE_PC(*trace, 0, lr);
+            /* And it's called by the current function */
+            STORE_PC(*trace, len, pc+4);
+            if (++len == limit || !in_stack_range((uword_t)frame, thread))
+                return len;
+            frame = (void*)frame->old_cont;
+        }
+        else if (inst == 0xF900075EU) {  // STR LR, [CFP, #8]
+            STORE_PC(*trace, 0, pc);
+            lr = (lispobj)*os_context_register_addr(context, reg_LR);
+            STORE_PC(*trace, len, lr);
+            if (++len == limit) return len;
+            if (!in_stack_range((uword_t)frame, thread))
+                return len;
+            frame = (void*)frame->old_cont;
+        }
+        else if (inst == 0xD65F03C0U) { // RET
+            STORE_PC(*trace, 0, pc);
+            lr = (lispobj)*os_context_register_addr(context, reg_LR);
+            STORE_PC(*trace, len, lr);
+            if (++len == limit) return len;
+        }
+        else {
+            STORE_PC(*trace, 0, pc);
+        }
+
         for (;;) {
             if (!in_stack_range((uword_t)frame, thread))
                 break;
+            lr = frame->saved_lra;
 
-#ifdef LISP_FEATURE_ARM64
-            lispobj lr;
-            unsigned inst = ((unsigned *) pc)[0];
-
-            if (inst == 0xF900075EU || // STR LR, [CFP, #8]
-                inst == 0xD65F03C0U) // RET
-                lr = (lispobj)*os_context_register_addr(context, reg_LR);
-            else
-                lr = frame->saved_lra;
             if (!component_ptr_from_pc((char*)lr))
                 break;
             STORE_PC(*trace, len, lr);
             if (++len == limit) break;
             frame = (void*)frame->old_cont;
+        }
 #else
-            if (
+            STORE_PC(*trace, 0, pc);
+            if (in_stack_range((uword_t)frame, thread)
 #ifdef reg_LRA
                 lowtag_of(frame->saved_lra) == OTHER_POINTER_LOWTAG &&
 #endif
                 component_ptr_from_pc((void*)frame->saved_lra)) {
                 STORE_PC(*trace, len, frame->saved_lra);
+                ++len;
             }
-                break;
-#endif
 
-        }
+#endif
     }
 #endif
     return len;

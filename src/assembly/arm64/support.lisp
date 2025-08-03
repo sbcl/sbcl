@@ -11,14 +11,19 @@
 
 (in-package "SB-VM")
 
-(defun invoke-asm-routine (name reg &key tail)
+(defun invoke-asm-routine (name reg &key tail
+                                         load-cfp)
   (cond ((or (not (boundp '*component-being-compiled*))
              (code-immobile-p *component-being-compiled*))
+         (when load-cfp
+           (move cfp-tn load-cfp))
          (if tail
              (inst b (make-fixup name :assembly-routine))
              (inst bl (make-fixup name :assembly-routine))))
         (t
          (load-inline-constant reg `(:fixup ,name :assembly-routine))
+         (when load-cfp
+           (move cfp-tn load-cfp))
          (if tail
              (inst br reg)
              (inst blr reg)))))

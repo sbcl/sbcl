@@ -1025,14 +1025,18 @@
        (let* ((cur-nfp (current-nfp-tn vop))
               (filler
                 (remove nil
-                        (list ,@(if (eq return :tail)
-                                    '(:load-nargs
-                                      (when cur-nfp
-                                        :frob-nfp))
-                                    '(:load-nargs
-                                      (when cur-nfp
-                                        :frob-nfp)
-                                      :load-fp))))))
+                        (list ,@'(:load-nargs
+                                  (when cur-nfp
+                                    :frob-nfp)))))
+              ,@(unless (eq return :tail)
+                  `((new-fp-tn (cond ,@(and
+                                        (not variable)
+                                        '(((<= (if (consp nargs)
+                                                   (car nargs)
+                                                   nargs) register-arg-count)
+                                           csp-tn)))
+                                     (t
+                                      new-fp))))))
          (flet ((do-next-filler ()
                   (let* ((next (pop filler))
                          (what (if (consp next) (car next) next)))
@@ -1052,21 +1056,11 @@
                                (storew cfp-tn new-fp ocfp-save-offset))
                              '((unless (consp nargs)
                                  (load-immediate-word nargs-pass (fixnumize nargs))))))
-                      ,@(if (eq return :tail)
-                            '((:frob-nfp
-                               (inst add nsp-tn cur-nfp (add-sub-immediate
-                                                         (bytes-needed-for-non-descriptor-stack-frame)))))
-                            `((:frob-nfp
-                               (store-stack-tn nfp-save cur-nfp))
-                              (:load-fp
-                               (move cfp-tn (cond ,@(and
-                                                     (not variable)
-                                                     '(((<= (if (consp nargs)
-                                                                (car nargs)
-                                                                nargs) register-arg-count)
-                                                        csp-tn)))
-                                                  (t
-                                                   new-fp))))))
+                      (:frob-nfp
+                       ,(if (eq return :tail)
+                            `(inst add nsp-tn cur-nfp (add-sub-immediate
+                                                       (bytes-needed-for-non-descriptor-stack-frame)))
+                            `(store-stack-tn nfp-save cur-nfp)))
                       ((nil)))))
                 (insert-step-instrumenting ()
                   ;; Conditionally insert a conditional trap:
@@ -1107,10 +1101,6 @@
                      (do-next-filler)))
                   (insert-step-instrumenting)
                   (do-next-filler))))
-           (loop
-            (if filler
-                (do-next-filler)
-                (return)))
            ,@(case named
                ((t)
                 `((loadw lr name-pass fdefn-raw-addr-slot other-pointer-lowtag)
@@ -1120,16 +1110,24 @@
                 `((inst ldr lr (@ null-tn (load-store-offset (static-fun-offset fun))))
                   ,(if (eq return :tail)
                        `(inst add lr lr 4)))))
+           (loop
+            (if filler
+                (do-next-filler)
+                (return)))
+
 
            (note-this-location vop :call-site)
 
            ,(if named
                 (if (eq return :tail)
                     `(inst br lr)
-                    `(inst blr lr))
+                    `(progn
+                       ;; Load CFP just before calling for better profiling.
+                       (move cfp-tn new-fp-tn)
+                       (inst blr lr)))
                 (if (eq return :tail)
                     `(tail-call-unnamed lexenv lr fun-type)
-                    `(call-unnamed lexenv lr fun-type))))
+                    `(call-unnamed lexenv lr fun-type new-fp-tn))))
 
          ,@(ecase return
              (:fixed
@@ -1202,31 +1200,30 @@
     (t
      (assemble ()
        (when (eq type :designator)
+         (load-asm-routine lr 'call-symbol)
          (inst and tmp-tn lexenv lowtag-mask)
          (inst cmp tmp-tn fun-pointer-lowtag)
-         (inst b :eq call)
-         (invoke-asm-routine 'tail-call-symbol tmp-tn :tail t))
-       call
+         (inst b :ne call))
        (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+       call
        (inst add lr lr 4)
        (inst br lr)))))
 
-(defun call-unnamed (lexenv lr type)
+(defun call-unnamed (lexenv lr type new-fp-tn)
   (case type
     (:symbol
-     (invoke-asm-routine 'call-symbol tmp-tn))
+     (invoke-asm-routine 'call-symbol lr :load-cfp new-fp-tn))
     (t
      (assemble ()
        (when (eq type :designator)
+         (load-asm-routine lr 'call-symbol)
          (inst and tmp-tn lexenv lowtag-mask)
          (inst cmp tmp-tn fun-pointer-lowtag)
-         (inst b :eq call)
-         (invoke-asm-routine 'call-symbol tmp-tn)
-         (inst b ret))
-       call
+         (inst b :ne call))
        (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
-       (inst blr lr)
-       ret))))
+       call
+       (move cfp-tn new-fp-tn)
+       (inst blr lr)))))
 
 ;;;; Unknown values return:
 
