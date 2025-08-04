@@ -373,6 +373,29 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         }
 
 #endif
+    } else {
+        /* Probably foreign code */
+         STORE_PC(*trace, 0, pc);
+
+#ifdef LISP_FEATURE_ARM64
+         if (foreign_function_call_active_p(thread)) {
+             struct call_frame* frame = (void*)access_control_frame_pointer(thread);
+             lispobj lr;
+
+             for (;;) {
+                 if (!in_stack_range((uword_t)frame, thread))
+                     break;
+                 lr = frame->saved_lra;
+
+                 if (!component_ptr_from_pc((char*)lr))
+                     break;
+                 STORE_PC(*trace, len, lr);
+                 if (++len == limit) break;
+                 frame = (void*)frame->old_cont;
+             }
+         }
+#endif
+
     }
 #endif
     return len;
