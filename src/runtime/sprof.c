@@ -300,10 +300,10 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
         lispobj lr;
         unsigned inst = ((unsigned *) pc)[0];
 
-        /* The first frame needs be found */
+        /* The first frame needs to be found */
         if (points_to_asm_code_p(pc) ||
-            (inst == 0xD65F03C0U && // RET
-             ((unsigned *) pc)[-1] == 0xA9407B5AU)) { // LDP CFP, LR, [CFP]
+            (inst == 0xD65F03C0 && // RET
+             ((unsigned *) pc)[-1] == 0xA9407B5A)) { // LDP CFP, LR, [CFP]
             STORE_PC(*trace, 0, pc);
             lr = (lispobj)*os_context_register_addr(context, reg_LR);
             STORE_PC(*trace, len, lr);
@@ -319,16 +319,28 @@ gather_trace_from_context(struct thread* thread, os_context_t* context,
             if (++len == limit) return len;
 
             /* Unless an asm routine is called within the same frame. */
-            if ((((unsigned *) pc)[-1] | 0x1F0000) == 0xAA1F03FAU) { // MOV CFP, Rx
+            if ((((unsigned *) pc)[-1] | 0x1F0000) == 0xAA1F03FA) { // MOV CFP, Rx
                 if (!in_stack_range((uword_t)frame, thread))
                     return len;
                 frame = (void*)frame->old_cont;
             }
         }
-        else if (inst == 0xF900075EU) {  // STR LR, [CFP, #8]
+        else if (inst == 0xF900075E) {  // STR LR, [CFP, #8]
             STORE_PC(*trace, 0, pc);
             lr = (lispobj)*os_context_register_addr(context, reg_LR);
             STORE_PC(*trace, len, lr);
+            if (++len == limit) return len;
+            if (!in_stack_range((uword_t)frame, thread))
+                return len;
+            frame = (void*)frame->old_cont;
+        } else if ((inst >> 25) == 0x4A && // BL Lx
+                   ((((unsigned *) pc)[-1] | 0x1F0000) == 0xAA1F03FA)) { // MOV CFP, Rx
+            /* A local call */
+            unsigned imm = inst & 0x3FFFFFF;
+            // sign extend
+            int offset = ((int)(imm << 6) >> 6) * 4;
+            STORE_PC(*trace, 0, pc+offset);
+            STORE_PC(*trace, len, pc+4);
             if (++len == limit) return len;
             if (!in_stack_range((uword_t)frame, thread))
                 return len;
