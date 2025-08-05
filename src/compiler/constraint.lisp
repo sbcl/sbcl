@@ -1236,6 +1236,23 @@
             (when reoptimize
               (reoptimize-lvar (node-lvar ref)))))))))
 
+(defun delete-redundant-set (set in)
+  (let ((var (set-var set)))
+    (when (and (lambda-var-p var)
+               (lambda-var-eq-constraints var))
+      (let* ((value (set-value set))
+             (ref (principal-lvar-use value)))
+        (when (and (ref-p ref)
+                   (eq (ref-leaf ref) var))
+          (let ((constraint (gethash (node-lvar ref)
+                                     (lambda-var-eq-constraints var))))
+            (when (and constraint
+                       (conset-member constraint in))
+              (setf (lambda-var-sets var)
+                    (delq1 set (lambda-var-sets var)))
+              (delete-filter set (node-lvar set) value)
+              t)))))))
+
 ;;;; Flow analysis
 
 (defun maybe-add-eql-var-lvar-constraint (ref gen)
@@ -1302,31 +1319,33 @@
            (conset-add-constraint-to-eql gen 'typep var atype nil))
          (constraint-propagate-back lvar 'typep atype gen gen nil)))
       (cset
-       (binding* ((var (set-var node))
-                  (nil (lambda-var-p var) :exit-if-null)
-                  (nil (lambda-var-constraints var) :exit-if-null))
-         (when (policy node (or (and (= speed 3) (> speed compilation-speed))
-                                (> debug 1)))
-           (let ((type (lambda-var-type var)))
+       (unless (and preprocess-refs-p
+                    (delete-redundant-set node gen))
+         (binding* ((var (set-var node))
+                    (nil (lambda-var-p var) :exit-if-null)
+                    (nil (lambda-var-constraints var) :exit-if-null))
+           (when (policy node (or (and (= speed 3) (> speed compilation-speed))
+                                  (> debug 1)))
+             (let ((type (lambda-var-type var)))
+               (when (type-for-constraints-p type)
+                 (do-eql-vars (other (var gen))
+                   (unless (eql other var)
+                     (conset-add-constraint gen 'typep other type nil))))))
+
+           (let ((new (add-set-constraints var (set-value node) gen)))
+             (conset-clear-lambda-var gen var)
+             (when new
+               (conset-union gen new)))
+
+           (let ((type (single-value-type (node-derived-type node))))
              (when (type-for-constraints-p type)
-               (do-eql-vars (other (var gen))
-                 (unless (eql other var)
-                   (conset-add-constraint gen 'typep other type nil))))))
-
-         (let ((new (add-set-constraints var (set-value node) gen)))
-           (conset-clear-lambda-var gen var)
-           (when new
-             (conset-union gen new)))
-
-         (let ((type (single-value-type (node-derived-type node))))
-           (when (type-for-constraints-p type)
-             (conset-add-constraint gen 'typep var type nil)))
-         (unless (policy node (> compilation-speed speed))
-           (maybe-add-eql-var-var-constraint var (set-value node) gen))
-         (add-eq-constraint var (set-value node) gen)
-         (conset-add-constraint gen 'set var var nil)
-         (when (node-lvar node)
-           (conset-add-lvar-lambda-var-eql gen (node-lvar node) var))))
+               (conset-add-constraint gen 'typep var type nil)))
+           (unless (policy node (> compilation-speed speed))
+             (maybe-add-eql-var-var-constraint var (set-value node) gen))
+           (add-eq-constraint var (set-value node) gen)
+           (conset-add-constraint gen 'set var var nil)
+           (when (node-lvar node)
+             (conset-add-lvar-lambda-var-eql gen (node-lvar node) var)))))
       (combination
        (case (combination-kind node)
          (:known
