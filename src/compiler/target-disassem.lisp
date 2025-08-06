@@ -1403,11 +1403,13 @@
 
 ;;; Logically or MASK into the set of instruction properties in DSTATE.
 (defun dstate-setprop (dstate mask)
+  (declare (fixnum mask))
   (setf (dstate-inst-properties dstate) (logior mask (dstate-inst-properties dstate))))
 
 ;;; Return non-NIL if any bit in MASK
 ;;; is in the set of instruction properties in DSTATE.
 (defun dstate-getprop (dstate mask)
+  (declare (fixnum mask))
   (logtest mask (dstate-inst-properties dstate)))
 
 (defun add-fun-header-hooks (segment)
