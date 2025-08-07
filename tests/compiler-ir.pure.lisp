@@ -530,3 +530,10 @@
                              10)))))
     (assert (= (count 'sb-vm::allocate-vector-on-stack vops) 1))
     (assert (= (count 'sb-vm::allocate-vector-on-heap vops) 0))))
+
+
+(with-test (:name :no-type-check-tail-call)
+  (destructuring-bind (combination)
+      (ir-full-calls `(lambda (x)
+                        (truly-the fixnum (funcall x))))
+    (assert (node-tail-p combination))))

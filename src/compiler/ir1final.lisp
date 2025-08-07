@@ -147,7 +147,18 @@
               ((and (cast-p node)
                     (eq (cast-type-check node) :external))
                (aver (basic-combination-p dest))
-               (delete-filter node lvar (cast-value node))))))))
+               (delete-filter node lvar (cast-value node)))
+              ((and (cast-p node)
+                    (not (delay-p node))
+                    (not (cast-type-check node))
+                    (return-p dest))
+               (let ((value (cast-value node))
+                     (type (node-derived-type node)))
+                 (setf (lvar-%derived-type (cast-value node))
+                       type)
+                 (do-uses (use value)
+                   (setf (node-derived-type use) type))
+                (delete-filter node lvar (cast-value node)))))))))
 
 (defglobal *two-arg-functions*
     `((* two-arg-*
