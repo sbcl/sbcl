@@ -103,8 +103,7 @@ LDB_OBJS = $(filter-out main.o interr.o runtime.o monitor.o thread.o safepoint.o
 ldb: $(LIBSBCL)
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-interr.o interr.c
-	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-thread.o thread.c
-	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-interr.o standalone-thread.o \
+	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-interr.o \
 		$(LDB_OBJS) $(LIBS)
 
 $(TARGET): $(LIBSBCL)

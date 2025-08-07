@@ -1246,6 +1246,13 @@ void init_ldb_service()
 #endif
 
 #ifdef STANDALONE_LDB
+void callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2) { }
+void set_thread_state(struct thread *thread, char state, bool sigblocked) {
+    lose("can't set_thread_state %p %d %d", thread, state, sigblocked);
+}
+int thread_wait_until_not(int undesired_state, struct thread *thread) {
+    lose("can't thread_wait %d %p", undesired_state, thread);
+}
 void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing
 #include <errno.h>

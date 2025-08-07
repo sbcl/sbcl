@@ -114,3 +114,11 @@ lispobj *text_space_highwatermark;
  */
 unsigned int text_space_size;
 #endif
+
+#ifdef LISP_FEATURE_GCC_TLS
+__thread struct thread *current_thread;
+#elif defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_WIN32
+pthread_key_t current_thread = 0;
+#endif
+struct thread *all_threads;
+int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads

@@ -533,3 +533,233 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
         lose("HEAP-EXHAUSTED-ERROR fell through");
     }
 }
+
+/* this is called from any other thread to create the new one, and
+ * initialize all parts of it that can be initialized from another
+ * thread
+ *
+ * The allocated memory will be laid out as depicted below.
+ * Left-to-right is in order of lowest to highest address:
+ *
+ *      ______ spaces as obtained from OS
+ *     /   ___ aligned_spaces
+ *    /   /
+ *  (0) (1)       (2)       (3)       (4)    (5)          (6)
+ *   |   | CONTROL | BINDING |  ALIEN  | Trap | thread     |          |
+ *   |   |  STACK  |  STACK  |  STACK  | page | structure  | altstack |
+ *   |...|------------------------------------------------------------|
+ *          2MiB       1MiB     1MiB               (*)         (**)
+ *
+ *  |              Lisp TLS             |   (**) altstack         |
+ *  |-----------------------------------|----------|--------------|
+ *  | thread + struct + dynamically     |   extra  |   sigstack   |
+ *  | header   thread   assigned TLS    |   data   |              |
+ *  +---------+-------------------------|----------+--------------|
+ *  |         | <--- TLS_SIZE words --> |   ~1kb   | 32*SIGSTKSZ  |
+ *            ^ thread base
+ *
+ *   (1) = control stack start. default size shown
+ *   (2) = binding stack start. size = BINDING_STACK_SIZE
+ *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
+ *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
+ *   (5) = per_thread_data.     size = (THREAD_HEADER_SLOTS+TLS_SIZE) words
+ *   (6) = arbitrarily-sized "extra" data and signal stack.
+ *
+ *   (0) and (1) may coincide; (4) and (5) may coincide
+ *
+ *   - Lisp TLS overlaps 'struct thread' so that the first N (~30) words
+ *     have preassigned TLS indices.
+ *
+ *   - "extra" data are not in 'struct thread' because placing them there
+ *     makes it tough to calculate addresses in 'struct thread' from Lisp.
+ *     (Every 'struct thread' slot has a known size)
+ *
+ * On sb-safepoint builds one page before the thread base is used for the foreign calls safepoint.
+ */
+
+struct thread *
+alloc_thread_struct(void* spaces) {
+    /* Allocate the thread structure in one fell swoop as there is no way to recover
+     * from failing to obtain contiguous memory. Note that the OS may have a smaller
+     * alignment granularity than BACKEND_PAGE_BYTES so we may have to adjust the
+     * result to make it conform to our guard page alignment requirement. */
+    bool is_recycled = 0;
+    if (spaces) {
+        // If reusing memory from a previously exited thread, start by removing
+        // some old junk from the stack. This is imperfect since we only clear a little
+        // at the top, but doing so enables diagnosing some garbage-retention issues
+        // using a fine-toothed comb. It would not be possible at all to diagnose
+        // if any newly started thread could refer a dead thread's heap objects.
+        is_recycled = 1;
+    } else {
+        spaces = os_alloc_gc_space(THREAD_STRUCT_CORE_SPACE_ID, MOVABLE,
+                                   NULL, THREAD_STRUCT_SIZE);
+        if (!spaces) return NULL;
+    }
+    /* Aligning up is safe as THREAD_STRUCT_SIZE has
+     * THREAD_ALIGNMENT_BYTES padding. */
+    char *aligned_spaces = PTR_ALIGN_UP(spaces, THREAD_ALIGNMENT_BYTES);
+    char* csp_page = aligned_spaces + thread_control_stack_size +
+                     BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
+
+    // Refer to the ASCII art in the block comment above
+    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE
+                                + THREAD_HEADER_SLOTS*N_WORD_BYTES);
+
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    // Out of caution I'm supposing that the last thread to use this memory
+    // might have left this page as read-only. Could it? I have no idea.
+    os_protect(csp_page, THREAD_CSP_PAGE_SIZE, OS_VM_PROT_READ|OS_VM_PROT_WRITE);
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+    memset(th, 0, sizeof *th);
+    lispobj* ptr = (lispobj*)(th + 1);
+    lispobj* end = (lispobj*)((char*)th + dynamic_values_bytes);
+    memset(ptr, NO_TLS_VALUE_MARKER & 0xFF, (char*)end-(char*)ptr);
+    th->tls_size = dynamic_values_bytes;
+#endif
+
+    __attribute((unused)) lispobj* tls = (lispobj*)th;
+
+    th->os_address = spaces;
+    th->control_stack_start = (lispobj*)aligned_spaces;
+    th->binding_stack_start=
+        (lispobj*)((char*)th->control_stack_start+thread_control_stack_size);
+    th->control_stack_end = th->binding_stack_start;
+
+    if (is_recycled) {
+#if GENCGC_IS_PRECISE
+    /* Clear the entire control stack. Without this I was able to induce a GC failure
+     * in a test which hammered on thread creation for hours. The control stack is
+     * scavenged before the heap, so a stale word could point to the start (or middle)
+     * of an object using a bad lowtag, for whatever object formerly was there.
+     * Then a wrong transport function would be called and (if it worked at all) would
+     * place a wrongly tagged FP into a word that might not be the base of an object.
+     * Assume for simplicity (as is true) that stacks grow upward if GENCGC_IS_PRECISE.
+     * This could just call scrub_thread_control_stack but the comment there says that
+     * it's a lame algorithm and only mostly right - it stops after (1<<12) words
+     * and checks if the next is nonzero, looping again if it isn't.
+     * There's no reason not to be exactly right here instead of probably right */
+        memset((char*)th->control_stack_start, 0,
+               // take off 2 pages because of the soft and hard guard pages
+               thread_control_stack_size - 2*os_vm_page_size);
+#else
+    /* This is a little wasteful of cycles to pre-zero the pthread overhead (which in glibc
+     * resides at the highest stack addresses) comprising about 5kb, below which is the lisp
+     * stack. We don't need to zeroize above the lisp stack end, but we don't know exactly
+     * where that will be.  Zeroizing more than necessary is conservative, and helps ensure
+     * that garbage retention from reused stacks does not pose a huge problem. */
+        memset((char*)th->control_stack_end - 16384, 0, 16384);
+#endif
+    }
+
+    th->state_word.control_stack_guard_page_protected = 1;
+    th->state_word.alien_stack_guard_page_protected = 1;
+    th->state_word.binding_stack_guard_page_protected = 1;
+    th->alien_stack_start=
+        (lispobj*)((char*)th->binding_stack_start+BINDING_STACK_SIZE);
+    set_binding_stack_pointer(th,th->binding_stack_start);
+    th->this = th;
+    th->os_kernel_tid = 0;
+    th->os_thread = 0;
+    // Once allocated, the allocation profiling buffer sticks around.
+    // If present and enabled, assign into the new thread.
+    extern int alloc_profiling;
+    th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
+
+    struct extra_thread_data *extra_data = thread_extra_data(th);
+    // thread_interrupt_data(th) gets cleared by this memset
+    memset(extra_data, 0, sizeof *extra_data);
+
+#if THREADS_USING_GCSIGNAL
+    os_sem_init(&extra_data->state_sem, 1);
+    os_sem_init(&extra_data->state_not_running_sem, 0);
+    os_sem_init(&extra_data->state_not_stopped_sem, 0);
+#endif
+#if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
+    os_sem_init(&extra_data->sprof_sem, 0);
+#endif
+    th->sprof_data = 0;
+
+    th->state_word.state = STATE_RUNNING;
+    th->state_word.sprof_enable = 0;
+    th->state_word.user_thread_p = 1;
+
+    lispobj* alien_stack_end = (lispobj*)((char*)th->alien_stack_start + ALIEN_STACK_SIZE);
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    // Alien-stack-pointer is predecremented upon use
+    th->alien_stack_pointer = alien_stack_end;
+#else
+    // I do not know the convention for alien-stack-pointer
+    th->alien_stack_pointer = alien_stack_end - 1;
+#endif
+
+#ifdef HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT
+    memset(&th->pseudo_atomic_bits, 0, sizeof th->pseudo_atomic_bits);
+#elif defined LISP_FEATURE_GENERATIONAL
+    clear_pseudo_atomic_atomic(th);
+    clear_pseudo_atomic_interrupted(th);
+#endif
+
+    INIT_THREAD_REGIONS(th);
+#ifdef LISP_FEATURE_SB_THREAD
+    /* This parallels the same logic in globals.c for the
+     * single-threaded foreign_function_call_active, KLUDGE and
+     * all. */
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    th->ffcall_active_p = 0;
+#elif !defined(LISP_FEATURE_ARM64) // uses control_stack_start
+    th->ffcall_active_p = 1;
+#endif
+#endif
+
+#ifndef LISP_FEATURE_SB_THREAD
+    /* the tls-points-into-struct-thread trick is only good for threaded
+     * sbcl, because unithread sbcl doesn't have tls.  So, we copy the
+     * appropriate values from struct thread here, and make sure that
+     * we use the appropriate SymbolValue macros to access any of the
+     * variable quantities from the C runtime.  It's not quite OAOOM,
+     * it just feels like it */
+    SetSymbolValue(BINDING_STACK_START,(lispobj)th->binding_stack_start,th);
+    SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
+    SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
+    SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
+#endif
+#endif
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    access_control_stack_pointer(th)=th->control_stack_start;
+    access_control_frame_pointer(th)=0;
+#endif
+
+#if defined LISP_FEATURE_PPC64
+    /* Storing a 0 into code coverage mark bytes or GC card mark bytes
+     * can be done from the low byte of the thread base register.
+     * The thread alignment is BACKEND_PAGE_BYTES (from thread.h), but seeing as this is
+     * a similar-but-different requirement, it pays to double-check */
+    if ((lispobj)th & 0xFF) lose("Thread struct not at least 256-byte-aligned");
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+// This macro is the same as "write_TLS(sym,val,th)" but can't be spelled thus.
+// 'sym' would get substituted prior to token pasting, so you end up with a bad
+// token "(*)_tlsindex" because all symbols are #defined to "(*)" so that #ifdef
+// remains meaningful to the preprocessor, while use of 'sym' itself yields
+// a deliberate syntax error if you try to compile an expression involving it.
+#  define INITIALIZE_TLS(sym,val) write_TLS_index(sym##_tlsindex, val, th, _ignored_)
+#else
+#  define INITIALIZE_TLS(sym,val) SYMBOL(sym)->value = val
+#endif
+#include "genesis/thread-init.inc"
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER;
+
+#if defined(LISP_FEATURE_WIN32)
+    int i;
+    for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
+        thread_private_events(th,i) = CreateEvent(NULL,FALSE,FALSE,NULL);
+    thread_extra_data(th)->synchronous_io_handle_and_flag = 0;
+#endif
+    th->stepping = 0;
+    return th;
+}
