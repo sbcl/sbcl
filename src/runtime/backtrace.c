@@ -885,7 +885,7 @@ void libunwind_backtrace(struct thread *th, FILE* f)
             struct lispmutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
             if (lispmutex->name != NIL) {
                 fprintf(f, " (MUTEX:\"");
-                print_string(VECTOR(lispmutex->name), stderr);
+                print_string(VECTOR(lispmutex->name), f);
                 fprintf(f, "\")");
             }
         }
