@@ -1875,12 +1875,6 @@ int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
   return 0;
 }
 
-int sb_pthr_kill(struct thread* thread, int signum)
-{
-    __sync_fetch_and_or(&thread_extra_data(thread)->pending_signal_set, 1<<signum);
-    return 0;
-}
-
 /* Signals */
 int sched_yield()
 {

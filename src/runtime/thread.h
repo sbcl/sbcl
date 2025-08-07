@@ -206,11 +206,6 @@ static inline int calc_altstack_size(struct thread* thread) {
     // If the memory was as aligned as we'd like, the padding is ours to keep.
     return (char*)calc_altstack_end(thread) - (char*)calc_altstack_base(thread);
 }
-#if defined(LISP_FEATURE_WIN32)
-static inline struct thread* get_sb_vm_thread()
-    __attribute__((__const__));
-int sb_pthr_kill(struct thread* thread, int signum);
-#endif
 
 /* This is clearly per-arch and possibly even per-OS code, but we can't
  * put it somewhere sensible like x86-linux-os.c because it needs too

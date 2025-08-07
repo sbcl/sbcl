@@ -984,6 +984,8 @@ static void wake_thread_impl(struct thread_instance *lispthread)
 void wake_thread(struct thread_instance* lispthread)
 {
 #ifdef LISP_FEATURE_WIN32
+#define sb_pthr_kill(t,sig) \
+ __sync_fetch_and_or(&thread_extra_data(t)->pending_signal_set, 1<<sig)
     /* META: why is this comment about safepoint builds mentioning
      * gc_stop_the_world() ? Never the twain shall meet. */
 
