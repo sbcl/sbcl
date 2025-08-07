@@ -1127,41 +1127,6 @@ int create_lisp_thread(pthread_t *th, pthread_attr_t *attr, void *arg) {
 int try_acquire_gc_lock() { return TryEnterCriticalSection(&in_gc_lock); }
 int release_gc_lock() { return mutex_release(&in_gc_lock); }
 
-static __attribute__((unused)) struct timespec stw_begin_realtime, stw_begin_cputime;
-long timespec_diff(struct timespec* begin, struct timespec* end)
-{
-#ifdef LISP_FEATURE_64_BIT
-    return (end->tv_sec - begin->tv_sec) * 1000000000L + (end->tv_nsec - begin->tv_nsec) ;
-#else
-    return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
-#endif
-}
-#ifdef MEASURE_STOP_THE_WORLD_PAUSE
-void thread_accrue_stw_time(struct thread* th,
-                            struct timespec* begin_real,
-                            struct timespec* begin_cpu)
-{
-    /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
-     * can receive SIG_STOP_FOR_GC as soon as it has a 'struct thread'
-     * and _before_ a thread instance has been consed */
-    if (th->lisp_thread) {
-        struct timespec now;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-        unsigned long elapsed = timespec_diff(begin_real, &now);
-        struct thread_instance* ti = (void*)INSTANCE(th->lisp_thread);
-        if (elapsed > ti->uw_max_stw_pause) ti->uw_max_stw_pause = elapsed;
-        ti->uw_sum_stw_pause += elapsed;
-        ++ti->uw_ct_stw_pauses;
-        if (begin_cpu) {
-#ifdef CLOCK_THREAD_CPUTIME_ID
-          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
-          ti->uw_gc_virtual_time += timespec_diff(begin_cpu, &now);
-#endif
-        }
-    }
-}
-#endif
-
 #ifndef LISP_FEATURE_WIN32
 /* pthread_kill is not guaranteed to be reentrant, prevent
  * gc_stop_the_world from interrupting another pthread_kill */
@@ -1208,6 +1173,7 @@ int sb_thread_kill (pthread_t thread, int sig) {
  * can't have died (i.e. if ESRCH could be returned, then that implies that
  * the memory shouldn't be there) */
 
+static __attribute__((unused)) struct timespec stw_begin_realtime, stw_begin_cputime;
 void gc_stop_the_world()
 {
 #ifdef MEASURE_STOP_THE_WORLD_PAUSE
@@ -1215,9 +1181,9 @@ void gc_stop_the_world()
      * so it would not accrue time spent stopped. Force it to, by considering it "paused"
      * from the moment it wants to stop all other threads. */
     clock_gettime(CLOCK_MONOTONIC, &stw_begin_realtime);
-#endif
-#ifdef CLOCK_THREAD_CPUTIME_ID
+# ifdef CLOCK_THREAD_CPUTIME_ID
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &stw_begin_cputime);
+# endif
 #endif
     struct thread *th, *me = get_sb_vm_thread();
     int rc;
@@ -1296,9 +1262,7 @@ void gc_start_the_world()
 
     lock_ret = mutex_release(&all_threads_lock);
     gc_assert(lock_ret);
-#ifdef MEASURE_STOP_THE_WORLD_PAUSE
     thread_accrue_stw_time(me, &stw_begin_realtime, &stw_begin_cputime);
-#endif
 }
 
 #endif /* !LISP_FEATURE_SB_SAFEPOINT */

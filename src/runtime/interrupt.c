@@ -51,9 +51,6 @@
 #include <sys/wait.h>
 #endif
 #include <errno.h>
-#ifdef MEASURE_STOP_THE_WORLD_PAUSE
-#include <time.h>
-#endif
 
 #include "runtime.h"
 #include "arch.h"
@@ -1453,10 +1450,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * we wish to support has no problem with sem_wait() here in the signal handler. */
 
     int my_state = thread_wait_until_not(STATE_STOPPED, thread);
-#ifdef MEASURE_STOP_THE_WORLD_PAUSE
-    extern void thread_accrue_stw_time(struct thread*,struct timespec*,struct timespec*);
     thread_accrue_stw_time(thread, &t_beginpause, 0);
-#endif
 
     if (!thread->state_word.control_stack_guard_page_protected) {
         protect_control_stack_return_guard_page(1, thread);

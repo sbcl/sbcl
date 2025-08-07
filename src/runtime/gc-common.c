@@ -3531,3 +3531,38 @@ void sweep_linkage_space()
                 linkage_space[linkage_index] = (uword_t)illegal_linkage_space_call;
     }
 }
+
+#ifdef MEASURE_STOP_THE_WORLD_PAUSE
+static long timespec_diff(struct timespec* begin, struct timespec* end)
+{
+#ifdef LISP_FEATURE_64_BIT
+    return (end->tv_sec - begin->tv_sec) * 1000000000L + (end->tv_nsec - begin->tv_nsec) ;
+#else
+    return (end->tv_sec - begin->tv_sec) * 1000000L + (end->tv_nsec - begin->tv_nsec) / 1000;
+#endif
+}
+void thread_accrue_stw_time(void* opaque_thread,
+                            struct timespec* begin_real,
+                            struct timespec* begin_cpu)
+{
+    struct thread* th = opaque_thread;
+    /* A non-Lisp thread calling into Lisp via DEFINE-ALIEN-CALLABLE
+     * can receive SIG_STOP_FOR_GC as soon as it has a 'struct thread'
+     * and _before_ a thread instance has been consed */
+    if (th->lisp_thread) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        unsigned long elapsed = timespec_diff(begin_real, &now);
+        struct thread_instance* ti = (void*)INSTANCE(th->lisp_thread);
+        if (elapsed > ti->uw_max_stw_pause) ti->uw_max_stw_pause = elapsed;
+        ti->uw_sum_stw_pause += elapsed;
+        ++ti->uw_ct_stw_pauses;
+        if (begin_cpu) {
+#ifdef CLOCK_THREAD_CPUTIME_ID
+          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
+          ti->uw_gc_virtual_time += timespec_diff(begin_cpu, &now);
+#endif
+        }
+    }
+}
+#endif

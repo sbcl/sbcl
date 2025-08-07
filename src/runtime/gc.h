@@ -143,7 +143,11 @@ static inline char *page_address(page_index_t page_num)
 
 #if (defined LISP_FEATURE_DARWIN || defined LISP_FEATURE_LINUX) \
   && defined LISP_FEATURE_SB_THREAD
+#include <time.h>
 #define MEASURE_STOP_THE_WORLD_PAUSE
+extern void thread_accrue_stw_time(void*,struct timespec*,struct timespec*);
+#else
+#define thread_accrue_stw_time(dummy1,dummy2,dummy3)
 #endif
 
 #ifdef LISP_FEATURE_X86_64
