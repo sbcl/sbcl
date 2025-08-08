@@ -20,10 +20,6 @@
   (descriptor 0 :type #-os-provides-poll (mod #.sb-unix:fd-setsize)
                       #+os-provides-poll (and fixnum unsigned-byte))
   ;; T iff this handler is running.
-  ;;
-  ;; FIXME: unused. At some point this used to be set to T
-  ;; around the call to the handler-function, but that was commented
-  ;; out with the verbose explantion "Doesn't work -- ACK".
   active
   ;; Function to call.
   (function nil :type function)
@@ -50,20 +46,18 @@
 (defmethod print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
     (format stream
-            "~A on ~:[~;BOGUS ~]descriptor ~W: ~S"
+            "~A on ~:[~;BOGUS ~]~:[inactive~;active~] descriptor ~W: ~S"
             (handler-direction handler)
             (handler-bogus handler)
+            (handler-active handler)
             (handler-descriptor handler)
             (handler-function handler))))
 
-(define-thread-local *descriptor-handlers* nil
-  "List of all the currently active handlers for file descriptors")
+(defvar *descriptor-handlers-lock* (sb-thread:make-mutex :name "*DESCRIPTOR-HANDLERS-LOCK*"))
 
 (defmacro with-descriptor-handlers (&body forms)
-  ;; FD-STREAM functionality can add and remove descriptors on it's
-  ;; own, so getting an interrupt while modifying this and the
-  ;; starting to recursively modify it could lose...
-  `(without-interrupts ,@forms))
+  `(sb-thread::with-recursive-system-lock (*descriptor-handlers-lock*)
+     ,@forms))
 
 ;; Deallocating the pollfds is a no-op if not using poll()
 #-os-provides-poll (declaim (inline deallocate-pollfds))
@@ -80,16 +74,16 @@
           (pollfds-map it) nil)))
 
 (defun list-all-descriptor-handlers ()
-  (with-descriptor-handlers
-    (awhen *descriptor-handlers*
-      (copy-list (pollfds-list it)))))
+  (awhen *descriptor-handlers*
+    (copy-list (pollfds-list it))))
 
 (defun map-descriptor-handlers (function)
   (declare (function function))
-  (with-descriptor-handlers
-    (awhen *descriptor-handlers*
-      (dolist (handler (pollfds-list it))
-        (funcall function handler)))))
+  ;; Reading from *descriptor-handlers* is safe without a lock,
+  ;; DELETE wouldn't make it lose any conses.
+  (awhen *descriptor-handlers*
+    (dolist (handler (pollfds-list it))
+      (funcall function handler))))
 
 ;;; Add a new handler to *descriptor-handlers*.
 (defun add-fd-handler (fd direction function)
@@ -155,12 +149,17 @@
          (when ,handler
            (remove-fd-handler ,handler))))))
 
-  (defun invoke-handler (handler)
-    (with-simple-restart (remove-fd-handler "Remove ~S" handler)
-      (funcall (handler-function handler)
-               (handler-descriptor handler))
-      (return-from invoke-handler))
-    (remove-fd-handler handler))
+(defun invoke-handler (handler)
+  (unless (cas (handler-active handler) nil t)
+    (unwind-protect
+         (with-simple-restart (remove-fd-handler "Remove ~S" handler)
+           (funcall (handler-function handler)
+                    (handler-descriptor handler))
+           (return-from invoke-handler))
+      (sb-thread:barrier (:memory))
+      (setf (handler-active handler) nil))
+    (remove-fd-handler handler)))
+
 ;;; First, get a list and mark bad file descriptors. Then signal an error
 ;;; offering a few restarts.
 (defun handler-descriptors-error
@@ -325,9 +324,8 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
       ;; descriptor count.
       (map-descriptor-handlers
        (lambda (handler)
-         ;; FIXME: If HANDLER-ACTIVE ever is reinstanted, it needs
-         ;; to be checked here in addition to HANDLER-BOGUS
-         (unless (handler-bogus handler)
+         (unless (or (handler-bogus handler)
+                     (handler-active handler))
            (let ((fd (handler-descriptor handler)))
              (ecase (handler-direction handler)
                (:input (sb-unix:fd-set fd read-fds))
@@ -419,7 +417,8 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                              :initial-element nil)))
             (dolist (handler handlers)
               (incf handler-index)
-              (unless (handler-bogus handler)
+              (unless (or (handler-bogus handler)
+                          (handler-active handler))
                 (let* ((fd (handler-descriptor handler))
                        (fd-index (svref scratchpad fd)))
                   (if fd-index
@@ -430,10 +429,12 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
           ;; This is O(N^2) but fast for small inputs.
           (dolist (handler handlers)
             (incf handler-index)
-            (unless (handler-bogus handler)
+            (unless (or (handler-bogus handler)
+                        (handler-active handler))
               (let ((dup-of (position (handler-descriptor handler)
                                       handlers :key (lambda (x)
-                                                      (unless (handler-bogus x)
+                                                      (unless (or (handler-bogus x)
+                                                                  (handler-active x))
                                                         (handler-descriptor x)))
                                                :end handler-index))
                     (fd-index nil))
@@ -503,7 +504,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                ;; handler to index into the C array was necessarily clobbered.
                (loop for handler in list
                      for fd-index across map
-                     for revents = (slot (deref fds fd-index) 'sb-unix:revents)
+                     for revents = (if fd-index (slot (deref fds fd-index) 'sb-unix:revents) 0)
                      when (logtest revents sb-unix:pollnval)
                      collect handler into bad
                      ;; James Knight says that if POLLERR is set, user code
