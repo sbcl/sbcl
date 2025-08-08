@@ -53,6 +53,9 @@
             (handler-descriptor handler)
             (handler-function handler))))
 
+(define-thread-local *descriptor-handlers* nil
+  "List of all the currently active handlers for file descriptors")
+
 (defvar *descriptor-handlers-lock* (sb-thread:make-mutex :name "*DESCRIPTOR-HANDLERS-LOCK*"))
 
 (defmacro with-descriptor-handlers (&body forms)
