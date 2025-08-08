@@ -565,26 +565,12 @@ on_stack_p(struct thread *th, void *esp)
         < (void *)th->control_stack_end;
 }
 
-#ifdef LISP_FEATURE_UNIX
-/* (Technically, we still allocate an altstack even on Windows.  Since
- * Windows has a contiguous stack with an automatic guard page of
- * user-configurable size instead of an alternative stack though, the
- * SBCL-allocated altstack doesn't actually apply and won't be used.) */
-int
-on_altstack_p(struct thread *th, void *esp)
-{
-    void *start = (char *)th+dynamic_values_bytes;
-    void *end = (char *)start + 32*SIGSTKSZ;
-    return start <= esp && esp < end;
-}
-#endif
-
-void
-assert_on_stack(struct thread *th, void *esp)
+void assert_on_stack(struct thread *th, void *esp)
 {
     if (on_stack_p(th, esp))
         return;
 #ifdef LISP_FEATURE_UNIX
+    extern int on_altstack_p(struct thread *th, void *esp);
     if (on_altstack_p(th, esp))
         lose("thread %p: esp on altstack: %p", th, esp);
 #endif

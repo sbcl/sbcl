@@ -13,9 +13,6 @@
  * files for more information.
  */
 
-#ifdef __linux__
-#define _GNU_SOURCE // potentially alters SIGSTKSZ
-#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include "gc.h"
@@ -537,6 +534,35 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
     }
 }
 
+/* Apparently SIGSTKSZ can be defined differently depending on _GNU_SOURCE.
+ * It would be fine if different ways of arriving at the constant produced
+ * the same answer, but they dont:
+ *   #include <signal.h>
+ *   #include <stdio.h>
+ *   #include <unistd.h>
+ *   int main() { printf("%d %d\n", sysconf (_SC_SIGSTKSZ), SIGSTKSZ); return 0; }
+ * Output:
+ * 20480 16384
+ *
+ * As such, it's best that all uses of the preprocessor macro be confined to one place
+ * because free_thread_struct explicitly passes a size when freeing.
+ */
+
+#ifdef LISP_FEATURE_WIN32
+#define ALT_STACK_SIZE 0
+#else
+#define ALT_STACK_SIZE 32 * SIGSTKSZ
+#endif
+
+/* As a helpful reminder of how this calculation arises, the summands should
+ * correspond, in the correct order, to the picture below */
+#define THREAD_STRUCT_SIZE \
+  (THREAD_ALIGNMENT_BYTES + \
+   thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
+   THREAD_CSP_PAGE_SIZE + \
+   (THREAD_HEADER_SLOTS*N_WORD_BYTES) + dynamic_values_bytes + \
+   sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
+
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
  * thread
@@ -765,4 +791,28 @@ alloc_thread_struct(void* spaces) {
 #endif
     th->stepping = 0;
     return th;
+}
+
+void free_thread_struct(struct thread *th)
+{
+    struct extra_thread_data *extra_data = thread_extra_data(th);
+    if (extra_data->arena_savearea) free(extra_data->arena_savearea);
+    os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
+}
+
+#ifdef LISP_FEATURE_UNIX
+/* (Technically, we still allocate an altstack even on Windows.  Since
+ * Windows has a contiguous stack with an automatic guard page of
+ * user-configurable size instead of an alternative stack though, the
+ * SBCL-allocated altstack doesn't actually apply and won't be used.) */
+int
+on_altstack_p(struct thread *th, void *esp)
+{
+    void *start = (char *)th+dynamic_values_bytes;
+    void *end = (char *)start + 32*SIGSTKSZ;
+    return start <= esp && esp < end;
+}
+#endif
+void* calc_altstack_end(struct thread* thread) {
+    return (char*)thread->os_address + THREAD_STRUCT_SIZE;
 }

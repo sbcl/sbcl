@@ -173,21 +173,6 @@ extern pthread_key_t current_thread;
 # define THREAD_CSP_PAGE_SIZE os_reported_page_size
 #endif
 
-#ifdef LISP_FEATURE_WIN32
-#define ALT_STACK_SIZE 0
-#else
-#define ALT_STACK_SIZE 32 * SIGSTKSZ
-#endif
-
-/* As a helpful reminder of how this calculation arises, the summands should
- * correspond, in the correct order, to the picture in thread.c */
-#define THREAD_STRUCT_SIZE \
-  (THREAD_ALIGNMENT_BYTES + \
-   thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
-   THREAD_CSP_PAGE_SIZE + \
-   (THREAD_HEADER_SLOTS*N_WORD_BYTES) + dynamic_values_bytes + \
-   sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
-
 /* sigaltstack() - "Signal stacks are automatically adjusted
  * for the direction of stack growth and alignment requirements." */
 static inline void* calc_altstack_base(struct thread* thread) {
@@ -196,9 +181,7 @@ static inline void* calc_altstack_base(struct thread* thread) {
     return ((char*) thread) + dynamic_values_bytes
         + ALIGN_UP(sizeof (struct extra_thread_data), N_WORD_BYTES);
 }
-static inline void* calc_altstack_end(struct thread* thread) {
-    return (char*)thread->os_address + THREAD_STRUCT_SIZE;
-}
+extern void* calc_altstack_end(struct thread* thread);
 static inline int calc_altstack_size(struct thread* thread) {
     // 'end' is calculated as exactly the end address we got from the OS.
     // The usually ends up making the stack slightly larger than ALT_STACK_SIZE

@@ -402,14 +402,6 @@ void sb_posix_after_fork() { // for use by sb-posix:fork
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-
-void free_thread_struct(struct thread *th)
-{
-    struct extra_thread_data *extra_data = thread_extra_data(th);
-    if (extra_data->arena_savearea) free(extra_data->arena_savearea);
-    os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
-}
-
 /* Note: scribble must be stack-allocated */
 static void
 init_new_thread(struct thread *th,
@@ -668,6 +660,7 @@ static void put_recyclebin_item(struct thread* th)
     recyclebin_threads = th;
     ignore_value(mutex_release(&recyclebin_lock));
 }
+extern void free_thread_struct(struct thread *);
 void empty_thread_recyclebin()
 {
     if (!recyclebin_threads) return;
