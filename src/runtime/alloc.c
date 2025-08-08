@@ -13,6 +13,9 @@
  * files for more information.
  */
 
+#ifdef __linux__
+#define _GNU_SOURCE // potentially alters SIGSTKSZ
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include "gc.h"

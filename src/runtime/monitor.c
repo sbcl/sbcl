@@ -1246,7 +1246,9 @@ void init_ldb_service()
 #endif
 
 #ifdef STANDALONE_LDB
+# ifdef LISP_FEATURE_X86_64
 void callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2) { }
+# endif
 void set_thread_state(struct thread *thread, char state, bool sigblocked) {
     lose("can't set_thread_state %p %d %d", thread, state, sigblocked);
 }
