@@ -56,10 +56,8 @@
 (define-thread-local *descriptor-handlers* nil
   "List of all the currently active handlers for file descriptors")
 
-(defvar *descriptor-handlers-lock* (sb-thread:make-mutex :name "*DESCRIPTOR-HANDLERS-LOCK*"))
-
 (defmacro with-descriptor-handlers (&body forms)
-  `(sb-thread::with-recursive-system-lock (*descriptor-handlers-lock*)
+  `(without-interrupts
      ,@forms))
 
 ;; Deallocating the pollfds is a no-op if not using poll()
@@ -92,7 +90,7 @@
 (defun add-fd-handler (fd direction function)
   "Arrange to call FUNCTION whenever FD is usable. DIRECTION should be
   either :INPUT or :OUTPUT. The value returned should be passed to
-  SYSTEM:REMOVE-FD-HANDLER when it is no longer needed."
+  SB-SYS:REMOVE-FD-HANDLER when it is no longer needed."
   (unless (member direction '(:input :output))
     ;; FIXME: should be TYPE-ERROR?
     (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
@@ -140,7 +138,7 @@
 ;;; it discards the cached C array of (struct pollfd), as it must do
 ;;; each time the list of Lisp HANDLER structs is touched.
 (defmacro with-fd-handler ((fd direction function) &rest body)
-  "Establish a handler with SYSTEM:ADD-FD-HANDLER for the duration of BODY.
+  "Establish a handler with SB-SYS:ADD-FD-HANDLER for the duration of BODY.
    DIRECTION should be either :INPUT or :OUTPUT, FD is the file descriptor to
    use, and FUNCTION is the function to call whenever FD is usable."
   (let ((handler (gensym)))
@@ -153,15 +151,14 @@
            (remove-fd-handler ,handler))))))
 
 (defun invoke-handler (handler)
-  (unless (cas (handler-active handler) nil t)
-    (unwind-protect
-         (with-simple-restart (remove-fd-handler "Remove ~S" handler)
-           (funcall (handler-function handler)
-                    (handler-descriptor handler))
-           (return-from invoke-handler))
-      (sb-thread:barrier (:memory))
-      (setf (handler-active handler) nil))
-    (remove-fd-handler handler)))
+  (setf (handler-active handler) t)
+  (unwind-protect
+       (with-simple-restart (remove-fd-handler "Remove ~S" handler)
+         (funcall (handler-function handler)
+                  (handler-descriptor handler))
+         (return-from invoke-handler))
+    (setf (handler-active handler) nil))
+  (remove-fd-handler handler))
 
 ;;; First, get a list and mark bad file descriptors. Then signal an error
 ;;; offering a few restarts.
