@@ -333,7 +333,7 @@ extern int sb_GetTID();
 # define THREAD_ID_VALUE (sb_GetTID())
 #else
 # define THREAD_ID_LABEL " pthread %p"
-# define THREAD_ID_VALUE ((void*)thread_self())
+# define THREAD_ID_VALUE ((void*)pthread_self())
 #endif
 
 #ifdef LISP_FEATURE_DARWIN_JIT

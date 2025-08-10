@@ -38,8 +38,6 @@ static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; 
 #define CONDITION_VAR_WAIT(x,y) SleepConditionVariableCS(x,y,INFINITE)
 #define CONDITION_VAR_WAKE_ALL(x) WakeAllConditionVariable(x)
 #else
-#define thread_self() pthread_self()
-#define thread_equal(a,b) pthread_equal(a,b)
 #define thread_sigmask pthread_sigmask
 #define mutex_acquire(l) !pthread_mutex_lock(l)
 #define mutex_release(l) !pthread_mutex_unlock(l)
@@ -50,8 +48,6 @@ static inline int cs_mutex_unlock(void* l) { LeaveCriticalSection(l); return 1; 
 
 #else
 // not SB_THREAD
-#define thread_self() 0
-#define thread_equal(a,b) ((a)==(b))
 #define thread_sigmask sigprocmask
 #define mutex_acquire(l) 1
 #define mutex_release(l) 1

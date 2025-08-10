@@ -242,7 +242,9 @@ pthread_attr_t new_lisp_thread_attr;
 #endif
 struct thread *alloc_thread_struct(void*);
 
-#ifdef LISP_FEATURE_WIN32
+#ifndef LISP_FEATURE_SB_THREAD
+#define ASSOCIATE_OS_THREAD(thread) { /*do nothing */ }
+#elif defined LISP_FEATURE_WIN32
 #define ASSOCIATE_OS_THREAD(thread) \
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), \
                     GetCurrentProcess(), (LPHANDLE)&thread->os_thread, 0, TRUE, \
@@ -252,9 +254,9 @@ struct thread *alloc_thread_struct(void*);
 #include <sys/prctl.h>
 extern int arch_prctl(int code, unsigned long *addr);
 #define ASSOCIATE_OS_THREAD(thread) arch_prctl(ARCH_SET_GS, (uword_t*)thread), \
-      thread->os_thread = thread_self()
+      thread->os_thread = pthread_self()
 #else
-#define ASSOCIATE_OS_THREAD(thread) thread->os_thread = thread_self()
+#define ASSOCIATE_OS_THREAD(thread) thread->os_thread = pthread_self()
 #endif
 
 #ifdef LISP_FEATURE_WIN32
