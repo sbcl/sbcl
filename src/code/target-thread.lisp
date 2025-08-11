@@ -1072,11 +1072,8 @@ IF-NOT-OWNER is :FORCE)."
     nil))
 
 (defmethod print-object ((waitqueue waitqueue) stream)
-  (acond ((waitqueue-name waitqueue)
-          (print-unreadable-object (waitqueue stream :type t :identity t)
-            (write-string it stream)))
-         (t
-          (print-unreadable-object (waitqueue stream :type t :identity t)))))
+  (print-unreadable-object (waitqueue stream :type t :identity t)
+    (format stream "~:[-~;~:*~S~]" (waitqueue-name waitqueue))))
 
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
@@ -1298,6 +1295,12 @@ must be held by this thread during this call."
 
 
 ;;;; Semaphores
+
+(defmethod print-object ((sem semaphore) stream)
+  (print-unreadable-object (sem stream :type t :identity t)
+    (format stream "~@[~S ~]Ct=~D"
+            (waitqueue-name (semaphore-queue sem))
+            (semaphore-%count sem))))
 
 (defun make-semaphore (&key name (count 0))
   "Create a semaphore with the supplied COUNT and NAME."
