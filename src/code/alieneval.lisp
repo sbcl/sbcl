@@ -1149,7 +1149,13 @@
               (setf (auxiliary-alien-type kind name env)
                     (!make-alien-record-type :name name :kind kind))))
          (t
-          (!make-alien-record-type :kind kind)))))
+          (ecase kind
+            (:union
+             (load-time-value
+              (!make-alien-record-type :kind :union)))
+            (:struct
+             (load-time-value
+              (!make-alien-record-type :kind :struct))))))))
   (define-alien-type-translator union (name &rest fields &environment env)
     (parse-alien-record-type :union name fields env))
   (define-alien-type-translator struct (name &rest fields &environment env)
