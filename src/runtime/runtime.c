@@ -610,6 +610,8 @@ parse_argv(struct memsize_options memsize_options,
     return o;
 }
 
+void dyndebug_init(void);
+
 int
 initialize_lisp(int argc, char *argv[], char *envp[])
 {

@@ -67,8 +67,6 @@ typedef enum {
     GC_NPHASES
 }  gc_phase_t;
 
-void map_gc_page();
-void unmap_gc_page();
 void gc_state_lock();
 void gc_state_wait(gc_phase_t);
 int gc_cycle_active(void);
@@ -79,11 +77,6 @@ void gc_state_unlock();
     RUN_BODY_ONCE(gc_state_lock, gc_state_unlock())
 
 #endif
-
-/*
- * Configuration options end here -- the following defines do not
- * generally need customization.
- */
 
 /* Flags defined in a structure to avoid code duplication between
  * declaration and definition. */
@@ -98,8 +91,6 @@ extern struct dyndebug_config {
     int dyndebug_io;
     int dyndebug_runtime_link;
 } dyndebug_config;
-
-void dyndebug_init(void);
 
 #include <sys/types.h>
 
@@ -122,8 +113,6 @@ void dyndebug_init(void);
 
 extern void *checked_malloc (size_t size);
 extern char *copied_string (char *string);
-
-void *os_dlsym_default(char *name); // Why not in 'os.h' ?
 
 /* Even with just -O1, gcc optimizes the jumps in this "loop" away
  * entirely, giving the ability to define WITH-FOO-style macros. */

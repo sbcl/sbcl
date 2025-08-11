@@ -166,6 +166,7 @@ os_sem_destroy(os_sem_t *sem)
  * table entry for each element of REQUIRED_FOREIGN_SYMBOLS.
  */
 
+void *os_dlsym_default(char *name);
 #ifndef LISP_FEATURE_WIN32
 void *
 os_dlsym_default(char *name)

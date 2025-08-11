@@ -102,6 +102,8 @@ const char* gc_phase_names[GC_NPHASES] = {
     ignore_value(mutex_acquire(&all_threads_lock)); \
     RUN_BODY_ONCE(all_threads_lock, ignore_value(mutex_release(&all_threads_lock)))
 
+extern void map_gc_page();
+extern void unmap_gc_page();
 #if !defined(LISP_FEATURE_WIN32)
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
  * definition goes here.  Fixme: (Why) don't these work for Windows?
