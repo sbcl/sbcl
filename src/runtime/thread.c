@@ -323,7 +323,11 @@ void asan_lisp_thread_cleanup() {
     ignore_value(mutex_release(&all_threads_lock));
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
 static void unregister_thread(struct thread *, init_thread_data *);
+#else
+#define unregister_thread(dummy1,dummy2)
+#endif
 
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
@@ -385,9 +389,7 @@ void create_main_lisp_thread(lispobj function) {
     funcall0(function);
 #endif
     // If we end up returning (when used as shared library), clean up the initial thread.
-#ifdef LISP_FEATURE_SB_THREAD
     unregister_thread(th, NULL);
-#endif
 }
 
 void sb_posix_after_fork() { // for use by sb-posix:fork
