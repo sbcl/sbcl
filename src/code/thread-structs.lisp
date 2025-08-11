@@ -129,9 +129,12 @@ in future versions."
   ;; might have been known as the %ALIVE-P flag.
   (%visible 1 :type fixnum)
   (interruptions nil :type list)
-  (interruptions-lock
-   (make-mutex :name "thread interruptions lock")
-   :type mutex :read-only t)
+  ;; This lock ensures that accessing the so-called "primitive thread" for this
+  ;; instance from a different thread does not engender a use-after-free error,
+  ;; as the lock must be acquired to free the mmapped backing store..
+  ;; It also protects the queue of interruptions from concurrent access,
+  ;; though that could potentially become a lockfree list.
+  (storage-lock (make-mutex :name "thread memory") :type mutex :read-only t)
 
   ;; Per-thread memoization of GET-INTERNAL-REAL-TIME, for race-free update.
   ;; This might be a bignum, which is why we bother.

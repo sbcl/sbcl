@@ -1541,7 +1541,7 @@ on this semaphore, then N of them is woken up."
 ;;; WITH-DEATHLOK ensures that the 'struct thread' and/or OS thread won't go away
 ;;; by synchronizing with HANDLE-THREAD-EXIT.
 (defmacro with-deathlok ((thread &optional c-thread) &body body)
-  `(with-system-mutex ((thread-interruptions-lock ,thread))
+  `(with-system-mutex ((thread-storage-lock ,thread))
      ,@(if c-thread
            `((let ((,c-thread (thread-primitive-thread ,thread))) ,@body))
            body)))
