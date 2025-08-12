@@ -3516,8 +3516,8 @@ expansion happened."
 (define-type-method (array :simple-intersection2) (type1 type2)
   (array-intersection type1 type2 nil))
 
-;;; Turn (and (simple-array t) (not vector)) into
-;;; (and (simple-array t) (not simple-vector))
+;;; Turn (and (simple-array t) (not (vector t))) into
+;;; (and (simple-array t) (not vector))
 (define-type-method (array :complex-intersection2) (type1 type2)
   (or
    (block nil
@@ -3526,7 +3526,7 @@ expansion happened."
          (when (array-type-p not-type1)
            (let ((complexp (array-type-complexp type2))
                  (dim (array-type-dimensions type2))
-                 (et (array-type-element-type type2))
+                 ;(et (array-type-element-type type2))
                  (sp-et (array-type-specialized-element-type type2))
                  (not-complexp (array-type-complexp not-type1))
                  (not-dim (array-type-dimensions not-type1))
@@ -3536,36 +3536,28 @@ expansion happened."
                  new-dim
                  new-et
                  new-sp-et)
-             (when (and (neq complexp :maybe)
-                        (eq not-complexp :maybe))
-               (setf new-complexp complexp))
-             (when (neq dim '*)
-               (cond ((eq not-dim '*)
-                      (setf new-dim dim))
-                     ((not (= (length dim)
-                              (length not-dim)))
-                      (return))
-                     ((or (equal dim not-dim)
-                          (not (find '* dim :test-not #'eq))
-                          (not (find '* not-dim))))
+             (when (and (eq complexp not-complexp)
+                        (neq complexp :maybe))
+               (setf new-complexp :maybe))
+             (when (and (neq dim '*)
+                        (neq not-dim '*))
+               (cond ((or (equal dim not-dim)
+                          (not (find '* not-dim :test-not #'eq)))
+                      (setf new-dim '*))
                      (t
                       (let ((maybe-new-dim
                               (loop for d in dim
                                     for not-d in not-dim
-                                    collect (if (and (neq d '*)
-                                                     (eq not-d '*))
-                                                d
+                                    collect (if (eql d not-d)
+                                                '*
                                                 not-d))))
                         (unless (equal maybe-new-dim not-dim)
                           (setf new-dim maybe-new-dim))))))
-             (cond ((and (neq sp-et *wild-type*)
-                         (eq not-sp-et *wild-type*)
-                         (eq not-et *wild-type*))
-                    (setf new-sp-et sp-et))
-                   ((and (eql sp-et not-sp-et)
-                         (not (eql et not-et))
-                         (not (contains-unknown-type-p not-et)))
-                    (setf new-et et)))
+             (when (and (eq sp-et not-sp-et)
+                        (neq sp-et *wild-type*)
+                        (not (contains-unknown-type-p not-et)))
+               (setf new-sp-et *wild-type*
+                     new-et *wild-type*))
              (when (or new-dim new-et new-sp-et
                        (not (eql new-complexp 0)))
                (type-difference type2
