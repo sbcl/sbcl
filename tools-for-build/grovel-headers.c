@@ -355,7 +355,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 #endif // !WIN32
     printf("\n");
 
-#if !defined(LISP_FEATURE_AVOID_CLOCK_GETTIME)
+#ifdef LISP_FEATURE_OS_PROVIDES_CLOCK_GETTIME
 #ifdef LISP_FEATURE_UNIX
     DEFCONSTANT("clock-realtime", CLOCK_REALTIME);
     DEFCONSTANT("clock-monotonic", CLOCK_MONOTONIC);

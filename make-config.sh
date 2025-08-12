@@ -561,6 +561,11 @@ rm -f sbcl.mk sbcl.o libsbcl.a
 # of the shell script, though. -- CSR, 2002-02-03
 link_or_copy $sbcl_arch-arch.h target-arch.h
 link_or_copy $sbcl_arch-lispregs.h target-lispregs.h
+case "$sbcl_os" in # all but 2 unconditionally have clock-gettime
+    darwin) ;;
+    win32) ;;
+    *) printf ' :os-provides-clock-gettime' >> $ltf ;;
+esac
 case "$sbcl_os" in
     linux)
         printf ' :unix :linux :elf' >> $ltf
@@ -642,8 +647,8 @@ case "$sbcl_os" in
         else
             printf ' :os-provides-pthread-setname-np' >> $ltf
         fi
-        if (( 15 > $darwin_version_major )); then
-            printf ' :avoid-clock-gettime' >> $ltf
+        if (( $darwin_version_major >= 15 )); then
+            printf ' :os-provides-clock-gettime' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
             if (( 8 < $darwin_version_major )); then

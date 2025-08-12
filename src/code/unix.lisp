@@ -995,12 +995,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
-#-win32
+#+os-provides-clock-gettime
 (progn
-
-  #-avoid-clock-gettime
   (declaim (inline clock-gettime))
-  #-avoid-clock-gettime
   (defun clock-gettime (clockid)
     (declare (type (signed-byte 32) clockid))
     (with-alien ((ts (struct timespec)))
@@ -1011,8 +1008,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
       ;; can express 1E11 years in seconds.
       (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
               #-64-bit (slot ts 'tv-sec)
-              (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec)))))
+              (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec))))))
 
+#+unix
+(progn
   (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
@@ -1035,10 +1034,10 @@ the UNIX epoch (January 1st 1970.)"
           ;; By scaling down we end up with far less resolution than clock-realtime
           ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
           ;; BSD has something similar.
-          #-avoid-clock-gettime
-        (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
-        #+avoid-clock-gettime
-        (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
+          #+os-provides-clock-gettime
+          (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
+          #-os-provides-clock-gettime
+          (multiple-value-bind (c-sec c-usec) (get-time-of-day) (values c-sec (* c-usec 1000)))
 
         #+64-bit ;; I know that my math is valid for 64-bit.
         (declare (optimize (sb-c::type-check 0)))
@@ -1090,13 +1089,13 @@ the UNIX epoch (January 1st 1970.)"
 
   ;; SunOS defines CLOCK_PROCESS_CPUTIME_ID but you get EINVAL if you try to use it,
   ;; also use the same trick when clock_gettime should be avoided.
-  #-(or sunos avoid-clock-gettime)
+  #+(and os-provides-clock-gettime (not sunos))
   (defun system-internal-run-time ()
     (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
       (+ (* sec internal-time-units-per-second)
          (floor (+ nsec (floor nanoseconds-per-internal-time-unit 2))
                 nanoseconds-per-internal-time-unit))))
-  #+(or sunos avoid-clock-gettime)
+  #-(and os-provides-clock-gettime (not sunos))
   (defun system-internal-run-time ()
     (multiple-value-bind (utime-sec utime-usec stime-sec stime-usec)
         (with-alien ((usage (struct sb-unix::rusage)))

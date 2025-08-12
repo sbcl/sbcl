@@ -159,9 +159,9 @@
         (assert (zerop n-unary-nodes)))))
 
 (defmacro microseconds-elapsed (form)
-  #+(or win32 avoid-clock-gettime)
+  #-os-provides-clock-gettime
   `(values 0 ,form)
-  #-(or win32 avoid-clock-gettime)
+  #+os-provides-clock-gettime
   `(multiple-value-bind (sec0 nsec0) (sb-unix:clock-gettime sb-unix:clock-realtime)
      (let ((result ,form))
        (multiple-value-bind (sec1 nsec1) (sb-unix:clock-gettime sb-unix:clock-realtime)

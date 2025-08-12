@@ -41,6 +41,7 @@
 #include <limits.h>
 
 #include <time.h>
+#include <sys/time.h> // for gettimeofday
 
 #ifndef LISP_FEATURE_WIN32
 #include <signal.h>
@@ -620,12 +621,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
     struct lisp_exception_frame exception_frame;
 #endif
 #ifdef LISP_FEATURE_UNIX
-#ifdef LISP_FEATURE_AVOID_CLOCK_GETTIME
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    lisp_init_time.tv_sec = tv.tv_sec;
-    lisp_init_time.tv_nsec = tv.tv_usec * 1000;
-#else
+#ifdef LISP_FEATURE_OS_PROVIDES_CLOCK_GETTIME
     clock_gettime(
 #ifdef LISP_FEATURE_LINUX
         CLOCK_MONOTONIC_COARSE
@@ -633,6 +629,11 @@ initialize_lisp(int argc, char *argv[], char *envp[])
         CLOCK_MONOTONIC
 #endif
         , &lisp_init_time);
+#else
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    lisp_init_time.tv_sec = tv.tv_sec;
+    lisp_init_time.tv_nsec = tv.tv_usec * 1000;
 #endif
 #endif
 
