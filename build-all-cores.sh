@@ -74,13 +74,16 @@
            (setq start (1+ end))))))))
 
 (defun add-os-features (arch features)
-  (if (intersection '(:unix :win32) features)
-      features
-      (let* ((arch-symbol (sb-int:keywordicate (string-upcase arch)))
-             (os-features (case arch-symbol
-                            ((:x86 :x86-64) '(:win32 :sb-thread :sb-safepoint))
-                            (t '(:unix :linux :elf)))))
-        (append os-features features))))
+  (cond ((find :unix features)
+         (append features '(:os-provides-clock-gettime)))
+        ((find :win32 features)
+         features)
+        (t
+         (let* ((arch-symbol (sb-int:keywordicate (string-upcase arch)))
+                (os-features (case arch-symbol
+                               ((:x86 :x86-64) '(:win32 :sb-thread :sb-safepoint))
+                               (t '(:unix :linux :elf :os-provides-clock-gettime)))))
+           (append os-features features)))))
 
 ;;; TODO: dependencies for each target based on build-order.lisp-expr
 (let
