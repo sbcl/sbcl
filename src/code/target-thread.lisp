@@ -1778,10 +1778,8 @@ session."
                 (alien-funcall setguard attr 0)))
          (with-pinned-objects (thread)
            (= 0 (alien-funcall
-                 (extern-alien "create_lisp_thread"
-                               (function int system-area-pointer
-                                         system-area-pointer system-area-pointer))
-                 (struct-slot-sap thread thread os-thread) attr thread-sap))))))
+                 (extern-alien "create_lisp_thread" (function int unsigned system-area-pointer))
+                 (get-lisp-obj-address thread) thread-sap))))))
 
 (defmacro free-thread-struct (memory)
   `(alien-funcall (extern-alien "free_thread_struct" (function void system-area-pointer))
@@ -1917,8 +1915,8 @@ session."
               0)
         ;; Take ownership of our statistical profiling data and transfer the results to
         ;; the global pool. This doesn't need to synchronize with the signal handler,
-        ;; which is effectively disabled now, but does synchronize via the interruptions
-        ;; mutex with any other thread trying to read this thread's data.
+        ;; which is effectively disabled now, but does synchronize via THREAD-STORAGE-LOCK
+        ;; with any other thread trying to read this thread's data.
         (let ((sprof-data (sb-vm::current-thread-offset-sap sb-vm:thread-sprof-data-slot)))
           (unless (= (sap-int sprof-data) 0)
             (setf (sap-ref-word (descriptor-sap c-thread)

@@ -143,7 +143,7 @@ EXPERIMENTAL: Interface subject to change."
                                sb-kernel:*current-internal-error-context*
                                (sb-sys:int-sap 0))
                            0))
-      ;; %INTERRUPT-THREAD requires that the interruptions lock be held by the caller.
+      ;; %INTERRUPT-THREAD requires that the storage lock be held by the caller.
       (sb-thread:with-deathlok (thread c-thread)
         (when (and (/= c-thread 0)
                    (zerop (sap-ref-8 (int-sap c-thread) (sprof-enable-byte))))

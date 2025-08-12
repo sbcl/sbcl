@@ -110,7 +110,7 @@ in future versions."
   ;; correspond to an OS thread, it could be the case that the threading model has
   ;; user-visible threads that do not map directly to OSs threads (or LWPs).
   ;; Any use of THREAD-OS-THREAD from lisp should take care to ensure validity of
-  ;; the thread id by holding the INTERRUPTIONS-LOCK.
+  ;; the thread id by holding THREAD-STORAGE-LOCK.
   ;; Not needed for win32 threads.
   #-win32 (os-thread 0 :type sb-vm:word)
   ;; Keep a copy of the stack range for use in SB-EXT:STACK-ALLOCATED-P so that

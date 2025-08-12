@@ -879,8 +879,17 @@ uword_t create_lisp_thread(struct thread* th)
 #else
 # define START_ROUTINE new_thread_trampoline
 #endif
-int create_lisp_thread(pthread_t *th, pthread_attr_t *attr, void *arg) {
-    return pthread_create(th, attr, START_ROUTINE, arg);
+int create_lisp_thread(lispobj lispthread, struct thread* arg)
+{
+    struct thread_instance* instance = (void*)INSTANCE(lispthread);
+    /* All pthread implementations SBCL runs on have sizeof (pthread_t) = sizeof (uintptr_t)
+     * which is not a POSIX requirement. If pthread_t is larger than a word, we would have to
+     * overlay it on >1 raw slot of 'struct thread_instance'. grovel-headers could output the
+     * number of slots needed to hold the type. But we'd have other problems too: pthread_join
+     * and pthread_kill are called from Lisp, but we can't pass structs by value. Anyway, the
+     * cast to (pthread_t*) proves that monkey business was and is going on */
+    return pthread_create((pthread_t*)&instance->uw_os_thread,
+                          &new_lisp_thread_attr, START_ROUTINE, arg);
 }
 #endif
 
