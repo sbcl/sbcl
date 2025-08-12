@@ -638,7 +638,9 @@ case "$sbcl_os" in
         darwin_version=`uname -r`
         darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
         if (( 10 > $darwin_version_major )) || [ $sbcl_arch = "ppc" ]; then
-            printf ' :use-darwin-posix-semaphores :avoid-pthread-setname-np' >> $ltf
+            printf ' :use-darwin-posix-semaphores' >> $ltf
+        else
+            printf ' :os-provides-pthread-setname-np' >> $ltf
         fi
         if (( 15 > $darwin_version_major )); then
             printf ' :avoid-clock-gettime' >> $ltf

@@ -630,7 +630,7 @@ void sb_set_os_thread_name(char* name)
      * but my testing showed that 12.1 seems to accept any length */
     pthread_set_name_np(pthread_self(), name);
 #endif
-#if defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_AVOID_PTHREAD_SETNAME_NP
+#if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_OS_PROVIDES_PTHREAD_SETNAME_NP
     if (vector_len(v) < 64) pthread_setname_np(name);
 #endif
 }
