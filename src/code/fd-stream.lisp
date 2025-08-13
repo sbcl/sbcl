@@ -298,6 +298,8 @@
 ;;; queued output we try to write the buffer immediately -- otherwise
 ;;; we queue it for later.
 (defun flush-output-buffer (stream)
+  (when (>= (fd-stream-file-position stream) 0)
+    (setf (fd-stream-file-position stream) -1))
   (let ((obuf (fd-stream-obuf stream)))
     (when obuf
       (let ((head (buffer-head obuf))
@@ -317,8 +319,6 @@
                (aver (< head tail))
                (when (fd-stream-synchronize-output stream)
                  (synchronize-stream-output stream))
-               (when (>= (fd-stream-file-position stream) 0)
-                 (setf (fd-stream-file-position stream) -1))
                (loop
                 (let ((length (- tail head)))
                   (multiple-value-bind (count errno)
