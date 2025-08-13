@@ -106,8 +106,10 @@
 (defmacro int-syscall ((name &rest arg-types) &rest args)
   `(syscall (,(libc-name-for name) ,@arg-types) (values result 0) ,@args))
 
-(defmacro type-syscall ((name return-type &rest arg-types) &rest args)
-  `(syscall-type (,(libc-name-for name) ,return-type ,@arg-types) (values result 0) ,@args))
+(defmacro type-syscall ((name return-type lisp-return-type &rest arg-types) &rest args)
+  `(syscall-type (,(libc-name-for name) ,return-type ,@arg-types)
+                 (values (truly-the ,lisp-return-type result) 0)
+                 ,@args))
 
 (defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
@@ -329,7 +331,7 @@ corresponds to NAME, or NIL if there is none."
   (declare (type unix-fd fd)
            (type index len))
   (type-syscall (#-win32 "read" #+win32 "win32_unix_read"
-                 ssize-t
+                 ssize-t index
                  int (* char) size-t)
                 fd buf
                 (min len
@@ -350,7 +352,8 @@ corresponds to NAME, or NIL if there is none."
   (flet ((%write (sap)
            (declare (system-area-pointer sap))
            (type-syscall (#-win32 "write" #+win32 "win32_unix_write"
-                          ssize-t int (* char) size-t)
+                          ssize-t index
+                          int (* char) size-t)
                          fd
                          (with-alien ((ptr (* char) sap))
                            (addr (deref ptr offset)))
