@@ -329,6 +329,45 @@ static void unregister_thread(struct thread *, init_thread_data *);
 #define unregister_thread(dummy1,dummy2)
 #endif
 
+/* Consing an SB-THREAD:THREAD instance from C for each thread would be ideal because:
+ * 1. Generally the representation of a thread that *MUST* exist is the Lisp object,
+ *    despite the backing memory being freed. Unfortunately, the main thread violated
+ *    this during startup, as it has backing memory without a thread_instance.
+ * 2. In a new yieldpoint implementation (WIP), some logic requires a pthread mutex
+ *    (or Windows equivalent) in each 'struct thread' for mediating access.
+ *    This can cause a lock ordering problem (i.e. deadlock) if, to manipulate a thread
+ *    from Lisp, both the Lisp mutex and C mutex are needed. There should be exactly one
+ *    lock per thread, and it belongs to the thread manifestation that always exists.
+ *    This poses difficulties if the main thread's instance is missing for even a moment.
+ * 3. Possibly we could eliminate the duplicated os_thread slot,
+ *    which is a source of confusion if nothing else.
+ */
+static lispobj cons_lisp_thread(struct thread* thread)
+{
+    struct alloc_region* r = THREAD_ALLOC_REGION(thread, mixed);
+    struct thread_instance* instance
+        = (void*)gc_general_alloc(r, ALIGN_UP(sizeof (struct thread), 2*N_WORD_BYTES),
+                                  PAGE_TYPE_MIXED);
+    int payload_len = (sizeof *instance >> WORD_SHIFT) - 1;
+    instance->header = (payload_len << INSTANCE_LENGTH_SHIFT) | INSTANCE_WIDETAG;
+    instance->_name = NIL;
+    instance->_ephemeral_p = NIL;
+    instance->uw_primitive_thread = (lispobj)thread;
+#ifdef LISP_FEATURE_UNIX
+    instance->uw_os_thread = (lispobj)thread->os_thread;
+#endif
+    instance->uw_control_stack_start = (lispobj)thread->control_stack_start;
+    instance->uw_control_stack_end = (lispobj)thread->control_stack_end;
+    instance->_visible = make_fixnum(1);
+    instance->interruptions = NIL;
+    instance->waiting_for = NIL;
+#ifndef LISP_FEATURE_64_BIT
+    instance->sw_observed_internal_real_time_delta_millisec = 0x7FFFFFFF;
+    instance->internal_real_time = NIL;
+#endif
+    return make_lispobj(instance, INSTANCE_POINTER_LOWTAG);
+}
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -357,6 +396,7 @@ void create_main_lisp_thread(lispobj function) {
 #endif
     link_thread(th);
     th->os_kernel_tid = get_nonzero_tid();
+    th->lisp_thread = cons_lisp_thread(th);
 
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, NULL);

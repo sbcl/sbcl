@@ -377,18 +377,6 @@ created and old ones may exit at any time."
 (sb-ext:define-load-time-global *joinable-threads* nil)
 (declaim (list *joinable-threads*)) ; list of threads
 
-;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
-(defmacro copy-primitive-thread-fields (this)
-  `(progn
-     (setf (thread-primitive-thread ,this) (current-thread-sap-int))
-     #-win32
-     (setf (thread-os-thread ,this)
-           (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))))
-
-(defmacro set-thread-control-stack-slots (this)
-  `(setf (thread-control-stack-start ,this) (get-lisp-obj-address sb-vm:*control-stack-start*)
-         (thread-control-stack-end ,this) (get-lisp-obj-address sb-vm:*control-stack-end*)))
-
 (defvar *session*)
 
 ;;; Not uncoincidentally, the variables assigned here are also
@@ -399,9 +387,15 @@ created and old ones may exit at any time."
         sb-vm::*allocator-mutex* (make-mutex :name "Allocator")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let* ((name "main thread")
-         (thread (%make-thread name nil (make-semaphore :name name))))
-    (copy-primitive-thread-fields thread)
-    (set-thread-control-stack-slots thread)
+         (lock (make-mutex :name "thread memory"))
+         (thread
+          #-sb-thread (sap-ref-lispobj (current-thread-sap)
+                                       (ash sb-vm::thread-lisp-thread-slot sb-vm:word-shift))
+          #+sb-thread *current-thread*)) ; an ordinary read of the TLS
+    (setf (%instance-layout thread) #.(find-layout 'thread)
+          (thread-%name thread) name
+          (%instance-ref thread (get-dsd-index thread semaphore)) (make-semaphore :name name)
+          (%instance-ref thread (get-dsd-index thread storage-lock)) lock)
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
     (init-thread-local-storage thread)
@@ -1976,7 +1970,10 @@ session."
 (defmacro startup-info-fp-modes (th) `(svref (thread-startup-info ,th) 6))
 
 (defun run (); All threads other than the initial thread start via this function.
-  (set-thread-control-stack-slots *current-thread*)
+  (setf (thread-control-stack-start *current-thread*) ; for SB-EXT:STACK-ALLOCATED-P
+        (get-lisp-obj-address sb-vm:*control-stack-start*)
+        (thread-control-stack-end *current-thread*)
+        (get-lisp-obj-address sb-vm:*control-stack-end*))
   (flet ((unmask-signals ()
            (let ((mask (startup-info-sigmask *current-thread*)))
                   (if mask

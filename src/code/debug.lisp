@@ -803,6 +803,9 @@ information."
                      (< a (get-lisp-obj-address sb-vm:*control-stack-end*)))
                 sb-thread:*current-thread*)
                (all-threads
+                ;; There aren't many reasons to inquire whether a random object is on any stack.
+                ;; And if performance isn't important, this loop could be changed to
+                ;; a C function that scans all threads while holding the all_threads lock.
                 (macrolet ((in-stack-range-p ()
                              `(and (>= a (sb-thread::thread-control-stack-start thread))
                                    (< a (sb-thread::thread-control-stack-end thread)))))

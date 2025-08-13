@@ -353,6 +353,9 @@ function value."
                                  (list index return arguments)
                                  nil nil))) ; sigmask + fpu state bits
     (let ((thread (init-thread-local-storage (make-foreign-thread startup-info))))
-      (copy-primitive-thread-fields thread)
+      (setf (thread-primitive-thread thread) (current-thread-sap-int))
+      #-win32
+      (setf (thread-os-thread thread)
+            (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))
       (update-all-threads (thread-primitive-thread thread) thread)
       (run))))
