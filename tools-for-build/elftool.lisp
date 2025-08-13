@@ -1327,7 +1327,6 @@ lisp_fun_linkage_space: .zero ~:*~D
           (with-open-file (output elf-core-pathname
                                   :direction :output :if-exists :supersede
                                   :element-type '(unsigned-byte 8))
-            (setf (sb-impl::fd-stream-file-position output) -2)
             #+x86-64 ; adjust the words of the core header that fill in *ASM-ROUTINE-VECTOR*
             (let ((code-start (bounds-low (space-bounds immobile-text-core-space-id spacemap)))
                   (static-asm-jmpvec-nelts
@@ -1434,7 +1433,6 @@ lisp_fun_linkage_space: .zero ~:*~D
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (output output-pathname :direction :output
                             :element-type '(unsigned-byte 8) :if-exists :supersede)
-      (setf (sb-impl::fd-stream-file-position output) -2)
       (let* ((core-header (make-array +backend-page-bytes+
                                       :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header nil))

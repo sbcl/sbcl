@@ -1169,7 +1169,6 @@
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (output output-pathname :direction :output
                                             :element-type '(unsigned-byte 8) :if-exists :supersede)
-      (setf (sb-impl::fd-stream-file-position output) -2)
       (let* ((core-header (make-array +backend-page-bytes+ :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header))
              (parsed-header (parse-core-header input core-header core-offset))
@@ -2130,7 +2129,6 @@
               (rplaca cell newspace)))
           (with-open-file (output output-pathname :direction :output
                                   :element-type '(unsigned-byte 8) :if-exists :supersede)
-            (setf (sb-impl::fd-stream-file-position output) -2)
             (rewrite-core
              (mapcar (lambda (space)
                        (list 0 (space-id space) (space-physaddr space spacemap)
