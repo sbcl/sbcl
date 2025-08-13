@@ -161,7 +161,13 @@
   ;; fixed width, or function to call with a character
   (char-size 1 :type (or fixnum function))
   (replacement nil :type (or null character string (simple-array (unsigned-byte 8) 1)))
-  (output-bytes #'ill-out :type function))
+  (output-bytes #'ill-out :type function)
+  (file-position -1 :type (or (and unsigned-byte
+                                   #+64-bit index)
+                              ;; -1: uninitialized
+                              ;; -2: don't track
+                              ;; -3: can't be determined
+                              (member -1 -2 -3))))
 
 (defun fd-stream-bivalent-p (stream)
   (eq (fd-stream-element-mode stream) :bivalent))
@@ -311,43 +317,47 @@
                (aver (< head tail))
                (when (fd-stream-synchronize-output stream)
                  (synchronize-stream-output stream))
+               (when (>= (fd-stream-file-position stream) 0)
+                 (setf (fd-stream-file-position stream) -1))
                (loop
-                 (let ((length (- tail head)))
-                   (multiple-value-bind (count errno)
-                       (sb-unix:unix-write (fd-stream-fd stream) (buffer-sap obuf)
-                                           head length)
-                     (flet ((queue-or-wait ()
-                              (if (fd-stream-serve-events stream)
-                                  (return (%queue-and-replace-output-buffer stream))
-                                  (or (wait-until-fd-usable (fd-stream-fd stream) :output
-                                                            (fd-stream-timeout stream)
-                                                            nil)
-                                      (signal-timeout 'io-timeout
-                                                      :stream stream
-                                                      :direction :output
-                                                      :seconds (fd-stream-timeout stream))))))
-                        (cond ((eql count length)
-                               ;; Complete write -- we can use the same buffer.
-                               (return (reset-buffer obuf)))
-                              (count
-                               ;; Partial write -- update buffer status and
-                               ;; queue or wait.
-                               (incf head count)
-                               (setf (buffer-head obuf) head)
-                               (queue-or-wait))
-                              #-win32
-                              ((eql errno sb-unix:ewouldblock)
-                               ;; Blocking, queue or wair.
-                               (queue-or-wait))
-                              ;; if interrupted on win32, just try again
-                              #+win32 ((eql errno sb-unix:eintr))
-                              (t
-                               (simple-stream-perror +write-failed+
-                                                     stream errno)))))))))))))
+                (let ((length (- tail head)))
+                  (multiple-value-bind (count errno)
+                      (sb-unix:unix-write (fd-stream-fd stream) (buffer-sap obuf)
+                                          head length)
+                    (flet ((queue-or-wait ()
+                             (if (fd-stream-serve-events stream)
+                                 (return (%queue-and-replace-output-buffer stream))
+                                 (or (wait-until-fd-usable (fd-stream-fd stream) :output
+                                                           (fd-stream-timeout stream)
+                                                           nil)
+                                     (signal-timeout 'io-timeout
+                                                     :stream stream
+                                                     :direction :output
+                                                     :seconds (fd-stream-timeout stream))))))
+                      (cond ((eql count length)
+                             ;; Complete write -- we can use the same buffer.
+                             (return (reset-buffer obuf)))
+                            (count
+                             ;; Partial write -- update buffer status and
+                             ;; queue or wait.
+                             (incf head count)
+                             (setf (buffer-head obuf) head)
+                             (queue-or-wait))
+                            #-win32
+                            ((eql errno sb-unix:ewouldblock)
+                             ;; Blocking, queue or wair.
+                             (queue-or-wait))
+                            ;; if interrupted on win32, just try again
+                            #+win32 ((eql errno sb-unix:eintr))
+                            (t
+                             (simple-stream-perror +write-failed+
+                                                   stream errno)))))))))))))
 
 (defun finish-writing-sequence (sequence stream start end)
   (when (fd-stream-synchronize-output stream)
     (synchronize-stream-output stream))
+  (when (>= (fd-stream-file-position stream) 0)
+    (setf (fd-stream-file-position stream) -1))
   (loop
    (let ((length (- end start)))
      (multiple-value-bind (count errno)
@@ -404,6 +414,8 @@
   (aver (fd-stream-serve-events stream))
   (when (fd-stream-synchronize-output stream)
     (synchronize-stream-output stream))
+  (when (>= (fd-stream-file-position stream) 0)
+    (setf (fd-stream-file-position stream) -1))
   (let (not-first-p)
     (tagbody
      :pop-buffer
@@ -460,6 +472,8 @@
          (let ((length (- end start)))
            (when (fd-stream-synchronize-output stream)
              (synchronize-stream-output stream))
+           (when (>= (fd-stream-file-position stream) 0)
+             (setf (fd-stream-file-position stream) -1))
            (multiple-value-bind (count errno)
                (sb-unix:unix-write (fd-stream-fd stream) thing start length)
              (cond ((eql count length)
@@ -1036,6 +1050,8 @@
   (let ((fd (fd-stream-fd stream))
         (errno 0)
         (count 0))
+    (when (>= (fd-stream-file-position stream) 0)
+      (setf (fd-stream-file-position stream) -1))
     (tagbody
        #+win32
        (go :main)
@@ -1381,6 +1397,8 @@
                 (eq (fd-stream-fd-type stream) :regular)
                 ;; TODO: handle non-empty initial buffers
                 (= (buffer-head ibuf) (buffer-tail ibuf)))
+           (when (>= (fd-stream-file-position stream) 0)
+             (setf (fd-stream-file-position stream) -1))
            (prog ((fd (fd-stream-fd stream))
                   (errno 0)
                   (count 0))
@@ -1951,9 +1969,12 @@
             (setf (fd-stream-ibuf fd-stream) nil)
             (release-buffer ibuf))))
 
-    ;; FIXME: Why only for output? Why unconditionally?
     (when output-p
-      (setf (fd-stream-output-column fd-stream) 0))
+      ;; FIXME: Why only for output? Why unconditionally?
+      (setf (fd-stream-output-column fd-stream) 0)
+      (when input-p
+        ;; Do not track
+        (setf (fd-stream-file-position fd-stream) -2)))
 
     (when input-p
       (flet ((no-input-routine ()
@@ -2321,7 +2342,14 @@
 (defun fd-stream-get-file-position (stream)
   (declare (fd-stream stream))
   (without-interrupts
-    (let ((posn (sb-unix:unix-lseek (fd-stream-fd stream) 0 sb-unix:l_incr)))
+    (let* ((cached (fd-stream-file-position stream))
+           (posn (cond ((>= cached 0)
+                        cached)
+                       ((>= cached -2)
+                        (let ((r (sb-unix:unix-lseek (fd-stream-fd stream) 0 sb-unix:l_incr)))
+                          (unless (eq cached -2)
+                            (setf (fd-stream-file-position stream) (or r -3)))
+                          r)))))
       (declare (type (or (alien sb-unix:unix-offset) null) posn))
       ;; We used to return NIL for errno==ESPIPE, and signal an error
       ;; in other failure cases. However, CLHS says to return NIL if
@@ -2353,6 +2381,8 @@
   (check-type position-spec
               (or (alien sb-unix:unix-offset) (member nil :start :end))
               "valid file position designator")
+  (when (>= (fd-stream-file-position stream) 0)
+    (setf (fd-stream-file-position stream) -1))
   (tagbody
    :again
      ;; Make sure we don't have any output pending, because if we
@@ -2373,29 +2403,29 @@
        (flush-input-buffer stream)
        ;; Trash cached value for listen, so that we check next time.
        (setf (fd-stream-listen stream) nil)
-         ;; Now move it.
-         (multiple-value-bind (offset origin)
-             (case position-spec
-               (:start
-                (values 0 sb-unix:l_set))
-               (:end
-                (values 0 sb-unix:l_xtnd))
-               (t
-                (values (* position-spec (fd-stream-element-size stream))
-                        sb-unix:l_set)))
-           (declare (type (alien sb-unix:unix-offset) offset))
-           (let ((posn (sb-unix:unix-lseek (fd-stream-fd stream)
-                                           offset origin)))
-             ;; CLHS says to return true if the file-position was set
-             ;; successfully, and NIL otherwise. We are to signal an error
-             ;; only if the given position was out of bounds, and that is
-             ;; dealt with above. In times past we used to return NIL for
-             ;; errno==ESPIPE, and signal an error in other cases.
-             ;;
-             ;; FIXME: We are still liable to signal an error if flushing
-             ;; output fails.
-             (return-from fd-stream-set-file-position
-               (typep posn '(alien sb-unix:unix-offset))))))))
+       ;; Now move it.
+       (multiple-value-bind (offset origin)
+           (case position-spec
+             (:start
+              (values 0 sb-unix:l_set))
+             (:end
+              (values 0 sb-unix:l_xtnd))
+             (t
+              (values (* position-spec (fd-stream-element-size stream))
+                      sb-unix:l_set)))
+         (declare (type (alien sb-unix:unix-offset) offset))
+         (let ((posn (sb-unix:unix-lseek (fd-stream-fd stream)
+                                         offset origin)))
+           ;; CLHS says to return true if the file-position was set
+           ;; successfully, and NIL otherwise. We are to signal an error
+           ;; only if the given position was out of bounds, and that is
+           ;; dealt with above. In times past we used to return NIL for
+           ;; errno==ESPIPE, and signal an error in other cases.
+           ;;
+           ;; FIXME: We are still liable to signal an error if flushing
+           ;; output fails.
+           (return-from fd-stream-set-file-position
+             (typep posn '(alien sb-unix:unix-offset))))))))
 
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
