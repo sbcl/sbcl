@@ -345,7 +345,7 @@
                              (queue-or-wait))
                             #-win32
                             ((eql errno sb-unix:ewouldblock)
-                             ;; Blocking, queue or wair.
+                             ;; Blocking, queue or wait.
                              (queue-or-wait))
                             ;; if interrupted on win32, just try again
                             #+win32 ((eql errno sb-unix:eintr))
@@ -2129,6 +2129,8 @@
          (unread (length instead)))
     ;; (setf fill-pointer) performs some checks and is slower
     (setf (%array-fill-pointer instead) 0)
+    (when (>= (fd-stream-file-position stream) 0)
+      (setf (fd-stream-file-position stream) -1))
     (let ((ibuf (fd-stream-ibuf stream)))
       (if ibuf
           (let ((head (buffer-head ibuf))
@@ -2347,7 +2349,16 @@
                         cached)
                        ((>= cached -2)
                         (let ((r (sb-unix:unix-lseek (fd-stream-fd stream) 0 sb-unix:l_incr)))
-                          (unless (eq cached -2)
+                          (unless (or (eq cached -2)
+                                      ;; Only cache the result if there is something buffered.
+                                      (cond ((let ((obuf (fd-stream-obuf stream)))
+                                               (when obuf
+                                                 (eql (buffer-head obuf)
+                                                      (buffer-tail obuf)))))
+                                            ((let ((ibuf (fd-stream-ibuf stream)))
+                                               (when ibuf
+                                                 (and (= (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
+                                                      (zerop (buffer-tail ibuf))))))))
                             (setf (fd-stream-file-position stream) (or r -3)))
                           r)))))
       (declare (type (or (alien sb-unix:unix-offset) null) posn))
@@ -2374,7 +2385,7 @@
           (when ibuf
             (decf posn (- (buffer-tail ibuf) (buffer-head ibuf)))))
         ;; Divide bytes by element size.
-        (truncate posn (fd-stream-element-size stream))))))
+        (values (truncate posn (fd-stream-element-size stream)))))))
 
 (defun fd-stream-set-file-position (stream position-spec)
   (declare (fd-stream stream))
