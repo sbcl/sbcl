@@ -3104,7 +3104,8 @@
 
 
 (macrolet ((define-conditional-vop (tran cond unsigned
-                                    addend addend-signed addend-unsigned)
+                                    addend addend-signed addend-unsigned
+                                    &optional zero)
              `(progn
                 ,@(loop for (suffix cost signed constant)
                         in '((/fixnum 4 t)
@@ -3134,6 +3135,12 @@
                                            ',(if signed
                                                  (list addend-signed)
                                                  (list addend-unsigned))))
+                                         ,@(when (and zero
+                                                      signed)
+                                             ;; (< x 0) can be tested using only the sign flag,
+                                             ;; which allows sub x, y; test x, x to be optimized
+                                             `(((zerop y)
+                                                (change-vop-flags vop '(,zero)))))
                                          ((and
                                            (not (plausible-signed-imm32-operand-p ,(fix 'y)))
                                            (plausible-signed-imm32-operand-p ,(fix `(+ y ,addend))))
@@ -3146,7 +3153,7 @@
                                (emit-optimized-cmp
                                  x ,(fix 'y)
                                  temp (tn-ref-type x-tn-ref)))))))))
-  (define-conditional-vop < :l :b -1 :le :be)
+  (define-conditional-vop < :l :b -1 :le :be :s)
   (define-conditional-vop > :g :a 1 :ge :ae))
 
 (define-vop (<-unsigned-signed)
