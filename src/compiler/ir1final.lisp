@@ -157,7 +157,9 @@
                  (setf (lvar-%derived-type (cast-value node))
                        type)
                  (do-uses (use value)
-                   (setf (node-derived-type use) type))
+                   (let ((type (values-type-intersection (node-derived-type use) type)))
+                     (unless (eq type *empty-type*)
+                       (setf (node-derived-type use) type))))
                 (delete-filter node lvar (cast-value node)))))))))
 
 (defglobal *two-arg-functions*
