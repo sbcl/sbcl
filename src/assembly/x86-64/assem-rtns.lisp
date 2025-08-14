@@ -78,8 +78,8 @@
   ZERO-VALUES
   (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (inst mov rdx null-tn)
-  (inst mov rdi rdx)
-  (inst mov rsi rdx)
+  (inst mov rdi null-tn)
+  (inst mov rsi null-tn)
   (inst stc)
   (inst leave)
   (inst ret)
