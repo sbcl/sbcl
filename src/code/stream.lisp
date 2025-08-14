@@ -180,24 +180,24 @@
   (declare (type stream stream))
   ;; FIXME: It would be good to comment on the stuff that is done here...
   ;; FIXME: This doesn't look interrupt safe.
-  (let ((res (call-ansi-stream-misc stream :get-file-position))
+  (let ((res (truly-the (or null index) (call-ansi-stream-misc stream :get-file-position)))
         (delta (- +ansi-stream-in-buffer-length+
                   (ansi-stream-in-index stream))))
     (if (eql delta 0)
         res
         (when res
-         (let ((char-size (if (fd-stream-p stream)
-                              (fd-stream-char-size stream)
-                              (external-format-char-size (stream-external-format stream)))))
-           (- res
-              (etypecase char-size
-                (function
-                 (loop with buffer = (ansi-stream-csize-buffer stream)
-                       with start = (ansi-stream-in-index stream)
-                       for i from start below +ansi-stream-in-buffer-length+
-                       sum (aref buffer i)))
-                (fixnum
-                 (* char-size delta)))))))))
+          (let ((char-size (if (fd-stream-p stream)
+                               (fd-stream-char-size stream)
+                               (external-format-char-size (stream-external-format stream)))))
+            (- res
+               (etypecase char-size
+                 (fixnum
+                  (* (truly-the (unsigned-byte 8) char-size) delta))
+                 (function
+                  (loop with buffer = (ansi-stream-csize-buffer stream)
+                        with start = (ansi-stream-in-index stream)
+                        for i from start below +ansi-stream-in-buffer-length+
+                        sum (aref buffer i) of-type fixnum)))))))))
 
 ;;; You're not allowed to specify NIL for the position but we were permitting
 ;;; it, which made it impossible to test for a bad call that tries to assign
