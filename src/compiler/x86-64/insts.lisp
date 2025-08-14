@@ -3583,7 +3583,19 @@
                  ((:s :ns)
                   (eq size2 size1))
                  ((:ne :e :nz :z)
-                  (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))))
+                  (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))
+                 ((:ge :g :le :l)
+                  (and (eq size2 size1)
+                       ;; Assume there's no overflow for signed arithmetic
+                       (memq (vop-name (sb-assem::stmt-vop stmt))
+                             '(sb-vm::fast--/fixnum=>fixnum
+                               sb-vm::fast-+/fixnum=>fixnum
+                               sb-vm::fast--/signed=>signed
+                               sb-vm::fast-+/signed=>signed
+                               sb-vm::fast---c/fixnum=>fixnum
+                               sb-vm::fast-+-c/fixnum=>fixnum
+                               sb-vm::fast---c/signed=>signed
+                               sb-vm::fast-+-c/signed=>signed))))))
       (delete-stmt next)
       next-next)))
 
