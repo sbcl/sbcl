@@ -351,7 +351,7 @@ static lispobj cons_lisp_thread(struct thread* thread)
     int payload_len = (sizeof *instance >> WORD_SHIFT) - 1;
     instance->header = (payload_len << INSTANCE_LENGTH_SHIFT) | INSTANCE_WIDETAG;
     instance->_name = NIL;
-    instance->_ephemeral_p = NIL;
+    instance->ephemeral_p = NIL;
     instance->uw_primitive_thread = (lispobj)thread;
 #ifdef LISP_FEATURE_UNIX
     instance->uw_os_thread = (lispobj)thread->os_thread;
@@ -600,7 +600,7 @@ void* new_thread_trampoline(void* arg)
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
-    if (lispthread->_ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
+    if (lispthread->ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
 
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);

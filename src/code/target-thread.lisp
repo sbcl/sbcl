@@ -278,15 +278,12 @@ a simple-string (not necessarily unique) or NIL."
             (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
             (format stream "~@[~S ~](free)" name))))))
 
-;; NB: ephemeral threads must terminate strictly before the test of NTHREADS>1
-;; in DEINIT, i.e. this is not a promise that the thread will terminate
-;; just-in-time for the final call out to save, but rather by an earlier time.
-(defun thread-ephemeral-p (thread)
+(setf (documentation 'thread-ephemeral-p 'function)
   "Return T if THREAD is `ephemeral', which indicates that this thread is
 used by SBCL for internal purposes, and specifically that our runtime knows how
 to terminate this thread cleanly prior to core file saving without signalling
 an error in that case."
-  (thread-%ephemeral-p thread))
+)
 
 ;;; Ensure that THREAD is in *ALL-THREADS*.
 (defmacro update-all-threads (key thread)

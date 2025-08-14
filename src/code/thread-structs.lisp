@@ -72,12 +72,20 @@ future."
 (sb-ext:define-load-time-global *profiled-threads* :all)
 (declaim (type (or (eql :all) list) *profiled-threads*))
 
-(sb-xc:defstruct (thread (:constructor %make-thread (%name %ephemeral-p semaphore))
+(sb-xc:defstruct (thread (:constructor %make-thread (%name ephemeral-p semaphore))
                          (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
   (%name         nil :type (or null simple-string)) ; C code could read this
-  (%ephemeral-p  nil :type boolean :read-only t)
+  ;; When true, the thread is (supposedy) internal, and the runtime knows how to start/stop
+  ;; it around certain operations like SB-POSIX:FORK. There are two other important aspects:
+  ;; - it promises to cleanly exit prior to core saving, never causing an error about
+  ;;   more than 1 thread running.
+  ;; - returning from it never commences forcible termination of other threads.
+  ;; At present only 1 thread ever has this slot being T by default, namely the finalizer.
+  ;; Allegedly users could specify it too, but git rev a5511496 removed the option
+  ;; and no complaints have arisen due to its absence.
+  (ephemeral-p  nil :type boolean :read-only t)
   ;; This is one of a few different views of a lisp thread:
   ;;  1. the memory space (thread->os_addr in C)
   ;;  2. 'struct thread' at some offset into the memory space, coinciding

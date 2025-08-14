@@ -3382,6 +3382,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "THREAD-ERROR"
            "THREAD-ERROR-THREAD"
            "THREAD-ALIVE-P"
+           ;; Can we delete this export? The original change is sketchy. It claimed that "the
+           ;; thread will be started and stopped by the runtime ... as needed" but it exposed
+           ;; :EPHEMERAL as an argument to MAKE-THREAD, meaning that users could specify it.
+           ;; Lacking a notification, how would users know to stop such a thread for S-L-A-D?
            "THREAD-EPHEMERAL-P"
            "THREAD-NAME"
            "THREAD-OS-TID"
