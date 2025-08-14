@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+Changes relative to sbcl-2.5.7:
+  * minor incompatible change: MAIN-THREAD-P can only be applied to threads,
+    not arbitrary lisp objects.
+
 changes in sbcl-2.5.7 relative to sbcl-2.5.6:
   * enhancement: the encapsulate mechanism can be used to wrap functions that
     are currently not FBOUNDP.

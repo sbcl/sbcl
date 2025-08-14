@@ -411,8 +411,18 @@ created and old ones may exit at any time."
   "Returns the main thread of the process."
   *initial-thread*)
 
+(declaim (inline main-thread-p))
 (defun main-thread-p (&optional (thread *current-thread*))
   "True if THREAD, defaulting to current thread, is the main thread of the process."
+  ;; Though it would have made perfect sense to constrain THREAD to be a THREAD,
+  ;; it's pretty much certain that users do this:
+  ;;   (defparameter *maybe-thread* nil)
+  ;; and then before making the thread:
+  ;;   (MAIN-THREAD-P some-variable-bound-to-*maybe-thread*)
+  ;; because I found at least one example of that pattern in a local test.
+  ;; [If this predicate were meant to be total, then its arg ought to have been
+  ;; named OBJECT, as is tradition]
+  (declare (type (or thread null) thread))
   (eq thread *initial-thread*))
 
 (locally (declare (sb-c::tlab :system)) (defun sys-tlab-list (&rest args) args))
