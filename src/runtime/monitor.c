@@ -279,7 +279,7 @@ void save_gc_crashdump(char *pathname,
 #endif
 
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
-static cmd flush_cmd, regs_cmd, exit_cmd, print_code;
+static cmd flush_cmd, regs_cmd, exit_cmd, print_code, set_context_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd, hashtable_cmd;
 static cmd backtrace_cmd, threadbt_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
@@ -472,6 +472,7 @@ static struct cmd {
     {"call", "Call FUNCTION with ARG1, ARG2, ...", call_cmd},
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
+    {"set_context", "Set the current context.", set_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
     {"d", "(an alias for dump)", dump_cmd},
 #ifdef ATOMIC_LOGGING
@@ -915,6 +916,20 @@ static int print_context_cmd(char **ptr, iochannel_t io)
             print_context(nth_interrupt_context(free_ici - 1, thread), io);
         }
     }
+    return 0;
+}
+
+static int set_context_cmd(char **ptr, iochannel_t io)
+{
+    struct thread *thread = get_sb_vm_thread();
+
+    int index;
+
+    if (!parse_number(ptr, &index, io->out)) 
+        return 0;
+    
+    write_TLS(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(index + 1),thread);
+
     return 0;
 }
 
