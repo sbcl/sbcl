@@ -3558,7 +3558,7 @@
       (delete-stmt stmt)
       next)))
 
-;;; In "{AND,OR,...} reg, src ; TEST reg, reg ; {JMP,SET} {:z,:nz,:s,:ns}"
+;;; In {AND,OR,...} reg, src ; TEST reg, reg ; {JMP,SET,CMOV} {:z,:nz,:s,:ns,...}
 ;;; the TEST is unnecessary since ALU operations set the Z and S flags.
 ;;; Per the processor manual, TEST clears OF and CF, so presumably
 ;;; there is not a branch-if on either of those flags.
@@ -3577,9 +3577,18 @@
                (not (and (memq (stmt-mnemonic stmt) '(sar shl shr))
                          (memq (car (last (stmt-operands stmt)))
                                '(:cl 0))))
-               (memq (stmt-mnemonic next-next) '(jmp set))
-               ;; TODO: figure out when it would be correct to omit TEST for the carry flag
-               (case (car (stmt-operands next-next))
+               (case (cond ((memq (stmt-mnemonic next-next) '(jmp set))
+                            (car (stmt-operands next-next)))
+                           (t
+                            (loop for next = next-next then (stmt-next next)
+                                  while next
+                                  do (case (stmt-mnemonic next)
+                                       ((mov lea))
+                                       (cmov
+                                        (return (second (stmt-operands next))))
+                                       (t
+                                        (return))))))
+                 ;; TODO: figure out when it would be correct to omit TEST for the carry flag
                  ((:s :ns)
                   (eq size2 size1))
                  ((:ne :e :nz :z)
