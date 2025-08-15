@@ -767,6 +767,8 @@ static void print_obj(char *prefix, lispobj obj, iochannel_t io)
         fprintf(IO.out, "%s0x%08lx: ", prefix, (unsigned long) obj);
         if (cur_depth < brief_depth) {
             fputs(lowtag_names[type], IO.out);
+            if (obj == LISP_T)
+                fprintf(IO.out, " (T)");
             fns = print_fns;
         }
         else

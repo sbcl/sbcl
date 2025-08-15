@@ -48,7 +48,6 @@
 #endif
 
 #include "runtime.h"
-#include "vars.h"
 #include "globals.h"
 #include "os.h"
 #include "interr.h"
@@ -769,9 +768,6 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__) || defined(__HAIKU__)
     tzset();
 #endif
-
-    define_var("nil", NIL, 1);
-    define_var("t", LISP_T, 1);
 
     if (!options.disable_lossage_handler_p)
         enable_lossage_handler();

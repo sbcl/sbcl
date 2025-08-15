@@ -85,7 +85,7 @@ void visit_context_registers(void (*p)(os_context_register_t,void*),
     // This is the order the registers appear in gregset_t (which makes no difference of course).
     // Not sure why the order is so kooky.
     p(m->gregs[REG_R8 ], arg); p(m->gregs[REG_R9 ], arg); p(m->gregs[REG_R10], arg);
-    p(m->gregs[REG_R11], arg); p(m->gregs[REG_R12], arg); p(m->gregs[REG_R13], arg); 
+    p(m->gregs[REG_R11], arg); p(m->gregs[REG_R12], arg); p(m->gregs[REG_R13], arg);
     p(m->gregs[REG_R14], arg); p(m->gregs[REG_R15], arg);
     p(m->gregs[REG_RDI], arg); p(m->gregs[REG_RSI], arg); p(m->gregs[REG_RBX], arg);
     p(m->gregs[REG_RDX], arg); p(m->gregs[REG_RAX], arg); p(m->gregs[REG_RCX], arg);

@@ -925,9 +925,9 @@ static int set_context_cmd(char **ptr, iochannel_t io)
 
     int index;
 
-    if (!parse_number(ptr, &index, io->out)) 
+    if (!parse_number(ptr, &index, io->out))
         return 0;
-    
+
     write_TLS(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(index + 1),thread);
 
     return 0;
