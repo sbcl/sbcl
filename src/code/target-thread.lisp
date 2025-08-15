@@ -13,7 +13,6 @@
 
 ;;; symbols to protect from tree-shaker, for some tests
 (export '(%thread-local-references
-          current-thread-sap
           get-spinlock
           release-spinlock
           spinlock
@@ -2640,17 +2639,6 @@ mechanism for inter-thread communication."
   ;; Prevent further use of DEFINE-THREAD-LOCAL after compiling this file
   ;; because the definition of INIT-THREAD-LOCAL-STORAGE is now frozen.
   (setf *thread-local-specials* (cons :final (cdr *thread-local-specials*))))
-
-;;;; Stepping
-
-(defun thread-stepping ()
-  (sap-ref-lispobj (current-thread-sap)
-                   (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes)))
-
-(defun (setf thread-stepping) (value)
-  (setf (sap-ref-lispobj (current-thread-sap)
-                         (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))
-        value))
 
 ;;;; Diagnostic tool
 

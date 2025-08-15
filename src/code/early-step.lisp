@@ -38,7 +38,11 @@
 ;; but the REPL calls DISABLE-STEPPING right way.
 ;; Adding a file of target-only code for these isn't worth the trouble.
 (symbol-macrolet ((place
-                   #+sb-thread (sb-thread::thread-stepping)
+                   ;; sap-ref-8 stores to the MSB for big-endian. It's ok because the call vops
+                   ;; compare the entire stepping word against 0 on architectures where the
+                   ;; endianness might differ based on the particular hardware.
+                   #+sb-thread (sap-ref-8 (sb-thread:current-thread-sap)
+                                          (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))
                    #-sb-thread *stepping*))
   (defun (setf stepping) (new-value)
     (setf place new-value))

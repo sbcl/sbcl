@@ -3358,6 +3358,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:documentation "public (but low-level): native thread support")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-KERNEL")
   (:export "*CURRENT-THREAD*"
+           "CURRENT-THREAD-SAP"
            "DESTROY-THREAD"
            "INTERRUPT-THREAD"
            "INTERRUPT-THREAD-ERROR"
