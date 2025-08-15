@@ -5775,6 +5775,42 @@
        (not (check-range<= f i most-positive-fixnum))
        t))
 
+;;; (> unsigned 0) => (/= unsigned 0), which doesn't need to check for fixnum
+;;; (> (integer * 0) -1) => (= integer 0)
+(deftransform > ((x y) (integer (constant-arg integer)) * :important nil)
+  (let* ((int (type-approximate-interval (lvar-type x)))
+         (low (and int
+                   (interval-low int)))
+         (high (and int
+                    (interval-high int)))
+         (y (lvar-value y)))
+    (cond ((and low
+                (= low y))
+           `(not (eql x ,y)))
+          ((and high
+                (= high (1+ y)))
+           `(eql x ,(1+ y)))
+          (t
+           (give-up-ir1-transform)))))
+
+;;; (< unsigned 1) => (= unsigned 0)
+;;; (< (integer * 0) 0) => (/= integer 0)
+(deftransform < ((x y) (integer (constant-arg integer)) * :important nil)
+  (let* ((int (type-approximate-interval (lvar-type x)))
+         (low (and int
+                   (interval-low int)))
+         (high (and int
+                    (interval-high int)))
+         (y (lvar-value y)))
+    (cond ((and low
+                (= low (1- y)))
+           `(eql x ,(1- y)))
+          ((and high
+                (= high y))
+           `(not (eql x y)))
+          (t
+           (give-up-ir1-transform)))))
+
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))
 
