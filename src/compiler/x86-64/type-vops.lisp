@@ -927,8 +927,7 @@
                                               (setf comparison :le))))
                                 (setf value (- value one)))
                                (t
-                                (inst mov temp value)
-                                temp)))
+                                value)))
                        fixnum)))
       (multiple-value-bind (yep nope)
           (if not-p
@@ -954,6 +953,22 @@
                (inst jmp :z (if (eq comparison :l)
                                 nope
                                 yep)))
+              ((and (eql fixnum (fixnumize most-positive-fixnum))
+                    (case comparison
+                      (:g
+                       (inst jmp :z nope)
+                       t)
+                      (:le
+                       (inst jmp :z yep)
+                       t))))
+              ((and (eql fixnum (fixnumize most-negative-fixnum))
+                    (case comparison
+                      (:l
+                       (inst jmp :z nope)
+                       t)
+                      (:ge
+                       (inst jmp :z yep)
+                       t))))
               (t
                (inst jmp :nz BIGNUM)
                (cond ((eql fixnum 0)
@@ -970,7 +985,11 @@
                                         (setf comparison :le)))))
                       (inst test integer integer))
                      (t
-                      (inst cmp integer fixnum)))
+                      (inst cmp integer (if (plausible-signed-imm32-operand-p fixnum)
+                                            fixnum
+                                            (progn
+                                              (inst mov temp fixnum)
+                                              temp)))))
                (inst jmp comparison yep)
                (inst jmp nope))))
           bignum
