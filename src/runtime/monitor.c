@@ -279,7 +279,7 @@ void save_gc_crashdump(char *pathname,
 #endif
 
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
-static cmd flush_cmd, regs_cmd, exit_cmd;
+static cmd flush_cmd, regs_cmd, exit_cmd, print_code;
 static cmd print_context_cmd, pte_cmd, search_cmd, hashtable_cmd;
 static cmd backtrace_cmd, threadbt_cmd, catchers_cmd;
 static cmd threads_cmd, findpath_cmd, layouts_cmd;
@@ -484,6 +484,7 @@ static struct cmd {
     {"layouts", "Dump LAYOUT instances.", layouts_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
+    {"code", "Print the code object at ADDRESS.", print_code},
     {"pte", "Page table entry for address", pte_cmd},
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
@@ -630,6 +631,17 @@ static int print_cmd(char **ptr, iochannel_t io)
 {
     lispobj obj;
     if (parse_lispobj(ptr, &obj, io->out)) print_to_iochan(obj, io);
+    return 0;
+}
+
+static int print_code(char **ptr, iochannel_t io)
+{
+    lispobj obj;
+    if (parse_lispobj(ptr, &obj, io->out)) {
+        lispobj * code = component_ptr_from_pc((char *)obj);
+        if (code)
+            print_to_iochan((lispobj)code | OTHER_POINTER_LOWTAG, io);
+    }
     return 0;
 }
 
