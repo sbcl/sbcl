@@ -1026,65 +1026,66 @@
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)
   (declare (type component component))
-  (let* ((dfuns nil)
-         (simple-fun-headers
-          ;; Compute all simple-fun metadata and store into a simple-vector
-          (let* ((entries (ir2-component-entries (component-info component)))
-                 (nfuns (length entries))
-                 (i (* sb-vm:code-slots-per-simple-fun nfuns))
-                 (v (make-array i)))
-            (dolist (e entries v)
-              ;; Process in reverse order of ENTRIES.
-              (decf i sb-vm:code-slots-per-simple-fun)
-              (setf (svref v (+ i sb-vm:simple-fun-name-slot)) (entry-info-name e)
-                    (svref v (+ i sb-vm:simple-fun-arglist-slot)) (entry-info-arguments e)
-                    (svref v (+ i sb-vm:simple-fun-source-slot)) (entry-info-form/doc e)
-                    (svref v (+ i sb-vm:simple-fun-info-slot)) (entry-info-type/xref e)))))
-         (var-locs (make-hash-table :test 'eq))
-         (*byte-buffer* (make-array 10
-                                    :element-type '(unsigned-byte 8)
-                                    :fill-pointer 0
-                                    :adjustable t))
-         (*contexts* (make-array 10
-                                 :fill-pointer 0
-                                 :adjustable t))
-         (lambdas (sort (copy-list (component-lambdas component))
-                        #'<
-                        :key (lambda (lambda)
-                               (label-position (block-label (lambda-block lambda))))))
-         (name (loop for lambda in lambdas
-                     for entry = (leaf-info lambda)
-                     when entry
-                     return
-                     (entry-info-name entry)))
-         (*debug-component-name* name))
-    (declare (special *debug-component-name*))
-    (dolist (lambda lambdas)
-      (unless (empty-fun-p lambda)
-        (clrhash var-locs)
-        (let ((2block (block-info (lambda-block lambda))))
-          (push (cons (label-position (or (ir2-block-%trampoline-label 2block)
-                                          (ir2-block-%label 2block)))
-                      (compute-1-debug-fun lambda var-locs))
-                dfuns))))
-    (let ((map (compute-packed-debug-funs (nreverse dfuns)))
-          (contexts (compact-vector *contexts*)))
-      #+sb-xc-host
-      (!make-compiled-debug-info name *package* map contexts simple-fun-headers)
-      #-sb-xc-host
-      (let ((di (%make-instance (+ (sb-kernel::type-dd-length compiled-debug-info)
-                                   (length simple-fun-headers)))))
-        (setf (%instance-layout di) #.(find-layout 'compiled-debug-info)
-              ;; The fixed slots except for SOURCE are declared readonly
-              (%instance-ref di (get-dsd-index compiled-debug-info name)) name
-              (%instance-ref di (get-dsd-index compiled-debug-info source)) nil
-              (%instance-ref di (get-dsd-index compiled-debug-info package)) *package*
-              (%instance-ref di (get-dsd-index compiled-debug-info fun-map)) map
-              (%instance-ref di (get-dsd-index compiled-debug-info contexts)) contexts)
-        (let ((i (get-dsd-index compiled-debug-info rest)))
-          (dovector (x simple-fun-headers di)
-            (setf (%instance-ref di i) x)
-            (incf i)))))))
+  (flet ((lambda-position (lambda)
+           (let ((2block (block-info (lambda-block lambda))))
+             (label-position (or (ir2-block-%trampoline-label 2block)
+                                 (ir2-block-%label 2block))))))
+   (let* ((dfuns nil)
+          (simple-fun-headers
+            ;; Compute all simple-fun metadata and store into a simple-vector
+            (let* ((entries (ir2-component-entries (component-info component)))
+                   (nfuns (length entries))
+                   (i (* sb-vm:code-slots-per-simple-fun nfuns))
+                   (v (make-array i)))
+              (dolist (e entries v)
+                ;; Process in reverse order of ENTRIES.
+                (decf i sb-vm:code-slots-per-simple-fun)
+                (setf (svref v (+ i sb-vm:simple-fun-name-slot)) (entry-info-name e)
+                      (svref v (+ i sb-vm:simple-fun-arglist-slot)) (entry-info-arguments e)
+                      (svref v (+ i sb-vm:simple-fun-source-slot)) (entry-info-form/doc e)
+                      (svref v (+ i sb-vm:simple-fun-info-slot)) (entry-info-type/xref e)))))
+          (var-locs (make-hash-table :test 'eq))
+          (*byte-buffer* (make-array 10
+                                     :element-type '(unsigned-byte 8)
+                                     :fill-pointer 0
+                                     :adjustable t))
+          (*contexts* (make-array 10
+                                  :fill-pointer 0
+                                  :adjustable t))
+          (lambdas (sort (copy-list (component-lambdas component))
+                         #'<
+                         :key #'lambda-position))
+          (name (loop for lambda in lambdas
+                      for entry = (leaf-info lambda)
+                      when entry
+                      return
+                      (entry-info-name entry)))
+          (*debug-component-name* name))
+     (declare (special *debug-component-name*))
+     (dolist (lambda lambdas)
+       (unless (empty-fun-p lambda)
+         (clrhash var-locs)
+         (push (cons (lambda-position lambda)
+                     (compute-1-debug-fun lambda var-locs))
+               dfuns)))
+     (let ((map (compute-packed-debug-funs (nreverse dfuns)))
+           (contexts (compact-vector *contexts*)))
+       #+sb-xc-host
+       (!make-compiled-debug-info name *package* map contexts simple-fun-headers)
+       #-sb-xc-host
+       (let ((di (%make-instance (+ (sb-kernel::type-dd-length compiled-debug-info)
+                                    (length simple-fun-headers)))))
+         (setf (%instance-layout di) #.(find-layout 'compiled-debug-info)
+               ;; The fixed slots except for SOURCE are declared readonly
+               (%instance-ref di (get-dsd-index compiled-debug-info name)) name
+               (%instance-ref di (get-dsd-index compiled-debug-info source)) nil
+               (%instance-ref di (get-dsd-index compiled-debug-info package)) *package*
+               (%instance-ref di (get-dsd-index compiled-debug-info fun-map)) map
+               (%instance-ref di (get-dsd-index compiled-debug-info contexts)) contexts)
+         (let ((i (get-dsd-index compiled-debug-info rest)))
+           (dovector (x simple-fun-headers di)
+             (setf (%instance-ref di i) x)
+             (incf i))))))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.
