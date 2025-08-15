@@ -306,9 +306,11 @@
                    (setf vop (vop-next vop)))
                   (t
                    (funcall gen vop)))))))
-
-    (when *do-instcombine-pass*
-      #+(or arm64 x86-64)
+    #+(or arm64 x86-64)
+    (when (and *do-instcombine-pass*
+               (policy (block-home-lambda
+                        (block-next (component-head component)))
+                   (>= speed compilation-speed)))
       (sb-assem::combine-instructions (asmstream-code-section asmstream)))
 
     (emit (asmstream-data-section asmstream)
