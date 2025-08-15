@@ -75,6 +75,8 @@ int arch_os_thread_cleanup(struct thread __attribute__((unused)) *thread) {
     return 1;
 }
 
+/* Visit all registers even if lisp doesn't store pointers there, C
+code might be using any register for lisp pointers. */
 void visit_context_registers(void (*p)(os_context_register_t,void*),
                              os_context_t *context, void* arg)
 {
@@ -83,13 +85,7 @@ void visit_context_registers(void (*p)(os_context_register_t,void*),
     // This is the order the registers appear in gregset_t (which makes no difference of course).
     // Not sure why the order is so kooky.
     p(m->gregs[REG_R8 ], arg); p(m->gregs[REG_R9 ], arg); p(m->gregs[REG_R10], arg);
-    p(m->gregs[REG_R11], arg);
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    p(m->gregs[REG_R12], arg);  /* CARD_TABLE_REG */
-#endif
-#ifndef LISP_FEATURE_SB_THREAD
-    p(m->gregs[REG_R13], arg);  /* THREAD_BASE_REG */
-#endif
+    p(m->gregs[REG_R11], arg); p(m->gregs[REG_R12], arg); p(m->gregs[REG_R13], arg); 
     p(m->gregs[REG_R14], arg); p(m->gregs[REG_R15], arg);
     p(m->gregs[REG_RDI], arg); p(m->gregs[REG_RSI], arg); p(m->gregs[REG_RBX], arg);
     p(m->gregs[REG_RDX], arg); p(m->gregs[REG_RAX], arg); p(m->gregs[REG_RCX], arg);
