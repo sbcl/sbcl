@@ -2080,6 +2080,10 @@ interrupt_init(void)
 #ifndef LISP_FEATURE_WIN32
     ll_install_handler(SIGABRT, sigabrt_handler);
 #endif
+#ifdef START_LDB_SERVICE_THREAD
+    extern void init_ldb_service();
+    init_ldb_service();
+#endif
 }
 
 void lisp_memory_fault_warning(os_context_t *context, os_vm_address_t addr) {
