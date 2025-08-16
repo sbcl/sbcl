@@ -3577,37 +3577,43 @@
                (not (and (memq (stmt-mnemonic stmt) '(sar shl shr))
                          (memq (car (last (stmt-operands stmt)))
                                '(:cl 0))))
-               (or (memq (stmt-mnemonic stmt) '(and xor or)) ;; the same flags are set
-                   (case (cond ((memq (stmt-mnemonic next-next) '(jmp set))
-                                (car (stmt-operands next-next)))
-                               (t
-                                (loop for next = next-next then (stmt-next next)
-                                      while next
-                                      do (case (stmt-mnemonic next)
-                                           ((mov lea))
-                                           (cmov
-                                            (return (second (stmt-operands next))))
-                                           (t
-                                            (return))))))
-                     ;; TODO: figure out when it would be correct to omit TEST for the carry flag
-                     ((:s :ns)
-                      (eq size2 size1))
-                     ((:ne :e :nz :z)
-                      (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))
-                     ((:ge :g :le :l)
-                      (and (eq size2 size1)
-                           ;; Assume there's no overflow for signed arithmetic
-                           (memq (vop-name (sb-assem::stmt-vop stmt))
-                                 '(sb-vm::fast--/fixnum=>fixnum
-                                   sb-vm::fast-+/fixnum=>fixnum
-                                   sb-vm::fast--/signed=>signed
-                                   sb-vm::fast-+/signed=>signed
-                                   sb-vm::fast---c/fixnum=>fixnum
-                                   sb-vm::fast-+-c/fixnum=>fixnum
-                                   sb-vm::fast---c/signed=>signed
-                                   sb-vm::fast-+-c/signed=>signed
-                                   sb-vm::fast-negate/fixnum
-                                   sb-vm::fast-negate/signed)))))))
+               (let ((flag (cond ((memq (stmt-mnemonic next-next) '(jmp set))
+                                  (car (stmt-operands next-next)))
+                                 (t
+                                  (loop for next = next-next then (stmt-next next)
+                                        while next
+                                        do (case (stmt-mnemonic next)
+                                             ((mov lea))
+                                             (cmov
+                                              (return (second (stmt-operands next))))
+                                             (t
+                                              (return))))))))
+                (or (and (memq (stmt-mnemonic stmt) '(and xor or)) ;; the same flags are set
+                         (or (eq size2 size1)
+                             (and (memq flag '(:ne :e :nz :z))
+                                  (eq size1 :dword)
+                                  (eq size2 :qword))))
+                    (case flag
+                      ;; TODO: figure out when it would be correct to omit TEST for the carry flag
+                      ((:s :ns)
+                       (eq size2 size1))
+                      ((:ne :e :nz :z)
+                       (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))
+                      ((:ge :g :le :l
+                        :nl :nle :ng :nge)
+                       (and (eq size2 size1)
+                            ;; Assume there's no overflow for signed arithmetic
+                            (memq (vop-name (sb-assem::stmt-vop stmt))
+                                  '(sb-vm::fast--/fixnum=>fixnum
+                                    sb-vm::fast-+/fixnum=>fixnum
+                                    sb-vm::fast--/signed=>signed
+                                    sb-vm::fast-+/signed=>signed
+                                    sb-vm::fast---c/fixnum=>fixnum
+                                    sb-vm::fast-+-c/fixnum=>fixnum
+                                    sb-vm::fast---c/signed=>signed
+                                    sb-vm::fast-+-c/signed=>signed
+                                    sb-vm::fast-negate/fixnum
+                                    sb-vm::fast-negate/signed))))))))
       (delete-stmt next)
       next-next)))
 
