@@ -1052,6 +1052,8 @@
         (count 0))
     (when (>= (fd-stream-file-position stream) 0)
       (setf (fd-stream-file-position stream) -1))
+    (when (fd-stream-synchronize-output stream)
+      (finish-fd-stream-output stream))
     (tagbody
        #+win32
        (go :main)
@@ -1399,6 +1401,8 @@
                 (= (buffer-head ibuf) (buffer-tail ibuf)))
            (when (>= (fd-stream-file-position stream) 0)
              (setf (fd-stream-file-position stream) -1))
+           (when (fd-stream-synchronize-output stream)
+             (finish-fd-stream-output stream))
            (prog ((fd (fd-stream-fd stream))
                   (errno 0)
                   (count 0))

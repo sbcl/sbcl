@@ -885,3 +885,33 @@
   (assert (=  (with-open-file (s "/dev/zero")
                 (read-sequence (make-string 4096) s :start 9))
               4096)))
+
+(with-test (:name :io-buffer-sync-basic)
+  (let ((file (scratch-file-name)))
+    (unwind-protect
+         (with-open-file (stream file
+                                 :direction :io
+                                 :if-exists :overwrite
+                                 :if-does-not-exist :create)
+           (write-string "abc" stream)
+           (file-position stream 0)
+           (write-char #\x stream)
+           ;; This should read the character after the 'x' we just wrote,
+           ;; which should be 'b', not 'a' (the original first character)
+           (assert (char= (read-char stream) #\b)))
+      (ignore-errors (delete-file file)))))
+
+(with-test (:name :io-buffer-sync-multiple-ops)
+  (let ((file (scratch-file-name)))
+    (unwind-protect
+         (with-open-file (stream file
+                                 :direction :io
+                                 :if-exists :overwrite
+                                 :if-does-not-exist :create)
+           (write-string "hello world" stream)
+           (file-position stream 6)  ; position after "hello "
+           (write-string "SBCL" stream)
+           (file-position stream 9)  ; position at last character of "SBCL"
+           ;; Should read the 'L' from "SBCL", not 'r' from original "world"
+           (assert (char= (read-char stream) #\L)))
+      (ignore-errors (delete-file file)))))
