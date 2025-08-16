@@ -337,11 +337,11 @@ EXPERIMENTAL: Interface subject to change."
              ;; Ensure that the thread can't exit (which ensures that it can't free the sprof_sem
              ;; that might be needed by the C routine, depending on things), and also ensure
              ;; mutual exclusivity with other callers of this.
-             (sb-thread:with-deathlok (thread c-thread)
-               (unless (zerop c-thread)
-                 (let ((sap (alien-funcall acquire-data c-thread)))
-                   (unless (= (sap-int sap) 0)
-                     (process sap thread))))))
+             (let ((sap (sb-thread:with-deathlok (thread c-thread)
+                          (unless (zerop c-thread)
+                            (alien-funcall acquire-data c-thread)))))
+               (when (and sap (/= (sap-int sap) 0))
+                 (process sap thread))))
            nil)
          all-threads)))))
 
