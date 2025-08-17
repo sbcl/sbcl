@@ -545,10 +545,11 @@
 
 ;;;; lvar substitution
 
+(defun update-ref-dependencies (new old)
+  (update-lvar-dependencies new (lambda-var-ref-lvar old nil t)))
+
 (defun update-lvar-dependencies (new old)
   (typecase old
-    (ref
-     (update-lvar-dependencies new (lambda-var-ref-lvar old)))
     (lvar
      (do-uses (node old)
        (when (exit-p node)
@@ -1121,11 +1122,13 @@
           (lambda-dynamic-extents (node-home-lambda dynamic-extent)))
     dynamic-extent))
 
-(defun lambda-var-ref-lvar (ref &optional allow-sets)
+(defun lambda-var-ref-lvar (ref &optional allow-sets single-ref)
   (let ((var (ref-leaf ref)))
     (when (and (lambda-var-p var)
                (or allow-sets
-                   (not (lambda-var-sets var))))
+                   (not (lambda-var-sets var)))
+               (not (and single-ref
+                         (cdr (leaf-refs var)))))
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
              (refs (lambda-refs fun))
@@ -2491,7 +2494,7 @@ is :ANY, the function name is not checked."
   (declare (type ref ref) (type leaf leaf))
   (unless (eq (ref-leaf ref) leaf)
     (push ref (leaf-refs leaf))
-    (update-lvar-dependencies leaf ref)
+    (update-ref-dependencies leaf ref)
     (delete-ref ref)
     (setf (ref-leaf ref) leaf
           (ref-same-refs ref) nil)
