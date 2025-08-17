@@ -915,3 +915,30 @@
            ;; Should read the 'L' from "SBCL", not 'r' from original "world"
            (assert (char= (read-char stream) #\L)))
       (ignore-errors (delete-file file)))))
+
+#+unix
+(with-test (:name :unbuffered-nonblocking-write-sequence)
+  (flet ((make-non-blocking-pipe ()
+           (multiple-value-bind (i o) (sb-posix:pipe)
+             (sb-posix:fcntl i sb-posix:f-setfl sb-posix:o-nonblock)
+             (sb-posix:fcntl o sb-posix:f-setfl sb-posix:o-nonblock)
+             (make-two-way-stream (sb-sys:make-fd-stream i :input t :buffering :none :element-type '(unsigned-byte 8))
+                                  (sb-sys:make-fd-stream o :output t :buffering :none :element-type '(unsigned-byte 8))))))
+    (let ((pipe (make-non-blocking-pipe))
+          (buf (make-array 1 :element-type '(unsigned-byte 8))))
+      (unwind-protect
+           (progn
+             ;; Fill the pipe buffer
+             (loop while (sb-unix:unix-write (sb-sys:fd-stream-fd (two-way-stream-output-stream pipe)) buf 0 1))
+             (write-sequence (coerce #(1 2 3 4) '(vector (unsigned-byte 8))) pipe)
+             (let ((in (make-array 65536 :element-type '(unsigned-byte 8)
+                                         :initial-element 255)))
+               (read-sequence in pipe)
+               (assert (every #'zerop in)))
+             (write-sequence (make-array 4 :element-type '(unsigned-byte 8) :initial-element 0) pipe)
+             (let ((in (make-array 4 :element-type '(unsigned-byte 8)
+                                     :initial-element 255)))
+               (read-sequence in pipe)
+               (assert (equalp in #(1 2 3 4)))))
+        (close (two-way-stream-output-stream pipe))
+        (close (two-way-stream-input-stream pipe))))))

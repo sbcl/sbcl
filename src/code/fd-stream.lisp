@@ -474,6 +474,7 @@
              (synchronize-stream-output stream))
            (when (>= (fd-stream-file-position stream) 0)
              (setf (fd-stream-file-position stream) -1))
+           (flush-output-buffer stream)
            (multiple-value-bind (count errno)
                (sb-unix:unix-write (fd-stream-fd stream) thing start length)
              (cond ((eql count length)
