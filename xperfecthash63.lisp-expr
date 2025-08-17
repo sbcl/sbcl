@@ -975,6 +975,13 @@
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 5) 28)))
     (^ a (aref tab b))))))")
+(#(20F3DEB2 29F3ECDD 36F40154 3DF40C59 3FF40F7F 731427B9 732570DA 941DAF55 A42F11A6 BF1975D8 C61980DD C8198403 D119922E
+   DA19A059)
+ "(:NGE :NG :NLE :NL :L :LE :G :GE :Z :NZ :E :NE :NS :S)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 8 4 13 12 2 1)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
 (#(20F3DEB2 29F3ECDD 36F40154 3DF40C59 3FF40F7F 941DAF55 A42F11A6 C8198403 D119922E DA19A059)
  "(:L :LE :G :GE :Z :NZ :E :NE :NS :S)"
  "((let ((tab #a((8) (unsigned-byte 8) 0 0 8 14 2 4 2 3)))
@@ -984,6 +991,9 @@
 (#(20F3DEB2 29F3ECDD 3FF40F7F C8198403 D119922E DA19A059)
  "(:Z :NZ :E :NE :NS :S)"
  "((& (>> val 11) 7))")
+(#(20F3DEB2 3FF40F7F C8198403 D119922E)
+ "(:NE :E :NZ :Z)"
+ "((& (>> val 3) 3))")
 (#(225B3CE5 42D83FFB 645CF61B 64BF0315 8A9A92D0 9BC82B5D EBD01872)
  "(:ALLOW-OTHER-KEYS :INFINITY-DATA :OPERATIONS :FLAG-VARIABLE :TEMP-VARIABLE :TYPE :ANSWER-VARIABLE)"
  "((& (^ (>> val 3) (>> val 30)) 7))")
