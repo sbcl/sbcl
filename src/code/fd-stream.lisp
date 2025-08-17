@@ -130,6 +130,8 @@
   ;; controls whether the input buffer must be cleared before output
   ;; (must be done for files, not for sockets, pipes and other data
   ;; sources where input and output aren't related).
+  ;; 1 means the OBUF is full but no output needs to be written,
+  ;; just the input buffer flushed, used for :IO streams.
   (synchronize-output nil)
   ;; character position if known -- this may run into bignums, but
   ;; we probably should flip it into null then for efficiency's sake...
@@ -318,7 +320,8 @@
                ;; whatever is left over. Otherwise wait until we can write.
                (aver (< head tail))
                (when (fd-stream-synchronize-output stream)
-                 (synchronize-stream-output stream))
+                 (when (synchronize-stream-output stream)
+                   (return-from flush-output-buffer obuf)))
                (loop
                 (let ((length (- tail head)))
                   (multiple-value-bind (count errno)
@@ -354,10 +357,6 @@
                                                    stream errno)))))))))))))
 
 (defun finish-writing-sequence (sequence stream start end)
-  (when (fd-stream-synchronize-output stream)
-    (synchronize-stream-output stream))
-  (when (>= (fd-stream-file-position stream) 0)
-    (setf (fd-stream-file-position stream) -1))
   (loop
    (let ((length (- end start)))
      (multiple-value-bind (count errno)
@@ -472,8 +471,6 @@
          (let ((length (- end start)))
            (when (fd-stream-synchronize-output stream)
              (synchronize-stream-output stream))
-           (when (>= (fd-stream-file-position stream) 0)
-             (setf (fd-stream-file-position stream) -1))
            (flush-output-buffer stream)
            (multiple-value-bind (count errno)
                (sb-unix:unix-write (fd-stream-fd stream) thing start length)
@@ -666,10 +663,15 @@
 (defun synchronize-stream-output (stream)
   ;; If we're reading and writing on the same file, flush buffered
   ;; input and rewind file position accordingly.
-  (when (fd-stream-synchronize-output stream)
+  (when (eql (fd-stream-synchronize-output stream) 1)
     (let ((adjust (nth-value 1 (flush-input-buffer stream))))
       (unless (eql 0 adjust)
-        (sb-unix:unix-lseek (fd-stream-fd stream) (- adjust) sb-unix:l_incr)))))
+        (sb-unix:unix-lseek (fd-stream-fd stream) (- adjust) sb-unix:l_incr)))
+    (setf (fd-stream-synchronize-output stream) t)
+    ;; The output buffer wasn't really full, just asking for the
+    ;; input buffer to be flushed.
+    (reset-buffer (fd-stream-obuf stream))
+    t))
 
 (defun fd-stream-output-finished-p (stream)
   (let ((obuf (fd-stream-obuf stream)))
@@ -689,10 +691,6 @@
            `((when (< (buffer-length obuf) (+ tail 4))
                (setf obuf (flush-output-buffer ,stream-var)
                      tail (buffer-tail obuf)))))
-       ,@(unless (eq (car buffering) :none)
-           ;; FIXME: Why this here? Doesn't seem necessary.
-           `((when (fd-stream-synchronize-output ,stream-var)
-               (synchronize-stream-output ,stream-var))))
        (,@(if restart
               '(block output-nothing)
               '(progn))
@@ -714,10 +712,6 @@
           `((when (< (buffer-length obuf) (+ tail ,size))
              (setf obuf (flush-output-buffer ,stream-var)
                    tail (buffer-tail obuf)))))
-       ;; FIXME: Why this here? Doesn't seem necessary.
-       ,@(unless (eq (car buffering) :none)
-          `((when (fd-stream-synchronize-output ,stream-var)
-              (synchronize-stream-output ,stream-var))))
        ,(if restart
             `(block output-nothing
                ,@body
@@ -1054,7 +1048,7 @@
     (when (>= (fd-stream-file-position stream) 0)
       (setf (fd-stream-file-position stream) -1))
     (when (fd-stream-synchronize-output stream)
-      (finish-fd-stream-output stream))
+      (fd-stream-io-start-reading stream))
     (tagbody
        #+win32
        (go :main)
@@ -1403,7 +1397,7 @@
            (when (>= (fd-stream-file-position stream) 0)
              (setf (fd-stream-file-position stream) -1))
            (when (fd-stream-synchronize-output stream)
-             (finish-fd-stream-output stream))
+             (fd-stream-io-start-reading stream))
            (prog ((fd (fd-stream-fd stream))
                   (errno 0)
                   (count 0))
@@ -1584,8 +1578,6 @@
                      (end (or end (length string)))
                      (last-newline nil))
                  (declare (type index start end))
-                 (when (fd-stream-synchronize-output stream)
-                   (synchronize-stream-output stream))
                  (unless (<= 0 start end (length string))
                    (sequence-bounding-indices-bad-error string start end))
                  (do ()
@@ -2346,6 +2338,16 @@
     (aver (fd-stream-serve-events stream))
     (serve-all-events)))
 
+(defun fd-stream-io-start-reading (stream)
+  (unless (eql (fd-stream-synchronize-output stream) 1)
+    (finish-fd-stream-output stream)
+    ;; The next flush-output-buffer will flush the input buffer without touching
+    ;; the output.
+    (let ((obuf (fd-stream-obuf stream)))
+      (setf (fd-stream-synchronize-output stream) 1
+            ;; Make it seem full
+            (buffer-tail obuf) (buffer-length obuf)))))
+
 (defun fd-stream-get-file-position (stream)
   (declare (fd-stream stream))
   (without-interrupts
@@ -2380,7 +2382,8 @@
           (incf posn (- (buffer-tail buffer) (buffer-head buffer))))
         (let ((obuf (fd-stream-obuf stream)))
           (when obuf
-            (incf posn (buffer-tail obuf))))
+            (unless (eq (fd-stream-synchronize-output stream) 1)
+              (incf posn (buffer-tail obuf)))))
         ;; Adjust for unread input: If there is any input
         ;; read from UNIX but not supplied to the user of the
         ;; stream, the *real* file position will smaller than

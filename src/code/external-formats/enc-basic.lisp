@@ -1040,8 +1040,6 @@
         (end (or end (length string)))
         (last-newline -1))
     (declare (type index start end))
-    (when (fd-stream-synchronize-output stream)
-      (synchronize-stream-output stream))
     (unless (<= 0 start end (length string))
       (sequence-bounding-indices-bad-error string start end))
     (do ()
