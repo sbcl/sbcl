@@ -164,18 +164,20 @@
     ;; merge in the widetag
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)))
-(flet ((header-byte-imm8 (bits)
-         ;; return an imm8 and a shift amount expressed in bytes
-         (cond ((typep bits '(unsigned-byte 8))
-                (values bits 0))
-               ((and (not (logtest bits #xff))
-                     (typep (ash bits -8) '(unsigned-byte 8)))
-                (values (ash bits -8) 1))
-               ((and (not (logtest bits #xffff))
-                     (typep (ash bits -16) '(unsigned-byte 8)))
-                (values (ash bits -16) 2))
-               (t
-                (bug "Can't construct mask from ~x" bits)))))
+
+(defun header-byte-imm8 (bits)
+  ;; return an imm8 and a shift amount expressed in bytes
+  (cond ((typep bits '(unsigned-byte 8))
+         (values bits 0))
+        ((and (not (logtest bits #xff))
+              (typep (ash bits -8) '(unsigned-byte 8)))
+         (values (ash bits -8) 1))
+        ((and (not (logtest bits #xffff))
+              (typep (ash bits -16) '(unsigned-byte 8)))
+         (values (ash bits -16) 2))
+        (t
+         (bug "Can't construct mask from ~x" bits))))
+
 (define-vop (logior-header-bits)
   (:translate logior-header-bits)
   (:policy :fast-safe)
@@ -223,7 +225,7 @@
   (:conditional :ne)
   (:generator 1
     (multiple-value-bind (imm8 shift) (header-byte-imm8 mask)
-      (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8)))))
+      (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8))))
 
 ;;;; allocation
 

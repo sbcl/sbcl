@@ -939,3 +939,15 @@
 
 (with-test (:name :make-simple-array-not-displaced)
   (assert (not (array-displacement (funcall (checked-compile `(lambda (d) (make-array d))) '(1 2))))))
+
+(with-test (:name :data-vector-pop-fill-pointer-check)
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (array)
+      (declare ((array t) array))
+      (vector-pop array))
+   (((make-array 5)) (condition 'type-error))
+   (((make-array 5 :adjustable t)) (condition 'type-error))
+   (((make-array '(5 5))) (condition 'type-error))
+   (((make-array '(5 5) :adjustable t)) (condition 'type-error))
+   (((make-array 5 :fill-pointer t :initial-element 3)) 3)))

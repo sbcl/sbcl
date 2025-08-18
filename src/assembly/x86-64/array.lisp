@@ -212,13 +212,10 @@
   (declare (ignore result))
   (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
-      (inst mov :dword temp (ea (- other-pointer-lowtag) array))
-      (inst cmp :byte temp complex-base-string-widetag)
-      (inst jmp :l ERROR)
 
-      (inst test :word temp (ash sb-vm:+array-fill-pointer-p+
-                                 sb-vm:array-flags-data-position))
-      (inst jmp :nz ERROR)
+      (multiple-value-bind (imm8 shift) (header-byte-imm8 (ash +array-fill-pointer-p+ array-flags-data-position))
+        (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8))
+      (inst jmp :z ERROR)
 
       (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
       (inst test offset offset)
@@ -253,13 +250,9 @@
   (declare (ignore result))
   (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
-      (inst mov :dword temp (ea (- other-pointer-lowtag) array))
-      (inst cmp :byte temp complex-base-string-widetag)
-      (inst jmp :l ERROR)
-
-      (inst test :word temp (ash sb-vm:+array-fill-pointer-p+
-                                 sb-vm:array-flags-data-position))
-      (inst jmp :nz ERROR)
+      (multiple-value-bind (imm8 shift) (header-byte-imm8 (ash +array-fill-pointer-p+ array-flags-data-position))
+        (inst test :byte (ea (- (1+ shift) other-pointer-lowtag) array) imm8))
+      (inst jmp :z ERROR)
 
       (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
       (loadw temp array array-elements-slot other-pointer-lowtag)

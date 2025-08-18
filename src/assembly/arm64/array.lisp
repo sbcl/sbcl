@@ -189,12 +189,8 @@
   (let ((error (generate-error-code nil 'fill-pointer-error array)))
     (assemble ()
       (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
-      (inst tbnz tmp-tn (1- (integer-length (ash sb-vm:+array-fill-pointer-p+
-                                                 sb-vm:array-flags-data-position)))
+      (inst tbz tmp-tn (1- (integer-length (ash +array-fill-pointer-p+ array-flags-position)))
             error)
-      (inst and tmp-tn tmp-tn #xFF)
-      (inst cmp tmp-tn complex-base-string-widetag)
-      (inst b :lt ERROR)
 
       (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
       (inst cbz offset error)
@@ -230,12 +226,8 @@
     (assemble ()
 
       (inst ldr tmp-tn (@ array (- other-pointer-lowtag)))
-      (inst tbnz tmp-tn (1- (integer-length (ash sb-vm:+array-fill-pointer-p+
-                                                 sb-vm:array-flags-data-position)))
+      (inst tbz tmp-tn (1- (integer-length (ash +array-fill-pointer-p+ array-flags-position)))
             error)
-      (inst and tmp-tn tmp-tn #xFF)
-      (inst cmp tmp-tn complex-base-string-widetag)
-      (inst b :lt ERROR)
 
       (loadw offset array array-fill-pointer-slot other-pointer-lowtag)
       (loadw tmp-tn array array-elements-slot other-pointer-lowtag)
