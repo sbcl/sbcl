@@ -1934,6 +1934,11 @@
 (defoptimizer (%coerce-callable-for-call ir2-convert) ((fun) node block)
   (when fun
     (ir2-convert-full-call node block)))
+
+;; Has an ir2-converter but needs to behave like a full call.
+#+call-symbol
+(setf (fun-info-externally-checkable-type (fun-info-or-lose '%coerce-callable-for-call))
+      :full)
 
 ;;;; DYNAMIC-EXTENT
 

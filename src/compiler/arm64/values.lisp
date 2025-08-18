@@ -121,6 +121,7 @@
   (:vop-var vop)
   (:node-var node)
   (:save-p :compute-only)
+  (:check-type t)
   (:generator 0
     (move list arg)
 

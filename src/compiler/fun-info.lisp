@@ -174,7 +174,9 @@
   annotation
   ;; For functions with unboxed args/returns
   (folder nil :type (or function null))
-  (externally-checkable-type nil :type (or function null))
+  ;; :FULL means it behaves like a full call despite being implemented
+  ;; via VOPs or ir2-convert.
+  (externally-checkable-type nil :type (or function null (eql :full)))
   (constants nil :type (or function null))
   ;; A description of read-only arguments that can be constant folded.
   ;; An integer bitmap for positional arguments.

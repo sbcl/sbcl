@@ -374,7 +374,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c::fun-info-call-type-deriver . sb-c::call-type-deriver))))
               (loop for (reader . name) in otypes
                     for fn = (funcall reader fun-info)
-                    when fn collect
+                    when (functionp fn) collect
                     (let ((source (find-definition-source fn)))
                       (setf (definition-source-description source)
                             (list name))

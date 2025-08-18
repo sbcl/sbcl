@@ -2830,18 +2830,16 @@ is :ANY, the function name is not checked."
   (let ((kind (basic-combination-kind call)))
     (or (eq kind :full)
         (eq kind :unknown-keys)
-        ;; It has an ir2-converter, but needs to behave like a full call.
-        (eq (lvar-fun-name (basic-combination-fun call) t)
-            '%coerce-callable-for-call)
         (and (eq kind :known)
              (let ((info (basic-combination-fun-info call)))
-               (and
-                (not (fun-info-ir2-convert info))
-                (not (fun-info-ltn-annotate info))
-                (dolist (template (fun-info-templates info) t)
-                  (when (eq (template-ltn-policy template) :fast-safe)
-                    (when (valid-fun-use call (template-type template))
-                      (return))))))))))
+               (or (eq (fun-info-externally-checkable-type info) :full)
+                   (and
+                    (not (fun-info-ir2-convert info))
+                    (not (fun-info-ltn-annotate info))
+                    (dolist (template (fun-info-templates info) t)
+                      (when (eq (template-ltn-policy template) :fast-safe)
+                        (when (valid-fun-use call (template-type template))
+                          (return)))))))))))
 
 ;;;; careful call
 

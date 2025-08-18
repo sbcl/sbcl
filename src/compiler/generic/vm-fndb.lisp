@@ -738,11 +738,11 @@
 ;;; Checks for and adjusts fill-pointer for vector-pop/push and
 ;;; returns the underlying simple data vector.
 (defknown %data-vector-pop
-    (array)
+    (complex-vector)
     (values (simple-array * (*)) index))
 
 (defknown %data-vector-push
-    (array)
+    (complex-vector)
     (values (simple-array * (*)) (or null index)))
 
 (defknown restart-point (t) t ())

@@ -253,8 +253,6 @@
                                                                  hairy-data-vector-ref string-hairy-data-vector-ref
                                                                  hairy-data-vector-set string-hairy-data-vector-set)
                                                                fun-name)))))))
-                        #+(or arm64 x86-64)
-                        ((lvar-fun-is (basic-combination-fun dest) '(values-list)))
                         ;; Not great
                         ((lvar-fun-is (basic-combination-fun dest) '(%%primitive))
                          (destructuring-bind (vop &rest args) (basic-combination-args dest)
