@@ -1463,31 +1463,55 @@
   (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target r))
+  (:arg-refs x-ref)
   (:arg-types (:constant (eql #.n-fixnum-bits)) t)
   (:results (r :scs (any-reg)))
   (:result-types fixnum)
   (:info width)
   (:ignore width)
+  (:check-type t)
+  (:save-p :compute-only)
+  (:vop-var vop)
   (:generator 5
-    (move r x)
-    (inst tbz r 0 DONE)
-    (loadw tmp-tn r bignum-digits-offset other-pointer-lowtag)
-    (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits))
+    (let* ((integerp (csubtypep (tn-ref-type x-ref)
+                                (specifier-type 'integer)))
+           (error (unless integerp
+                    (generate-error-code vop 'object-not-integer-error x))))
+      (move r x)
+      (inst tbz r 0 DONE)
+      (unless integerp
+        (%test-headers r tmp-tn error t nil '(#.bignum-widetag)
+                       :value-tn-ref x-ref
+                       :immediate-tested '(fixnum)))
+      (loadw tmp-tn r bignum-digits-offset other-pointer-lowtag)
+      (inst lsl r tmp-tn (- n-word-bits n-fixnum-bits)))
     DONE))
 
 (define-vop (mask-signed-field-integer)
   (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:arg-types (:constant (integer 0 64)) integer)
+  (:arg-refs x-ref)
+  (:arg-types (:constant (integer 0 64)) t)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:info width)
+  (:check-type t)
+  (:vop-var vop)
+  (:save-p :compute-only)
   (:generator 63
     (aver (/= width 0))
     (inst asr r x n-fixnum-tag-bits)
     (inst tbz x 0 do)
-    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    (let* ((integerp (csubtypep (tn-ref-type x-ref)
+                                (specifier-type 'integer)))
+           (error (unless integerp
+                    (generate-error-code vop 'object-not-integer-error x))))
+      (unless integerp
+        (%test-headers x tmp-tn error t nil '(#.bignum-widetag)
+                       :value-tn-ref x-ref
+                       :immediate-tested '(fixnum)))
+      (loadw r x bignum-digits-offset other-pointer-lowtag))
     DO
     (cond ((= width 64))
           (t
@@ -1497,13 +1521,25 @@
   (:translate logand)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
+  (:arg-refs x-ref)
   (:arg-types t (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:info mask)
   (:result-types unsigned-num)
+  (:check-type t)
+  (:vop-var vop)
+  (:save-p :compute-only)
   (:generator 10
     (inst asr r x n-fixnum-tag-bits)
     (inst tbz x 0 AND)
+    (let* ((integerp (csubtypep (tn-ref-type x-ref)
+                                (specifier-type 'integer)))
+           (error (unless integerp
+                    (generate-error-code vop 'object-not-integer-error x))))
+      (unless integerp
+        (%test-headers x tmp-tn error t nil '(#.bignum-widetag)
+                       :value-tn-ref x-ref
+                       :immediate-tested '(fixnum))))
     (loadw r x bignum-digits-offset other-pointer-lowtag)
     AND
     (cond ((= mask most-positive-word))
