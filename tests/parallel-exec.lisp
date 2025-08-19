@@ -127,6 +127,9 @@
                          (when (or (search ".pure" filename) (search ".impure" filename))
                            (push filename missing-usage))))
                      (cond ((eq code 104)
+                            (when (and *delete-logs*
+                                       (equal (pathname-type filename) "test"))
+                              (delete-file (format nil "~a/~a~@[-~d~]" *logdir* filename iteration)))
                             (format t "~A: success (~d msec)~%" filename et))
                            (t
                             (format t "~A~@[[~d]~]: status ~D (~d msec)~%"
@@ -235,6 +238,10 @@
 (when (string= (car *posix-argv*) "--filter")
   (setq *filter* (cadr *posix-argv*))
   (setq *posix-argv* (cddr *posix-argv*)))
+(when (find "--delete-logs" *posix-argv* :test #'equal)
+  (setf *delete-logs* t)
+  (setf *posix-argv* (remove "--delete-logs" *posix-argv* :test #'equal)))
+
 (if (<= (length *posix-argv*) 1)
     ;; short form - test all files. Argument N if specified is the number of
     ;; tasks, defaulting to half the machine's reported cores
@@ -258,8 +265,10 @@
                                 (impure-cload-files)
                                 (sh-files)))))
        jobs
-       t)
-      #+(and linux sb-thread 64-bit) (summarize-gc-times))
+       (not (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")))
+      #+(and linux sb-thread 64-bit)
+      (unless (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")
+        (summarize-gc-times)))
     ;; long form
     (let ((jobs 4)
           (runs-per-test 1)
