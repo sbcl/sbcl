@@ -421,6 +421,22 @@ triggers."
             (real-time->sec-and-nsec delta)))
         (%clear-system-timer))))
 
+;;; Caution: both cases below - (eq thread t) or not - are on thin ice.
+;;; Case 1: MAKE-THREAD is definitely not technically legal because pthread_create
+;;;   can not (necessarily) be called from the SIGALRM handler which we're currently
+;;;   inside of (if maybe_now_maybe_later did not defer the signal to a
+;;;   receive-pending-interrupt trap). And if it did defer, it's nonetheless still
+;;;   not fair game, because in that case we're in whatever the signal handler is
+;;;   which handles a breakpoint trap. Deferral has a higher chance of succeeding
+;;;   because we're less likely to be holding any pthread mutex, since the interrupt
+;;;   was in Lisp (not foreign) code. If users are really accustomed to making timers
+;;;   that run in a separate thread, there needs to be a dedicated thread if not
+;;;   a thread pool. I suspect that users do (or can) implement the latter themselves.
+;;; Case 2: Though most pthread libraries allow pthread_kill inside a signal handler
+;;;   (i.e. the SIGALRM handler we're in), there is evidence that some implementations
+;;;   do not correctly support it, as per the comment above sb_thread_kill. Such
+;;;   libpthread is probably buggy, because POSIX added it to the OK list
+;;;   according to https://man7.org/linux/man-pages/man7/signal-safety.7.html
 (defun run-timer (timer)
   (let ((function (%timer-interrupt-function timer))
         (thread (%timer-thread timer)))

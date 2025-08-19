@@ -197,7 +197,7 @@
                    (when (member :allocator-metrics sb-impl:+internal-features+)
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
-                   #+test-sprof 
+                   #+test-sprof
                    (sb-sprof:report :type :flat
                                     :stream (if (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")
                                                 (make-broadcast-stream)
