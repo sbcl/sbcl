@@ -165,8 +165,8 @@
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
-(defun sigterm-handler (signal code context)
-  (declare (ignore signal code context))
+(defun sigterm-handler (signal info context)
+  (declare (ignore signal info context))
   (exit))
 
 #-sb-safepoint
@@ -175,13 +175,13 @@
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
 ;;; nothing to do so it's safe to receive spurious SIGURGs coming
 ;;; from the kernel.
-(defun sigurg-handler (signal code sb-kernel:*current-internal-error-context*)
-  (declare (ignore signal code))
+(defun sigurg-handler (signal info sb-kernel:*current-internal-error-context*)
+  (declare (ignore signal info))
   (sb-thread::run-interruption))
 
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
-(defun sigchld-handler  (signal code context)
-  (declare (ignore signal code context))
+(defun sigchld-handler  (signal info context)
+  (declare (ignore signal info context))
   (sb-impl::get-processes-status-changes))
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
