@@ -500,10 +500,34 @@
   (deffrob floor)
   (deffrob ceiling))
 
-;;; This used to be a source transform (hence the lack of restrictions
-;;; on the argument types), but we make it a regular transform so that
-;;; the VM has a chance to see the bare LOGTEST and potentiall choose
-;;; to implement it differently.  --njf, 06-02-2006
+(deftransform logtest ((x y) * * :node node :before-vop t)
+  (let (name)
+    (cond ((and (constant-lvar-p y)
+                (= (logcount (lvar-value y)) 1)
+                (splice-fun-args x 'lognot 1 nil))
+           `(not (logtest x y)))
+          ;; (evenp (+ x even)) => (evenp x) and so on
+          ((and (constant-lvar-p y)
+                (= (lvar-value y) 1)
+                (setf name
+                      (combination-matches* '(+ - *) '(* constant) (lvar-uses x))))
+           (destructuring-bind (l c) (combination-args (lvar-uses x))
+             (declare (ignore l))
+             (let ((c (lvar-value c)))
+               (cond ((and (eq name '*)
+                           (evenp c))
+                      nil)
+                     (t
+                      (splice-fun-args x :any 2)
+                      `(lambda (x c y)
+                         (declare (ignore y c))
+                         ,(if (or (eq name '*)
+                                  (evenp c))
+                              `(logtest x 1)
+                              `(not (logtest x 1)))))))))
+          (t
+           (give-up-ir1-transform)))))
+
 (deftransform logtest ((x y) * * :node node)
   (delay-ir1-transform node :ir1-phases)
   `(not (zerop (logand x y))))
@@ -520,27 +544,29 @@
               ((type= type (specifier-type '(eql 0)))
                (specifier-type '(eql nil))))))))
 
-(defun logbitp-to-minusp-p (index integer)
-  (let* ((int (type-approximate-interval (lvar-type integer)))
-         (length (max (integer-length (interval-low int))
-                      (integer-length (interval-high int))))
-         (index-int (type-approximate-interval (lvar-type index))))
-    (>= (interval-low index-int) length)))
+(deftransform logbitp ((index integer) * * :node node :before-vop t)
+  (cond ((splice-fun-args integer 'lognot 1 nil)
+         `(not (logbitp index integer)))
+        ((let* ((int (type-approximate-interval (lvar-type integer)))
+                (length (and int
+                             (interval-low int)
+                             (interval-high int)
+                             (max (integer-length (interval-low int))
+                                  (integer-length (interval-high int)))))
+                (index-int (type-approximate-interval (lvar-type index))))
+           (when (and length
+                      index-int)
+             (>= (interval-low index-int) length)))
+         `(< integer 0))
+        (t
+         (give-up-ir1-transform))))
 
 (deftransform logbitp ((index integer) * * :node node)
-  (let ((integer-type (lvar-type integer))
-        (integer-value (and (constant-lvar-p integer)
-                            (lvar-value integer))))
-    (cond ((eql integer-value 0)
-           nil)
-          ((eql integer-value -1)
-           t)
-          ((csubtypep integer-type (specifier-type '(or word
-                                                     sb-vm:signed-word)))
+  (let ((integer-type (lvar-type integer)))
+    (cond ((or (csubtypep integer-type (specifier-type 'word))
+               (csubtypep integer-type (specifier-type 'sb-vm:signed-word)))
            (delay-ir1-transform node :ir1-phases)
-           (if (logbitp-to-minusp-p index integer)
-               `(minusp integer)
-               `(logtest 1 (ash integer (- index)))))
+           `(logtest 1 (ash integer (- index))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
                           (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
@@ -551,7 +577,6 @@
            `(logbitp index (logand integer ,most-positive-word)))
           (t
            (give-up-ir1-transform)))))
-
 
 (defoptimizer (logbitp derive-type) ((index integer))
   (let* ((one (specifier-type '(eql 1)))

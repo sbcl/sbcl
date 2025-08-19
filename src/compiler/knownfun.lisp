@@ -43,11 +43,18 @@
   ;; or if another transform could be applied with the right policy.
   (policy nil :type (or null function)))
 
+;;; A normal transform inserted before VOP-TRANSFORMs
+(defstruct (before-vop-transform (:copier nil)
+                                 (:predicate nil)
+                                 (:include transform)))
+
 ;;; A transform inserted at the front of fun-info-transforms and stops
 ;;; other from firing if it has a VOP that can do the job.
 (defstruct (vop-transform (:copier nil)
                           (:predicate nil)
                           (:include transform)))
+
+(declaim (freeze-type transform))
 
 (defun transform-note (transform)
   (or #+sb-xc-host (documentation (transform-function transform) 'function)
@@ -69,9 +76,13 @@
          (info (fun-info-or-lose name))
          (transforms (fun-info-transforms info))
          (old (find-if (lambda (transform)
-                         (and (if (eq important :vop)
-                                  (typep transform 'vop-transform)
-                                  (not (typep transform 'vop-transform)))
+                         (and (case important (eq important :vop)
+                                    (:vop
+                                     (typep transform 'vop-transform))
+                                    (:before-vop
+                                     (typep transform 'before-vop-transform))
+                                    (t
+                                     (not (typep transform '(or vop-transform before-vop-transform)))))
                               (type= (transform-type transform)
                                      ctype)))
                        transforms)))
@@ -79,22 +90,34 @@
            (style-warn 'redefinition-with-deftransform :transform old)
            (setf (transform-function old) fun
                  (transform-policy old) policy)
-           (unless (eq important :vop)
+           (unless (or (eq important :vop)
+                       (eq important :before-vop))
              (setf (transform-important old) important)))
           (t
            ;; Put vop-transform at the front.
-           (if (eq important :vop)
-               (push (make-vop-transform :type ctype :function fun
-                                         :policy policy)
-                     (fun-info-transforms info))
-               (let ((normal (member-if (lambda (transform)
-                                          (not (typep transform 'vop-transform)))
-                                        transforms))
-                     (transform (make-transform :type ctype :function fun
-                                                :important important
-                                                :policy policy)))
-                 (setf (fun-info-transforms info)
-                       (append (ldiff transforms normal) (list* transform normal)))))))
+           (case important
+             (:before-vop
+              (push (make-before-vop-transform :type ctype :function fun
+                                               :policy policy)
+                    (fun-info-transforms info)))
+             (:vop
+              (let ((normal (member-if (lambda (transform)
+                                         (not (eq (type-of transform) 'before-vop-transform)))
+                                       transforms))
+                    (transform (make-vop-transform :type ctype :function fun
+                                                   :policy policy)))
+                (setf (fun-info-transforms info)
+                      (append (ldiff transforms normal) (list* transform normal)))))
+             (t
+              (let ((normal (member-if (lambda (transform)
+                                         (not (typep transform '(or vop-transform
+                                                                 before-vop-transform))))
+                                       transforms))
+                    (transform (make-transform :type ctype :function fun
+                                               :important important
+                                               :policy policy)))
+                (setf (fun-info-transforms info)
+                      (append (ldiff transforms normal) (list* transform normal))))))))
     name))
 
 ;;; Make a FUN-INFO structure with the specified type, attributes

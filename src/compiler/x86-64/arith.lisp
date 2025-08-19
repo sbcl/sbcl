@@ -2909,8 +2909,8 @@
       (cons #'vop-optimize-fast-logtest-c/fixnum-optimizer 'sb-c::select-representations))
 
 (deftransform logbitp ((index integer) (:or ((signed-word signed-word) *)
-                                  ((word word) *)) * :vop t)
-  (not (sb-c::logbitp-to-minusp-p index integer)))
+                                            ((word word) *)) * :vop t)
+  t)
 
 ;;; TODO: The TEST instruction preceding this JEQ is entirely superfluous
 ;;; and can be removed with a vop optimizer:

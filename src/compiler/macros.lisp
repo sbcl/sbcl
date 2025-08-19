@@ -296,16 +296,19 @@
 ;;;   :VOP
 ;;;           - insert it at the front, stop other transforms from firing
 ;;;             if the function returns T.
+;;;   :BEFORE-VOP
+;;;           - an ordinary transform placed before VOP transforms.
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                                     (result-type '*)
                               &key result policy node defun-only
                                    (important :slightly)
-                                   vop)
+                                   vop
+                                   before-vop)
                         &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
   (when defun-only
     (aver (eq important :slightly))     ; can't be specified
-    (aver (not policy)))            ; has no effect on the defun
+    (aver (not policy)))                ; has no effect on the defun
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node '#:node))
           (n-decls '#:decls)
@@ -331,13 +334,13 @@
                                         :none
                                         :failure)))
                          `(multiple-value-bind (,n-lambda ,n-decls)
-                             (progn ,@body)
-                           (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
-                               ,n-lambda
-                               `(lambda ,',lambda-list
-                                  (declare (ignorable ,@',vars))
-                                  ,@,n-decls
-                                  ,,n-lambda))))))))
+                              (progn ,@body)
+                            (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
+                                ,n-lambda
+                                `(lambda ,',lambda-list
+                                   (declare (ignorable ,@',vars))
+                                   ,@,n-decls
+                                   ,,n-lambda))))))))
           (cond
             ((not defun-only)
              `(let ((fun (named-lambda (deftransform ,name) ,@stuff)))
@@ -348,13 +351,16 @@
                                                 ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
                                                 '(function ,types ,result-type)
                                                 fun
-                                                ,(if vop
-                                                     :vop
-                                                     important)))))
+                                                ,(cond (vop
+                                                        :vop)
+                                                       (before-vop
+                                                        :before-vop)
+                                                       (t
+                                                        important))))))
             ((eq defun-only 'lambda)
              `(named-lambda ,name ,@stuff))
             (defun-only
-             `(defun ,name ,@stuff))))))))
+                `(defun ,name ,@stuff))))))))
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
