@@ -38,7 +38,7 @@
 (in-package run-tests)
 (import '(sb-alien:alien-funcall sb-alien:extern-alien
           sb-alien:int sb-alien:c-string sb-alien:unsigned))
-(setq *summarize-test-times* t)
+(setq *summarize-test-times* (not (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")))
 ;;; Ordered approximately in descending order by running time
 (defvar *timings* (with-open-file (s "timing") (read s)))
 
@@ -194,7 +194,11 @@
                    (when (member :allocator-metrics sb-impl:+internal-features+)
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
-                   #+test-sprof (sb-sprof:report :type :flat)
+                   #+test-sprof 
+                   (sb-sprof:report :type :flat
+                                    :stream (if (sb-ext:posix-getenv "SBCL_TEST_NO_SUMMARIZE")
+                                                (make-broadcast-stream)
+                                                *standard-output*))
                    #+tlsf-stress (cl-user::tlsf-dump)
                    #-arm64 ;; causes crashes
                    (gc :gen 7)

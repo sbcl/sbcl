@@ -415,9 +415,7 @@
     (dolist (package delete)
       (unuse-package (package-use-list package) package))
     ;; Then all deletions
-    (mapc 'delete-package delete)
-    (when delete
-      (format t "::: NOTE: Deleted ~D package~:P~%" (length delete))))
+    (mapc 'delete-package delete))
   ;; Remove PRINT-OBJECT methods specialized on uninterned symbols
   (let ((gf #'print-object))
     (dolist (method (sb-mop:generic-function-methods gf))
