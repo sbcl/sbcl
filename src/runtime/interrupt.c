@@ -1004,15 +1004,13 @@ interrupt_handle_pending(os_context_t *context)
 #ifdef ADDRESS_SANITIZER
     __asan_unpoison_memory_region(context, sizeof *context);
 #endif
-    /* There are three ways we can get here. First, if an interrupt
+    /* There are a few ways we can get here. First, if an interrupt
      * occurs within pseudo-atomic, it will be deferred, and we'll
      * trap to here at the end of the pseudo-atomic block. Second, if
      * the GC (in alloc()) decides that a GC is required, it will set
      * *GC-PENDING* and pseudo-atomic-interrupted if not *GC-INHIBIT*,
      * and alloc() is always called from within pseudo-atomic, and
-     * thus we end up here again. Third, when calling GC-ON or at the
-     * end of a WITHOUT-GCING, MAYBE-HANDLE-PENDING-GC will trap to
-     * here if there is a pending GC. Fourth, ahem, at the end of
+     * thus we end up here again. Or at the end of
      * WITHOUT-INTERRUPTS (bar complications with nesting).
      *
      * A fourth way happens with safepoints: In addition to a stop for

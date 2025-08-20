@@ -342,13 +342,6 @@ Note: currently changes to this value are lost when saving core."
       (decf (extern-alien "auto_gc_trigger" os-vm-size-t) (- current val))))
   (setf (extern-alien "bytes_consed_between_gcs" os-vm-size-t) val))
 
-(declaim (inline maybe-handle-pending-gc))
-(defun maybe-handle-pending-gc ()
-  (when (and (not *gc-inhibit*)
-             (or #+sb-thread *stop-for-gc-pending*
-                 *gc-pending*))
-    (sb-unix::receive-pending-interrupt)))
-
 ;;;; GENCGC specifics
 ;;;;
 (define-alien-variable ("gc_logfile" %gc-logfile) (* char))
