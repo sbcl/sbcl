@@ -302,19 +302,24 @@
                                               (eql (lvar-value arg) arg-m))))))
            name))))
 
-(defun combination-matches* (names args combination)
-  (and (combination-p combination)
-       (let* ((fun (combination-fun combination))
-              (name (lvar-fun-name fun)))
-         (when (and (memq name names)
-                    (loop for arg in (combination-args combination)
-                          for arg-m in args
-                          always (or (eq arg arg-m)
-                                     (eq arg-m '*)
-                                     (and (constant-lvar-p arg)
-                                          (or (eq arg-m 'constant)
-                                              (eql (lvar-value arg) arg-m))))))
-           name))))
+(defun combination-matches* (names args combination &key cast-type)
+  (typecase combination
+    (combination
+     (let* ((fun (combination-fun combination))
+            (name (lvar-fun-name fun)))
+       (when (and (memq name names)
+                  (loop for arg in (combination-args combination)
+                        for arg-m in args
+                        always (or (eq arg arg-m)
+                                   (eq arg-m '*)
+                                   (and (constant-lvar-p arg)
+                                        (or (eq arg-m 'constant)
+                                            (eql (lvar-value arg) arg-m))))))
+         (values name combination))))
+    (cast
+     (when (and cast-type
+                (eq (cast-type-to-check combination) cast-type))
+       (combination-matches* names args (lvar-uses (cast-value combination)))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
@@ -2383,47 +2388,74 @@
 ;;; of arguments changes, the transform must be prepared to return a
 ;;; lambda with a new lambda-list with the correct number of
 ;;; arguments.
-(defun splice-fun-args (lvar fun num-args &optional (give-up t))
+(defun splice-fun-args (lvar fun num-args &optional (give-up t) cast-type)
   "If LVAR is a call to FUN with NUM-ARGS args, change those arguments to feed
 directly to the LVAR-DEST of LVAR, which must be a combination. If FUN
 is :ANY, the function name is not checked."
   (declare (type lvar lvar)
            (type symbol fun)
-           (type (or index null) num-args))
+           (type (or index null function) num-args))
   (flet ((give-up ()
            (if give-up
                (give-up-ir1-transform)
                (return-from splice-fun-args nil))))
     (let ((outside (lvar-dest lvar))
-          (inside (lvar-uses lvar)))
+          (inside (lvar-uses lvar))
+          cast)
       (aver (combination-p outside))
-      (unless (combination-p inside)
-        (give-up))
-      (let ((inside-fun (combination-fun inside)))
+      (cond ((combination-p inside))
+            ((and (cast-p inside)
+                  (eq (cast-type-to-check inside) cast-type)
+                  (setf cast inside)
+                  (combination-p (setf inside (lvar-uses (cast-value inside))))))
+            (t
+             (give-up)))
+      (let ((inside-fun (combination-fun inside))
+            (inside-args (combination-args inside)))
         (unless (or (eq fun :any)
                     (eq (lvar-fun-name inside-fun) fun))
           (give-up))
-
-        (let ((inside-args (combination-args inside)))
-          (when num-args
-            (unless (= (length inside-args) num-args)
-              (give-up)))
-          (let* ((outside-args (combination-args outside))
-                 (arg-position (position lvar outside-args))
-                 (before-args (subseq outside-args 0 arg-position))
-                 (after-args (subseq outside-args (1+ arg-position))))
-            (dolist (arg inside-args)
-              (setf (lvar-dest arg) outside))
-            (setf (combination-args inside) nil)
-            (setf (combination-args outside)
-                  (append before-args inside-args after-args))
-            (change-ref-leaf (lvar-uses inside-fun)
-                             (find-free-fun 'list "???"))
-            (setf (combination-fun-info inside) (info :function :info 'list)
-                  (combination-kind inside) :known)
-            (setf (node-derived-type inside) *wild-type*)
-            (flush-dest lvar)
-            inside-args))))))
+        (cond (cast
+               (let ((args (make-gensym-list (length inside-args))))
+                 (setf (node-derived-type inside)
+                       (lvar-derived-type (funcall num-args inside-args)))
+                 (transform-call inside `(lambda ,args
+                                           (declare (ignorable ,@args))
+                                           ,(funcall num-args args))
+                                 'splice-fun-args)
+                 inside-args))
+              (t
+               (cond ((functionp num-args)
+                      (let ((new-args (funcall num-args inside-args)))
+                        (cond ((lvar-p new-args)
+                               (loop for arg in inside-args
+                                     unless (eq arg new-args)
+                                     do (flush-dest arg))
+                               (setf inside-args (list new-args)))
+                              (t
+                               (loop for arg in inside-args
+                                     unless (memq arg new-args)
+                                     do (flush-dest arg))
+                               (setf inside-args new-args)))))
+                     (num-args
+                      (unless (= (length inside-args) num-args)
+                        (give-up))))
+               (let* ((outside-args (combination-args outside))
+                      (arg-position (position lvar outside-args))
+                      (before-args (subseq outside-args 0 arg-position))
+                      (after-args (subseq outside-args (1+ arg-position))))
+                 (dolist (arg inside-args)
+                   (setf (lvar-dest arg) outside))
+                 (setf (combination-args inside) nil)
+                 (setf (combination-args outside)
+                       (append before-args inside-args after-args))
+                 (change-ref-leaf (lvar-uses inside-fun)
+                                  (find-free-fun 'list "???"))
+                 (setf (combination-fun-info inside) (info :function :info 'list)
+                       (combination-kind inside) :known)
+                 (setf (node-derived-type inside) *wild-type*)
+                 (flush-dest lvar)
+                 inside-args)))))))
 
 ;;; Eliminate keyword arguments from the call (leaving the
 ;;; parameters in place.

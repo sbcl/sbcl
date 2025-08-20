@@ -537,3 +537,7 @@
       (ir-full-calls `(lambda (x)
                         (truly-the fixnum (funcall x))))
     (assert (node-tail-p combination))))
+
+(with-test (:name :evenp+arithmetic)
+  (assert (not (ir-full-calls `(lambda (x)
+                                 (evenp (+ x 3)))))))

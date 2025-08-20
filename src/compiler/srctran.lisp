@@ -501,32 +501,31 @@
   (deffrob ceiling))
 
 (deftransform logtest ((x y) * * :node node :before-vop t)
-  (let (name)
-    (cond ((and (constant-lvar-p y)
-                (= (logcount (lvar-value y)) 1)
-                (splice-fun-args x 'lognot 1 nil))
-           `(not (logtest x y)))
-          ;; (evenp (+ x even)) => (evenp x) and so on
-          ((and (constant-lvar-p y)
-                (= (lvar-value y) 1)
-                (setf name
-                      (combination-matches* '(+ - *) '(* constant) (lvar-uses x))))
-           (destructuring-bind (l c) (combination-args (lvar-uses x))
-             (declare (ignore l))
-             (let ((c (lvar-value c)))
-               (cond ((and (eq name '*)
-                           (evenp c))
-                      nil)
-                     (t
-                      (splice-fun-args x :any 2)
-                      `(lambda (x c y)
-                         (declare (ignore y c))
-                         ,(if (or (eq name '*)
-                                  (evenp c))
-                              `(logtest x 1)
-                              `(not (logtest x 1)))))))))
-          (t
-           (give-up-ir1-transform)))))
+  (cond ((and (constant-lvar-p y)
+              (= (logcount (lvar-value y)) 1)
+              (splice-fun-args x 'lognot 1 nil))
+         `(not (logtest x y)))
+        ;; (evenp (+ x even)) => (evenp x) and so on
+        ((and (constant-lvar-p y)
+              (= (lvar-value y) 1))
+         (multiple-value-bind (name combination) (combination-matches* '(+ - *) '(* constant) (lvar-uses x)
+                                                                       :cast-type (specifier-type 'integer))
+           (if name
+               (destructuring-bind (l c) (combination-args combination)
+                 (declare (ignore l))
+                 (let ((c (lvar-value c)))
+                   (splice-fun-args x :any #'first t (specifier-type 'integer))
+                   (cond ((and (eq name '*)
+                               (evenp c))
+                          nil)
+                         ((or (eq name '*)
+                              (evenp c))
+                          `(logtest x 1))
+                         (t
+                          `(not (logtest x 1))))))
+               (give-up-ir1-transform))))
+        (t
+         (give-up-ir1-transform))))
 
 (deftransform logtest ((x y) * * :node node)
   (delay-ir1-transform node :ir1-phases)
