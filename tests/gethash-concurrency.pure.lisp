@@ -34,6 +34,22 @@
   (sb-debug:print-backtrace)
   (throw 'done nil))
 
+(defglobal *terminate-now* nil)
+(defmacro forever (&rest forms)
+  #+use-terminate-thread `(loop ,@forms)
+  #-use-terminate-thread
+  `(loop (barrier (:read))
+         (when *terminate-now* (return))
+         ,@forms))
+
+(defun end-all (threads)
+  #+use-terminate-thread (mapc #'terminate-thread threads)
+  #-use-terminate-thread
+  (progn (setq *terminate-now* t)
+         (barrier (:write))
+         (mapc #'join-thread threads)
+         (setq *terminate-now* nil)))
+
 (with-test (:name (hash-table :unsynchronized)
                   ;; FIXME: This test occasionally eats out craploads
                   ;; of heap instead of expected error early. Not 100%
@@ -41,16 +57,15 @@
                   ;; hits swap on my system I'm not likely to find out
                   ;; soon. Disabling for now. -- nikodemus
             :broken-on :sbcl)
-  ;; We expect a (probable) error here: parellel readers and writers
-  ;; on a hash-table are not expected to work -- but we also don't
-  ;; expect this to corrupt the image.
+  ;; We expect a (probable) error here: concurrent readers and writers
+  ;; on an unsynchronized hash-table are not expected to work.
   (let* ((hash (make-hash-table))
          (*errors* nil)
          (threads (list (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
-                               (loop
+                               (forever
                                  ;;(princ "1") (force-output)
                                  (setf (gethash (random 100) hash) 'h)))))
                          :name "writer")
@@ -58,7 +73,7 @@
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
-                               (loop
+                               (forever
                                  ;;(princ "2") (force-output)
                                  (remhash (random 100) hash)))))
                          :name "reader")
@@ -66,13 +81,13 @@
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
-                               (loop
+                               (forever
                                  (sleep (random 1.0))
                                  (sb-ext:gc)))))
                          :name "collector"))))
     (unwind-protect
          (sleep 10)
-      (mapc #'terminate-thread threads))))
+      (end-all threads))))
 
 
 ;;; Structures are hashed by their address for any kind of standard hash-table
@@ -116,25 +131,24 @@
 
 (defparameter *sleep-delay-max* .025)
 
-(with-test (:name (hash-table :synchronized)
-            :broken-on :win32)
+(with-test (:name (hash-table :synchronized))
   (dolist (shrinkp '(nil t))
    (with-test-setup (keys (hash (make-hash-table :synchronized t)))
     (let* ((*errors* nil)
            (threads
             (list (make-join-thread
-                   (lambda () (loop (setf (gethash (aref keys (random 100)) hash) 'h)))
+                   (lambda () (forever (setf (gethash (aref keys (random 100)) hash) 'h)))
                    :name "writer")
                   (make-join-thread
-                   (lambda () (loop (remhash (aref keys (random 100)) hash)))
+                   (lambda () (forever (remhash (aref keys (random 100)) hash)))
                    :name "remover")
                   (make-join-thread
                    (lambda ()
-                     (loop (sleep (random *sleep-delay-max*))
-                           (sb-ext:gc)))
+                     (forever (sleep (random *sleep-delay-max*))
+                              (sb-ext:gc)))
                    :name "GC"))))
       (unwind-protect (sleep 2.5)
-        (mapc #'terminate-thread threads))
+        (end-all threads))
       (assert (not *errors*))))))
 
 (defun test-concurrent-gethash (table-kind)
@@ -151,7 +165,7 @@
             ((reader (n random-state)
                  (catch 'done
                    (handler-bind ((serious-condition 'oops))
-                     (loop
+                     (forever
                       (let* ((i (random 100))
                              (x (gethash (aref keys i) table)))
                         (atomic-incf (aref actions n))
@@ -175,11 +189,11 @@
                      (lambda ()
                        (catch 'done
                          (handler-bind ((serious-condition 'oops))
-                           (loop (sleep (random *sleep-delay-max*))
-                                 (sb-ext:gc)))))
+                           (forever (sleep (random *sleep-delay-max*))
+                                    (sb-ext:gc)))))
                      :name "collector"))))
             (unwind-protect (sleep 2.5)
-              (mapc #'terminate-thread threads))
+              (end-all threads))
             #+hash-table-metrics
             (let ((n-gethash (reduce #'+ actions))
                   (n-lsearch (sb-impl::hash-table-n-lsearch table)))
@@ -193,17 +207,16 @@
             (assert (not *errors*))))))))
 (compile 'test-concurrent-gethash)
 
-(with-test (:name (hash-table :parallel-readers-eq-table) :broken-on :win32)
+(with-test (:name (hash-table :parallel-readers-eq-table))
   (test-concurrent-gethash 'eq))
 (with-test (:name (hash-table :parallel-readers-eql-table)
-            :broken-on (or :win32 :riscv)) ;; memory reordering issues
+            :broken-on (or :riscv)) ;; memory reordering issues
   (test-concurrent-gethash 'eql))
 (with-test (:name (hash-table :parallel-readers-equal-table)
-            :broken-on (or :win32 :riscv))
+            :broken-on (or :riscv))
   (test-concurrent-gethash 'equal))
 
-(with-test (:name (hash-table :single-accessor :parallel-gc)
-            :broken-on :win32)
+(with-test (:name (hash-table :single-accessor :parallel-gc))
   (dolist (shrinkp '(nil t))
     (with-test-setup (keys (hash (make-hash-table)))
       (let ((*errors* nil))
@@ -211,7 +224,7 @@
                (list (make-kill-thread
                           (lambda ()
                             (handler-bind ((serious-condition 'oops))
-                              (loop
+                              (forever
                                 (let* ((i (random 100))
                                        (k (aref keys i))
                                        (val (gethash k hash)))
@@ -224,24 +237,24 @@
                          (make-kill-thread
                           (lambda ()
                             (handler-bind ((serious-condition 'oops))
-                              (loop
+                              (forever
                                 (sleep (random *sleep-delay-max*))
                                 (sb-ext:gc))))
                           :name "collector"))))
           (unwind-protect (sleep 2.5)
-            (mapc #'terminate-thread threads))
+            (end-all threads))
           (assert (not *errors*)))))))
 
 ;;; Stress GROW-HASH-TABLE's optimization wherein no rehashing may be
 ;;; done if the index vector is not growing.
-(with-test (:name (hash-table :not-growing-index-vector :parallel-gc)
-            :broken-on :win32)
+(with-test (:name (hash-table :not-growing-index-vector :parallel-gc))
   (let ((*errors* nil))
     (let ((threads
             (list (make-kill-thread
                    (lambda ()
                      (handler-bind ((serious-condition 'oops))
-                       (loop (let ((h (make-hash-table))
+                       (forever
+                             (let ((h (make-hash-table))
                                    (l (loop for i below (random 200)
                                             collect (make-teststruct i))))
                                (loop for x in l do (setf (gethash x h) x))
@@ -251,10 +264,10 @@
                   (make-kill-thread
                    (lambda ()
                      (handler-bind ((serious-condition 'oops))
-                       (loop
+                       (forever
                          (sb-ext:gc :full t)
                          (sleep (random *sleep-delay-max*)))))
                    :name "collector"))))
       (unwind-protect (sleep 2.5)
-        (mapc #'terminate-thread threads))
+        (end-all threads))
       (assert (not *errors*)))))
