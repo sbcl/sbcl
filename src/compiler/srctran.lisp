@@ -500,32 +500,41 @@
   (deffrob floor)
   (deffrob ceiling))
 
-(deftransform logtest ((x y) * * :node node :before-vop t)
-  (cond ((and (constant-lvar-p y)
-              (= (logcount (lvar-value y)) 1)
-              (splice-fun-args x 'lognot 1 nil))
-         `(not (logtest x y)))
-        ;; (evenp (+ x even)) => (evenp x) and so on
-        ((and (constant-lvar-p y)
-              (= (lvar-value y) 1))
-         (multiple-value-bind (name combination) (combination-matches* '(+ - *) '(* constant) (lvar-uses x)
-                                                                       :cast-type (specifier-type 'integer))
-           (if name
-               (destructuring-bind (l c) (combination-args combination)
+(deftransform logtest ((x y) (t (constant-arg t)) * :node node :before-vop t)
+  (let ((y (lvar-value y)))
+    (block nil
+      (cond ((and (= (logcount y) 1)
+                  (splice-fun-args x 'lognot 1 nil))
+             `(not (logtest x y)))
+            ;; (evenp (+ x even)) => (evenp x) and so on
+            ((and (= y 1)
+                  (multiple-value-bind (name combination)
+                      (combination-matches* '(+ - *) '(* constant) (lvar-uses x)
+                                            :cast-type (specifier-type 'integer))
+                    (when name
+                      (destructuring-bind (l c) (combination-args combination)
+                        (declare (ignore l))
+                        (let ((c (lvar-value c)))
+                          (when (splice-fun-args x :any #'first nil (specifier-type 'integer))
+                            (return (cond ((and (eq name '*)
+                                                (evenp c))
+                                           nil)
+                                          ((or (eq name '*)
+                                               (evenp c))
+                                           `(logtest x 1))
+                                          (t
+                                           `(not (logtest x 1))))))))))))
+            ;; (logtest (logand x #xFF) 1) => (logtest x 1)
+            ((when (combination-matches 'logand '(* constant) (lvar-uses x))
+               (destructuring-bind (l c) (combination-args (lvar-uses x))
                  (declare (ignore l))
                  (let ((c (lvar-value c)))
-                   (splice-fun-args x :any #'first t (specifier-type 'integer))
-                   (cond ((and (eq name '*)
-                               (evenp c))
-                          nil)
-                         ((or (eq name '*)
-                              (evenp c))
-                          `(logtest x 1))
-                         (t
-                          `(not (logtest x 1))))))
-               (give-up-ir1-transform))))
-        (t
-         (give-up-ir1-transform))))
+                   (cond ((= (logand y c) y)
+                          (splice-fun-args x :any #'first)
+                          ;; Don't transform, just need to change the first argument.
+                          nil))))))
+            (t
+             (give-up-ir1-transform))))))
 
 (deftransform logtest ((x y) * * :node node)
   (delay-ir1-transform node :ir1-phases)
@@ -573,7 +582,8 @@
                `(bignum-logbitp index integer)))
           ((and (constant-lvar-p index)
                 (< (lvar-value index) sb-vm:n-word-bits))
-           `(logbitp index (logand integer ,most-positive-word)))
+           `(logtest ,(ash 1 (lvar-value index))
+                     (logand integer ,most-positive-word)))
           (t
            (give-up-ir1-transform)))))
 

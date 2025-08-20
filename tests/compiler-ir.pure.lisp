@@ -540,4 +540,6 @@
 
 (with-test (:name :evenp+arithmetic)
   (assert (not (ir-full-calls `(lambda (x)
-                                 (evenp (+ x 3)))))))
+                                 (evenp (+ x 3))))))
+  (assert (not (ir-full-calls `(lambda (x)
+                                 (logbitp 0 (+ x 3)))))))
