@@ -89,6 +89,7 @@
                   *default-source-external-format*
                   *free-interrupt-context-index*))
 (declaim (always-bound *default-external-format* *default-source-external-format*))
+(declaim (type (integer 0 #.sb-vm::max-interrupts) *free-interrupt-context-index*))
 
 ;;; A unique GC id. This is supplied for code that needs to detect
 ;;; whether a GC has happened since some earlier point in time. For
