@@ -1656,10 +1656,12 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (call-no-applicable-method gf args)))
       (let* ((key (car methods))
              (cache
-              (if (listp key)           ; early method
-                  (sixth key)           ; See !EARLY-MAKE-A-METHOD
-                  (or (method-em-cache key)
-                      (setf (method-em-cache key) (cons nil nil))))))
+               (if (listp key)          ; early method
+                   (sixth key)          ; See !EARLY-MAKE-A-METHOD
+                   (or (method-em-cache key)
+                       (setf (method-em-cache key)
+                             (sb-thread:barrier (:write)
+                               (cons nil nil)))))))
         (if (and (null (cdr methods)) all-applicable-p ; the most common case
                  (null method-alist-p) wrappers-p (not function-p))
             (or (car cache)
@@ -1674,7 +1676,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                   (let ((value (get-secondary-dispatch-function2
                                 gf methods types method-alist-p wrappers-p
                                 all-applicable-p all-sorted-p function-p)))
-                    (push (cons akey value) (cdr cache))
+                    (setf (cdr cache)
+                          (sb-thread:barrier (:write)
+                            (cons (cons akey value) (cdr cache))))
                     value)))))))
 
 (defun get-secondary-dispatch-function2 (gf methods types method-alist-p
