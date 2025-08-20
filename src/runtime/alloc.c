@@ -233,8 +233,9 @@ extern lispobj* lisp_alloc(int, struct alloc_region *, sword_t,
 
 #if defined(LISP_FEATURE_SYSTEM_TLABS) || defined(LISP_FEATURE_X86_64)
 
-// The asm routines have been modified so that alloc() and alloc_list()
-// each receive the size an a single-bit flag affecting locality of the result.
+/* The asm routines have been modified so that alloc() and alloc_list()
+ * each receive the size and a single-bit flag selecting the system or user TLAB.
+ */
 #define DEFINE_LISP_ENTRYPOINT(name, largep, TLAB, page_type) \
 NO_SANITIZE_MEMORY lispobj *name(sword_t nbytes, int sys) { \
     struct thread *self = get_sb_vm_thread(); \
