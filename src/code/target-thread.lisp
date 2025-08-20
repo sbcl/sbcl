@@ -2414,7 +2414,7 @@ Short version: be careful out there."
   ;; O(N), but it does not hurt to slow interruptors down a
   ;; bit when the queue gets long.
   (setf (thread-interruptions thread)
-        (append (thread-interruptions thread) (list function)))
+        (nconc (thread-interruptions thread) (list function)))
   ;; We use SIGURG because it satisfies a lot of requirements that
   ;; other people have thought about more than we have.
   ;; See https://golang.org/src/runtime/signal_unix.go where they describe
