@@ -86,10 +86,12 @@
            ;; Importantly, macros can sense when they are producing code for the
            ;; compiler or interpreter based on the type of environment.
            (let ((hook (truly-the function (valid-macroexpand-hook))))
-             (values (if (eq hook #'funcall)
-                         (if expansion-p expansion (funcall expander form env))
-                         (funcall hook expander form env))
-                     t)))
+             (let ((result (if (eq hook #'funcall)
+                               (if expansion-p expansion (funcall expander form env))
+                               (funcall hook expander form env))))
+               (sb-c::record-macroexpand-source-path form result env)
+               (values result
+                       t))))
          (symbol-expansion (sym env)
            (flet ((global-expansion () (info :variable :macro-expansion sym)))
              (typecase env

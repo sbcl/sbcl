@@ -889,12 +889,32 @@
                           (find-free-fun fun "shouldn't happen! (no-cmacro)")
                           form))))
 
+(defvar *equal-source-paths*)
+
+;;; Some macro scall macroexpand-1 and then copy its results.
+(defun record-macroexpand-source-path (original-form expanded env)
+  (when (boundp '*equal-source-paths*)
+    (let ((env (if (and (or (not env)
+                            (null-lexenv-p env))
+                        (boundp '*lexenv*))
+                   *lexenv*
+                   env)))
+      (when (policy env (> debug 1))
+        (unless *equal-source-paths*
+          (setf *equal-source-paths* (make-hash-table :test #'equal)))
+        (let ((path (get-source-path original-form)))
+          (when path
+            (push path (gethash expanded *equal-source-paths*))
+            (let ((*lexenv* env))
+              (recover-source-paths original-form expanded))))))))
+
 ;;; This may produce false matches when there are multiple copies and
 ;;; they are reordered, duplicated or omitted. Still better than
 ;;; nothing.
 (defun recover-source-paths (original-form expanded)
   (when (policy *lexenv* (> debug 1))
-    (let ((equal-table (make-hash-table :test #'equal))
+    (let ((equal-table (or *equal-source-paths*
+                           (make-hash-table :test #'equal)))
           some)
       (let ((seen (alloc-xset)))
         (labels ((rec (form)
@@ -963,7 +983,8 @@
                          (t
                           (compiler-error "~@<~A~@:_ ~A~:>"
                                           (wherestring) c))))))
-      (let ((result (funcall (valid-macroexpand-hook) fun form *lexenv*)))
+      (let* (*equal-source-paths*
+             (result (funcall (valid-macroexpand-hook) fun form *lexenv*)))
         #-sb-xc-host
         (recover-source-paths form result)
         result))))
