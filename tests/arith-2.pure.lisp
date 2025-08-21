@@ -779,4 +779,11 @@
    `(lambda (a)
       (declare ((rational 6435247825949752037) a))
       (logand (1+ a) 138))
-   ((6435247825949752037) 130)))
+   ((6435247825949752037) 130))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (declare ((member 813472 -183 -1.0) x))
+      (evenp (1+ x)))
+   ((813472) nil)
+   ((-183) t)))

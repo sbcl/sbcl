@@ -2417,8 +2417,9 @@ is :ANY, the function name is not checked."
           (give-up))
         (cond (cast
                (let ((args (make-gensym-list (length inside-args))))
-                 (setf (node-derived-type inside)
-                       (lvar-derived-type (funcall num-args inside-args)))
+                 (setf (node-derived-type cast)
+                       (setf (node-derived-type inside)
+                             (lvar-derived-type (funcall num-args inside-args))))
                  (transform-call inside `(lambda ,args
                                            (declare (ignorable ,@args))
                                            ,(funcall num-args args))
