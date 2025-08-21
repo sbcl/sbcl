@@ -553,14 +553,6 @@
                  (inst sub rem x rem)))))))
 
 ;;;
-(define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)
-  (:translate lognor)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
-  (:generator 3
-    (inst orr r x y)
-    (inst eor r r (lognot fixnum-tag-mask))))
-
 (define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
   (:args (x :scs (signed-reg))
          (y :scs (unsigned-reg)))
@@ -1416,6 +1408,8 @@
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
+(define-source-transform lognor (x y)
+  `(lognot (logior ,x ,y)))
 
 (deftransform logbitp ((x y) (:or (((constant-arg (mod #.n-word-bits)) signed-word) *)
                                   (((constant-arg (mod #.n-word-bits)) word) *)) * :vop t)
