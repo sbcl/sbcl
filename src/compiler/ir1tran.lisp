@@ -604,7 +604,8 @@
                       reference-constant
                       expand-compiler-macro
                       maybe-reanalyze-functional
-                      ir1-convert-common-functoid))
+                      ir1-convert-common-functoid
+                      record-macroexpand-source-path))
 
 ;;; Translate FORM into IR1. The code is inserted as the NEXT of the
 ;;; CTRAN START. RESULT is the LVAR which receives the value of the
