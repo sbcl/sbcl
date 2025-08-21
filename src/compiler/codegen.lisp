@@ -240,7 +240,8 @@
 (defun generate-code (component &aux (ir2-component (component-info component)))
   (declare (type ir2-component ir2-component))
   (when *compiler-trace-output*
-    (let ((*print-pretty* nil)) ; force 1 line
+    (let ((*print-pretty* nil)          ; force 1 line
+          (*print-readably*))
       (format *compiler-trace-output* "~|~%assembly code for ~S~2%" component)))
   (let* ((prev-env nil)
          (sb-vm::*adjustable-vectors* nil)

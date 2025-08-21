@@ -265,6 +265,10 @@
          (y :scs (signed-reg)))
   (:arg-types unsigned-num signed-num))
 
+(define-modular-fun logandc2-mod64 (x y) logandc2 :untagged nil 64)
+(define-vop (fast-logandc2-mod64/unsigned=>unsigned fast-logandc2/unsigned=>unsigned)
+  (:translate logandc2-mod64))
+
 ;; (define-binop logorc2 2 orn
 ;;   :constant-test bic-encode-immediate
 ;;   :constant-fixnum-test bic-fixnum-encode-immediate
