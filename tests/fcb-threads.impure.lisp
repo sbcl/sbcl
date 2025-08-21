@@ -67,9 +67,12 @@
 ;;; Something is very off about these numbers though. If there are 20,000 thread creation/
 ;;; destructions, and each thread wastes all of its 4 TLABs, that should be 132KiB per thread,
 ;;; for roughly 2.6GB of waste in total. How are we seing nearly 8x that?
-(if (> (sb-c:policy sb-c::*policy* sb-c:instrument-consing) 0)
-    (sb-aprof:aprof-run #'trivial-call-test :arguments '(200000))
-    (time (trivial-call-test 200000)))
+(with-test (:name :trivial-call-test)
+ (cond #+(and x86-64 sb-thread (not win32))
+       ((> (sb-c:policy sb-c::*policy* sb-c:instrument-consing) 0)
+        (sb-aprof:aprof-run #'trivial-call-test :arguments '(200000)))
+       (t
+        (time (trivial-call-test 200000)))))
 
 ;;;;
 (defglobal *counter* 0)
