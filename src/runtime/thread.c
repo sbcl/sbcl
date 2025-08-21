@@ -270,6 +270,7 @@ void* read_current_thread() {
 extern pthread_key_t ignore_stop_for_gc;
 #endif
 
+int show_gc_stats, n_gcs_done; // these may or may not get updated, it doesn't matter
 #if !defined COLLECT_GC_STATS && \
   defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
 #define COLLECT_GC_STATS
@@ -279,7 +280,6 @@ __attribute__((unused)) static struct timespec gc_start_time;
 __attribute__((unused)) static long stw_elapsed,
     stw_min_duration = LONG_MAX, stw_max_duration, stw_sum_duration,
     gc_min_duration = LONG_MAX, gc_max_duration, gc_sum_duration;
-int show_gc_stats, n_gcs_done;
 static void summarize_gc_stats(void) {
     // TODO: also collect things like number of root pages,bytes scanned
     // and number of pages,bytes copied on average per GC cycle.
