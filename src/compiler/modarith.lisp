@@ -307,7 +307,38 @@
                                                                            name))))
                                  (setf (lvar-%derived-type (node-lvar node)) nil)
                                  (ir1-optimize-combination node))
-                               (values t did-something over-wide)))))))))
+                               (values t did-something over-wide)))))))
+                 (cast
+                  ;; Cut (logand (+ x 1) m), which is (logand (the integer (+ x 1)) m),
+                  ;; and X can only be an integer for that to be true.
+                  (when (eq (cast-type-to-check node)
+                            (specifier-type 'integer))
+                    (let* ((value (cast-value node))
+                           (combination (lvar-uses value)))
+                      (when (and (lvar-matches value :fun-names '(+ -) :arg-count 2)
+                                 (almost-immediately-used-p (node-lvar combination) combination
+                                                            :flushable t))
+                        (destructuring-bind (a b) (combination-args combination)
+                          (when (or (not (types-equal-or-intersect (lvar-type a)
+                                                                   #1=(specifier-type '(or ratio (complex rational)))))
+                                    (not (types-equal-or-intersect (lvar-type b) #1#)))
+                            (labels ((intersect (type)
+                                       (if (values-type-p type)
+                                           (values-type-intersection type
+                                                                     (specifier-type 'integer))
+                                           (type-intersection type
+                                                              (specifier-type 'integer))))
+                                     (change-cast (lvar)
+                                       (let ((cast (lvar-uses lvar)))
+                                         (when (and (cast-p cast)
+                                                    (almost-immediately-used-p lvar cast :flushable t))
+                                           (setf (cast-asserted-type cast) (intersect (cast-asserted-type cast)))
+                                           (derive-node-type cast
+                                                             (setf (cast-type-to-check cast)
+                                                                   (intersect (cast-type-to-check cast))))))))
+                              (change-cast a)
+                              (change-cast b)
+                              (cut-lvar value))))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled

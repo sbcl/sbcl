@@ -543,3 +543,7 @@
                                  (evenp (+ x 3))))))
   (assert (not (ir-full-calls `(lambda (x)
                                  (logbitp 0 (+ x 3)))))))
+
+(with-test (:name :modarith-unknown-types)
+  (assert (not (ir-full-calls `(lambda (x)
+                                 (logand (+ x 10) 20))))))
