@@ -257,7 +257,7 @@
                         (x-rationalp (csubtypep (lvar-type x) rational-type))
                         (y-rationalp (csubtypep (lvar-type y) rational-type)))
                    (flet ((int (c-interval x y)
-                            (let* ((y-interval (type-approximate-interval (lvar-type y)))
+                            (let* ((y-interval (type-approximate-interval (lvar-type y) 'rational))
                                    (int (and c-interval
                                              y-interval
                                              (interval-div c-interval y-interval))))
