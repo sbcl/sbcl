@@ -338,7 +338,12 @@
                                                                    (intersect (cast-type-to-check cast))))))))
                               (change-cast a)
                               (change-cast b)
-                              (cut-lvar value))))))))))
+                              (multiple-value-bind (handled any-change wide)
+                                  (cut-node combination)
+                                (declare (ignore handled))
+                                (when any-change
+                                  (delete-cast node))
+                                (values t t wide)))))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled
