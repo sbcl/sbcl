@@ -250,6 +250,8 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                     size)
              (let ((value-scs (cond ((member ref-name '(sap-ref-64 signed-sap-ref-64))
                                      `(,sc constant immediate))
+                                    ;; TODO: sap-ref-lispobj can directly store null-tn
+                                    ;; but this is rejecting immediate
                                     ((not (member ref-name '(sap-ref-single sap-ref-sap
                                                              sap-ref-lispobj)))
                                      `(,sc immediate))
@@ -297,7 +299,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:policy :fast-safe)
                     (:args (value :scs ,value-scs)
                            (sap :scs (sap-reg))
-                           (offset :scs (signed-reg)))
+                           (offset :scs (signed-reg immediate)))
                     (:arg-types ,type system-area-pointer signed-num)
                     ;; In theory TEMP could assist with loading either OFFSET or VALUE, but
                     ;; there is an AVER that it doesn't actually get used for both.
