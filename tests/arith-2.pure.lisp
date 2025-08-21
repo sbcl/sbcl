@@ -773,3 +773,10 @@
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (ldb (byte y (- 32 y)) x))))))
 
+(with-test (:name :modarith-unknown)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((rational 6435247825949752037) a))
+      (logand (1+ a) 138))
+   ((6435247825949752037) 130)))

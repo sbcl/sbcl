@@ -3026,11 +3026,12 @@
 
 ;;; TODO:
 ;;; - CAST chains;
-(defun delete-cast (cast)
+(defun delete-cast (cast &optional (derive-use-types t))
   (declare (type cast cast))
   (let ((value (cast-value cast))
         (lvar (cast-lvar cast)))
-    (unless (array-index-cast-p cast)
+    (when (and derive-use-types
+               (not (array-index-cast-p cast)))
       ;; Normally the types are the same, as the cast gets its derived
       ;; type from the lvar, but it may get a different type when an
       ;; inlined function with a derived type is let-converted.

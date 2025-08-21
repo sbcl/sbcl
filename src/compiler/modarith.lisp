@@ -338,11 +338,12 @@
                                                                    (intersect (cast-type-to-check cast))))))))
                               (change-cast a)
                               (change-cast b)
+
                               (multiple-value-bind (handled any-change wide)
-                                  (cut-node combination)
+                                  (cut-lvar value)
                                 (declare (ignore handled))
                                 (when any-change
-                                  (delete-cast node))
+                                  (delete-cast node nil))
                                 (values t t wide)))))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
