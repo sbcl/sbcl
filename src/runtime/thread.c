@@ -515,7 +515,14 @@ unregister_thread(struct thread *th,
         th->remset = 0;
     }
 #endif
+    /* Here's a thought: if this structure was for a native thread doing call-in
+     * and so we're about to toss this into the recycle bin, what if we didn't
+     * consume the remainder of all open regions but instead just kept them?
+     * A subsequent call-in which reuses this structure could own the same open
+     * regions if no GC ran in the meantime. If GC does need to run,
+     * it should close TLABs of all thread structures in the recycle bin */
     gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
+
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     if (scribble)
       pop_gcing_safety(&scribble->safety);

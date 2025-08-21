@@ -85,6 +85,8 @@
 
 (define-alien-variable alloc-profile-buffer system-area-pointer)
 (defun aprof-reset ()
+  (setf (extern-alien "close_region_nfillers" int) 0)
+  (setf (extern-alien "close_region_tot_bytes_wasted" unsigned) 0)
   (let ((buffer alloc-profile-buffer))
     (unless (= (sap-int buffer) 0)
       (alien-funcall (extern-alien "memset" (function void system-area-pointer int size-t))
@@ -605,10 +607,15 @@
          (dstate (sb-disassem:make-dstate nil))
          (collection (make-hash-table :test 'equal)))
     (when stream
-      (format stream "~&~d (of ~d max) profile entries consumed~2%"
-              n-hit metadata-len))
+      (format stream "~&~d (of ~d max) profile entries consumed, ~D GCs done~2%"
+              n-hit metadata-len (extern-alien "n_gcs_done" int)))
     (loop
      (when (>= index n-counters)
+       ;; Add an item accounting for waste caused by closing regions on unfull pages
+       (let ((count (extern-alien "close_region_nfillers" int))
+             (total-bytes (extern-alien "close_region_tot_bytes_wasted" unsigned)))
+         (push (make-alloc total-bytes count 'sb-vm::filler 0)
+               (gethash 'sb-vm::filler collection)))
        (return collection))
      (let ((count (sap-ref-word sap (* index 8))))
        (multiple-value-bind (code pc-offset total-bytes)

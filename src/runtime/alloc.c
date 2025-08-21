@@ -128,6 +128,9 @@ CRITICAL_SECTION code_allocator_lock; // threads are mandatory for win32
 pthread_mutex_t code_allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
+int close_region_nfillers;
+uword_t close_region_tot_bytes_wasted;
+
 typedef struct { struct alloc_region* r; int type; } close_region_arg;
 void sync_close_regions(int block_signals, int options,
                         close_region_arg* a, int count)
@@ -163,6 +166,8 @@ void sync_close_regions(int block_signals, int options,
             // fillers may not be needed. This anticipates non-zero-filed pages though.
             deposit_filler(freeptr, new_end);
             a[i].r->free_pointer = new_end;
+            close_region_nfillers++;
+            close_region_tot_bytes_wasted += new_end - freeptr;
         }
 #endif
         ensure_region_closed(a[i].r, a[i].type);

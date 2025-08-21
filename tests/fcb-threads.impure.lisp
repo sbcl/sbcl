@@ -46,7 +46,30 @@
 (defun trivial-call-test (n)
   (with-alien ((testfun (function int system-area-pointer int) :extern "minimal_perftest"))
     (alien-funcall testfun (alien-sap (alien-callable-function 'perftestcb)) n)))
-(time (trivial-call-test 200000))
+
+
+;;; When compiled with APROF, the truly astounding amount of space taken up not by objects
+;;; but just closing the open regions in unregister_thread becomes evident:
+#|
+10 (of 150000 max) profile entries consumed, 367 GCs done
+       %        Bytes        Count    Function
+ -------  -----------    ---------    --------
+  99.7    19590256480       600000    SB-VM::FILLER - SB-VM::FILLER
+   0.1       28800144       600003    SB-THREAD::AVLNODE - SB-THREAD::AVLNODE
+   0.1       28800000       200000    SB-THREAD::MAKE-FOREIGN-THREAD - SB-THREAD:FOREIGN-THREAD
+  00.0        6400000       200000    SB-THREAD:MAKE-MUTEX - SB-THREAD:MUTEX
+  00.0        3200000       200000    SB-THREAD::SYS-TLAB-LIST
+  00.0           5840          365    (FLET "WITHOUT-GCING-BODY-" :IN SB-KERNEL:SUB-GC) - LIST
+  00.0             16            1    SB-THREAD::%ENROLL-NEW-THREADS - LIST
+ =======  ===========
+ 100.0    19657462480
+|#
+;;; Something is very off about these numbers though. If there are 20,000 thread creation/
+;;; destructions, and each thread wastes all of its 4 TLABs, that should be 132KiB per thread,
+;;; for roughly 2.6GB of waste in total. How are we seing nearly 8x that?
+(if (> (sb-c:policy sb-c::*policy* sb-c:instrument-consing) 0)
+    (sb-aprof:aprof-run #'trivial-call-test :arguments '(200000))
+    (time (trivial-call-test 200000)))
 
 ;;;;
 (defglobal *counter* 0)
