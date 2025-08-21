@@ -892,15 +892,16 @@
 
 (defvar *equal-source-paths*)
 
-;;; Some macro scall macroexpand-1 and then copy its results.
+;;; Some macros call macroexpand-1 and then copy its results.
 (defun record-macroexpand-source-path (original-form expanded env)
   (when (boundp '*equal-source-paths*)
-    (let ((env (if (and (or (not env)
-                            (null-lexenv-p env))
-                        (boundp '*lexenv*))
+    (let ((env (if (and (boundp '*lexenv*)
+                        (or (not (lexenv-p env))
+                            (null-lexenv-p env)))
                    *lexenv*
                    env)))
-      (when (policy env (> debug 1))
+      (when (and (lexenv-p env)
+                 (policy env (> debug 1)))
         (unless *equal-source-paths*
           (setf *equal-source-paths* (make-hash-table :test #'equal)))
         (let ((path (get-source-path original-form)))

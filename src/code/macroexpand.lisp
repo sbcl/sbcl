@@ -89,6 +89,7 @@
              (let ((result (if (eq hook #'funcall)
                                (if expansion-p expansion (funcall expander form env))
                                (funcall hook expander form env))))
+               #-sb-xc-host
                (sb-c::record-macroexpand-source-path form result env)
                (values result
                        t))))
