@@ -1045,7 +1045,12 @@
    (lambda (m)
      (when (typep (+ m 1) 'float)
        m))
-   (or null float)))
+   (or null float))
+  (assert-type
+   (lambda (i)
+     (the (mod 16) (* i 3/4))
+     i)
+   (rational 0 20)))
 
 (with-test (:name :ignore-hairy-types)
   (checked-compile
