@@ -460,3 +460,7 @@
 
 (defun unbound-marker-p (x)
   (eq x *unbound-marker*))
+
+(defmacro with-source-form (source-form form)
+  (declare (ignore source-form))
+  form)

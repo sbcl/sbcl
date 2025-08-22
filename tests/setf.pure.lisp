@@ -258,8 +258,9 @@
                (ref-it (aref a 0))
                (a *foo-array*)
                ((setf thing x)
-                (let* ((a0 a) (new1 x))
-                  (funcall #'(setf aref) new1 a0 0))))))))
+                (sb-c::with-source-form (aref a 0)
+                 (let* ((a0 a) (new1 x))
+                   (funcall #'(setf aref) new1 a0 0)))))))))
 
 (with-test (:name :remf-basic-correctness)
   (flet ((try (indicator input expect)
