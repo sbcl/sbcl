@@ -127,6 +127,11 @@
          do (format nil "~E~%" n))
    floating-point-overflow))
 
+(with-test (:name :bignum-double-float-overflow)
+  (loop for n from 1024 to 1030
+        do (assert-error (coerce (opaque-identity (expt 2 n)) 'double-float) floating-point-overflow)
+           (assert-error (coerce (opaque-identity (- (expt 2 n))) 'double-float) floating-point-overflow)))
+
 ;; 1.0.29.44 introduces a ton of changes for complex floats
 ;; on x86-64. Huge test of doom to help catch weird corner
 ;; cases.
