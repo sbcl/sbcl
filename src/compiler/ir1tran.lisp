@@ -915,8 +915,7 @@
 ;;; nothing.
 (defun recover-source-paths (original-form expanded)
   (when (policy *lexenv* (> debug 1))
-    (let ((equal-table (or *equal-source-paths*
-                           (make-hash-table :test #'equal)))
+    (let ((equal-table (make-hash-table :test #'equal))
           some)
       (let ((seen (alloc-xset)))
         (labels ((rec (form)
@@ -936,7 +935,9 @@
         (let ((seen (alloc-xset)))
           (labels ((rec (form)
                      (unless (xset-member-p form seen)
-                       (let ((original (gethash form equal-table)))
+                       (let ((original (or (gethash form equal-table)
+                                           (and *equal-source-paths*
+                                                (gethash form *equal-source-paths*)))))
                          (when original
                            (let ((location
                                    (if (cdr original)
