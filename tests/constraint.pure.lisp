@@ -1767,6 +1767,24 @@
                      nil))
              0)))
 
+(with-test (:name :loop-row-major-aref-check-bound)
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (type (simple-array t (* *)) x))
+                        (loop for i below (array-total-size x)
+                              do (print (row-major-aref x i))))
+                     nil))
+             0))
+  (assert (= (count 'sb-kernel:%check-bound
+                    (ctu:ir1-named-calls
+                     `(lambda (x)
+                        (declare (type (simple-array t (* *)) x))
+                        (loop for i below (array-total-size x)
+                              do (print (row-major-aref x (1+ i)))))
+                     nil))
+             1)))
+
 (with-test (:name :concatenate-length)
   (assert-type
    (lambda (x y)

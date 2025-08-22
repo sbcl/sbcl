@@ -106,7 +106,12 @@
          (array-lvar
            (and (combination-p use)
                 (lvar-fun-is (combination-fun use)
-                             '(vector-length length))
+                             '(vector-length length
+                               ;; vector-length-constraint can also be
+                               ;; used for multidimensional arrays in
+                               ;; some cases, like accessing via
+                               ;; ROW-MAJOR-AREF.
+                               %array-available-elements))
                 (car (combination-args use))))
          (array-var (and array-lvar
                          (or (not simple)
@@ -626,7 +631,7 @@
 (defoptimizer (%check-bound equality-constraint) ((array dimension index) node gen)
   (let ((array-var (ok-lvar-lambda-var array gen)))
     (when (and array-var
-               (csubtypep (lvar-type array) (specifier-type '(simple-array * (*))))
+               (csubtypep (lvar-type array) (specifier-type 'simple-array))
                (block nil
                  (map-equality-constraints (make-vector-length-constraint array-var) index gen
                                            (lambda (op not-p)
