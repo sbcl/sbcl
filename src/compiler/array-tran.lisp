@@ -2551,18 +2551,22 @@
 (defoptimizer (%other-pointer-widetag derive-type) ((object))
   (let ((object (lvar-type object)))
     (cond ((types-equal-or-intersect object (specifier-type 'simple-array))
-           (when (csubtypep object (specifier-type 'simple-array))
-             (let ((eltype (array-type-upgraded-element-type object)))
-               (if (and (csubtypep object (specifier-type 'vector))
-                        (neq eltype *wild-type*))
-                   (specifier-type `(eql ,(sb-vm:saetp-typecode (find-saetp-by-ctype eltype))))
-                   (specifier-type `(integer ,sb-vm:simple-array-widetag (,sb-vm:complex-base-string-widetag)))))))
-          ((types-equal-or-intersect object (specifier-type 'array))
+           (cond ((csubtypep object (specifier-type 'simple-array))
+                  (let ((eltype (array-type-upgraded-element-type object)))
+                    (if (and (csubtypep object (specifier-type 'vector))
+                             (neq eltype *wild-type*))
+                        (specifier-type `(eql ,(sb-vm:saetp-typecode (find-saetp-by-ctype eltype))))
+                        (specifier-type `(integer ,sb-vm:simple-array-widetag (,sb-vm:complex-base-string-widetag))))))
+                 ((csubtypep object (specifier-type '(not (simple-array * (*)))))
+                  (specifier-type `(and (not (integer (,sb-vm:simple-array-widetag)
+                                                      (,sb-vm:complex-base-string-widetag)))
+                                        (unsigned-byte ,sb-vm:n-widetag-bits))))))
+          ((not (types-equal-or-intersect object (specifier-type 'array)))
+           (specifier-type `(integer 0 (,sb-vm:simple-array-widetag))))
+          (t
            (specifier-type `(and (not (integer ,sb-vm:simple-array-widetag
                                                (,sb-vm:complex-base-string-widetag)))
-                                 (unsigned-byte ,sb-vm:n-widetag-bits))))
-          (t
-           (specifier-type `(integer 0 (,sb-vm:simple-array-widetag)))))))
+                                 (unsigned-byte ,sb-vm:n-widetag-bits)))))))
 
 ;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
 ;;; is of the specified type.

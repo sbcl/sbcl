@@ -1387,7 +1387,8 @@
 (defun show-transform (kind name new-form &optional combination)
   (let ((*print-length* 100)
         (*print-level* 50)
-        (*print-right-margin* 128))
+        (*print-right-margin* 128)
+        (*print-readably* nil))
     (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
             kind
             (if combination
