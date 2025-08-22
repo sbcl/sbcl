@@ -883,7 +883,7 @@
                      :high (cond ((not integer)
                                   high)
                                  ((eq integer 'rational)
-                                  (rational-bound low))
+                                  (rational-bound high))
                                  ((consp high)
                                   (let ((high (car high)))
                                     (unless (and (floatp high)
