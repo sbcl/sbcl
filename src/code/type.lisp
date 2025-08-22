@@ -2509,15 +2509,12 @@ expansion happened."
                              ;; (and (not (simple-array t))
                              ;;      (not (and (array t) (not simple-array))))
                              ;; => (not (array t))
-                             (let ((u (type-union type1
-                                                  (change-array-type-complexp type2 :maybe))))
-                               (when (array-type-p u)
-                                 (make-negation-type u))))
-                            ((eql (array-type-complexp type2) :maybe)
-                             ;; Make it canonical
-                             (type-intersection not1
-                                                (make-negation-type
-                                                 (change-array-type-complexp type2 t))))))))))
+                             (let* ((maybe (change-array-type-complexp type2 :maybe))
+                                    (u (type-union type1 maybe)))
+                               (if (array-type-p u)
+                                   (make-negation-type u)
+                                   ;; Make it canonical
+                                   (type-intersection not1 (make-negation-type maybe)))))))))))
          (or (try not1 not2 type1)
              (try not2 not1 type2))))
       ;; Why no analagous clause to the disjoint in the SIMPLE-UNION2
