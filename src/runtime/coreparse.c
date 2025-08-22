@@ -1153,8 +1153,12 @@ static void gengcbarrier_patch_code_range(uword_t start, lispobj* limit)
         if (widetag_of(where) != CODE_HEADER_WIDETAG || !code->fixups) continue;
         varint_unpacker_init(&unpacker, code->fixups);
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
-        // There are two other data streams preceding the one we want
+        // There are two other data streams (linkage table refs, and immobile space refs)
+        // preceding the one we want
         skip_data_stream(&unpacker);
+        skip_data_stream(&unpacker);
+#elif defined LISP_FEATURE_PPC64
+        // There is one other data stream (linkage table refs) preceding the one we want
         skip_data_stream(&unpacker);
 #endif
         char* instructions = code_text_start(code);
