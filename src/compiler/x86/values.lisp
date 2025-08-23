@@ -130,8 +130,7 @@
 
     (move loop-index count)
     (inst mov start esp-tn)
-    (inst test ecx-tn ecx-tn)
-    (inst jmp :z done)  ; check for 0 count?
+    (inst jecxz done)  ; check for 0 count?
 
     (inst sub esp-tn count)
     (inst sub src count)

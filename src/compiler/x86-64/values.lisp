@@ -148,8 +148,7 @@
         (inst lea loop-index (ea nil num (ash 1 (- word-shift n-fixnum-tag-bits)))))
     (unless (eq (tn-kind start) :unused)
       (inst mov start rsp-tn))
-    (inst test rcx-tn rcx-tn)
-    (inst jmp :z DONE)  ; check for 0 count?
+    (inst jrcxz DONE)  ; check for 0 count?
 
     (inst sub rsp-tn loop-index)
     (inst sub src loop-index)
