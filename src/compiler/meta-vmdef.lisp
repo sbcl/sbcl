@@ -409,7 +409,7 @@
                                        (vop-parse-or-lose name)))))))
 
        (let ((vop (template-or-lose ',name)))
-         (setf (vop-info-move-vop-p vop) t)
+         (setf (vop-info-move-vop-p vop) ,kind)
          (do-sc-pairs (from-sc to-sc ',scs)
            (dolist (dest-sc (cons to-sc (sc-alternate-scs to-sc)))
              (let ((vec (,accessor dest-sc)))

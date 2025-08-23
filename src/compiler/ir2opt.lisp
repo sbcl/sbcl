@@ -264,17 +264,34 @@
         (when (jump-falls-through-p 2block)
           (delete-vop (ir2-block-last-vop 2block)))))))
 
+(defun compatible-move-p (tn1 tn2)
+  (let ((sc1 (tn-sc tn1))
+        (sc2 (tn-sc tn2)))
+    (or (eq sc1 sc2)
+        (flet ((try (csc1 csc2)
+                 (cond ((eq sc1 csc1)
+                        (eq sc2 csc2))
+                       ((eq sc1 csc2)
+                        (eq sc2 csc1)))))
+          (or (try (load-time-value (sc-or-lose 'sb-vm::any-reg))
+                   (load-time-value (sc-or-lose 'sb-vm::descriptor-reg)))
+              (try (load-time-value (sc-or-lose 'sb-vm::signed-reg))
+                   (load-time-value (sc-or-lose 'sb-vm::unsigned-reg))))))))
+
 (defun delete-no-op-vops (component)
   (do-ir2-blocks (block component)
     (do ((vop (ir2-block-start-vop block) (vop-next vop)))
         ((null vop))
       (let ((args (vop-args vop))
             (results (vop-results vop)))
-       (case (vop-name vop)
-         ((move sb-vm::sap-move)
+        (when (vop-info-move-vop-p (vop-info vop))
           (let ((x (tn-ref-tn args))
                 (y (tn-ref-tn results)))
-            (when (location= x y)
+            (when (and (location= x y)
+                       (compatible-move-p x y)
+                       (not (and (eq (vop-info-move-vop-p (vop-info vop)) :move-arg)
+                                 ;; MOVE-ARG moves stack args into a different frame
+                                 (eq (sb-kind (sc-sb (tn-sc x))) :unbounded))))
               (delete-vop vop)
               ;; Deleting the copy may make it look like that register
               ;; is not used anywhere else and some optimizations,
@@ -291,7 +308,7 @@
                 (when x-reads
                   (reference-tn y nil))
                 (when x-writes
-                  (reference-tn y t)))))))))))
+                  (reference-tn y t))))))))))
 
 ;;; Unchain BRANCHes that jump to a BRANCH.
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
