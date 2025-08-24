@@ -2943,6 +2943,14 @@ is :ANY, the function name is not checked."
     (when (eq (lvar-value (first arg)) key)
       (return (second arg)))))
 
+(defun find-keyword-lvar-pair (args key)
+  (declare (type list args) (type keyword key))
+  (do ((arg args (cddr arg)))
+      ((null arg) nil)
+    (let ((key-lvar (first arg)))
+      (when (eq (lvar-value key-lvar) key)
+        (return (values key-lvar (second arg)))))))
+
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that alternating lvars in ARGS are constant and that there
 ;;; is an even number of args.

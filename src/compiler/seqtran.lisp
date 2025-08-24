@@ -4017,3 +4017,18 @@
      (loop for i from (1- (length vector)) downto 0
            do (setf result (cons (aref vector i) result)))
      result))
+
+(defoptimizers optimizer (remove delete count) ((item sequence &key
+                                                      ((test test-keyword))
+                                                      ((test-not test-not-keyword))
+                                                      &allow-other-keys))
+  (unless (and test test-not)
+    (flet ((change (key value complement)
+             (let ((key-ref (and key
+                                 (lvar-uses key))))
+               (when (and (ref-p key-ref)
+                          (splice-fun-args value 'complement 1 nil))
+                 (change-ref-leaf key-ref (find-constant complement))
+                 t))))
+      (or (change test-keyword test :test-not)
+          (change test-not-keyword test-not :test)))))

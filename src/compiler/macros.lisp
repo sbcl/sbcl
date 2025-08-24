@@ -216,21 +216,25 @@
                                       (if (ll-kwds-allowp llks)
                                           `((check-key-args-constant ,tail))
                                           `((check-transform-keys
-                                             ,tail ',(mapcar #'cdr keys))))))
+                                             ,tail ',(loop for (() . key) in keys
+                                                           collect (if (keywordp key)
+                                                                       key
+                                                                       (keywordicate key))))))))
                       ,error-form))))
         (when rest
           (binds `(,(car rest) ,tail)))
-        ;; Return list of bindings, the list of user-specified symbols,
-        ;; and the list of gensyms to be declared ignorable.
+        ;; Return list of bindings, the list of user-specified symbols
         (values (append (binds)
                         (mapcar (lambda (k)
-                                  `(,(car k)
-                                     (find-keyword-lvar ,tail ',(cdr k))))
+                                  (if (keywordp (cdr k))
+                                      `(,(car k)
+                                        (find-keyword-lvar ,tail ',(cdr k)))
+                                      ;; Abuse the &key syntax to specify both key and value
+                                      `((,(car k) ,(cdr k))
+                                        (find-keyword-lvar-pair ,tail ,(keywordicate (cdr k))))))
                                 keys))
                 (sort (append (nset-difference (mapcar #'car (binds)) all-dummies)
                                (mapcar #'car keys))
-                      #'string<)
-                (sort (intersection (mapcar #'car (binds)) (cdr all-dummies))
                       #'string<))))))
 ) ; EVAL-WHEN
 
@@ -448,8 +452,12 @@
                (declare (ignorable ,node ,@(butlast vars))
                         (ignore ,args))
                ,@(if var-decls (list var-decls))
-               (let* (,@binds)
-                 (declare (ignorable ,@(mapcar #'car binds)))
+               (binding* (,@binds)
+                 (declare (ignorable ,@(loop for (bind) in binds
+                                             if (consp bind)
+                                             append bind
+                                             else
+                                             collect bind)))
                  ,@more-decls ,@forms))
              ,@(when (consp what)
                  `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
