@@ -1279,19 +1279,23 @@
                (setf (basic-combination-args node) (nreverse args))))
 
            (let ((optimizer (fun-info-optimizer info)))
-             (unless (and optimizer (funcall optimizer node))
-               (dolist (x (fun-info-transforms info))
-                 (when (eq show :all)
-                   (let* ((lvar (basic-combination-fun node))
-                          (fname (lvar-fun-name lvar t)))
-                     (format *trace-output*
-                             "~&trying transform ~s for ~s"
-                             (transform-type x) fname)))
-                 (unless (ir1-transform node x show)
+             (if (and optimizer (funcall optimizer node))
+                 (when (and (node-reoptimize node)
+                            (not (node-deleted node)))
+                   (setf (node-reoptimize node) nil)
+                   (ir1-optimize-combination node))
+                 (dolist (x (fun-info-transforms info))
                    (when (eq show :all)
-                     (format *trace-output*
-                             "~&quitting because IR1-TRANSFORM result was NIL"))
-                   (return))))))))))
+                     (let* ((lvar (basic-combination-fun node))
+                            (fname (lvar-fun-name lvar t)))
+                       (format *trace-output*
+                               "~&trying transform ~s for ~s"
+                               (transform-type x) fname)))
+                   (unless (ir1-transform node x show)
+                     (when (eq show :all)
+                       (format *trace-output*
+                               "~&quitting because IR1-TRANSFORM result was NIL"))
+                     (return))))))))))
   (values))
 
 (defun xep-tail-combination-p (node)
