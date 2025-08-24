@@ -725,7 +725,48 @@
                            (optional-dispatch-entry-point-fun
                             fun (- call-args min-args)))))
           ((optional-dispatch-more-entry fun)
-           (convert-more-call ref call fun))
+           ;; If there are multiple calls to a local function with &rest
+           ;; and they all have the same number of arguments,
+           ;; make a new local function with fixed arguments in which
+           ;; the optional-dispatch entry will be inlined.
+           (cond ((and (cdr (leaf-refs fun))
+                       (or (not (functional-entry-fun fun))
+                           (not (leaf-refs (functional-entry-fun fun))))
+                       (not (functional-inlinep fun))
+                       (loop for var in (optional-dispatch-arglist fun)
+                             for info = (lambda-var-arg-info var)
+                             thereis (and info
+                                          (eq (arg-info-kind info) :rest)))
+                       (let (lengths
+                             unequal)
+                         (block nil
+                           (map-refs (lambda (dest lvar)
+                                       (if (and (combination-p dest)
+                                                (eq (combination-fun dest) lvar))
+                                           (let ((length (length (combination-args dest))))
+                                             (if lengths
+                                                 (if (/= length lengths)
+                                                     (setf unequal t))
+                                                 (setf lengths length)))
+                                           (return)))
+                                     fun)
+                           (unless unequal
+                             (with-ir1-environment-from-node call
+                               (let* ((vars (make-gensym-list lengths))
+                                      (shim (ir1-convert-lambda
+                                             `(lambda ,vars
+                                                (%funcall ,fun ,@vars))
+                                             :debug-name (lvar-fun-debug-name
+                                                          (basic-combination-fun call))))
+                                      (new-ref (car (leaf-refs fun))))
+                                 (substitute-leaf-if (lambda (x)
+                                                       (not (eq x new-ref)))
+                                                     shim fun)
+                                 (locall-analyze-fun-1 fun)
+                                 (locall-analyze-fun-1 shim)
+                                 t)))))))
+                 (t
+                  (convert-more-call ref call fun))))
           (t
            (warn-invalid-local-call call call-args
             'local-argument-mismatch

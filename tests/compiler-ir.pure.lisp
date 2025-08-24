@@ -571,3 +571,11 @@
                         (position 10 l :test (complement #'=))))
                     :key (lambda (x) (combination-fun-source-name x nil)))
              0)))
+
+(with-test (:name :local-calls-to-&rest)
+  (assert (not (ir-full-calls
+                `(lambda (a)
+                   (flet ((a (&rest args)
+                            (apply #'eql args)))
+                     (list (a a 1)
+                           (a a 2))))))))
