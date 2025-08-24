@@ -767,12 +767,12 @@
 
 (define-vop (test-widetag)
   (:args (value :scs (unsigned-reg)))
-  (:info target not-p type-codes)
+  (:info target not-p type-codes object-tn-ref)
   (:generator 1
     (%test-headers value nil target not-p nil
       (if (every #'integerp type-codes)
           (canonicalize-widetags type-codes)
-          type-codes))))
+          type-codes) :value-tn-ref object-tn-ref)))
 
 (define-vop (load-instance-layout)
   (:args (object :scs (any-reg descriptor-reg)))

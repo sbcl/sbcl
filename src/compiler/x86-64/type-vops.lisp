@@ -1071,14 +1071,15 @@
 (define-vop (test-widetag)
   (:args (value :scs (unsigned-reg) :target temp))
   (:temporary (:sc unsigned-reg :from (:argument 1)) temp)
-  (:info target not-p type-codes)
+  (:info target not-p type-codes object-tn-ref)
   (:generator 1
     (move temp value :dword)
     (%test-headers nil temp target not-p nil
       (if (every #'integerp type-codes)
           (canonicalize-widetags type-codes)
           type-codes)
-      :load-widetag nil)))
+      :load-widetag nil
+      :value-tn-ref object-tn-ref)))
 
 (macrolet ((read-depthoid ()
              `(ea (- (+ 4 (ash (+ instance-slots-offset

@@ -915,7 +915,10 @@
                                                (reference-tn widetag nil)
                                                nil
                                                vop
-                                               (list (first info) (second info) tags))))
+                                               (list (first info) (second info) tags
+                                                     ;; It would fetch TN-REF-TYPE for
+                                                     ;; some further optimizations.
+                                                     (vop-args vop)))))
                     (delete-vop vop)))))))
     nil)
 
