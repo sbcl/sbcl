@@ -54,6 +54,8 @@
       '#'(lambda (&rest args)
            (not (apply fun args))))
      (t
+      (when (node-lvar node)
+        (pushnew node (lvar-dependent-nodes (node-lvar node)) :test #'eq))
       (give-up-ir1-transform
        "The function doesn't have a fixed argument count.")))))
 

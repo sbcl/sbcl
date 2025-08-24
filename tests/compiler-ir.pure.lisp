@@ -547,3 +547,9 @@
 (with-test (:name :modarith-unknown-types)
   (assert (not (ir-full-calls `(lambda (x)
                                  (logand (+ x 10) 20))))))
+
+(with-test (:name :reoptimize-complement)
+  (assert (not (ir-full-calls `(lambda (x)
+                                 (declare ((simple-array fixnum (*)) x)
+                                          (optimize speed))
+                                 (position 1 x :test-not #'=))))))
