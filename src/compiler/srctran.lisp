@@ -40,24 +40,24 @@
 ;;; MV optimization figure things out.
 (deftransform complement ((fun) * * :node node)
   "open code"
-  (multiple-value-bind (min max)
-      (fun-type-nargs (lvar-type fun))
+  (delay-ir1-transform node :constraint) ;; give a chance for the :test to :test-not transforms
+  (multiple-value-bind (min max) (fun-type-nargs (lvar-type fun))
     (cond
-     ((and min (eql min max))
-      (let ((dums (make-gensym-list min)))
-        `#'(lambda ,dums (not (funcall fun ,@dums)))))
-     ((let ((lvar (node-lvar node)))
-        (when lvar
-          (let ((dest (lvar-dest lvar)))
-            (and (combination-p dest)
-                 (eq (combination-fun dest) lvar)))))
-      '#'(lambda (&rest args)
-           (not (apply fun args))))
-     (t
-      (when (node-lvar node)
-        (pushnew node (lvar-dependent-nodes (node-lvar node)) :test #'eq))
-      (give-up-ir1-transform
-       "The function doesn't have a fixed argument count.")))))
+      ((and min (eql min max))
+       (let ((dums (make-gensym-list min)))
+         `#'(lambda ,dums (not (funcall fun ,@dums)))))
+      ((let ((lvar (node-lvar node)))
+         (when lvar
+           (let ((dest (lvar-dest lvar)))
+             (and (combination-p dest)
+                  (eq (combination-fun dest) lvar)))))
+       '#'(lambda (&rest args)
+            (not (apply fun args))))
+      (t
+       (when (node-lvar node)
+         (pushnew node (lvar-dependent-nodes (node-lvar node)) :test #'eq))
+       (give-up-ir1-transform
+        "The function doesn't have a fixed argument count.")))))
 
 ;;;; list hackery
 
