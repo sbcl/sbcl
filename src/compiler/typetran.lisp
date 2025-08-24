@@ -1143,7 +1143,10 @@
                                             :element-type eltype
                                             :specialized-element-type eltype)))
       (let* ((typecode (sb-vm:saetp-typecode (find-saetp-by-ctype eltype)))
-             (complexp (array-type-complexp type)))
+             (complexp (array-type-complexp type))
+             (headerp (or headerp
+                          (not (types-equal-or-intersect object-type
+                                                         (specifier-type 'vector))))))
         (cond ((and headerp (not complexp))
                (let ((obj `(truly-the ,(type-specifier stype) ,obj)))
                  ;; If we know OBJ is an array header, and that the array is
@@ -1156,10 +1159,11 @@
               ((not complexp)
                (values
                 `((and (%other-pointer-p ,obj)
-                       (let ((widetag (%other-pointer-widetag ,obj)))
-                         (or (eq widetag ,typecode)
-                             (and (eq widetag sb-vm:simple-array-widetag)
-                                  (eq (%other-pointer-widetag (%array-data ,obj)) ,typecode))))))
+                       (let ((widetag (%other-pointer-widetag object)))
+                         (eq ,typecode
+                             (if (eq widetag sb-vm:simple-array-widetag)
+                                 (%other-pointer-widetag (%array-data object))
+                                 widetag)))))
                 ;; skip checking for array.
                 t))
               (t
@@ -1235,70 +1239,106 @@
   ;; this nonstandard predicate can be generically defined for all backends.
   (let ((dims (array-type-dimensions type))
         (et (array-type-element-type type)))
-    (if (and (not (array-type-complexp type))
-             (eq et *wild-type*)
-             (equal dims '(*)))
-        `(simple-rank-1-array-*-p ,object)
-        (multiple-value-bind (pred stype) (find-supertype-predicate type)
-          (if (and (array-type-p stype)
-                   ;; (If the element type hasn't been defined yet, it's
-                   ;; not safe to assume here that it will eventually
-                   ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
-                   (not (unknown-type-p (array-type-element-type type)))
-                   (or (eq (array-type-complexp stype) (array-type-complexp type))
-                       (and (eql (array-type-complexp stype) :maybe)
-                            (eql (array-type-complexp type) t))))
-              (let ((complex-tag (and
-                                  (eql (array-type-complexp type) t)
-                                  (singleton-p dims)
-                                  (and (neq et *wild-type*)
-                                       (sb-vm:saetp-complex-typecode
-                                        (find-saetp-by-ctype (array-type-element-type type))))))
-                    (simple-array-header-p
-                      (and (null (array-type-complexp stype))
-                           (listp dims)
-                           (cdr dims)))
-                    (complexp (and (eql (array-type-complexp stype) :maybe)
-                                   (eql (array-type-complexp type) t))))
-                (if complex-tag
-                    `(and (%other-pointer-p ,object)
-                          (eq (%other-pointer-widetag ,object) ,complex-tag)
-                          ,@(unless (eq (car dims) '*)
-                              `((= (%array-dimension ,object 0) ,(car dims)))))
-                    (multiple-value-bind (dim-tests headerp length no-check-for-array1)
-                        (test-array-dimensions object type stype simple-array-header-p)
-                      (multiple-value-bind (type-test no-check-for-array2 length-checked)
-                          (test-array-element-type object type stype headerp pred length object-type)
-                        (if (or no-check-for-array1 no-check-for-array2)
-                            `(and ,@type-test
-                                  ,@(unless length-checked
-                                      dim-tests))
-                            `(and
-                              ,@(cond ((and (eql pred 'vectorp)
-                                            complexp)
-                                       `((%other-pointer-subtype-p ,object
-                                                                   ',(list sb-vm:complex-base-string-widetag
-                                                                           #+sb-unicode sb-vm:complex-character-string-widetag
-                                                                           sb-vm:complex-bit-vector-widetag
-                                                                           sb-vm:complex-vector-widetag))))
-                                      ((and (eql pred 'arrayp)
-                                            complexp)
-                                       `((%other-pointer-subtype-p ,object
-                                                                   ',(list sb-vm:complex-base-string-widetag
-                                                                           #+sb-unicode sb-vm:complex-character-string-widetag
-                                                                           sb-vm:complex-bit-vector-widetag
-                                                                           sb-vm:complex-vector-widetag
-                                                                           sb-vm:complex-array-widetag))))
-                                      (t
-                                       `(,@(unless (or (and headerp (eql pred 'arrayp))
-                                                       simple-array-header-p)
-                                             ;; ARRAY-HEADER-P from DIM-TESTS will test for that
-                                             `((,pred ,object)))
-                                         ,@(when complexp
-                                             `((typep ,object '(not simple-array)))))))
-                              ,@dim-tests
-                              ,@type-test))))))
-              `(%typep ,object ',(type-specifier type)))))))
+    (cond ((and (not (array-type-complexp type))
+                (eq et *wild-type*)
+                (equal dims '(*)))
+           `(simple-rank-1-array-*-p ,object))
+          ((let ((int (type-intersection type object-type)))
+             (when (and (array-type-p int)
+                        (not (array-type-complexp int))
+                        (neq (array-type-specialized-element-type int) *wild-type*))
+               (cond
+                 ;; (typep vector '(simple-array double-float)) =>
+                 ;; (typep x '(simple-array double-float (*)), which is a single widetag check.
+                 ((and (eq dims '*)
+                       (typep (array-type-dimensions int) '(cons t null)))
+                  `(typep ,object ',(type-specifier
+                                     (make-array-type '(*)
+                                                      :element-type (array-type-element-type int)
+                                                      :specialized-element-type (array-type-specialized-element-type int)
+                                                      :complexp nil))))
+                 ;; (typep simple-array '(array double-float (* *)) =>
+                 ;; (typep x '(simple-array double-float (* *))), without checking for displaced arrays.
+                 ((and (eq (array-type-complexp type) :maybe)
+                       (not (array-type-complexp int)))
+                  `(typep ,object ',(type-specifier
+                                     (make-array-type dims
+                                                      :element-type et
+                                                      :specialized-element-type (array-type-specialized-element-type type)
+                                                      :complexp nil))))))))
+          ;; Don't check dimensions if they are already matching
+          ((and (not (eq dims '*))
+                (equal dims
+                       (let ((int (type-intersection object-type (specifier-type 'array))))
+                         (if (eq int *empty-type*)
+                             '*
+                             (ctype-array-dimensions int)))))
+           `(typep ,object ',(type-specifier
+                              (make-array-type '*
+                                               :element-type et
+                                               :specialized-element-type (array-type-specialized-element-type type)
+                                               :complexp (array-type-complexp type)))))
+          (t
+           (multiple-value-bind (pred stype) (find-supertype-predicate type)
+             (if (and (array-type-p stype)
+                      ;; (If the element type hasn't been defined yet, it's
+                      ;; not safe to assume here that it will eventually
+                      ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
+                      (not (unknown-type-p (array-type-element-type type)))
+                      (or (eq (array-type-complexp stype) (array-type-complexp type))
+                          (and (eql (array-type-complexp stype) :maybe)
+                               (eql (array-type-complexp type) t))))
+                 (let ((complex-tag (and
+                                     (eql (array-type-complexp type) t)
+                                     (singleton-p dims)
+                                     (and (neq et *wild-type*)
+                                          (sb-vm:saetp-complex-typecode
+                                           (find-saetp-by-ctype (array-type-element-type type))))))
+                       (simple-array-header-p
+                         (and (null (array-type-complexp stype))
+                              (listp dims)
+                              (cdr dims)))
+                       (complexp (and (eql (array-type-complexp stype) :maybe)
+                                      (eql (array-type-complexp type) t))))
+                   (if complex-tag
+                       `(and (%other-pointer-p ,object)
+                             (eq (%other-pointer-widetag ,object) ,complex-tag)
+                             ,@(unless (eq (car dims) '*)
+                                 `((= (%array-dimension ,object 0) ,(car dims)))))
+                       (multiple-value-bind (dim-tests headerp length no-check-for-array1)
+                           (test-array-dimensions object type stype simple-array-header-p)
+                         (multiple-value-bind (type-test no-check-for-array2 length-checked)
+                             (test-array-element-type object type stype headerp pred length object-type)
+                           (if (or no-check-for-array1 no-check-for-array2)
+                               `(and ,@type-test
+                                     ,@(unless length-checked
+                                         dim-tests))
+                               `(and
+                                 ,@(cond ((and (eql pred 'vectorp)
+                                               complexp)
+                                          `((%other-pointer-subtype-p ,object
+                                                                      ',(list sb-vm:complex-base-string-widetag
+                                                                              #+sb-unicode sb-vm:complex-character-string-widetag
+                                                                              sb-vm:complex-bit-vector-widetag
+                                                                              sb-vm:complex-vector-widetag))))
+                                         ((and (eql pred 'arrayp)
+                                               complexp)
+                                          `((%other-pointer-subtype-p ,object
+                                                                      ',(list sb-vm:complex-base-string-widetag
+                                                                              #+sb-unicode sb-vm:complex-character-string-widetag
+                                                                              sb-vm:complex-bit-vector-widetag
+                                                                              sb-vm:complex-vector-widetag
+                                                                              sb-vm:complex-array-widetag))))
+                                         (t
+                                          `(,@(unless (or (and headerp (eql pred 'arrayp))
+                                                          simple-array-header-p)
+                                                ;; ARRAY-HEADER-P from DIM-TESTS will test for that
+                                                `((,pred ,object)))
+                                            ,@(when complexp
+                                                `((typep ,object '(not simple-array)))))))
+                                 ,@dim-tests
+                                 ,@type-test))))))
+                 `(%typep ,object ',(type-specifier type))))))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly
