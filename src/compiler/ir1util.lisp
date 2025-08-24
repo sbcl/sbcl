@@ -3245,7 +3245,7 @@ is :ANY, the function name is not checked."
                                           (recur var)
                                           t)))))))
                           (t
-                           (funcall function dest))))))))
+                           (funcall function dest leaf/lvar))))))))
       (recur leaf/lvar))))
 
 (defun propagate-lvar-annotations-to-refs (lvar var)

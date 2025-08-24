@@ -553,3 +553,21 @@
                                  (declare ((simple-array fixnum (*)) x)
                                           (optimize speed))
                                  (position 1 x :test-not #'=))))))
+
+(with-test (:name :complement-multiple-calls)
+  (assert (= (count 'complement
+                    (ir-calls
+                     `(lambda (m n)
+                        (let ((c (complement #'=)))
+                          (values (funcall c 1 m)
+                                  (funcall c 3 n)))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0))
+  (assert (= (count 'complement
+                    (ir-calls
+                     `(lambda (l)
+                        (declare (list l)
+                                 (optimize speed))
+                        (position 10 l :test (complement #'=))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0)))

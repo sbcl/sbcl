@@ -530,8 +530,8 @@
   (when (lambda-p leaf)
     (let ((once nil))
       ;; TODO: what if all destinations can disable arg count checking.
-      (map-refs (lambda (dest)
-                  (declare (ignore dest))
+      (map-refs (lambda (dest lvar)
+                  (declare (ignore dest lvar))
                   (when (shiftf once t)
                     (return-from disable-arg-count-checking)))
                 leaf))

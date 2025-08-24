@@ -473,7 +473,8 @@
     ;; Optimize multiple alien-saps through a variable
     (cond ((block nil
              (map-refs
-              (lambda (dest)
+              (lambda (dest lvar)
+                (declare (ignore lvar))
                 (cond ((combination-is dest '(alien-sap))
                        (pushnew dest alien-saps :test #'eq))
                       ((combination-is dest '(eq)))

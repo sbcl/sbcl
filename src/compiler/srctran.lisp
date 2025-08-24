@@ -46,13 +46,25 @@
       ((and min (eql min max))
        (let ((dums (make-gensym-list min)))
          `#'(lambda ,dums (not (funcall fun ,@dums)))))
-      ((let ((lvar (node-lvar node)))
-         (when lvar
-           (let ((dest (lvar-dest lvar)))
-             (and (combination-p dest)
-                  (eq (combination-fun dest) lvar)))))
-       '#'(lambda (&rest args)
-            (not (apply fun args))))
+      ((let (lengths
+             unequal)
+         (block nil
+           (map-refs (lambda (dest lvar)
+                       (if (and (combination-p dest)
+                                (eq (combination-fun dest) lvar))
+                           (let ((length (length (combination-args dest))))
+                             (if lengths
+                                 (if (/= length lengths)
+                                     (setf unequal t))
+                                 (setf lengths length)))
+                           (return)))
+                     (node-lvar node))
+           (if unequal
+               '#'(lambda (&rest args)
+                    (not (apply fun args)))
+               (let ((vars (make-gensym-list lengths)))
+                 `#'(lambda ,vars
+                      (not (funcall fun ,@vars))))))))
       (t
        (when (node-lvar node)
          (pushnew node (lvar-dependent-nodes (node-lvar node)) :test #'eq))
