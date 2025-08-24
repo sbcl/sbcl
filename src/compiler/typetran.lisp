@@ -616,11 +616,10 @@
                                     `(= (%array-dimension (truly-the vector ,object) 0)
                                         ,length))
                                    (t
-                                    `(if (array-header-p (truly-the vector ,object))
-                                         (= (%array-dimension (truly-the vector ,object) 0)
-                                            ,length)
-                                         (= (vector-length (truly-the vector ,object))
-                                            ,length))))))
+                                    `(= (if (array-header-p (truly-the vector ,object))
+                                            (%array-dimension (truly-the vector ,object) 0)
+                                            (vector-length (truly-the vector ,object)))
+                                        ,length)))))
           ,@(and
              other
              `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
@@ -1078,30 +1077,39 @@
 ;;;
 ;;; Secondary return value is true if passing the generated tests implies that
 ;;; the array has a header.
-(defun test-array-dimensions (original-obj type stype simple-array-header-p)
+(defun test-array-dimensions (original-obj type stype simple-array-header-p object-type)
   (declare (type array-type type stype))
-  (let ((obj `(truly-the ,(type-specifier stype) ,original-obj))
-        (dims (array-type-dimensions type))
-        (header-test (if simple-array-header-p
-                         `(simple-array-header-p ,original-obj)
-                         `(array-header-p ,original-obj))))
+  (let* ((obj `(truly-the ,(type-specifier stype) ,original-obj))
+         (dims (array-type-dimensions type))
+         (header-test (if simple-array-header-p
+                          `(simple-array-header-p ,original-obj)
+                          `(array-header-p ,original-obj)))
+         (object-dims (let ((int (type-intersection object-type (specifier-type 'array))))
+                        (if (eq int *empty-type*)
+                            '*
+                            (ctype-array-dimensions int))))
+         (object-rank (unless (eq object-dims '*)
+                        (length object-dims))))
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
       (cond ((cdr dims)
-             (values `(,@(if (and simple-array-header-p
-                                  (vop-existsp :translate simple-array-header-of-rank-p)
-                                  (eq (array-type-dimensions stype) '*))
-                             `((simple-array-header-of-rank-p ,original-obj ,(length dims)))
-                             `(,(if simple-array-header-p
-                                    `(simple-array-header-p ,original-obj)
-                                    `(arrayp ,original-obj))
-                               ,@(when (eq (array-type-dimensions stype) '*)
-                                   (if (vop-existsp :translate %array-rank=)
-                                       `((%array-rank= ,obj ,(length dims)))
-                                       `((= (%array-rank ,obj) ,(length dims)))))))
+             (values `(,@(unless (eql object-rank (length dims))
+                           (if (and simple-array-header-p
+                                    (vop-existsp :translate simple-array-header-of-rank-p)
+                                    (eq (array-type-dimensions stype) '*))
+                               `((simple-array-header-of-rank-p ,original-obj ,(length dims)))
+                               `(,(if simple-array-header-p
+                                      `(simple-array-header-p ,original-obj)
+                                      `(arrayp ,original-obj))
+                                 ,@(when (eq (array-type-dimensions stype) '*)
+                                     (if (vop-existsp :translate %array-rank=)
+                                         `((%array-rank= ,obj ,(length dims)))
+                                         `((= (%array-rank ,obj) ,(length dims))))))))
                        ,@(loop for d in dims
                                for i from 0
-                               unless (eq '* d)
+                               unless (or (eq '* d)
+                                          (and (listp object-dims)
+                                               (eql (nth i object-dims) d)))
                                collect `(= (%array-dimension ,obj ,i) ,d)))
                      t))
             ((not dims)
@@ -1306,7 +1314,7 @@
                              ,@(unless (eq (car dims) '*)
                                  `((= (%array-dimension ,object 0) ,(car dims)))))
                        (multiple-value-bind (dim-tests headerp length no-check-for-array1)
-                           (test-array-dimensions object type stype simple-array-header-p)
+                           (test-array-dimensions object type stype simple-array-header-p object-type)
                          (multiple-value-bind (type-test no-check-for-array2 length-checked)
                              (test-array-element-type object type stype headerp pred length object-type)
                            (if (or no-check-for-array1 no-check-for-array2)
