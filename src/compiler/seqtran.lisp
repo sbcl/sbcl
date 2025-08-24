@@ -604,6 +604,12 @@
                                #'identity)))
                 (t
                  (values key (ensure-lvar-fun-form key 'key))))))
+    (let ((inverse '((assoc-if . assoc-if-not)
+                     (rassoc-if . rassoc-if-not)
+                     (member-if . member-if-not))))
+      (when (splice-fun-args pred 'complement 1 nil)
+        (setf name (or (cdr (assoc name inverse))
+                       (car (rassoc name inverse))))))
     (let ((test-expr `(%funcall pred ,(if key '(%funcall key target) 'target)))
           (pred-expr (ensure-lvar-fun-form pred 'pred :node node)))
       (when (member name '(member-if-not assoc-if-not rassoc-if-not))
@@ -3410,8 +3416,7 @@
             (aver (ref-p fun))
             (when (every #'fixnump range)
               (setq range (coerce-to-smallest-eltype range)))
-            (change-ref-leaf fun (find-free-fun 'values "?") :recklessly t)
-            (setf (combination-fun-info car/cdr) (info :function :info 'values))
+            (change-full-call car/cdr 'values :recklessly t)
             ;; This is cargo-culted from a related transform on MEMBER where we cause it to
             ;; return a value that is not based on the input list directly.
             (derive-node-type node (specifier-type 't) :from-scratch t)
@@ -3564,26 +3569,6 @@
   (define-find-position-if find-if 0)
   (define-find-position-if position-if 1))
 
-;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We
-;;; didn't bother to worry about optimizing them, except note that on
-;;; Sat, Oct 06, 2001 at 04:22:38PM +0100, Christophe Rhodes wrote on
-;;; sbcl-devel
-;;;
-;;;     My understanding is that while the :test-not argument is
-;;;     deprecated in favour of :test (complement #'foo) because of
-;;;     semantic difficulties (what happens if both :test and :test-not
-;;;     are supplied, etc) the -if-not variants, while officially
-;;;     deprecated, would be undeprecated were X3J13 actually to produce
-;;;     a revised standard, as there are perfectly legitimate idiomatic
-;;;     reasons for allowing the -if-not versions equal status,
-;;;     particularly remove-if-not (== filter).
-;;;
-;;;     This is only an informal understanding, I grant you, but
-;;;     perhaps it's worth optimizing the -if-not versions in the same
-;;;     way as the others?
-;;;
-;;; FIXME: Maybe remove uses of these deprecated functions within the
-;;; implementation of SBCL.
 (macrolet ((define-find-position-if-not (fun-name values-index)
                `(deftransform ,fun-name ((predicate sequence &key
                                           from-end (start 0)
@@ -4018,17 +4003,103 @@
            do (setf result (cons (aref vector i) result)))
      result))
 
-(defoptimizers optimizer (remove delete count) ((item sequence &key
-                                                      ((test test-keyword))
-                                                      ((test-not test-not-keyword))
-                                                      &allow-other-keys))
-  (unless (and test test-not)
+(defun test-not-complementer (test test-keyword test-not test-not-keyword
+                              all-keywords)
+  (unless (or (and test test-not)
+              ;; Can't transform (remove a b :test c :test #'eql)
+              (loop for (k) on all-keywords by #'cddr
+                    thereis (and (not (eq k test-keyword))
+                                 (not (eq k test-not-keyword))
+                                 (member (lvar-value k) '(:test :test-not)))))
     (flet ((change (key value complement)
-             (let ((key-ref (and key
-                                 (lvar-uses key))))
-               (when (and (ref-p key-ref)
-                          (splice-fun-args value 'complement 1 nil))
+             (let* ((key-ref (and key
+                                  (lvar-uses key)))
+                    (new (and (ref-p key-ref)
+                              (splice-fun-args value 'complement 1 nil))))
+               (when new
                  (change-ref-leaf key-ref (find-constant complement))
+                 (setf (lvar-annotations (car new))
+                       (lvar-annotations value))
                  t))))
       (or (change test-keyword test :test-not)
           (change test-not-keyword test-not :test)))))
+
+(defoptimizers optimizer
+    (remove delete count find position
+     sublis nsublis)
+    ((item sequence &rest args &key
+           ((test test-keyword))
+           ((test-not test-not-keyword))
+           &allow-other-keys))
+  (test-not-complementer test test-keyword test-not test-not-keyword
+                         args))
+
+(defoptimizers optimizer
+    (remove-duplicates delete-duplicates)
+    ((sequence &rest args &key
+               ((test test-keyword))
+               ((test-not test-not-keyword))
+               &allow-other-keys))
+  (test-not-complementer test test-keyword test-not test-not-keyword
+                         args))
+
+(defoptimizers optimizer
+    (substitute nsubstitute subst nsubst)
+    ((new old sequence &rest args &key
+          ((test test-keyword))
+          ((test-not test-not-keyword))
+          &allow-other-keys))
+  (test-not-complementer test test-keyword test-not test-not-keyword
+                         args))
+
+(defoptimizers optimizer
+    (mismatch search tree-equal
+              union intersection
+              nunion nintersection
+              subsetp)
+    ((sequence1 sequence2 &rest args &key
+                ((test test-keyword))
+                ((test-not test-not-keyword))
+                &allow-other-keys))
+  (test-not-complementer test test-keyword test-not test-not-keyword args))
+
+(defun if-not-complementer (pred node inverse)
+  (when (splice-fun-args pred 'complement 1 nil)
+    (let* ((fun (combination-fun node))
+           (name (lvar-fun-name fun)))
+      (change-full-call node
+                        (or (cdr (assoc name inverse))
+                            (car (rassoc name inverse))))
+      t)))
+
+(defoptimizers optimizer
+    (remove-if remove-if-not
+               delete-if delete-if-not
+               count-if count-if-not
+               find-if find-if-not
+               position-if position-if-not
+               %find-position-if %find-position-if-not
+               subst-if subst-if-not
+               nsubst-if nsubst-if-not
+               substitute-if substitute-if-not
+               nsubstitute-if nsubstitute-if-not)
+    ((pred &rest args) node)
+  (if-not-complementer pred node
+                       '((remove-if . remove-if-not)
+                         (delete-if . delete-if-not)
+                         (count-if . count-if-not)
+                         (find-if . find-if-not)
+                         (position-if . position-if-not)
+                         (%find-position-if . %find-position-if-not))))
+
+(defoptimizers optimizer
+    (subst-if subst-if-not
+              nsubst-if nsubst-if-not
+              substitute-if substitute-if-not
+              nsubstitute-if nsubstitute-if-not)
+    ((new pred &rest args) node)
+  (if-not-complementer pred node
+                       '((subst-if . subst-if-not)
+                         (nsubst-if . nsubst-if-not)
+                         (substitute-if . substitute-if-not)
+                         (nsubstitute-if . nsubstitute-if-not))))

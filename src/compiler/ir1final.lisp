@@ -309,7 +309,7 @@
         (when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
           (reorder-type-tests node))))))
 
-(defun change-full-call (combination new-fun-name)
+(defun change-full-call (combination new-fun-name &key recklessly)
   (let ((ref (lvar-uses (combination-fun combination))))
     (when (ref-p ref)
       (when (combination-fun-info combination)
@@ -317,7 +317,8 @@
               (fun-info-or-lose new-fun-name)))
       (change-ref-leaf
        ref
-       (find-free-fun new-fun-name ""))
+       (find-free-fun new-fun-name "")
+       :recklessly recklessly)
       t)))
 
 (defun rewrite-full-call (combination)

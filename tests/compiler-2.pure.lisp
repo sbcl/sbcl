@@ -311,11 +311,9 @@
                             (map-into (make-string 10) #'evenp z))))
 
 (with-test (:name (:type-conflict complement))
-  (assert (nth-value 3
-                     (checked-compile
-                      `(lambda (z)
-                         (find z "l" :test (complement #'=)))
-                      :allow-style-warnings t))))
+  (compiles-with-warning
+   `(lambda (z)
+      (find z "l" :test (complement #'=)))))
 
 (with-test (:name :type-across-hairy-lambda-transforms)
   (assert (subtypep (sb-kernel:%simple-fun-type
