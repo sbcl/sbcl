@@ -793,3 +793,11 @@
       (logand (+ c (multiple-value-prog1 0)) 1))
    ((1) 1)
    ((2) 0)))
+
+(with-test (:name :logtest-lognot)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (logtest -3 (lognot a)))
+   ((5) t)
+   ((-3) nil)))

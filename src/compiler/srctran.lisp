@@ -503,7 +503,8 @@
 (deftransform logtest ((x y) (t (constant-arg t)) * :node node :before-vop t)
   (let ((y (lvar-value y)))
     (block nil
-      (cond ((and (= (logcount y) 1)
+      (cond ((and (plusp y)
+                  (= (logcount y) 1)
                   (splice-fun-args x 'lognot 1 nil))
              `(not (logtest x y)))
             ;; (evenp (+ x even)) => (evenp x) and so on
