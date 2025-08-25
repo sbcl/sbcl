@@ -786,4 +786,10 @@
       (declare ((member 813472 -183 -1.0) x))
       (evenp (1+ x)))
    ((813472) nil)
-   ((-183) t)))
+   ((-183) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (logand (+ c (multiple-value-prog1 0)) 1))
+   ((1) 1)
+   ((2) 0)))

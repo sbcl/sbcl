@@ -331,6 +331,7 @@
                                      (change-cast (lvar)
                                        (let ((cast (lvar-uses lvar)))
                                          (when (and (cast-p cast)
+                                                    (not (delay-p cast))
                                                     (almost-immediately-used-p lvar cast :flushable t))
                                            (setf (cast-asserted-type cast) (intersect (cast-asserted-type cast)))
                                            (derive-node-type cast
