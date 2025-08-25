@@ -579,3 +579,10 @@
                             (apply #'eql args)))
                      (list (a a 1)
                            (a a 2))))))))
+
+(with-test (:name :inline-local-call-with-casts)
+  (assert (not (ir-full-calls
+                `(lambda (n)
+                   (funcall (the (function (fixnum) fixnum)
+                                 (lambda (x) (1+ x)))
+                            n))))))

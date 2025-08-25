@@ -1534,6 +1534,13 @@
        (multiple-value-bind (leaf info)
            (multiple-value-bind (type name leaf asserted) (lvar-fun-type fun-lvar)
              (declare (ignorable name asserted))
+             (when (and (functional-p leaf)
+                        (cast-p (lvar-uses fun-lvar))
+                        (atom (lvar-uses (cast-value (lvar-uses fun-lvar)))))
+               ;; Delete the cast for the call to be inlined,
+               ;; validate-call-type will transfer the types onto the arguments.
+               (setf (leaf-where-from leaf) :declared-verify)
+               (delete-cast (lvar-uses fun-lvar)))
              (validate-call-type call type leaf nil
                                  (or asserted
                                      (policy call (zerop type-check))
@@ -1571,7 +1578,7 @@
                                      (,@(if (symbolp name)
                                             `(,name)
                                             `(funcall #',name))
-                                        ,@dummies))
+                                      ,@dummies))
                                   (leaf-source-name leaf)
                                   nil))))))))
   (values))

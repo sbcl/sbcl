@@ -4876,10 +4876,9 @@
   (checked-compile-and-assert
    (:optimize :safe)
    `(lambda (n j)
-      (opaque-identity
-       (funcall (the (function ((signed-byte 33)) (values symbol &optional))
-                     (lambda (x) (when (evenp x)
-                                   j)))
-                n)))
+      (funcall (the (function ((signed-byte 33)) (values symbol &optional))
+                    (lambda (x) (when (evenp x)
+                                  j)))
+               n))
    ((2 'a) 'a)
    ((2 1) (condition 'type-error))))
