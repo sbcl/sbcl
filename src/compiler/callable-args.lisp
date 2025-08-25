@@ -277,13 +277,17 @@
          (lvar-type (lvar-type lvar)))
     (cond ((ref-p use)
            (multiple-value-bind (type fun-name leaf asserted) (node-fun-type use defined-here asserted-type)
-             (let* ((lvar-type (or (and (intersection-type-p lvar-type)
-                                        (find-if #'fun-type-p (intersection-type-types lvar-type)))
-                                   lvar-type))
-                    (int (if (fun-type-p lvar-type)
-                             ;; save the cast type
-                             (type-intersection type lvar-type)
-                             type)))
+             (let* ((lvar-type (unless asserted-type
+                                 (or (and (intersection-type-p lvar-type)
+                                          (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                     lvar-type)))
+                    (int (cond ((and (not (eq lvar-type type))
+                                     (fun-type-p lvar-type))
+                                ;; save the cast type
+                                (setf asserted nil)
+                                (type-intersection type lvar-type))
+                               (t
+                                type))))
                (values (if (neq int *empty-type*)
                            int
                            lvar-type)
@@ -299,13 +303,17 @@
                      (unless (and (global-var-p leaf)
                                   (eq (global-var-kind leaf) :global-function)
                                   (eq (global-var-%source-name leaf) nil))
-                       (let* ((lvar-type (or (and (intersection-type-p lvar-type)
-                                                  (find-if #'fun-type-p (intersection-type-types lvar-type)))
-                                             lvar-type))
-                              (int (if (fun-type-p lvar-type)
-                                       ;; save the cast type
-                                       (type-intersection type lvar-type)
-                                       type)))
+                       (let* ((lvar-type (unless asserted-type
+                                           (or (and (intersection-type-p lvar-type)
+                                                   (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                              lvar-type)))
+                              (int  (cond ((and (not (eq lvar-type type))
+                                                (fun-type-p lvar-type))
+                                           ;; save the cast type
+                                           (setf asserted nil)
+                                           (type-intersection type lvar-type))
+                                          (t
+                                           type))))
                          (setf all-asserted (and all-asserted asserted)
                                union (type-union union int))))))
              (values union '.anonymous. nil all-asserted)))

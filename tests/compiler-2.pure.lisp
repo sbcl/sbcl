@@ -4843,3 +4843,43 @@
      (let ((x #(a b)))
        (aref x 0)))
    (eql a)))
+
+(with-test (:name :funcall-externally-checkable-type)
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (n m)
+      (funcall (the (function ((signed-byte 33)) t)
+                    (if m
+                        (lambda (x) x)
+                        (lambda (x) (1+ x))))
+               n))
+   (('a t) (condition 'type-error))
+   (((expt 2 33) nil) (condition 'type-error))
+   ((1 t) 1)
+   ((2 nil) 3))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (n f)
+      (funcall (the (function ((signed-byte 33)) t)
+                    f)
+               n))
+   (('a #'-) (condition 'type-error))
+   ((1 #'-) -1))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (n)
+      (funcall (the (function ((signed-byte 33)) t)
+                    #'opaque-identity)
+               n))
+   (("a") (condition 'type-error))
+   ((2) 2))
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (n j)
+      (opaque-identity
+       (funcall (the (function ((signed-byte 33)) (values symbol &optional))
+                     (lambda (x) (when (evenp x)
+                                   j)))
+                n)))
+   ((2 'a) 'a)
+   ((2 1) (condition 'type-error))))
