@@ -1380,84 +1380,86 @@
 ;;; Note that this blocks in UNIX-READ. It is generally used where
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
-(defun fd-stream-read-n-bytes (stream buffer sbuffer start end eof-error-p
-                               &aux (index start))
+(defun fd-stream-read-n-bytes (stream buffer sbuffer start end eof-error-p)
   (declare (type fd-stream stream))
   (declare (type index start end))
   (declare (ignore sbuffer))
   (aver (= (length (fd-stream-instead stream)) 0))
   (let* ((ibuf (fd-stream-ibuf stream))
-         (sap (buffer-sap ibuf)))
-    (cond #+soft-card-marks ; read(2) doesn't like write-protected buffers
-          ((and (typep buffer '(simple-array (unsigned-byte 8) (*)))
-                (>= (- end start) 256)
-                (eq (fd-stream-fd-type stream) :regular)
-                ;; TODO: handle non-empty initial buffers
-                (= (buffer-head ibuf) (buffer-tail ibuf)))
-           (when (>= (fd-stream-file-position stream) 0)
-             (setf (fd-stream-file-position stream) -1))
-           (when (fd-stream-synchronize-output stream)
-             (fd-stream-io-start-reading stream))
-           (prog ((fd (fd-stream-fd stream))
-                  (errno 0)
-                  (count 0))
-              (declare ((or null index) count))
-              (go :read)
-            :read-error
-              (simple-stream-perror "couldn't read from ~S" stream errno)
-            :eof
-              (if eof-error-p
-                  (error 'end-of-file :stream stream)
-                  (return index))
-            :read
-              (without-interrupts
-                (tagbody
-                 :read
-                   (with-pinned-objects (buffer)
-                     (let ((sap (vector-sap buffer)))
-                       (declare (inline sb-unix:unix-read))
-                       (setf (fd-stream-listen stream) nil)
-                       (setf (values count errno)
-                             (sb-unix:unix-read fd (sap+ sap index) (- end index)))
-                       (cond ((null count)
-                              (cond #-win32 ((eql errno sb-unix:eintr)
-                                             (go :read))
-                                    (t
-                                     (go :read-error))))
-                             ((zerop count)
-                              (setf (fd-stream-listen stream) :eof)
-                              (go :eof))
-                             (t
-                              (setf index (truly-the index (+ index count)))))
-                       (when (= index end)
-                         (return index))
-                       (go :read)))))))
-          (t
-           (do ()
-               (nil)
+         (sap (buffer-sap ibuf))
+         (index start))
+    (declare (type index index))
+    (flet ((copy-from-buffer ()
              (let* ((remaining-request (- end index))
                     (head (buffer-head ibuf))
                     (tail (buffer-tail ibuf))
                     (available (- tail head))
                     (n-this-copy (min remaining-request available)))
-               (declare (type index remaining-request head tail available))
-               (declare (type index n-this-copy))
+               (declare (type index remaining-request head tail available index
+                              n-this-copy))
                ;; Copy data from stream buffer into user's buffer.
                (%byte-blt sap head buffer index n-this-copy)
                (incf (buffer-head ibuf) n-this-copy)
-               (incf index n-this-copy)
-               ;; Maybe we need to refill the stream buffer.
-               (cond (;; If there were enough data in the stream buffer, we're done.
-                      (= index end)
-                      (return index))
-                     (;; If EOF, we're done in another way.
-                      (null (catch 'eof-input-catcher (refill-input-buffer stream)))
-                      (if eof-error-p
-                          (error 'end-of-file :stream stream)
-                          (return index)))
-                     ;; Otherwise we refilled the stream buffer, so fall
-                     ;; through into another pass of the loop.
-                     )))))))
+               (incf index n-this-copy))))
+      ;; Both paths need to empty the buffer first
+      (copy-from-buffer)
+      (cond #+soft-card-marks ; read(2) doesn't like write-protected buffers
+            ((and (>= (- end index) 256)
+                  (typep buffer '(simple-array (unsigned-byte 8) (*)))
+                  (eq (fd-stream-fd-type stream) :regular))
+             (when (>= (fd-stream-file-position stream) 0)
+               (setf (fd-stream-file-position stream) -1))
+             (when (fd-stream-synchronize-output stream)
+               (fd-stream-io-start-reading stream))
+             (prog ((fd (fd-stream-fd stream))
+                    (errno 0)
+                    (count 0))
+                (declare ((or null index) count))
+                (go :read)
+              :read-error
+                (simple-stream-perror "couldn't read from ~S" stream errno)
+              :eof
+                (if eof-error-p
+                    (error 'end-of-file :stream stream)
+                    (return index))
+              :read
+                (without-interrupts
+                  (tagbody
+                   :read
+                     (with-pinned-objects (buffer)
+                       (let ((sap (vector-sap buffer)))
+                         (declare (inline sb-unix:unix-read))
+                         (setf (fd-stream-listen stream) nil)
+                         (setf (values count errno)
+                               (sb-unix:unix-read fd (sap+ sap index) (- end index)))
+                         (cond ((null count)
+                                (cond #-win32 ((eql errno sb-unix:eintr)
+                                               (go :read))
+                                      (t
+                                       (go :read-error))))
+                               ((zerop count)
+                                (setf (fd-stream-listen stream) :eof)
+                                (go :eof))
+                               (t
+                                (setf index (truly-the index (+ index count)))))
+                         (when (= index end)
+                           (return index))
+                         (go :read)))))))
+            (t
+             (loop
+              ;; Maybe we need to refill the stream buffer.
+              (cond (;; If there were enough data in the stream buffer, we're done.
+                     (= index end)
+                     (return index))
+                    (;; If EOF, we're done in another way.
+                     (null (catch 'eof-input-catcher (refill-input-buffer stream)))
+                     (if eof-error-p
+                         (error 'end-of-file :stream stream)
+                         (return index)))
+                    ;; Otherwise we refilled the stream buffer, so fall
+                    ;; through into another pass of the loop.
+                    )
+              (copy-from-buffer)))))))
 
 (defun fd-stream-advance (stream unit)
   (let* ((buffer (fd-stream-ibuf stream))
