@@ -280,9 +280,10 @@
 ;;; and return NIL. This seems kinda sloppy. Can we get rid of that "feature"?
 (declaim (inline contains-unknown-type-p contains-hairy-type-p opaque-type-p))
 (defun contains-unknown-type-p (ctype)
-  (if ctype (oddp (type-%bits ctype)) nil))
+  (and ctype
+       (logtest (type-%bits ctype) ctype-contains-unknown)))
 (defun contains-hairy-type-p (ctype)
-  (logbitp 1 (type-%bits ctype)))
+  (logtest (type-%bits ctype) ctype-contains-hairy))
 
 ;;; Can't do optimizations for satisfies, unknown types or standard-class.
 (defun opaque-type-p (ctype)
