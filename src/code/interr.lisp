@@ -599,7 +599,11 @@
 
 (deferr op-not-type2-error (a b)
   (destructuring-bind (type . op) (sb-di:error-context)
-   (object-not-type-error (funcall op a b) type nil)))
+    (unless (typep a 'number)
+      (object-not-type-error a 'number nil))
+    (unless (typep b 'number)
+      (object-not-type-error b 'number nil))
+    (object-not-type-error (funcall op a b) type nil)))
 
 (deferr fill-pointer-error (array)
   (declare (notinline fill-pointer-error))
