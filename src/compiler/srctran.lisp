@@ -3674,6 +3674,32 @@
                    (specifier-type 'index)
                    (specifier-type 'sb-vm:signed-word))))))))
 
+;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
+(when-vop-existsp (:translate overflow+)
+  (macrolet ((def (name types word-var args vop)
+               `(deftransform ,name ((x y) ,types
+                                     * :node node :important nil)
+                  (when (or (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word))
+                            (not (node-lvar node)))
+                    (give-up-ir1-transform))
+                  (delay-ir1-transform node :ir1-phases)
+                  (let ((cast (cast-or-check-bound-type node)))
+                    (cond ((and cast
+                                (csubtypep cast (specifier-type 'fixnum)))
+                           (let ((word-cast (lvar-uses ,word-var)))
+                             (when (cast-p word-cast)
+                               (when (eql (cast-type-to-check word-cast)
+                                          (specifier-type 'number))
+                                 (delete-cast (lvar-uses ,word-var)))))
+                           `(%primitive ,',vop
+                                        ,@',args '(:signed . ,(type-specifier cast))))
+                          (t
+                           (give-up-ir1-transform)))))))
+    (def + (t fixnum) x (x y) sb-vm::overflow+t)
+    (def + (fixnum t) y (y x) sb-vm::overflow+t)
+    (def - (t fixnum) x (x y) sb-vm::overflow-t)
+    (def - (fixnum t) y (x y) sb-vm::overflow-t-y)))
+
 (defun overflow-transform (name x y node &optional (swap t))
   (unless (node-lvar node)
     (give-up-ir1-transform))
@@ -3698,7 +3724,7 @@
                            (not (and (csubtypep (lvar-type x) (specifier-type 'fixnum))
                                      (csubtypep (lvar-type y) (specifier-type 'fixnum))))))
                   wordp)
-         (give-up-ir1-transform)))
+          (give-up-ir1-transform)))
       (flet ((subp (lvar type)
                (cond
                  ((not (constant-type-p type))

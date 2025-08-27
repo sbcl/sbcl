@@ -402,8 +402,6 @@
  ("src/compiler/{arch}/char")
  ("src/compiler/{arch}/system")
  ("src/compiler/{arch}/memory")
- ("src/compiler/{arch}/arith")
- ("src/compiler/{arch}/pred")
  ("src/compiler/{arch}/c-call")
 
  ;; The assembly files need to be compiled twice: once as
@@ -422,7 +420,10 @@
  ("src/compiler/array-tran")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/type-vop-macros")
+ ("src/compiler/{arch}/arith")
+ ("src/compiler/{arch}/pred")
  ("src/compiler/{arch}/type-vops")
+
  ("src/compiler/generic/type-vops")
  ("src/compiler/ir1final")
 

@@ -941,11 +941,6 @@
     (dolist (name (cddr spec))
       (unless (symbolp name)
         (error "bad temporary name: ~S" name))
-      ;; It's almost always a mistake to have overlaps in the operand names.
-      ;; But I guess that some users think it's fine?
-      #+sb-xc-host
-      (when (member name (vop-parse-temps parse) :key #'operand-parse-name)
-        (warn "temp ~s already exists in ~s" name (vop-parse-name parse)))
       (incf *parse-vop-operand-count*)
       (let ((res (list :born (parse-time-spec :load)
                        :dies (parse-time-spec :save))))

@@ -3138,67 +3138,99 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:variant-vars op error)
+  (:variant 'adds 'sb-kernel::add-overflow2-error)
   (:generator 2
-    (let* ((*location-context* (unless (eq type 'fixnum)
+    (let* ((signed-p (and (typep type '(cons (eql :signed)))
+                          (pop type)))
+           (*location-context* (unless (eq type 'fixnum)
                                  type))
-           (error (generate-error-code vop 'sb-kernel::add-overflow2-error x y)))
-      (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
-        (inst tbnz* x 0 error))
-      (inst adds r x (sc-case y
-                       (any-reg y)
-                       (immediate
-                        (fixnumize (tn-value y)))
-                       (t
-                        (lsl y n-fixnum-tag-bits))))
-      (inst b :vs error))))
+           (error (generate-error-code vop error x y)))
+      (if signed-p
+          (let (signed)
+            (assemble (:elsewhere)
+              start
+              (setf signed start)
+              (unless (fixnum-or-other-pointer-tn-ref-p x-ref t)
+                (test-type x tmp-tn error t (other-pointer-lowtag) :value-tn-ref x-ref))
+              (loadw tmp-tn x 0 other-pointer-lowtag)
+              (inst cmp tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+              (inst b :ne ERROR)
+              (loadw tmp-tn x bignum-digits-offset other-pointer-lowtag)
+              (inst* op tmp-tn tmp-tn (sc-case y
+                                        (any-reg (asr y n-fixnum-tag-bits))
+                                        (immediate (tn-value y))
+                                        (t
+                                         y)))
+              (inst b :vs ERROR)
+              (inst adds r tmp-tn tmp-tn)
+              (inst b :vs ERROR)
+              (inst b DONE))
 
-(define-vop (overflow-t)
-  (:translate overflow-)
-  (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg signed-reg
-                          (immediate
-                           (typep (tn-value tn) '(and sc-offset
-                                                  (satisfies fixnum-add-sub-immediate-p)))))))
-  (:arg-types (:or t tagged-num) tagged-num)
-  (:arg-refs x-ref)
-  (:info type)
-  (:results (r :scs (any-reg) :from :load))
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 2
-    (let* ((*location-context* (unless (eq type 'fixnum)
-                                 type))
-           (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
-        (inst tbnz* x 0 error))
-      (inst subs r x (sc-case y
-                       (any-reg y)
-                       (immediate
-                        (fixnumize (tn-value y)))
-                       (t
-                        (lsl y n-fixnum-tag-bits))))
-      (inst b :vs error))))
+            (inst tbnz* x 0 signed)
+            (inst* op r x (sc-case y
+                            (any-reg y)
+                            (immediate
+                             (fixnumize (tn-value y)))
+                            (t
+                             (lsl y n-fixnum-tag-bits))))
+            (inst b :vs error))
+          (progn
+            (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
+              (inst tbnz* x 0 error))
+            (inst* op r x (sc-case y
+                             (any-reg y)
+                             (immediate
+                              (fixnumize (tn-value y)))
+                             (t
+                              (lsl y n-fixnum-tag-bits))))
+            (inst b :vs error))))
+    DONE))
 
-(define-vop (overflow-t-y)
+(define-vop (overflow-t overflow+t)
   (:translate overflow-)
+  (:variant 'subs 'sb-kernel::sub-overflow2-error))
+
+(define-vop (overflow-t-y overflow-t)
   (:args (x :scs (any-reg))
          (y :scs (any-reg descriptor-reg)))
   (:arg-types tagged-num (:or t tagged-num))
+  (:temporary (:scs (unsigned-reg) :unused-if (atom type)) temp)
   (:arg-refs nil y-ref)
-  (:info type)
-  (:results (r :scs (any-reg) :from :load))
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:vop-var vop)
+  (:ignore op error)
   (:generator 2
-    (let* ((*location-context* (unless (eq type 'fixnum)
+    (let* ((signed-p (and (typep type '(cons (eql :signed)))
+                          (pop type)))
+           (*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::sub-overflow2-error x y)))
-      (unless (csubtypep (tn-ref-type y-ref) (specifier-type 'fixnum))
-        (inst tbnz* y 0 error))
-      (inst subs r x y)
-      (inst b :vs error))))
+      (if signed-p
+          (let* (signed)
+            (assemble (:elsewhere)
+              start
+              (setf signed start)
+              (unless (fixnum-or-other-pointer-tn-ref-p y-ref t)
+                (test-type y tmp-tn error t (other-pointer-lowtag) :value-tn-ref y-ref))
+              (loadw tmp-tn y 0 other-pointer-lowtag)
+              (inst cmp tmp-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+              (inst b :ne ERROR)
+              (loadw tmp-tn y bignum-digits-offset other-pointer-lowtag)
+              (inst asr temp x n-fixnum-tag-bits)
+              (inst subs tmp-tn temp tmp-tn)
+              (inst b :vs ERROR)
+              (inst adds r tmp-tn tmp-tn)
+              (inst b :vs ERROR)
+              (inst b DONE))
+
+            (inst tbnz* y 0 signed)
+            (inst subs r x y)
+            (inst b :vs error))
+          (progn
+            (unless (csubtypep (tn-ref-type y-ref) (specifier-type 'fixnum))
+              (inst tbnz* y 0 error))
+            (inst subs r x y)
+            (inst b :vs error))))
+    DONE))
 
 (define-vop (overflow*t)
   (:translate overflow*)

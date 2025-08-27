@@ -813,19 +813,20 @@ necessary, since type inference may take arbitrarily long to converge.")
   (values))
 
 (defun describe-ir2-component (component *standard-output*)
-  (format t "~%~|~%;;;; IR2 component: ~S~2%" (component-name component))
-  (format t "entries:~%")
-  (dolist (entry (ir2-component-entries (component-info component)))
-    (format t "~4TL~D: ~S~:[~; [closure]~]~%"
-            (label-id (entry-info-offset entry))
-            (entry-info-name entry)
-            (entry-info-closure-tn entry)))
-  (terpri)
-  (pre-pack-tn-stats component *standard-output*)
-  (terpri)
-  (print-ir2-blocks component)
-  (terpri)
-  (values))
+  (let ((*print-readably* nil))
+    (format t "~%~|~%;;;; IR2 component: ~S~2%" (component-name component))
+    (format t "entries:~%")
+    (dolist (entry (ir2-component-entries (component-info component)))
+      (format t "~4TL~D: ~S~:[~; [closure]~]~%"
+              (label-id (entry-info-offset entry))
+              (entry-info-name entry)
+              (entry-info-closure-tn entry)))
+    (terpri)
+    (pre-pack-tn-stats component *standard-output*)
+    (terpri)
+    (print-ir2-blocks component)
+    (terpri)
+    (values)))
 
 ;;; Leave this as NIL if you want modern, rational, correct, behavior,
 ;;; or switch it to T for legacy (CLHS-specified) bullshit a la
