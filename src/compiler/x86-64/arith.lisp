@@ -4355,8 +4355,12 @@
                                  (inst cmp x (imm flo))
                                  (change-vop-flags vop '(:e)))
                                 ((sb-c::interval-high<=n int hi)
-                                 (change-vop-flags vop '(:ge))
-                                 (inst cmp x (imm flo)))
+                                 (cond ((eql lo 1)
+                                        (change-vop-flags vop '(:g))
+                                        (inst test x x))
+                                       (t
+                                        (change-vop-flags vop '(:ge))
+                                        (inst cmp x (imm flo)))))
                                 ((and (sb-c::interval-low>=n int lo)
                                       (cond ((< lo 0))
                                             (t
@@ -4470,10 +4474,9 @@
                                                :dword
                                                :qword)))
                                  (cond
-                                   ((and (eq lo (fixnumize 1))
-                                         (/= hi ,(fixnumize most-positive-fixnum)))
+                                   ((eq lo (fixnumize 1))
                                     (inst test size x x)
-                                    (inst jmp (if not-p :e :ne) target))
+                                    (inst jmp (if not-p :le :g) target))
                                    (t
                                     (inst cmp size x (imm lo))
                                     (inst jmp (if (eq size :dword)
