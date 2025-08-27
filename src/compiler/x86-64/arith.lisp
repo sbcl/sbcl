@@ -1037,7 +1037,8 @@
 (define-vop (overflow+-unsigned)
   (:translate overflow+)
   (:args (x :scs (unsigned-reg))
-         (y :scs (unsigned-reg)))
+         (y :scs (unsigned-reg (immediate
+                                (plausible-signed-imm32-operand-p (tn-value tn))))))
   (:arg-types unsigned-num unsigned-num)
   (:info type)
   (:results (r :scs (unsigned-reg) :from (:argument 0)))
@@ -1046,7 +1047,9 @@
   (:vop-var vop)
   (:generator 2
     (move r x)
-    (inst add r y)
+    (inst add r (if (sc-is y immediate)
+                    (tn-value y)
+                    y))
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
@@ -1055,7 +1058,8 @@
 (define-vop (overflow+-signed)
   (:translate overflow+)
   (:args (x :scs (signed-reg))
-         (y :scs (signed-reg)))
+         (y :scs (signed-reg (immediate
+                              (plausible-signed-imm32-operand-p (tn-value tn))))))
   (:arg-types signed-num signed-num)
   (:info type)
   (:results (r :scs (signed-reg) :from (:argument 0)))
@@ -1064,7 +1068,9 @@
   (:vop-var vop)
   (:generator 2
     (move r x)
-    (inst add r y)
+    (inst add r (if (sc-is y immediate)
+                    (tn-value y)
+                    y))
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
