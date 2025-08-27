@@ -351,6 +351,33 @@
       (inst cmp :qword ea (bignum-header-for-length 1)))
     OUT))
 
+(define-vop (signed-byte-64-p-move-to-word type-predicate)
+  (:args (value :scs (any-reg descriptor-reg) :to :save))
+  (:arg-refs value-ref)
+  (:info target not-p flags)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate)
+  (:generator 10
+    (aver (equal (conditional-flags-flags flags) '(:z)))
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type value-ref) (specifier-type 'fixnum))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (when fixnum-p
+            (move r value)
+            (inst sar r n-fixnum-tag-bits)
+            (inst jmp :nc YEP))
+          (unless (fixnum-or-other-pointer-tn-ref-p value-ref t)
+            (test-type value temp nope t (other-pointer-lowtag)))
+          (loadw temp value 0 other-pointer-lowtag)
+          (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (loadw r value bignum-digits-offset other-pointer-lowtag)
+          (inst jmp (if not-p :ne :eq) target))))
+    not-target))
+
 (define-vop (signed-byte-64-p/unsigned)
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
