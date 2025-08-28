@@ -586,9 +586,9 @@
   (deferr ash-overflow2-error (x y)
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
-      (if (numberp x)
+      (if (integerp x)
           (object-not-type-error (ash x y) type nil)
-          (object-not-type-error x 'number nil))))
+          (object-not-type-error x 'integer nil))))
 
   (deferr negate-overflow-error (x)
     (let ((type (or (sb-di:error-context)

@@ -2939,6 +2939,8 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:variant-vars type-check)
+  (:variant nil)
   (:generator 4
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
@@ -2961,6 +2963,8 @@
                    vop 'sb-kernel::ash-overflow2-error number amount-error))
            (fits (csubtypep (tn-ref-type amount-ref)
                             (specifier-type `(integer -63 63)))))
+      (when type-check
+        (inst tbnz* number 0 error))
       (cond ((numberp amount)
              (cond ((minusp amount)
                     (setf amount (min (- amount) 63))
@@ -3123,6 +3127,13 @@
   (:arg-types signed-num untagged-num)
   (:variant t nil)
   (:variant-cost 4))
+
+(define-vop (overflow-ash-t overflow-ash-fixnum)
+  (:args (number :scs (any-reg descriptor-reg))
+         (amount :scs (unsigned-reg signed-reg immediate)))
+  (:arg-types (:or t tagged-num) unsigned-num)
+  (:variant t)
+  (:variant-cost 10))
 
 (define-vop (overflow+t)
   (:translate overflow+)

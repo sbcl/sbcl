@@ -1548,6 +1548,8 @@
   (:result-types signed-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:variant-vars type-check)
+  (:variant nil)
   (:generator 3
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
@@ -1561,8 +1563,8 @@
                            (t
                             (setf amount-error
                                   (make-random-tn (sc-or-lose (if (typep amount 'word)
-                                                                      'unsigned-reg
-                                                                      'signed-reg))
+                                                                  'unsigned-reg
+                                                                  'signed-reg))
                                                   (tn-offset temp)))
 
                             (lambda ()
@@ -1574,6 +1576,9 @@
                              :qword))
            (fits (csubtypep (tn-ref-type amount-ref)
                             (specifier-type `(integer -63 63)))))
+      (when type-check
+        (generate-fixnum-test number)
+        (inst jmp :nz error))
       (cond ((numberp amount)
              (cond ((minusp amount)
                     (move result number)
@@ -1636,6 +1641,13 @@
   (:results (result :scs (any-reg) :from :load))
   (:result-types tagged-num)
   (:variant-cost 2))
+
+(define-vop (overflow-ash-t overflow-ash-fixnum)
+  (:args (number :scs (any-reg descriptor-reg))
+         (amount :scs (unsigned-reg signed-reg immediate)))
+  (:arg-types (:or t tagged-num) unsigned-num)
+  (:variant t)
+  (:variant-cost 10))
 
 (define-vop (overflow+t)
   (:translate overflow+)

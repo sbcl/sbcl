@@ -3690,7 +3690,7 @@
                              (when (cast-p word-cast)
                                (when (eql (cast-type-to-check word-cast)
                                           (specifier-type 'number))
-                                 (delete-cast (lvar-uses ,word-var)))))
+                                 (delete-cast word-cast))))
                            `(%primitive ,',vop
                                         ,@',args '(:signed . ,(type-specifier cast))))
                           (t
@@ -3869,6 +3869,23 @@
 (deftransform - ((x y) ((or word sb-vm:signed-word) t)
                  * :node node :important nil)
   (overflow-transform-unknown-x 'overflow- x y node t))
+
+(when-vop-existsp (:named sb-vm::overflow-ash-t)
+  (deftransform ash ((x y) (t word)
+                     * :node node :important nil)
+    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (delay-ir1-transform node :ir1-phases)
+          (let ((cast (cast-or-check-bound-type node)))
+            (when (and cast
+                       (csubtypep cast (specifier-type 'fixnum)))
+              (let ((x-cast (lvar-uses x)))
+                (when (cast-p x-cast)
+                  (when (eql (cast-type-to-check x-cast)
+                             (specifier-type 'integer))
+                    (delete-cast x-cast))))
+              `(%primitive sb-vm::overflow-ash-t x y ',(type-specifier cast)))))
+        (give-up-ir1-transform))))
 
 (defun overflow-transform-1 (name x node)
   (unless (node-lvar node)
