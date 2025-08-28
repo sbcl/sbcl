@@ -1,8 +1,36 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 Changes relative to sbcl-2.5.7:
-  * minor incompatible change: MAIN-THREAD-P can only be applied to threads,
-    not arbitrary lisp objects.
+  * minor incompatible change: SB-THREAD:MAIN-THREAD-P can only be applied to
+    threads, not arbitrary lisp objects.
+  * minor incompatible change: the instruction-combining (peephole)
+    optimization pass does not run if COMPILATION-SPEED has a higher value
+    than SPEED.
+  * platform support:
+    ** on arm64, provide better backtraces in the statistical profiler's
+       reporting, along with better detection of assembly routines, local
+       functions and callers of foreign code.
+    ** on ppc64le, make --dynamic-space-size behave as documented.
+       (lp#2121255)
+    ** on x86-64, handle more cases in the ALU+TEST peephole optimization.
+  * bug fix: for file-streams with :DIRECTION :IO, it is now harder for the
+    input and output file positions get out of sync.  (lp#1600610, reported by
+    Guillaume le Vaillant, test cases by Brent Benson)
+  * bug fix: an infinite loop in SUBTYPEP for types involving negations of
+    CONS of specialized ARRAY types.  (lp#2114755)
+  * bug fix: miscompilation of a CASE form with small numeric keys.
+    (lp#2119035)
+  * bug fix: anonymous alien structs definitions are deduplicated, making it
+    harder to overflow internal data structures.  (lp#2114943, reported by
+    Brooke Tilley)
+  * bug fix: allow ALU+TEST peephole optimizations to fire on x86-64.
+    (lp#2120547, reported by Christoph Breitkopf)
+  * bug fix: miscompilation of a LOOP form with rational arithmetic on
+    variables involved in termination tests.  (lp#2121178, reported by 3b)
+  * bug fix: the compiler is better able to associate some forms in a
+    macroexpanion with the original sources.
+  * optimization: improve array construction with LIST or SEQUENCE
+    :INITIAL-CONTENTS.
 
 changes in sbcl-2.5.7 relative to sbcl-2.5.6:
   * enhancement: the encapsulate mechanism can be used to wrap functions that
