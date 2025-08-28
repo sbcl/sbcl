@@ -3914,6 +3914,23 @@
                        * :node node :important nil)
   (overflow-transform-1 'overflow-negate x node))
 
+(when-vop-existsp (:named sb-vm::overflow-negate-t)
+  (deftransform %negate ((x) (t)
+                         * :node node :important nil)
+    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (delay-ir1-transform node :ir1-phases)
+          (let ((cast (cast-or-check-bound-type node)))
+            (when (and cast
+                       (csubtypep cast (specifier-type 'fixnum)))
+              (let ((x-cast (lvar-uses x)))
+                (when (cast-p x-cast)
+                  (when (eql (cast-type-to-check x-cast)
+                             (specifier-type 'number))
+                    (delete-cast x-cast))))
+              `(%primitive sb-vm::overflow-negate-t x ',(type-specifier cast)))))
+        (give-up-ir1-transform))))
+
 (defun template-translates (fun-name args result-type)
   (let ((vops (fun-info-templates (fun-info-or-lose fun-name))))
     (flet ((subp (lvar type)
