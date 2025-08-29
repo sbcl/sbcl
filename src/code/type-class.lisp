@@ -291,9 +291,10 @@
 
 (defun ok-to-memoize-p (arg)
   (etypecase arg
-    (ctype (evenp (type-%bits arg))) ; i.e. not CTYPE-CONTAINS-UNKNOWN
+    (ctype (not (logtest (type-%bits arg) ctype-contains-unknown)))
     (list  (dolist (elt arg t)
-             (when (oddp (type-%bits elt)) (return nil))))))
+             (when (logtest (type-%bits elt) ctype-contains-unknown)
+               (return nil))))))
 
 (defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-PRNG-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
