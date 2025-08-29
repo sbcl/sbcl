@@ -1219,12 +1219,14 @@
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
 
-(defmacro define-conditional-vop (tran signed unsigned &optional addend addend-signed addend-unsigned)
+(defmacro define-conditional-vop (tran fixnum signed unsigned &optional addend addend-signed addend-unsigned)
   `(progn
      ,@(loop for (suffix cost signed-p) in
-             '((/fixnum 4 t)
-               (/signed 6 t)
-               (/unsigned 6 nil))
+             (append
+              (and fixnum
+                   '((/fixnum 4 t)))
+              '((/signed 6 t)
+                (/unsigned 6 nil)))
              collect
              `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)" tran suffix))
                            ,(intern (format nil "~:@(FAST-CONDITIONAL~A~)" suffix)))
@@ -1278,9 +1280,9 @@
                  (try (ldb (byte 64 0) (- y)) t)
                  (inst cmp x (load-immediate-word tmp-tn y)))))))))
 
-(define-conditional-vop < :lt :lo -1 :le :ls)
-(define-conditional-vop > :gt :hi 1 :ge :hs)
-(define-conditional-vop eql :eq :eq)
+(define-conditional-vop < t :lt :lo -1 :le :ls)
+(define-conditional-vop > t :gt :hi 1 :ge :hs)
+(define-conditional-vop eql nil :eq :eq)
 
 (define-vop (<-unsigned-signed)
   (:translate <)
@@ -1335,17 +1337,6 @@
 (define-vop (eq-signed-unsigned eql-signed-unsigned)
   (:variant-cost 6)
   (:translate eq))
-
-(define-vop (generic-eql/fixnum fast-if-eql/fixnum)
-  (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg)))
-  (:arg-types * tagged-num)
-  (:variant-cost 7))
-
-(define-vop (generic-eql-c/fixnum fast-if-eql-integer/c)
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
-  (:variant-cost 6))
 
 (deftransform logtest ((x y) (:or ((signed-word signed-word) *)
                                   ((word word) *)

@@ -164,7 +164,6 @@
                 (:variant-cost ,cost))))
   (def fast-if-eq-character fast-char=/character 3)
   (def fast-if-eq-character/c fast-char=/character/c 2)
-  (def fast-if-eq-fixnum fast-if-eql/fixnum 3)
   (def fast-if-eq-integer/c fast-if-eql-integer/c 2)
   (def fast-if-eq-signed fast-if-eql/signed 5)
   (def fast-if-eq-unsigned fast-if-eql/unsigned 5))

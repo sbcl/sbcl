@@ -333,7 +333,7 @@
                ((and (zerop value) (sc-is x any-reg descriptor-reg))
                 (inst test x x))
                (immediate
-                (inst cmp x immediate))
+                (emit-optimized-cmp x value temp (tn-ref-type x-tn-ref)))
                ((not (sc-is x control-stack))
                 (inst cmp x (constantize value)))
                (t
@@ -359,8 +359,6 @@
                 (:variant-cost ,cost))))
   (def fast-if-eq-character fast-char=/character 3)
   (def fast-if-eq-character/c fast-char=/character/c 2)
-  (def fast-if-eq-fixnum fast-eql/fixnum 3)
-  (def fast-if-eq-fixnum/c fast-eql-c/fixnum 2)
   (def fast-if-eq-signed fast-if-eql/signed 5)
   (def fast-if-eq-signed/c fast-if-eql-c/signed 4)
   (def fast-if-eq-unsigned fast-if-eql/unsigned 5)

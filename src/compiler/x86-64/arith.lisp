@@ -3384,45 +3384,6 @@
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
   (:translate eql)
   (:generator 5 (emit-optimized-cmp x y temp)))
-
-;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
-;;; known fixnum.
-
-;;; These versions specify a fixnum restriction on their first arg. We have
-;;; also generic-eql/fixnum VOPs which are the same, but have no restriction on
-;;; the first arg and a higher cost. The reason for doing this is to prevent
-;;; fixnum specific operations from being used on word integers, spuriously
-;;; consing the argument.
-
-(define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg control-stack))
-         (y :scs (any-reg control-stack)))
-  (:arg-types tagged-num tagged-num)
-  (:note "inline fixnum comparison")
-  (:translate eql)
-  (:generator 4 (emit-optimized-cmp x y temp)))
-
-(define-vop (generic-eql/fixnum fast-eql/fixnum)
-  (:args (x :scs (any-reg descriptor-reg control-stack))
-         (y :scs (any-reg control-stack)))
-  (:arg-types * tagged-num)
-  (:variant-cost 7))
-
-(define-vop (fast-eql-c/fixnum fast-conditional-c/fixnum)
-  (:args (x :scs (any-reg control-stack)))
-  (:arg-types tagged-num (:constant fixnum))
-  (:info y)
-  (:conditional :e)
-  (:policy :fast-safe)
-  (:translate eql)
-  (:arg-refs x-tn-ref)
-  (:generator 2 (emit-optimized-cmp x (fixnumize y) temp (tn-ref-type x-tn-ref))))
-
-;;; FIXME: this seems never to be invoked any more. What did we either break or improve?
-(define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
-  (:args (x :scs (any-reg descriptor-reg control-stack)))
-  (:arg-types * (:constant fixnum))
-  (:variant-cost 6))
 
 ;;;; 64-bit logical operations
 
