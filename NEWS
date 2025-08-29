@@ -13,8 +13,8 @@ Changes relative to sbcl-2.5.7:
     ** on ppc64le, make --dynamic-space-size behave as documented.
        (lp#2121255)
     ** on x86-64, handle more cases in the ALU+TEST peephole optimization.
-  * bug fix: for file-streams with :DIRECTION :IO, it is now harder for the
-    input and output file positions get out of sync.  (lp#1600610, reported by
+  * bug fix: for file-streams with :DIRECTION :IO, input and output file
+    positions should no longer get out of sync.  (lp#1600610, reported by
     Guillaume le Vaillant, test cases by Brent Benson)
   * bug fix: an infinite loop in SUBTYPEP for types involving negations of
     CONS of specialized ARRAY types.  (lp#2114755)
