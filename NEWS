@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.7:
+changes in sbcl-2.5.8 relative to sbcl-2.5.7:
   * minor incompatible change: SB-THREAD:MAIN-THREAD-P can only be applied to
     threads, not arbitrary lisp objects.
   * minor incompatible change: the instruction-combining (peephole)
