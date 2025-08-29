@@ -478,7 +478,13 @@
                      `(lambda (x)
                         (the fixnum (the integer x))))
                     :key (lambda (x) (combination-fun-source-name x nil)))
-             1)))
+             1))
+  (assert (= (count 'sb-c::%type-check-error/c
+                    (ir-calls
+                     `(lambda (x)
+                        (logand (the number x) 2)))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0)))
 
 (with-test (:name :sign-extend)
   (assert (= (count 'sb-c::mask-signed-field

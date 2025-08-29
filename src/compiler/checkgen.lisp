@@ -293,10 +293,10 @@
                                     (values-type-p dest-asserted-type)))
                            (csubtypep dest-asserted-type
                                       asserted-type)))))
-             (setf (cast-asserted-type cast) (cast-asserted-type dest)
-                   (cast-type-to-check cast) (cast-type-to-check dest)
-                   (cast-%type-check dest) nil)
-             nil)))))
+             (or (cast-externally-checkable-p dest)
+                 (setf (cast-asserted-type cast) (cast-asserted-type dest)
+                       (cast-type-to-check cast) (cast-type-to-check dest)
+                       (cast-%type-check dest) nil)))))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be
