@@ -3660,32 +3660,36 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
-(defun cast-or-check-bound-type (node &optional fixnum)
+(defun cast-or-check-bound-type (node &optional type fixnum)
   (let ((lvar (node-lvar node)))
     (when lvar
       (multiple-value-bind (dest lvar) (immediately-used-let-dest lvar node t)
-        (cond ((cast-p dest)
-               (and (cast-type-check dest)
-                    (single-value-type (cast-type-to-check dest))))
-              ((and (combination-p dest)
-                    (equal (combination-fun-debug-name dest) '(transform-for check-bound))
-                    (eq (third (combination-args dest)) lvar))
-               (if fixnum
-                   (specifier-type 'index)
-                   (specifier-type 'sb-vm:signed-word))))))))
+        (let ((cast-type (cond ((cast-p dest)
+                                (and (cast-type-check dest)
+                                     (single-value-type (cast-type-to-check dest))))
+                               ((and (combination-p dest)
+                                     (equal (combination-fun-debug-name dest) '(transform-for check-bound))
+                                     (eq (third (combination-args dest)) lvar))
+                                (if fixnum
+                                    (specifier-type 'index)
+                                    (specifier-type 'sb-vm:signed-word))))))
+          (when cast-type
+            (let ((result-type (type-intersection cast-type (lvar-type lvar))))
+              (when (and (not (eq result-type *empty-type*))
+                         (or (not type)
+                             (csubtypep result-type type)))
+                (values cast-type result-type)))))))))
 
 ;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
 (when-vop-existsp (:translate overflow+)
   (macrolet ((def (name types word-var args vop)
                `(deftransform ,name ((x y) ,types
                                      * :node node :important nil)
-                  (when (or (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word))
-                            (not (node-lvar node)))
+                  (when (csubtypep (lvar-type ,word-var) (specifier-type 'sb-vm:signed-word))
                     (give-up-ir1-transform))
                   (delay-ir1-transform node :ir1-phases)
-                  (let ((cast (cast-or-check-bound-type node)))
-                    (cond ((and cast
-                                (csubtypep cast (specifier-type 'fixnum)))
+                  (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
+                    (cond (cast
                            `(%primitive ,',vop
                                         ,@',args '(:signed . ,(type-specifier cast))))
                           (t
@@ -3705,51 +3709,49 @@
                  (or (csubtypep (lvar-type y) (specifier-type 'word))
                      (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))))
       (give-up-ir1-transform))
-    (let* ((vops (fun-info-templates (fun-info-or-lose name)))
-           (cast (or (cast-or-check-bound-type node)
-                     (give-up-ir1-transform)))
-           (result-type (type-intersection type cast)))
-      (when (eq result-type *empty-type*)
+    (multiple-value-bind (cast result-type) (cast-or-check-bound-type node)
+      (unless cast
         (give-up-ir1-transform))
-      (let ((wordp (or (csubtypep type (specifier-type 'word))
-                       (csubtypep type (specifier-type 'sb-vm:signed-word)))))
+      (let* ((vops (fun-info-templates (fun-info-or-lose name)))
+             (wordp (or (csubtypep type (specifier-type 'word))
+                        (csubtypep type (specifier-type 'sb-vm:signed-word)))))
         (when (if (csubtypep result-type (specifier-type 'fixnum))
                   (or (csubtypep type (specifier-type 'fixnum))
                       (and wordp
                            (not (and (csubtypep (lvar-type x) (specifier-type 'fixnum))
                                      (csubtypep (lvar-type y) (specifier-type 'fixnum))))))
                   wordp)
-          (give-up-ir1-transform)))
-      (flet ((subp (lvar type)
-               (cond
-                 ((not (constant-type-p type))
-                  (csubtypep (lvar-type lvar) type))
-                 ((not (constant-lvar-p lvar))
-                  nil)
-                 (t
-                  (let ((value (lvar-value lvar))
-                        (type (type-specifier (constant-type-type type))))
-                    (if (typep type '(cons (eql satisfies)))
-                        (funcall (second type) value)
-                        (sb-xc:typep value type)))))))
-        (loop with rotate
-              for vop in vops
-              for (x-type y-type) = (fun-type-required (vop-info-type vop))
-              when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
-                        (neq x-type *universal-type*)
-                        (neq y-type *universal-type*)
-                        (or (and (subp x x-type)
-                                 (subp y y-type))
-                            (and swap
-                                 (subp y x-type)
-                                 (subp x y-type)
-                                 (setf rotate t))))
-              return `(%primitive ,(vop-info-name vop)
-                                  ,@(if rotate
-                                        '(y x)
-                                        '(x y))
-                                  ',(type-specifier cast))
-              finally (give-up-ir1-transform))))))
+          (give-up-ir1-transform))
+        (flet ((subp (lvar type)
+                 (cond
+                   ((not (constant-type-p type))
+                    (csubtypep (lvar-type lvar) type))
+                   ((not (constant-lvar-p lvar))
+                    nil)
+                   (t
+                    (let ((value (lvar-value lvar))
+                          (type (type-specifier (constant-type-type type))))
+                      (if (typep type '(cons (eql satisfies)))
+                          (funcall (second type) value)
+                          (sb-xc:typep value type)))))))
+          (loop with rotate
+                for vop in vops
+                for (x-type y-type) = (fun-type-required (vop-info-type vop))
+                when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
+                          (neq x-type *universal-type*)
+                          (neq y-type *universal-type*)
+                          (or (and (subp x x-type)
+                                   (subp y y-type))
+                              (and swap
+                                   (subp y x-type)
+                                   (subp x y-type)
+                                   (setf rotate t))))
+                return `(%primitive ,(vop-info-name vop)
+                                    ,@(if rotate
+                                          '(y x)
+                                          '(x y))
+                                    ',(type-specifier cast))
+                finally (give-up-ir1-transform)))))))
 
 (deftransform * ((x y) ((or word sb-vm:signed-word) (or word sb-vm:signed-word))
                  * :node node :important nil)
@@ -3783,17 +3785,10 @@
                   (or (csubtypep x-type (specifier-type 'word))
                       (csubtypep x-type (specifier-type 'sb-vm:signed-word)))))
       (give-up-ir1-transform))
-    (let* ((vops (fun-info-templates (fun-info-or-lose name)))
-           (cast (or (cast-or-check-bound-type node t)
-                     (give-up-ir1-transform)))
-           (result-type (type-intersection type cast)))
-      (when (eq result-type *empty-type*)
+    (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum) t)
+      (unless cast
         (give-up-ir1-transform))
-      (multiple-value-bind (cast-low cast-high) (integer-type-numeric-bounds
-                                                 (type-intersection (specifier-type 'integer) cast))
-        (unless (and (fixnump cast-low)
-                     (fixnump cast-high))
-          (give-up-ir1-transform))
+      (multiple-value-bind (cast-low cast-high) (integer-type-numeric-bounds result-type)
         (multiple-value-bind (y-low y-high) (if swap
                                                 (integer-type-numeric-bounds x-type)
                                                 (integer-type-numeric-bounds y-type))
@@ -3828,7 +3823,7 @@
                         (if (typep type '(cons (eql satisfies)))
                             (funcall (second type) value)
                             (sb-xc:typep value type)))))))
-            (loop for vop in vops
+            (loop for vop in (fun-info-templates (fun-info-or-lose name))
                   for (x-type y-type) = (fun-type-required (vop-info-type vop))
                   when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                             (if swap
@@ -3871,10 +3866,35 @@
     (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
           (delay-ir1-transform node :ir1-phases)
-          (let ((cast (cast-or-check-bound-type node)))
-            (when (and cast
-                       (csubtypep cast (specifier-type 'fixnum)))
+          (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
+            (when cast
               `(%primitive sb-vm::overflow-ash-t x y ',(type-specifier cast)))))
+        (give-up-ir1-transform)))
+
+  ;; (the fixnum (ash x -1)) can be inlined
+  (deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
+                     * :node node :important nil)
+    (delay-ir1-transform node :ir1-phases)
+    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
+            (when cast
+              (let* ((result-int (type-approximate-interval result-type))
+                     (shift (lvar-value shift))
+                     (shifted-low (ash (interval-low result-int) (- shift)))
+                     (shifted-high (ash (interval-high result-int) (- shift))))
+                (when (and (typep shifted-low 'sb-vm:signed-word)
+                           (typep shifted-high 'sb-vm:signed-word))
+                  (let ((fixnum-only (and (typep shifted-low 'fixnum)
+                                          (typep shifted-high 'fixnum))))
+                    (multiple-value-bind (input-low input-high)
+                        (if fixnum-only
+                            (values most-negative-fixnum most-positive-fixnum)
+                            (values (- (expt 2 (1- sb-vm:n-word-bits)))
+                                    (1- (expt 2 (1- sb-vm:n-word-bits)))))
+                      `(truly-the (integer ,(ash input-low shift)
+                                           ,(ash input-high shift))
+                         (%primitive sb-vm::overflow-ash-t-signed x shift ',(type-specifier cast) ,fixnum-only)))))))))
         (give-up-ir1-transform))))
 
 (defun overflow-transform-1 (name x node)
@@ -3885,14 +3905,13 @@
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word)))
       (give-up-ir1-transform))
-    (unless (and (or (csubtypep (lvar-type x) (specifier-type 'word))
-                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))))
+    (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
       (give-up-ir1-transform))
-    (let* ((vops (fun-info-templates (fun-info-or-lose name)))
-           (cast (or (cast-or-check-bound-type node)
-                     (give-up-ir1-transform)))
-           (result-type (type-intersection type cast)))
-      (loop for vop in vops
+    (multiple-value-bind (cast result-type) (cast-or-check-bound-type node)
+      (unless cast
+        (give-up-ir1-transform))
+      (loop for vop in (fun-info-templates (fun-info-or-lose name))
             for (x-type) = (fun-type-required (vop-info-type vop))
             when (and (csubtypep result-type (single-value-type (fun-type-returns (vop-info-type vop))))
                       (neq x-type *universal-type*)
@@ -6225,10 +6244,8 @@
                  (:or ((word word) *)
                       ((sb-vm:signed-word sb-vm:signed-word) *))
                  * :node node :important nil)
-  (let ((cast (or (cast-or-check-bound-type node)
-                  (give-up-ir1-transform))))
-    (if (csubtypep (type-intersection cast (specifier-type 'rational))
-                   (specifier-type 'integer))
+  (let ((cast (cast-or-check-bound-type node (specifier-type 'integer))))
+    (if cast
         `(multiple-value-bind (q rem) (truncate numerator denominator)
            (unless (eql rem 0)
              (sb-vm::op-not-type2-error numerator denominator '(,(type-specifier cast) . /)))
