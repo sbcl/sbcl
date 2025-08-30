@@ -111,7 +111,8 @@
                                    `(,arg :scs (descriptor-reg any-reg character-reg
                                                 unsigned-reg signed-reg constant
                                                 single-reg double-reg
-                                                complex-single-reg complex-double-reg)
+                                                complex-single-reg complex-double-reg
+                                                (immediate (typep (tn-value tn) 'sc-offset-immediate)))
                                           #+(or immobile-space permgen)
                                           ,@(if (eq name 'sb-c::%type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
