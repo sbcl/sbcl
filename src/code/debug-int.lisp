@@ -2791,7 +2791,9 @@ register."
                  :invalid-code-object-at-pc))
            :invalid-value-for-unescaped-register-storage))
       (#.immediate-sc-number
-       (sb-c:sc+offset-offset sc+offset)))))
+       (sb-c:sc+offset-offset sc+offset))
+      (#.sb-vm::negative-immediate-sc-number
+       (- (sb-c:sc+offset-offset sc+offset))))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if

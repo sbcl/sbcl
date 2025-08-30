@@ -2589,10 +2589,13 @@
 (defun get-random-tn-name (sc+offset)
   (let ((sc (sb-c:sc+offset-scn sc+offset))
         (offset (sb-c:sc+offset-offset sc+offset)))
-    (if (= sc sb-vm:immediate-sc-number)
-        (princ-to-string offset)
-        (sb-c:location-print-name
-         (sb-c:make-random-tn (svref sb-c:*backend-sc-numbers* sc) offset)))))
+    (cond ((= sc sb-vm:immediate-sc-number)
+           (princ-to-string offset))
+          ((= sc sb-vm::negative-immediate-sc-number)
+           (princ-to-string (- offset)))
+          (t
+           (sb-c:location-print-name
+            (sb-c:make-random-tn (svref sb-c:*backend-sc-numbers* sc) offset))))))
 
 ;;; When called from an error break instruction's :DISASSEM-CONTROL (or
 ;;; :DISASSEM-PRINTER) function, will correctly deal with printing the

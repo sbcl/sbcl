@@ -171,6 +171,13 @@
      (prog1 (progn ,@body)
        (push ,var *adjustable-vectors*))))
 
+(defun encode-immediate-error-arg (x)
+  (declare (type sc-offset-immediate x))
+  (make-sc+offset (if (minusp x)
+                      negative-immediate-sc-number
+                      immediate-sc-number)
+                  (abs x)))
+
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)
     (dolist (where values)
@@ -180,7 +187,7 @@
               where)
              ((and (sc-is where immediate)
                    (fixnump (tn-value where)))
-              (make-sc+offset immediate-sc-number (tn-value where)))
+              (encode-immediate-error-arg (tn-value where)))
              (t
               (make-sc+offset (if (and (sc-is where immediate)
                                        (typep (tn-value where) '(or symbol layout)))

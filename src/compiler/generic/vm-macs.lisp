@@ -189,6 +189,9 @@
                (append *!late-primitive-object-forms*
                        ',(forms)))))))
 
+;;; A special sc-number for encoding errors
+(defconstant negative-immediate-sc-number 61)
+
 ;;; We want small SC-NUMBERs for SCs whose numbers are frequently
 ;;; embedded into machine code. We therefore fix the numbers for the
 ;;; four (i.e two bits) most frequently embedded SCs (empirically
@@ -204,6 +207,9 @@
                (let* ((sc-number (or (cdr (assoc sc-name fixed-numbers))
                                      (1- (incf index))))
                       (constant-name (symbolicate sc-name "-SC-NUMBER")))
+                 (when (= sc-number negative-immediate-sc-number)
+                   (error "sc-number can't be the sames ~a=~a"
+                          'negative-immediate-sc-number negative-immediate-sc-number))
                  `((!define-storage-class ,sc-name ,sc-number
                      ,sb-name ,@args)
                    (defconstant ,constant-name ,sc-number))))))
@@ -220,6 +226,7 @@
 (defconstant sc-offset-limit (ash 1 21))
 (defconstant sc-offset-bits (integer-length (1- sc-offset-limit)))
 (deftype sc-offset () `(integer 0 (,sc-offset-limit)))
+(deftype sc-offset-immediate () `(signed-byte 22))
 
 (defconstant finite-sc-offset-limit
   #-(or sparc) 32
