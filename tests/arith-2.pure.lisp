@@ -792,7 +792,13 @@
    `(lambda (c)
       (logand (+ c (multiple-value-prog1 0)) 1))
    ((1) 1)
-   ((2) 0)))
+   ((2) 0))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (oddp (1+ (read-from-string a))))
+   (("1") nil)
+   (("-2") t)))
 
 (with-test (:name :logtest-lognot)
   (checked-compile-and-assert

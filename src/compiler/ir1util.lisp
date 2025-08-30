@@ -2419,7 +2419,10 @@ is :ANY, the function name is not checked."
                (let ((args (make-gensym-list (length inside-args))))
                  (setf (node-derived-type cast)
                        (setf (node-derived-type inside)
-                             (lvar-derived-type (funcall num-args inside-args))))
+                             (let ((type (lvar-derived-type (funcall num-args inside-args))))
+                               (if (type-single-value-p type)
+                                   type
+                                   (make-single-value-type (single-value-type type))))))
                  (transform-call inside `(lambda ,args
                                            (declare (ignorable ,@args))
                                            ,(funcall num-args args))
