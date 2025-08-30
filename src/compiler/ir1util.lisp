@@ -2874,21 +2874,6 @@ is :ANY, the function name is not checked."
     (functional
      (assure-functional-live-p leaf))))
 
-(defun call-full-like-p (call)
-  (declare (type basic-combination call))
-  (let ((kind (basic-combination-kind call)))
-    (or (eq kind :full)
-        (eq kind :unknown-keys)
-        (and (eq kind :known)
-             (let ((info (basic-combination-fun-info call)))
-               (or (eq (fun-info-externally-checkable-type info) :full)
-                   (and
-                    (not (fun-info-ir2-convert info))
-                    (not (fun-info-ltn-annotate info))
-                    (dolist (template (fun-info-templates info) t)
-                      (when (eq (template-ltn-policy template) :fast-safe)
-                        (when (valid-fun-use call (template-type template))
-                          (return)))))))))))
 
 ;;;; careful call
 

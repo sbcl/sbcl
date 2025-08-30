@@ -2422,12 +2422,12 @@
            overflow-ash)
   (integer integer t)
   integer
-  (movable always-translatable))
+  (always-translatable))
 
 (defknown overflow-negate
   (integer t)
   integer
-  (movable always-translatable))
+  (always-translatable))
 
 (defknown %coerce-to-policy (t) policy (flushable))
 (defknown (check-ds-list check-ds-list/&rest) (t index index t)

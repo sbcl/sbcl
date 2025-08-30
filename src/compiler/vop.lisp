@@ -744,9 +744,12 @@
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1)))
   (optimizer nil :type (or null function (cons function symbol)))
   (optional-results nil :type list)
-  move-vop-p
+  (move-vop-p nil)
   (after-sc-selection nil :type (or null function) :read-only t)
-  gc-barrier)
+  (gc-barrier nil)
+  (translate nil)
+  ;; A bit mask of arguments for which this VOP checks the type
+  (check-type 0 :type fixnum))
 (!set-load-form-method vop-info (:xc :target) :ignore-it)
 
 (declaim (inline vop-name))

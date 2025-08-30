@@ -271,31 +271,6 @@
          t)
         ((types-equal-or-intersect type (specifier-type '(or cons (and array (not simple-array)))))
          t)))
-
-;;; If LVAR is an argument of a function, return a type which the
-;;; function checks LVAR for.
-(defun lvar-externally-checkable-type (lvar)
-  (declare (type lvar lvar))
-  (let ((dest (lvar-dest lvar)))
-    (when (and (basic-combination-p dest)
-               (call-full-like-p dest))
-      (let ((info (and (eq (basic-combination-kind dest) :known)
-                       (basic-combination-fun-info dest))))
-        (if (and info
-                 (functionp (fun-info-externally-checkable-type info)))
-            (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar)))
-              (when type
-                (return-from lvar-externally-checkable-type
-                  (coerce-to-values type))))
-            (map-combination-args-and-types
-             (lambda (arg type &rest args)
-               (declare (ignore args))
-               (when (eq arg lvar)
-                 (return-from lvar-externally-checkable-type
-                   (coerce-to-values type))))
-             dest
-             :defined-here t :asserted-type t))))
-    *wild-type*))
 
 ;;;; interface routines used by optimizers
 

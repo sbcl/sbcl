@@ -1095,7 +1095,7 @@
         (:gc-barrier
          (setf (vop-parse-gc-barrier parse) (rest spec)))
         (:check-type
-         (setf (vop-parse-check-type parse) (second spec)))
+         (setf (vop-parse-check-type parse) (rest spec)))
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (cond (arg-refs-p
@@ -1513,6 +1513,7 @@
 
     `(make-vop-info
       :name ',(vop-parse-name parse)
+      :translate ',(vop-parse-translate parse)
       ,@(make-vop-info-types parse)
       :guard ,(awhen (vop-parse-guard parse)
                 (if (typep it '(cons (eql lambda)))
@@ -1538,6 +1539,14 @@
       ;; TODO: inherit it?
       ,(make-after-sc-function parse)
       :gc-barrier ',(vop-parse-gc-barrier parse)
+      :check-type ,(let ((mask 0)
+                         (spec (vop-parse-check-type parse)))
+                     (unless (equal spec '(t))
+                       (loop for arg in spec
+                             do (setf (ldb (byte 1 (position arg (vop-parse-operands parse) :key #'operand-parse-name))
+                                           mask)
+                                      1)))
+                     mask)
       #+(and (not sb-xc-host) sb-devel)
       :optimizer
       #+(and (not sb-xc-host) sb-devel)
@@ -1781,7 +1790,7 @@
                `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
                    (store-vop-info ,n-res)
                    ,@(set-up-fun-translation parse n-res))))
-           ,@(when (vop-parse-check-type parse)
+           ,@(when (equal (vop-parse-check-type parse) '(t))
                `((setf ,@(loop for name in (or (vop-parse-translate parse)
                                                (list name))
                                collect `(fun-info-externally-checkable-type (fun-info-or-lose ',name))

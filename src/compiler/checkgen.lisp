@@ -192,6 +192,60 @@
           (t
            (values :hairy (list ctype atype))))))
 
+(defun call-full-like-p (call)
+  (declare (type basic-combination call))
+  (let ((kind (basic-combination-kind call)))
+    (or (eq kind :full)
+        (eq kind :unknown-keys)
+        (and (eq kind :known)
+             (let ((info (basic-combination-fun-info call)))
+               (or (eq (fun-info-externally-checkable-type info) :full)
+                   (and
+                    (not (fun-info-ir2-convert info))
+                    (not (fun-info-ltn-annotate info))
+                    (dolist (template (fun-info-templates info) t)
+                      (when (eq (template-ltn-policy template) :fast-safe)
+                        (when (valid-fun-use call (template-type template))
+                          (return)))))
+                   (and (eq (lvar-fun-name (basic-combination-fun call) t) '%%primitive)
+                        (let* ((vop-info (lvar-value (car (basic-combination-args call))))
+                               (mask (vop-info-check-type vop-info)))
+                          (when (plusp mask)
+                           (values mask
+                                   (car (vop-info-translate vop-info))))))))))))
+
+;;; If LVAR is an argument of a function, return a type which the
+;;; function checks LVAR for.
+(defun lvar-externally-checkable-type (lvar)
+  (declare (type lvar lvar))
+  (let ((dest (lvar-dest lvar)))
+    (when (basic-combination-p dest)
+      (multiple-value-bind (full-p %%primitive-name) (call-full-like-p dest)
+        (cond (%%primitive-name
+               (let ((arg (1- (position lvar (basic-combination-args dest)))))
+                 (when (logbitp arg full-p)
+                   (return-from lvar-externally-checkable-type
+                    (coerce-to-values
+                     (nth arg (fun-type-required (info :function :type %%primitive-name))))))))
+              (full-p
+               (let ((info (and (eq (basic-combination-kind dest) :known)
+                                (basic-combination-fun-info dest))))
+                 (if (and info
+                          (functionp (fun-info-externally-checkable-type info)))
+                     (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar)))
+                       (when type
+                         (return-from lvar-externally-checkable-type
+                           (coerce-to-values type))))
+                     (map-combination-args-and-types
+                      (lambda (arg type &rest args)
+                        (declare (ignore args))
+                        (when (eq arg lvar)
+                          (return-from lvar-externally-checkable-type
+                            (coerce-to-values type))))
+                      dest
+                      :defined-here t :asserted-type t)))))))
+    *wild-type*))
+
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
@@ -253,17 +307,6 @@
                                                                  hairy-data-vector-ref string-hairy-data-vector-ref
                                                                  hairy-data-vector-set string-hairy-data-vector-set)
                                                                fun-name)))))))
-                        ;; Not great
-                        ((lvar-fun-is (basic-combination-fun dest) '(%%primitive))
-                         (destructuring-bind (vop &rest args) (basic-combination-args dest)
-                           (and (constant-lvar-p vop)
-                                (let ((name (vop-info-name (lvar-value vop))))
-                                  (or (and (memq name '(sb-vm::overflow+t
-                                                        sb-vm::overflow-t
-                                                        sb-vm::overflow*t))
-                                           (eq lvar (car args)))
-                                      (and (memq name '(sb-vm::overflow-t-y))
-                                           (eq lvar (cadr args))))))))
                         ((and (policy dest (= debug 3))
                               (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
                                 (and leaf

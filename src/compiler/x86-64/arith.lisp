@@ -1443,6 +1443,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:check-type x)
   (:generator 10
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
@@ -1684,7 +1685,8 @@
          (amount :scs (unsigned-reg signed-reg immediate)))
   (:arg-types (:or t tagged-num) unsigned-num)
   (:variant t)
-  (:variant-cost 10))
+  (:variant-cost 10)
+  (:check-type number))
 
 (define-vop (overflow+t)
   (:translate overflow+)
@@ -1702,6 +1704,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:check-type x)
   (:generator 2
     (let* ((signed-p (and (typep type '(cons (eql :signed)))
                           (pop type)))
@@ -1811,6 +1814,7 @@
          (y :scs (any-reg descriptor-reg)))
   (:arg-types tagged-num (:or t tagged-num))
   (:arg-refs nil y-ref)
+  (:check-type y)
   (:generator 2
     (let* ((signed-p (and (typep type '(cons (eql :signed)))
                           (pop type)))
@@ -1861,6 +1865,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:check-type x)
   (:generator 2
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))

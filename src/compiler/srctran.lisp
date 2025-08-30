@@ -3686,11 +3686,6 @@
                   (let ((cast (cast-or-check-bound-type node)))
                     (cond ((and cast
                                 (csubtypep cast (specifier-type 'fixnum)))
-                           (let ((word-cast (lvar-uses ,word-var)))
-                             (when (cast-p word-cast)
-                               (when (eql (cast-type-to-check word-cast)
-                                          (specifier-type 'number))
-                                 (delete-cast word-cast))))
                            `(%primitive ,',vop
                                         ,@',args '(:signed . ,(type-specifier cast))))
                           (t
@@ -3879,11 +3874,6 @@
           (let ((cast (cast-or-check-bound-type node)))
             (when (and cast
                        (csubtypep cast (specifier-type 'fixnum)))
-              (let ((x-cast (lvar-uses x)))
-                (when (cast-p x-cast)
-                  (when (eql (cast-type-to-check x-cast)
-                             (specifier-type 'integer))
-                    (delete-cast x-cast))))
               `(%primitive sb-vm::overflow-ash-t x y ',(type-specifier cast)))))
         (give-up-ir1-transform))))
 
@@ -3923,11 +3913,6 @@
           (let ((cast (cast-or-check-bound-type node)))
             (when (and cast
                        (csubtypep cast (specifier-type 'fixnum)))
-              (let ((x-cast (lvar-uses x)))
-                (when (cast-p x-cast)
-                  (when (eql (cast-type-to-check x-cast)
-                             (specifier-type 'number))
-                    (delete-cast x-cast))))
               `(%primitive sb-vm::overflow-negate-t x ',(type-specifier cast)))))
         (give-up-ir1-transform))))
 

@@ -2929,6 +2929,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:check-type x)
   (:generator 10
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
@@ -3160,7 +3161,8 @@
          (amount :scs (unsigned-reg signed-reg immediate)))
   (:arg-types (:or t tagged-num) unsigned-num)
   (:variant t)
-  (:variant-cost 10))
+  (:variant-cost 10)
+  (:check-type number))
 
 (define-vop (overflow+t)
   (:translate overflow+)
@@ -3178,6 +3180,7 @@
   (:vop-var vop)
   (:variant-vars op error)
   (:variant 'adds 'sb-kernel::add-overflow2-error)
+  (:check-type x)
   (:generator 2
     (let* ((signed-p (and (typep type '(cons (eql :signed)))
                           (pop type)))
@@ -3217,11 +3220,11 @@
             (unless (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))
               (inst tbnz* x 0 error))
             (inst* op r x (sc-case y
-                             (any-reg y)
-                             (immediate
-                              (fixnumize (tn-value y)))
-                             (t
-                              (lsl y n-fixnum-tag-bits))))
+                            (any-reg y)
+                            (immediate
+                             (fixnumize (tn-value y)))
+                            (t
+                             (lsl y n-fixnum-tag-bits))))
             (inst b :vs error))))
     DONE))
 
@@ -3236,6 +3239,7 @@
   (:temporary (:scs (unsigned-reg) :unused-if (atom type)) temp)
   (:arg-refs nil y-ref)
   (:ignore op error)
+  (:check-type y)
   (:generator 2
     (let* ((signed-p (and (typep type '(cons (eql :signed)))
                           (pop type)))
@@ -3287,6 +3291,7 @@
   (:result-types tagged-num)
   (:policy :fast-safe)
   (:vop-var vop)
+  (:check-type x)
   (:generator 2
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
