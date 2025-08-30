@@ -3869,33 +3869,55 @@
           (let ((cast (cast-or-check-bound-type node (specifier-type 'fixnum))))
             (when cast
               `(%primitive sb-vm::overflow-ash-t x y ',(type-specifier cast)))))
-        (give-up-ir1-transform)))
-
-  ;; (the fixnum (ash x -1)) can be inlined
-  (deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
-                     * :node node :important nil)
-    (delay-ir1-transform node :ir1-phases)
-    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
-                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
-          (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
-            (when cast
-              (let* ((result-int (type-approximate-interval result-type))
-                     (shift (lvar-value shift))
-                     (shifted-low (ash (interval-low result-int) (- shift)))
-                     (shifted-high (ash (interval-high result-int) (- shift))))
-                (when (and (typep shifted-low 'sb-vm:signed-word)
-                           (typep shifted-high 'sb-vm:signed-word))
-                  (let ((fixnum-only (and (fixnump shifted-low)
-                                          (fixnump shifted-high))))
-                    (multiple-value-bind (input-low input-high)
-                        (if fixnum-only
-                            (values most-negative-fixnum most-positive-fixnum)
-                            (values (- (expt 2 (1- sb-vm:n-word-bits)))
-                                    (1- (expt 2 (1- sb-vm:n-word-bits)))))
-                      `(truly-the (integer ,(ash input-low shift)
-                                           ,(ash input-high shift))
-                         (%primitive sb-vm::overflow-ash-t-signed x shift ',(type-specifier cast) ,fixnum-only)))))))))
         (give-up-ir1-transform))))
+
+;;; Issue a single type error for the input X and for the output result.
+(sb-xc:defmacro with-signed-word-checked (operator x y cast-type x-type)
+  `(truly-the ,cast-type
+              (block nil
+                (tagbody
+                   (let ((tr (,operator
+                              (if (typep ,x ',x-type)
+                                  (truly-the ,x-type ,x)
+                                  (go error))
+                              ,y)))
+                     (when (typep tr ',cast-type)
+                       (return tr)))
+                 error
+                   (sb-vm::op-not-type2-error ,x ,y '(,cast-type . ,operator))))))
+
+(defmacro signed-word-checked-transform (operator x y type &optional fixnump)
+  `(let ((x-uses (lvar-uses ,x))
+         (test-type (if ,fixnump
+                        'fixnum
+                        'sb-vm:signed-word))
+         (test-ctype (if ,fixnump
+                         (specifier-type 'fixnum)
+                         (specifier-type 'sb-vm:signed-word))))
+     (when (and (cast-p x-uses)
+                (csubtypep test-ctype
+                           (single-value-type (cast-type-to-check x-uses))))
+       (delete-cast x-uses nil))
+     `(with-signed-word-checked ,',operator ,',x ,',y ,(type-specifier ,type) ,test-type)))
+
+;; (the fixnum (ash x -1)) can be inlined
+(deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
+                   * :node node :important nil)
+  (delay-ir1-transform node :ir1-phases)
+  (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                  (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+        (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
+          (when cast
+            (let* ((result-int (type-approximate-interval result-type))
+                   (shift (lvar-value shift))
+                   (shifted-low (ash (interval-low result-int) (- shift)))
+                   (shifted-high (ash (interval-high result-int) (- shift))))
+              (when (and (typep shifted-low 'sb-vm:signed-word)
+                         (typep shifted-high 'sb-vm:signed-word))
+                (let ((fixnum-only (and (fixnump shifted-low)
+                                        (fixnump shifted-high))))
+                  (signed-word-checked-transform ash x shift cast fixnum-only)))))))
+      (give-up-ir1-transform)))
 
 (defun overflow-transform-1 (name x node)
   (unless (node-lvar node)
