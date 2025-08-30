@@ -3885,8 +3885,8 @@
                      (shifted-high (ash (interval-high result-int) (- shift))))
                 (when (and (typep shifted-low 'sb-vm:signed-word)
                            (typep shifted-high 'sb-vm:signed-word))
-                  (let ((fixnum-only (and (typep shifted-low 'fixnum)
-                                          (typep shifted-high 'fixnum))))
+                  (let ((fixnum-only (and (fixnump shifted-low)
+                                          (fixnump shifted-high))))
                     (multiple-value-bind (input-low input-high)
                         (if fixnum-only
                             (values most-negative-fixnum most-positive-fixnum)
