@@ -3485,6 +3485,7 @@ void verify_hash_tables(uintptr_t fix_bad)
 #define REMSET_GLOBAL_MAX 20000
 lispobj permgen_remset[REMSET_GLOBAL_MAX];
 int permgen_remset_count;
+lispobj remset_transfer_list;
 
 static void remset_append1(lispobj x)
 {

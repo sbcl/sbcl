@@ -494,8 +494,6 @@ init_new_thread(struct thread *th,
 #endif
 }
 
-lispobj remset_transfer_list;
-
 static void
 unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
