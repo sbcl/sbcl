@@ -511,6 +511,7 @@
 ;;;; generation of emit functions
 
 (defun compute-temporaries-description (parse)
+  #+sb-show (declare (optimize (debug 1))) ; workaround for something, I don't know what
   (let ((temps (vop-parse-temps parse))
         (element-type '(unsigned-byte 16)))
     (when temps
@@ -531,6 +532,7 @@
         results))))
 
 (defun compute-ref-ordering (parse)
+  #+sb-show (declare (optimize (debug 1))) ; workaround for something, I don't know what
   (let* ((num-args (+ (length (vop-parse-args parse))
                       (if (vop-parse-more-args parse) 1 0)))
          (num-results (+ (length (vop-parse-results parse))

@@ -52,6 +52,9 @@
        ,@(let ((preamble (if (and (stringp (car xlist)) (cdr xlist))
                              (concatenate 'string "/" (pop xlist) " ")
                              "/")))
+           ;; MAPCAN uses (SETF CDR) which results in a warning later in src/code/defsetfs
+           ;; at (DEFSETF CDR %RPLACD) that a full call to #'(SETF CDR) was compiled
+           #+sb-xc (declare (notinline mapcan))
            (mapcan
             (lambda (x)
               (prog1
@@ -96,6 +99,6 @@
     #+sb-xc-host `(/show ,s)
     ;; ensure that fprintf() receives only a SIMPLE-BASE-STRING
     #+(and sb-show (not sb-xc-host))
-    `(%primitive print ,(concatenate 'simple-base-string "/" s))))
+    `(sb-sys:%primitive print ,(concatenate 'simple-base-string "/" s))))
 (defmacro /noshow0 (&rest rest)
   (declare (ignore rest)))

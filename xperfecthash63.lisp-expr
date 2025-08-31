@@ -1648,5 +1648,17 @@
   (let ((b (& val #x1f)))
    (let ((a (>> val 27)))
     (^ a (aref tab b))))))")
+(#(1A 1C 3A 3C 56 58)
+ "(13 29 43 14 30 44)"
+ "((let ((tab #a((4) (unsigned-byte 8) 7 0 2 6)))
+  (let ((b (& (>> val 1) #x3)))
+   (let ((a (>> (<< val 25) 30)))
+    (^ a (aref tab b))))))")
+(#(20 22 40 42 5E 60)
+ "(16 32 47 17 33 48)"
+ "((let ((tab #a((4) (unsigned-byte 8) 0 4 0 2)))
+  (let ((b (>> (<< val 25) 30)))
+   (let ((a (& (>> val 1) #x3)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

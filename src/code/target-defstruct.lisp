@@ -34,6 +34,7 @@
                          (info nil)
                          (bitmap (if info (dd-bitmap info) 0))
                          (invalid :uninitialized))
+  #+sb-show (declare (optimize (debug 1))) ; workaround for something, I don't know what
   (let* ((fixed-words (type-dd-length layout))
          (extra-id-words ; count of additional words needed to store ancestors
           (if (logtest flags +structure-layout-flag+)

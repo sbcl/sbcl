@@ -529,6 +529,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 (defun unix-realpath (path)
   (declare (type unix-pathname path))
+  (declare (optimize (debug 1))) ; see comment in UNIX-WRITE
   (with-alien ((ptr (* char)
                     (alien-funcall (extern-alien
                                     "sb_realpath"
