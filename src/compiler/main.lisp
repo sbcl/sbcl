@@ -1734,8 +1734,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defglobal *compile-elapsed-time* 0) ; nanoseconds
 (defglobal *compile-file-elapsed-time* 0) ; nanoseconds
 (defun get-thread-virtual-time ()
-  #+(and linux (not sb-xc-host)) (sb-unix:clock-gettime sb-unix:clock-thread-cputime-id)
-  #-(and linux (not sb-xc-host)) (values 0 0))
+  #+(and linux sb-devel (not sb-xc-host))
+  (return-from get-thread-virtual-time
+    (sb-unix:clock-gettime sb-unix:clock-thread-cputime-id))
+  (values 0 0))
 
 (defun accumulate-compiler-time (symbol start-sec start-nsec)
   (declare (ignorable symbol start-sec start-nsec))
