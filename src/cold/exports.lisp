@@ -2145,7 +2145,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%FUN-NAME"
 
            "FDEFN" "MAKE-FDEFN" "FDEFN-P" "FDEFN-NAME" "FDEFN-FUN"
-           "FDEFN-MAKUNBOUND"
+           #-linkage-space "FDEFN-MAKUNBOUND" ; tree shaker won't delete an external symbol
            "%COERCE-CALLABLE-TO-FUN"
            "%COERCE-CALLABLE-FOR-CALL"
            "%FUN-POINTER-WIDETAG"

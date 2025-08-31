@@ -93,7 +93,7 @@
   (def make-fdefn)
   (def fdefn-name)
   (def fdefn-fun)
-  (def fdefn-makunbound)
+  #-linkage-space (def fdefn-makunbound)
   (def sb-c::vector-length)
   (def make-array-header (type rank))
   (def code-instructions)
