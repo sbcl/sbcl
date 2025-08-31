@@ -807,3 +807,12 @@
       (logtest -3 (lognot a)))
    ((5) t)
    ((-3) nil)))
+
+(with-test (:name :transform-deleted-casts)
+  (checked-compile-and-assert
+   (:optimize :safe)
+   `(lambda (x y)
+      (declare ((integer 0 30) y))
+      (dpb 3 (byte 2 y) (the (integer * 300) x)))
+   ((400 2) (condition 'type-error))
+   ((300 0) 303)))

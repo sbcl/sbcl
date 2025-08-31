@@ -3283,16 +3283,12 @@
           ((not (csubtypep (lvar-type posn) (specifier-type `(integer 0 (,(- sb-vm:n-fixnum-bits size))))))
            (give-up-ir1-transform))
           ((= (logcount new) size)
-           (let ((uses (lvar-uses int)))
-             ;; Move the cast after the ash for cast-externally-checkable-p to work.
-             (when (cast-p uses)
-               (delete-cast uses)))
+           ;; Move the cast after the ash for cast-externally-checkable-p to work.
+           (delete-lvar-cast-if (specifier-type 'integer) int)
            `(logior (ash new posn)
                     (the integer int)))
           ((zerop new)
-           (let ((uses (lvar-uses int)))
-             (when (cast-p uses)
-               (delete-cast uses)))
+           (delete-lvar-cast-if (specifier-type 'integer) int)
            `(logandc2 int
                       (ash (ldb (byte size 0) -1) posn)))
 
@@ -3887,17 +3883,13 @@
                    (sb-vm::op-not-type2-error ,x ,y '(,cast-type . ,operator))))))
 
 (defmacro signed-word-checked-transform (operator x y type &optional fixnump)
-  `(let ((x-uses (lvar-uses ,x))
-         (test-type (if ,fixnump
+  `(let ((test-type (if ,fixnump
                         'fixnum
                         'sb-vm:signed-word))
          (test-ctype (if ,fixnump
                          (specifier-type 'fixnum)
                          (specifier-type 'sb-vm:signed-word))))
-     (when (and (cast-p x-uses)
-                (csubtypep test-ctype
-                           (single-value-type (cast-type-to-check x-uses))))
-       (delete-cast x-uses nil))
+     (delete-lvar-cast-if test-ctype x)
      `(with-signed-word-checked ,',operator ,',x ,',y ,(type-specifier ,type) ,test-type)))
 
 ;; (the fixnum (ash x -1)) can be inlined
@@ -7364,10 +7356,7 @@
           object))
 
 (deftransform read-char ((&optional stream eof-error-p eof-value recursive-p))
-  (when stream
-    (let ((uses (lvar-uses stream)))
-      (when (cast-p uses)
-        (delete-cast uses))))
+  (delete-lvar-cast-if (specifier-type '(or stream boolean)) stream)
   `(block nil
      (or (and (sb-impl::ansi-stream-p stream)
               (let* ((buffer (sb-impl::ansi-stream-cin-buffer stream))
@@ -7390,10 +7379,7 @@
                               collect var))))))
 
 (deftransform read-byte ((stream &optional eof-error-p eof-value))
-  (when stream
-    (let ((uses (lvar-uses stream)))
-      (when (cast-p uses)
-        (delete-cast uses))))
+  (delete-lvar-cast-if (specifier-type 'stream) stream)
   `(block nil
      (or (and (sb-impl::ansi-stream-p stream)
               (let* ((buffer (ansi-stream-in-buffer stream))
@@ -7416,10 +7402,7 @@
 
 (deftransform peek-char ((&optional peek-type stream eof-error-p eof-value recursive-p)
                          (null &rest t))
-  (when stream
-    (let ((uses (lvar-uses stream)))
-      (when (cast-p uses)
-        (delete-cast uses))))
+  (delete-lvar-cast-if (specifier-type '(or stream boolean)) stream)
   `(or (and (sb-impl::ansi-stream-p stream)
             (let* ((buffer (sb-impl::ansi-stream-cin-buffer stream))
                    (index (ansi-stream-in-index stream)))

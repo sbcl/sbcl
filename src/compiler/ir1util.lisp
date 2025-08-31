@@ -923,6 +923,16 @@
         (t (flush-dest value)
            (unlink-node node))))
 
+(defun delete-lvar-cast-if (type lvar)
+  (when lvar
+    (let ((cast (lvar-uses lvar)))
+      (when (and (cast-p cast)
+                 (csubtypep type
+                            (single-value-type (cast-type-to-check cast)))
+                 (almost-immediately-used-p lvar cast))
+        (delete-cast cast nil)
+        t))))
+
 ;;; Make a CAST and insert it into IR1 before node NEXT.
 
 (defun insert-cast-before (next lvar type policy &optional context)

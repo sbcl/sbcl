@@ -2976,11 +2976,8 @@
         ((and (vop-existsp :named reverse-values-list)
               (lvar-matches (principal-lvar list) :fun-names '(reverse sb-impl::list-reverse))
               (almost-immediately-used-p list (lvar-use list) :flushable t))
-         (let ((cast (lvar-use list)))
-           (when (and (cast-p cast)
-                      (eq (cast-asserted-type cast) (specifier-type 'list)))
-             (delete-cast cast))
-          (splice-fun-args (principal-lvar list) :any 1))
+         (delete-lvar-cast-if (specifier-type 'list) list)
+         (splice-fun-args (principal-lvar list) :any 1)
          `(reverse-values-list list (length (the list list))))
         (t
          (give-up-ir1-transform))))

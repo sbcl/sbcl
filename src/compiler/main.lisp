@@ -511,6 +511,9 @@ necessary, since type inference may take arbitrarily long to converge.")
         (*delayed-ir1-transforms* nil))
     (declare (special *constraint-universe* *delayed-ir1-transforms*))
     (ir1-optimize-phase-1 component)
+    (when *compiler-trace-output*
+      (when (memq :checkgen *compile-trace-targets*)
+        (describe-component component *compiler-trace-output*)))
     (loop while (progn
                   (maybe-mumble "Type ")
                   (generate-type-checks component))

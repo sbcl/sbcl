@@ -322,30 +322,11 @@
                           (when (or (not (types-equal-or-intersect (lvar-type a)
                                                                    #1=(specifier-type '(or ratio (complex rational)))))
                                     (not (types-equal-or-intersect (lvar-type b) #1#)))
-                            (labels ((intersect (type)
-                                       (if (values-type-p type)
-                                           (values-type-intersection type
-                                                                     (specifier-type 'integer))
-                                           (type-intersection type
-                                                              (specifier-type 'integer))))
-                                     (change-cast (lvar)
-                                       (let ((cast (lvar-uses lvar)))
-                                         (when (and (cast-p cast)
-                                                    (not (delay-p cast))
-                                                    (almost-immediately-used-p lvar cast :flushable t))
-                                           (setf (cast-asserted-type cast) (intersect (cast-asserted-type cast)))
-                                           (derive-node-type cast
-                                                             (setf (cast-type-to-check cast)
-                                                                   (intersect (cast-type-to-check cast))))))))
-                              (change-cast a)
-                              (change-cast b)
-
-                              (multiple-value-bind (handled any-change wide)
-                                  (cut-lvar value)
-                                (declare (ignore handled))
-                                (when any-change
-                                  (delete-cast node nil))
-                                (values t t wide)))))))))))
+                            (multiple-value-bind (handled any-change wide) (cut-lvar value)
+                              (declare (ignore handled))
+                              (when any-change
+                                (delete-cast node nil))
+                              (values t t wide))))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled

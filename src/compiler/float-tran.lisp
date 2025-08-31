@@ -22,9 +22,7 @@
   '(%double-float n))
 
 (deftransform float ((n) *)
-  (let ((uses (lvar-uses n)))
-    (when (cast-p uses)
-      (delete-cast uses)))
+  (delete-lvar-cast-if (specifier-type 'real) n)
   `(if (floatp n)
        n
        (%single-float n)))
