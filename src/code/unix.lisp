@@ -342,30 +342,21 @@ corresponds to NAME, or NIL if there is none."
 ;;; length to write. It attempts to write len bytes to the device
 ;;; associated with fd from the buffer starting at offset. It returns
 ;;; the actual number of bytes written.
+;;; If BUF is a string, is does *NOT* undergo external-format encoding.
 (defun unix-write (fd buf offset len)
-  ;; KLUDGE: change 60fa88b187e438cc made this function unusable in cold-init
-  ;; if compiled with #+sb-show (which increases DEBUG to 2) because of
-  ;; full calls to SB-ALIEN-INTERNALS:DEPORT-ALLOC and DEPORT.
-  (declare (optimize (debug 1)))
   (declare (type unix-fd fd)
            (type index offset len))
-  (flet ((%write (sap)
-           (declare (system-area-pointer sap))
-           (type-syscall (#-win32 "write" #+win32 "win32_unix_write"
-                          ssize-t index
-                          int (* char) size-t)
-                         fd
-                         (with-alien ((ptr (* char) sap))
-                           (addr (deref ptr offset)))
-                         (min len
-                              #+(or darwin freebsd)
-                              (1- (expt 2 31))))))
-    (etypecase buf
-      ((simple-array * (*))
-       (with-pinned-objects (buf)
-         (%write (vector-sap buf))))
-      (system-area-pointer
-       (%write buf)))))
+  (declare (type (or (sb-kernel:simple-unboxed-array (*)) system-area-pointer) buf))
+  ;; Pinning unconditionally allows the guts of this function to be relatively
+  ;; straight-line versus an ETYPECASE over two calls to a local function
+  ;; taking a SAP. It's no big deal if BUF is already a SAP.
+  (with-pinned-objects (buf)
+    (type-syscall (#-win32 "write" #+win32 "win32_unix_write"
+                   ssize-t index
+                   int system-area-pointer size-t)
+                  fd
+                  (sap+ (if (system-area-pointer-p buf) buf (vector-sap buf)) offset)
+                  (min len #+(or darwin freebsd) (1- (expt 2 31))))))
 
 ;;; Set up a unix-piping mechanism consisting of an input pipe and an
 ;;; output pipe. Return two values: if no error occurred the first
@@ -529,7 +520,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 (defun unix-realpath (path)
   (declare (type unix-pathname path))
-  (declare (optimize (debug 1))) ; see comment in UNIX-WRITE
+  ;; KLUDGE: change 60fa88b187e438cc made this function unusable in cold-init
+  ;; if compiled with #+sb-show (which increases DEBUG to 2) because of
+  ;; full calls to SB-ALIEN-INTERNALS:DEPORT-ALLOC and DEPORT.
+  (declare (optimize (debug 1)))
   (with-alien ((ptr (* char)
                     (alien-funcall (extern-alien
                                     "sb_realpath"
