@@ -55,8 +55,14 @@
              (values))
             ((:internal :external)
              (when (boundp symbol)
-               (push (cons :symbol-value (symbol-value symbol))
-                     symbol-properties))
+               ;; We could add *FEATURES* to *CL-IGNORABLE-DIFFS* but it's probably
+               ;; better to granularly allow (i.e. ignore) only certain changes
+               (let ((v (symbol-value symbol)))
+                 (push (cons :symbol-value
+                             (if (eq symbol 'cl:*features*)
+                                 (remove :use-host-hash-generator v)
+                                 v))
+                       symbol-properties)))
              (when (fboundp symbol)
                (push (cons :symbol-function (symbol-function symbol))
                      symbol-properties))
