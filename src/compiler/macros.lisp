@@ -293,10 +293,8 @@
 ;;;
 ;;;   :IMPORTANT
 ;;;           - If the transform fails and :IMPORTANT is
-;;;               NIL,       then never print an efficiency note.
-;;;               :SLIGHTLY, then print a note if SPEED>INHIBIT-WARNINGS.
-;;;               T,         then print a note if SPEED>=INHIBIT-WARNINGS.
-;;;             :SLIGHTLY is the default.
+;;;              NIL,       then never print an efficiency note.
+;;;              T, the default, print a note if SPEED>INHIBIT-WARNINGS.
 ;;;   :VOP
 ;;;           - insert it at the front, stop other transforms from firing
 ;;;             if the function returns T.
@@ -305,13 +303,13 @@
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                                     (result-type '*)
                               &key result policy node defun-only
-                                   (important :slightly)
+                                   (important t)
                                    vop
                                    before-vop)
                         &body body-decls-doc)
-  (declare (type (member nil :slightly t) important))
+  (declare (type boolean important))
   (when defun-only
-    (aver (eq important :slightly))     ; can't be specified
+    (aver (eq important t))             ; can't be specified
     (aver (not policy)))                ; has no effect on the defun
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node '#:node))
@@ -368,7 +366,7 @@
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
-                                &key result policy node (important :slightly))
+                                &key result policy node (important t))
                          &body body-decls-doc)
 
   (let ((transform-name (symbolicate (car names) '-transform))

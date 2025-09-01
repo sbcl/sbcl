@@ -1587,9 +1587,8 @@
          (fun (transform-function transform))
          (constrained (fun-type-p type))
          (table (component-failed-optimizations *component-being-compiled*))
-         (flame (case (transform-important transform)
-                  ((t) (policy node (>= speed inhibit-warnings)))
-                  (:slightly (policy node (> speed inhibit-warnings)))))
+         (flame (and (transform-important transform)
+                     (policy node (> speed inhibit-warnings))))
          (*compiler-error-context* node)
          (policy-test (transform-policy transform)))
     (cond ((and policy-test

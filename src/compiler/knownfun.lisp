@@ -33,8 +33,7 @@
   ;; the transformation function. Takes the COMBINATION node and
   ;; returns a lambda expression, or THROWs out.
   (function (missing-arg) :type function)
-  ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
-  (important nil :type (member nil :slightly t))
+  (important nil :type boolean)
   ;; A function with NODE as an argument that checks wheteher the
   ;; transform applies in its policy.
   ;; It used to be checked in the FUNCTION body but it would produce
@@ -70,7 +69,7 @@
 ;;; one with the same type and note.
 ;;; Argument order is: policy constraint, ftype constraint, consequent.
 ;;; (think "qualifiers + specializers -> method")
-(defun %deftransform (name policy type fun &optional (important :slightly))
+(defun %deftransform (name policy type fun &optional (important t))
   (declare (inline make-transform))
   (let* ((ctype (specifier-type type))
          (info (fun-info-or-lose name))
