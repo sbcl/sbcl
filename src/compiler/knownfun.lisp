@@ -69,7 +69,8 @@
 ;;; one with the same type and note.
 ;;; Argument order is: policy constraint, ftype constraint, consequent.
 ;;; (think "qualifiers + specializers -> method")
-(defun %deftransform (name policy type fun &optional (important t))
+(defun %deftransform (name policy type fun &optional (important t)
+                                                     priority)
   (declare (inline make-transform))
   (let* ((ctype (specifier-type type))
          (info (fun-info-or-lose name))
@@ -116,7 +117,9 @@
                                                :important important
                                                :policy policy)))
                 (setf (fun-info-transforms info)
-                      (append (ldiff transforms normal) (list* transform normal))))))))
+                      (if (eq priority :last)
+                          (append transforms (list transform))
+                          (append (ldiff transforms normal) (list* transform normal)))))))))
     name))
 
 ;;; Make a FUN-INFO structure with the specified type, attributes

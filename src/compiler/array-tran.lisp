@@ -2466,6 +2466,26 @@
                                 ,(check-bound-code 'array '(array-total-size array) 'index index)
                                 new-value))))
 
+;;; Change to dedicated variants which will do the right type check, requiring less code.
+(macrolet ((def ()
+             `(progn
+                ,@(loop for (type names) in '((vector (vector-hairy-data-vector-set/check-bounds hairy-data-vector-set/check-bounds
+                                                       vector-hairy-data-vector-ref/check-bounds hairy-data-vector-ref/check-bounds
+                                                       vector-hairy-data-vector-ref hairy-data-vector-ref
+                                                       vector-hairy-data-vector-set hairy-data-vector-set))
+                                              (string (string-hairy-data-vector-set/check-bounds hairy-data-vector-set/check-bounds
+                                                       string-hairy-data-vector-ref/check-bounds hairy-data-vector-ref/check-bounds
+                                                       string-hairy-data-vector-ref hairy-data-vector-ref
+                                                       string-hairy-data-vector-set hairy-data-vector-set)))
+                        append
+                        (loop for (vector hairy) on names by #'cddr
+                              collect
+                              `(deftransform ,hairy ((array &rest args) (,type &rest t) * :node node :important nil :priority :last)
+                                 (delay-ir1-transform node :ir1-phases)
+                                 ;; Not actually transforming preservers the previous efficiency notes
+                                 (change-full-call node ',vector)
+                                 (give-up-ir1-transform)))))))
+  (def))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF/SET
 (deftransform row-major-aref ((array index) * * :node node)

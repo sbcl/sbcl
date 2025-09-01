@@ -264,57 +264,13 @@
                       ;; fixed-args functions do not check their arguments.
                       (not (ir1-attributep (fun-info-attributes (basic-combination-fun-info dest))
                                            fixed-args
-                                           always-translatable)))
-                  ;; The theory is that the type assertion is from a declaration on the
-                  ;; callee, so the callee should be able to do the check. We want to
-                  ;; let the callee do the check, because it is possible that by the
-                  ;; time of call that declaration will be changed and we do not want
-                  ;; to make people recompile all calls to a function when they were
-                  ;; originally compiled with a bad declaration.
-                  ;;
-                  ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
-                  ;; that occur before nodes that can cause observable side effects --
-                  ;; most commonly other non-external casts: so the order in which
-                  ;; possible type errors are signalled matches with the evaluation
-                  ;; order.
-                  ;;
-                  ;; FIXME: We should let more cases be handled by the callee then we
-                  ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
-                  ;; This is not fixable quite here, though, because flow-analysis has
-                  ;; deleted the LVAR of the cast by the time we get here, so there is
-                  ;; no destination. Perhaps we should mark cases inserted by
-                  ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
-                  ;; deemed unreachable?
-                  (cond ((and (lvar-fun-is (basic-combination-fun dest)
-                                           '(hairy-data-vector-set/check-bounds
-                                             hairy-data-vector-ref/check-bounds
-                                             hairy-data-vector-ref
-                                             hairy-data-vector-set))
-                              (eq (car (basic-combination-args dest)) lvar)
-                              (let ((type (single-value-type (cast-type-to-check cast)))
-                                    (fun-name (lvar-fun-name (basic-combination-fun dest) t)))
-                                (cond ((type= (specifier-type 'vector) type)
-                                       (change-full-call dest
-                                                         (getf '(hairy-data-vector-set/check-bounds vector-hairy-data-vector-set/check-bounds
-                                                                 hairy-data-vector-ref/check-bounds vector-hairy-data-vector-ref/check-bounds
-                                                                 hairy-data-vector-ref vector-hairy-data-vector-ref
-                                                                 hairy-data-vector-set vector-hairy-data-vector-set)
-                                                               fun-name)))
-                                      ((type= (specifier-type 'string) type)
-                                       (change-full-call dest
-                                                         (getf '(hairy-data-vector-set/check-bounds string-hairy-data-vector-set/check-bounds
-                                                                 hairy-data-vector-ref/check-bounds string-hairy-data-vector-ref/check-bounds
-                                                                 hairy-data-vector-ref string-hairy-data-vector-ref
-                                                                 hairy-data-vector-set string-hairy-data-vector-set)
-                                                               fun-name)))))))
-                        ((and (policy dest (= debug 3))
-                              (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
-                                (and leaf
-                                     (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
-                         nil)
-                        (t
-                         (values-subtypep (lvar-externally-checkable-type lvar)
-                                          (cast-type-to-check cast))))))
+                                           always-translatable))))
+             (unless (and (policy dest (= debug 3)) ;; don't trust declared types if debug=3
+                          (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
+                            (and leaf
+                                 (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
+               (values-subtypep (lvar-externally-checkable-type lvar)
+                                (cast-type-to-check cast))))
             ;; Turn (the fixnum (the integer x)) into (the fixnum x)
             ((and (cast-p dest)
                   (cast-type-check dest)

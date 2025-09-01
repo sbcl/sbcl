@@ -305,7 +305,8 @@
                               &key result policy node defun-only
                                    (important t)
                                    vop
-                                   before-vop)
+                                   before-vop
+                                   priority)
                         &body body-decls-doc)
   (declare (type boolean important))
   (when defun-only
@@ -358,7 +359,8 @@
                                                        (before-vop
                                                         :before-vop)
                                                        (t
-                                                        important))))))
+                                                        important))
+                                                ,priority))))
             ((eq defun-only 'lambda)
              `(named-lambda ,name ,@stuff))
             (defun-only
