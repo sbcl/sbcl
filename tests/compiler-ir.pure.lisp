@@ -552,7 +552,9 @@
 
 (with-test (:name :modarith-unknown-types)
   (assert (not (ir-full-calls `(lambda (x)
-                                 (logand (+ x 10) 20))))))
+                                 (logand (+ x 10) 20)))))
+  (assert (not (ir-full-calls `(lambda (m x)
+                                 (logand (if m (+ x 3) (- x 2)) 20))))))
 
 (with-test (:name :reoptimize-complement)
   (assert (not (ir-full-calls `(lambda (x)

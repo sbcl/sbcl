@@ -313,20 +313,15 @@
                   ;; and X can only be an integer for that to be true.
                   (when (eq (cast-type-to-check node)
                             (specifier-type 'integer))
-                    (let* ((value (cast-value node))
-                           (combination (lvar-uses value)))
-                      (when (and (lvar-matches value :fun-names '(+ -) :arg-count 2)
+                    (do-uses (combination (cast-value node))
+                      (when (and (combination-matches* '(+ -) '(* *) combination)
                                  (almost-immediately-used-p (node-lvar combination) combination
                                                             :flushable t))
                         (destructuring-bind (a b) (combination-args combination)
                           (when (or (not (types-equal-or-intersect (lvar-type a)
                                                                    #1=(specifier-type '(or ratio (complex rational)))))
                                     (not (types-equal-or-intersect (lvar-type b) #1#)))
-                            (multiple-value-bind (handled any-change wide) (cut-lvar value)
-                              (declare (ignore handled))
-                              (when any-change
-                                (delete-cast node nil))
-                              (values t t wide))))))))))
+                            (cut-node combination)))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled
