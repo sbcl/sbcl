@@ -36,23 +36,6 @@ uword_t STATIC_SPACE_START;
 
 uword_t asm_routines_start, asm_routines_end;
 
-// Return the ALLOCATE_LOW flag or 0 for the hardwired spaces
-// depending on the backend.  Why specify the ALLOCATE_LOW on a non-relocatable
-// mapping? To make the OS tell us an address that it would have been ok with,
-// as well as our code being ok with. Otherwise, we see unhelpful output:
-//  "mmap: wanted 1048576 bytes at 0x50000000, actually mapped at 0x7f75b1f6b000"
-// which could never work as the base of static space on x86-64.
-// Care is needed because not all backends put the small spaces below 2GB.
-// In particular, arm64 has #xF0000000 which is above 2GB but below 4GB.
-// The ALLOCATE_LOW flag means that the limit is 2GB.
-// (See MAP_32BIT in http://man7.org/linux/man-pages/man2/mmap.2.html)
-static const int should_allocate_low =
-#ifdef LISP_FEATURE_X86_64
-    ALLOCATE_LOW;
-#else
-    0;
-#endif
-
 os_vm_address_t undefined_alien_address = 0;
 /* As contrasted with the useless os_vm_page_size which is identical to
  * the constant BACKEND_PAGE_BYTES that we define for various other purposes
@@ -111,7 +94,7 @@ bool allocate_hardwired_spaces(bool hard_failp)
     for (i = 0; i< n_spaces; ++i) {
         if (!preinit_spaces[i].size) continue;
         if (os_alloc_gc_space(preinit_spaces[i].id,
-                              NOT_MOVABLE | should_allocate_low,
+                              NOT_MOVABLE,
                               (os_vm_address_t)preinit_spaces[i].start,
                               preinit_spaces[i].size)) continue;
         if (!hard_failp) return 0; // soft fail. Try again after disabling ASLR
