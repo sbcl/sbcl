@@ -217,6 +217,9 @@
                  (setf (block-reoptimize (node-block node)) t)
                  (reoptimize-component (node-component node) :maybe))
                t)
+             (change-return-type (node type)
+               (setf (node-derived-type node) type)
+               (setf (lvar-%derived-type (node-lvar node)) nil))
              (cut-node (node)
                "Try to cut a node to width. The primary return value is
                 whether we managed to cut (cleverly), and the second whether
@@ -241,10 +244,7 @@
                              (t
                               (change-ref-leaf node (find-constant new-value)
                                                :recklessly t)
-                              (let ((lvar (node-lvar node)))
-                                (setf (lvar-%derived-type lvar)
-                                      (and (lvar-has-single-use-p lvar)
-                                           (make-values-type (list (ctype-of new-value))))))
+                              (change-return-type node (make-values-type (list (ctype-of new-value))))
                               (setf (block-reoptimize (node-block node)) t)
                               (reoptimize-component (node-component node) :maybe)
                               (values t t)))))))
@@ -301,11 +301,10 @@
                                  ;; Can't rely on REOPTIMIZE-NODE, as it may neve get reoptimized.
                                  ;; But the outer functions don't want the type to get
                                  ;; widened and their VOPs may never be applied.
-                                 (setf (node-derived-type node)
-                                       (fun-type-returns (global-ftype (if (eq name t)
-                                                                           fun-name
-                                                                           name))))
-                                 (setf (lvar-%derived-type (node-lvar node)) nil)
+                                 (change-return-type node
+                                                     (fun-type-returns (global-ftype (if (eq name t)
+                                                                                         fun-name
+                                                                                         name))))
                                  (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))
                  (cast
@@ -313,15 +312,20 @@
                   ;; and X can only be an integer for that to be true.
                   (when (eq (cast-type-to-check node)
                             (specifier-type 'integer))
-                    (do-uses (combination (cast-value node))
-                      (when (and (combination-matches* '(+ -) '(* *) combination)
-                                 (almost-immediately-used-p (node-lvar combination) combination
-                                                            :flushable t))
-                        (destructuring-bind (a b) (combination-args combination)
-                          (when (or (not (types-equal-or-intersect (lvar-type a)
-                                                                   #1=(specifier-type '(or ratio (complex rational)))))
-                                    (not (types-equal-or-intersect (lvar-type b) #1#)))
-                            (cut-node combination)))))))))
+                    (let (did-something)
+                      (do-uses (combination (cast-value node))
+                        (when (and (combination-matches* '(+ -) '(* *) combination)
+                                   (almost-immediately-used-p (node-lvar combination) combination
+                                                              :flushable t))
+                          (destructuring-bind (a b) (combination-args combination)
+                            (when (or (not (types-equal-or-intersect (lvar-type a)
+                                                                     #1=(specifier-type '(or ratio (complex rational)))))
+                                      (not (types-equal-or-intersect (lvar-type b) #1#)))
+                              (when (cut-node combination)
+                                (setf did-something t))))))
+                      (when did-something
+                        (change-return-type node (values-specifier-type '(values integer &optional))))
+                      nil)))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled
