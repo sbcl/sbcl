@@ -397,15 +397,15 @@ void create_main_lisp_thread(lispobj function) {
     th->lisp_thread = cons_lisp_thread(th);
 
 #ifndef LISP_FEATURE_WIN32
-    protect_control_stack_hard_guard_page(1, NULL);
+    protect_control_stack_hard_guard_page(1, th);
 #endif
-    protect_binding_stack_hard_guard_page(1, NULL);
-    protect_alien_stack_hard_guard_page(1, NULL);
+    protect_binding_stack_hard_guard_page(1, th);
+    protect_alien_stack_hard_guard_page(1, th);
 #ifndef LISP_FEATURE_WIN32
-    protect_control_stack_guard_page(1, NULL);
+    protect_control_stack_guard_page(1, th);
 #endif
-    protect_binding_stack_guard_page(1, NULL);
-    protect_alien_stack_guard_page(1, NULL);
+    protect_binding_stack_guard_page(1, th);
+    protect_alien_stack_guard_page(1, th);
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
     set_thread_stack(th->control_stack_end);
@@ -459,12 +459,12 @@ init_new_thread(struct thread *th,
 
 #ifndef LISP_FEATURE_WIN32
     if (guardp & GUARD_CONTROL_STACK)
-        protect_control_stack_guard_page(1, NULL);
+        protect_control_stack_guard_page(1, th);
 #endif
     if (guardp & GUARD_BINDING_STACK)
-        protect_binding_stack_guard_page(1, NULL);
+        protect_binding_stack_guard_page(1, th);
     if (guardp & GUARD_ALIEN_STACK)
-        protect_alien_stack_guard_page(1, NULL);
+        protect_alien_stack_guard_page(1, th);
 
     /* Since GC can only know about this thread from the all_threads
      * list and we're just adding this thread to it, there is no

@@ -1748,8 +1748,8 @@ void lower_thread_alien_stack_guard_page(struct thread *th)
 
 void reset_thread_alien_stack_guard_page(struct thread *th)
 {
-    protect_alien_stack_guard_page(1, NULL);
-    protect_alien_stack_return_guard_page(0, NULL);
+    protect_alien_stack_guard_page(1, th);
+    protect_alien_stack_return_guard_page(0, th);
     th->state_word.alien_stack_guard_page_protected = 1;
     fprintf(stderr, "INFO: Alien stack guard page reprotected\n");
 }
@@ -1765,8 +1765,8 @@ void lower_thread_binding_stack_guard_page(struct thread *th)
 
 void reset_thread_binding_stack_guard_page(struct thread *th)
 {
-    protect_binding_stack_guard_page(1, NULL);
-    protect_binding_stack_return_guard_page(0, NULL);
+    protect_binding_stack_guard_page(1, th);
+    protect_binding_stack_return_guard_page(0, th);
     th->state_word.binding_stack_guard_page_protected = 1;
     fprintf(stderr, "INFO: Binding stack guard page reprotected\n");
 }

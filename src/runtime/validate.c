@@ -117,8 +117,6 @@ protect_guard_page(void *page, int protect_p, os_vm_prot_t flags) {
 #define DEF_PROTECT_PAGE(name,page_name,flags)                          \
     void                                                                \
     protect_##name(int protect_p, struct thread *thread) {              \
-        if (!thread)                                                    \
-            thread = get_sb_vm_thread();                      \
         protect_guard_page(page_name(thread), protect_p, flags);        \
     }
 
