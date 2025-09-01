@@ -384,9 +384,7 @@ void create_main_lisp_thread(lispobj function) {
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     pthread_key_create(&ignore_stop_for_gc, 0);
 #endif
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    __attribute__((unused)) lispobj *args = NULL;
-#endif
+
     ASSOCIATE_OS_THREAD(th);
     ASSIGN_CURRENT_THREAD(th);
 #if THREADS_USING_GCSIGNAL && \
@@ -421,7 +419,7 @@ void create_main_lisp_thread(lispobj function) {
      * of the current stack */
 #if !(defined(LISP_FEATURE_WIN32) && !defined(OS_THREAD_STACK)) \
     && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    call_into_lisp_first_time(function,args,0);
+    call_into_lisp_first_time(function, NULL, 0);
 #else
     funcall0(function);
 #endif
