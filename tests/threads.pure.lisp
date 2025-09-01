@@ -445,14 +445,21 @@
           (sleep 0.01)
           (ignore-errors
             (terminate-thread t2))
-          (flet ((safe-join-thread (thread &key timeout)
+          (flet ((safe-join-thread (thread &key timeout
+                                                abort)
                    (assert timeout)
-                   (when (eq :timeout
-                             (join-thread thread
-                                          :timeout timeout
-                                          :default :timeout))
-                     (error "Hang in (join-thread ~A) ?" thread))))
+                   (multiple-value-bind (value problem)
+                       (join-thread thread
+                                    :timeout timeout
+                                    :default :timeout)
+                     (cond (abort
+                            (assert (eq problem :abort)))
+                           (t
+                            (when (eq value :timeout)
+                              (assert (eq problem :timeout))
+                              (error "Hang in (join-thread ~A) ?" thread)))))))
             (safe-join-thread t1 :timeout 60)
+            (safe-join-thread t2 :timeout 60 :abort t)
             (safe-join-thread t3 :timeout 60)))))
     (when (zerop (mod run 60))
       (fresh-line)
