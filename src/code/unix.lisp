@@ -330,9 +330,11 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type index len))
+  (declare (system-area-pointer buf))
+  (declare (inline get-errno))
   (type-syscall (#-win32 "read" #+win32 "win32_unix_read"
                  ssize-t index
-                 int (* char) size-t)
+                 int system-area-pointer size-t)
                 fd buf
                 (min len
                      #+(or darwin freebsd)
@@ -347,6 +349,7 @@ corresponds to NAME, or NIL if there is none."
   (declare (type unix-fd fd)
            (type index offset len))
   (declare (type (or (sb-kernel:simple-unboxed-array (*)) system-area-pointer) buf))
+  (declare (inline get-errno))
   ;; Pinning unconditionally allows the guts of this function to be relatively
   ;; straight-line versus an ETYPECASE over two calls to a local function
   ;; taking a SAP. It's no big deal if BUF is already a SAP.
