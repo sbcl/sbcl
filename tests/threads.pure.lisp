@@ -452,12 +452,11 @@
                        (join-thread thread
                                     :timeout timeout
                                     :default :timeout)
-                     (cond (abort
-                            (assert (eq problem :abort)))
-                           (t
-                            (when (eq value :timeout)
-                              (assert (eq problem :timeout))
-                              (error "Hang in (join-thread ~A) ?" thread)))))))
+                     (unless (and abort
+                                  (eq problem :abort))
+                       (when (eq value :timeout)
+                         (assert (eq problem :timeout))
+                         (error "Hang in (join-thread ~A) ?" thread))))))
             (safe-join-thread t1 :timeout 60)
             (safe-join-thread t2 :timeout 60 :abort t)
             (safe-join-thread t3 :timeout 60)))))
