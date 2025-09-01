@@ -413,9 +413,6 @@ void create_main_lisp_thread(lispobj function) {
     set_thread_stack(th->control_stack_end);
 #endif
 
-#ifdef LISP_FEATURE_PPC64
-    NIL_SYMBOL_SLOTS_START[-1] = (uword_t)gc_card_mark;
-#endif
 #ifdef COLLECT_GC_STATS
     atexit(summarize_gc_stats);
 #endif

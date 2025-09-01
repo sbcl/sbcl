@@ -1094,6 +1094,8 @@ void gc_allocate_ptes()
 #elif defined LISP_FEATURE_PPC64
     unsigned char* mem = checked_malloc(num_gc_cards + LISP_LINKAGE_SPACE_SIZE);
     gc_card_mark = mem + LISP_LINKAGE_SPACE_SIZE;
+    // ppc64-assem loads reg_CARDTABLE from here
+    NIL_SYMBOL_SLOTS_START[-1] = (uword_t)gc_card_mark;
     /* Copy linkage entries from where they were allocated to where they're accessible
      * off the GC card table register using negative indices. */
     memcpy(mem, linkage_space, LISP_LINKAGE_SPACE_SIZE);
