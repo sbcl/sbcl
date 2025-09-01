@@ -329,28 +329,28 @@
                             (f)))))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
 
+(defun count-type-checks (lambda)
+  (count-if (lambda (name)
+              (member name '(sb-c::%type-check-error/c sb-c::%type-check-error)))
+         (ir-calls lambda)
+         :key (lambda (x) (combination-fun-source-name x nil))))
+
 (with-test (:name :instance-constraint-intersection)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (x)
-                         (typecase x
-                           (stream 2)
-                           (hash-table 1))))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+  (assert (zerop (count-type-checks
+                  `(lambda (x)
+                     (typecase x
+                       (stream 2)
+                       (hash-table 1)))))))
 
 (with-test (:name :aref-full-call-no-type-check)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (x)
-                         (aref x 0)))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+  (assert (zerop (count-type-checks
+                  `(lambda (x)
+                     (aref x 0))))))
 
 (with-test (:name :call-full-like-p-constants)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (a b)
-                         (< (truly-the double-float a) b)))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+  (assert (zerop (count-type-checks
+                  `(lambda (a b)
+                     (< (truly-the double-float a) b))))))
 
 (with-test (:name :constant-substitution)
   (let ((calls (ir-calls
@@ -421,21 +421,17 @@
       0)))
 
 (with-test (:name :let-no-typecheck)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (x)
-                         (let ((m (the sequence x)))
-                           (values (length m)
-                                   m))))
-                     :key (lambda (x) (combination-fun-source-name x nil)))))
-  (assert (eql (count 'sb-c::%type-check-error/c
-                      (ir-calls
-                       `(lambda (x l)
-                          (let ((m (the sequence x))
-                                (l (the integer l)))
-                            (values (length m)
-                                    l))))
-                      :key (lambda (x) (combination-fun-source-name x nil)))
+  (assert (zerop (count-type-checks
+                  `(lambda (x)
+                     (let ((m (the sequence x)))
+                       (values (length m)
+                               m))))))
+  (assert (eql (count-type-checks
+                `(lambda (x l)
+                   (let ((m (the sequence x))
+                         (l (the integer l)))
+                     (values (length m)
+                             l))))
                1)))
 
 (with-test (:name :pop-special-once)
@@ -455,36 +451,32 @@
       1)))
 
 (with-test (:name :other-pointer-p)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (x)
-                         (when (and (stringp (truly-the (or simple-string (member #\a)) x))
-                                    (zerop (length x)))
-                           x)))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+  (assert (zerop (count-type-checks
+                  `(lambda (x)
+                     (when (and (stringp (truly-the (or simple-string (member #\a)) x))
+                                (zerop (length x)))
+                       x))))))
 
 (with-test (:name :external-type-checks-across-functions)
-  (assert (not (find 'sb-c::%type-check-error/c
-                     (ir-calls
-                      `(lambda (a b)
-                         (declare (number a b)
-                                  (optimize speed))
-                         (+ a b)))
-                     :key (lambda (x) (combination-fun-source-name x nil))))))
+  (assert (zerop (count-type-checks
+                  `(lambda (a b)
+                     (declare (number a b)
+                              (optimize speed))
+                     (+ a b))))))
 
 (with-test (:name :consecutive-casts)
-  (assert (= (count 'sb-c::%type-check-error/c
-                    (ir-calls
-                     `(lambda (x)
-                        (the fixnum (the integer x))))
-                    :key (lambda (x) (combination-fun-source-name x nil)))
+  (assert (= (count-type-checks
+              `(lambda (x)
+                 (the fixnum (the integer x))))
              1))
-  (assert (= (count 'sb-c::%type-check-error/c
-                    (ir-calls
-                     `(lambda (x)
-                        (logand (the number x) 2)))
-                    :key (lambda (x) (combination-fun-source-name x nil)))
-             0)))
+  (assert (= (count-type-checks
+              `(lambda (x)
+                 (logand (the number x) 2)))
+             0))
+  (assert (= (count-type-checks
+              `(lambda (x)
+                 (the integer (the (real 5) x))))
+             1)))
 
 (with-test (:name :sign-extend)
   (assert (= (count 'sb-c::mask-signed-field
@@ -510,16 +502,12 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
-
 (with-test (:name :optional-type-checks)
-  (assert (= (count 'sb-c::%type-check-error/c
-                    (ir-calls
-                     `(lambda (&optional x y)
-                        (declare (list x))
-                        (values x y)))
-                    :key (lambda (x) (combination-fun-source-name x nil)))
+  (assert (= (count-type-checks
+              `(lambda (&optional x y)
+                 (declare (list x))
+                 (values x y)))
              1)))
-
 
 (with-test (:name :flush-multiple-callables)
   (assert (not (ir-full-calls
