@@ -4105,22 +4105,33 @@
     (let ((shift (- len))
           (mask (1- y-abs))
           (delta (* (signum y) (1- y-abs))))
-      (if (and (plusp y)
-               result
-               (lvar-single-value-p result)
-               (csubtypep (lvar-type result) (specifier-type 'word))
-               (not (csubtypep (lvar-type x)
-                               (make-numeric-type :class 'integer :low 0 :high (- sb-ext:most-positive-word delta)))))
-          ;; Avoid overflowing word-sized arithmetic
-          `(if (= x 0)
-               (values 0 0)
-               (values (1+ (ash (1- x) ,shift)) 0))
-          `(let ((x (+ x ,delta)))
-             ,(if (minusp y)
-                  `(values (ash (- x) ,shift)
-                           (- (- (logand (- x) ,mask)) ,delta))
-                  `(values (ash x ,shift)
-                           (- (logand x ,mask) ,delta))))))))
+      (cond ((and (plusp y)
+                  result
+                  (lvar-single-value-p result)
+                  (csubtypep (lvar-type result) (specifier-type 'word))
+                  (not (csubtypep (lvar-type x)
+                                  (make-numeric-type :class 'integer :low 0 :high (- sb-ext:most-positive-word delta)))))
+             ;; Avoid overflowing word-sized arithmetic
+             `(if (= x 0)
+                  (values 0 0)
+                  (values (1+ (ash (1- x) ,shift)) 0)))
+            ((or (and (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
+                      (not (csubtypep (lvar-type x)
+                                      (make-numeric-type :class 'integer
+                                                         :low (- (expt 2 (1- sb-vm:n-word-bits)))
+                                                         :high (- (1- (expt 2 (1- sb-vm:n-word-bits))) delta)))))
+                 (and (csubtypep (lvar-type x) (specifier-type 'word))
+                      (not (csubtypep (lvar-type x)
+                                      (make-numeric-type :class 'integer :low 0 :high (- sb-ext:most-positive-word delta))))))
+             ;; Transforming to truncate is better
+             (give-up-ir1-transform))
+            (t
+             `(let ((x (+ x ,delta)))
+                ,(if (minusp y)
+                     `(values (ash (- x) ,shift)
+                              (- (- (logand (- x) ,mask)) ,delta))
+                     `(values (ash x ,shift)
+                              (- (logand x ,mask) ,delta)))))))))
 
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
 (deftransform truncate ((x y)
