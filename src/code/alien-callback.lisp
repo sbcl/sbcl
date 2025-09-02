@@ -354,6 +354,9 @@ function value."
                                  nil nil))) ; sigmask + fpu state bits
     (let ((thread (init-thread-local-storage (make-foreign-thread startup-info))))
       (setf (thread-primitive-thread thread) (current-thread-sap-int))
+      ;; set the read-only TID slot
+      (setf (%instance-ref thread (get-dsd-index thread os-tid))
+            (alien-funcall (extern-alien "sb_get_os_thread_id" (function unsigned-int))))
       #-win32
       (setf (thread-os-thread thread)
             (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))

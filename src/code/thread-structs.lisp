@@ -96,6 +96,8 @@ in future versions."
   ;; This value is 0 if the thread is not considered alive, though the pthread
   ;; may be running its termination code (unlinking from all_threads etc)
   (primitive-thread 0 :type sb-vm:word)
+  ;; Caution: the identified thread may have exited by the time you've read this slot
+  (os-tid 0 :type (unsigned-byte 32) :read-only t)
   ;; This is a redundant copy of the pthread identifier from the primitive thread.
   ;; It's needed in the SB-THREAD:THREAD as well because there are valid reasons to
   ;; manipulate the new thread before it has assigned 'th->os_thread = pthread_self()'.

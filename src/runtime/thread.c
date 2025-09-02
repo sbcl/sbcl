@@ -221,7 +221,7 @@ int thread_wait_until_not(int undesired_state,
  * so this works out fine. The pthread ID is not an acceptable substitute.
  * (#+win32 can have WaitOnAddress use an 8-byte value, but we don't)
  */
-static int get_nonzero_tid()
+int sb_get_os_thread_id()
 {
     int tid = sb_GetTID();
 #ifdef LISP_FEATURE_SB_FUTEX
@@ -368,6 +368,9 @@ static lispobj cons_lisp_thread(struct thread* thread)
     return make_lispobj(instance, INSTANCE_POINTER_LOWTAG);
 }
 
+
+#define LISPTHREAD(x) ((struct thread_instance*)INSTANCE(x->lisp_thread))
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -393,8 +396,8 @@ void create_main_lisp_thread(lispobj function) {
     unblock_gc_stop_signal();
 #endif
     link_thread(th);
-    th->os_kernel_tid = get_nonzero_tid();
     th->lisp_thread = cons_lisp_thread(th);
+    LISPTHREAD(th)->os_tid = make_fixnum(sb_get_os_thread_id());
 
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, th);
@@ -429,7 +432,9 @@ void create_main_lisp_thread(lispobj function) {
 
 void sb_posix_after_fork() { // for use by sb-posix:fork
     struct thread* th = get_sb_vm_thread();
-    th->os_kernel_tid = get_nonzero_tid();
+    // There's no reason for a GC to occur, so this use of th->lisp_thread
+    // is OK for precise GC.
+    LISPTHREAD(th)->os_tid = make_fixnum(sb_get_os_thread_id());
 #ifdef LISP_FEATURE_DARWIN
     extern void darwin_reinit();
     darwin_reinit();
@@ -601,6 +606,7 @@ void* new_thread_trampoline(void* arg)
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
+    lispthread->os_tid = make_fixnum(sb_get_os_thread_id());
 
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
@@ -630,7 +636,6 @@ void* new_thread_trampoline(void* arg)
     && !defined LISP_FEATURE_SB_SAFEPOINT
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
-    th->os_kernel_tid = get_nonzero_tid();
     init_new_thread(th, SCRIBBLE, 0);
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
@@ -739,7 +744,6 @@ static void attach_os_thread(init_thread_data *scribble)
     unblock_gc_stop_signal();
 #endif
 
-    th->os_kernel_tid = get_nonzero_tid();
     /* win32: While ASSOCIATE_OS_THREAD performs a relatively expensive DuplicateHandle(),
      * simplicity here is preferable to the complexity entailed by memoizing the handle
      * in a TLS slot and registering a waiter on the foreign thread to close to handle.
@@ -908,7 +912,7 @@ uword_t create_lisp_thread(struct thread* th)
                      CREATE_SUSPENDED, &tid);
     bool success = th->os_thread != 0;
     if (success) {
-        th->os_kernel_tid = tid;
+        LISPTHREAD(th)->os_tid = tid; // new_thread_trampoline does it, so why here too???
         ResumeThread((HANDLE)th->os_thread);
     }
     return success;

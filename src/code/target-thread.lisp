@@ -21,10 +21,7 @@
           with-spinlock))
 
 #+(or linux win32 freebsd darwin openbsd)
-(defmacro my-kernel-thread-id ()
-  `(sb-ext:truly-the
-    (unsigned-byte 32)
-    (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-kernel-tid-slot))))
+(defmacro my-kernel-thread-id () `(thread-os-tid *current-thread*))
 
 ;;; CAS Lock
 ;;;
@@ -2331,18 +2328,6 @@ The default behavior is to use FUNCALL.")
         ;; in the mean time.
         ;; -- DFL
         (setf *thruption-pending* t)))))
-
-#+(or linux win32 freebsd darwin openbsd)
-(progn
-  (declaim (ftype (sfunction (thread) (or null (unsigned-byte 32))) thread-os-tid))
-  (defun thread-os-tid (thread)
-    (if (eq *current-thread* thread)
-        (my-kernel-thread-id)
-        (with-deathlok (thread c-thread)
-          (unless (= c-thread 0)
-            (sap-ref-32 (int-sap c-thread)
-                        (+ (ash sb-vm::thread-os-kernel-tid-slot sb-vm:word-shift)
-                           #+(and 64-bit big-endian) 4)))))))
 
 (defun interrupt-thread (thread function)
   (declare (ignorable thread))
