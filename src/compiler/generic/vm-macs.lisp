@@ -226,7 +226,8 @@
 (defconstant sc-offset-limit (ash 1 21))
 (defconstant sc-offset-bits (integer-length (1- sc-offset-limit)))
 (deftype sc-offset () `(integer 0 (,sc-offset-limit)))
-(deftype sc-offset-immediate () `(signed-byte 22))
+(deftype sc-offset-immediate () `(integer ,(- 1 (ash 1 21)) ;; it's stored as sign-magnitude
+                                          ,(1- (ash 1 21))))
 
 (defconstant finite-sc-offset-limit
   #-(or sparc) 32
