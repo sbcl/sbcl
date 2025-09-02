@@ -3868,21 +3868,23 @@
         (give-up-ir1-transform))))
 
 ;;; Issue a single type error for the input X and for the output result.
-(sb-xc:defmacro with-signed-word-checked (operator x y cast-type x-type)
-  `(truly-the ,cast-type
-              (block nil
-                (tagbody
-                   (let ((tr (,operator
-                              (if (typep ,x ',x-type)
-                                  (truly-the ,x-type ,x)
-                                  (go error))
-                              ,y)))
-                     (when (typep tr ',cast-type)
-                       (return tr)))
-                 error
-                   (sb-vm::op-not-type2-error ,x ,y '(,cast-type . ,operator))))))
+(sb-xc:defmacro with-signed-word-checked (operator x y cast-type x-type values)
+  (let ((values (make-gensym-list values)))
+   `(truly-the ,cast-type
+               (block nil
+                 (tagbody
+                    (multiple-value-bind ,values
+                        (,operator
+                         (if (typep ,x ',x-type)
+                             (truly-the ,x-type ,x)
+                             (go error))
+                         ,y)
+                      (when (typep ,(car values) ',cast-type)
+                        (return (values ,@values))))
+                  error
+                    (sb-vm::op-not-type2-error ,x ,y '(,cast-type . ,operator)))))))
 
-(defmacro signed-word-checked-transform (operator x y type &optional fixnump)
+(defmacro signed-word-checked-transform (operator x y type &optional fixnump (values 1))
   `(let ((test-type (if ,fixnump
                         'fixnum
                         'sb-vm:signed-word))
@@ -3890,16 +3892,16 @@
                          (specifier-type 'fixnum)
                          (specifier-type 'sb-vm:signed-word))))
      (delete-lvar-cast-if test-ctype x)
-     `(with-signed-word-checked ,',operator ,',x ,',y ,(type-specifier ,type) ,test-type)))
+     `(with-signed-word-checked ,',operator ,',x ,',y ,(type-specifier ,type) ,test-type ,',values)))
 
 ;; (the fixnum (ash x -1)) can be inlined
 (deftransform ash ((x shift) (t (constant-arg (integer #.(- 1 sb-vm:n-word-bits) -1)))
-                   * :node node :important nil)
-  (delay-ir1-transform node :ir1-phases)
+                   * :node node :important nil :priority :last)
   (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
                   (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
         (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
           (when cast
+            (delay-ir1-transform node :constraint)
             (let* ((result-int (type-approximate-interval result-type))
                    (shift (lvar-value shift))
                    (shifted-low (ash (interval-low result-int) (- shift)))
@@ -3910,6 +3912,34 @@
                                         (fixnump shifted-high))))
                   (signed-word-checked-transform ash x shift cast fixnum-only)))))))
       (give-up-ir1-transform)))
+
+;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
+(make-defs (($fun truncate floor ceiling))
+  (deftransform $fun ((x y) (integer fixnum)
+                      * :node node :priority :last)
+    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (block nil
+            (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
+              (when cast
+                (delay-ir1-transform node :constraint)
+                (let* ((result-int (type-approximate-interval result-type))
+                       (y-int (type-approximate-interval (lvar-type y)))
+                       (r-low (interval-low result-int))
+                       (r-high (interval-high result-int))
+                       (y-low (interval-low y-int))
+                       (y-high (interval-high y-int))
+                       (low (min (* r-low y-low) (* r-low y-high)
+                                 (* r-high y-low) (* r-high y-high)))
+                       (high (max (* r-low y-low) (* r-low y-high)
+                                  (* r-high y-low) (* r-high y-high))))
+                  (when (and (typep low 'sb-vm:signed-word)
+                             (typep high 'sb-vm:signed-word))
+                    (let ((fixnum-only (and (fixnump low)
+                                            (fixnump high))))
+                      (break)
+                      (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
+        (give-up-ir1-transform))))
 
 (defun overflow-transform-1 (name x node)
   (unless (node-lvar node)
