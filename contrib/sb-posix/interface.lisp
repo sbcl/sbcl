@@ -361,9 +361,8 @@
     "Forks the current process, returning 0 in the new process and the PID of
 the child process in the parent. Forking while multiple threads are running is
 not supported."
-    ;; It would be easy enough to to allow fork in multithreaded code - we'd need the new
-    ;; process to set *ALL-THREADS* to contain only one thread, and unmap other threads'
-    ;; stack to avoid a memory leak. The tricky part would be adhering the the POSIX caveats.
+    ;; Supporting fork in multithreaded code is not worth the hassle, as users would
+    ;; be prone to violating the constraints of the various operating systems:
     ;; Linux:
     ;;   After a fork() in a multithreaded program, the child can safely call only async-signal-safe
     ;;   functions (see signal-safety(7)) until such time as it calls execve(2).
