@@ -21,11 +21,20 @@
 (deftransform float ((n f) (t double-float) *)
   '(%double-float n))
 
-(deftransform float ((n) *)
+(deftransform float ((n) * * :node node)
+  ;; ;; Run after constraint propagation or deleting the cast might lead
+  ;; ;; to the second if leg to conclude N is not a real and issue a warning.
+  (delay-ir1-transform node :ir1-phases)
   (delete-lvar-cast-if (specifier-type 'real) n)
   `(if (floatp n)
-       n
+       (truly-the float n)
        (%single-float n)))
+
+(deftransform float ((n) (float))
+  'n)
+
+(deftransform float ((n) ((and real (not double-float))))
+  `(%single-float n))
 
 (deftransform %single-float ((n) (single-float) * :important nil)
   'n)
