@@ -49,6 +49,9 @@
 #if defined __DragonFly__
 #include <sys/lwp.h>
 lwpid_t sb_GetTID() { return lwp_gettid(); }
+#elif defined __NetBSD__
+#include <lwp.h>
+int sb_GetTID() { return _lwp_self(); }
 #elif defined __FreeBSD__
 #include <sys/thr.h>
 int sb_GetTID()
