@@ -18,7 +18,6 @@ extern void lose(char *fmt, ...)
  __attribute__((format(printf,1,2))) // clang and gcc support this, MSVC doesn't
 #endif
  never_returns;
-extern void tprintf(char *fmt, ...);
 extern int lose_on_corruption_p;
 extern void corruption_warning_and_maybe_lose(char *fmt, ...);
 extern void corruption_warning(char *fmt, ...);
