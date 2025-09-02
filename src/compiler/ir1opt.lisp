@@ -3145,6 +3145,10 @@
                       (lambda (dummy) `(list ,dummy))
                       (lambda (dummy) `(multiple-value-call #'list ,dummy)))))
 
+               (when (typep context '(cons (eql :restart)))
+                 ;; FIXME: Can't restart because the error calls do not return.
+                 (pop context))
+
                (filter-lvar
                 (cast-value cast)
                 (if (cast-silent-conflict cast)
