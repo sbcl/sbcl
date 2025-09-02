@@ -1660,24 +1660,34 @@
 
 ;;; Wait for the next component-reoptimize-counter
 (defun delay-ir1-optimizer (node reason)
-  (let ((delayed (basic-combination-delay-to node))
-        (component *component-being-compiled*))
+  (let* ((delayed (basic-combination-delay-to node))
+         (delayed-n (ash delayed -1))
+         (component *component-being-compiled*)
+         (reoptimize-counter (component-reoptimize-counter component))
+         (phase-counter (component-phase-counter component)))
     (aver (eq component (node-component node)))
     (ecase reason
       (:constraint
-       (let ((counter (component-reoptimize-counter component)))
-         (cond ((= delayed -1)
-                (push node *ir1-transforms-after-constraints*)
-                (setf (basic-combination-delay-to node) counter)
-                t)
-               ((= delayed counter)))))
+       (cond ((> phase-counter 0)
+              ;; There will be no more constraint-propagate
+              nil)
+             ((or (= delayed-n -1)
+                  (logbitp 0 delayed)) ;; delayed to :ir1-phases but :constraint takes priority
+              (push node *ir1-transforms-after-constraints*)
+              (setf (basic-combination-delay-to node)
+                    ;; Disambiguate by having different low bits
+                    (logand most-positive-fixnum (ash reoptimize-counter 1)))
+              t)
+             ((= delayed-n reoptimize-counter))))
       (:ir1-phases
-       (let ((counter (component-phase-counter component)))
-         (cond ((= delayed -1)
-                (push node *ir1-transforms-after-ir1-phases*)
-                (setf (basic-combination-delay-to node) counter)
-                t)
-               ((= delayed counter))))))))
+       (cond ((and (not (logbitp 0 delayed))
+                   (= delayed-n reoptimize-counter))) ;; already delayed to :constraint
+             ((= delayed -1)
+              (push node *ir1-transforms-after-ir1-phases*)
+              (setf (basic-combination-delay-to node)
+                    (logand most-positive-fixnum (1+ (ash phase-counter 1))))
+              t)
+             ((= delayed-n phase-counter)))))))
 
 (defun delay-ir1-transform (node reason)
   (when (delay-ir1-optimizer node reason)

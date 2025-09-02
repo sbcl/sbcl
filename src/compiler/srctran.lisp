@@ -3937,7 +3937,6 @@
                              (typep high 'sb-vm:signed-word))
                     (let ((fixnum-only (and (fixnump low)
                                             (fixnump high))))
-                      (break)
                       (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
         (give-up-ir1-transform))))
 
