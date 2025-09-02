@@ -370,6 +370,11 @@ static lispobj cons_lisp_thread(struct thread* thread)
 
 
 #define LISPTHREAD(x) ((struct thread_instance*)INSTANCE(x->lisp_thread))
+#ifdef LISP_FEATURE_64_BIT
+#  define SET_LISPTHREAD_TID(x) x->os_tid = make_fixnum(sb_get_os_thread_id())
+#else // it's a raw slot
+#  define SET_LISPTHREAD_TID(x) x->uw_os_tid = sb_get_os_thread_id()
+#endif
 
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
@@ -397,7 +402,7 @@ void create_main_lisp_thread(lispobj function) {
 #endif
     link_thread(th);
     th->lisp_thread = cons_lisp_thread(th);
-    LISPTHREAD(th)->os_tid = make_fixnum(sb_get_os_thread_id());
+    SET_LISPTHREAD_TID(LISPTHREAD(th));
 
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, th);
@@ -434,7 +439,7 @@ void sb_posix_after_fork() { // for use by sb-posix:fork
     struct thread* th = get_sb_vm_thread();
     // There's no reason for a GC to occur, so this use of th->lisp_thread
     // is OK for precise GC.
-    LISPTHREAD(th)->os_tid = make_fixnum(sb_get_os_thread_id());
+    SET_LISPTHREAD_TID(LISPTHREAD(th));
 #ifdef LISP_FEATURE_DARWIN
     extern void darwin_reinit();
     darwin_reinit();
@@ -606,7 +611,7 @@ void* new_thread_trampoline(void* arg)
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
-    lispthread->os_tid = make_fixnum(sb_get_os_thread_id());
+    SET_LISPTHREAD_TID(lispthread);
 
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
