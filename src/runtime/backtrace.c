@@ -838,9 +838,14 @@ void libunwind_bt_from_sigcontext(void* context)
     } while (unw_step(&cursor));
 }
 
+#ifdef LISP_FEATURE_64_BIT
+# define unfixnumize_tid(thread) x->os_tid
+#else
+# define unfixnumize_tid(thread) fixnum_value(x->os_tid)
+#endif
 void perform_backtrace(struct thread *th, os_context_t* context, FILE* f)
 {
-    fprintf(f, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
+    fprintf(f, "Lisp thread @ %p, tid %d", th, unfixnumize_tid(LISPTHREAD(th)));
     // the TLS area is not used if #-sb-thread. And if so, it must be "main thread"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->_name != NIL) {

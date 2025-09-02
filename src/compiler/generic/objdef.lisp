@@ -535,7 +535,6 @@ during backtrace.
   ;; for any system that we care about.
   (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
                      #-(or win32 (not sb-thread)) "pthread_t")
-  (os-kernel-tid) ; the kernel's thread identifier, 32 bits on linux
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
