@@ -912,7 +912,6 @@ uword_t create_lisp_thread(struct thread* th)
                      CREATE_SUSPENDED, &tid);
     bool success = th->os_thread != 0;
     if (success) {
-        LISPTHREAD(th)->os_tid = tid; // new_thread_trampoline does it, so why here too???
         ResumeThread((HANDLE)th->os_thread);
     }
     return success;
