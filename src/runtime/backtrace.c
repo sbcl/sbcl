@@ -839,9 +839,9 @@ void libunwind_bt_from_sigcontext(void* context)
 }
 
 #ifdef LISP_FEATURE_64_BIT
-# define unfixnumize_tid(thread) x->os_tid
-#else
-# define unfixnumize_tid(thread) fixnum_value(x->os_tid)
+# define unfixnumize_tid(thread) fixnum_value(thread->os_tid)
+#else // stored as raw 32-bit integer
+# define unfixnumize_tid(thread) thread->os_tid
 #endif
 void perform_backtrace(struct thread *th, os_context_t* context, FILE* f)
 {
