@@ -3913,33 +3913,6 @@
                   (signed-word-checked-transform ash x shift cast fixnum-only)))))))
       (give-up-ir1-transform)))
 
-;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
-(make-defs (($fun truncate floor ceiling))
-  (deftransform $fun ((x y) (integer fixnum)
-                      * :node node :priority :last)
-    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
-                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
-          (block nil
-            (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
-              (when cast
-                (delay-ir1-transform node :constraint)
-                (let* ((result-int (type-approximate-interval result-type))
-                       (y-int (type-approximate-interval (lvar-type y)))
-                       (r-low (interval-low result-int))
-                       (r-high (interval-high result-int))
-                       (y-low (interval-low y-int))
-                       (y-high (interval-high y-int))
-                       (low (min (* r-low y-low) (* r-low y-high)
-                                 (* r-high y-low) (* r-high y-high)))
-                       (high (max (* r-low y-low) (* r-low y-high)
-                                  (* r-high y-low) (* r-high y-high))))
-                  (when (and (typep low 'sb-vm:signed-word)
-                             (typep high 'sb-vm:signed-word))
-                    (let ((fixnum-only (and (fixnump low)
-                                            (fixnump high))))
-                      (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
-        (give-up-ir1-transform))))
-
 (defun overflow-transform-1 (name x node)
   (unless (node-lvar node)
     (give-up-ir1-transform))
@@ -4002,6 +3975,7 @@
                                always (subp arg param)))))))
 
 (deftransform floor ((number divisor) (integer integer) * :node node)
+  (delay-ir1-transform node :constraint)
   (let ((truncate-type (truncate-derive-type-optimizer node)))
     (if (template-translates 'truncate (combination-args node) (single-value-type truncate-type))
         (let* ((rem-int (type-approximate-interval (lvar-type divisor)))
@@ -4104,13 +4078,14 @@
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
 ;;; remainder.
-(deftransform floor ((x y) (integer (constant-arg integer)) *)
+(deftransform floor ((x y) (integer (constant-arg integer)) * :node node)
   "convert division by 2^k to shift"
   (let* ((y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
+    (delay-ir1-transform node :constraint)
     (let ((shift (- len))
           (mask (1- y-abs)))
       (if (minusp y)
@@ -4126,7 +4101,7 @@
          (len (1- (integer-length y-abs))))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
-    (delay-ir1-optimizer node :constraint)
+    (delay-ir1-transform node :constraint)
     (let ((shift (- len))
           (mask (1- y-abs))
           (delta (* (signum y) (1- y-abs))))
@@ -4201,6 +4176,32 @@
     (let ((var (ok-lvar-lambda-var y gen)))
       (when var
         (list (list 'typep var (specifier-type '(eql 0)) t))))))
+
+;;; (the fixnum (truncate integer 2)) can work with a signed-word X.
+(make-defs (($fun truncate floor ceiling))
+  (deftransform $fun ((x y) (integer fixnum) * :node node)
+    (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                    (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+          (block nil
+            (multiple-value-bind (cast result-type) (cast-or-check-bound-type node (specifier-type 'fixnum))
+              (when cast
+                (delay-ir1-transform node :constraint)
+                (let* ((result-int (type-approximate-interval result-type))
+                       (y-int (type-approximate-interval (lvar-type y)))
+                       (r-low (interval-low result-int))
+                       (r-high (interval-high result-int))
+                       (y-low (interval-low y-int))
+                       (y-high (interval-high y-int))
+                       (low (min (* r-low y-low) (* r-low y-high)
+                                 (* r-high y-low) (* r-high y-high)))
+                       (high (max (* r-low y-low) (* r-low y-high)
+                                  (* r-high y-low) (* r-high y-high))))
+                  (when (and (typep low 'sb-vm:signed-word)
+                             (typep high 'sb-vm:signed-word))
+                    (let ((fixnum-only (and (fixnump low)
+                                            (fixnump high))))
+                      (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
+        (give-up-ir1-transform))))
 
 (defoptimizer (/ constraint-propagate)
     ((x y) node gen)
