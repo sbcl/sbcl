@@ -355,7 +355,7 @@
   (:args (value :scs (any-reg descriptor-reg) :to :save))
   (:arg-refs value-ref)
   (:info target not-p flags)
-  (:results (r :scs (signed-reg)))
+  (:results (r :scs (unsigned-reg signed-reg)))
   (:result-types signed-num)
   (:translate)
   (:generator 10
