@@ -296,6 +296,39 @@
                       (* (maybe-truncate dx g2)
                          (maybe-truncate dy g1))))))))
 
+(defun *-by-fixnum-to-fixnum (n f)
+  (declare (explicit-check n))
+  (flet ((err ()
+           (the fixnum (two-arg-* n f))
+           (sb-impl::unreachable)))
+    (typecase n
+      (ratio
+       (if (= f 0)
+           0
+           (let ((num (numerator n))
+                 (den (denominator n)))
+             (if (and (typep num 'fixnum)
+                      (typep den 'fixnum))
+                 (multiple-value-bind (q r) (truncate f den)
+                   (if (zerop r)
+                       (the fixnum (* q num))
+                       (err)))
+                 (err)))))
+      (bignum
+       (if (= f 0)
+           0
+           (if (and (typep n 'sb-vm:signed-word)
+                    (= f -1)
+                    (= n (- most-negative-fixnum)))
+               most-negative-fixnum
+               (err))))
+      ((complex rational)
+       (if (= f 0)
+           0
+           (err)))
+      (t
+       (err)))))
+
 (defun %negate (n)
   (declare (explicit-check))
   (number-dispatch ((n number))

@@ -69,14 +69,18 @@
                                                         (error "~a => ~a /= ~a" (list* lambda args) c result)
                                                         (let ((x (type-error-datum c))
                                                               (type (type-error-expected-type c)))
-                                                          (cond ((not (equal type result-type))
-                                                                 (error "~a => type error ~a /= ~a" (list* lambda args)
-                                                                        c
-                                                                        result-type))
-                                                                ((not (eql x result))
-                                                                 (error "~a => type error ~a /= ~a" (list* lambda args)
-                                                                        c
-                                                                        x))))))
+                                                          (cond 
+                                                            ((not (or (equal type result-type)
+                                                                      (and (eq op '*)
+                                                                           ;; Some transforms are not too careful about their errors
+                                                                           (subtypep result-type type))))
+                                                             (error "~a => type error ~a /= ~a" (list* lambda args)
+                                                                    c
+                                                                    result-type))
+                                                            ((not (eql x result))
+                                                             (error "~a => type error ~a /= ~a" (list* lambda args)
+                                                                    c
+                                                                    x))))))
                                                   (error (c)
                                                     (error "~a => type error ~a /= ~a" (list* lambda args)
                                                            c

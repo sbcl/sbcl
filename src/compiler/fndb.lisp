@@ -245,6 +245,10 @@
   (number number) number
   (no-verify-arg-count))
 
+(defknown (*-by-fixnum-to-fixnum)
+  (number fixnum) fixnum
+  (no-verify-arg-count))
+
 (defknown sb-kernel::integer-/-integer
   (integer integer) rational
   (no-verify-arg-count unsafely-flushable))

@@ -1937,6 +1937,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "ODD-KEY-ARGS-ERROR" "OUTPUT-OBJECT" "OUTPUT-UGLY-OBJECT"
            "OVERFLOW*" "OVERFLOW+" "OVERFLOW-"
            "OVERFLOW-ASH" "OVERFLOW-NEGATE"
+           "*-BY-FIXNUM-TO-FIXNUM"
            "PACKAGE-DESIGNATOR" "PACKAGE-DOC-STRING"
            "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"
            "PARSE-UNKNOWN-TYPE"
