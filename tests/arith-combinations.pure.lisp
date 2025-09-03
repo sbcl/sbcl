@@ -69,7 +69,7 @@
                                                         (error "~a => ~a /= ~a" (list* lambda args) c result)
                                                         (let ((x (type-error-datum c))
                                                               (type (type-error-expected-type c)))
-                                                          (cond 
+                                                          (cond
                                                             ((not (or (equal type result-type)
                                                                       (and (eq op '*)
                                                                            ;; Some transforms are not too careful about their errors

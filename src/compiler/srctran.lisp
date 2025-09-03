@@ -3922,7 +3922,7 @@
           (multiple-value-bind (cast) (cast-or-check-bound-type node (specifier-type 'fixnum))
             (when cast
               (cond ((csubtypep (lvar-type x) (specifier-type 'integer))
-                     (delay-ir1-transform node :constraint)
+                     (delay-ir1-transform node :ir1-phases)
                      (if (and
                           (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0))))
                           (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql #.(- most-negative-fixnum)))))
@@ -3942,6 +3942,35 @@
 
 (deftransform * ((y x) (fixnum t) * :node node :priority :last)
   (unknown-*-transform x y node))
+
+(deftransform * ((x y) (t t) * :node node :priority :last)
+  (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+                  (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
+                  (csubtypep (lvar-type x) (specifier-type '(or complex float)))
+                  (csubtypep (lvar-type y) (specifier-type 'word))
+                  (csubtypep (lvar-type y) (specifier-type 'sb-vm:signed-word))
+                  (csubtypep (lvar-type y) (specifier-type '(or complex float))))
+        (block nil
+          (multiple-value-bind (cast) (cast-or-check-bound-type node (specifier-type 'fixnum))
+            (when cast
+              (cond ((and (csubtypep (lvar-type x) (specifier-type '(and integer (not (member 0 -1)))))
+                          (csubtypep (lvar-type y) (specifier-type '(and integer (not (member 0 -1))))))
+                     (delay-ir1-transform node :constraint)
+                     `(* (the fixnum x) (the fixnum y)))
+                    ((and (csubtypep (lvar-type x) (specifier-type 'integer))
+                          (csubtypep (lvar-type y) (specifier-type 'integer)))
+                     (delay-ir1-transform node :constraint)
+                     `(* (the sb-vm:signed-word x) (the sb-vm:signed-word y)))
+                    (t
+                     (delay-ir1-transform node :ir1-phases)
+                     (delete-lvar-cast-if (specifier-type 'number) y)
+                     (delete-lvar-cast-if (specifier-type 'number) x)
+                     `(if (and (typep x 'fixnum)
+                               (typep y 'fixnum))
+                          (* (truly-the fixnum x)
+                             (truly-the fixnum y))
+                          (two-arg-* x y))))))))
+      (give-up-ir1-transform)))
 
 (defun overflow-transform-1 (name x node)
   (unless (node-lvar node)

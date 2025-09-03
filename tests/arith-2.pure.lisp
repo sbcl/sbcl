@@ -862,4 +862,7 @@
                                        (the fixnum (* y x))))))
   (assert (equal (ctu:ir1-named-calls `(lambda (x)
                                          (the fixnum (* x 2))))
-                 '(sb-kernel:*-by-fixnum-to-fixnum))))
+                 '(sb-kernel:*-by-fixnum-to-fixnum)))
+  (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                       (declare (integer x y))
+                                       (the fixnum (* x y)))))))
