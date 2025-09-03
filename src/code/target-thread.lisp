@@ -1898,30 +1898,29 @@ session."
       ;; there is no real harm in reading the memory.  In this state the pthread library
       ;; will usually return ESRCH if you try to use the pthread id - it's a valid
       ;; pointer, but it knows that it has no underlying OS thread.
-      (with-deathlok (thread)
-        (when sem ; ordinary lisp thread, not FOREIGN-THREAD
-          (setf (thread-startup-info thread) c-thread))
-        ;; Accept no further interruptions. Other threads can't add new ones to the queue
-        ;; as doing so requires grabbing the per-thread mutex which we currently own.
-        ;; Deferrable signals are masked at this point, but it is best to tidy up
-        ;; any stray data such as captured closure values.
-        (setf (thread-interruptions thread) nil
-              (thread-primitive-thread thread) 0)
-        (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
-                         (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
-              0)
-        ;; Take ownership of our statistical profiling data and transfer the results to
-        ;; the global pool. This doesn't need to synchronize with the signal handler,
-        ;; which is effectively disabled now, but does synchronize via THREAD-STORAGE-LOCK
-        ;; with any other thread trying to read this thread's data.
-        (let ((sprof-data (sb-vm::current-thread-offset-sap sb-vm:thread-sprof-data-slot)))
-          (unless (= (sap-int sprof-data) 0)
-            (setf (sap-ref-word (descriptor-sap c-thread)
-                                (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
-                  0)
-            ;; Operation on the global list must be atomic.
-            (sb-ext:atomic-push (cons sprof-data thread) *sprof-data*)))
-        (barrier (:write)))
+      (let ((sprof-data
+             (with-deathlok (thread)
+               (when sem ; ordinary lisp thread, not FOREIGN-THREAD
+                 (setf (thread-startup-info thread) c-thread))
+               ;; Accept no further interruptions. Other threads can't add new ones to the queue
+               ;; as doing so requires grabbing the per-thread mutex which we currently own.
+               ;; Deferrable signals are masked at this point, but it is best to tidy up
+               ;; any stray data such as captured closure values.
+               (setf (thread-interruptions thread) nil
+                     (thread-primitive-thread thread) 0)
+               (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
+                                (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
+                     0)
+               ;; Take ownership of sb-sprof profile, and nullify the data slot.
+               ;; This doesn't need to synchronize with the signal handler, which is
+               ;; effectively disabled now, but does synchronize via THREAD-STORAGE-LOCK
+               ;; with any other thread trying to read this thread's data.
+               (shiftf (sap-ref-word (descriptor-sap c-thread)
+                                     (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
+                       0))))
+        ;; Atomically transfer sprof results to the global pool.
+        (when (/= sprof-data 0)
+          (sb-ext:atomic-push (cons (int-sap sprof-data) thread) *sprof-data*)))
       ;; After making the thread dead, remove from session. If this were done first,
       ;; we'd just waste time moving the thread into SESSION-THREADS (if it wasn't there)
       ;; only to remove it right away.

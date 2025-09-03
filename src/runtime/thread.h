@@ -335,6 +335,7 @@ extern int sb_GetTID();
 # define THREAD_ID_LABEL " pthread %p"
 # define THREAD_ID_VALUE ((void*)pthread_self())
 #endif
+#define LISPTHREAD(x) ((struct thread_instance*)INSTANCE(x->lisp_thread))
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 #define THREAD_JIT_WP(x) pthread_jit_write_protect_np((x))

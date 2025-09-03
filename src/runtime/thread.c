@@ -368,8 +368,6 @@ static lispobj cons_lisp_thread(struct thread* thread)
     return make_lispobj(instance, INSTANCE_POINTER_LOWTAG);
 }
 
-
-#define LISPTHREAD(x) ((struct thread_instance*)INSTANCE(x->lisp_thread))
 #ifdef LISP_FEATURE_64_BIT
 #  define SET_LISPTHREAD_TID(x) x->os_tid = make_fixnum(sb_get_os_thread_id())
 #else // it's a raw slot
