@@ -473,6 +473,10 @@
   (annotate-ordinary-lvar (set-value node))
   (values))
 
+(defoptimizer (%%primitive ltn-annotate) ((template &rest args) node)
+  (ltn-default-call node)
+  (setf (basic-combination-info node) (lvar-value template)))
+
 ;;; If the only use of the TEST lvar is a combination annotated with a
 ;;; conditional template, then don't annotate the lvar so that IR2
 ;;; conversion knows not to emit any code, otherwise annotate as an

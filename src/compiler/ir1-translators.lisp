@@ -505,14 +505,13 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
                nargs
                min)))
 
-    (when (template-conditional-p template)
-      (bug "%PRIMITIVE was used with a conditional template."))
-
     (when (template-more-results-type template)
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-                 `(%%primitive ',template ,@args))))
+                 (if (template-conditional-p template)
+                     `(if (%%primitive ',template ,@args) t nil)
+                     `(%%primitive ',template ,@args)))))
 
 (defmacro inline-%primitive (template &rest args)
   (let* ((required (length (template-arg-types template)))
