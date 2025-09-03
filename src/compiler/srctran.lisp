@@ -4593,10 +4593,15 @@
                          (specifier-type 'sb-vm:signed-word))
               (eq (lvar-type y) (specifier-type '(eql 0))))
       (give-up-ir1-transform))
-    `(if (and (= y -1)
-              (= x ,(- #1=(expt 2 (1- sb-vm:n-word-bits)))))
-         (values ,#1# 0)
-         (truly-the sb-vm:signed-word ($fun x y)))))
+    (let ((cast (cast-or-check-bound-type node (specifier-type 'sb-vm:signed-word))))
+      `(if (and (= y -1)
+                (= x ,(- #1=(expt 2 (1- sb-vm:n-word-bits)))))
+           ;; Insert a seprate error call otherwise the result will
+           ;; have to be boxed because this value is an unsigned word.
+           ,(if cast
+                (internal-type-error-call #1# (type-specifier cast))
+                `(values ,#1# 0))
+           (truly-the sb-vm:signed-word ($fun x y))))))
 
 
 ;;;; arithmetic and logical identity operation elimination

@@ -582,3 +582,9 @@
                    (funcall (the (function (fixnum) fixnum)
                                  (lambda (x) (1+ x)))
                             n))))))
+
+(with-test (:name :truncate-signed-word-error)
+  (assert (not (find 'sb-vm::move-from-signed
+                     (ir2-vops '(lambda (x d)
+                                 (declare ((signed-byte 64) x d))
+                                 (values (the fixnum (truncate x d)))))))))
