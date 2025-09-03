@@ -193,8 +193,16 @@
            (,shift 0)
            (,acc 0)
            (,prev 0))
+       ;; The maximum value we expect for any integer in the packed stream.
+       ;; These are offsets into the raw portion of a codeblob.
+       ;; This limit is extremely generous since code can't in practice be so large.
+       (declare (type (unsigned-byte 29) ,prev))
        #-sb-xc-host (declare (notinline sb-kernel:%ldb)) ; lp#1573398
        (declare (type (mod ,sb-vm:n-word-bits) ,shift)
+                ;; The maximum number of bits we expect in the bitstream
+                ;; which is in %code-fixups for any codeblob.
+                ;; (This limit is absurdly large)
+                (type (unsigned-byte 20) ,bytepos)
                 (type word ,acc ,prev))
        (loop
         (let ((,byte (ldb (byte 8 ,bytepos) ,integer)))
@@ -205,14 +213,17 @@
                 ;; No offset can be zero, so this is the delimiter
                 ((zerop ,acc) (return))
                 (t
-                 (let ((,loc (+ ,prev ,acc))) ,@body (setq ,prev ,loc))
+                 (let ((,loc (+ ,prev ,acc)))
+                   (declare (type (unsigned-byte 29) ,loc))
+                   ,@body
+                   (setq ,prev ,loc))
                  (setq ,acc 0 ,shift 0))))))))
 
 ;;; Unpack the (potentially) three stream of data in PACKED-INTEGER.
 (defun unpack-code-fixup-locs (packed-integer)
-  (collect ((stream1) (stream2) (stream3))
-    (let ((pos 0))
-      (do-packed-varints (loc packed-integer pos) (stream1 loc))
-      (do-packed-varints (loc packed-integer pos) (stream2 loc))
-      (do-packed-varints (loc packed-integer pos) (stream3 loc)))
-    (values (stream1) (stream2) (stream3))))
+  (let ((pos 0))
+    (flet ((decode ()
+             (collect ((integers))
+               (do-packed-varints (loc packed-integer pos) (integers loc))
+               (integers))))
+      (values (decode) (decode) (decode)))))
