@@ -415,6 +415,8 @@ main(int argc, char __attribute__((unused)) *argv[])
 #endif
 #ifdef HAVE_LIBUNWIND
     defconstant("sizeof-unw-cursor", sizeof (unw_cursor_t));
+#else
+    defconstant("sizeof-unw-cursor", 0);
 #endif
 
 #ifdef LISP_FEATURE_BSD
