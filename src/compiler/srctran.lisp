@@ -986,6 +986,15 @@
           ((and hi (sb-xc:> point (type-bound-number hi)))
            '-))))
 
+(defun interval-range-info>> (x &optional (point 0))
+  (declare (type interval x))
+  (let ((lo (interval-low x))
+        (hi (interval-high x)))
+    (cond ((and lo (sb-xc:> (type-bound-number lo) point))
+           '+)
+          ((and hi (sb-xc:> point (type-bound-number hi)))
+           '-))))
+
 ;;; Test to see whether the interval X is bounded. HOW determines the
 ;;; test, and should be either ABOVE, BELOW, or BOTH.
 (defun interval-bounded-p (x how)
@@ -1269,16 +1278,26 @@
             (t
              (bug "excluded case in INTERVAL-MUL"))))))
 
-;;; Like interval-mul, which is reverse of interval-div, but this is a
+;;; Like interval-mul, which is a reverse of interval-div, but this is a
 ;;; reverse of interval-truncate (if that existed)
 (defun interval-untruncate (n d)
   (declare (type interval n d))
   ;; Simply doing interval-mul will lose the (1- d) part in
   ;; (truncate (+ n (1- d)) d)
-  (interval-add
-   (interval-mul d
-                 (interval-add n (load-time-value (make-interval :low -1 :high 1))))
-   (load-time-value (make-interval :low 1 :high -1))))
+  (let ((range (interval-range-info>> n)))
+    (multiple-value-bind (add sub)
+        (ecase range
+          ((nil)
+           (values (load-time-value (make-interval :low -1 :high  1))
+                   (load-time-value (make-interval :low  1 :high -1))))
+          (+
+           (values (load-time-value (make-interval :low  0 :high  1))
+                   (load-time-value (make-interval :low  0 :high -1))))
+          (-
+           (values (load-time-value (make-interval :low -1 :high  0))
+                   (load-time-value (make-interval :low  1 :high  0)))))
+      (interval-add (interval-mul d (interval-add n add))
+                    sub))))
 
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
