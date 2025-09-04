@@ -4896,11 +4896,6 @@
   "convert (* x 0) to 0"
   0)
 
-(deftransform %negate ((x) (rational) * :important nil)
-  "Eliminate %negate/%negate of rationals"
-  (splice-fun-args x '%negate 1)
-  '(the rational x))
-
 (deftransform %negate ((x) * * :node node)
   "Combine - with +, -, *"
   (flet ((float-safe-p ()
@@ -4911,6 +4906,10 @@
                (give-up-ir1-transform "the arguments are not rational"))))
     (or
      (combination-case x
+       ;; (- (- x)) => x
+       (%negate (*)
+         (splice-fun-args x '%negate 1)
+         'x)
        ;; (- (* x c)) => (* x -c)
        (* (* constant)
           (splice-fun-args x '* 2)
