@@ -700,64 +700,70 @@
 (macrolet ((def (format)
              `(defun ,(symbolicate format '-ratio) (x)
                 (dispatch-ratio (x signed-num den)
-                  (let* ((plusp (plusp signed-num))
-                         (num (if plusp signed-num (- signed-num)))
-                         (digits ,(package-symbolicate :sb-vm format '-digits))
-                         (scale 0))
-                    (declare (fixnum digits scale))
-                    ;; Strip any trailing zeros from the denominator and move it into the scale
-                    ;; factor (to minimize the size of the operands.)
-                    (let ((den-twos (1- (integer-length (logxor den (1- den))))))
-                      (declare (fixnum den-twos))
-                      (decf scale den-twos)
-                      (setq den (ash den (- den-twos))))
-                    ;; Guess how much we need to scale by from the magnitudes of the numerator
-                    ;; and denominator. We want one extra bit for a guard bit.
-                    (let* ((num-len (integer-length num))
-                           (den-len (integer-length den))
-                           (delta (- den-len num-len))
-                           (shift (1+ (the fixnum (+ delta digits))))
-                           (shifted-num (ash num shift)))
-                      (declare (fixnum delta shift))
-                      (decf scale delta)
-                      (labels ((float-and-scale (bits)
-                                 (let* ((bits (ash bits -1))
-                                        (len (integer-length bits)))
-                                   (cond ((> len digits)
-                                          (aver (= len (the fixnum (1+ digits))))
-                                          (scale-float (floatit (ash bits -1)) (1+ scale)))
-                                         (t
-                                          (scale-float (floatit bits) scale)))))
-                               (floatit (bits)
-                                 (let ((sign (if plusp 0 1)))
-                                   ,(case format
-                                      (single-float
-                                       `(single-from-bits sign sb-vm:single-float-bias bits))
-                                      (double-float
-                                       `(double-from-bits sign sb-vm:double-float-bias bits))
-                                      #+long-float
-                                      (long-float
-                                       `(long-from-bits sign sb-vm:long-float-bias bits))))))
-                        (declare (inline floatit))
-                        (loop
-                         (multiple-value-bind (fraction-and-guard rem)
-                             (truncate shifted-num den)
-                           (let ((extra (- (integer-length fraction-and-guard) digits)))
-                             (declare (fixnum extra))
-                             (cond ((/= extra 1)
-                                    (aver (> extra 1)))
-                                   ((oddp fraction-and-guard)
-                                    (return
-                                      (if (zerop rem)
-                                          (float-and-scale
-                                           (if (zerop (logand fraction-and-guard 2))
-                                               fraction-and-guard
-                                               (1+ fraction-and-guard)))
-                                          (float-and-scale (1+ fraction-and-guard)))))
-                                   (t
-                                    (return (float-and-scale fraction-and-guard)))))
-                           (setq shifted-num (ash shifted-num -1))
-                           (incf scale))))))))))
+                  (if (and (<= ,(symbolicate 'most-negative-exactly- format '-integer)
+                               signed-num
+                               ,(symbolicate 'most-positive-exactly- format '-integer))
+                           (<= ,(symbolicate 'most-negative-exactly- format '-integer)
+                               den
+                               ,(symbolicate 'most-positive-exactly- format '-integer)))
+                      (/ (coerce signed-num ',format)
+                         (coerce den ',format))
+                      (let* ((plusp (plusp signed-num))
+                             (num (if plusp signed-num (- signed-num)))
+                             (digits ,(package-symbolicate :sb-vm format '-digits))
+                             (scale 0))
+                        (declare (fixnum scale))
+                        ;; Strip any trailing zeros from the denominator and move it into the scale
+                        ;; factor (to minimize the size of the operands.)
+                        (let ((den-twos (1- (integer-length (logxor den (1- den))))))
+                          (decf scale den-twos)
+                          (setq den (ash den (- den-twos))))
+                        ;; Guess how much we need to scale by from the magnitudes of the numerator
+                        ;; and denominator. We want one extra bit for a guard bit.
+                        (let* ((num-len (integer-length num))
+                               (den-len (integer-length den))
+                               (delta (- den-len num-len))
+                               (shift (1+ (+ delta digits)))
+                               (shifted-num (ash num shift)))
+                          (decf scale delta)
+                          (labels ((float-and-scale (bits)
+                                     (let* ((bits (ash bits -1))
+                                            (len (integer-length bits)))
+                                       (cond ((> len digits)
+                                              (aver (= len (1+ digits)))
+                                              (scale-float (floatit (ash bits -1)) (1+ scale)))
+                                             (t
+                                              (scale-float (floatit bits) scale)))))
+                                   (floatit (bits)
+                                     (let ((sign (if plusp 0 1)))
+                                       ,(case format
+                                          (single-float
+                                           `(single-from-bits sign sb-vm:single-float-bias bits))
+                                          (double-float
+                                           `(double-from-bits sign sb-vm:double-float-bias bits))
+                                          #+long-float
+                                          (long-float
+                                           `(long-from-bits sign sb-vm:long-float-bias bits))))))
+                            (declare (inline floatit))
+                            (loop
+                             (multiple-value-bind (fraction-and-guard rem) (truncate shifted-num den)
+                               (declare ((unsigned-byte ,(+ (symbol-value (package-symbolicate :sb-vm format '-digits)) 2))
+                                         fraction-and-guard))
+                               (let ((extra (- (integer-length fraction-and-guard) digits)))
+                                 (cond ((/= extra 1)
+                                        (aver (> extra 1)))
+                                       ((oddp fraction-and-guard)
+                                        (return
+                                          (if (zerop rem)
+                                              (float-and-scale
+                                               (if (zerop (logand fraction-and-guard 2))
+                                                   fraction-and-guard
+                                                   (1+ fraction-and-guard)))
+                                              (float-and-scale (1+ fraction-and-guard)))))
+                                       (t
+                                        (return (float-and-scale fraction-and-guard)))))
+                               (setq shifted-num (ash shifted-num -1))
+                               (incf scale)))))))))))
   (def double-float)
   (def single-float))
 
