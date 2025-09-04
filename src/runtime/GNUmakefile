@@ -138,7 +138,7 @@ libsbcl.so: $(PIC_OBJS)
 %.pic.o: %.c
 	$(CC) -fPIC -c $(CPPFLAGS) $(filter-out -fno-pie,$(CFLAGS)) $< -o $@
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@ -DLIBSBCL
 
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/elftool.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
