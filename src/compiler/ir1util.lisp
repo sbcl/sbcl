@@ -289,17 +289,26 @@
               (and var
                    (notany #'node-lvar (leaf-refs var))))))))))
 
+(defun combination-matches-args (args specs)
+  (loop do (if args
+               (if (not specs)
+                   (return))
+               (if specs
+                   (return)
+                   (return t)))
+        always (let ((arg (pop args))
+                     (arg-m (pop specs)))
+                 (or (eq arg arg-m)
+                     (eq arg-m '*)
+                     (and (constant-lvar-p arg)
+                          (or (eq arg-m 'constant)
+                              (eql (lvar-value arg) arg-m)))))))
+
 (defun combination-matches (name args combination)
   (and (combination-p combination)
        (let ((fun (combination-fun combination)))
          (when (and (eq (lvar-fun-name fun) name)
-                    (loop for arg in (combination-args combination)
-                          for arg-m in args
-                          always (or (eq arg arg-m)
-                                     (eq arg-m '*)
-                                     (and (constant-lvar-p arg)
-                                          (or (eq arg-m 'constant)
-                                              (eql (lvar-value arg) arg-m))))))
+                    (combination-matches-args (combination-args combination) args))
            name))))
 
 (defun combination-matches* (names args combination &key cast-type)
@@ -308,18 +317,24 @@
      (let* ((fun (combination-fun combination))
             (name (lvar-fun-name fun)))
        (when (and (memq name names)
-                  (loop for arg in (combination-args combination)
-                        for arg-m in args
-                        always (or (eq arg arg-m)
-                                   (eq arg-m '*)
-                                   (and (constant-lvar-p arg)
-                                        (or (eq arg-m 'constant)
-                                            (eql (lvar-value arg) arg-m))))))
+                  (combination-matches-args (combination-args combination) args))
          (values name combination (combination-args combination)))))
     (cast
      (when (and cast-type
                 (eq (cast-type-to-check combination) cast-type))
        (combination-matches* names args (lvar-uses (cast-value combination)))))))
+
+;;; Will bind NAME, COMBINATION, ARGS
+(defmacro combination-case (lvar &body cases)
+  `(let ((combination (lvar-uses ,lvar)))
+     (when (combination-p combination)
+       (let ((name (lvar-fun-name (combination-fun combination)))
+             (args (combination-args combination)))
+        (case name
+          ,@(loop for (name arg-spec . body) in cases
+                  collect (list name
+                                `(when (combination-matches-args args ',arg-spec)
+                                  ,@body))))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)

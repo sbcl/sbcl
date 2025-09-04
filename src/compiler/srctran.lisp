@@ -4889,31 +4889,48 @@
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
-(deftransform - ((x y) ((constant-arg (member 0)) rational) *)
+(deftransform - ((x y) ((constant-arg (member 0)) rational))
   "convert (- 0 x) to negate"
   '(%negate y))
-(deftransform * ((x y) (rational (constant-arg (member 0))) *)
+(deftransform * ((x y) (rational (constant-arg (member 0))))
   "convert (* x 0) to 0"
   0)
 
-(deftransform %negate ((x) (rational))
+(deftransform %negate ((x) (rational) * :important nil)
   "Eliminate %negate/%negate of rationals"
   (splice-fun-args x '%negate 1)
   '(the rational x))
 
-(deftransform %negate ((x) (number))
-  "Combine %negate/*"
-  (let ((use (lvar-uses x))
-        arg)
-    (unless (and (combination-p use)
-                 (eql '* (lvar-fun-name (combination-fun use)))
-                 (constant-lvar-p (setf arg (second (combination-args use))))
-                 (numberp (setf arg (lvar-value arg))))
-      (give-up-ir1-transform))
-    (splice-fun-args x '* 2)
-    `(lambda (x y)
-       (declare (ignore y))
-       (* x ,(- arg)))))
+(deftransform %negate ((x) * * :node node)
+  "Combine - with +, -, *"
+  (flet ((float-safe-p ()
+           (or (policy node (zerop float-accuracy))
+               (not (types-equal-or-intersect
+                     (lvar-type x)
+                     (specifier-type '(or float (complex float)))))
+               (give-up-ir1-transform "the arguments are not rational"))))
+    (or
+     (combination-case x
+       ;; (- (* x c)) => (* x -c)
+       (* (* constant)
+          (splice-fun-args x '* 2)
+          `(lambda (x y)
+             (declare (ignore y))
+             (* x ,(- (lvar-value (second args))))))
+       ;; (- (- x y)) => (- y x)
+       (- (* *)
+          (when (float-safe-p)
+            (splice-fun-args x '- 2)
+            `(lambda (x y)
+               (- y x))))
+       ;; (- (+ x c)) => (- -c x)
+       (+ (* constant)
+          (when (float-safe-p)
+            (splice-fun-args x '+ 2)
+            `(lambda (x y)
+               (declare (ignore y))
+               (- ,(- (lvar-value (second args))) x)))))
+     (give-up-ir1-transform))))
 
 ;;; Return T if in an arithmetic op including lvars X and Y, the
 ;;; result type is not affected by the type of X. That is, Y is at
