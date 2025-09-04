@@ -59,12 +59,13 @@
                                  (setf lengths length)))
                            (return)))
                      (node-lvar node))
-           (if unequal
-               '#'(lambda (&rest args)
-                    (not (apply fun args)))
-               (let ((vars (make-gensym-list lengths)))
-                 `#'(lambda ,vars
-                      (not (funcall fun ,@vars))))))))
+           (cond (unequal
+                  '#'(lambda (&rest args)
+                       (not (apply fun args))))
+                 (lengths
+                  (let ((vars (make-gensym-list lengths)))
+                    `#'(lambda ,vars
+                         (not (funcall fun ,@vars)))))))))
       (t
        (when (node-lvar node)
          (pushnew node (lvar-dependent-nodes (node-lvar node)) :test #'eq))
