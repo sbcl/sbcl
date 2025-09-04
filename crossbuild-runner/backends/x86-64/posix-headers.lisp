@@ -163,6 +163,7 @@
 
 (defconstant sizeof-timespec 16) ; #x10
 (defconstant sizeof-timeval 16) ; #x10
+(defconstant sizeof-unw-cursor 0) ; #x0
 
 ;;; sysctl(3) names
 (in-package "SB-IMPL")
