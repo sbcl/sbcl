@@ -866,3 +866,23 @@
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (integer x y))
                                        (the fixnum (* x y)))))))
+
+(with-test (:name :logxor-1-type)
+  (assert-type
+   (lambda (x)
+     (logxor x (1- x)))
+   (integer -1))
+  (assert-type
+   (lambda (x)
+     (declare ((integer 1) x))
+     (logxor x (1- x)))
+   (integer 1))
+  (assert-type
+   (lambda (x)
+     (logxor x (1+ x)))
+   (integer -1))
+  (assert-type
+   (lambda (x)
+     (unless (eql x -1)
+      (logxor x (1+ x))))
+   (or null (integer 1))))

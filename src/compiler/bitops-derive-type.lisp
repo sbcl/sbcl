@@ -371,8 +371,39 @@
              `(defoptimizer (,logfun derive-type) ((x y))
                 (two-arg-derive-type x y #',fun-aux #',logfun)))))
   (deffrob logand)
-  (deffrob logior)
-  (deffrob logxor))
+  (deffrob logior))
+
+(defoptimizer (logxor derive-type) ((x y))
+  (let ((type (two-arg-derive-type x y #'logxor-derive-type-aux #'logxor)))
+    (flet ((try (x y)
+             ;; If it's (logxor x (1- x)) then it will be a positive number,
+             ;; except for 0 => -1. This is used to count unset bits.
+             (or (multiple-value-bind (name combination args)
+                     (combination-matches* '(-) '(* 1) (lvar-uses y) :cast-type (specifier-type 'integer))
+                   (declare (ignore name))
+                   (when combination
+                     (when (same-leaf-ref-p x (car args))
+                       (let ((r (if (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))
+                                    (specifier-type '(integer -1))
+                                    (specifier-type '(integer 1)))))
+                         (if type
+                             (type-intersection type r)
+                             (specifier-type r))))))
+                 ;; (logxor x (1+ x)) is positive, except -1 => -1.
+                 (multiple-value-bind (name combination args)
+                     (combination-matches* '(+) '(* 1) (lvar-uses y) :cast-type (specifier-type 'integer))
+                   (declare (ignore name))
+                   (when combination
+                     (when (same-leaf-ref-p x (car args))
+                       (let ((r (if (types-equal-or-intersect (lvar-type x) (specifier-type '(eql -1)))
+                                    (specifier-type '(integer -1))
+                                    (specifier-type '(integer 1)))))
+                         (if type
+                             (type-intersection type r)
+                             (specifier-type r)))))))))
+      (or (try x y)
+          (try y x)
+          type))))
 
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)

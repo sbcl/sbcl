@@ -315,7 +315,7 @@
                                    (and (constant-lvar-p arg)
                                         (or (eq arg-m 'constant)
                                             (eql (lvar-value arg) arg-m))))))
-         (values name combination))))
+         (values name combination (combination-args combination)))))
     (cast
      (when (and cast-type
                 (eq (cast-type-to-check combination) cast-type))
