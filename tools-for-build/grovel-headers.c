@@ -74,6 +74,10 @@
 #include "gc-typedefs.h" // for page_index_t
 #include "os.h" // for os_vm_size_t
 
+#ifdef HAVE_LIBUNWIND
+#include <libunwind.h>
+#endif
+
 #if defined LISP_FEATURE_WIN32 && defined LISP_FEATURE_64_BIT
 # define CAST_SIZEOF (unsigned long)
 #else
@@ -408,6 +412,9 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef LISP_FEATURE_ANDROID
     defconstant("path-max", PATH_MAX);
     printf("\n");
+#endif
+#ifdef HAVE_LIBUNWIND
+    defconstant("sizeof-unw-cursor", sizeof (unw_cursor_t));
 #endif
 
 #ifdef LISP_FEATURE_BSD

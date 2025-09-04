@@ -789,8 +789,6 @@ static bool __attribute__((unused)) print_lisp_fun_name(char* pc, FILE* f)
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 int sbcl_have_libunwind() { return 1; }
-int get_sizeof_unw_context() { return sizeof (unw_context_t); }
-int get_sizeof_unw_cursor() { return sizeof (unw_cursor_t); }
 #ifdef LISP_FEATURE_DARWIN // slightly different libunwind. And it doesn't work for me
 int sb_unw_init(void* a, void* b) { return unw_init_local(a, b); }
 int sb_unw_get_pc(void* a, void* b) { return unw_get_reg(a, UNW_REG_IP, b); }
@@ -805,8 +803,6 @@ int sb_unw_step(void* a) { return unw_step(a); }
 # include <ucontext.h>
 #endif
 int sbcl_have_libunwind() { return 0; }
-int get_sizeof_unw_context() { return 0; }
-int get_sizeof_unw_cursor() { return 0; }
 int sb_unw_init(void* a, void* b) { lose("unw_init %p %p", a, b); }
 int sb_unw_get_proc_name(void* a, void* b, int c, void* d) { lose("unw_get_proc_name %p %p %d %p", a, b, c, d); }
 int sb_unw_step(void* a) { lose("unw_step %p", a); }
@@ -845,7 +841,7 @@ void libunwind_bt_from_sigcontext(void* context)
 #endif
 void perform_backtrace(struct thread *th, os_context_t* context, FILE* f)
 {
-    fprintf(f, "Lisp thread @ %p, tid %d", th, unfixnumize_tid(LISPTHREAD(th)));
+    fprintf(f, "Lisp thread @ %p, tid %d", th, (int)unfixnumize_tid(LISPTHREAD(th)));
     // the TLS area is not used if #-sb-thread. And if so, it must be "main thread"
     struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->_name != NIL) {
