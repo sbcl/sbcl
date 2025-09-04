@@ -135,8 +135,26 @@
   (def "NIL-FUN-RETURNED"        nil-fun-returned-error       nil fun)
   (def "UNREACHABLE"             sb-impl::unreachable         nil)
   (def "FAILED-AVER"             sb-impl::%failed-aver        nil form)
-  (def "FILL-POINTER"            fill-pointer-error           nil array)
-  (def "OP-NOT-TYPE2"            op-not-type2-error           t a b))
+  (def "FILL-POINTER"            fill-pointer-error           nil array))
+
+(define-vop (op-not-type2-error)
+  (:policy :fast-safe)
+  (:translate op-not-type2-error)
+  (:args
+   (a :scs
+    #1=(descriptor-reg any-reg character-reg unsigned-reg signed-reg constant single-reg double-reg complex-single-reg complex-double-reg
+     (immediate (typep (tn-value tn) 'sc-offset-immediate))))
+   (b :scs #1#))
+  (:info *location-context*)
+  (:arg-types * * (:constant t))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 1000
+    (if (policy (sb-c::vop-node vop) (= debug 0))
+        ;; no debug fun is computed and the context is lost,
+        ;; just report the type without the value
+        (error-call vop 'sb-kernel::op-not-type2-error a (emit-constant *location-context*))
+        (error-call vop 'sb-kernel::op-not-type2-error a b))))
 
 
 (defun emit-internal-error (kind code values &key trap-emitter)
