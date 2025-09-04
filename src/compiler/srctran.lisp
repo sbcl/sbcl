@@ -1269,6 +1269,17 @@
             (t
              (bug "excluded case in INTERVAL-MUL"))))))
 
+;;; Like interval-mul, which is reverse of interval-div, but this is a
+;;; reverse of interval-truncate (if that existed)
+(defun interval-untruncate (n d)
+  (declare (type interval n d))
+  ;; Simply doing interval-mul will lose the (1- d) part in
+  ;; (truncate (+ n (1- d)) d)
+  (interval-add
+   (interval-mul d
+                 (interval-add n (load-time-value (make-interval :low -1 :high 1))))
+   (load-time-value (make-interval :low 1 :high -1))))
+
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
   (declare (type interval top bot))
@@ -4274,14 +4285,9 @@
                 (delay-ir1-transform node :constraint)
                 (let* ((result-int (type-approximate-interval result-type))
                        (y-int (type-approximate-interval (lvar-type y)))
-                       (r-low (interval-low result-int))
-                       (r-high (interval-high result-int))
-                       (y-low (interval-low y-int))
-                       (y-high (interval-high y-int))
-                       (low (min (* r-low y-low) (* r-low y-high)
-                                 (* r-high y-low) (* r-high y-high)))
-                       (high (max (* r-low y-low) (* r-low y-high)
-                                  (* r-high y-low) (* r-high y-high))))
+                       (m (interval-untruncate result-int y-int))
+                       (low (interval-low m))
+                       (high (interval-high m)))
                   (when (and (typep low 'sb-vm:signed-word)
                              (typep high 'sb-vm:signed-word))
                     (let ((fixnum-only (and (fixnump low)
