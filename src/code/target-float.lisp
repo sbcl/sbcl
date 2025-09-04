@@ -210,3 +210,22 @@
 ;;; the floating-point operation cache at the very start of warm build.
 (defun make-single-float (x) (make-single-float x))
 (defun make-double-float (hi lo) (make-double-float hi lo))
+
+;;; When all we want is the sign bit, there is a simpler way to extract it
+;;; than via either integer-decode-float or float-sign. Just shift the msb
+;;; over to the lsb position. FLOAT-SIGN produces some pretty horrific code
+;;; if the specific subtype of float is unnown:
+;;;  (minusp (float-sign x)) becomes (< (float-sign x) (float 0 x))
+;;; which ends up calling not only FLOAT-SIGN, but also FLOAT merely to cast
+;;; the integer 0 into a float of whatever type X is.
+(defun float-sign-bit (x)      ; return 1 or 0, literally the sign bit
+  (declare (explicit-check))
+  (number-dispatch ((x float))
+    ((single-float) (float-sign-bit x))
+    ((double-float) (float-sign-bit x))))
+
+(defun float-sign-bit-set-p (x)
+  (declare (explicit-check))
+  (number-dispatch ((x float))
+    ((single-float) (float-sign-bit-set-p x))
+    ((double-float) (float-sign-bit-set-p x))))

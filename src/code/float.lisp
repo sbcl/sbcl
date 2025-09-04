@@ -384,26 +384,6 @@
        (float 1 float1))
    (abs float2)))
 
-;;; When all we want is the sign bit, there is a simpler way to extract it
-;;; than via either integer-decode-float or float-sign. Just shift the msb
-;;; over to the lsb position. FLOAT-SIGN produces some pretty horrific code
-;;; if the specific subtype of float is unnown:
-;;;  (minusp (float-sign x)) becomes (< (float-sign x) (float 0 x))
-;;; which ends up calling not only FLOAT-SIGN, but also FLOAT merely to cast
-;;; the integer 0 into a float of whatever type X is.
-#-sb-xc-host
-(defun float-sign-bit (x)      ; return 1 or 0, literally the sign bit
-  (declare (explicit-check))
-  (number-dispatch ((x float))
-    ((single-float) (float-sign-bit x))
-    ((double-float) (float-sign-bit x))))
-#-sb-xc-host
-(defun float-sign-bit-set-p (x)
-  (declare (explicit-check))
-  (number-dispatch ((x float))
-    ((single-float) (float-sign-bit-set-p x))
-    ((double-float) (float-sign-bit-set-p x))))
-
 (declaim (inline float-digits float-radix))
 
 (defun float-digits (f)
@@ -747,7 +727,8 @@
                             (declare (inline floatit))
                             (loop
                              (multiple-value-bind (fraction-and-guard rem) (truncate shifted-num den)
-                               (declare ((unsigned-byte ,(+ (symbol-value (package-symbolicate :sb-vm format '-digits)) 2))
+                               (declare (type
+                                         (unsigned-byte ,(+ (symbol-value (package-symbolicate :sb-vm format '-digits)) 2))
                                          fraction-and-guard))
                                (let ((extra (- (integer-length fraction-and-guard) digits)))
                                  (cond ((/= extra 1)
