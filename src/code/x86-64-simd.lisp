@@ -1299,7 +1299,7 @@
             do (inst cmp byte-array end)
                (inst jmp :ge DONE)
                (inst cmp :byte element (ea byte-array))
-               (inst jmp :eq FOUND-SCALAR)
+               (inst jmp :e FOUND-SCALAR)
                (inst inc byte-array))
       (inst jmp DONE)
 
@@ -1373,7 +1373,7 @@
             do (inst cmp byte-array end)
                (inst jmp :ge DONE)
                (inst cmp :byte element (ea byte-array))
-               (inst jmp :eq FOUND-SCALAR)
+               (inst jmp :e FOUND-SCALAR)
                (inst inc byte-array))
       (inst jmp DONE)
 
@@ -1438,7 +1438,7 @@
                (inst jmp :le DONE)
                (inst dec byte-array)
                (inst cmp :byte element (ea byte-array))
-               (inst jmp :eq FOUND-SCALAR))
+               (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
       FOUND
@@ -1512,7 +1512,7 @@
                (inst jmp :le DONE)
                (inst dec byte-array)
                (inst cmp :byte element (ea byte-array))
-               (inst jmp :eq FOUND-SCALAR))
+               (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
       FOUND
@@ -1574,7 +1574,7 @@
             do (inst cmp 32-bit-array end)
                (inst jmp :ge DONE)
                (inst cmp :dword element (ea 32-bit-array))
-               (inst jmp :eq FOUND-SCALAR)
+               (inst jmp :e FOUND-SCALAR)
                (inst add 32-bit-array 4))
       (inst jmp DONE)
 
@@ -1650,7 +1650,7 @@
             do (inst cmp 32-bit-array end)
                (inst jmp :ge DONE)
                (inst cmp :dword element (ea 32-bit-array))
-               (inst jmp :eq FOUND-SCALAR)
+               (inst jmp :e FOUND-SCALAR)
                (inst add 32-bit-array 4))
       (inst jmp DONE)
 
@@ -1713,7 +1713,7 @@
                (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
                (inst cmp :byte element (ea 32-bit-array))
-               (inst jmp :eq FOUND-SCALAR))
+               (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
       FOUND
@@ -1789,7 +1789,7 @@
                (inst jmp :le DONE)
                (inst sub 32-bit-array 4)
                (inst cmp :byte element (ea 32-bit-array))
-               (inst jmp :eq FOUND-SCALAR))
+               (inst jmp :e FOUND-SCALAR))
       (inst jmp DONE)
 
       FOUND

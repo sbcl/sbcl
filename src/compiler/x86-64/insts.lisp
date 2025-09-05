@@ -326,7 +326,7 @@
     (:no . 1)
     (:b . 2) (:nae . 2) (:c . 2)
     (:ae . 3) (:nb . 3) (:nc . 3)
-    (:eq . 4) (:e . 4) (:z . 4)
+    (:e . 4) (:z . 4)
     (:ne . 5) (:nz . 5)
     (:be . 6) (:na . 6)
     (:a . 7) (:nbe . 7)
@@ -3715,7 +3715,7 @@
            :not-taken)
           ;; I manually examined a sampling of calls to this function
           ;; and did not notice other opportunities to return non-NIL
-          ((conditions :a :eq) :not-taken) ; above to equal
+          ((conditions :a :e) :not-taken) ; above to equal
           ((conditions :a :ne) :taken) ; above to not-equal
           (t nil))))
 

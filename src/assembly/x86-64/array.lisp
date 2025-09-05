@@ -145,7 +145,7 @@
   (inst mov :byte temp (ea (- other-pointer-lowtag) array))
 
   (inst cmp :byte temp simple-array-widetag)
-  (inst jmp :eq SKIP)
+  (inst jmp :e SKIP)
   (inst cmp :byte temp complex-base-string-widetag)
   (inst jmp :l DONE)
   SKIP
@@ -172,7 +172,7 @@
     (assemble ()
       (inst mov :byte temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp simple-array-widetag)
-      (inst jmp :eq HEADER)
+      (inst jmp :e HEADER)
       (inst cmp :byte temp complex-base-string-widetag)
       (inst jmp :ge HEADER)
 
@@ -192,7 +192,7 @@
 
       (inst mov :byte temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp simple-array-widetag)
-      (inst jmp :eq LOOP)
+      (inst jmp :e LOOP)
       (inst cmp :byte temp complex-base-string-widetag)
       (inst jmp :ge LOOP)
 
@@ -230,7 +230,7 @@
 
       (inst mov :byte temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp simple-array-widetag)
-      (inst jmp :eq LOOP)
+      (inst jmp :e LOOP)
       (inst cmp :byte temp complex-base-string-widetag)
       (inst jmp :ge LOOP)
 
@@ -271,7 +271,7 @@
 
       (inst mov :byte temp (ea (- other-pointer-lowtag) array))
       (inst cmp :byte temp simple-array-widetag)
-      (inst jmp :eq LOOP)
+      (inst jmp :e LOOP)
       (inst cmp :byte temp complex-base-string-widetag)
       (inst jmp :ge LOOP)
 

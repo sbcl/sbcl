@@ -229,7 +229,7 @@
                 (aver (not (ea-p widetag-tn))) ; can't clobber a header
                 (inst or :byte widetag-tn diff-bit)
                 (inst cmp :byte widetag-tn (logior first diff-bit))
-                (if not-p (inst jmp :ne target) (inst jmp :eq target))))
+                (if not-p (inst jmp :ne target) (inst jmp :e target))))
              (t
               ;; Compared to x86 we additionally optimize the cases of a
               ;; range starting with BIGNUM-WIDETAG (= min widetag)
@@ -375,7 +375,7 @@
           (loadw temp value 0 other-pointer-lowtag)
           (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
           (loadw r value bignum-digits-offset other-pointer-lowtag)
-          (inst jmp (if not-p :ne :eq) target))))
+          (inst jmp (if not-p :ne :e) target))))
     not-target))
 
 (define-vop (signed-byte-64-p/unsigned)

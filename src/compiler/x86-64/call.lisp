@@ -862,7 +862,7 @@
        (when step-instrumenting
          ,@(when named '((compute-linkage-cell node fun rax)))
          (emit-single-step-test)
-         (inst jmp :eq DONE)
+         (inst jmp :e DONE)
          (inst break single-step-around-trap))
        DONE
        (note-this-location vop :call-site)
@@ -1229,13 +1229,13 @@
         #.(assert (= register-arg-count 3))
         (cond ((> fixed 0)
                (inst cmp :dword rcx-tn (fixnumize i))
-               (inst jmp :eq DONE))
+               (inst jmp :e DONE))
               ;; Use a single comparison for 1 and 2
               ((= i 1)
                (inst cmp :dword rcx-tn (fixnumize 2))
                (inst jmp :l DONE))
               (t
-               (inst jmp :eq DONE)))))
+               (inst jmp :e DONE)))))
 
     (inst jmp DONE)
 
@@ -1474,7 +1474,7 @@
   (:vop-var vop)
   (:generator 3
      (emit-single-step-test)
-     (inst jmp :eq DONE)
+     (inst jmp :e DONE)
      (inst break single-step-before-trap)
      DONE
      (note-this-location vop :internal-error)))

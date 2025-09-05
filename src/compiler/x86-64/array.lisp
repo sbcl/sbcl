@@ -554,7 +554,7 @@
               (:constant (integer 0 #x3ffffffff)) (:constant (integer 0 0)))
   (:info index addend)
   (:ignore addend)
-  (:conditional :eq)
+  (:conditional :e)
   (:generator 3
     (multiple-value-bind (byte-index bit) (floor index 8)
       (inst test :byte (ea (+ byte-index

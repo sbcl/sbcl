@@ -354,7 +354,7 @@
     (inst jmp :z skip)
     ;; Bind stack debug sentinels have the unbound marker in the symbol slot
     (inst cmp symbol unbound-marker-widetag)
-    (inst jmp :eq skip)
+    (inst jmp :e skip)
     (loadw value bsp binding-value-slot)
     #-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
     #+sb-thread (with-tls-ea (EA :base symbol :base-already-live-p t)

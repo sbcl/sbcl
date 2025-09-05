@@ -1900,7 +1900,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
+      (inst jmp :e (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (inst cqo)
     (inst idiv y)
@@ -1960,7 +1960,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
+      (inst jmp :e (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (zeroize edx)
     (inst div y)
@@ -2012,7 +2012,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
+      (inst jmp :e (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
     (inst cqo)
     (inst idiv y)
@@ -2054,7 +2054,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)
           (inst cmp y 0))
-      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x)))
+      (inst jmp :e (generate-error-code vop 'division-by-zero-error x)))
     (move eax x)
 
     (inst cmp y -1)
@@ -2108,7 +2108,7 @@
           (if (sc-is y unsigned-reg)
               (inst test y y)
               (inst cmp y 0))
-          (inst jmp :eq zero))
+          (inst jmp :e zero))
         (inst div y))
        (t
         (assemble ()
@@ -2120,7 +2120,7 @@
             (if (sc-is y unsigned-reg)
                 (inst test y y)
                 (inst cmp y 0))
-            (inst jmp :eq zero))
+            (inst jmp :e zero))
           (inst div y)
 
           (inst test x x)
@@ -3361,7 +3361,7 @@
   (:args (unsigned :scs (unsigned-reg))
          (signed :scs (signed-reg)))
   (:arg-types unsigned-num signed-num)
-  (:conditional :eq)
+  (:conditional :e)
   (:policy :fast-safe)
   (:generator 7
     (inst test signed signed)

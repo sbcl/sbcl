@@ -514,7 +514,7 @@
       (if (sc-is y any-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :e zero))
     (move eax x)
     (inst cdq)
     (inst idiv eax y)
@@ -570,7 +570,7 @@
       (if (sc-is y unsigned-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :e zero))
     (move eax x)
     (inst xor edx edx)
     (inst div eax y)
@@ -620,7 +620,7 @@
       (if (sc-is y signed-reg)
           (inst test y y)  ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :e zero))
     (move eax x)
     (inst cdq)
     (inst idiv eax y)
