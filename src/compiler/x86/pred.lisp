@@ -75,10 +75,8 @@
     (sc-case dst-tn
       ((descriptor-reg any-reg)
        'move-if/t)
-      (unsigned-reg
-       'move-if/unsigned)
-      (signed-reg
-       'move-if/signed)
+      ((unsigned-reg signed-reg)
+       'move-if/word)
       ;; FIXME: Can't use CMOV with byte registers, and characters live
       ;; in such outside of unicode builds. A better solution then just
       ;; disabling MOVE-IF/CHAR should be possible, though.
@@ -138,22 +136,21 @@
 
 (macrolet ((def-move-if (name type reg stack)
              `(define-vop (,name move-if)
-                (:args (then :scs (immediate ,@(ensure-list reg) ,stack) :to :eval
+                (:args (then :scs (immediate ,@(ensure-list reg) ,@stack) :to :eval
                              :load-if (not (or (sc-is then immediate)
-                                               (and (sc-is then ,stack)
+                                               (and (sc-is then ,@stack)
                                                     (not (location= else res))))))
-                       (else :scs (immediate ,@(ensure-list reg) ,stack) :target res
-                             :load-if (not (sc-is else immediate ,stack))))
+                       (else :scs (immediate ,@(ensure-list reg) ,@stack) :target res
+                             :load-if (not (sc-is else immediate ,@stack))))
                 (:arg-types ,type ,type)
                 (:results (res :scs ,(ensure-list reg)))
                 (:result-types ,type))))
-  (def-move-if move-if/t t (descriptor-reg any-reg) control-stack)
-  (def-move-if move-if/unsigned unsigned-num unsigned-reg unsigned-stack)
-  (def-move-if move-if/signed signed-num signed-reg signed-stack)
+  (def-move-if move-if/t t (descriptor-reg any-reg) (control-stack))
+  (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg) (unsigned-stack signed-stack))
   ;; FIXME: See convert-conditional-move-p above.
   #+sb-unicode
-  (def-move-if move-if/char character character-reg character-stack)
-  (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))
+  (def-move-if move-if/char character character-reg (character-stack))
+  (def-move-if move-if/sap system-area-pointer sap-reg (sap-stack)))
 
 
 ;;;; conditional VOPs

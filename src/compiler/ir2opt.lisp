@@ -76,11 +76,14 @@
                      (return-from move-value-target)))
          (second (vop-next first)))
     (when (and (memq (vop-name first) '(move sb-vm::double-move
-                                        sb-vm::single-move))
+                                        sb-vm::single-move
+                                        sb-vm::word-move
+                                        sb-vm::move-to-word/fixnum))
                (or (not second)
                    (eq (vop-name second) 'branch)))
       (values (tn-ref-tn (vop-args first))
-              (tn-ref-tn (vop-results first))))))
+              (tn-ref-tn (vop-results first))
+              first))))
 
 ;; A conditional jump may be converted to a conditional move if
 ;; both branches move a value to the same TN and then continue
@@ -106,37 +109,40 @@
                  (eq (car succ-a) (car succ-b))
                  (singleton-p (block-pred a))
                  (singleton-p (block-pred b)))
-            (multiple-value-bind (value-a target)
+            (multiple-value-bind (value-a target move-a)
                 (move-value-target a2)
-              (multiple-value-bind (value-b targetp)
+              (multiple-value-bind (value-b targetp move-b)
                   (move-value-target b2)
                 (and value-a value-b (eq target targetp)
                      (values (block-label (car succ-a))
-                             target value-a value-b)))))
-           ;; A branch jumping over a move.
+                             target value-a value-b
+                             move-a move-b)))))
+           ;; ;; A branch jumping over a move.
            ((and (singleton-p succ-a)
                  (singleton-p (block-pred a))
                  (equal (car succ-a)
                         b))
-            (multiple-value-bind (value target)
+            (multiple-value-bind (value target move)
                 (move-value-target a2)
               (when value
                 (values (block-label b)
-                        target value target))))
+                        target value target move nil))))
            ((and (singleton-p succ-b)
                  (singleton-p (block-pred b))
                  (equal (car succ-b)
                         a))
-            (multiple-value-bind (value target)
+            (multiple-value-bind (value target move)
                 (move-value-target b2)
               (when value
                 (values (block-label a)
-                        target target value))))))))
+                        target target value nil move))))))))
 
 #-x86-64
-(defun sb-vm::computable-from-flags-p (res x y flags)
-  (declare (ignorable res x y flags))
-  nil)
+(progn
+  (declaim (inline sb-vm::computable-from-flags-p))
+  (defun sb-vm::computable-from-flags-p (res x y flags)
+    (declare (ignorable res x y flags))
+    nil))
 
 ;; To convert a branch to a conditional move:
 ;; 1. Convert both possible values to the chosen common representation
@@ -146,6 +152,7 @@
 ;; 5. Jump to the successor
 (defun convert-one-cmov (cmove-vop
                          value-if value-else
+                         move-if move-else
                          res flags
                          label vop node 2block
                          &aux (prev (vop-prev vop)))
@@ -178,11 +185,36 @@
                     (eq (tn-primitive-type x-tn)
                         (tn-primitive-type res)))
            (setf value-if x-tn))))
-     (emit-template node 2block (template-or-lose cmove-vop)
-                    (reference-tn-list (list value-if value-else)
-                                       nil)
-                    (reference-tn res t)
-                    (list flags))))
+     (flet ((coerce-tn (tn move)
+              (if (or (eq tn res)
+                      (sc-is tn sb-vm::immediate sb-vm::constant)
+                      (compatible-move-p res tn))
+                  tn
+                  (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
+                                                                 (sc-number (tn-sc res))
+                                                                 (tn-type tn))))
+                    (multiple-value-bind (node block before)
+                        (cond #+arm64
+                              ((eq (vop-name move) 'sb-vm::move-to-word/fixnum)
+                               ;; Doesn't affect the flags, can be
+                               ;; issued after the test, potentially
+                               ;; reusing a register.
+                               (values node 2block nil))
+                              (t
+                               (values (vop-node prev) (vop-block prev) prev)))
+                      (emit-and-insert-vop node
+                                           block
+                                           (vop-info move)
+                                           (reference-tn tn nil)
+                                           (reference-tn intermediate-tn t)
+                                           before))
+                    intermediate-tn))))
+       (emit-template node 2block (template-or-lose cmove-vop)
+                      (reference-tn-list (list (coerce-tn value-if move-if)
+                                               (coerce-tn value-else move-else))
+                                         nil)
+                      (reference-tn res t)
+                      (list flags)))))
 
   (vop branch node 2block label)
   (update-block-succ 2block (list label)))
@@ -195,16 +227,19 @@
          (a    (first succ))
          (b    (second succ)))
     (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
-      (multiple-value-bind (label target value-a value-b)
+      (multiple-value-bind (label target value-a value-b move-a move-b)
           (cmovp jump-target a b)
         (unless label
           (return-from maybe-convert-one-cmov))
         (multiple-value-bind (cmove-vop) (convert-conditional-move-p target)
           (when cmove-vop
             (when not-p
-              (rotatef value-a value-b))
+              (rotatef value-a value-b)
+              (rotatef move-a move-b))
             (convert-one-cmov cmove-vop
-                              value-a value-b target
+                              value-a value-b
+                              move-a move-b
+                              target
                               flags
                               label vop node (vop-block vop))
             t))))))
