@@ -1591,7 +1591,9 @@
        ;; Give the optimizers a second opportunity to alter newly inserted vops
        ;; by looking for patterns that have a shorter expression as a single vop.
        (run-vop-optimizers component stage t)
-       (delete-unused-ir2-blocks component))
+       (delete-unused-ir2-blocks component)
+       #+arm64
+       (choose-zero-tn (ir2-component-constant-tns (component-info component))))
       (t
        (when (and *compiler-trace-output*
                   (member :pre-ir2-optimize *compile-trace-targets*))

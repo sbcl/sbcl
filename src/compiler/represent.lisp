@@ -1049,8 +1049,6 @@
               (setf (block-number block) num)
               (incf num))))))
 
-    #+arm64
-    (choose-zero-tn (ir2-component-constant-tns 2comp))
     #-c-stack-is-control-stack
     (macrolet ((frob (slot restricted)
                  `(do ((tn (,slot 2comp) (tn-next tn)))
