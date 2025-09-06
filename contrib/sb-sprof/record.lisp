@@ -136,18 +136,14 @@ EXPERIMENTAL: Interface subject to change."
 ;;; to tell it to do that.
 (defun start-sampling (&optional (thread sb-thread:*current-thread*))
   "Unblock SIGPROF in the specified thread"
-  (if (eq thread sb-thread:*current-thread*)
-      (when (zerop (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)))
-        (setf (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)) 1)
-        (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
-                               sb-kernel:*current-internal-error-context*
-                               (sb-sys:int-sap 0))
-                           0))
-      ;; %INTERRUPT-THREAD requires that the storage lock be held by the caller.
-      (sb-thread:with-deathlok (thread c-thread)
-        (when (and (/= c-thread 0)
-                   (zerop (sap-ref-8 (int-sap c-thread) (sprof-enable-byte))))
-          (sb-thread::%interrupt-thread thread #'start-sampling))))
+  (cond ((neq thread sb-thread:*current-thread*)
+         (sb-thread::%interrupt-thread thread #'start-sampling))
+        ((zerop (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)))
+         (setf (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)) 1)
+         (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
+                                sb-kernel:*current-internal-error-context*
+                                (sb-sys:int-sap 0))
+                            0)))
   nil)
 
 (defun stop-sampling (&optional (thread sb-thread:*current-thread*))
