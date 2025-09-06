@@ -585,7 +585,7 @@ static void diagnose_failure(struct thread* thread) {
 
 void record_backtrace_from_context(void *context, struct thread* thread) {
     int success = collect_backtrace(thread, 1, context) == 1;
-    // Release the lock. This synchronizes with acquire_sprof_data_lock()
+    // Release the lock. This synchronizes with acquire_sprof_data()
     // which atomically adds LOCKED_BY_OTHER to the lock field.
     // If that happens first, then the cmpxchg will fail, and we'll do
     // a sem_post here. If this happens first, then the thread wishing to
@@ -644,7 +644,7 @@ uword_t acquire_sprof_data(struct thread* thread)
         gc_assert(old == LOCKED_BY_SELF); // could not be LOCKED_BY_OTHER
         // A profiled thread will sem_post() on return from its profiling signal handler
         // if it observes that both lock bits were on.
-        // This should be called with the thread's interruption mutex held so that the thread
+        // This should be called with the thread's TLS lock held so that the thread
         // whose data are being acquired can't exit and delete its sprof_sem.
         os_sem_wait(&thread_extra_data(thread)->sprof_sem);
         gc_assert(SPROF_LOCK(thread) == LOCKED_BY_OTHER);
