@@ -919,7 +919,7 @@ static int print_context_cmd(char **ptr, iochannel_t io)
 
 static int set_context_cmd(char **ptr, iochannel_t io)
 {
-    struct thread *thread = get_sb_vm_thread();
+    __attribute__((unused)) struct thread *thread = get_sb_vm_thread();
 
     int index;
 
