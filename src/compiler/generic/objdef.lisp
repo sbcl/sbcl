@@ -555,6 +555,7 @@ during backtrace.
               :length #.(/ 64 sb-vm:n-word-bits))
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
+  (sprof-enable :special sb-thread::*sprof-enable*) ; = 0 to block SIGPROF
   ;;
   (arena)
   ;; Miscellaneous arch-specific thread-local state for breakpoints.

@@ -1369,8 +1369,7 @@ lisp_alloc(__attribute__((unused)) int flags,
 #if !(defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 \
       || defined LISP_FEATURE_SPARC || defined LISP_FEATURE_WIN32)
     extern void allocator_record_backtrace(void*, struct thread*);
-    if (page_type != PAGE_TYPE_CODE && gencgc_alloc_profiler
-        && thread->state_word.sprof_enable)
+    if (page_type != PAGE_TYPE_CODE && gencgc_alloc_profiler && thread->sprof_enable)
         allocator_record_backtrace(__builtin_frame_address(0), thread);
 #endif
 

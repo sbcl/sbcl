@@ -715,9 +715,9 @@ alloc_thread_struct(void* spaces) {
     os_sem_init(&extra_data->sprof_sem, 0);
 #endif
     th->sprof_data = 0;
+    th->sprof_enable = 0;
 
     th->state_word.state = STATE_RUNNING;
-    th->state_word.sprof_enable = 0;
     th->state_word.user_thread_p = 1;
 
     lispobj* alien_stack_end = (lispobj*)((char*)th->alien_stack_start + ALIEN_STACK_SIZE);

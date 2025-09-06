@@ -572,7 +572,7 @@ static void diagnose_failure(struct thread* thread) {
     struct sprof_data* data = (void*)thread->sprof_data;
     if (data && data->capacity == CAPACITY_MAX) {
         // disable the profiler in this thread
-        thread->state_word.sprof_enable = 0;
+        thread->sprof_enable = 0;
 #ifdef LISP_FEATURE_SB_THREAD
         char msg[100];
         int msglen = sprintf(msg,
@@ -614,7 +614,7 @@ void sigprof_handler(int sig, __attribute__((unused)) siginfo_t* info,
     struct thread* thread = get_sb_vm_thread();
     // We can only profile Lisp threads.
     if (thread) {
-        if (thread->state_word.sprof_enable)
+        if (thread->sprof_enable)
             record_backtrace_from_context(context, thread);
         else
             // Block further signals it on return from the handler.

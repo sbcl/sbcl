@@ -383,7 +383,7 @@ void create_main_lisp_thread(lispobj function) {
     struct thread *th = alloc_thread_struct(0);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
-    th->state_word.sprof_enable = 1;
+    th->sprof_enable = make_fixnum(1);
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
     pthread_key_create(&current_thread, 0);
 #endif

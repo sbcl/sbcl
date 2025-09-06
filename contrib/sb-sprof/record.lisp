@@ -125,42 +125,41 @@ EXPERIMENTAL: Interface subject to change."
     (finish-output)))
 
 (define-alien-routine "sb_toggle_sigprof" int (context system-area-pointer) (state int))
-(eval-when (:compile-toplevel)
-  ;; current-thread-offset-sap has no slot setter, let alone for other threads,
-  ;; nor for sub-fields of a word, so ...
-  (defmacro sprof-enable-byte () ; see 'thread.h'
-    (+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift) 1)))
 
 ;;; If a thread wants sampling but had previously blocked SIGPROF,
 ;;; it will have to unblock the signal. We can use %INTERRUPT-THREAD
 ;;; to tell it to do that.
+(macrolet ((enabled ()
+             ;; %SYMBOL-VALUE-IN-THREAD can return NIL causing stop/stop to have no effect,
+             ;; as seems perfectly reasonable for statistical sampling of a non-running thread.
+             #+sb-thread '(sb-thread::%symbol-value-in-thread 'sb-thread::*sprof-enable* thread)
+             #-sb-thread 'sb-thread::*sprof-enable*))
 (defun start-sampling (&optional (thread sb-thread:*current-thread*))
   "Unblock SIGPROF in the specified thread"
-  (cond ((neq thread sb-thread:*current-thread*)
-         (sb-thread::%interrupt-thread thread #'start-sampling))
-        ((zerop (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)))
-         (setf (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)) 1)
-         (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
-                                sb-kernel:*current-internal-error-context*
-                                (sb-sys:int-sap 0))
-                            0)))
+  (when (eql (enabled) 0)
+    (cond ((neq thread sb-thread:*current-thread*)
+           (sb-thread::%interrupt-thread thread #'start-sampling))
+          (t
+           (setf sb-thread::*sprof-enable* 1)
+           (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
+                                  sb-kernel:*current-internal-error-context*
+                                  (sb-sys:int-sap 0))
+                              0))))
   nil)
 
 (defun stop-sampling (&optional (thread sb-thread:*current-thread*))
   "Block SIGPROF in the specified thread"
-  (sb-thread:with-deathlok (thread c-thread)
-    (when (and (/= c-thread 0)
-               (not (zerop (sap-ref-8 (int-sap c-thread) (sprof-enable-byte)))))
-      (setf (sap-ref-8 (int-sap c-thread) (sprof-enable-byte)) 0)
-      ;; Blocking the signal is done lazily in threads other than the current one.
-      (when (eq thread sb-thread:*current-thread*)
-        (sb-toggle-sigprof (sb-sys:int-sap 0) 1)))) ; 1 = mask it
-  nil)
+  (when (eql (enabled) 1)
+    #+sb-thread (sb-thread::%set-symbol-value-in-thread 'sb-thread::*sprof-enable* thread 0)
+    #-sb-thread (setq sb-thread::*sprof-enable* 0)
+    ;; Blocking the signal is done lazily in threads other than the current one.
+    (when (eq thread sb-thread:*current-thread*)
+      (sb-toggle-sigprof (sb-sys:int-sap 0) 1))) ; 1 = mask it
+  nil))
 
 (defun call-with-sampling (enable thunk)
   (declare (dynamic-extent thunk))
-  (if (= (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte))
-         (if enable 1 0))
+  (if (eql (if enable 1 0) sb-thread::*sprof-enable*)
       ;; Already in the correct state
       (funcall thunk)
       ;; Invert state, call thunk, invert again

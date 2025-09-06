@@ -3418,7 +3418,7 @@ struct thread_state_word {
   // - sprof_enable is referenced with SAPs.
   //   (grep 'sb-vm:thread-state-word-slot')
   char control_stack_guard_page_protected;
-  char sprof_enable; // statistical CPU profiler switch
+  char unused;
   char state;
   char user_thread_p; // opposite of lisp's ephemeral-p
   char alien_stack_guard_page_protected;
