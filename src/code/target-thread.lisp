@@ -1908,9 +1908,7 @@ session."
                ;; any stray data such as captured closure values.
                (setf (thread-interruptions thread) nil
                      (thread-primitive-thread thread) 0)
-               (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
-                                (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
-                     0)
+               (setf *sprof-enable* 0)
                ;; Take ownership of sb-sprof profile, and nullify the data slot.
                ;; This doesn't need to synchronize with the signal handler, which is
                ;; effectively disabled now, but does synchronize via THREAD-STORAGE-LOCK
@@ -2016,9 +2014,7 @@ session."
                      ;; right now, but it suffices to just leave the enabling bit at its default
                      ;; of 0; at worst, one undesired signal would be received.
                      (when (eq *profiled-threads* :all)
-                       (setf (sap-ref-8 (current-thread-sap) ; state_word.sprof_enable
-                                        (1+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift)))
-                             1))
+                       (setf *sprof-enable* 1))
                      (unmask-signals)
                      (let ((list
                              (multiple-value-call #'sys-tlab-list

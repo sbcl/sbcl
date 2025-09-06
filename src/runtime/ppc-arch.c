@@ -284,7 +284,7 @@ handle_allocation_trap(os_context_t * context)
 
     struct thread* thread = get_sb_vm_thread();
     gc_assert(!foreign_function_call_active_p(thread));
-    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+    if (gencgc_alloc_profiler && thread->sprof_enable)
         record_backtrace_from_context(context, thread);
 
     fake_foreign_function_call(context);

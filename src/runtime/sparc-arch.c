@@ -185,7 +185,7 @@ static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
       lose("Allocation trap inside foreign code.");
 
     struct thread* thread = get_sb_vm_thread();
-    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+    if (gencgc_alloc_profiler && thread->sprof_enable)
         record_backtrace_from_context(context, thread);
 
     or_inst = pc[-1];
