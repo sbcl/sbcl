@@ -16,7 +16,7 @@
           get-spinlock
           release-spinlock
           spinlock
-          with-deathlok
+          with-tls-lock
           with-session-lock
           with-spinlock))
 
@@ -1538,9 +1538,9 @@ on this semaphore, then N of them is woken up."
   (declare (ignore args))               ;for extensibility
   `(call-with-new-session (lambda () ,@forms)))
 
-;;; WITH-DEATHLOK ensures that the 'struct thread' and/or OS thread won't go away
+;;; WITH-TLS-LOCK ensures that the 'struct thread' and/or OS thread won't go away
 ;;; by synchronizing with HANDLE-THREAD-EXIT.
-(defmacro with-deathlok ((thread &optional c-thread) &body body)
+(defmacro with-tls-lock ((thread &optional c-thread) &body body)
   `(with-system-mutex ((thread-storage-lock ,thread))
      ,@(if c-thread
            `((let ((,c-thread (thread-primitive-thread ,thread))) ,@body))
@@ -1899,7 +1899,7 @@ session."
       ;; will usually return ESRCH if you try to use the pthread id - it's a valid
       ;; pointer, but it knows that it has no underlying OS thread.
       (let ((sprof-data
-             (with-deathlok (thread)
+             (with-tls-lock (thread)
                (when sem ; ordinary lisp thread, not FOREIGN-THREAD
                  (setf (thread-startup-info thread) c-thread))
                ;; Accept no further interruptions. Other threads can't add new ones to the queue
@@ -2286,7 +2286,7 @@ The default behavior is to use FUNCALL.")
 ;;; Called from the signal handler.
 #-(or sb-safepoint win32)
 (defun run-interruption ()
-  (let ((interruption (with-deathlok (*current-thread*)
+  (let ((interruption (with-tls-lock (*current-thread*)
                         (pop (thread-interruptions *current-thread*)))))
     ;; If there is more to do, then resignal and let the normal
     ;; interrupt deferral mechanism take care of the rest. From the
@@ -2305,7 +2305,7 @@ The default behavior is to use FUNCALL.")
 #+sb-safepoint
 (defun run-interruption (*current-internal-error-context*)
   (in-interruption () ;the non-thruption code does this in the signal handler
-    (let ((interruption (with-deathlok (*current-thread*)
+    (let ((interruption (with-tls-lock (*current-thread*)
                           (pop (thread-interruptions *current-thread*)))))
       (when interruption
         (without-interrupts (allow-with-interrupts (funcall interruption)))
@@ -2387,9 +2387,9 @@ Short version: be careful out there."
 ;;; POSIX says:
 ;;; "If an application attempts to use a thread ID whose lifetime has ended,
 ;;;  the behavior is undefined."
-;;; so we use the death lock to keep the thread alive, unless it already isn't.
+;;; so we use the TLS lock to keep the thread alive, unless it already isn't.
 (defun %interrupt-thread (thread function &aux (tail (list function)))
-  (with-deathlok (thread c-thread)
+  (with-tls-lock (thread c-thread)
     (when (/= c-thread 0)
       ;; Append to the end of the interruptions queue. It's
       ;; O(N), but it does not hurt to slow interruptors down a
@@ -2460,7 +2460,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 #+sb-thread
 (progn
   (defun %symbol-value-in-thread (symbol thread &aux (tlsindex (symbol-tls-index symbol)))
-    (with-deathlok (thread c-thread)
+    (with-tls-lock (thread c-thread)
       (if (/= c-thread 0)
           ;; Avoid loading not-really-an-object markers into a descriptor register.
           (macrolet ((read-using (reader) `(,reader (int-sap c-thread) tlsindex)))
@@ -2472,7 +2472,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    (with-deathlok (thread c-thread)
+    (with-tls-lock (thread c-thread)
       (if (/= c-thread 0)
           (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
@@ -2701,7 +2701,7 @@ mechanism for inter-thread communication."
         ;; can get a NIL if a thread exited by the time we got to asking for its data
         (reduce #'sum (delete nil
                               (mapcar 'allocator-histogram (%list-all-threads)))))
-      (with-deathlok (thread c-thread)
+      (with-tls-lock (thread c-thread)
         (unless (= c-thread 0)
           (let ((a (make-array (histogram-array-length) :element-type 'fixnum))
                 (boxed (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot))
@@ -2719,7 +2719,7 @@ mechanism for inter-thread communication."
 (defun reset-allocator-histogram (&optional (thread *current-thread*))
   (if (eq thread :all)
       (mapc #'reset-allocator-histogram (%list-all-threads))
-      (with-deathlok (thread c-thread)
+      (with-tls-lock (thread c-thread)
         (unless (= c-thread 0)
           (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
                 (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0

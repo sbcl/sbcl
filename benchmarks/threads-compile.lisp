@@ -48,7 +48,7 @@ The statistics:
 (define-alien-routine pthread-cond-broadcast int (cv unsigned))
 
 (defun thread-gcmetrics (thread)
-  (sb-thread:with-deathlok (thread c-thread)
+  (sb-thread:with-tls-lock (thread c-thread)
     (if (= c-thread 0)
         (values nil nil nil)
         (let ((sap
@@ -144,7 +144,7 @@ The statistics:
             ;; Wait for any thread to be done with one COMPILE-FILE
             (wait-on-semaphore sem)
             (dolist (thread threads)
-              (with-deathlok (thread c-thread)
+              (with-tls-lock (thread c-thread)
                 (unless (= c-thread 0)
                   (let* ((sap (int-sap c-thread))
                          (divisor (intmetric sb-vm::thread-slow-path-allocs-slot))
