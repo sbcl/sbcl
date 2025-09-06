@@ -1671,5 +1671,11 @@
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
+(#(2F01E50 468BDC1 1011FF64 3DF9BEAB 5019F8A6 8AC96829 D4A7D2E2 DAAFF766 FA9B170B)
+ "(SB-C:MOVE SB-VM::DOUBLE-MOVE SB-VM::SINGLE-MOVE SB-VM::WORD-MOVE SB-VM::MOVE-TO-WORD/FIXNUM SB-VM::CHARACTER-MOVE SB-VM::MOVE-FROM-CHARACTER SB-VM::MOVE-TO-CHARACTER SB-VM::SAP-MOVE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 8 0 5 0 5 0 0 0)))
+  (let ((b (& val #x7)))
+   (let ((a (>> val 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

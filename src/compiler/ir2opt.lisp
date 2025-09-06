@@ -78,7 +78,11 @@
     (when (and (memq (vop-name first) '(move sb-vm::double-move
                                         sb-vm::single-move
                                         sb-vm::word-move
-                                        sb-vm::move-to-word/fixnum))
+                                        sb-vm::move-to-word/fixnum
+                                        sb-vm::character-move
+                                        sb-vm::move-from-character
+                                        sb-vm::move-to-character
+                                        sb-vm::sap-move))
                (or (not second)
                    (eq (vop-name second) 'branch)))
       (values (tn-ref-tn (vop-args first))
@@ -195,7 +199,9 @@
                                                                  (tn-type tn))))
                     (multiple-value-bind (node block before)
                         (cond #+arm64
-                              ((eq (vop-name move) 'sb-vm::move-to-word/fixnum)
+                              ((member (vop-name move) '(sb-vm::move-to-word/fixnum
+                                                         sb-vm::move-from-character
+                                                         sb-vm::move-to-character))
                                ;; Doesn't affect the flags, can be
                                ;; issued after the test, potentially
                                ;; reusing a register.
