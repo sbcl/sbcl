@@ -346,19 +346,19 @@ function value."
 (in-package "SB-THREAD")
 #+sb-thread
 (defun enter-foreign-callback (index return arguments)
+  (declare (inline !make-foreign-thread make-mutex))
   (dx-let ((startup-info (vector nil ; trampoline is not applicable
                                  nil ; cell in *STARTING-THREADS* is not applicable
                                  nil ; *SESSION* is not applicable
                                  #'sb-alien::enter-alien-callback
                                  (list index return arguments)
                                  nil nil))) ; sigmask + fpu state bits
-    (let ((thread (init-thread-local-storage (make-foreign-thread startup-info))))
-      (setf (thread-primitive-thread thread) (current-thread-sap-int))
-      ;; set the read-only TID slot
-      (setf (%instance-ref thread (get-dsd-index thread os-tid))
-            (alien-funcall (extern-alien "sb_get_os_thread_id" (function unsigned-int))))
-      #-win32
-      (setf (thread-os-thread thread)
-            (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))
+    (let ((thread
+           (init-thread-local-storage
+            (!make-foreign-thread
+             (current-thread-sap-int)
+             #+unix (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
+             (alien-funcall (extern-alien "sb_get_os_thread_id" (function unsigned-int)))
+             startup-info))))
       (update-all-threads (thread-primitive-thread thread) thread)
       (run))))

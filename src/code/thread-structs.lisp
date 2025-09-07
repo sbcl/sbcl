@@ -182,7 +182,8 @@ in future versions."
 (sb-xc:defstruct (foreign-thread
                   (:copier nil)
                   (:include thread (%name "callback"))
-                  (:constructor make-foreign-thread (startup-info))
+                  (:constructor !make-foreign-thread
+                      (primitive-thread #+unix os-thread os-tid startup-info))
                   (:conc-name "THREAD-"))
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
