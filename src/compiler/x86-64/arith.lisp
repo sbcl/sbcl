@@ -3605,12 +3605,12 @@
   (:policy :fast-safe)
   (:results (res :scs (unsigned-reg any-reg)))
   (:generator 6
-    (loadw res x 0 other-pointer-lowtag)
-    #.(assert (zerop (ash bignum-widetag
-                        (- n-fixnum-tag-bits n-widetag-bits))))
-    (inst shr res (if (sc-is res any-reg)
-                      (- n-widetag-bits n-fixnum-tag-bits)
-                      n-widetag-bits))))
+     #.(assert (subtypep 'sb-bignum:bignum-length '(unsigned-byte 32)))
+       (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
+    (sc-case res
+      (any-reg
+       (inst shl res n-fixnum-tag-bits))
+      (t))))
 
 (define-vop (bignum-set-length set-header-data)
   (:translate sb-bignum:%bignum-set-length)
