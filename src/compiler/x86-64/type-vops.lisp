@@ -589,17 +589,20 @@
                  (inst test :byte temp lowtag-mask)
                  (inst jmp :ne nope)))
           ;; Get the header.
-          (loadw temp value 0 other-pointer-lowtag)
-          (unless integer-p
-            (inst cmp :byte temp bignum-widetag)
-            (inst jmp :ne nope))
-          (inst shr temp n-widetag-bits)
+          (cond ((and integer-p unsigned-p)
+                 (inst mov :dword temp (ea (1+ (- other-pointer-lowtag)) value)))
+                (t
+                 (loadw temp value 0 other-pointer-lowtag)
+                 (unless integer-p
+                   (inst cmp :byte temp bignum-widetag)
+                   (inst jmp :ne nope))
+                 (inst shr temp n-widetag-bits)))
           (inst cmp :dword temp (1+ (/ x n-word-bits)))
           (inst jmp :g nope)
           ;; Is it a sign-extended sign bit
           (cond (unsigned-p
                  (inst jmp :l yep)
-                 (inst cmp :dword (ea (+ (- other-pointer-lowtag) (/ n-word-bytes 2))
+                 (inst cmp :qword (ea (- other-pointer-lowtag)
                                       value temp n-word-bytes)
                        0)
                  (inst jmp (if not-p :nz :z) target))

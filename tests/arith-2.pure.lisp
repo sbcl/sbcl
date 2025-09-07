@@ -893,3 +893,28 @@
      (unless (eql x -1)
       (logxor x (1+ x))))
    (or null (integer 1))))
+
+(with-test (:name :unsigned-byte-x-p)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (typep a '(unsigned-byte 128)))
+   (((1- (expt 2 128))) t)
+   (((expt 2 128)) nil)
+   (((- (expt 2 128))) nil)
+   (('a) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (unsigned-byte a))
+      (typep a '(unsigned-byte 128)))
+   (((1- (expt 2 128))) t)
+   (((expt 2 128)) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (integer a))
+      (typep a '(unsigned-byte 128)))
+   (((1- (expt 2 128))) t)
+   (((expt 2 128)) nil)
+   (((- (expt 2 128))) nil)))
