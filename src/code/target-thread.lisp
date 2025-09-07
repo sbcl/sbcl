@@ -2064,10 +2064,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   #-sb-thread (error "Not supported in unithread builds.")
   #+sb-thread
   (let ((name (when name (possibly-base-stringize-to-heap name))))
-    (assert (or (atom arguments) (null (cdr (last arguments))))
-            (arguments)
-            "Argument passed to ~S, ~S, is an improper list."
-            'make-thread arguments)
+    (unless (or (atom arguments) (proper-list-p arguments))
+      (error "~S received an improper list of arguments: ~S" 'make-thread arguments))
     (start-thread (sb-vm:without-arena (%make-thread name nil (make-semaphore :name name)))
                   (coerce function 'function)
                   (ensure-list arguments))))
