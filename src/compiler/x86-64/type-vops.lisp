@@ -1076,13 +1076,12 @@
           bignum
           (unless (fixnum-or-other-pointer-tn-ref-p integer-ref t)
             (test-type integer temp nope t (other-pointer-lowtag)))
-          (loadw temp integer 0 other-pointer-lowtag)
           (unless integer-p
-            (inst cmp :byte temp bignum-widetag)
+            (inst cmp :byte (object-slot-ea integer 0 other-pointer-lowtag) bignum-widetag)
             (inst jmp :ne nope))
-          #.(assert (= (integer-length bignum-widetag) 5))
-          (inst shr temp 5)
-          (inst cmp :dword (ea (+ (- other-pointer-lowtag) (/ n-word-bytes 2)) integer temp) 0)
+          #.(assert (subtypep 'sb-bignum:bignum-length '(unsigned-byte 32)))
+          (inst mov :dword temp (ea (1+ (- other-pointer-lowtag)) integer))
+          (inst cmp :dword (ea (+ (- other-pointer-lowtag) (/ n-word-bytes 2)) integer temp 8) 0)
           (inst jmp (case comparison
                       ((:l :le) (if not-p :ge :l))
                       (t (if not-p :l :ge)))
