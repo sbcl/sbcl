@@ -398,17 +398,18 @@
         (use-lvar cast internal-lvar)
         t))))
 
-(defun assert-node-type (node type policy &optional context)
+(defun assert-node-type (node type policy &optional context not-asserted)
   (declare (type node node) (type ctype type))
   (let ((lvar (node-lvar node)))
-    (unless (type-asserted-p lvar type)
+    (when (or not-asserted
+              (not (type-asserted-p lvar type)))
       (let ((new-lvar (make-lvar)))
         (%delete-lvar-use node)
         (use-lvar node new-lvar)
         (let ((cast (insert-cast-after node new-lvar type policy
                                        context)))
           (use-lvar cast lvar)
-          t)))))
+          cast)))))
 
 
 ;;;; IR1-OPTIMIZE
@@ -3044,11 +3045,11 @@
 ;;; Delete or move around casts when possible
 (defun maybe-delete-cast (cast)
   (let ((lvar (cast-lvar cast))
-        (value (cast-value cast)))
+        (value (cast-value cast))
+        (asserted (cast-asserted-type cast)))
     (cond ((delay-p cast) nil)
-          ((or (values-subtypep (lvar-derived-type value)
-                                (cast-asserted-type cast))
-               (and (fun-type-p (cast-asserted-type cast))
+          ((or (values-subtypep (lvar-derived-type value) asserted)
+               (and (fun-type-p asserted)
                     (let ((uses (lvar-uses value)))
                       (when (ref-p uses)
                         (let ((fun (ref-leaf uses)))
@@ -3056,23 +3057,34 @@
                                      (functional-entry-fun fun))
                             ;; FIXME: is it important to compute this once?
                             (csubtypep (definition-type (functional-entry-fun fun))
-                                       (cast-asserted-type cast))))))))
+                                       asserted)))))))
            (delete-cast cast)
            t)
-          ((listp (lvar-uses value))
+          ((and
+            (cast-%type-check cast)
+            (listp (lvar-uses value)))
            ;; Turn (the vector (if x y #())) into
            ;; (if x (the vector y) #())
-           (let ((atype (cast-asserted-type cast))
-                 (ctran (node-next cast))
+           (let ((ctran (node-next cast))
                  (dest (and lvar
                             (lvar-dest lvar)))
-                 next-block)
+                 next-block
+                 good-types-not-immediately-used
+                 bad-use
+                 multiple-bad-uses)
              (collect ((merges))
                (do-uses (use value)
                  (let ((type (node-derived-type use)))
-                   (when (and (neq type *empty-type*)
-                              (values-subtypep (node-derived-type use) atype)
-                              (immediately-used-p value use))
+                   (when (and (or (and (neq type *empty-type*)
+                                       (values-subtypep type asserted))
+                                  (progn (if bad-use
+                                             (setf multiple-bad-uses t)
+                                             (setf bad-use use))
+                                         nil))
+                              (or (immediately-used-p value use)
+                                  (progn (when (almost-immediately-used-p value use :flushable t)
+                                           (setf good-types-not-immediately-used t))
+                                         nil)))
                      (unless next-block
                        (when ctran (ensure-block-start ctran))
                        (setq next-block (first (block-succ (node-block cast))))
@@ -3091,7 +3103,20 @@
                                 (eq (basic-combination-kind use) :local))
                        (merges use)))))
                (dolist (use (merges))
-                 (merge-tail-sets use))))))))
+                 (merge-tail-sets use)))
+             ;; Can't move a use with a fitting type directly after
+             ;; the cast if there are intermediate nodes between the
+             ;; use and the cast. But if only one use has a bad type the
+             ;; cast can be moved to that use.
+             (when (and nil good-types-not-immediately-used
+                        (not multiple-bad-uses))
+               (setf (cast-silent-conflict
+                      (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
+                                        (cast-context cast)
+                                        t))
+                     :style-warning)
+               (delete-filter cast lvar value)
+               t))))))
 
 (defun ir1-optimize-cast (cast)
   (declare (type cast cast))

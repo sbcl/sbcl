@@ -588,3 +588,18 @@
                      (ir2-vops '(lambda (x d)
                                  (declare ((signed-byte 64) x d))
                                  (values (the fixnum (truncate x d)))))))))
+
+(with-test (:name :cast-movement)
+  (assert (not (find 'sb-vm::move-from-unsigned
+                     (ir2-vops '(lambda (d x c)
+                                 (declare ((simple-array word (4)) x))
+                                 (let* ((b (aref x 1))
+                                        (a (if d c b)))
+                                   (> (the word a) 10)))))))
+  (assert (find 'sb-vm::move-from-unsigned
+                (ir2-vops '(lambda (d x c)
+                            (declare ((simple-array word (4)) x))
+                            (let* ((b (aref x 1))
+                                   (a (if d c b)))
+                              (print 1)
+                              (> (the word a) 10)))))))
