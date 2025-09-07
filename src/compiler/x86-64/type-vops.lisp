@@ -504,6 +504,60 @@
           (inst jmp (if not-p :nz :z) target))))
     not-target))
 
+(define-vop (unsigned-byte-64-p-move-to-word type-predicate)
+  (:results (r :scs (signed-reg unsigned-reg) :from :load))
+  (:result-types unsigned-num)
+  (:generator 10
+    (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+           (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))
+           (unsigned-p (or not-signed-byte-64-p
+                           (not (types-equal-or-intersect (tn-ref-type args) (specifier-type '(integer * -1)))))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (when fixnum-p
+            (move r value)
+            (inst sar r (the (eql 1) n-fixnum-tag-bits))
+            (inst jmp :nc (if unsigned-p
+                              yep
+                              test-sign)))
+          (unless (fixnum-or-other-pointer-tn-ref-p args t)
+            (%lea-for-lowtag-test temp value other-pointer-lowtag)
+            (inst test :byte temp lowtag-mask)
+            (inst jmp :ne nope))
+          ;; Get the header.
+          bignum
+          (loadw r value bignum-digits-offset other-pointer-lowtag)
+          (loadw temp value 0 other-pointer-lowtag)
+
+          (unless not-signed-byte-64-p
+            ;; Is it one?
+            (inst cmp temp (bignum-header-for-length 1))
+            (inst jmp :e (if unsigned-p
+                             yep
+                             test-sign)))
+
+          two-word
+          ;; If it's other than two, we can't be an (unsigned-byte 64)
+          ;; Leave TEMP holding 0 in the affirmative case.
+          (inst sub temp (bignum-header-for-length 2))
+          (inst jmp :ne nope)
+          ;; Compare the second digit to zero (in TEMP).
+          (inst cmp (object-slot-ea value (1+ bignum-digits-offset) other-pointer-lowtag) temp)
+          (cond (unsigned-p
+                 (inst jmp (if not-p :nz :z) target))
+                (t
+                 (inst jmp :e yep)
+                 (inst jmp nope)))
+
+          test-sign
+          (unless unsigned-p
+            (inst test r r)
+            (inst jmp (if not-p :s :ns) target)))))
+    not-target))
+
 (define-vop (unsigned-byte-x-p type-predicate)
   (:arg-types * (:constant (integer 1)))
   (:translate sb-c::unsigned-byte-x-p)

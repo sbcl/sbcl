@@ -3108,7 +3108,7 @@
              ;; the cast if there are intermediate nodes between the
              ;; use and the cast. But if only one use has a bad type the
              ;; cast can be moved to that use.
-             (when (and nil good-types-not-immediately-used
+             (when (and good-types-not-immediately-used
                         (not multiple-bad-uses))
                (setf (cast-silent-conflict
                       (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
