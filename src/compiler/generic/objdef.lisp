@@ -577,7 +577,6 @@ during backtrace.
   (remset)
   ;; allocation instrumenting
   (slow-path-allocs)
-  (et-allocator-mutex-acq) ; elapsed times
   (et-find-freeish-page)
   (et-bzeroing)
   ;; The *current-thread* MUST be the last slot in the C thread structure.
