@@ -37,27 +37,29 @@ The statistics:
  [ 6463084  5699894  6391162  5323400  5510025  5425688  6288613  4886611  5456971  5394043  5564274  5639621  5054329  5722550  5208487  5986264  6858847  5267559  7030543  5811645  5656792  5012832  6000738  5682139  7220169  6433044  5468151  5295718  5333045  5908446]
 |#
 
-(defparameter *gcmetrics-condvar*
-  (sb-sys:find-dynamic-foreign-symbol-address "gcmetrics_condvar"))
-(defparameter *gcmetrics-mutex*
-  (sb-sys:find-dynamic-foreign-symbol-address "gcmetrics_mutex"))
-
-(define-alien-routine pthread-mutex-lock int (m unsigned))
-(define-alien-routine pthread-mutex-unlock int (m unsigned))
-(define-alien-routine pthread-cond-wait int (cv unsigned) (m unsigned))
-(define-alien-routine pthread-cond-broadcast int (cv unsigned))
+(in-package sb-thread)
+(defparameter *gcmetrics-condvar* (make-waitqueue))
+(defparameter *gcmetrics-mutex* (make-mutex))
 
 (defun thread-gcmetrics (thread)
-  (sb-thread:with-tls-lock (thread c-thread)
-    (if (= c-thread 0)
-        (values nil nil nil)
-        (let ((sap
-               (sb-sys:sap+ (sb-sys:int-sap c-thread)
-                           (+ (sb-alien:extern-alien "dynamic_values_bytes" (sb-alien:unsigned 32))
-                              (* 8 8))))) ; interrupt context pointers
-          (values (sb-sys:sap-ref-64 sap 8) ; avg
-                  (sb-sys:sap-ref-64 sap 16) ; worst
-                  (sb-sys:sap-ref-64 sap 0)))))) ; runtime
+  (let ((a (make-array 1 :element-type '(unsigned-byte 32) :initial-element 0))
+        (cputime))
+    (declare (dynamic-extent a))
+    (sb-sys:with-pinned-objects (a)
+      (let ((futex (sb-sys:sap-int (vector-sap a))))
+        (when (%interrupt-thread
+               thread
+               (lambda ()
+                 (multiple-value-bind (ok user system)
+                     (sb-unix:unix-getrusage 1) ; 1 = RUSAGE_THREAD
+                   (declare (ignore ok))
+                   (setf cputime (+ user system) (aref a 0) 1)
+                   (futex-wake futex 1))))
+          (loop  while (= (aref a 0) 0)
+                 do (futex-wait futex 0 -1 0)))))
+    (values (round (/ (thread-sum-stw-pause thread) (thread-ct-stw-pauses thread))    )
+            (thread-max-stw-pause thread)
+            cputime))) ; NIL if thread already exited
 
 ;;; Exercise COMPILE-FILE in many threads, which is representative of a
 ;;; lispy workload.  Any suitable workload should do.
@@ -80,35 +82,43 @@ The statistics:
                    (let ((file (format nil "/tmp/foo~d.fasl" arg)))
                      (compile-file "src/compiler/srctran"
                                    :print nil
-                                   :output-file file)))))
+                                   :output-file file)
+                     ;; it's ok to miss this wakeup
+                     (condition-broadcast *gcmetrics-condvar*)))))
              (setf (aref running arg) nil)
-             (pthread-cond-broadcast *gcmetrics-condvar*)))
+             (multiple-value-bind (ok usr sys) (sb-unix:unix-getrusage 1)
+               (declare (ignore ok))
+               (setf (aref runtime arg) (+ usr sys)))
+             (with-mutex (*gcmetrics-mutex*) ; but not ok to miss this one
+               (condition-broadcast *gcmetrics-condvar*))))
     (dotimes (i n-threads)
-      (push (sb-thread:make-thread
+      (push (make-thread
              #'work
              :name (format nil "worker~d" i)
              :arguments i)
             threads)))
     (let ((start (get-internal-real-time)))
-      (assert (= 0 (pthread-mutex-lock *gcmetrics-mutex*)))
+      (grab-mutex *gcmetrics-mutex*)
       (loop
         (let ((count (count t running)))
           (when (zerop count) (return))
-          (assert (= 0 (pthread-cond-wait *gcmetrics-condvar* *gcmetrics-mutex*)))
+          (format t "~&Running is ~S~%" running)
+          (condition-wait *gcmetrics-condvar* *gcmetrics-mutex*)
           (let ((i 0))
             (dolist (thread threads)
               (multiple-value-bind (avg worst run) (thread-gcmetrics thread)
                 (when avg
                   (setf (aref avg-gc-wait i) avg
-                        (aref worst-gc-wait i) worst
-                        (aref runtime i) run)))
+                        (aref worst-gc-wait i) worst))
+                (when run
+                  (setf (aref runtime i) run)))
               (incf i)))
           (format t "~D threads:~% [~{~8d~^ ~}]~% [~{~8d~^ ~}]~% [~{~8d~^ ~}]~%"
                   count
                   (coerce worst-gc-wait 'list)
                   (coerce avg-gc-wait 'list)
                   (coerce runtime 'list))))
-      (pthread-mutex-unlock *gcmetrics-mutex*)
+      (release-mutex *gcmetrics-mutex*)
       (let ((end (get-internal-real-time)))
         (format t "~&all done: ~fs~%"
                 (/ (- end start) internal-time-units-per-second))))))
@@ -124,8 +134,7 @@ The statistics:
                                :output-file out)
                  (signal-semaphore sem))
                (delete-file out))
-             (values (sb-vm::current-thread-offset-sap
-                      sb-vm::thread-et-allocator-mutex-acq-slot)
+             (values 0 ; was et-allocator-mutex-acq-slot
                      (sb-vm::current-thread-offset-sap
                       sb-vm::thread-et-find-freeish-page-slot)
                      (sb-vm::current-thread-offset-sap
@@ -149,8 +158,7 @@ The statistics:
                   (let* ((sap (int-sap c-thread))
                          (divisor (intmetric sb-vm::thread-slow-path-allocs-slot))
                          (times
-                          (list (/ (floatmetric sb-vm::thread-et-allocator-mutex-acq-slot)
-                                   divisor)
+                          (list 0.0 ; was et-allocator-mutex-acq-slot
                                 (/ (floatmetric sb-vm::thread-et-find-freeish-page-slot)
                                    divisor)
                                 (/ (floatmetric sb-vm::thread-et-bzeroing-slot)
