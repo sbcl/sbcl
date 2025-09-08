@@ -1547,7 +1547,6 @@ on this semaphore, then N of them is woken up."
            body)))
 
 (sb-ext:define-load-time-global *sprof-data* nil)
-#+allocator-metrics
 (sb-ext:define-load-time-global *allocator-metrics* nil)
 
 (defvar sb-ext:*invoke-debugger-hook* nil
@@ -1886,11 +1885,10 @@ session."
       ;; They must not participate in shutting other threads down.
       (when (and *exit-in-progress* (not (thread-ephemeral-p thread)))
         (%exit))
-      ;; If collecting allocator metrics, transfer them to the global list
-      ;; so that we can summarize over exited threads.
-      #+allocator-metrics
-      (let ((metrics (cons (thread-name thread) (allocator-histogram))))
-        (sb-ext:atomic-push metrics *allocator-metrics*))
+      ;; If collecting allocation histogram, transfer to the global list
+      ;; for summarization including exited threads.
+      (awhen (thread-alloc-histogram thread)
+        (sb-ext:atomic-push (cons (thread-name thread) it) *allocator-metrics*))
       ;; Stash the primitive thread SAP for reuse, but clobber the PRIMITIVE-THREAD
       ;; slot which makes ALIVE-P return NIL.
       ;; A minor TODO: can this lock acquire/release be moved to where we actually
@@ -2637,9 +2635,6 @@ mechanism for inter-thread communication."
             #-sb-thread (ash thread-obj-len sb-vm:word-shift)
             by sb-vm:n-word-bytes
             do
-         (unless (<= sb-vm::thread-allocator-histogram-slot
-                     (ash tlsindex (- sb-vm:word-shift))
-                     (1- sb-vm::thread-lisp-thread-slot))
            (let ((thread-slot-name
                   (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
                            (aref names (ash tlsindex (- sb-vm:word-shift))))))
@@ -2648,7 +2643,7 @@ mechanism for inter-thread communication."
                              thread-slot-name (sap-ref-word sap tlsindex))
                      (let ((val (safely-read sap tlsindex)))
                        (unless (eq val :no-tls-value)
-                         (show tlsindex val)))))))
+                         (show tlsindex val))))))
       (let ((from (descriptor-sap sb-vm:*binding-stack-start*))
             (to (binding-stack-pointer-sap)))
         (format t "~%Binding stack: (depth ~d)~%"
@@ -2660,17 +2655,6 @@ mechanism for inter-thread communication."
                      #-sb-thread (sap-ref-lispobj from sb-vm:n-word-bytes)))
             (show sym val))
           (setq from (sap+ from (* sb-vm:binding-size sb-vm:n-word-bytes))))))))
-
-(macrolet ((histogram-value (c-thread index)
-             `(sap-ref-word (int-sap ,c-thread)
-                            (ash (+ sb-vm::thread-allocator-histogram-slot ,index)
-                                 sb-vm:word-shift)))
-           (metric (c-thread slot)
-             `(sap-ref-word (int-sap ,c-thread)
-                            (ash ,slot sb-vm:word-shift)))
-           (histogram-array-length ()
-             (+ sb-vm::n-histogram-bins-small
-                (* 2 sb-vm::n-histogram-bins-large))))
 
 (export '(allocator-histogram print-allocator-histogram reset-allocator-histogram))
 (defun allocator-histogram (&optional (thread *current-thread*))
@@ -2687,31 +2671,24 @@ mechanism for inter-thread communication."
         ;; can get a NIL if a thread exited by the time we got to asking for its data
         (reduce #'sum (delete nil
                               (mapcar 'allocator-histogram (%list-all-threads)))))
-      (with-tls-lock (thread c-thread)
-        (unless (= c-thread 0)
-          (let ((a (make-array (histogram-array-length) :element-type 'fixnum))
-                (boxed (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot))
-                (unboxed (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot)))
-            (declare (dynamic-extent a))
-            (dotimes (i (length a))
-              (setf (aref a i) (histogram-value c-thread i)))
-            (list (subseq a 0 (+ sb-vm::n-histogram-bins-small
-                                 sb-vm::n-histogram-bins-large))
-                  (subseq a (+ sb-vm::n-histogram-bins-small
-                               sb-vm::n-histogram-bins-large))
-                  unboxed
-                  boxed))))))
+      ;; Save a snapshot so that consing in SUBSEQ does not affect the output
+      (let ((a (make-array alloc-histogram-words :element-type 'fixnum))
+            (unboxed (thread-tot-bytes-alloc-unboxed thread))
+            (boxed (thread-tot-bytes-alloc-boxed thread)))
+        (declare (dynamic-extent a))
+        (awhen (thread-alloc-histogram thread) (replace a it))
+        (list (subseq a 0 (+ n-histogram-bins-small n-histogram-bins-large))
+              (subseq a (+ n-histogram-bins-small n-histogram-bins-large))
+              unboxed
+              boxed))))
 
 (defun reset-allocator-histogram (&optional (thread *current-thread*))
-  (if (eq thread :all)
-      (mapc #'reset-allocator-histogram (%list-all-threads))
-      (with-tls-lock (thread c-thread)
-        (unless (= c-thread 0)
-          (setf (metric c-thread sb-vm::thread-tot-bytes-alloc-boxed-slot) 0
-                (metric c-thread sb-vm::thread-tot-bytes-alloc-unboxed-slot) 0
-                (metric c-thread sb-vm::thread-slow-path-allocs-slot) 0)
-          (dotimes (i (histogram-array-length))
-            (setf (histogram-value c-thread i) 0)))))))
+  (cond ((eq thread :all)
+         (mapc #'reset-allocator-histogram (%list-all-threads)))
+        (t
+         (awhen (thread-alloc-histogram thread) (fill it 0))
+         (setf (thread-tot-bytes-alloc-boxed thread) 0
+               (thread-tot-bytes-alloc-unboxed thread) 0))))
 
 (defun print-allocator-histogram (&optional (thread-or-values *current-thread*))
   (destructuring-bind (counts large-allocated tot-bytes-unboxed tot-bytes-boxed)
@@ -2723,12 +2700,12 @@ mechanism for inter-thread communication."
            (bin-label (make-array tot-bins))
            (bin-nbytes (make-array tot-bins))
            (cumulative 0))
-      (dotimes (i sb-vm::n-histogram-bins-small)
+      (dotimes (i n-histogram-bins-small)
         (setf (aref bin-label i) (* (1+ i) sb-vm:cons-size sb-vm:n-word-bytes)
               (aref bin-nbytes i) (* (aref counts i) (aref bin-label i))))
-      (dotimes (i sb-vm::n-histogram-bins-small)
-        (let ((bin-index (+ sb-vm::n-histogram-bins-small i))
-              (size-max (ash 1 (+ i sb-vm::first-large-histogram-bin-log2size)))
+      (dotimes (i n-histogram-bins-small)
+        (let ((bin-index (+ n-histogram-bins-small i))
+              (size-max (ash 1 (+ i first-large-histogram-bin-log2size)))
               (allocated (aref large-allocated i)))
           (setf (aref bin-label bin-index)
                 (if (< size-max 1048576)

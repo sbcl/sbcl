@@ -132,6 +132,8 @@ run in any thread.")
   #-64-bit 0)
 
 (defun sub-gc (gen)
+  ;; Can't instrument GC-EPOCH cons in a foreign thead with no *CURRENT-THREAD* yet
+  (declare (optimize (sb-c::instrument-consing 0)))
   (cond (*gc-inhibit*
          (setf *gc-pending* t)
          nil)

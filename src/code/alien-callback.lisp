@@ -353,6 +353,8 @@ function value."
                                  #'sb-alien::enter-alien-callback
                                  (list index return arguments)
                                  nil nil))) ; sigmask + fpu state bits
+    ;; Must not try to update consing histogram since *CURRENT-THREAD* is unbound
+    (declare (optimize (sb-c::instrument-consing 0)))
     (let ((thread
            (init-thread-local-storage
             (!make-foreign-thread

@@ -72,6 +72,20 @@ future."
 (sb-ext:define-load-time-global *profiled-threads* :all)
 (declaim (type (or (eql :all) list) *profiled-threads*))
 
+;; allocator histogram capacity
+(defconstant n-histogram-bins-small 32)
+(defconstant n-histogram-bins-large 32)
+;; small bins store just a count, large bins store a count and total size
+(defconstant alloc-histogram-words
+  (+ n-histogram-bins-small (* 2 n-histogram-bins-large)))
+
+;;; the #+allocation-size-histogram has an exact count of objects allocated
+;;; for all sizes up to (* cons-size n-word-bytes n-histogram-bins-small).
+;;; Larger allocations are grouped by the binary log of the size.
+;;; The small bins account for at least 99% of all allocations.
+(defconstant first-large-histogram-bin-log2size
+  (integer-length (* n-histogram-bins-small 16)))
+
 (sb-xc:defstruct (thread (:constructor %make-thread (%name ephemeral-p semaphore))
                          (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
@@ -158,6 +172,11 @@ in future versions."
             :type sb-vm:signed-word)
   #-64-bit (internal-real-time)
 
+  (alloc-histogram (or #+allocation-size-histogram
+                       (make-array alloc-histogram-words :element-type 'sb-vm:word))
+                   :type (or (simple-array sb-vm:word 1) null))
+  (tot-bytes-alloc-boxed 0 :type sb-vm:word)
+  (tot-bytes-alloc-unboxed 0 :type sb-vm:word)
   (max-stw-pause 0 :type sb-vm:word) ; microseconds
   (sum-stw-pause 0 :type sb-vm:word) ; "
   (ct-stw-pauses 0 :type sb-vm:word) ; to compute the avg

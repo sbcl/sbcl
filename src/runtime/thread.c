@@ -365,6 +365,14 @@ static lispobj cons_lisp_thread(struct thread* thread)
     instance->sw_observed_internal_real_time_delta_millisec = 0x7FFFFFFF;
     instance->internal_real_time = NIL;
 #endif
+    instance->alloc_histogram = NIL;
+#ifdef LISP_FEATURE_X86_64
+    struct vector* v = (void*)gc_general_alloc(r, (2+ALLOC_HISTOGRAM_WORDS)*N_WORD_BYTES,
+                                               PAGE_TYPE_MIXED);
+    v->header = SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG;
+    v->length_ = make_fixnum(ALLOC_HISTOGRAM_WORDS);
+    instance->alloc_histogram = make_lispobj(v, OTHER_POINTER_LOWTAG);
+#endif
     return make_lispobj(instance, INSTANCE_POINTER_LOWTAG);
 }
 
