@@ -510,6 +510,14 @@
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 5) 28)))
     (^ a (aref tab b))))))")
+(#(F3DEB2 42F11A6 61980DD 72DACBB 8198403 822B0BF 9198596 9F3ECDD A198729 AF3EE70 C198A4F 1119922E 131427B9 132570DA 13FFFF01
+   141DAF55 15F3FFC1 16F40154 17344F50 182AE654 18F4047A 19F4060D 1A19A059 1B19A1EC 1BF40933 1DF40C59 1E000EBF 1E197445
+   1F1975D8 1FF40F7F)
+ "((:O . 0) (:NO . 1) (:B . 2) (:NAE . 2) (:C . 2) (:NB . 3) (:AE . 3) (:NC . 3) (:E . 4) (:Z . 4) (:NE . 5) (:NZ . 5) (:BE . 6) (:NA . 6) (:NBE . 7) (:A . 7) (:S . 8) (:NS . 9) (:P . 10) (:PE . 10) (:NP . 11) (:PO . 11) (:L . 12) (:NGE . 12) (:NL . 13) (:GE . 13) (:LE . 14) (:NG . 14) (:NLE . 15) (:G . 15))"
+ "((let ((tab #a((16) (unsigned-byte 8) 14 18 21 16 21 0 1 31 15 17 0 30 0 21 22 3)))
+  (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 5) 28)))
+    (^ a (aref tab b))))))")
 (#(F3DEB2 B2EEA4B 1119922E 111DAA9C 13195146 1ABA962F)
  "(:GEZ :GZ :NZ :LZ :LEZ :Z)"
  "((& (+ (>> val 0) (>> val 5) (>> val 12)) 7))")
@@ -1057,6 +1065,12 @@
 (#(2E47517 34C00E1 BCA1BE4 17505980 1B5C8A6A)
  "(HASH-TABLE PACKAGE PATHNAME RANDOM-STATE READTABLE)"
  "((& (^ (>> val 1) (>> val 28)) 7))")
+(#(2F01E50 468BDC1 AC96829 1011FF64 1019F8A6 14A7D2E2 1A9B170B 1AAFF766 1DF9BEAB)
+ "(SB-C:MOVE SB-VM::DOUBLE-MOVE SB-VM::SINGLE-MOVE SB-VM::WORD-MOVE SB-VM::MOVE-TO-WORD/FIXNUM SB-VM::CHARACTER-MOVE SB-VM::MOVE-FROM-CHARACTER SB-VM::MOVE-TO-CHARACTER SB-VM::SAP-MOVE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 0 4 0 0 1 4 11)))
+  (let ((b (>> (<< val 3) 29)))
+   (let ((a (& val #x7)))
+    (^ a (aref tab b))))))")
 (#(2F7D2FB 4BD45A5 59E8BAB 7F71775 19402A3C)
  "(RASSOC ASSOC MEMBER POSITION FIND)"
  "((& (- (>> val 1) (>> val 11)) 7))")
