@@ -3111,7 +3111,7 @@
              ;; cast can be moved to that use.
              (when (and good-types-not-immediately-used
                         (not multiple-bad-uses))
-               (setf (cast-silent-conflict 
+               (setf (cast-silent-conflict
                       (if (exit-p bad-use)
                           (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
                                             (cast-context cast)
