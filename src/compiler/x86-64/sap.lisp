@@ -210,7 +210,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (let ((ea (sap+offset-to-ea sap offset temp)))
       (sb-assem:inst* insn modifier result ea)))))
 
-(defun emit-sap-set (size sap offset value temp
+(defun emit-sap-set (size sap offset value temp &optional val-temp
                           &aux (ea (sap+offset-to-ea sap offset temp)))
   #+linux
   (when (sb-c:msan-unpoison sb-c:*compilation*)
@@ -218,12 +218,18 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (inst xor temp (static-constant-ea msan-xor-constant))
     (inst mov size (ea temp) 0))
   (when (sc-is value constant immediate)
-    (cond ((plausible-signed-imm32-operand-p (tn-value value))
-           (setq value (tn-value value)))
-          (t
-           (aver (not (offset-needs-temp offset)))
-           (inst mov temp (tn-value value))
-           (setq value temp))))
+    (setq value
+          (cond ((plausible-signed-imm32-operand-p (tn-value value))
+                 (tn-value value))
+                ((null (tn-value value))
+                 null-tn)
+                (val-temp
+                 (move-immediate val-temp (immediate-tn-repr value))
+                 val-temp)
+                (t
+                 (aver (not (offset-needs-temp offset)))
+                 (inst mov temp (tn-value value))
+                 temp))))
   (inst mov size ea value))
 
 (defun emit-cas-sap-ref (size signedp sap offset oldval newval result rax temp)
@@ -250,8 +256,6 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                     size)
              (let ((value-scs (cond ((member ref-name '(sap-ref-64 signed-sap-ref-64))
                                      `(,sc constant immediate))
-                                    ;; TODO: sap-ref-lispobj can directly store null-tn
-                                    ;; but this is rejecting immediate
                                     ((not (member ref-name '(sap-ref-single sap-ref-sap
                                                              sap-ref-lispobj)))
                                      `(,sc immediate))
@@ -294,7 +298,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                                 temp)
                     (:generator 3 (emit-sap-ref ,size ',ref-insn
                                                 ',modifier result sap offset node vop temp)))
-                  (define-vop (,set-name)
+
+                  ,@(unless (eq ref-name 'sap-ref-lispobj)
+                `((define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
                     (:args (value :scs ,value-scs)
@@ -305,7 +311,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     ;; there is an AVER that it doesn't actually get used for both.
                     (:temporary (:sc unsigned-reg) temp)
                     (:generator 5
-                      (emit-sap-set ,size sap offset value temp)))))))
+                      (emit-sap-set ,size sap offset value temp)))))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
     unsigned-reg positive-fixnum :byte)
@@ -327,6 +333,21 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     sap-reg system-area-pointer :qword)
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj mov
     descriptor-reg * :qword))
+
+;;; (CAS SAP-REF-LISPOBJ) still does not accept immediates for old,new values
+;;; but SETF does
+(define-vop (%set-sap-ref-lispobj)
+   (:translate %set-sap-ref-lispobj)
+   (:policy :fast-safe)
+   (:args (value :scs (descriptor-reg immediate))
+          (sap :scs (sap-reg))
+          (offset :scs (signed-reg immediate)))
+   (:arg-types * system-area-pointer signed-num)
+   (:temporary (:sc unsigned-reg) temp)
+   (:temporary (:sc descriptor-reg :unused-if (or (sc-is value descriptor-reg)
+                                                  (null (tn-value value))))
+               val-temp)
+   (:generator 5 (emit-sap-set :qword sap offset value temp val-temp)))
 
 ;;;; SAP-REF-SINGLE and SAP-REF-DOUBLE
 

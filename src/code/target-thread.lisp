@@ -2573,18 +2573,10 @@ mechanism for inter-thread communication."
   (macrolet ((expand () `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
     (setf *current-thread* thread)
     (expand))
-  ;; Bear in mind that relative to the #-sb-thread code these assignments require
-  ;; a trick because none of the symbols have been thread-locally bound.
-  ;; The C runtime shouldn't have to know to prefill most but not all the TLS with
-  ;; NO-TLS-VALUE. Hence these symbols' TLS slots contain NO-TLS-VALUE which under
-  ;; ordinary circumstances could cause the store to affect SYMBOL-GLOBAL-VALUE.
-  ;; So we have to store directly into offsets relative to the primitive thread.
+  ;; These assignments require a trick with #+sb-thread as all of the symbols' TLS
+  ;; cells contain NO-TLS-VALUE which ordinarily causes SET to affect SYMBOL-GLOBAL-VALUE.
+  ;; So we have to store directly into offsets off the primitive thread.
   ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison.
-  ;; Also note that on x86-64, (SETF SAP-REF-LISPOBJ) won't move immediate-to-memory
-  ;; using one instruction, but sap-ref-word will.
-  ;; So some of these are compile-time converted into their bit representation.
-  ;; (Additionally there is a redundant move from THREAD-TN to a sap register
-  ;; which could probably be eliminated but only via peephole optimization)
   #+sb-thread
   (let ((sap (current-thread-sap)))
     (macrolet ((expand ()
