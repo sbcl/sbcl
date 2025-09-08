@@ -387,16 +387,17 @@
 ;;; splitting off DEST a new CAST node; old LVAR will deliver values
 ;;; to CAST. If we improve the assertion, we set TYPE-CHECK to
 ;;; guarantee that the new assertion will be checked.
-(defun assert-lvar-type (lvar type policy &optional context)
+(defun assert-lvar-type (lvar type policy &optional context not-asserted)
   (declare (type lvar lvar) (type ctype type))
-  (unless (type-asserted-p lvar type)
+  (when (or not-asserted
+            (not (type-asserted-p lvar type)))
     (let ((internal-lvar (make-lvar))
           (dest (lvar-dest lvar)))
       (substitute-lvar internal-lvar lvar)
       (let ((cast (insert-cast-before dest lvar type policy
                                       context)))
         (use-lvar cast internal-lvar)
-        t))))
+        cast))))
 
 (defun assert-node-type (node type policy &optional context not-asserted)
   (declare (type node node) (type ctype type))
@@ -3110,10 +3111,14 @@
              ;; cast can be moved to that use.
              (when (and good-types-not-immediately-used
                         (not multiple-bad-uses))
-               (setf (cast-silent-conflict
-                      (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
-                                        (cast-context cast)
-                                        t))
+               (setf (cast-silent-conflict 
+                      (if (exit-p bad-use)
+                          (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
+                                            (cast-context cast)
+                                            t)
+                          (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
+                                            (cast-context cast)
+                                            t)))
                      :style-warning)
                (delete-filter cast lvar value)
                t))))))

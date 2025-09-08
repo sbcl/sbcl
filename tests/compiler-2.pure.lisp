@@ -4882,3 +4882,33 @@
                n))
    ((2 'a) 'a)
    ((2 1) (condition 'type-error))))
+
+(with-test (:name :cast-move-exit)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (m f)
+         (+ m (catch t (funcall f) 0)))
+    ((1 #'list) 1)
+    ((1 (lambda () (throw t 1))) 2)
+    ((1 (lambda () (throw t t))) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (f)
+         (the number (catch t (funcall f) 2)))
+    ((#'list) 2)
+    (((lambda () (throw t 3))) 3)
+    (((lambda () (throw t t))) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (f)
+         (the number (values (catch t (funcall f) 2))))
+    ((#'list) 2)
+    (((lambda () (throw t 3))) 3)
+    (((lambda () (throw t t))) (condition 'type-error)))
+  (checked-compile-and-assert
+      (:optimize :safe)
+      `(lambda (f)
+         (values (the number (catch t (funcall f) 2))))
+    ((#'list) 2)
+    (((lambda () (throw t 3))) 3)
+    (((lambda () (throw t t))) (condition 'type-error))))
