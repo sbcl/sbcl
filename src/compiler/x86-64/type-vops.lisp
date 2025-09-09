@@ -558,63 +558,81 @@
     not-target))
 
 (define-vop (unsigned-byte-x-p type-predicate)
-  (:arg-types * (:constant (integer 1)))
+  (:arg-types * (:constant t))
   (:translate sb-c::unsigned-byte-x-p)
   (:info target not-p x)
   (:temporary (:sc unsigned-reg) last-digit)
   (:generator 10
-    (let* ((type (tn-ref-type args))
-           (fixnum-p (types-equal-or-intersect type (specifier-type 'fixnum)))
-           (integer-p (csubtypep type (specifier-type 'integer)))
-           (unsigned-p (not (types-equal-or-intersect type (specifier-type '(integer * -1))))))
-      (multiple-value-bind (yep nope)
-          (if not-p
-              (values not-target target)
-              (values target not-target))
-        (assemble ()
-          (when fixnum-p
-            (cond (unsigned-p
-                   (inst test :byte value fixnum-tag-mask)
-                   (inst jmp :z yep))
-                  (t ;; Is it a fixnum with the sign bit clear?
-                   (inst test (constantize non-negative-fixnum-mask) value)
-                   (inst jmp :z yep))))
-          (cond ((fixnum-or-other-pointer-tn-ref-p args t)
-                 (when (and fixnum-p
-                            (not unsigned-p))
-                   (inst test :byte value fixnum-tag-mask)
-                   (inst jmp :z nope)))
-                (t
-                 (%lea-for-lowtag-test temp value other-pointer-lowtag)
-                 (inst test :byte temp lowtag-mask)
-                 (inst jmp :ne nope)))
-          ;; Get the header.
-          (cond ((and integer-p unsigned-p)
-                 (inst mov :dword temp (ea (1+ (- other-pointer-lowtag)) value)))
-                (t
-                 (loadw temp value 0 other-pointer-lowtag)
-                 (unless integer-p
-                   (inst cmp :byte temp bignum-widetag)
-                   (inst jmp :ne nope))
-                 (inst shr temp n-widetag-bits)))
-          (inst cmp :dword temp (1+ (/ x n-word-bits)))
-          (inst jmp :g nope)
-          ;; Is it a sign-extended sign bit
-          (cond (unsigned-p
-                 (inst jmp :l yep)
-                 (inst cmp :qword (ea (- other-pointer-lowtag)
-                                      value temp n-word-bytes)
-                       0)
-                 (inst jmp (if not-p :nz :z) target))
-                (t
-                 (inst mov last-digit (ea (- other-pointer-lowtag) value temp n-word-bytes))
-                 (inst jmp :l fixnum)
-                 (inst test last-digit last-digit)
-                 (inst jmp :nz nope)))
-          fixnum
-          (unless unsigned-p
-            (inst test last-digit last-digit)
-            (inst jmp (if not-p :s :ns) target)))))
+    (multiple-value-bind (digits left) (truncate x n-word-bits)
+      (let* ((type (tn-ref-type args))
+             (fixnum-p (types-equal-or-intersect type (specifier-type 'fixnum)))
+             (integer-p (csubtypep type (specifier-type 'integer)))
+             (unsigned-p (not (types-equal-or-intersect type (specifier-type '(integer * -1))))))
+        (multiple-value-bind (yep nope)
+            (if not-p
+                (values not-target target)
+                (values target not-target))
+          (assemble ()
+            (when fixnum-p
+              (cond (unsigned-p
+                     (inst test :byte value fixnum-tag-mask)
+                     (inst jmp :z yep))
+                    (t ;; Is it a fixnum with the sign bit clear?
+                     (inst test (constantize non-negative-fixnum-mask) value)
+                     (inst jmp :z yep))))
+            (cond ((fixnum-or-other-pointer-tn-ref-p args t)
+                   (when (and fixnum-p
+                              (not unsigned-p))
+                     (inst test :byte value fixnum-tag-mask)
+                     (inst jmp :z nope)))
+                  (t
+                   (%lea-for-lowtag-test temp value other-pointer-lowtag)
+                   (inst test :byte temp lowtag-mask)
+                   (inst jmp :ne nope)))
+            ;; Get the header.
+            (cond ((and integer-p unsigned-p)
+                   (inst mov :dword temp (ea (1+ (- other-pointer-lowtag)) value)))
+                  (t
+                   (loadw temp value 0 other-pointer-lowtag)
+                   (unless integer-p
+                     (inst cmp :byte temp bignum-widetag)
+                     (inst jmp :ne nope))
+                   (inst shr temp n-widetag-bits)))
+            (inst cmp :dword temp (1+ digits))
+            (inst jmp :g nope)
+            (if (zerop left)
+                ;; Is it a sign-extended sign bit
+                (cond (unsigned-p
+                       (inst jmp :l yep)
+                       (inst cmp :qword (ea (- other-pointer-lowtag)
+                                            value temp n-word-bytes)
+                             0)
+                       (inst jmp (if not-p :nz :z) target))
+                      (t
+                       (inst mov last-digit (ea (- other-pointer-lowtag) value temp n-word-bytes))
+                       (inst jmp :l fixnum)
+                       (inst test last-digit last-digit)
+                       (inst jmp :nz nope)))
+                ;; Check if the remaining high bits are zero
+                (let ((bits (dpb 0 (byte left 0) -1)))
+                  (cond ((< left 32)
+                         (inst mov last-digit (ea (- other-pointer-lowtag) value temp n-word-bytes))
+                         (inst jmp :l fixnum)
+                         (inst test last-digit bits))
+                        (t
+                         (inst movsx '(:dword :qword) last-digit (ea (+ (- other-pointer-lowtag)
+                                                                        (/ n-word-bytes 2))
+                                                                     value temp n-word-bytes))
+                         (inst jmp :l fixnum)
+                         (if (= left 32)
+                             (inst test last-digit last-digit)
+                             (inst test last-digit (ash bits -32)))))
+                  (inst jmp :z yep)
+                  (inst jmp nope)))
+            fixnum
+            (unless unsigned-p
+              (inst test last-digit last-digit)
+              (inst jmp (if not-p :s :ns) target))))))
     not-target))
 
 ;;; SINGLE-FLOAT-P, CHARACTERP, UNBOUND-MARKER-P produce a flag result

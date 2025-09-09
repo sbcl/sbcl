@@ -461,18 +461,19 @@
                    ((type= type (specifier-type '(or word sb-vm:signed-word)))
                     `(or (typep ,object 'sb-vm:signed-word)
                          (typep ,object 'word)))
-                   ;; (unsigned-byte n-word-bits^x)
+                   ;; (unsigned-byte x>n-word-bits)
                    ((and (vop-existsp :translate unsigned-byte-x-p)
                          (eql low 0)
                          high
                          (= (logcount (1+ high)) 1)
-                         (zerop (rem (integer-length high) sb-vm:n-word-bits)))
+                         (> high most-positive-word))
                     `(unsigned-byte-x-p ,object ,(integer-length high)))
                    ;; (signed-byte n-word-bits^x)
                    ((and
                      low
                      (eql high (- -1 low))
                      (= (logcount (1+ high)) 1)
+                     (> high (ash most-positive-word -1))
                      (multiple-value-bind (q r) (truncate (1+ (integer-length high)) sb-vm:n-word-bits)
                        (when (zerop r)
                          `(or (fixnump ,object)
