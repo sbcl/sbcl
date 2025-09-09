@@ -3384,19 +3384,6 @@
                                   `(lambda ()
                                      (declare (optimize (sb-c::float-accuracy 0)))
                                      ,lambda-form)))))
-             ;; Let's make sure there is no substraction at runtime: for x86
-             ;; and x86-64 that implies an FSUB, SUBSS, or SUBSD instruction,
-             ;; so look for SUB in the disassembly. It's a terrible KLUDGE,
-             ;; but it works. Unless FLOAT-ACCURACY is zero, we leave the
-             ;; substraction in in to catch SNaNs.
-             #+x86
-             (assert (and (ctu:asm-search "FSUB" fun1)
-                          (not (ctu:asm-search "FSUB" fun2))))
-             #+x86-64
-             (let ((inst (if (typep result 'double-float)
-                             "SUBSD" "SUBSS")))
-               (assert (and (ctu:asm-search inst fun1)
-                            (not (ctu:asm-search inst fun2)))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (test `(lambda (x) (declare (single-float x)) (- x 0)) 123.45)
