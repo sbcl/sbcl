@@ -4750,6 +4750,9 @@
 (deftransform logandc2 ((x y) ((constant-arg (eql -1)) t) *)
   `(lognot y))
 
+(deftransform logandc2 ((x y) (t (constant-arg t)))
+  `(logand x ,(lognot (lvar-value y))))
+
 (deftransform logandc2 ((x y) * * :important nil :node node)
   (delay-ir1-transform node :ir1-phases)
   (if (and (not (or (csubtypep (lvar-type x) (specifier-type 'word))
