@@ -5011,14 +5011,19 @@
 ;;; If a signaling nan somehow got here without signaling anything then
 ;;; why signal now.
 (macrolet
-    ((def (name result minus-result type)
+    ((def (name result minus-result type &optional (constant-type '(member 1 -1)))
          `(deftransform ,name ((x y)
-                               (,type (constant-arg (member 1 -1))))
+                               (,type (constant-arg ,constant-type)))
             "fold identity operations"
             (if (minusp (lvar-value y)) ',minus-result ',result))))
   (def * x (%negate x) number)
   (def / x (%negate x) number)
-  (def expt x (/ 1 x) (or exact-number real))) ;; (expt #c(2d0 2d0) 1) doesn't return #c(2d0 2d0)
+  (def expt x (/ 1 x) (or exact-number real))  ;; (expt #c(2d0 2d0) 1) doesn't return #c(2d0 2d0)
+  ;; These have to respect the float contagion rules
+  (def * x (%negate x) double-float (member 1f0 -1f0 1d0 -1d0))
+  (def / x (%negate x) double-float (member 1f0 -1f0 1d0 -1d0))
+  (def * x (%negate x) float (member 1f0 -1f0))
+  (def / x (%negate x) float (member 1f0 -1f0)))
 
 (deftransform + ((x y) (number number))
   (cond ((splice-fun-args y '%negate 1 nil)
