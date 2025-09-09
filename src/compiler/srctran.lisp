@@ -5039,7 +5039,7 @@
      ;; (- x (- y)) => (+ x y)
      ((splice-fun-args y '%negate 1 nil)
       `(+ x y))
-     ;; (- (- x) c) => (+ -c x)
+     ;; (- (- x) c) => (- -c x)
      ((and (constant-lvar-p y)
            (let ((y (lvar-value y)))
              (cond ((eql y 0)
