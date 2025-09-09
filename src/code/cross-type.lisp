@@ -378,3 +378,6 @@
 ;; Use of non-ASCII during build occurs no sooner than make-target-2,
 ;; therefore _every_ character satisfies BASE-CHAR-P prior to that.
 #+sb-unicode (defun base-char-p (x) (characterp x))
+
+(defun sb-bignum:%bignum-length (x)
+  (values (ceiling (1+ (integer-length x)) sb-vm:n-word-bits)))

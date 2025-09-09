@@ -961,3 +961,15 @@
     (((1- (expt 2 127))) t)
     (((- (expt 2 127))) t)
     (((expt 2 127)) nil)))
+
+(with-test (:name :logxor-1-type)
+  (assert-type
+   (lambda (x)
+     (declare ((signed-byte 64) x))
+     (sb-bignum:%bignum-length x))
+   (integer 1 1))
+  (assert-type
+   (lambda (x)
+     (declare ((unsigned-byte 64) x))
+     (sb-bignum:%bignum-length x))
+   (integer 1 2)))

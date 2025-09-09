@@ -2859,6 +2859,23 @@
                   (specifier-type `(integer ,(integer-length hi)))))))))
    #'integer-length))
 
+(defoptimizer (%bignum-length derive-type) ((x))
+  (one-arg-derive-type
+   x
+   (lambda (x-type)
+     (let ((lo (numeric-type-low x-type))
+           (hi (numeric-type-high x-type)))
+       (cond ((and lo hi)
+              (specifier-type `(integer ,(%bignum-length lo)
+                                        ,(%bignum-length hi))))
+             (lo
+              (when (> lo 0)
+                (specifier-type `(integer ,(%bignum-length lo)))))
+             (hi
+              (when (< hi 0)
+                (specifier-type `(integer ,(%bignum-length hi))))))))
+   nil))
+
 (defoptimizer (logcount derive-type) ((x))
   (one-arg-derive-type
    x
