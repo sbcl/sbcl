@@ -5029,8 +5029,29 @@
          (give-up-ir1-transform))))
 
 (deftransform - ((x y) (number number))
-  (splice-fun-args y '%negate 1)
-  `(+ x y))
+  (or
+   (cond
+     ;; (- x (- y)) => (+ x y)
+     ((splice-fun-args y '%negate 1 nil)
+      `(+ x y))
+     ;; (- (- x) c) => (+ -c x)
+     ((and (constant-lvar-p y)
+           (let ((y (lvar-value y)))
+             (cond ((eql y 0)
+                    ;; no float contagion
+                    'x)
+                   ((zerop y)
+                    (cond ((and (eql y 0f0)
+                                (csubtypep (lvar-type x) (specifier-type 'float)))
+                           'x)
+                          ((and (eql y 0d0)
+                                (csubtypep (lvar-type x) (specifier-type 'double-float)))
+                           'x)))
+                   ((not (typep y '(complex float)))
+                    (when (splice-fun-args x '%negate 1 nil)
+                      `(- ,(- y) x)))))))
+     (t
+      (give-up-ir1-transform)))))
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
