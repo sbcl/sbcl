@@ -2363,7 +2363,7 @@ register."
                                         sb-vm::cfp-offset)))
          (sb-debug:*stack-top-hint* (find-interrupted-frame))
          (error-context (error-context)))
-    (and error-context
+    (and (typep error-context '(cons t list))
          (values (car error-context)
                  (loop for x in (cdr error-context)
                        collect (if (integerp x)

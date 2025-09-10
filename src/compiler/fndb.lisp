@@ -2073,6 +2073,7 @@
 (defknown %type-check-error (t t t) nil)
 (defknown %type-check-error/c (t t t) nil)
 (defknown sb-vm::op-not-type2-error (t t t) nil)
+(defknown sb-vm::op-not-type1-error (t t) nil)
 ;; %compile-time-type-error does not return, but due to the implementation
 ;; of FILTER-LVAR we cannot write it here.
 (defknown (%compile-time-type-error %compile-time-type-style-warn) (t t t t t t) *)

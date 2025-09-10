@@ -1746,26 +1746,29 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun &optional)
+(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun)
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
                         derive-fun member-fun
                         (same-leaf-ref-p arg1 arg2)))
 
 (defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf)
-  (declare (type function derive-fun member-fun))
+  (declare (type function derive-fun)
+           (type (or function null) member-fun))
   (labels ((deriver (x y same-arg)
              (cond ((and (member-type-p x) (member-type-p y))
-                    (let* ((x (first (member-type-members x)))
-                           (y (first (member-type-members y)))
-                           (result (ignore-errors
-                                    (funcall member-fun x y))))
-                      (cond ((null result) *empty-type*)
-                            ((and (floatp result) (float-nan-p result))
-                             (make-numeric-type :class 'float
-                                                :format (type-of result)
-                                                :complexp :real))
-                            (t
-                             (specifier-type `(eql ,result))))))
+                    (if member-fun
+                        (funcall derive-fun (convert-member-type x) (convert-member-type y) same-arg)
+                        (let* ((x (first (member-type-members x)))
+                               (y (first (member-type-members y)))
+                               (result (ignore-errors
+                                        (funcall member-fun x y))))
+                          (cond ((null result) *empty-type*)
+                                ((and (floatp result) (float-nan-p result))
+                                 (make-numeric-type :class 'float
+                                                    :format (type-of result)
+                                                    :complexp :real))
+                                (t
+                                 (specifier-type `(eql ,result)))))))
                    ((and (member-type-p x) (numeric-type-p y))
                     (funcall derive-fun (convert-member-type x) y same-arg))
                    ((and (numeric-type-p x) (member-type-p y))
@@ -3729,22 +3732,24 @@
 (defun cast-or-check-bound-type (node &optional type fixnum)
   (let ((lvar (node-lvar node)))
     (when lvar
-      (multiple-value-bind (dest lvar) (immediately-used-let-dest lvar node t)
-        (let ((cast-type (cond ((cast-p dest)
-                                (and (cast-type-check dest)
-                                     (single-value-type (cast-type-to-check dest))))
-                               ((and (combination-p dest)
-                                     (equal (combination-fun-debug-name dest) '(transform-for check-bound))
-                                     (eq (third (combination-args dest)) lvar))
-                                (if fixnum
-                                    (specifier-type 'index)
-                                    (specifier-type 'sb-vm:signed-word))))))
-          (when cast-type
-            (let ((result-type (type-intersection cast-type (lvar-type lvar))))
-              (when (and (not (eq result-type *empty-type*))
-                         (or (not type)
-                             (csubtypep result-type type)))
-                (values cast-type result-type)))))))))
+      (unless (and type
+                   (csubtypep (single-value-type (node-derived-type node)) type))
+        (multiple-value-bind (dest lvar) (immediately-used-let-dest lvar node t)
+          (let ((cast-type (cond ((cast-p dest)
+                                  (and (cast-type-check dest)
+                                       (single-value-type (cast-type-to-check dest))))
+                                 ((and (combination-p dest)
+                                       (equal (combination-fun-debug-name dest) '(transform-for check-bound))
+                                       (eq (third (combination-args dest)) lvar))
+                                  (if fixnum
+                                      (specifier-type 'index)
+                                      (specifier-type 'sb-vm:signed-word))))))
+            (when cast-type
+              (let ((result-type (type-intersection cast-type (lvar-type lvar))))
+                (when (and (not (eq result-type *empty-type*))
+                           (or (not type)
+                               (csubtypep result-type type)))
+                  (values cast-type result-type))))))))))
 
 ;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
 (when-vop-existsp (:translate overflow+)

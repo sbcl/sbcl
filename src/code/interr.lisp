@@ -597,6 +597,20 @@
           (object-not-type-error (- x) type nil)
           (object-not-type-error x 'number nil)))))
 
+(deferr op-not-type1-error (a)
+  (let* ((context-p (sb-di:error-context))
+         (context (or context-p
+                      a)))
+    (multiple-value-bind (type op) (if (consp context)
+                                       (values (car context) (cdr context))
+                                       (values 'fixnum context))
+      (cond (context-p
+             (unless (typep a 'number)
+               (object-not-type-error a 'number nil))
+             (object-not-type-error (funcall op a) type nil))
+            (t
+             (object-not-type-error "#<no debug info>" type nil))))))
+
 (deferr op-not-type2-error (a b)
   (let* ((context-p (sb-di:error-context))
          (context (or context-p

@@ -501,6 +501,34 @@
 
 ;;;; irrational transforms
 
+(make-defs (($type double-float single-float))
+  (deftransform log ((x) ($type) * :node node)
+    (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
+      (if cast
+          `(if (float-sign-bit-set-p x)
+               (sb-vm::op-not-type1-error x '(,(type-specifier cast) . log))
+               (truly-the $type (log (truly-the (float 0.0) x))))
+          (give-up-ir1-transform))))
+
+  (deftransform log ((x y) ($type $type) * :node node)
+    (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
+      (if cast
+          `(if (or (float-sign-bit-set-p x)
+                   ;; The out of line definition returns 0 for all zeros
+                   (< y 0))
+               (sb-vm::op-not-type2-error x y '(,(type-specifier cast) . log))
+               (truly-the $type (log (truly-the (float 0.0) x)
+                                     (truly-the (float 0.0) y))))
+          (give-up-ir1-transform))))
+
+  (deftransform sqrt ((x) ($type) * :node node)
+    (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
+      (if cast
+          `(if (< x 0)
+               (sb-vm::op-not-type1-error x '(,(type-specifier cast) . sqrt))
+               (truly-the $type (sqrt (truly-the (float 0.0) x))))
+          (give-up-ir1-transform)))))
+
 (macrolet ((def (name prim rtype)
              `(progn
                (deftransform ,name ((x) (single-float) ,rtype :node node)
@@ -1088,8 +1116,16 @@
 
 (defoptimizer (log derive-type) ((x &optional y))
   (if y
-      (two-arg-derive-type x y #'log-derive-type-aux-2 #'log)
-      (one-arg-derive-type x #'log-derive-type-aux-1 #'log)))
+      (two-arg-derive-type x y #'log-derive-type-aux-2 nil)
+      (one-arg-derive-type x #'log-derive-type-aux-1
+                           (lambda (n)
+                             (case n
+                               (0f0
+                                single-float-negative-infinity)
+                               (0d0
+                                double-float-negative-infinity)
+                               (t
+                                (log n)))))))
 
 (defun atan-derive-type-aux-1 (y)
   (elfun-derive-type-simple y #'atan nil nil (sb-xc:- (sb-xc:/ pi 2)) (sb-xc:/ pi 2)))
@@ -1821,37 +1857,6 @@
                         (,(symbolicate 'unary-truncate- type '-to-bignum) number)))))))
   (def single-float)
   (def double-float))
-
-(defmacro make-defs (vars &body body)
-  (labels ((subst-if-with (test tree)
-             (labels ((s (subtree)
-                        (let ((test (funcall test subtree)))
-                          (cond (test)
-                                ((atom subtree) subtree)
-                                (t (let ((car (s (car subtree)))
-                                         (cdr (s (cdr subtree))))
-                                     (if (and (eq car (car subtree))
-                                              (eq cdr (cdr subtree)))
-                                         subtree
-                                         (cons car cdr))))))))
-               (s tree)))
-           (test (pattern with)
-             (lambda (x)
-               (when (symbolp x)
-                 (let* ((str (string x))
-                        (float (search pattern str)))
-                   (when float
-                     (symbolicate (subseq str 0 float)
-                                  with
-                                  (subseq str (+ float (length pattern)))))))))
-           (gen (vars body)
-             (if vars
-                 (loop for with in (cdar vars)
-                       append
-                       (gen (cdr vars)
-                            (subst-if-with (test (string (caar vars)) with) body)))
-                 body)))
-    `(progn ,@(gen vars body))))
 
 (make-defs (($float single-float double-float))
   (deftransform unary-truncate-$float-to-bignum-div ((quot number divisor) * * :result result)
