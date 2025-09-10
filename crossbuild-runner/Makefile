@@ -100,7 +100,7 @@ obj/xbuild/x86-64-darwin.core: obj/xbuild/x86-64-darwin/xc.core
 	$(SBCL) $(ARGS) x86-64-darwin < $(SCRIPT2)
 
 obj/xbuild/x86-64-imm/xc.core: $(DEPS1)
-	$(SBCL) $(ARGS) x86-64-imm x86-64 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :IMMOBILE-SPACE)" < $(SCRIPT1)
+	$(SBCL) $(ARGS) x86-64-imm x86-64 "(:WIN32 :SB-THREAD :SB-SAFEPOINT :LITTLE-ENDIAN :AVX2 :GENCGC :SB-SIMD-PACK :SB-SIMD-PACK-256 :IMMOBILE-SPACE (NOT :SB-UNICODE))" < $(SCRIPT1)
 obj/xbuild/x86-64-imm.core: obj/xbuild/x86-64-imm/xc.core
 	$(SBCL) $(ARGS) x86-64-imm < $(SCRIPT2)
 

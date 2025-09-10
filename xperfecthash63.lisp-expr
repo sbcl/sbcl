@@ -14,6 +14,9 @@
 (#(0 2 4 44 46 48)
  "(35 34 2 36 1 0)"
  "((& (+ (>> val 1) (>> val 6)) 7))")
+(#(0 2 4 46 48)
+ "(35 2 36 1 0)"
+ "((& (>> val 1) 7))")
 (#(0 2 A C E 10 1E)
  "(8 7 0 15 1 5 6)"
  "((let ((tab #a((4) (unsigned-byte 8) 0 4 7 0)))
@@ -35,6 +38,12 @@
 (#(0 732BDD9 6BC2D01D 841FB34E)
  "(NIL :STRINGS :BOTH :SYMBOLS)"
  "((& (>> val 25) 3))")
+(#(0 B445B28 1A7E09AF 2EF3F4BC 4A8C210D 72E2CBDA 80D0C591 9BAC0C5C A8892768 AC841474 C6B4780F D0BE7277 E331CAB8 E48D4754)
+ "(NIL COMPLEX INTEGER MOD SINGLE-FLOAT DOUBLE-FLOAT SIGNED-BYTE UNSIGNED-BYTE FIXNUM BIT CHARACTER STANDARD-CHAR BASE-CHAR T)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 13 11 2 0 8 5 3)))
+  (let ((b (& (>> val 4) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 (#(0 B445B28 1A7E09AF 2EF3F4BC 4A8C210D 72E2CBDA 80D0C591 9BAC0C5C A8892768 AC841474 C6B4780F D0BE7277 E331CAB8 E48D4754
    FEDA4470)
  "(NIL COMPLEX INTEGER MOD SINGLE-FLOAT DOUBLE-FLOAT SIGNED-BYTE UNSIGNED-BYTE FIXNUM BIT EXTENDED-CHAR CHARACTER STANDARD-CHAR BASE-CHAR T)"
@@ -252,6 +261,12 @@
 (#(C8 CA CC CE 1E0 1E4 1E6)
  "(243 242 240 103 102 101 100)"
  "((& (^ (>> val 1) (>> val 4)) 7))")
+(#(112 11A 122 12A 132 13A 142 14A 152 15A 162 16A 172 17A 182 18A 192 19A 1A2 1AA 1B2 1BA 1C2)
+ "(137 221 217 205 201 197 193 189 185 181 177 173 169 165 161 157 153 149 145 141 213 209 225)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 24 0 13 0 13 0 13 1 21 16 22 16 18 7 21)))
+  (let ((b (& (>> val 3) #xf)))
+   (let ((a (>> (<< val 24) 28)))
+    (^ a (aref tab b))))))")
 (#(112 11A 122 12A 132 13A 142 14A 152 15A 162 16A 172 17A 182 18A 192 19A 1A2 1AA 1B2 1BA 1C2 1CA)
  "(137 221 217 205 201 197 193 189 185 181 177 173 169 165 161 157 153 149 145 141 213 209 229 225)"
  "((let ((tab #a((16) (unsigned-byte 8) 31 24 0 13 0 13 0 13 1 12 16 22 16 18 21 22)))
@@ -265,6 +280,12 @@
   (^= val (>> val 4))
   (let ((b (& (>> val 3) #x3)))
    (let ((a (>> (u32+ val (<< val 25)) 30)))
+    (^ a (aref tab b))))))")
+(#(11A 122 12A 13A 14A 15A 172 17A 182 18A 19A 1C2)
+ "(141 225 145 149 157 165 173 185 189 193 197 205)"
+ "((let ((tab #a((8) (unsigned-byte 8) 12 5 0 0 4 2 5 8)))
+  (let ((b (& (>> val 3) #x7)))
+   (let ((a (>> (<< val 24) 29)))
     (^ a (aref tab b))))))")
 (#(11A 122 12A 13A 14A 15A 172 17A 182 18A 19A 1C2 1CA)
  "(141 225 229 145 149 157 165 173 185 189 193 197 205)"

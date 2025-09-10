@@ -53,7 +53,7 @@
               ("x86-64-darwin" :darwin :bsd :unix :mach-o :little-endian :avx2 :gencgc
                                :sb-simd-pack :sb-simd-pack-256)
               ("x86-64-imm" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
-                            :immobile-space)
+                            :immobile-space (not :sb-unicode))
               ("x86-64-permgen" :little-endian :avx2 :gencgc :sb-simd-pack :sb-simd-pack-256
                                 :permgen))))
 
