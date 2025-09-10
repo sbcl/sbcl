@@ -336,9 +336,14 @@
     (%%sqrt rational (cl:/ (isqrt (numerator rational)) (isqrt (denominator rational))))))
 
 (defun sb-xc:sqrt (arg)
-  (let ((format (if (rationalp arg) 'single-float (type-of arg))))
-    (with-memoized-math-op (sqrt arg)
-      (flonum-from-rational (%sqrt (rational arg)) format))))
+  (cond ((eql arg 0)
+         0.0)
+        ((sb-xc:= arg 0)
+         arg)
+        (t
+         (let ((format (if (rationalp arg) 'single-float (type-of arg))))
+           (with-memoized-math-op (sqrt arg)
+             (flonum-from-rational (%sqrt (rational arg)) format))))))
 
 ;;; There seems to be no portable way to mask float traps, so right
 ;;; now we ignore them and hardcode special cases.
