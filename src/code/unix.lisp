@@ -1175,3 +1175,6 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
+
+(push '("SB-UNIX" unix-opendir unix-readdir unix-closedir unix-dirent-name)
+      *!removable-symbols*)
