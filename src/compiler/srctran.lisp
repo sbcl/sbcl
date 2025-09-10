@@ -1704,10 +1704,10 @@
 ;;; For the case of member types, if a MEMBER-FUN is given it is
 ;;; called to compute the result otherwise the member type is first
 ;;; converted to a numeric type and the DERIVE-FUN is called.
-(defun one-arg-derive-type (arg derive-fun member-fun)
+(defun %one-arg-derive-type (arg-type derive-fun member-fun)
   (declare (type function derive-fun)
            (type (or null function) member-fun))
-  (let ((arg-list (prepare-arg-for-derive-type (lvar-type arg))))
+  (let ((arg-list (prepare-arg-for-derive-type arg-type)))
     (when arg-list
       (labels ((deriver (x)
                  (cond
@@ -1728,7 +1728,7 @@
           (dolist (arg arg-list)
             (let ((result (deriver arg)))
               (cond ((not result)
-                     (return-from one-arg-derive-type))
+                     (return-from %one-arg-derive-type))
                     ((listp result)
                      (setf results (append results result)))
                     (t
@@ -1736,6 +1736,9 @@
           (if (rest results)
               (make-derived-union-type results)
               (first results)))))))
+
+(defun one-arg-derive-type (arg derive-fun member-fun)
+  (%one-arg-derive-type (lvar-type arg) derive-fun member-fun))
 
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
 ;;; two arguments. DERIVE-FUN takes 3 args in this case: the two
@@ -2121,6 +2124,9 @@
 (defun abs-derive-type-aux (type)
   (cond ((ratio-type-p type)
          (specifier-type '(and ratio (rational 0))))
+        ((eq type (specifier-type 'number))
+         (specifier-type '(and (real 0)
+                           (not (member -0f0 -0d0)))))
         ((eq (numeric-type-complexp type) :complex)
          ;; The absolute value of a complex number is always a
          ;; non-negative float.
@@ -2128,25 +2134,41 @@
                           ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
-           (make-numeric-type :class 'float
-                              :format format
-                              :complexp :real
-                              :low (coerce 0 bound-format)
-                              :high nil)))
+           (type-union 
+            (make-numeric-type :class 'float
+                               :format format
+                               :complexp :real
+                               :low (list (coerce 0 bound-format))
+                               :high nil)
+            (if (eq format 'double-float)
+                (specifier-type '(eql 0d0))
+                (specifier-type '(eql 0f0))))))
         (t
          ;; The absolute value of a real number is a non-negative real
          ;; of the same type.
          (let* ((abs-bnd (interval-abs (numeric-type->interval type)))
                 (class (numeric-type-class type))
                 (format (numeric-type-format type))
-                (bound-type (or format class 'real)))
-           (make-numeric-type
-            :class class
-            :format format
-            :complexp :real
-            :low (coerce-and-truncate-floats (interval-low abs-bnd) bound-type)
-            :high (coerce-and-truncate-floats
-                   (interval-high abs-bnd) bound-type))))))
+                (bound-type (or format class 'real))
+                (low (coerce-and-truncate-floats (interval-low abs-bnd) bound-type))
+                (high (coerce-and-truncate-floats (interval-high abs-bnd) bound-type))
+                (type (make-numeric-type
+                       :class class
+                       :format format
+                       :complexp :real
+                       :low low
+                       :high high)))
+           (case format
+             (double-float
+              (if (eql low 0d0)
+                  (type-intersection type (specifier-type '(not (eql -0d0))))
+                  type))
+             (single-float
+              (if (eql low 0f0)
+                  (type-intersection type (specifier-type '(not (eql -0f0))))
+                  type))
+             (t
+              type))))))
 
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux #'abs))

@@ -595,7 +595,8 @@
 
 ;;; Handle some simple transformations.
 
-(deftransform abs ((x) ((or (float (0.0)) (member 0d0 0f0)))) ;; exclude -0.0
+(deftransform abs ((x) ((and (real 0)
+                             (not (member -0f0 -0d0))))) ;; exclude -0.0
   'x)
 
 (deftransform abs ((x) ((complex double-float)) double-float)
@@ -1114,12 +1115,13 @@
       (one-arg-derive-type y #'atan-derive-type-aux-1 #'atan)))
 
 (defun cosh-derive-type-aux (x)
-  ;; We note that cosh x = cosh |x| for all real x.
-  (elfun-derive-type-simple
+  (%one-arg-derive-type
+   ;; We note that cosh x = cosh |x| for all real x.
    (if (numeric-type-real-p x)
        (abs-derive-type-aux x)
        x)
-   #'cosh nil nil 0 nil))
+   (lambda (x) (elfun-derive-type-simple x #'cosh nil nil 0 nil))
+   #'cosh))
 
 (defoptimizer (cosh derive-type) ((num))
   (one-arg-derive-type num #'cosh-derive-type-aux #'cosh))
