@@ -466,6 +466,8 @@
 ;;; we don't care how it looks, but can recover the intended specialization.
 (defun coerce-to-smallest-eltype (seq)
   (declare (type sequence seq))
+  ;; Silence "Clause CHARACTER is shadowed by BASE-CHAR" depending on +/-unicode of host+target
+  #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions style-warning))
   (let ((max-positive 0)
         (max-negative 0)
         (length 0)
@@ -492,14 +494,7 @@
                   (let ((abs (- x)))
                     (when (>= abs max-negative)
                       (setf max-negative abs))))
-                 ;; If the host is SBCL without Unicode support, then it style-warns:
-                 ;; in: DEFUN COERCE-TO-SMALLEST-ELTYPE
-                 ;;  (CHARACTER (UNLESS CHARACTER (SB-C::T-VECTOR)) (SETF CHARACTER 'CHARACTER))
-                 ;; caught STYLE-WARNING:
-                 ;;   Clause CHARACTER is shadowed by BASE-CHAR
-                 ;; and consequently
-                 ;; "make-host-1 stopped due to unexpected STYLE-WARNING."
-                 #+(and sb-unicode (not sb-xc-host))
+                 #+sb-unicode
                  (base-char
                   (unless character
                     (t-vector))
