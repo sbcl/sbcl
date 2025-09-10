@@ -446,17 +446,21 @@ not supported."
   (export 'getcwd :sb-posix)
   (defun getcwd ()
     "Returns the process's current working directory as a string."
+    #+(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
+    (sb-unix:posix-getcwd)
+    #-(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
     (flet ((%getcwd (buffer size)
              (alien-funcall
               (extern-alien #-win32 "getcwd"
                             #+win32 "_getcwd" (function c-string (* t) int))
               buffer size)))
+     (sb-int:possibly-base-stringize
       (with-growing-c-string (buf size)
         (let ((result (%getcwd buf size)))
           (cond (result
                  (buf))
                 ((/= (get-errno) sb-posix:erange)
-                 (syscall-error 'getcwd))))))))
+                 (syscall-error 'getcwd)))))))))
 
 #-win32
 (progn
@@ -962,17 +966,9 @@ not supported."
 
 ;;; environment
 
-(defun getenv (name)
-  ;; SUSv4 doesn't define any errors for getenv, but some systems do.
-  (set-errno 0)
-  (let ((r (alien-funcall
-            (extern-alien "getenv" (function (* char) (c-string :not-null t)))
-            name)))
-    (declare (type (alien (* char)) r))
-    (if (null-alien r)
-        (when (plusp (get-errno))
-          (syscall-error 'getenv))
-        (cast r c-string))))
+(declaim (ftype (function (t) (values (or simple-string null) &optional)) getenv))
+(setf (fdefinition 'getenv) #'sb-ext:posix-getenv)
+
 #-win32
 (progn
   (define-call "setenv" int minusp
@@ -986,7 +982,7 @@ not supported."
     ;; We don't want to call actual putenv: the string passed to putenv ends
     ;; up in environ, and we any string we allocate GC might move.
     ;;
-    ;; This makes our wrapper nonconformant if you squit hard enough, but
+    ;; This makes our wrapper nonconformant if you squint hard enough, but
     ;; users who care about that should really be calling putenv() directly in
     ;; order to be able to manage memory sanely.
     (let ((p (position #\= string))

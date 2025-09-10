@@ -887,11 +887,10 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (setf result (nreverse result))
     (coerce result 'string)))
 
-(declaim (type function sb-unix::posix-getenv))
 (defun get-user-locale ()
   (let ((raw-locale
-         #+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
-                                (sb-unix::posix-getenv "LANG"))
+         #+(or win32 unix) (or (sb-ext:posix-getenv "LC_ALL")
+                               (sb-ext:posix-getenv "LANG"))
          #-(or win32 unix) nil))
     (when raw-locale
       (let ((lang-code (string-upcase
