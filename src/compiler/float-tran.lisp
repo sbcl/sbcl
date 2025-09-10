@@ -198,11 +198,17 @@
   #-64-bit `(logand (ash (double-float-high-bits x) -31) 1)
   #+64-bit `(ash (logand (double-float-bits x) most-positive-word) -63))
 
-(deftransform float-sign-bit-set-p ((x) (single-float) *)
+(deftransform float-sign-bit-set-p ((x) (single-float) * :node node)
+  (delay-ir1-transform node :constraint)
   `(logbitp 31 (single-float-bits x)))
-(deftransform float-sign-bit-set-p ((x) (double-float) *)
+(deftransform float-sign-bit-set-p ((x) (double-float) * :node node)
+  (delay-ir1-transform node :constraint)
   #-64-bit `(logbitp 31 (double-float-high-bits x))
   #+64-bit `(logbitp 63 (double-float-bits x)))
+
+(defoptimizer (float-sign-bit-set-p constraint-propagate-if)
+    ((x))
+  (values x (specifier-type '(float * 0.0)))) ;; include -0.0 for now
 
 ;;; This doesn't deal with complex at the moment.
 (deftransform signum ((x) (number))
@@ -330,10 +336,10 @@
                            :high new-hi)))))
 (defoptimizer (scale-single-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       (lambda (x y) (scale-single-float x y))))
+                       #'scale-float))
 (defoptimizer (scale-double-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       (lambda (x y) (scale-double-float x y))))
+                       #'scale-float))
 
 ;;; DEFOPTIMIZERs for %SINGLE-FLOAT and %DOUBLE-FLOAT. This makes the
 ;;; FLOAT function return the correct ranges if the input has some
