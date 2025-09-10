@@ -492,7 +492,14 @@
                   (let ((abs (- x)))
                     (when (>= abs max-negative)
                       (setf max-negative abs))))
-                 #+sb-unicode
+                 ;; If the host is SBCL without Unicode support, then it style-warns:
+                 ;; in: DEFUN COERCE-TO-SMALLEST-ELTYPE
+                 ;;  (CHARACTER (UNLESS CHARACTER (SB-C::T-VECTOR)) (SETF CHARACTER 'CHARACTER))
+                 ;; caught STYLE-WARNING:
+                 ;;   Clause CHARACTER is shadowed by BASE-CHAR
+                 ;; and consequently
+                 ;; "make-host-1 stopped due to unexpected STYLE-WARNING."
+                 #+(and sb-unicode (not sb-xc-host))
                  (base-char
                   (unless character
                     (t-vector))
