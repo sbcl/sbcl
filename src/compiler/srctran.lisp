@@ -2134,7 +2134,7 @@
                           ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
-           (type-union 
+           (type-union
             (make-numeric-type :class 'float
                                :format format
                                :complexp :real

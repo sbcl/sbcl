@@ -945,6 +945,16 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 void save_context_for_ldb(os_context_t *context) {
     struct thread *thread = get_sb_vm_thread();
 
+#ifdef reg_CSP
+    lispobj * cfp = (lispobj*)*os_context_register_addr(context, reg_CFP);
+    lispobj * csp = (lispobj*)*os_context_register_addr(context, reg_CSP);
+    if (!(cfp >= thread->control_stack_start && cfp <= thread->control_stack_end &&
+          csp >= thread->control_stack_start && csp <= thread->control_stack_end)) {
+        save_interrupt_context(thread, context);
+        return;
+    }
+#endif
+
     if(!foreign_function_call_active_p(thread))
         fake_foreign_function_call(context);
     else
