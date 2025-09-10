@@ -1126,11 +1126,18 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Print some noise about FORM if *COMPILE-PRINT* is true.
 (defun note-top-level-form (form)
   (when *compile-print*
-    (let ((*print-length* 2)
-          (*print-level* 2)
-          (*print-pretty* nil))
-      (with-compiler-io-syntax
-        (compiler-mumble "~&; processing ~S" form)))))
+    (multiple-value-bind (*print-length* *print-level*)
+        (if (typep form '(cons (eql defmethod)))
+            (values (loop for i from 1
+                          for cdr on form
+                          when (or (atom cdr)
+                                   (listp (car cdr)))
+                          return i)
+                    5)
+            (values 2 2))
+      (let ((*print-pretty* nil))
+        (with-compiler-io-syntax
+          (compiler-mumble "~&; processing ~S" form))))))
 
 ;;; Handle the evaluation the a :COMPILE-TOPLEVEL body during
 ;;; compilation. Normally just evaluate in the appropriate
