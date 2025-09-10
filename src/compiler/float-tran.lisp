@@ -639,6 +639,13 @@
              'log-double-float)
             ((csubtypep (lvar-type number) (specifier-type 'single-float))
              'log-single-float))))
+
+(defoptimizer (sqrt rewrite-full-call) ((number) node)
+  (cond ((csubtypep (lvar-type number) (specifier-type 'double-float))
+         'sqrt-double-float)
+        ((csubtypep (lvar-type number) (specifier-type 'single-float))
+         'sqrt-single-float)))
+
 
 ;;; Handle some simple transformations.
 

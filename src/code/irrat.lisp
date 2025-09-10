@@ -387,6 +387,16 @@
           (foreach complex double-float single-float))
          (complex-expt base power))))))
 
+(defun sqrt-double-float (number)
+  (if (< number 0)
+      (complex 0d0 (sqrt (- number)))
+      (sqrt number)))
+
+(defun sqrt-single-float (number)
+  (if (< number 0)
+      (complex 0f0 (sqrt (- number)))
+      (sqrt number)))
+
 (defun log-double-float (number)
   (if (float-sign-bit-set-p number)
       (complex (log (- number)) pi)

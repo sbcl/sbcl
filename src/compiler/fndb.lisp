@@ -301,6 +301,11 @@
 (defknown log-single-float (single-float) (or single-float (complex single-float))
   (movable foldable flushable fixed-args))
 
+(defknown sqrt-double-float (double-float) (or double-float (complex double-float))
+  (movable foldable flushable fixed-args))
+(defknown sqrt-single-float (single-float) (or single-float (complex single-float))
+  (movable foldable flushable fixed-args))
+
 (defknown log-double-float2 (double-float double-float) (or double-float (complex double-float))
   (movable foldable flushable fixed-args))
 (defknown log-single-float2 (single-float single-float) (or single-float (complex single-float))
