@@ -593,6 +593,9 @@
 
 ;;; Handle some simple transformations.
 
+(deftransform abs ((x) ((or (float (0.0)) (member 0d0 0f0)))) ;; exclude -0.0
+  'x)
+
 (deftransform abs ((x) ((complex double-float)) double-float)
   '(%hypot (realpart x) (imagpart x)))
 
