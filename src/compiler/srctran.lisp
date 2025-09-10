@@ -4358,6 +4358,33 @@
                       (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
         (give-up-ir1-transform))))
 
+(flet ((single-value-fun (combination name)
+         (let ((lvar (node-lvar combination)))
+           (when (or (lvar-single-value-p lvar)
+                     (mv-bind-unused-p lvar 1))
+             (let ((args (combination-args combination)))
+               (unless (cdr args)
+                 (setf (cdr args)
+                       (list (insert-ref-before (find-constant 1) combination))))
+               (setf (node-derived-type combination)
+                     (make-single-value-type (single-value-type (node-derived-type combination))))
+               name)))))
+  (macrolet ((defs ()
+               `(progn
+                  ,@(loop for (name single-name) on '(truncate sb-kernel::truncate1
+                                                      floor sb-kernel::floor1
+                                                      ceiling sb-kernel::ceiling1
+                                                      round sb-kernel::round1
+                                                      ftruncate sb-kernel::ftruncate1
+                                                      ffloor sb-kernel::ffloor1
+                                                      fceiling sb-kernel::fceiling1
+                                                      fround sb-kernel::fround1)
+                          by #'cddr
+                          collect
+                          `(defoptimizer (,name rewrite-full-call) ((&rest args) node)
+                             (single-value-fun node ',single-name))))))
+    (defs)))
+
 (defoptimizer (/ constraint-propagate)
     ((x y) node gen)
   (when (csubtypep (lvar-type y) (specifier-type 'rational))

@@ -321,57 +321,40 @@
        :recklessly recklessly)
       t)))
 
-(defun rewrite-full-call (combination)
-  (let ((combination-name (lvar-fun-name (combination-fun combination) t))
-        (args (combination-args combination)))
-    (cond ((eq (combination-kind combination) :known)
-           (let ((two-arg (assoc (uncross combination-name) *two-arg-functions*)))
-             (when (and two-arg
-                        (= (length args) 2))
-               (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
-                 (declare (ignore name))
-                 (when (and types
-                            (loop for arg in args
-                                  for type in types
-                                  always (csubtypep (lvar-type arg) type)))
-                   (setf two-arg typed-two-arg))
-                 (change-full-call combination two-arg))))
-           (let ((lvar (node-lvar combination)))
-             (when (or (lvar-single-value-p lvar)
-                       (mv-bind-unused-p lvar 1))
-               (let ((single-value-fun (getf '(truncate sb-kernel::truncate1
-                                               floor sb-kernel::floor1
-                                               ceiling sb-kernel::ceiling1
-                                               round sb-kernel::round1
-                                               ftruncate sb-kernel::ftruncate1
-                                               ffloor sb-kernel::ffloor1
-                                               fceiling sb-kernel::fceiling1
-                                               fround sb-kernel::fround1)
-                                             combination-name)))
-                 (when single-value-fun
-                   (unless (cdr args)
-                     (setf (cdr args)
-                           (list (insert-ref-before (find-constant 1) combination))))
-                   (change-full-call combination single-value-fun)
-                   (setf (node-derived-type combination)
-                         (make-single-value-type (single-value-type (node-derived-type combination))))))))
-           (let ((rewrite (fun-info-rewrite-full-call (combination-fun-info combination))))
-             (when rewrite
-               (let ((new (funcall rewrite combination)))
-                 (when new
-                   (change-full-call combination new))))))
-          ((and (eq (combination-kind combination) :full)
-                (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
-           (let ((specialized (or (info :function :specialized-xep combination-name)
-                                  (let ((specialized (assoc 'sb-impl::specialized-xep
-                                                            (lexenv-user-data (node-lexenv combination)))))
-                                    (when (eq (cadr specialized) combination-name)
-                                      (cddr specialized))))))
+(macrolet ((def ()
+             `(progn
+                ,@(loop for (name two-arg types typed) in *two-arg-functions*
+                        collect
+                        (if typed
+                            `(defoptimizer (,name rewrite-full-call) ((a b) node)
+                               (if (and (csubtypep (lvar-type a) (specifier-type  ',(type-specifier (first types))))
+                                        (csubtypep (lvar-type b) (specifier-type  ',(type-specifier (second types)))))
+                                   ',typed
+                                   ',two-arg))
+                            `(defoptimizer (,name rewrite-full-call) ((a b) node)
+                               ',two-arg))))))
+  (def))
 
-             (when (and specialized
-                        (= (length args)
-                           (length (first specialized))))
-               (change-full-call combination `(sb-impl::specialized-xep ,combination-name ,@specialized))))))))
+(defun rewrite-full-call (combination)
+  (case (combination-kind combination)
+    (:known
+     (let ((rewrite (fun-info-rewrite-full-call (combination-fun-info combination))))
+       (when rewrite
+         (let ((new (funcall rewrite combination)))
+           (when new
+             (change-full-call combination new))))))
+    (:full
+     (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
+            (specialized (or (info :function :specialized-xep combination-name)
+                             (let ((specialized (assoc 'sb-impl::specialized-xep
+                                                       (lexenv-user-data (node-lexenv combination)))))
+                               (when (eq (cadr specialized) combination-name)
+                                 (cddr specialized))))))
+       (when (and specialized
+                  (= (length (combination-args combination))
+                     (length (first specialized)))
+                  (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
+         (change-full-call combination `(sb-impl::specialized-xep ,combination-name ,@specialized)))))))
 
 ;;; The %other-pointer-subtype-p optimizer in ir2opt combines multiple
 ;;; checks for other-pointer into a single widetag load.
