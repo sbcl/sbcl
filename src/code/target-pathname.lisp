@@ -329,9 +329,10 @@
                    ;; they don't mutate strings returned by pathname accessors.
                    (t (let ((l (length part)))
                         (logically-readonlyize
-                         (replace (typecase part
-                                    (base-string (make-string l :element-type 'base-char))
-                                    (t (make-string l)))
+                         (replace (if (or (typep part 'base-string)
+                                          #+sb-unicode (every #'base-char-p part))
+                                      (make-string l :element-type 'base-char)
+                                      (make-string l))
                                   part)))))))
       (let* ((dir+hash
               (if directory ; find the interned dir-key
