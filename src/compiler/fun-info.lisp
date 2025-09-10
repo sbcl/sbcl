@@ -99,7 +99,10 @@
   foldable-read-only)
 
 (defstruct (fun-info (:copier nil)
-                     #-sb-xc-host (:pure t))
+                     #-sb-xc-host (:pure t)
+                     (:constructor make-fun-info
+                         (attributes derive-type optimizer
+                          result-arg call-type-deriver annotation folder read-only-args)))
   ;; boolean attributes of this function.
   (attributes (missing-arg) :type attributes)
   ;; TRANSFORM structures describing transforms for this function
@@ -181,7 +184,8 @@
   ;; A description of read-only arguments that can be constant folded.
   ;; An integer bitmap for positional arguments.
   ;; Sign-extended into a negative integer for &rest arguments.
-  (read-only-args nil))
+  (read-only-args nil)
+  (rewrite-full-call nil :type (or function null)))
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))

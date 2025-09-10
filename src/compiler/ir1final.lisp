@@ -354,7 +354,12 @@
                            (list (insert-ref-before (find-constant 1) combination))))
                    (change-full-call combination single-value-fun)
                    (setf (node-derived-type combination)
-                         (make-single-value-type (single-value-type (node-derived-type combination)))))))))
+                         (make-single-value-type (single-value-type (node-derived-type combination))))))))
+           (let ((rewrite (fun-info-rewrite-full-call (combination-fun-info combination))))
+             (when rewrite
+               (let ((new (funcall rewrite combination)))
+                 (when new
+                   (change-full-call combination new))))))
           ((and (eq (combination-kind combination) :full)
                 (not (fun-lexically-notinline-p combination-name (node-lexenv combination))))
            (let ((specialized (or (info :function :specialized-xep combination-name)

@@ -176,14 +176,14 @@
                        (fun-info-read-only-args old-fun-info) read-only))
                 (t
                  (setf (info :function :info name)
-                       (make-fun-info :attributes attributes
-                                      :derive-type derive-type
-                                      :optimizer optimizer
-                                      :result-arg result-arg
-                                      :call-type-deriver call-type-deriver
-                                      :annotation annotation
-                                      :folder folder
-                                      :read-only-args read-only))))
+                       (make-fun-info attributes
+                                      derive-type
+                                      optimizer
+                                      result-arg
+                                      call-type-deriver
+                                      annotation
+                                      folder
+                                      read-only))))
           (if location
               (setf (getf (info :source-location :declaration name) 'defknown)
                     location)

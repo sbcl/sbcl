@@ -1550,6 +1550,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%LASTN/FIXNUM"
            "%LASTN/BIGNUM"
            "%LOG1P" "%LOG2"
+           "LOG-DOUBLE-FLOAT" "LOG-SINGLE-FLOAT"
+           "LOG-DOUBLE-FLOAT2" "LOG-SINGLE-FLOAT2"
            #+long-float "%LONG-FLOAT"
            "%MAKE-ARRAY"
            "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE"

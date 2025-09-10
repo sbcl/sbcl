@@ -371,7 +371,8 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c::fun-info-folder . sb-c::folder)
                             (sb-c::fun-info-externally-checkable-type . sb-c::externally-checkable-type)
                             (sb-c::fun-info-constants . sb-c::constants)
-                            (sb-c::fun-info-call-type-deriver . sb-c::call-type-deriver))))
+                            (sb-c::fun-info-call-type-deriver . sb-c::call-type-deriver)
+                            (sb-c::fun-info-rewrite-full-call . sb-c::rewrite-full-call))))
               (loop for (reader . name) in otypes
                     for fn = (funcall reader fun-info)
                     when (functionp fn) collect

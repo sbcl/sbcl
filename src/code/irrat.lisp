@@ -387,6 +387,28 @@
           (foreach complex double-float single-float))
          (complex-expt base power))))))
 
+(defun log-double-float (number)
+  (if (float-sign-bit-set-p number)
+      (complex (log (- number)) pi)
+      (log number)))
+
+(defun log-single-float (number)
+  (if (float-sign-bit-set-p number)
+      (complex (log (- number)) (coerce pi 'single-float))
+      (log number)))
+
+(defun log-double-float2 (number base)
+  (if (or (float-sign-bit-set-p number)
+          (< base 0))
+      (/ (log number) (log base))
+      (truly-the double-float (log number base))))
+
+(defun log-single-float2 (number base)
+  (if (or (float-sign-bit-set-p number)
+          (< base 0))
+      (/ (log number) (log base))
+      (truly-the single-float (log number base))))
+
 (declaim (start-block log))
 (defun log2/nonnegative-integer (x)
   (declare (type (integer 0) x))

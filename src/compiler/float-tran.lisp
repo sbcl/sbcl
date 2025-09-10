@@ -626,6 +626,19 @@
   `(if (zerop y)
        0.0d0
        (/ (%log x) (%log y))))
+
+(defoptimizer (log rewrite-full-call) ((number &optional base) node)
+  (if base
+      (cond ((csubtypep (lvar-type number) (specifier-type 'double-float))
+             (and (csubtypep (lvar-type base) (specifier-type 'double-float))
+                  'log-double-float2))
+            ((csubtypep (lvar-type number) (specifier-type 'single-float))
+             (and (csubtypep (lvar-type base) (specifier-type 'single-float))
+                  'log-single-float2)))
+      (cond ((csubtypep (lvar-type number) (specifier-type 'double-float))
+             'log-double-float)
+            ((csubtypep (lvar-type number) (specifier-type 'single-float))
+             'log-single-float))))
 
 ;;; Handle some simple transformations.
 
