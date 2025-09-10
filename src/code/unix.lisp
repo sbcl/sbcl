@@ -133,10 +133,14 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 ;;;; hacking the Unix environment
 
 #-win32
-(define-alien-routine ("getenv" posix-getenv) c-string
+(progn
+ (declaim (ftype (function (t) (values (or simple-string null) &optional))
+                 posix-getenv))
+ (defun posix-getenv (name)
   "Return the \"value\" part of the environment string \"name=value\" which
 corresponds to NAME, or NIL if there is none."
-  (name (c-string :not-null t)))
+  (with-alien ((posix-getenv (function c-string (c-string :not-null t)) :extern "getenv"))
+    (possibly-base-stringize (alien-funcall posix-getenv name)))))
 
 ;;; from stdio.h
 
@@ -391,11 +395,10 @@ corresponds to NAME, or NIL if there is none."
 ;;; corresponding Lisp string (or return NIL if the pointer is a C NULL).
 (defun newcharstar-string (newcharstar)
   (declare (type (alien (* char)) newcharstar))
-  (if (null-alien newcharstar)
-      nil
-      (prog1
-          (cast newcharstar c-string)
-        (free-alien newcharstar))))
+  (unless (null-alien newcharstar)
+    (possibly-base-stringize
+      (prog1 (cast newcharstar c-string)
+        (free-alien newcharstar)))))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING, in the
 ;;; style returned by getcwd() (no trailing slash character).
@@ -439,7 +442,10 @@ corresponds to NAME, or NIL if there is none."
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated
 ;;; by a slash character.
 (defun posix-getcwd/ ()
-  (concatenate 'string (posix-getcwd) "/"))
+  (let ((str (the simple-string (posix-getcwd))))
+    (if (typep str 'base-string)
+        (concatenate 'base-string str "/")
+        (concatenate 'string str "/"))))
 
 ;;; Duplicate an existing file descriptor (given as the argument) and
 ;;; return it. If FD is not a valid file descriptor, NIL and an error

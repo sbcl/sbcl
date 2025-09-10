@@ -307,11 +307,12 @@
       (let ((ret (alien-funcall afunc (1+ max_path) (cast apath (* char)))))
         (when (zerop ret)
           (win32-error "GetCurrentDirectory"))
-        (if (> ret (1+ max_path))
-            (with-alien ((apath (* char) (make-system-buffer ret)))
-              (alien-funcall afunc ret apath)
-              (cast-and-free apath))
-            (decode-system-string apath))))))
+        (possibly-base-stringize
+         (if (> ret (1+ max_path))
+             (with-alien ((apath (* char) (make-system-buffer ret)))
+               (alien-funcall afunc ret apath)
+               (cast-and-free apath))
+             (decode-system-string apath)))))))
 
 (defun sb-unix:unix-mkdir (name mode)
   (declare (type sb-unix:unix-pathname name)
@@ -329,7 +330,7 @@
            (values result (if result 0 (get-last-error)))
            name1 name2 +movefile-replace-existing+))
 
-(defun sb-unix::posix-getenv (name)
+(defun sb-ext:posix-getenv (name)
   (declare (type simple-string name))
   (with-alien ((aenv (* char) (make-system-buffer default-environment-length)))
     (with-sysfun (afunc ("GetEnvironmentVariable" t)
@@ -340,7 +341,7 @@
           (setf aenv (make-system-buffer ret))
           (alien-funcall afunc name aenv ret))
         (if (> ret 0)
-            (cast-and-free aenv)
+            (possibly-base-stringize (cast-and-free aenv))
             (free-alien aenv))))))
 
 ;; GET-CURRENT-PROCESS
