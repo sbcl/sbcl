@@ -82,7 +82,6 @@
 (defconstant eexist 17) ; #x11
 (defconstant eloop 62) ; #x3e
 (defconstant epipe 32) ; #x20
-(defconstant espipe 29) ; #x1d
 (defconstant ewouldblock 35) ; #x23
 
 (defconstant sc-nprocessors-onln 58) ; #x3a

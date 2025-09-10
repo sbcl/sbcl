@@ -80,7 +80,6 @@
 (defconstant eexist 17) ; #x11
 (defconstant eloop 40) ; #x28
 (defconstant epipe 32) ; #x20
-(defconstant espipe 29) ; #x1d
 (defconstant ewouldblock 11) ; #xb
 
 (defconstant sc-nprocessors-onln 84) ; #x54

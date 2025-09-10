@@ -261,7 +261,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     deferrno("eexist", EEXIST);
     deferrno("eloop", ELOOP);
     deferrno("epipe", EPIPE);
-    deferrno("espipe", ESPIPE);
     deferrno("ewouldblock", EWOULDBLOCK);
     printf("\n");
 

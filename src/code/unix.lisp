@@ -125,10 +125,6 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
 
 (defmacro void-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values t 0) ,@args))
-
-#+win32
-(progn
-  (defconstant espipe 29))
 
 ;;;; hacking the Unix environment
 
