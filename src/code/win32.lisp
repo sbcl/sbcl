@@ -578,15 +578,6 @@ absense."
       (void-syscall* (("SetEnvironmentVariable" t) system-string int-ptr)
                      name 0)))
 
-;; Let SETENV be an accessor for POSIX-GETENV.
-;;
-;; DFL: Merged this function because it seems useful to me.  But
-;; shouldn't we then define it on actual POSIX, too?
-(defun (setf sb-unix::posix-getenv) (new-value name)
-  (if (setenv name new-value)
-      new-value
-      (posix-getenv name)))
-
 (defmacro c-sizeof (s)
   "translate alien size (in bits) to c-size (in bytes)"
   `(/ (alien-size ,s) 8))
