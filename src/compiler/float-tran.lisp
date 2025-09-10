@@ -330,10 +330,10 @@
                            :high new-hi)))))
 (defoptimizer (scale-single-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-single-float))
+                       (lambda (x y) (scale-single-float x y))))
 (defoptimizer (scale-double-float derive-type) ((f ex))
   (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-double-float))
+                       (lambda (x y) (scale-double-float x y))))
 
 ;;; DEFOPTIMIZERs for %SINGLE-FLOAT and %DOUBLE-FLOAT. This makes the
 ;;; FLOAT function return the correct ranges if the input has some
@@ -366,7 +366,7 @@
 
             (defoptimizer (,fun derive-type) ((num))
               (handler-case
-                  (one-arg-derive-type num #',aux-name #',fun)
+                  (one-arg-derive-type num #',aux-name (lambda (x) (,fun x)))
                 (type-error ()
                   nil)))))))
   (frob %single-float single-float
@@ -380,8 +380,10 @@
                 (csubtypep type (specifier-type 'single-float)))
       (handler-case
           (type-union
-           (one-arg-derive-type number #'%single-float-derive-type-aux #'%single-float)
-           (one-arg-derive-type number #'%double-float-derive-type-aux #'%double-float))
+           (one-arg-derive-type number #'%single-float-derive-type-aux
+                                (lambda (x) (%single-float x)))
+           (one-arg-derive-type number #'%double-float-derive-type-aux
+                                (lambda (x) (%double-float x))))
         (type-error ()
           nil)))))
 

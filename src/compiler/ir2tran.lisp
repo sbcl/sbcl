@@ -152,16 +152,21 @@
        ;; might try to redefine it and get the old definition. And
        ;; they shouldn't be expected to understand the failure mode
        ;; and the remedy.
-       (let ((internal (internal-name-p name))
-             (could-early-bind
-              ;: Existence of globaldb info is a certificate that the function definition
-              ;; will not change. Though functions named (CAS CAR) and (SETF SVREF) lack
-              ;; globaldb info they won't be undefined, nor are they redefinable.
-              ;; And note that this is "could" and not "should", since we're also
-              ;; going to check for NOTINLINE.
-              (or (info :function :info name)
-                  (and (typep name '(cons (member setf cas) (cons symbol null)))
-                       (eq (sb-xc:symbol-package (cadr name)) *cl-package*)))))
+       (let* ((internal (internal-name-p name))
+              (info (info :function :info name))
+              (could-early-bind
+                ;; Existence of globaldb info is a certificate that the function definition
+                ;; will not change. Though functions named (CAS CAR) and (SETF SVREF) lack
+                ;; globaldb info they won't be undefined, nor are they redefinable.
+                ;; And note that this is "could" and not "should", since we're also
+                ;; going to check for NOTINLINE.
+                (or info
+                    (and (typep name '(cons (member setf cas) (cons symbol null)))
+                         (eq (sb-xc:symbol-package (cadr name)) *cl-package*)))))
+         #+()
+         (when (and info
+                    (ir1-attributep (fun-info-attributes info) unboxed-return fixed-args))
+           (cerror "Continue" "Can't use #' on a function with unboxed-return or fixed-args"))
          (if (and internal
                   could-early-bind
                    ;; Known functions can be dumped without going through fdefns.
