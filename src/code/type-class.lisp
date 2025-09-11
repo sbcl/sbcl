@@ -872,19 +872,11 @@
   ;;  :single-warning-for-single-undefined-type
   (specifier nil :type t :test equal :hasher sb-c::fallback-hash))
 
-(macrolet ((hash-fp-zeros (x) ; order-insensitive
-             `(let ((h 0))
-                (dolist (x ,x h) (setq h (logxor (sb-xc:sxhash x) h)))))
-           (fp-zeros= (a b)
-             `(let ((a ,a) (b ,b))
-                (and (= (length a) (length b))
-                     (every (lambda (x) (member x b)) a)))))
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
-(def-type-model (member-type (:constructor* nil (xset fp-zeroes)))
-  (xset nil :type xset :hasher xset-elts-hash :test xset=)
-  (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=)))
+(def-type-model (member-type (:constructor* nil (xset)))
+  (xset nil :type xset :hasher xset-elts-hash :test xset=))
 (define-load-time-global *xset-mutex* (or #-sb-xc-host (sb-thread:make-mutex :name "xset")))
 ;;; This hashset is guarded by *XSET-MUTEX*. It is _not_ declared as synchronized
 ;;; so that HASHSET-INSERT-IF-ABSENT should not acquire a mutex inside a mutex

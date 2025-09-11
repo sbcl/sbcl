@@ -399,8 +399,8 @@
 (defun cosh (number)
   (with-memoized-math-op (cosh number)
     (case number
-      ((0 0f0) 1f0)
-      (0d0 1d0)
+      ((0 0f0 -0f0) 1f0)
+      ((0d0 -0d0) 1d0)
       (t (error "Unimplemented.")))))
 
 (defun natural-log (number)

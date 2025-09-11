@@ -1457,6 +1457,7 @@ NOTE: This interface is experimental and subject to change."
 
 (in-package "SB-KERNEL")
 
+(declaim (inline fp-zero-p))
 (defun fp-zero-p (x)
   (typecase x
     (single-float (zerop x))

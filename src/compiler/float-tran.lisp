@@ -208,7 +208,7 @@
 
 (defoptimizer (float-sign-bit-set-p constraint-propagate-if)
     ((x))
-  (values x (specifier-type '(float * 0.0)))) ;; include -0.0 for now
+  (values x (specifier-type '(or (float * (0.0)) (member -0.0 -0d0)))))
 
 ;;; This doesn't deal with complex at the moment.
 (deftransform signum ((x) (number))
@@ -1119,7 +1119,7 @@
                             (if (integer-type-p x) 0 0d0)
                             nil
                             ;; (log 0) is an error
-                            ;; and there's nothing between 0 and 1 for integers.
+                            ;; and there's nothing between 0 and 1 forr integers.
                             (and (integer-type-p x) 0f0)
                             nil))
 

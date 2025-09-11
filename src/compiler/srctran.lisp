@@ -917,8 +917,6 @@
         complex)
     (dolist (type types)
       (let ((type (typecase type
-                    (member-type type
-                     (convert-member-type type))
                     (intersection-type
                      (find-if #'numeric-union-type-p
                               (intersection-type-types type)))
@@ -1611,11 +1609,6 @@
 ;;;
 ;;; If we're about to generate an overly complex union of numeric types, start
 ;;; collapse the ranges together.
-;;;
-;;; FIXME: The MEMBER canonicalization parts of MAKE-DERIVED-UNION-TYPE and
-;;; entire CONVERT-MEMBER-TYPE probably belong in the kernel's type logic,
-;;; invoked always, instead of in the compiler, invoked only during some type
-;;; optimizations.
 (defvar *derived-numeric-union-complexity-limit* 6)
 
 (defun widen-bignum-types (numeric-type)
@@ -1656,41 +1649,31 @@
 
 (defun make-derived-union-type (type-list)
   (let ((xset (alloc-xset))
-        (fp-zeroes '())
         (misc-types '())
         (numeric-type *empty-type*))
     (dolist (type type-list)
       (cond ((member-type-p type)
              (mapc-member-type-members
               (lambda (member)
-                (if (fp-zero-p member)
-                    (unless (member member fp-zeroes)
-                      (pushnew member fp-zeroes))
-                    (add-to-xset member xset)))
+                (add-to-xset member xset))
               type))
             ((numeric-type-p type)
              (setf numeric-type (type-union (widen-bignum-types type) numeric-type)))
             (t
              (push type misc-types))))
     (setf numeric-type (sb-kernel::weaken-numeric-type-union *derived-numeric-union-complexity-limit* numeric-type))
-    (if (and (xset-empty-p xset) (not fp-zeroes))
+    (if (xset-empty-p xset)
         (apply #'type-union numeric-type misc-types)
-        (apply #'type-union (make-member-type xset fp-zeroes)
+        (apply #'type-union (make-member-type xset)
                numeric-type misc-types))))
 
 ;;; Convert a member type with a single member to a numeric type.
+;;; It can only be a complex number
 (defun convert-member-type (arg)
   (let* ((members (member-type-members arg))
-         (member (first members))
-         (member-type (type-of member)))
+         (member (first members)))
     (aver (not (rest members)))
-    (specifier-type (cond ((typep member 'integer)
-                           `(integer ,member ,member))
-                          ((memq member-type '(short-float single-float
-                                               double-float long-float))
-                           `(,member-type ,member ,member))
-                          (t
-                           member-type)))))
+    (specifier-type (type-of member))))
 
 ;;; This is used in defoptimizers for computing the resulting type of
 ;;; a function.
@@ -1706,22 +1689,15 @@
 ;;; converted to a numeric type and the DERIVE-FUN is called.
 (defun %one-arg-derive-type (arg-type derive-fun member-fun)
   (declare (type function derive-fun)
-           (type (or null function) member-fun))
+           (ignore member-fun))
   (let ((arg-list (prepare-arg-for-derive-type arg-type)))
     (when arg-list
       (labels ((deriver (x)
                  (cond
-                   ((member-type-p x)
-                    (if member-fun
-                        (handler-case
-                            (specifier-type
-                             `(eql ,(funcall member-fun
-                                             (first (member-type-members x)))))
-                          (arithmetic-error () nil))
-                        ;; Otherwise convert to a numeric type.
-                        (funcall derive-fun (convert-member-type x))))
                    ((numeric-type-p x)
-                    (funcall derive-fun x)))))
+                    (funcall derive-fun x))
+                   ((member-type-p x)
+                    (funcall derive-fun (convert-member-type x))))))
         ;; Run down the list of args and derive the type of each one,
         ;; saving all of the results in a list.
         (let ((results nil))

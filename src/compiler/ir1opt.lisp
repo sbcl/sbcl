@@ -341,6 +341,9 @@
         ;; Don't use type/=, it will return NIL on unknown types.
         ;; Instead of checking the second value just negate TYPE=
         (unless (type= initial-type int)
+          ;; (when (and (eq int *empty-type*)
+          ;;            (neq rtype *empty-type*))
+          ;;   (break))
           ;; This assertion is easily legitimately violated by
           ;; transforms.
           #+(or)

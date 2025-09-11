@@ -11,9 +11,11 @@
 
 (enable-test-parallelism)
 
-(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type #\z))))
-(assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type 1.0))))
-(assert (sb-kernel:member-type-p (sb-kernel:make-eql-type -0.0s0)))
+(with-test (:name :make-eql-type)
+  (assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type #\z))))
+  (assert (not (sb-kernel:member-type-p (sb-kernel:make-eql-type 1.0))))
+  (assert (eql (sb-kernel:numeric-type-low (sb-kernel:make-eql-type -0f0)) -0f0))
+  (assert (eql (sb-kernel:numeric-type-high (sb-kernel:make-eql-type -0d0)) -0d0)))
 
 (with-test (:name (typexpand-1 typexpand typexpand-all :check-lexenv))
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))

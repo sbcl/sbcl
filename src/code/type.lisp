@@ -3631,7 +3631,7 @@ expansion happened."
 
 ;; Return possibly a union of a MEMBER type and a NUMERIC type,
 ;; or just one or the other, or *EMPTY-TYPE* depending on what's in the XSET
-;; and the FP-ZEROES. XSET must not contains characters or real numbers.
+;; XSET must not contains characters or real numbers.
 ;; MEMBER types go into one of three hash containers:
 ;;  - *EQL-TYPE-CACHE* holds singleton types. A weak hash-table suffices for this.
 ;;  - *MEMBER-TYPE-HASHSET* holds types whose members are {NUMBER|CHARACTER|SYMBOL}.
@@ -3639,104 +3639,68 @@ expansion happened."
 ;;    hash-cons XSETs without complications for EQ-comparable keys.
 ;;  - *MEMBER/EQ-TYPE-HASHSET* is the general case, allowing a mixture of objects
 ;;;   hashed by content-dependent hash and/or pseudorandom opaque hash.
-(defun make-member-type (xset fp-zeroes)
-  ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
-  ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
-  ;; ranges are compared by arithmetic operators (while MEMBERship is
-  ;; compared by EQL).  -- CSR, 2003-04-23
+(defun make-member-type (xset)
   (declare (sb-c::tlab :system))
   (map-xset (lambda (elt)
               (when (or (characterp elt) (realp elt))
                 (bug "MEMBER type contains ~S" elt)))
             xset)
-  (let ((presence 0)
-        (unpaired nil)
-        (float-types nil))
-    (cond
-     (fp-zeroes ; avoid doing two passes of nothing
-      (dotimes (pass 2)
-        (dolist (z fp-zeroes)
-          (let ((sign (float-sign-bit z))
-                (pair-idx
-                  (etypecase z
-                    (single-float 0)
-                    (double-float 2
-                    #+long-float (long-float 4)))))
-            (cond ((= pass 0) ; first pass: track presence of +-0 of each float format
-                   (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1))
-                  ;; second pass: if not both signs present, then it's an unpaired zero
-                  ((/= (ldb (byte 2 pair-idx) presence) #b11)
-                   (push z unpaired))
-                  ((= sign 0) ; take the +0 as canonical when both +-0 are present
-                   (push (make-numeric-type :complexp :real :class 'float :low z :high z
-                                            :format (float-format-name z))
-                         float-types)))))))
-     ((and (= (xset-count xset) 1)
-           (eq (car (xset-members xset)) nil))
-      ;; Bypass the hashset for type NULL because it's so important
-      (return-from make-member-type
-        (inline-cache-ctype (!alloc-member-type (make-ctype-bits 'member)
-                                                (!new-xset '(nil) 1)
-                                                '())
-                            null))))
-    (let* ((count (+ (length unpaired) (xset-count xset)))
-           (member-type
-            (unless (= count 0)
-              (dx-let ((temp (!alloc-member-type (ctype-class-bits 'member)
-                                                 xset unpaired)))
-                (cond
-                  ((= count 1)
-                   (let ((container *eql-type-cache*)
-                         (key (first (or unpaired (xset-data xset)))))
-                     (with-system-mutex ((hash-table-lock container))
-                       ;; This is like ENSURE-GETHASH but it potentially copies the key
-                       (or (gethash key container)
-                           (let ((copy (copy-ctype temp)))
-                             ;; re-fetch KEY from XSET in case it was copied.
-                             ;; hope no off-heap pointers buried within KEY.
-                             (setf (gethash (first (member-type-members copy)) container)
-                                   copy))))))
-                  ((xset-every (lambda (x) (typep x '(or symbol number character))) xset)
-                   (hashset-insert-if-absent *member-type-hashset* temp #'copy-ctype))
-                  (t
-                   (binding*
-                       ((container *member/eq-type-hashset*)
-                        ((result foundp)
-                         (with-system-mutex (*xset-mutex*)
-                           (xset-generate-stable-hashes xset)
-                           (acond ((hashset-find container temp)
-                                   (xset-delete-stable-hashes xset) ; inside the mutex scope
-                                   (values it t))
-                                  (t
-                                   (values (hashset-insert container (copy-ctype temp))
-                                           nil))))))
-                     (unless foundp ; "use" the var binding if #+sb-xc-host
-                       #-sb-xc-host ; attach finalizer (outside the mutex scope)
-                       (let ((xset (member-type-xset result))) ; in case XSET was copied
-                         (finalize
-                          result (lambda ()
-                                   (with-system-mutex (*xset-mutex*)
-                                     (xset-delete-stable-hashes xset))))))
-                     result)))))))
-      ;; The actual member-type contains the XSET (with no FP zeroes),
-      ;; and a list of unpaired zeroes.
-      (if (not float-types)
-          (or member-type *empty-type*)
-          (let ((types (if member-type
-                           (cons member-type float-types)
-                           float-types)))
-            (if (cdr types)
-                (make-union-type t types)
-                (car types)))))))
+  (cond
+    ((and (= (xset-count xset) 1)
+          (eq (car (xset-members xset)) nil))
+     ;; Bypass the hashset for type NULL because it's so important
+     (return-from make-member-type
+       (inline-cache-ctype (!alloc-member-type (make-ctype-bits 'member)
+                                               (!new-xset '(nil) 1))
+                           null))))
+  (let* ((count (xset-count xset))
+         (member-type
+           (unless (= count 0)
+             (dx-let ((temp (!alloc-member-type (ctype-class-bits 'member)
+                                                xset)))
+               (cond
+                 ((= count 1)
+                  (let ((container *eql-type-cache*)
+                        (key (first (xset-data xset))))
+                    (with-system-mutex ((hash-table-lock container))
+                      ;; This is like ENSURE-GETHASH but it potentially copies the key
+                      (or (gethash key container)
+                          (let ((copy (copy-ctype temp)))
+                            ;; re-fetch KEY from XSET in case it was copied.
+                            ;; hope no off-heap pointers buried within KEY.
+                            (setf (gethash (first (member-type-members copy)) container)
+                                  copy))))))
+                 ((xset-every (lambda (x) (typep x '(or symbol number character))) xset)
+                  (hashset-insert-if-absent *member-type-hashset* temp #'copy-ctype))
+                 (t
+                  (binding*
+                      ((container *member/eq-type-hashset*)
+                       ((result foundp)
+                        (with-system-mutex (*xset-mutex*)
+                          (xset-generate-stable-hashes xset)
+                          (acond ((hashset-find container temp)
+                                  (xset-delete-stable-hashes xset) ; inside the mutex scope
+                                  (values it t))
+                            (t
+                             (values (hashset-insert container (copy-ctype temp))
+                                     nil))))))
+                    (unless foundp ; "use" the var binding if #+sb-xc-host
+                      #-sb-xc-host ; attach finalizer (outside the mutex scope)
+                      (let ((xset (member-type-xset result))) ; in case XSET was copied
+                        (finalize
+                         result (lambda ()
+                                  (with-system-mutex (*xset-mutex*)
+                                    (xset-delete-stable-hashes xset))))))
+                    result)))))))
+    ;; The actual member-type contains the XSET (with no FP zeroes),
+    ;; and a list of unpaired zeroes.
+    (or member-type *empty-type*)))
 
 (defun member-type-size (type)
-  (+ (length (member-type-fp-zeroes type))
-     (xset-count (member-type-xset type))))
+  (xset-count (member-type-xset type)))
 
 (defun member-type-member-p (x type)
-  (if (fp-zero-p x)
-      (and (member x (member-type-fp-zeroes type)) t)
-      (xset-member-p x (member-type-xset type))))
+  (xset-member-p x (member-type-xset type)))
 
 (defun mapcar-member-type-members (function type)
   (declare (function function))
@@ -3744,43 +3708,18 @@ expansion happened."
     (map-xset (lambda (x)
                 (results (funcall function x)))
               (member-type-xset type))
-    (dolist (zero (member-type-fp-zeroes type))
-      (results (funcall function zero)))
     (results)))
 
 (defun mapc-member-type-members (function type)
   (declare (function function))
-  (map-xset function (member-type-xset type))
-  (dolist (zero (member-type-fp-zeroes type))
-    (funcall function zero)))
+  (map-xset function (member-type-xset type)))
 
 (defun member-type-members (type)
-  (append (member-type-fp-zeroes type)
-          (xset-members (member-type-xset type))))
+  (xset-members (member-type-xset type)))
 
+;;; REMOVE?
 (define-type-method (member :negate) (type)
-  (let ((xset (member-type-xset type))
-        (fp-zeroes (member-type-fp-zeroes type)))
-    (if fp-zeroes
-        ;; Hairy case, which needs to do a bit of float type
-        ;; canonicalization.
-        (apply #'type-intersection
-               (if (xset-empty-p xset)
-                   *universal-type*
-                   (make-negation-type (make-member-type xset nil)))
-               (mapcar
-                (lambda (x)
-                  (let* ((opposite (sb-xc:- x))
-                         (type (ctype-of opposite)))
-                    (type-union
-                     (make-negation-type
-                      (modified-numeric-type type :low nil :high nil))
-                     (modified-numeric-type type :low nil :high (list opposite))
-                     (make-eql-type opposite)
-                     (modified-numeric-type type :low (list opposite) :high nil))))
-                fp-zeroes))
-        ;; Easy case
-        (make-negation-type type))))
+  (make-negation-type type))
 
 (define-type-method (member :unparse) (flags type)
   (cond ((eq type (specifier-type 'null)) 'null) ; NULL type is EQ-comparable
@@ -3793,11 +3732,9 @@ expansion happened."
       (values nil nil)))
 
 (define-type-method (member :simple-subtypep) (type1 type2)
-   (values (and (xset-subset-p (member-type-xset type1)
-                               (member-type-xset type2))
-                (subsetp (member-type-fp-zeroes type1)
-                         (member-type-fp-zeroes type2)))
-           t))
+  (values (xset-subset-p (member-type-xset type1)
+                         (member-type-xset type2))
+          t))
 
 (define-type-method (member :complex-subtypep-arg1) (type1 type2)
   (block punt
@@ -3822,13 +3759,10 @@ expansion happened."
 
 (define-type-method (member :simple-intersection2) (type1 type2)
   (make-member-type (xset-intersection (member-type-xset type1)
-                                       (member-type-xset type2))
-                    (intersection (member-type-fp-zeroes type1)
-                                  (member-type-fp-zeroes type2))))
+                                       (member-type-xset type2))))
 
 (define-type-method (member :complex-intersection2) (type1 type2)
   (let ((xset (alloc-xset))
-        (fp-zeroes nil)
         (not-sure)
         (any-skipped))
     (mapc-member-type-members
@@ -3837,15 +3771,13 @@ expansion happened."
          (when (not sure)
            (setf not-sure t))
          (if (or ok (not sure))
-             (if (fp-zero-p member)
-                 (pushnew member fp-zeroes)
-                 (add-to-xset member xset))
+             (add-to-xset member xset)
              (setf any-skipped t))))
      type2)
     (let ((member
-            (if (and (xset-empty-p xset) (not fp-zeroes))
+            (if (xset-empty-p xset)
                 *empty-type*
-                (make-member-type xset fp-zeroes))))
+                (make-member-type xset))))
       (if not-sure
           (and any-skipped
                (type-intersection type1 member))
@@ -3856,9 +3788,7 @@ expansion happened."
 ;;; union type method.
 (define-type-method (member :simple-union2) (type1 type2)
   (make-member-type (xset-union (member-type-xset type1)
-                                (member-type-xset type2))
-                    (union (member-type-fp-zeroes type1)
-                           (member-type-fp-zeroes type2))))
+                                (member-type-xset type2))))
 
 (define-type-method (member :complex-=) (type1 type2)
   (if (type-enumerable type1)
@@ -3872,30 +3802,20 @@ expansion happened."
   ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
   ;;  literal symbol *, and does not represent an unspecified value."
   (if members
-      (let ((xset (alloc-xset)) fp-zeros characters
+      (let ((xset (alloc-xset))
+            characters
             rationals
             double-floats
             single-floats)
-        ;; Calling REMOVE-DUPLICATES up front as used to be done is wasteful because the XSET can't
-        ;; have dups in it. Elements that don't go in the XSET have to be de-duplicated.
-        ;; There are at most 4 fp-zeros, so calling PUSHNEW is fine. For the rest, we can suppose
-        ;; that DELETE-DUPLICATES is as good as it gets. (It could/should use a hash-table above
-        ;; a cetain length input, but does not)
         (dolist (m members)
           (typecase m
-            (character (push m characters))
-            (double-float
-             (if (fp-zero-p m)
-                 (pushnew m fp-zeros)
-                 (push m double-floats)))
-            (single-float
-             (if (fp-zero-p m)
-                 (pushnew m fp-zeros)
-                 (push m single-floats)))
-            (rational (push m rationals))
-            (t (add-to-xset m xset))))
+            (character    (push m characters))
+            (double-float (push m double-floats))
+            (single-float (push m single-floats))
+            (rational     (push m rationals))
+            (t            (add-to-xset m xset))))
         (type-union
-         (make-member-type xset fp-zeros)
+         (make-member-type xset)
          (character-set-type-from-characters characters)
          (member-rational rationals)
          (member-float 'double-float double-floats)
@@ -3920,27 +3840,18 @@ expansion happened."
            #-sb-xc-host (declare (dynamic-extent pairs))
            (make-character-set-type pairs)))
         (real
-         (unless (fp-zero-p elt)
-           ;; we do see singleton fp zeros in self-build but not other floats
-           #+sb-xc-host (bug "Unexpected singleton REAL type")
-           ;; This is a little redundant with CTYPE-OF-NUMBER,
-           ;; but imho easier to understand.
-           (multiple-value-bind (class format)
-               (typecase elt
-                 (float (values 'float (float-format-name elt)))
-                 (ratio 'rational)
-                 (t 'integer))
-             (make-numeric-type :class class :format format :low elt :high elt)))))
-      ;; The thing is definitely implemented as a MEMBER type. Just a question of
-      ;; whether to put ELT in the XSET.
-      (multiple-value-bind (xset fp-zeros)
-          (if (realp elt) ; is a floating-point zero
-              (values (load-time-value (alloc-xset) t) ; an always-empty XSET
-                      (list elt))
-              (let ((xset (alloc-xset)))
-                (add-to-xset elt xset)
-                (values xset nil)))
-        (make-member-type xset fp-zeros))))
+         #+sb-xc-host (bug "Unexpected singleton REAL type")
+         (multiple-value-bind (class format)
+             (typecase elt
+               (float (values 'float (float-format-name elt)))
+               (ratio 'rational)
+               (t 'integer))
+           (make-numeric-type :class class :format format :low elt :high elt
+                              :normalize-zeros nil))))
+      ;; The thing is definitely implemented as a MEMBER type.
+      (make-member-type (let ((xset (alloc-xset)))
+                          (add-to-xset elt xset)
+                          (values xset nil)))))
 
 ;;;; intersection types
 ;;;;
@@ -4407,27 +4318,39 @@ expansion happened."
               (when (and (match low (numeric-type-low double))
                          (match high (numeric-type-high double)))
                 (setf remainder (delq1 double (delq1 single remainder)))
-                (cond ((or (and rational
-                                (match low (numeric-type-low rational))
-                                (match high (numeric-type-high rational)))
-                           (and (setf rational integer)
-                                (numberp (numeric-type-low rational))
-                                (eql (numeric-type-low rational)
-                                     (numeric-type-high rational)) ;; (rational 1 1) is an integer.
-                                (match low (numeric-type-low rational))
-                                (match high (numeric-type-high rational))))
-                       (setf remainder (delq1 rational remainder))
-                       (let ((low (numeric-type-low rational))
-                             (high (numeric-type-high rational)))
-                         (recognized (cond (high
-                                            `(real ,(or low '*) ,high))
-                                           (low
-                                            `(real ,low))))))
-                      (t
-                       (recognized (cond (high
-                                          `(float ,(or low '*) ,high))
-                                         (low
-                                          `(float ,low)))))))))))
+                (multiple-value-bind (low high zero) (float-type-split-zeros low high)
+                  (cond ((and (not zero)
+                              (or (and rational
+                                       (match low (numeric-type-low rational))
+                                       (match high (numeric-type-high rational)))
+                                  (and (setf rational integer)
+                                       (numberp (numeric-type-low rational))
+                                       (eql (numeric-type-low rational)
+                                            (numeric-type-high rational)) ;; (rational 1 1) is an integer.
+                                       (match low (numeric-type-low rational))
+                                       (match high (numeric-type-high rational)))))
+                         (setf remainder (delq1 rational remainder))
+                         (let ((low (numeric-type-low rational))
+                               (high (numeric-type-high rational)))
+                           (recognized (cond (high
+                                              `(real ,(or low '*) ,high))
+                                             (low
+                                              `(real ,low))))))
+                        (t
+                         (flet ((gen (low high)
+                                  (cond
+                                    (high `(float ,(or low '*) ,high))
+                                    (low
+                                     `(float ,low)))))
+                           (recognized
+                            (if zero
+                                (let ((zero `(member ,(coerce zero 'double-float)
+                                                     ,(coerce zero 'single-float))))
+                                  (if (or low high)
+                                      `(or ,zero
+                                           ,(gen low high))
+                                      zero))
+                                (gen low high))))))))))))
       (let ((list (nconc (recognized)
                          (type-unparse flags (delete nil remainder)))))
         (if (cdr list) `(or ,@list) (car list))))))
@@ -5436,7 +5359,7 @@ expansion happened."
 (defconstant range-ratio-run 2)
 (defconstant range-rational-run 3)
 
-(defun make-numeric-type (&key class format (complexp :real) low high)
+(defun make-numeric-type (&key class format (complexp :real) low high (normalize-zeros t))
   (declare (type (member integer rational float nil) class))
   (declare (inline !compute-numtype-aspect-id))
   (let ((union-type (%make-union-numeric-type
@@ -5460,16 +5383,24 @@ expansion happened."
       (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
-    (flet ((normalize-zero (x)
+    (flet ((normalize-low-zero (x)
              (cond
-               ((eql x -0d0) 0d0)
-               ((eql x -0f0) 0f0)
+               ((not normalize-zeros) x)
+               ((eql x 0d0) -0d0)
+               ((eql x 0f0) -0f0)
                ((equal x '(-0d0)) '(0d0))
                ((equal x '(-0f0)) '(0f0))
+               (t x)))
+           (normalize-high-zero (x)
+             (cond
+               ((not normalize-zeros) x)
+               ((eql x -0d0) 0d0)
+               ((eql x -0f0) 0f0)
+               ((equal x '(0d0)) '(-0d0))
+               ((equal x '(0f0)) '(-0f0))
                (t x))))
-      (declare (inline normalize-zero))
-      (let ((low (normalize-zero low))
-            (high (normalize-zero high)))
+      (let ((low (normalize-low-zero low))
+            (high (normalize-high-zero high)))
         (new-ctype numeric-union-type 0 (get-numtype-aspects complexp class format)
                    (case class
                      (integer
@@ -5479,52 +5410,82 @@ expansion happened."
                      (t
                       (vector low high))))))))
 
+(defun float-type-split-zeros (low high)
+  (cond ((fp-zero-p low)
+         (if (eql low high)
+             (values nil nil low)
+             (if (float-sign-bit-set-p low)
+                 (values (sb-xc:- low) high nil)
+                 (values (list low) high low))))
+        ((and (fp-zero-p high)
+              (float-sign-bit-set-p high))
+         (values low (list (sb-xc:- high)) high))
+        ((typep high '(cons (satisfies fp-zero-p)))
+         (values low (abs (car high))))
+        (t
+         (values low high nil))))
+
 (defun number-unparse (type)
   (let* ((complexp (numeric-type-complexp type))
          (low (numeric-type-low type))
          (high (numeric-type-high type))
-         (base (case (numeric-type-class type)
+         (class (numeric-type-class type))
+         (base (case class
                  (integer 'integer)
                  (rational 'rational)
                  (float (or (numeric-type-format type) 'float))
                  (t 'real))))
-    (let ((base+bounds
-            (cond ((and (eq base 'integer) high low)
-                   (let ((high-count (logcount high))
-                         (high-length (integer-length high)))
-                     (cond ((= low 0)
-                            (cond ((= high 0) '(integer 0 0))
-                                  ((= high 1) 'bit)
-                                  ((and (= high-count high-length)
-                                        (plusp high-length))
-                                   `(unsigned-byte ,high-length))
-                                  (t
-                                   `(mod ,(1+ high)))))
-                           ((and (= low most-negative-fixnum)
-                                 (= high most-positive-fixnum))
-                            'fixnum)
-                           ((and (= low (lognot high))
-                                 (= high-count high-length)
-                                 (> high-count 0))
-                            `(signed-byte ,(1+ high-length)))
-                           (t
-                            `(integer ,low ,high)))))
-                  (high `(,base ,(or low '*) ,high))
-                  (low
-                   (if (and (eq base 'integer) (= low 0))
-                       'unsigned-byte
-                       `(,base ,low)))
-                  (t base))))
-      (ecase complexp
-        (:real
-         (aver (neq base 'real))
-         base+bounds)
-        (:complex
-         (aver (neq base 'real))
-         `(complex ,base+bounds))
-        ((nil)
-         (aver (eq base+bounds 'real))
-         'number)))))
+    (flet ((gen (low high)
+             (cond
+               (high `(,base ,(or low '*) ,high))
+               (low
+                (if (and (eq base 'integer) (= low 0))
+                    'unsigned-byte
+                    `(,base ,low)))
+               (t base))))
+      (let ((base+bounds
+              (cond ((and (eq base 'integer) high low)
+                     (let ((high-count (logcount high))
+                           (high-length (integer-length high)))
+                       (cond ((= low 0)
+                              (cond ((= high 0) '(integer 0 0))
+                                    ((= high 1) 'bit)
+                                    ((and (= high-count high-length)
+                                          (plusp high-length))
+                                     `(unsigned-byte ,high-length))
+                                    (t
+                                     `(mod ,(1+ high)))))
+                             ((and (= low most-negative-fixnum)
+                                   (= high most-positive-fixnum))
+                              'fixnum)
+                             ((and (= low (lognot high))
+                                   (= high-count high-length)
+                                   (> high-count 0))
+                              `(signed-byte ,(1+ high-length)))
+                             (t
+                              `(integer ,low ,high)))))
+                    ((eq class 'float)
+                     (multiple-value-bind (low high zero)
+                         (float-type-split-zeros low high)
+                       (if zero
+                           (let ((zero `(member ,zero)))
+                             (if (or low high)
+                                 `(or ,zero
+                                      ,(gen low high))
+                                 zero))
+                           (gen low high))))
+                    (t
+                     (gen low high)))))
+        (ecase complexp
+          (:real
+           (aver (neq base 'real))
+           base+bounds)
+          (:complex
+           (aver (neq base 'real))
+           `(complex ,base+bounds))
+          ((nil)
+           (aver (eq base+bounds 'real))
+           'number))))))
 
 (define-type-method (numeric-union :unparse) (flags type)
   (if (numeric-type-p type)
@@ -5643,6 +5604,44 @@ expansion happened."
           (t
            min))))
 
+;;; Order -0.0 before 0.0
+
+(defun fp> (a b)
+  (cond ((and (eql a 0f0)
+              (eql b -0f0)))
+        ((and (eql a 0d0)
+              (eql b -0d0)))
+        (t
+         (sb-xc:> a b))))
+
+(defun fp>= (a b)
+  (cond ((and (eql a -0f0)
+              (eql b 0f0))
+         nil)
+        ((and (eql a -0d0)
+              (eql b 0d0))
+         nil)
+        (t
+         (sb-xc:>= a b))))
+
+(defun fp< (a b)
+  (cond ((and (eql a -0f0)
+              (eql b 0f0)))
+        ((and (eql a -0d0)
+              (eql b 0d0)))
+        (t
+         (sb-xc:< a b))))
+
+(defun fp<= (a b)
+  (cond ((and (eql a 0f0)
+              (eql b -0f0))
+         nil)
+        ((and (eql a 0d0)
+              (eql b -0d0))
+         nil)
+        (t
+         (sb-xc:<= a b))))
+
 (defun low-le-low-p (a b)
   (cond ((not a)
          t)
@@ -5654,6 +5653,20 @@ expansion happened."
              (sb-xc:< (car a) b)))
         (t
          (sb-xc:<= a (if (consp b)
+                         (car b)
+                         b)))))
+
+(defun fp-low-le-low-p (a b)
+  (cond ((not a)
+         t)
+        ((not b)
+         nil)
+        ((consp a)
+         (if (consp b)
+             (fp<= (car a) (car b))
+             (fp< (car a) b)))
+        (t
+         (fp<= a (if (consp b)
                          (car b)
                          b)))))
 
@@ -5671,6 +5684,20 @@ expansion happened."
                          (car b)
                          b)))))
 
+(defun fp-high-ge-high-p (a b)
+  (cond ((not a)
+         t)
+        ((not b)
+         nil)
+        ((consp a)
+         (if (consp b)
+             (fp>= (car a) (car b))
+             (fp> (car a) b)))
+        (t
+         (fp>= a (if (consp b)
+                     (car b)
+                     b)))))
+
 (defun high-gt-high-p (a b)
   (cond ((not a)
          b)
@@ -5686,6 +5713,21 @@ expansion happened."
                       a)
                   b))))
 
+(defun fp-high-gt-high-p (a b)
+  (cond ((not a)
+         b)
+        ((not b)
+         nil)
+        ((consp b)
+         (if (consp a)
+             (fp> (car a) (car b))
+             (fp>= a (car b))))
+        (t
+         (fp> (if (consp a)
+                  (car a)
+                  a)
+              b))))
+
 (defun low-gt-high-p (a b)
   (cond ((not a)
          nil)
@@ -5698,6 +5740,19 @@ expansion happened."
          (sb-xc:>= a (car b)))
         (t
          (sb-xc:> a b))))
+
+(defun fp-low-gt-high-p (a b)
+  (cond ((not a)
+         nil)
+        ((not b)
+         nil)
+        ((consp a)
+         (fp>= (car a) (if (consp b)
+                           (car b) b)))
+        ((consp b)
+         (fp>= a (car b)))
+        (t
+         (fp> a b))))
 
 (defun coerce-rational-bound (x low run)
   (when x
@@ -6099,9 +6154,9 @@ expansion happened."
   (declare (simple-vector ranges2))
   (loop for i2 below (length ranges2) by 2
         do
-        (cond ((low-gt-high-p (aref ranges2 i2) float)
+        (cond ((fp-low-gt-high-p (aref ranges2 i2) float)
                (return))
-              ((low-gt-high-p float (aref ranges2 (1+ i2))))
+              ((fp-low-gt-high-p float (aref ranges2 (1+ i2))))
               (t
                (return t)))))
 
@@ -6121,14 +6176,19 @@ expansion happened."
                             (open-right-low (if (consp right-low)
                                                 (car right-low)
                                                 right-low)))
+                        ;; -0.0 can join 0.0
+                        ;; -0.0 can't join (0.0)
                         (if (and (consp left-high)
                                  (consp right-low))
                             (sb-xc:< open-right-low open-left-high)
-                            (sb-xc:<= open-right-low open-left-high))))))
+                            (if (or (consp left-high)
+                                    (consp right-low))
+                                (fp<= open-right-low open-left-high)
+                                (sb-xc:<= open-right-low open-left-high)))))))
              (store (low high)
                (let ((last-high (car result)))
                  (cond ((and result
-                             (high-ge-high-p last-high high)))
+                             (fp-high-ge-high-p last-high high)))
                        ((and result
                              (join-p last-high low))
                         (setf (car result) high))
@@ -6150,7 +6210,7 @@ expansion happened."
               (return))
              ((let ((low1 (aref ranges1 i1))
                     (low2 (aref ranges2 i2)))
-                (cond ((low-le-low-p low1 low2)
+                (cond ((fp-low-le-low-p low1 low2)
                        (store low1
                               (aref ranges1 (1+ i1)))
                        (incf i1 2))
@@ -6176,18 +6236,18 @@ expansion happened."
                          (high1 (aref ranges1 (1+ i1)))
                          (low2 (aref ranges2 i2))
                          (high2 (aref ranges2 (1+ i2))))
-                     (cond ((low-gt-high-p low2 high1)
+                     (cond ((fp-low-gt-high-p low2 high1)
                             (incf i1 2))
-                           ((low-gt-high-p low1 high2)
+                           ((fp-low-gt-high-p low1 high2)
                             (incf i2 2))
                            (t
-                            (store (if (low-le-low-p low1 low2)
+                            (store (if (fp-low-le-low-p low1 low2)
                                        low2
                                        low1)
-                                   (if (high-ge-high-p high1 high2)
+                                   (if (fp-high-ge-high-p high1 high2)
                                        high2
                                        high1))
-                            (if (high-gt-high-p high2 high1)
+                            (if (fp-high-gt-high-p high2 high1)
                                 (incf i1 2)
                                 (incf i2 2)))))))))
     (coerce (reverse result) 'vector)))
@@ -6198,6 +6258,10 @@ expansion happened."
         (i2 0)
         (result))
     (labels ((store (low high)
+               (when (typep low '(cons (member -0d0 -0f0)))
+                 (setf low (sb-xc:- (car low))))
+               (when (typep high '(cons (member 0d0 0f0)))
+                 (setf high (sb-xc:- (car high))))
                (push low result)
                (push high result)))
       (loop (cond ((= i1 (length ranges1))
@@ -6214,13 +6278,13 @@ expansion happened."
                            do
                            (let ((low2 (aref ranges2 i2))
                                  (high2 (aref ranges2 (1+ i2))))
-                             (cond ((low-gt-high-p low2 high1)
+                             (cond ((fp-low-gt-high-p low2 high1)
                                     (loop-finish))
-                                   ((low-gt-high-p low1 high2)
+                                   ((fp-low-gt-high-p low1 high2)
                                     (incf i2 2))
                                    (t
-                                    (let ((top (high-ge-high-p high2 high1))
-                                          (bottom (low-le-low-p low2 low1)))
+                                    (let ((top (fp-high-ge-high-p high2 high1))
+                                          (bottom (fp-low-le-low-p low2 low1)))
                                       (flet ((flip-exclusion (x)
                                                (if (consp x)
                                                    (car x)
@@ -6254,14 +6318,14 @@ expansion happened."
                        (high1 (aref ranges1 (1+ i1)))
                        (low2 (aref ranges2 i2))
                        (high2 (aref ranges2 (1+ i2))))
-                   (cond ((low-gt-high-p low2 high1)
+                   (cond ((fp-low-gt-high-p low2 high1)
                           (return))
-                         ((low-gt-high-p low1 high2)
+                         ((fp-low-gt-high-p low1 high2)
                           (incf i2 2))
                          (t
                           (unless (and
-                                   (low-le-low-p low2 low1)
-                                   (high-ge-high-p high2 high1))
+                                   (fp-low-le-low-p low2 low1)
+                                   (fp-high-ge-high-p high2 high1))
                             (return))
                           (incf i1 2)))))))))
 
@@ -6309,14 +6373,14 @@ expansion happened."
                  (store (low high)
                    (let ((last-high (car result)))
                      (cond ((and result
-                                 (high-ge-high-p last-high high)))
+                                 (fp-high-ge-high-p last-high high)))
                            ((and result
                                  (join-p last-high low))
                             (setf (car result) high))
                            (t
                             (push low result)
                             (push high result))))))
-          (loop for member in (sort (copy-list members) #'sb-xc:<)
+          (loop for member in (sort (copy-list members) #'fp<)
                 do (store member member))
           (new-ctype numeric-union-type 0
                      (get-numtype-aspects :real 'float type)
@@ -6593,11 +6657,7 @@ expansion happened."
             (high (numeric-type-high type)))
         (if (and low
                  (eql low high)
-                 (eql (numeric-type-complexp type) :real)
-                 (if (eq (numeric-type-class type) 'float)
-                     ;; (float 0.0 0.0) fits both -0.0 and 0.0
-                     (not (zerop low))
-                     (member (numeric-type-class type) '(integer rational))))
+                 (eql (numeric-type-complexp type) :real))
             (values t low)
             (values nil nil)))
       (values nil nil)))

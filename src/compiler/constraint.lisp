@@ -1036,15 +1036,12 @@
         (not-xset     nil)
         (not-numeric nil)
         not-characters
-        (not-fpz     '())
         set)
     (flet ((note-not (x)
-             (if (fp-zero-p x)
-                 (push x not-fpz)
-                 (when (or constrain-symbols (null x) (not (symbolp x)))
-                   (when (null not-xset)
-                     (setf not-xset (alloc-xset)))
-                   (add-to-xset x not-xset))))
+             (when (or constrain-symbols (null x) (not (symbolp x)))
+               (when (null not-xset)
+                 (setf not-xset (alloc-xset)))
+               (add-to-xset x not-xset)))
            (intersect-result (other-type)
              (setf type (type-intersection type other-type))))
       (declare (inline intersect-result))
@@ -1101,11 +1098,9 @@
            (change-ref-leaf ref (find-constant t)))
           (t
            (let* ((not-union not-type)
-                  (not-union (if (and (null not-xset) (null not-fpz))
-                               not-union
-                               (let ((excluded (make-member-type
-                                                (or not-xset (alloc-xset)) not-fpz)))
-                                 (type-union not-union excluded))))
+                  (not-union (if not-xset
+                                 (type-union not-union (make-member-type not-xset))
+                                 not-union))
                   (numeric (when not-numeric
                              (contiguous-numeric-set-type not-numeric)))
                   (not-union (if numeric

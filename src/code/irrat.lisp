@@ -993,7 +993,7 @@
   (declare (type (or complex rational) z))
   (multiple-value-bind (rho k)
       (cssqs z)
-    (declare (type (or (member 0d0) (double-float 0d0)) rho)
+    (declare (type (double-float 0d0) rho)
              (type fixnum k))
     (let ((x (float (realpart z) 1.0d0))
           (y (float (imagpart z) 1.0d0))

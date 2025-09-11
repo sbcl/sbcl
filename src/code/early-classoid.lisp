@@ -575,7 +575,7 @@
   (let ((bits (logior (type-%bits x) (logand (ctype-random) +ctype-hash-mask+))))
     (etypecase x
       (member-type
-       (!alloc-member-type bits (member-type-xset x) (member-type-fp-zeroes x))))))
+       (!alloc-member-type bits (member-type-xset x))))))
 #-sb-xc-host
 (macrolet ((safe-member-type-elt-p (obj)
              `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
@@ -606,9 +606,6 @@
              ;; If the XSET is represented as a hash-table, we may have another issue
              ;; which is not dealt with here (hash-table in the arena)
              (cond ((listp data)
-                    ;; the XSET can be empty if a MEMBER type contains only FP zeros.
-                    ;; While we could use (load-time-value) to reference a constant empty xset
-                    ;; there's really no point to doing that.
                     (collect ((elts))
                       (dolist (x data (!new-xset (elts) (xset-extra xset)))
                         (elts (cond ((numberp x) (sb-vm:copy-number-to-heap x))
@@ -647,8 +644,7 @@
            (%set-instance-layout copy (%instance-layout x))
            copy))
         (member-type
-         (!alloc-member-type bits (copy-xset (member-type-xset x))
-          (mapcar 'sb-vm:copy-number-to-heap (member-type-fp-zeroes x))))
+         (!alloc-member-type bits (copy-xset (member-type-xset x))))
         (array-type
          (!alloc-array-type bits (copy (array-type-dimensions x))
                             (array-type-complexp x) (array-type-element-type x)

@@ -375,7 +375,7 @@
                                  finally
                                  (flet ((result (union symbols min max)
                                           (when symbols
-                                            (let ((symbols (make-member-type symbols nil)))
+                                            (let ((symbols (make-member-type symbols)))
                                               (setf union (if union
                                                               (type-union union symbols)
                                                               symbols))))

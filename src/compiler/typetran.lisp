@@ -411,14 +411,24 @@
   (declare (type numeric-type type))
   (let ((low (numeric-type-low type))
         (high (numeric-type-high type)))
-    `(and ,@(when low
-              (if (consp low)
-                  `((> (truly-the ,base ,n-object) ,(car low)))
-                  `((>= (truly-the ,base ,n-object) ,low))))
-          ,@(when high
-              (if (consp high)
-                  `((< (truly-the ,base ,n-object) ,(car high)))
-                  `((<= (truly-the ,base ,n-object) ,high)))))))
+    (flet ((gen (low high)
+             `(and ,@(when low
+                       (if (consp low)
+                           `((> (truly-the ,base ,n-object) ,(car low)))
+                           `((>= (truly-the ,base ,n-object) ,low))))
+                   ,@(when high
+                       (if (consp high)
+                           `((< (truly-the ,base ,n-object) ,(car high)))
+                           `((<= (truly-the ,base ,n-object) ,high)))))))
+      (multiple-value-bind (low high zero)
+          (sb-kernel::float-type-split-zeros low high)
+        (if zero
+            (let ((zero `(eql ,n-object ,zero)))
+              (if (or low high)
+                  `(or ,zero
+                       ,(gen low high))
+                  zero))
+            (gen low high))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
