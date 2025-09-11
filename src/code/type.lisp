@@ -2640,24 +2640,15 @@ expansion happened."
              (rational
               (cond ((and (floatp thing) (float-infinity-p thing))
                      (return-from coerce-numeric-bound nil))
-                    ((or (eql thing -0d0)
-                         (eql thing -0f0))
-                     0)
                     (t
                      (rational thing))))
              ((float single-float)
-              (cond ((or (eql thing -0d0)
-                         (eql thing -0f0))
-                     0f0)
-                    ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
+              (cond ((sb-xc:<= most-negative-single-float thing most-positive-single-float)
                      (coerce thing 'single-float))
                     (t
                      (return-from coerce-numeric-bound nil))))
              (double-float
-              (cond ((or (eql thing -0d0)
-                         (eql thing -0f0))
-                     0d0)
-                    ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
+              (cond ((sb-xc:<= most-negative-double-float thing most-positive-double-float)
                      (coerce thing 'double-float))
                     (t
                      (return-from coerce-numeric-bound nil)))))))

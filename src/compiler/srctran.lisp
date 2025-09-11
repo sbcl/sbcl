@@ -2067,15 +2067,12 @@
                           ((integer rational) 'single-float)
                           (t (numeric-type-format type))))
                 (bound-format (or format 'float)))
-           (type-union
-            (make-numeric-type :class 'float
-                               :format format
-                               :complexp :real
-                               :low (list (coerce 0 bound-format))
-                               :high nil)
-            (if (eq format 'double-float)
-                (specifier-type '(eql 0d0))
-                (specifier-type '(eql 0f0))))))
+           (make-numeric-type :class 'float
+                              :format format
+                              :complexp :real
+                              :low (coerce 0 bound-format)
+                              :high nil
+                              :normalize-zeros nil)))
         (t
          ;; The absolute value of a real number is a non-negative real
          ;; of the same type.
@@ -2084,24 +2081,13 @@
                 (format (numeric-type-format type))
                 (bound-type (or format class 'real))
                 (low (coerce-and-truncate-floats (interval-low abs-bnd) bound-type))
-                (high (coerce-and-truncate-floats (interval-high abs-bnd) bound-type))
-                (type (make-numeric-type
-                       :class class
-                       :format format
-                       :complexp :real
-                       :low low
-                       :high high)))
-           (case format
-             (double-float
-              (if (eql low 0d0)
-                  (type-intersection type (specifier-type '(not (eql -0d0))))
-                  type))
-             (single-float
-              (if (eql low 0f0)
-                  (type-intersection type (specifier-type '(not (eql -0f0))))
-                  type))
-             (t
-              type))))))
+                (high (coerce-and-truncate-floats (interval-high abs-bnd) bound-type)))
+           (make-numeric-type :class class
+                              :format format
+                              :complexp :real
+                              :low low
+                              :high high
+                              :normalize-zeros nil)))))
 
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux))
@@ -3003,14 +2989,8 @@
                                          :low one :high one))
                 (minus (make-numeric-type :class class :format format
                                           :low minus-one :high minus-one))
-                ;; KLUDGE: here we have a fairly horrible hack to deal
-                ;; with the schizophrenia in the type derivation engine.
-                ;; The problem is that the type derivers reinterpret
-                ;; numeric types as being exact; so (DOUBLE-FLOAT 0d0
-                ;; 0d0) within the derivation mechanism doesn't include
-                ;; -0d0.  Ugh.  So force it in here, instead.
                 (zero (make-numeric-type :class class :format format
-                                         :low (sb-xc:- zero) :high zero)))
+                                         :low zero :high zero)))
            (let ((result
                    (case range-info
                      (+ (if contains-0-p (type-union plus zero) plus))
@@ -3019,9 +2999,7 @@
              (if (eq (numeric-type-complexp type) :real)
                  result
                  (type-union result (make-numeric-type :class 'float
-                                                       :complexp :complex
-                                                       :low -1
-                                                       :high 1))))))))
+                                                       :complexp :complex))))))))
 
 (defoptimizer (signum derive-type) ((num))
   (one-arg-derive-type num #'signum-derive-type-aux))
