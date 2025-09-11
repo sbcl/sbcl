@@ -398,23 +398,23 @@
       (sqrt number)))
 
 (defun log-double-float (number)
-  (if (float-sign-bit-set-p number)
+  (if (< number 0)
       (complex (log (- number)) pi)
       (log number)))
 
 (defun log-single-float (number)
-  (if (float-sign-bit-set-p number)
+  (if (< number 0)
       (complex (log (- number)) (coerce pi 'single-float))
       (log number)))
 
 (defun log-double-float2 (number base)
-  (if (or (float-sign-bit-set-p number)
+  (if (or (< number 0)
           (< base 0))
       (/ (log number) (log base))
       (truly-the double-float (log number base))))
 
 (defun log-single-float2 (number base)
-  (if (or (float-sign-bit-set-p number)
+  (if (or (< number 0)
           (< base 0))
       (/ (log number) (log base))
       (truly-the single-float (log number base))))
@@ -554,10 +554,8 @@
                                 log2e)
                              'single-float)))))
           (((foreach single-float double-float))
-           ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
-           ;; Since this doesn't seem to be an implementation issue
-           ;; I (pw) take the Kahan result.
-           (if (float-sign-bit-set-p number)
+           ;; IEEE 754 says (log -0.0) should be -inf
+           (if (< number 0.0)
                (complex (log (- number)) (coerce pi '(dispatch-type number)))
                (coerce (%log (coerce number 'double-float))
                        '(dispatch-type number))))

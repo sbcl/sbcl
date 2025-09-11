@@ -501,7 +501,7 @@
   (deftransform log ((x) ($type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (float-sign-bit-set-p x)
+          `(if (< x 0)
                (sb-vm::op-not-type1-error x '(,(type-specifier cast) . log))
                (truly-the $type (log (truly-the (float 0.0) x))))
           (give-up-ir1-transform))))
@@ -509,8 +509,7 @@
   (deftransform log ((x y) ($type $type) * :node node)
     (let ((cast (cast-or-check-bound-type node (specifier-type 'real))))
       (if cast
-          `(if (or (float-sign-bit-set-p x)
-                   ;; The out of line definition returns 0 for all zeros
+          `(if (or (< x 0)
                    (< y 0))
                (sb-vm::op-not-type2-error x y '(,(type-specifier cast) . log))
                (truly-the $type (log (truly-the (float 0.0) x)
@@ -1107,15 +1106,13 @@
 (defoptimizer (expt derive-type) ((x y))
   (two-arg-derive-type x y #'expt-derive-type-aux))
 
-;;; Note we must assume that a type including 0.0 may also include
-;;; -0.0 and thus the result may be complex -infinity + i*pi.
 (defun log-derive-type-aux-1 (x)
   (elfun-derive-type-simple x #'log
-                            (if (integer-type-p x) 0 0d0)
+                            (if (integer-type-p x) 0 -0d0)
                             nil
                             ;; (log 0) is an error
-                            ;; and there's nothing between 0 and 1 forr integers.
-                            (and (integer-type-p x) 0f0)
+                            ;; and there's nothing between 0 and 1 for integers.
+                            (and (integer-type-p x) -0f0)
                             nil))
 
 (defun log-derive-type-aux-2 (x y same-arg)

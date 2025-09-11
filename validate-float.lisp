@@ -26,9 +26,7 @@
                              (symbol (eql x y))
                              (rational (eql x y))
                              (float (= x y))
-                             (string (string= x y))
-                             ;; KLUDGE
-                             (complex t))))
+                             (string (string= x y)))))
                   (unless (eqal actual result)
                     (cerror "Continue"
                             "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
