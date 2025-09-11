@@ -420,15 +420,24 @@
                        (if (consp high)
                            `((< (truly-the ,base ,n-object) ,(car high)))
                            `((<= (truly-the ,base ,n-object) ,high)))))))
-      (multiple-value-bind (low high zero)
-          (sb-kernel::float-type-split-zeros low high)
-        (if zero
-            (let ((zero `(eql ,n-object ,zero)))
-              (if (or low high)
-                  `(or ,zero
-                       ,(gen low high))
-                  zero))
-            (gen low high))))))
+      (cond ((or (eql high -0d0)
+                 (eql high -0f0))
+             (wrap-if low (gen low nil)
+                     `(float-sign-bit-set-p ,n-object)))
+            ((or (eql low 0d0)
+                 (eql low 0f0))
+             (wrap-if high (gen high nil)
+                      `(not (float-sign-bit-set-p ,n-object))))
+            (t
+             (multiple-value-bind (low high zero)
+                 (sb-kernel::float-type-split-zeros low high)
+               (if zero
+                   (let ((zero `(eql ,n-object ,zero)))
+                     (if (or low high)
+                         `(or ,zero
+                              ,(gen low high))
+                         zero))
+                   (gen low high))))))))
 
 ;;; Do source transformation of a test of a known numeric type. We can
 ;;; assume that the type doesn't have a corresponding predicate, since
@@ -645,39 +654,7 @@
              `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
 
 (defun source-transform-union-numeric-typep (object types)
-  (cond ((and (= (length types) 2)
-              ;; Transform (or (double-float * (0d0)) (eql -0d0))
-              (destructuring-bind (a b) types
-                (multiple-value-bind (member numeric) (cond ((member-type-p a)
-                                                             (values a b))
-                                                            ((member-type-p b)
-                                                             (values b a)))
-                  (let ((double))
-                    (and (numeric-type-p numeric)
-                         (= (member-type-size member) 1)
-                         (or (setf double (sb-kernel::member-type-member-p -0d0 member))
-                             (sb-kernel::member-type-member-p -0f0 member))
-                         (let ((low (numeric-type-low numeric))
-                               (high (numeric-type-high numeric))
-                               (type (if double
-                                         'double-float
-                                         'single-float)))
-                           (when (and (eq (numeric-type-class numeric) 'float)
-                                      (eq (numeric-type-complexp numeric) :real)
-                                      (equal high (if double
-                                                      '(0d0)
-                                                      '(0f0))))
-                             `(and ,(if double
-                                        `(double-float-p ,object)
-                                        `(single-float-p ,object))
-                                   ,(if low
-                                        `(and (float-sign-bit-set-p (truly-the ,type ,object))
-                                              (,@(if (consp low)
-                                                     `(< ,(car low))
-                                                     `(<= ,low))
-                                               (truly-the ,type ,object)))
-                                        `(float-sign-bit-set-p (truly-the ,type ,object))))))))))))
-        ((not (every #'numeric-type-p types))
+  (cond ((not (every #'numeric-type-p types))
          nil)
         ((and (= (length types) 2)
               ;; (and subtype-of-integer (not (eql x)))
