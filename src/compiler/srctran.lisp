@@ -557,9 +557,7 @@
   `(not (zerop (logand x y))))
 
 (defoptimizer (logtest derive-type) ((x y))
-  (let ((type (two-arg-derive-type x y
-                                   #'logand-derive-type-aux
-                                   #'logand)))
+  (let ((type (two-arg-derive-type x y #'logand-derive-type-aux)))
     (when type
       (multiple-value-bind (typep definitely)
           (ctypep 0 type)
@@ -609,9 +607,7 @@
                                    (lambda (index integer same)
                                      (declare (ignore same))
                                      (logand-derive-type-aux integer
-                                                             (ash-derive-type-aux one index nil)))
-                                   (lambda (index integer)
-                                     (logand integer (ash 1 index))))))
+                                                             (ash-derive-type-aux one index nil))))))
     (cond ((not and)
            nil)
           ((type= and (specifier-type '(eql 0)))
@@ -1584,22 +1580,18 @@
                (t
                 (list arg)))))
     (unless (eq arg *empty-type*)
-      ;; Make sure all args are some type of numeric-type. For member
-      ;; types, convert the list of members into a union of equivalent
-      ;; single-element member-type's.
+      ;; Make sure all args are some type of numeric-type.
       (let ((new-args nil))
-        (dolist (arg (split arg))
+        (dolist (arg (split arg) new-args)
           (if (member-type-p arg)
-              ;; Run down the list of members and convert to a list of
-              ;; member types.
+              ;; Convert member types (i.e. complex numbers) to their supertypes
               (mapc-member-type-members
-               (lambda (member)
-                 (push (if (numberp member) (make-eql-type member) *empty-type*)
-                       new-args))
+               (lambda (x)
+                 (if (numberp x)
+                     (pushnew (specifier-type (type-of x)) new-args :test #'eq)
+                     (return)))
                arg)
-              (push arg new-args)))
-        (unless (member *empty-type* new-args)
-          new-args)))))
+              (push arg new-args)))))))
 
 ;;; Take a list of types and return a canonical type specifier,
 ;;; combining any MEMBER types together. If both positive and negative
@@ -1667,14 +1659,6 @@
         (apply #'type-union (make-member-type xset)
                numeric-type misc-types))))
 
-;;; Convert a member type with a single member to a numeric type.
-;;; It can only be a complex number
-(defun convert-member-type (arg)
-  (let* ((members (member-type-members arg))
-         (member (first members)))
-    (aver (not (rest members)))
-    (specifier-type (type-of member))))
-
 ;;; This is used in defoptimizers for computing the resulting type of
 ;;; a function.
 ;;;
@@ -1683,21 +1667,13 @@
 ;;; "atomic" lvar type like numeric-type or member-type (containing
 ;;; just one element). It should return the resulting type, which can
 ;;; be a list of types.
-;;;
-;;; For the case of member types, if a MEMBER-FUN is given it is
-;;; called to compute the result otherwise the member type is first
-;;; converted to a numeric type and the DERIVE-FUN is called.
-(defun %one-arg-derive-type (arg-type derive-fun member-fun)
-  (declare (type function derive-fun)
-           (ignore member-fun))
+(defun %one-arg-derive-type (arg-type derive-fun)
+  (declare (type function derive-fun))
   (let ((arg-list (prepare-arg-for-derive-type arg-type)))
     (when arg-list
       (labels ((deriver (x)
-                 (cond
-                   ((numeric-type-p x)
-                    (funcall derive-fun x))
-                   ((member-type-p x)
-                    (funcall derive-fun (convert-member-type x))))))
+                 (when (numeric-type-p x)
+                   (funcall derive-fun x))))
         ;; Run down the list of args and derive the type of each one,
         ;; saving all of the results in a list.
         (let ((results nil))
@@ -1713,8 +1689,8 @@
               (make-derived-union-type results)
               (first results)))))))
 
-(defun one-arg-derive-type (arg derive-fun member-fun)
-  (%one-arg-derive-type (lvar-type arg) derive-fun member-fun))
+(defun one-arg-derive-type (arg derive-fun)
+  (%one-arg-derive-type (lvar-type arg) derive-fun))
 
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
 ;;; two arguments. DERIVE-FUN takes 3 args in this case: the two
@@ -1722,37 +1698,16 @@
 ;;; really represent the same lvar. This is useful for deriving the
 ;;; type of things like (* x x), which should always be positive. If
 ;;; we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fun member-fun)
+(defun two-arg-derive-type (arg1 arg2 derive-fun)
   (%two-arg-derive-type (lvar-type arg1) (lvar-type arg2)
-                        derive-fun member-fun
-                        (same-leaf-ref-p arg1 arg2)))
+                        derive-fun (same-leaf-ref-p arg1 arg2)))
 
-(defun %two-arg-derive-type (arg1-type arg2-type derive-fun member-fun &optional same-leaf)
-  (declare (type function derive-fun)
-           (type (or function null) member-fun))
+(defun %two-arg-derive-type (arg1-type arg2-type derive-fun &optional same-leaf)
+  (declare (type function derive-fun))
   (labels ((deriver (x y same-arg)
-             (cond ((and (member-type-p x) (member-type-p y))
-                    (if member-fun
-                        (funcall derive-fun (convert-member-type x) (convert-member-type y) same-arg)
-                        (let* ((x (first (member-type-members x)))
-                               (y (first (member-type-members y)))
-                               (result (ignore-errors
-                                        (funcall member-fun x y))))
-                          (cond ((null result) *empty-type*)
-                                ((and (floatp result) (float-nan-p result))
-                                 (make-numeric-type :class 'float
-                                                    :format (type-of result)
-                                                    :complexp :real))
-                                (t
-                                 (specifier-type `(eql ,result)))))))
-                   ((and (member-type-p x) (numeric-type-p y))
-                    (funcall derive-fun (convert-member-type x) y same-arg))
-                   ((and (numeric-type-p x) (member-type-p y))
-                    (funcall derive-fun x (convert-member-type y) same-arg))
-                   ((and (numeric-type-p x) (numeric-type-p y))
-                    (funcall derive-fun x y same-arg))
-                   (t
-                    *universal-type*)))
+             (if (and (numeric-type-p x) (numeric-type-p y))
+                 (funcall derive-fun x y same-arg)
+                 *universal-type*))
            (derive (type1 type2 same-arg)
              (let ((a1 (prepare-arg-for-derive-type type1))
                    (a2 (prepare-arg-for-derive-type type2)))
@@ -1821,7 +1776,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (+ derive-type) ((x y))
-  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+))
+  (two-arg-derive-type x y #'+-derive-type-aux))
 
 (defun --derive-type-aux (x y same-arg)
   (cond ((and (integer-type-p x)
@@ -1873,7 +1828,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (- derive-type) ((x y))
-  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:-))
+  (two-arg-derive-type x y #'--derive-type-aux))
 
 (defun *-derive-type-aux (x y same-arg)
   (cond ((and same-arg
@@ -1940,14 +1895,14 @@
                  (return
                    (let ((result (%two-arg-derive-type (type-intersection x (specifier-type '(and integer (not (eql 0)))))
                                                        y
-                                                       #'*-derive-type-aux #'sb-xc:*)))
+                                                       #'*-derive-type-aux)))
                      (when result
                        (type-union result (specifier-type '(eql 0)))))))))
         ;; If one of the integer arguments is non zero seperate the zero
         ;; result from the rest of the result range.
         (try-zero x-type y-type)
         (try-zero y-type x-type)
-        (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*)))))
+        (two-arg-derive-type x y #'*-derive-type-aux)))))
 
 (defoptimizer (%signed-multiply-high derive-type) ((x y))
   (two-arg-derive-type x y
@@ -1959,8 +1914,7 @@
                              (make-numeric-type :class 'integer
                                                 :low
                                                 (ash low (- sb-vm:n-word-bits))
-                                                :high (ash high (- sb-vm:n-word-bits))))))
-                       #'sb-xc:*))
+                                                :high (ash high (- sb-vm:n-word-bits))))))))
 
 (defoptimizer (%multiply-high derive-type) ((x y) node)
   (%signed-multiply-high-derive-type-optimizer node))
@@ -2020,7 +1974,7 @@
          (numeric-contagion x y))))
 
 (defoptimizer (/ derive-type) ((x y))
-  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/))
+  (two-arg-derive-type x y #'/-derive-type-aux))
 
 (defconstant +left-shift-derive-type-cutoff+ 256)
 
@@ -2067,7 +2021,7 @@
         *universal-type*)))
 
 (defoptimizer (ash derive-type) ((n shift))
-  (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))
+  (two-arg-derive-type n shift #'ash-derive-type-aux))
 
 (defun lognot-derive-type-aux (int)
   (derive-integer-type-aux int int
@@ -2081,7 +2035,7 @@
                                        (numeric-type-format type))))))
 
 (defoptimizer (lognot derive-type) ((int))
-  (one-arg-derive-type int #'lognot-derive-type-aux #'lognot))
+  (one-arg-derive-type int #'lognot-derive-type-aux))
 
 (defun %negate-derive-type-aux (type)
   (flet ((negate-bound (b)
@@ -2098,7 +2052,7 @@
           r))))
 
 (defoptimizer (%negate derive-type) ((num))
-  (one-arg-derive-type num #'%negate-derive-type-aux #'sb-xc:-))
+  (one-arg-derive-type num #'%negate-derive-type-aux))
 
 (defun abs-derive-type-aux (type)
   (cond ((ratio-type-p type)
@@ -2150,7 +2104,7 @@
               type))))))
 
 (defoptimizer (abs derive-type) ((num))
-  (one-arg-derive-type num #'abs-derive-type-aux #'abs))
+  (one-arg-derive-type num #'abs-derive-type-aux))
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -2271,9 +2225,9 @@
 
 (defoptimizer (truncate derive-type) ((number divisor))
   (let ((quot (two-arg-derive-type number divisor
-                                   #'truncate-derive-type-quot-aux #'truncate))
+                                   #'truncate-derive-type-quot-aux))
         (rem (two-arg-derive-type number divisor
-                                  #'truncate-derive-type-rem-aux #'rem)))
+                                  #'truncate-derive-type-rem-aux)))
     (when (and quot rem)
       (make-values-type (list quot rem)))))
 
@@ -2282,28 +2236,23 @@
 
 (defoptimizer (%unary-truncate derive-type) ((number))
   (one-arg-derive-type number
-                       #'%unary-truncate-derive-type-aux
-                       #'truncate))
+                       #'%unary-truncate-derive-type-aux))
 
 (defoptimizer (%unary-truncate/single-float derive-type) ((number))
   (one-arg-derive-type number
-                       #'%unary-truncate-derive-type-aux
-                       #'truncate))
+                       #'%unary-truncate-derive-type-aux))
 
 (defoptimizer (%unary-truncate/double-float derive-type) ((number))
   (one-arg-derive-type number
-                       #'%unary-truncate-derive-type-aux
-                       #'truncate))
+                       #'%unary-truncate-derive-type-aux))
 
 (defoptimizer (unary-truncate derive-type) ((number))
   (let* ((one (specifier-type '(integer 1 1)))
          (quot (one-arg-derive-type number
                                     (lambda (x)
-                                      (truncate-derive-type-quot-aux x one nil))
-                                    #'truncate))
+                                      (truncate-derive-type-quot-aux x one nil))))
          (rem (one-arg-derive-type number
-                                   (lambda (x) (truncate-derive-type-rem-aux x one nil))
-                                   (lambda (x) (nth-value 1 (truncate x 1))))))
+                                   (lambda (x) (truncate-derive-type-rem-aux x one nil)))))
     (when (and quot rem)
       (make-values-type (list quot rem)))))
 
@@ -2333,9 +2282,9 @@
 (defoptimizer (ftruncate derive-type) ((number divisor))
   (let ((quot
           (two-arg-derive-type number divisor
-                               #'ftruncate-derive-type-quot-aux #'ftruncate))
+                               #'ftruncate-derive-type-quot-aux))
         (rem (two-arg-derive-type number divisor
-                                  #'truncate-derive-type-rem-aux #'rem)))
+                                  #'truncate-derive-type-rem-aux)))
     (when (and quot rem)
       (make-values-type (list quot rem)))))
 
@@ -2356,9 +2305,7 @@
                                                                                '*)
                                                                            (if hi
                                                                                (,fun (type-bound-number hi))
-                                                                               '*))))))
-                                               (lambda (x)
-                                                 (values (,fun x)))))))))
+                                                                               '*))))))))))))
   (defoptimizer (round-single derive-type) ((number mode))
     (derive single-float))
   (defoptimizer (round-double derive-type) ((number mode))
@@ -2383,8 +2330,7 @@
                                              '*)
                                         ,(if high
                                              (round high)
-                                             '*))))))
-                       #'round))
+                                             '*))))))))
 
 ;;; Define optimizers for FLOOR and CEILING.
 (macrolet
@@ -2452,9 +2398,9 @@
                             (t
                              (numeric-contagion num div)))))
                (let ((quot (two-arg-derive-type
-                            number divisor #'derive-q #',name))
+                            number divisor #'derive-q))
                      (rem (two-arg-derive-type
-                           number divisor #'derive-r #'mod)))
+                           number divisor #'derive-r)))
                  (when (and quot rem)
                    (make-values-type (list quot rem))))))))))
 
@@ -2827,7 +2773,7 @@
                      (t `(,high))))))
 
 (defoptimizer (random derive-type) ((bound &optional state))
-  (one-arg-derive-type bound #'random-derive-type-aux nil))
+  (one-arg-derive-type bound #'random-derive-type-aux))
 
 ;;;; miscellaneous derive-type methods
 
@@ -2857,8 +2803,7 @@
                   (specifier-type `(integer ,(integer-length lo)))))
                (hi
                 (when (< hi 0)
-                  (specifier-type `(integer ,(integer-length hi)))))))))
-   #'integer-length))
+                  (specifier-type `(integer ,(integer-length hi)))))))))))
 
 (defoptimizer (%bignum-length derive-type) ((x))
   (one-arg-derive-type
@@ -2874,8 +2819,7 @@
                 (specifier-type `(integer ,(%bignum-length lo)))))
              (hi
               (when (< hi 0)
-                (specifier-type `(integer ,(%bignum-length hi))))))))
-   nil))
+                (specifier-type `(integer ,(%bignum-length hi))))))))))
 
 (defoptimizer (logcount derive-type) ((x))
   (one-arg-derive-type
@@ -2924,8 +2868,7 @@
                 (specifier-type `(integer 1))))
              (hi
               (when (< hi -1)
-                (specifier-type `(integer 1)))))))
-   #'logcount))
+                (specifier-type `(integer 1)))))))))
 
 (defoptimizer (isqrt derive-type) ((x))
   (one-arg-derive-type
@@ -2939,8 +2882,7 @@
             (hi-res (if (typep hi 'unsigned-byte)
                         (isqrt hi)
                         '*)))
-       (specifier-type `(integer ,lo-res ,hi-res))))
-   #'isqrt))
+       (specifier-type `(integer ,lo-res ,hi-res))))))
 
 (defoptimizer (char-code derive-type) ((char))
   (let ((type (type-intersection (lvar-type char) (specifier-type 'character))))
@@ -2983,8 +2925,7 @@
                              ((csubtypep type (specifier-type 'extended-char))
                               (specifier-type 'extended-char))
                              (t #+sb-xc-host (specifier-type 'character)
-                                #-sb-xc-host type))))
-                       nil))
+                                #-sb-xc-host type))))))
 
 (deftransform code-char ((code))
   (splice-fun-args code 'char-code 1)
@@ -3083,7 +3024,7 @@
                                                        :high 1))))))))
 
 (defoptimizer (signum derive-type) ((num))
-  (one-arg-derive-type num #'signum-derive-type-aux nil))
+  (one-arg-derive-type num #'signum-derive-type-aux))
 
 ;;;; byte operations
 ;;;;
@@ -3137,18 +3078,14 @@
           (let* ((shifted (two-arg-derive-type num posn
                                                (lambda (num posn same)
                                                  (declare (ignore same))
-                                                 (ash-derive-type-aux num (%negate-derive-type-aux posn) nil))
-                                               (lambda (num posn)
-                                                 (ash num (- posn)))))
+                                                 (ash-derive-type-aux num (%negate-derive-type-aux posn) nil))))
                  (minus-one (specifier-type '(eql -1)))
                  (mask (one-arg-derive-type size
                                             (lambda (x)
                                               (lognot-derive-type-aux
-                                               (ash-derive-type-aux minus-one x nil)))
-                                            (lambda (x)
-                                              (lognot (ash -1 x))))))
+                                               (ash-derive-type-aux minus-one x nil))))))
             (when (and shifted mask)
-              (%two-arg-derive-type shifted mask #'logand-derive-type-aux #'logand))))
+              (%two-arg-derive-type shifted mask #'logand-derive-type-aux))))
         ;; Handle (ldb (byte y (- 64 y)) x)
         (minuend (related-byte-spec size posn)))
     (if (and minuend
@@ -3196,13 +3133,11 @@
                              (or (one-arg-derive-type size
                                                       (lambda (x)
                                                         (lognot-derive-type-aux
-                                                         (ash-derive-type-aux minus-one x nil)))
-                                                      (lambda (x)
-                                                        (lognot (ash -1 x))))
+                                                         (ash-derive-type-aux minus-one x nil))))
                                  (return)))
                            (mask-shifted
                              (or (%two-arg-derive-type mask (lvar-type posn)
-                                                       #'ash-derive-type-aux #'ash)
+                                                       #'ash-derive-type-aux)
                                  (return)))
                            (int
                              (or (%two-arg-derive-type (lvar-type int) mask-shifted
@@ -3211,19 +3146,16 @@
                                                          (%two-arg-derive-type
                                                           int
                                                           (lognot-derive-type-aux mask)
-                                                          #'logand-derive-type-aux
-                                                          #'logand))
-                                                       (lambda (int mask)
-                                                         (logandc2 int mask)))
+                                                          #'logand-derive-type-aux)))
                                  (return)))
                            (new-masked (or (%two-arg-derive-type mask (lvar-type newbyte)
-                                                                 #'logand-derive-type-aux #'logand)
+                                                                 #'logand-derive-type-aux)
                                            (return)))
                            (new
                              (or (%two-arg-derive-type new-masked (lvar-type posn)
-                                                       #'ash-derive-type-aux #'ash)
+                                                       #'ash-derive-type-aux)
                                  (return))))
-                      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
+                      (%two-arg-derive-type int new #'logior-derive-type-aux))))
         (int-interval (type-approximate-interval (lvar-type int))))
     (or
      (when (and int-interval
@@ -3255,9 +3187,7 @@
                                         (ash-derive-type-aux
                                          (lognot-derive-type-aux
                                           (ash-derive-type-aux minus-one size nil))
-                                         posn nil))
-                                      (lambda (x)
-                                        (lognot (ash -1 x))))
+                                         posn nil)))
                  (return)))
            (int
              (or (%two-arg-derive-type (lvar-type int) mask
@@ -3266,15 +3196,12 @@
                                          (%two-arg-derive-type
                                           int
                                           (lognot-derive-type-aux mask)
-                                          #'logand-derive-type-aux
-                                          #'logand))
-                                       (lambda (int mask)
-                                         (logandc2 int mask)))
+                                          #'logand-derive-type-aux)))
                  (return)))
            (new (or (%two-arg-derive-type mask (lvar-type newbyte)
-                                          #'logand-derive-type-aux #'logand)
+                                          #'logand-derive-type-aux)
                     (return))))
-      (%two-arg-derive-type int new #'logior-derive-type-aux #'logior))))
+      (%two-arg-derive-type int new #'logior-derive-type-aux))))
 
 (defmacro min-or-nil (&rest numbers-or-nil)
   (let ((min-sym (gensym "MIN")))
@@ -3467,7 +3394,7 @@
         *universal-type*))
 
   (defoptimizer (%ash/right derive-type) ((n shift))
-    (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right)))
+    (two-arg-derive-type n shift #'%ash/right-derive-type-aux)))
 
 (defmacro combination-typed-p (node name &rest types)
   (labels ((gen (type)
@@ -4788,7 +4715,7 @@
   (if (and (not (or (csubtypep (lvar-type x) (specifier-type 'word))
                     (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))))
            (csubtypep (lvar-type y) (specifier-type 'fixnum))
-           (csubtypep (one-arg-derive-type y #'lognot-derive-type-aux #'lognot)
+           (csubtypep (one-arg-derive-type y #'lognot-derive-type-aux)
                       (specifier-type 'fixnum)))
       `(logand x (lognot y))
       (give-up-ir1-transform)))
@@ -6533,8 +6460,7 @@
                              (make-numeric-type
                               :class 'rational
                               :low (%rational (numeric-type-low type))
-                              :high (%rational (numeric-type-high type)))))
-                       #'rational))
+                              :high (%rational (numeric-type-high type)))))))
 
 (defoptimizer (rationalize derive-type) ((x))
   (one-arg-derive-type x (lambda (type)
@@ -6550,8 +6476,7 @@
                              (make-numeric-type
                               :class 'rational
                               :low (%rationalize (numeric-type-low type))
-                              :high (%rationalize (numeric-type-high type)))))
-                       #'rationalize))
+                              :high (%rationalize (numeric-type-high type)))))))
 
 
 ;;;; transforming APPLY

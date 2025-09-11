@@ -369,12 +369,12 @@
 (macrolet ((deffrob (logfun)
              (let ((fun-aux (symbolicate logfun "-DERIVE-TYPE-AUX")))
              `(defoptimizer (,logfun derive-type) ((x y))
-                (two-arg-derive-type x y #',fun-aux #',logfun)))))
+                (two-arg-derive-type x y #',fun-aux)))))
   (deffrob logand)
   (deffrob logior))
 
 (defoptimizer (logxor derive-type) ((x y))
-  (let ((type (two-arg-derive-type x y #'logxor-derive-type-aux #'logxor)))
+  (let ((type (two-arg-derive-type x y #'logxor-derive-type-aux)))
     (flet ((try (x y)
              ;; If it's (logxor x (1- x)) then it will be a positive number,
              ;; except for 0 => -1. This is used to count unset bits.
@@ -408,43 +408,36 @@
 (defoptimizer (logeqv derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (lognot-derive-type-aux
-                              (logxor-derive-type-aux x y same-leaf)))
-                       #'logeqv))
+                              (logxor-derive-type-aux x y same-leaf)))))
 (defoptimizer (lognand derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (lognot-derive-type-aux
-                              (logand-derive-type-aux x y same-leaf)))
-                       #'lognand))
+                              (logand-derive-type-aux x y same-leaf)))))
 (defoptimizer (lognor derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (lognot-derive-type-aux
-                              (logior-derive-type-aux x y same-leaf)))
-                       #'lognor))
+                              (logior-derive-type-aux x y same-leaf)))))
 (defoptimizer (logandc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql 0))
                                  (logand-derive-type-aux
-                                  (lognot-derive-type-aux x) y)))
-                       #'logandc1))
+                                  (lognot-derive-type-aux x) y)))))
 (defoptimizer (logandc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql 0))
                                  (logand-derive-type-aux
-                                  x (lognot-derive-type-aux y))))
-                       #'logandc2))
+                                  x (lognot-derive-type-aux y))))))
 (defoptimizer (logorc1 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql -1))
                                  (logior-derive-type-aux
-                                  (lognot-derive-type-aux x) y)))
-                       #'logorc1))
+                                  (lognot-derive-type-aux x) y)))))
 (defoptimizer (logorc2 derive-type) ((x y))
   (two-arg-derive-type x y (lambda (x y same-leaf)
                              (if same-leaf
                                  (specifier-type '(eql -1))
                                  (logior-derive-type-aux
-                                  x (lognot-derive-type-aux y))))
-                       #'logorc2))
+                                  x (lognot-derive-type-aux y))))))

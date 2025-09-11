@@ -765,7 +765,7 @@
         (destructuring-bind (q r) (values-type-required res)
           (make-values-type  (list (%two-arg-derive-type q
                                                          (specifier-type `(eql ,(ldb (byte sb-vm:n-word-bits 0) -1)))
-                                                         #'logand-derive-type-aux #'logand)
+                                                         #'logand-derive-type-aux)
                                    r))))))
 
   (deftransform sb-vm::truncate-mod64 ((n d) * * :node node)

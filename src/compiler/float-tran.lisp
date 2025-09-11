@@ -335,11 +335,9 @@
                            :low new-lo
                            :high new-hi)))))
 (defoptimizer (scale-single-float derive-type) ((f ex))
-  (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-float))
+  (two-arg-derive-type f ex #'scale-float-derive-type-aux))
 (defoptimizer (scale-double-float derive-type) ((f ex))
-  (two-arg-derive-type f ex #'scale-float-derive-type-aux
-                       #'scale-float))
+  (two-arg-derive-type f ex #'scale-float-derive-type-aux))
 
 ;;; DEFOPTIMIZERs for %SINGLE-FLOAT and %DOUBLE-FLOAT. This makes the
 ;;; FLOAT function return the correct ranges if the input has some
@@ -372,7 +370,7 @@
 
             (defoptimizer (,fun derive-type) ((num))
               (handler-case
-                  (one-arg-derive-type num #',aux-name (lambda (x) (,fun x)))
+                  (one-arg-derive-type num #',aux-name)
                 (type-error ()
                   nil)))))))
   (frob %single-float single-float
@@ -386,10 +384,8 @@
                 (csubtypep type (specifier-type 'single-float)))
       (handler-case
           (type-union
-           (one-arg-derive-type number #'%single-float-derive-type-aux
-                                (lambda (x) (%single-float x)))
-           (one-arg-derive-type number #'%double-float-derive-type-aux
-                                (lambda (x) (%double-float x))))
+           (one-arg-derive-type number #'%single-float-derive-type-aux)
+           (one-arg-derive-type number #'%double-float-derive-type-aux))
         (type-error ()
           nil)))))
 
@@ -834,8 +830,7 @@
               (elfun-derive-type-simple arg #',name
                                         ,domain-low ,domain-high
                                         ,def-low-bnd ,def-high-bnd
-                                        ,increasingp))
-            #',name)))))
+                                        ,increasingp)))))))
   ;; These functions are easy because they are defined for the whole
   ;; real line.
   (frob exp nil nil 0 nil)
@@ -1110,7 +1105,7 @@
          (float-or-complex-float-type (numeric-contagion x y)))))
 
 (defoptimizer (expt derive-type) ((x y))
-  (two-arg-derive-type x y #'expt-derive-type-aux #'expt))
+  (two-arg-derive-type x y #'expt-derive-type-aux))
 
 ;;; Note we must assume that a type including 0.0 may also include
 ;;; -0.0 and thus the result may be complex -infinity + i*pi.
@@ -1136,16 +1131,8 @@
 
 (defoptimizer (log derive-type) ((x &optional y))
   (if y
-      (two-arg-derive-type x y #'log-derive-type-aux-2 nil)
-      (one-arg-derive-type x #'log-derive-type-aux-1
-                           (lambda (n)
-                             (case n
-                               (0f0
-                                single-float-negative-infinity)
-                               (0d0
-                                double-float-negative-infinity)
-                               (t
-                                (log n)))))))
+      (two-arg-derive-type x y #'log-derive-type-aux-2)
+      (one-arg-derive-type x #'log-derive-type-aux-1)))
 
 (defun atan-derive-type-aux-1 (y)
   (elfun-derive-type-simple y #'atan nil nil (sb-xc:- (sb-xc:/ pi 2)) (sb-xc:/ pi 2)))
@@ -1173,8 +1160,8 @@
 
 (defoptimizer (atan derive-type) ((y &optional x))
   (if x
-      (two-arg-derive-type y x #'atan-derive-type-aux-2 #'atan)
-      (one-arg-derive-type y #'atan-derive-type-aux-1 #'atan)))
+      (two-arg-derive-type y x #'atan-derive-type-aux-2)
+      (one-arg-derive-type y #'atan-derive-type-aux-1)))
 
 (defun cosh-derive-type-aux (x)
   (%one-arg-derive-type
@@ -1182,11 +1169,10 @@
    (if (numeric-type-real-p x)
        (abs-derive-type-aux x)
        x)
-   (lambda (x) (elfun-derive-type-simple x #'cosh nil nil 0 nil))
-   #'cosh))
+   (lambda (x) (elfun-derive-type-simple x #'cosh nil nil 0 nil))))
 
 (defoptimizer (cosh derive-type) ((num))
-  (one-arg-derive-type num #'cosh-derive-type-aux #'cosh))
+  (one-arg-derive-type num #'cosh-derive-type-aux))
 
 (defun phase-derive-type-aux (arg)
   (let* ((format (case (numeric-type-class arg)
@@ -1233,7 +1219,7 @@
                               :high (coerce pi bound-type))))))
 
 (defoptimizer (phase derive-type) ((num))
-  (one-arg-derive-type num #'phase-derive-type-aux #'phase))
+  (one-arg-derive-type num #'phase-derive-type-aux))
 
 (deftransform realpart ((x) ((complex rational)) * :important nil)
   '(%realpart x))
@@ -1271,7 +1257,7 @@
                               :high (numeric-type-high type))))))
 
 (defoptimizer (realpart derive-type) ((num))
-  (one-arg-derive-type num #'realpart-derive-type-aux #'realpart))
+  (one-arg-derive-type num #'realpart-derive-type-aux))
 
 (defun imagpart-derive-type-aux (type)
   (let ((class (numeric-type-class type))
@@ -1296,7 +1282,7 @@
                               :high (numeric-type-high type))))))
 
 (defoptimizer (imagpart derive-type) ((num))
-  (one-arg-derive-type num #'imagpart-derive-type-aux #'imagpart))
+  (one-arg-derive-type num #'imagpart-derive-type-aux))
 
 (defun complex-derive-type-aux-1 (re-type)
   (if (numeric-type-p re-type)
@@ -1344,8 +1330,8 @@
 
 (defoptimizer (complex derive-type) ((re &optional im))
   (if im
-      (two-arg-derive-type re im #'complex-derive-type-aux-2 #'complex)
-      (one-arg-derive-type re #'complex-derive-type-aux-1 #'complex)))
+      (two-arg-derive-type re im #'complex-derive-type-aux-2)
+      (one-arg-derive-type re #'complex-derive-type-aux-1)))
 
 ;;; Define some transforms for complex operations in lieu of complex operation
 ;;; VOPs for most backends. If vops exist, they must support the following
@@ -1648,8 +1634,7 @@
       arg
       (specifier-type `(float ,(sb-xc:- (sb-xc:/ pi 2)) ,(sb-xc:/ pi 2)))
       #'sin
-      -1 1))
-   #'sin))
+      -1 1))))
 
 (defoptimizer (cos derive-type) ((num))
   (one-arg-derive-type
@@ -1660,8 +1645,7 @@
                            (specifier-type `(float 0d0 ,pi))
                            #'cos
                            -1 1
-                           nil))
-   #'cos))
+                           nil))))
 
 (defoptimizer (tan derive-type) ((num))
   (one-arg-derive-type
@@ -1674,8 +1658,7 @@
                                                 ;; 1.5707964 coerced back to double-float is greater than (/ pi 2)
                                                 (single-float -1.5707963 1.5707963)))
                            #'tan
-                           nil nil))
-   #'tan))
+                           nil nil))))
 
 (defoptimizer (conjugate derive-type) ((num))
   (one-arg-derive-type num
@@ -1696,15 +1679,13 @@
                   (high (numeric-type-high arg)))
               (let ((new-low (most-negative-bound low high))
                     (new-high (most-positive-bound low high)))
-                (modified-numeric-type arg :low new-low :high new-high))))))
-    #'conjugate))
+                (modified-numeric-type arg :low new-low :high new-high))))))))
 
 (defoptimizer (cis derive-type) ((num))
   (one-arg-derive-type num
     (lambda (arg)
       (specifier-type
-       `(complex ,(or (numeric-type-format arg) 'float))))
-    #'cis))
+       `(complex ,(or (numeric-type-format arg) 'float))))))
 
 
 ;;;; TRUNCATE, FLOOR, CEILING, and ROUND
