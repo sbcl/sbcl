@@ -246,8 +246,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
 
-;;; portable implementation
-#-x86
 (defun random-mt19937-update (state)
   (declare (type random-state-state state)
            (optimize (speed 3) (safety 0)))
@@ -279,7 +277,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                       random-chunk big-random-chunk))
 
 (declaim (inline random-chunk))
-#-x86
 (defun random-chunk (state)
   (declare (type random-state state))
   (let* ((state (random-state-state state))
@@ -295,16 +292,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
       (setf y (logxor y (ash (logand y (ash mt19937-c -15)) 15)))
       (setf y (logxor y (ash y -18)))
       y)))
-
-;;; Using inline VOP support, only available on the x86 so far.
-;;;
-;;; FIXME: It would be nice to have some benchmark numbers on this.
-;;; My inclination is to get rid of the nonportable implementation
-;;; unless the performance difference is just enormous.
-#+x86
-(defun random-chunk (state)
-  (declare (type random-state state))
-  (sb-vm::random-mt19937 (random-state-state state)))
 
 (declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
@@ -339,7 +326,6 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                           (double-float 0d0))
                 %random-double-float))
 
-#-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
@@ -352,29 +338,10 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                       (sb-impl::double-float-high-bits 1d0))
                  (random-chunk state))
                 1d0))
-        while (= candidate arg)
+        while (#+x86 eql ;; Can't use = due to 80-bit precision
+               #-x86 =
+               candidate arg)
         finally (return (truly-the (double-float 0d0) candidate))))
-
-;;; using a faster inline VOP
-#+x86
-(defun %random-double-float (arg state)
-  (declare (type (double-float (0d0)) arg)
-           (type random-state state))
-  (let ((state-vector (random-state-state state)))
-    (loop for candidate of-type double-float
-          = (* arg
-               (- (sb-impl::make-double-float
-                   (dpb (ash (sb-vm::random-mt19937 state-vector)
-                             (- sb-vm:double-float-digits n-random-chunk-bits
-                                sb-vm:n-word-bits))
-                        sb-vm:double-float-hi-significand-byte
-                        (sb-impl::double-float-high-bits 1d0))
-                   (sb-vm::random-mt19937 state-vector))
-                  1d0))
-          ;; Can't use = due to 80-bit precision
-          while (eql candidate arg)
-          finally (return (truly-the (double-float 0d0) candidate)))))
-
 
 ;;;; random fixnums
 

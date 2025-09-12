@@ -1854,61 +1854,6 @@ constant shift greater than word length")))
     (move ecx count)
     (inst shl result :cl)))
 
-;;; Support for the Mersenne Twister, MT19937, random number generator
-;;; due to Matsumoto and Nishimura.
-;;;
-;;; Makoto Matsumoto and T. Nishimura, "Mersenne twister: A
-;;; 623-dimensionally equidistributed uniform pseudorandom number
-;;; generator.", ACM Transactions on Modeling and Computer Simulation,
-;;; 1997, to appear.
-;;;
-;;; State:
-;;;  0-1:   Constant matrix A. [0, #x9908b0df] (not used here)
-;;;  2:     Index; init. to 1.
-;;;  3-626: State.
-(defknown random-mt19937 ((simple-array (unsigned-byte 32) (*)))
-  (unsigned-byte 32) ())
-(define-vop (random-mt19937)
-  (:policy :fast-safe)
-  (:translate random-mt19937)
-  (:args (state :scs (descriptor-reg) :to :result))
-  (:arg-types simple-array-unsigned-byte-32)
-  (:temporary (:sc unsigned-reg :from (:eval 0) :to :result) k)
-  (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from (:eval 0) :to :result) tmp)
-  (:results (y :scs (unsigned-reg) :from (:eval 0)))
-  (:result-types unsigned-num)
-  (:generator 50
-    (loadw k state (+ 2 vector-data-offset) other-pointer-lowtag)
-    (inst cmp k 624)
-    (inst jmp :ne no-update)
-    (inst mov tmp state)        ; The state is passed in EAX.
-    (inst call (make-fixup 'random-mt19937-update :assembly-routine))
-    ;; Restore k, and set to 0.
-    (inst xor k k)
-    NO-UPDATE
-    ;; y = ptgfsr[k++];
-    (inst mov y (make-ea-for-vector-data state :index k :offset 3))
-    ;; y ^= (y >> 11);
-    (inst shr y 11)
-    (inst xor y (make-ea-for-vector-data state :index k :offset 3))
-    ;; y ^= (y << 7) & #x9d2c5680
-    (inst mov tmp y)
-    (inst inc k)
-    (inst shl tmp 7)
-    (storew k state (+ 2 vector-data-offset) other-pointer-lowtag)
-    (inst and tmp #x9d2c5680)
-    (inst xor y tmp)
-    ;; y ^= (y << 15) & #xefc60000
-    (inst mov tmp y)
-    (inst shl tmp 15)
-    (inst and tmp #xefc60000)
-    (inst xor y tmp)
-    ;; y ^= (y >> 18);
-    (inst mov tmp y)
-    (inst shr tmp 18)
-    (inst xor y tmp)))
-
 (in-package "SB-C")
 
 (defun mask-result (class width result)
