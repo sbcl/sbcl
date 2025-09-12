@@ -235,41 +235,6 @@
                       (3 0) (3 1) (3 2) (3 3))
                     value single double))))))))
 
-;; The x86 port used not to reduce the arguments of transcendentals
-;; correctly.
-;; This test is valid only for x86: The x86 port uses the builtin x87
-;; FPU instructions to implement the trigonometric functions; other
-;; ports rely on the system's math library. These two differ in the
-;; precision of pi used for the range reduction and so yield results
-;; that can differ by arbitrarily large amounts for large inputs.
-;; The test expects the x87 results.
-(with-test (:name (:range-reduction :x87)
-            :skipped-on (not :x86))
-  (flet ((almost= (x y)
-           (< (abs (- x y)) 1d-5)))
-    (macrolet ((foo (op value)
-                 `(let ((actual (,op ,value))
-                        (expected (,op (mod ,value (* 2 pi)))))
-                    (unless (almost= actual expected)
-                      (error "Inaccurate result for ~a: expected ~a, got ~a"
-                             (list ',op ,value) expected actual)))))
-      (let ((big (* pi (expt 2d0 70)))
-            (mid (coerce most-positive-fixnum 'double-float))
-            (odd (* pi most-positive-fixnum)))
-        (foo sin big)
-        (foo sin mid)
-        (foo sin odd)
-        (foo sin (/ odd 2d0))
-
-        (foo cos big)
-        (foo cos mid)
-        (foo cos odd)
-        (foo cos (/ odd 2d0))
-
-        (foo tan big)
-        (foo tan mid)
-        (foo tan odd)))))
-
 ;; To test the range reduction of trigonometric functions we need a much
 ;; more accurate approximation of pi than CL:PI is. Calculating this is
 ;; more fun than copy-pasting a constant and Gauss-Legendre converges
@@ -299,10 +264,7 @@ fractional bits."
 ;; with a sufficiently accurate value of pi that the reduced argument
 ;; is correct to nearly double-float precision even for arguments of
 ;; very large absolute value.
-;; This test is skipped on x86; as to why see the comment at the test
-;; (:range-reduction :x87) above.
-(with-test (:name (:range-reduction :precise-pi)
-            :skipped-on :x86)
+(with-test (:name (:range-reduction :precise-pi))
   (let ((rational-pi-half (/ (pi-gauss-legendre 2200) 2)))
     (labels ((round-pi-half (x)
                "Return two values as if (ROUND X (/ PI 2)) was called

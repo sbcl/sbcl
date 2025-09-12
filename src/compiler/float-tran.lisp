@@ -274,20 +274,10 @@
   '(integer-decode-double-float x))
 
 (deftransform scale-float ((f ex) (single-float t) *)
-  (cond #+(and x86 ()) ;; this producess different results based on whether it's inlined or not
-        ((csubtypep (lvar-type ex)
-                    (specifier-type '(signed-byte 32)))
-         '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float))
-        (t
-         '(scale-single-float f ex))))
+  '(scale-single-float f ex))
 
 (deftransform scale-float ((f ex) (double-float t) *)
-  (cond #+(and x86 ())
-        ((csubtypep (lvar-type ex)
-                    (specifier-type '(signed-byte 32)))
-         '(%scalbn f ex))
-        (t
-         '(scale-double-float f ex))))
+  '(scale-double-float f ex))
 
 ;;; Given a number X, create a form suitable as a bound for an
 ;;; interval. Make the bound open if OPEN-P is T. NIL remains NIL.
@@ -537,6 +527,9 @@
   (def sqrt %sqrt float)
   (def asin %asin float)
   (def acos %acos float)
+  (def sin %sin *)
+  (def cos %cos *)
+  (def tan %tan *)
   (def atan %atan *)
   (def sinh %sinh *)
   (def cosh %cosh *)
@@ -544,43 +537,6 @@
   (def asinh %asinh *)
   (def acosh %acosh float)
   (def atanh %atanh float))
-
-;;; The argument range is limited on the x86 FP trig. functions. A
-;;; post-test can detect a failure (and load a suitable result), but
-;;; this test is avoided if possible.
-(macrolet ((def (name prim prim-quick)
-             (declare (ignorable prim-quick))
-             `(progn
-                (deftransform ,name ((x) (single-float) *)
-                  #+x86 (cond ((csubtypep (lvar-type x)
-                                          (specifier-type
-                                           `(single-float (,(sb-xc:- (expt 2f0 63)))
-                                                          (,(expt 2f0 63)))))
-                                `(coerce (,',prim-quick (coerce x 'double-float))
-                                  'single-float))
-                               (t
-                                (compiler-notify
-                                 "unable to avoid inline argument range check~@
-                                  because the argument range (~S) was not within 2^63"
-                                 (type-specifier (lvar-type x)))
-                                `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
-                  #-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
-               (deftransform ,name ((x) (double-float) *)
-                 #+x86 (cond ((csubtypep (lvar-type x)
-                                         (specifier-type
-                                          `(double-float (,(sb-xc:- (expt 2d0 63)))
-                                                         (,(expt 2d0 63)))))
-                               `(,',prim-quick x))
-                              (t
-                               (compiler-notify
-                                "unable to avoid inline argument range check~@
-                                 because the argument range (~S) was not within 2^63"
-                                (type-specifier (lvar-type x)))
-                               `(,',prim x)))
-                 #-x86 `(,',prim x)))))
-  (def sin %sin %sin-quick)
-  (def cos %cos %cos-quick)
-  (def tan %tan %tan-quick))
 
 (deftransform atan ((x y) (single-float single-float) *)
   `(coerce (%atan2 (coerce x 'double-float) (coerce y 'double-float))

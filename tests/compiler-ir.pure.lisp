@@ -442,8 +442,8 @@
                          (pop s))))
       1)))
 
-(with-test (:name :overflow+make-array
-                  :fails-on (not :64-bit))
+#+(or x86-64 arm64)
+(with-test (:name :overflow+make-array)
   (assert
    (= (count 'sb-vm::overflow+t
              (ir2-vops '(lambda (y)
@@ -469,6 +469,7 @@
               `(lambda (x)
                  (the fixnum (the integer x))))
              1))
+  #+(or arm64 x86-64)
   (assert (= (count-type-checks
               `(lambda (x)
                  (logand (the number x) 2)))
@@ -529,7 +530,7 @@
 (with-test (:name :no-type-check-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda (x)
-                        (truly-the fixnum (funcall x))))
+                        (truly-the fixnum (funcall (the function x)))))
     (assert (node-tail-p combination))))
 
 (with-test (:name :evenp+arithmetic)

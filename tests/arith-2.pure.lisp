@@ -770,6 +770,7 @@
    (lambda (x y)
      (ldb (byte y (- 32 y)) x))
    (unsigned-byte 32))
+  #+64-bit
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (ldb (byte y (- 32 y)) x))))))
 

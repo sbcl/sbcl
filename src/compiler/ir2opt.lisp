@@ -198,6 +198,8 @@
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
                                                                  (sc-number (tn-sc res))
                                                                  (tn-type tn))))
+                    (when (sc-is tn sb-vm::constant)
+                      (break "~a" move))
                     (multiple-value-bind (node block before)
                         (cond #+arm64
                               ((member (vop-name move) '(sb-vm::move-to-word/fixnum

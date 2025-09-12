@@ -52,39 +52,19 @@
              ,body)))))
 
 
-#+x86 ;; for constant folding
-(macrolet ((def (name ll)
-             `(defun ,name ,ll (,name ,@ll))))
-  (def %atan2 (x y))
-  (def %atan (x))
-  (def %tan (x))
-  (def %tan-quick (x))
-  (def %cos (x))
-  (def %cos-quick (x))
-  (def %sin (x))
-  (def %sin-quick (x))
-  (def %sqrt (x))
-  (def %log (x))
-  (def %log1p (x))
-  (def %log2 (x))
-  (def %exp (x)))
-
-#+(or x86-64 arm-vfp arm64 riscv) ;; for constant folding
+#+(or #+x86 x86-64 arm-vfp arm64 riscv) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x)))
 
 ;;;; stubs for the Unix math library
-;;;;
-;;;; Many of these are unnecessary on the X86 because they're built
-;;;; into the FPU.
 
 ;;; trigonometric
-#-x86 (def-math-rtn "sin" 1)
-#-x86 (def-math-rtn "cos" 1)
-#-x86 (def-math-rtn "tan" 1)
-#-x86 (def-math-rtn "atan" 1)
-#-x86 (def-math-rtn "atan2" 2)
+(def-math-rtn "sin" 1)
+(def-math-rtn "cos" 1)
+(def-math-rtn "tan" 1)
+(def-math-rtn "atan" 1)
+(def-math-rtn "atan2" 2)
 
 ;;; See src/runtime/wrap.c for the definitions of the "sb_"-prefixed things.
 (def-math-rtn "acos" 1 #+win32 t)
@@ -98,14 +78,14 @@
 
 ;;; exponential and logarithmic
 (def-math-rtn "hypot" 2 #+win32 t)
-#-x86 (def-math-rtn "exp" 1)
-#-x86 (def-math-rtn "log" 1)
-#-x86 (def-math-rtn "log10" 1)
+(def-math-rtn "exp" 1)
+(def-math-rtn "log" 1)
+(def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
 #-(or x86 x86-64 arm-vfp arm64 riscv)
 (def-math-rtn "sqrt" 1 nil #+ppc64 t)
-#-x86 (def-math-rtn "log1p" 1)
-#-x86 (def-math-rtn "log2" 1)
+(def-math-rtn "log1p" 1)
+(def-math-rtn "log2" 1)
 
 
 ;;;; power functions
