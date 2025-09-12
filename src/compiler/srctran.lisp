@@ -5270,7 +5270,12 @@
                ((or (eq diff (specifier-type 'null))
                     (eq diff (specifier-type '(eql t)))
                     (eq diff (specifier-type '(eql 0))))
-                `(not (eq x ,(nth-value 1 (type-singleton-p diff))))))))))
+                `(not (eq x ,(nth-value 1 (type-singleton-p diff)))))
+               ((and (neq diff *empty-type*)
+                     (not (fixnump value))
+                     (csubtypep diff (specifier-type 'fixnum)))
+                ;; A fixnum test is cheaper than other comparisons
+                `(not (fixnump x))))))))
       ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
       ;; if possible, but do not defer the memory load unless doing
       ;; so can have no effect, i.e. Y is a constant or provably not
