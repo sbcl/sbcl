@@ -532,6 +532,15 @@
         (inst b unsigned-fall-through)))
     not-target))
 
+(define-vop (fixnump)
+  (:translate fixnump)
+  (:arg-refs arg-ref)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:conditional :eq)
+  (:policy :fast-safe)
+  (:generator 4
+    (inst tst value n-fixnum-tag-bits)))
+
 (define-vop (fixnump/unsigned)
   (:policy :fast-safe)
   (:args (value :scs (unsigned-reg)))
