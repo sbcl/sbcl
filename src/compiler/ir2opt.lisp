@@ -191,7 +191,8 @@
            (setf value-if x-tn))))
      (flet ((coerce-tn (tn move)
               (if (or (eq tn res)
-                      (sc-is tn sb-vm::immediate sb-vm::constant)
+                      (eq (vop-name move) 'move)
+                      (sc-is tn sb-vm::immediate)
                       (compatible-move-p res tn))
                   tn
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
