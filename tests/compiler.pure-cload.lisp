@@ -228,3 +228,9 @@
            (caddr
             (sb-kernel:%simple-fun-type #'compiled-ftype-test-opt))
            '(values (or null fixnum) &optional))))
+
+(defun ltv-constants ()
+  (load-time-value (char-code #\a)))
+
+(with-test (:name :ltv-constants)
+  (assert (not (ctu:find-code-constants #'ltv-constants))))
