@@ -5261,6 +5261,16 @@
       ((same-leaf-ref-p x y) t)
       ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
        nil)
+      ((multiple-value-bind (p value) (type-singleton-p (lvar-type y))
+         (when (and p
+                    (not (member value '(nil t 0))))
+           ;; Instead of (eq boolean t) do (not (eq boolean nil)), which is more compact.
+           (let ((diff (type-difference (lvar-type x) (lvar-type y))))
+             (cond
+               ((or (eq diff (specifier-type 'null))
+                    (eq diff (specifier-type '(eql t)))
+                    (eq diff (specifier-type '(eql 0))))
+                `(not (eq x ,(nth-value 1 (type-singleton-p diff))))))))))
       ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
       ;; if possible, but do not defer the memory load unless doing
       ;; so can have no effect, i.e. Y is a constant or provably not
