@@ -518,7 +518,7 @@
              `(progn
                (deftransform ,name ((x) (single-float) ,rtype :node node)
                  (delay-ir1-transform node :ir1-phases)
-                 `(%single-float (,',prim (%double-float x))))
+                 `(,',(symbolicate prim "F") x))
                (deftransform ,name ((x) (double-float) ,rtype :node node)
                  (delay-ir1-transform node :ir1-phases)
                  `(,',prim x)))))
@@ -539,29 +539,22 @@
   (def atanh %atanh float))
 
 (deftransform atan ((x y) (single-float single-float) *)
-  `(coerce (%atan2 (coerce x 'double-float) (coerce y 'double-float))
-    'single-float))
+  `(%atan2f x y))
+
 (deftransform atan ((x y) (double-float double-float) *)
   `(%atan2 x y))
 
 (deftransform expt ((x y) (single-float single-float) single-float)
-  `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
-           'single-float))
+  `(%powf x y))
 (deftransform expt ((x y) (double-float double-float) double-float)
   `(%pow x y))
-(deftransform expt ((x y) (single-float integer) single-float)
-  `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
-    'single-float))
-(deftransform expt ((x y) (double-float integer) double-float)
-  `(%pow x (coerce y 'double-float)))
 
 ;;; ANSI says log with base zero returns zero.
 (deftransform log ((x y) (single-float single-float) single-float :node node)
   (delay-ir1-transform node :ir1-phases)
   `(if (zerop y)
        0.0f0
-       (coerce (/ (%log (coerce x 'double-float)) (%log (coerce y 'double-float)))
-               'single-float)))
+       (/ (%logf x) (%logf y))))
 (deftransform log ((x y) (single-float double-float) double-float :node node)
   (delay-ir1-transform node :ir1-phases)
   `(if (zerop y)
@@ -608,17 +601,13 @@
   '(%hypot (realpart x) (imagpart x)))
 
 (deftransform abs ((x) ((complex single-float)) single-float)
-  '(coerce (%hypot (coerce (realpart x) 'double-float)
-                   (coerce (imagpart x) 'double-float))
-          'single-float))
+  '(%hypotf (realpart x) (imagpart x)))
 
 (deftransform phase ((x) ((complex double-float)) double-float)
   '(%atan2 (imagpart x) (realpart x)))
 
 (deftransform phase ((x) ((complex single-float)) single-float)
-  '(coerce (%atan2 (coerce (imagpart x) 'double-float)
-                   (coerce (realpart x) 'double-float))
-          'single-float))
+  '(%atan2f (imagpart x) (realpart x)))
 
 (deftransform phase ((x) ((float)) float)
   '(if (minusp (float-sign x))

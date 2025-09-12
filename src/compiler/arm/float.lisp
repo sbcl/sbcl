@@ -358,7 +358,7 @@
 (define-vop (fsqrts)
   (:args (x :scs (single-reg)))
   (:results (y :scs (single-reg)))
-  (:translate %sqrt)
+  (:translate %sqrtf)
   (:policy :fast-safe)
   (:arg-types single-float)
   (:result-types single-float)

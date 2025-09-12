@@ -55,11 +55,9 @@ rm -fr sandbox/scratch
              (list "MAP.48" "SYMBOL-FUNCTION.ERROR.5"))
 
          #+sb-unicode (list "BOTH-CASE-P.2" "CHAR-DOWNCASE.2" "CHAR-UPCASE.2"))))
-                         (failing (remove "FORMAT.E.26"
-                                          (mapcar (function string) regression-test:*failed-tests*)
-                                          :test (function equal)))
-                         #+sb-devel
-                         (failing (remove "COMMON-LISP-PACKAGE-NICKNAMES" failing :test (function equal)))
+                         (failing (mapcar (function string) regression-test:*failed-tests*))
+                         (failing (set-difference failing (list "FORMAT.E.26" #+sb-devel "COMMON-LISP-PACKAGE-NICKNAMES")
+                          :test (function equal)))
                          (diff1 (set-difference failing  expected :test (function equal)))
                          (diff2 (set-difference expected failing :test (function equal))))
    (cond ((or diff1 diff2)

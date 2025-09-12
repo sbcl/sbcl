@@ -428,10 +428,12 @@
   (frob abs/double-float fabs abs double-reg double-float)
   (frob %negate/single-float fneg %negate single-reg single-float)
   (frob %negate/double-float fneg %negate double-reg double-float)
-  (frob sqrt/single-float fsqrts %sqrt single-reg single-float)
+  (frob sqrt/single-float fsqrts %sqrtf single-reg single-float)
   (frob sqrt/double-float fsqrt %sqrt double-reg double-float))
 
 (deftransform %sqrt ((x) * * :vop t)
+  (memq :fsqrt *backend-subfeatures*))
+(deftransform %sqrtf ((x) * * :vop t)
   (memq :fsqrt *backend-subfeatures*))
 
 ;;;; Comparison:

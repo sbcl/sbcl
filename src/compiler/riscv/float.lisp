@@ -418,7 +418,7 @@
              `(define-vop (,name)
                 (:args (x :scs (,sc)))
                 (:results (y :scs (,sc)))
-                (:translate %sqrt)
+                (:translate ,name)
                 (:policy :fast-safe)
                 (:arg-types ,ptype)
                 (:result-types ,ptype)
@@ -426,8 +426,8 @@
                 (:save-p :compute-only)
                 (:generator 1
                   (inst fsqrt ,fmt y x)))))
-  (frob %sqrt/single-float :single single-reg single-float)
-  (frob %sqrt/double-float :double double-reg double-float))
+  (frob %sqrtf :single single-reg single-float)
+  (frob %sqrt :double double-reg double-float))
 
 
 ;;;; Comparison:

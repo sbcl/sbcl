@@ -616,7 +616,9 @@ SB_TRIG_WRAPPER(atanh)
 double sb_hypot (double x, double y) {
     return hypot(x, y);
 }
-
+double sb_hypotf (double x, double y) {
+    return hypotf(x, y);
+}
 #endif
 
 int sb_fileno(FILE* f) { return fileno(f); } // might be a C macro

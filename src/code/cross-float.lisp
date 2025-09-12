@@ -372,11 +372,7 @@
              `(defun ,(intern (string name) "SB-XC") ,lambda-list
                 (declare (ignorable ,@lambda-list))
                 (error "Unimplemented."))))
-  (def acos (number))
-  (def acosh (number))
-  (def asin (number))
   (def asinh (number))
-  (def atanh (number))
   (def cis (number))
   (def conjugate (number))
   (def cos (number))
@@ -386,6 +382,42 @@
   (def sinh (number))
   (def tan (number))
   (def tanh (number)))
+
+(defun asin (number)
+  (case number
+    (-1d0 -1.5707963267948966d0)
+    (1d0 1.5707963267948966d0)
+    (-1f0 -1.5707964)
+    (1f0 1.5707964)
+    (t
+     (error "Unimplemented."))))
+
+(defun acos (number)
+  (case number
+    (-1d0 pi)
+    (1d0 0d0)
+    (-1f0 (coerce pi 'single-float))
+    (1f0 0f0)
+    (t
+     (error "Unimplemented."))))
+
+(defun acosh (number)
+  (with-memoized-math-op (acosh number)
+    (case number
+      (1d0 0d0)
+      (1f0 0f0)
+      (t
+       (error "Unimplemented.")))))
+
+(defun atanh (number)
+  (with-memoized-math-op (atanh number)
+    (case number
+      (-1d0 double-float-negative-infinity)
+      (1d0 double-float-positive-infinity)
+      (-1f0 single-float-negative-infinity)
+      (1f0 single-float-positive-infinity)
+      (t
+       (error "Unimplemented.")))))
 
 (defun atan (number1 &optional (number2 nil number2p))
   (if number2p

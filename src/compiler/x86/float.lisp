@@ -2074,6 +2074,29 @@
            (maybe-fp-wait node))
           (t (inst fst y)))))
 
+(define-vop (fsqrtf)
+  (:args (x :scs (single-reg) :target fr0))
+  (:temporary (:sc single-reg :offset fr0-offset :from :argument :to :result) fr0)
+  (:ignore fr0)
+  (:results (y :scs (single-reg)))
+  (:arg-types single-float)
+  (:result-types single-float)
+  (:translate %sqrtf)
+  (:policy :fast-safe)
+  (:note "inline npx function")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:node-var node)
+  (:generator 5
+    (note-this-location vop :internal-error)
+    (unless (zerop (tn-offset x))
+      (inst fxch x)
+      (unless (location= x y) (inst fst x)))
+    (inst fsqrt)
+    (cond ((zerop (tn-offset y))
+           (maybe-fp-wait node))
+          (t (inst fst y)))))
+
 
 ;;;; complex float VOPs
 

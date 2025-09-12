@@ -18,10 +18,14 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun handle-reals (function var)
-    `((((foreach fixnum single-float bignum ratio))
-       (coerce (,function (coerce ,var 'double-float)) 'single-float))
-      ((double-float)
-       (,function ,var))))
+    (let ((f (find-symbol (format nil "~aF" function))))
+      (aver f)
+      `((((foreach fixnum bignum ratio))
+         (,f (coerce ,var 'single-float)))
+        ((single-float)
+         (,f ,var))
+        ((double-float)
+         (,function ,var)))))
 
   (defun handle-complex (form)
     `((((foreach (complex double-float) (complex single-float) (complex rational)))
@@ -30,32 +34,51 @@
 ;;; Make these INLINE, since the call to C is at least as compact as a
 ;;; Lisp call, and saves number consing to boot.
 (defmacro def-math-rtn (name num-args &optional wrapper transform)
-  (let* ((function (symbolicate "%" (string-upcase name)))
-         (args (loop for i below num-args
-                     collect (intern (format nil "ARG~D" i))))
-         (body `(locally
-                    (declare (sb-c:flushable sb-c:%alien-funcall))
-                  (truly-the ;; avoid checking the result
-                   ,(type-specifier (fun-type-returns (info :function :type function)))
-                   (alien-funcall
-                    (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
-                                  (function double-float
-                                            ,@(loop repeat num-args
-                                                    collect 'double-float)))
-                    ,@args)))))
-    (if transform
-        `(sb-c:deftransform ,function (,args)
-           ',body)
-        `(progn
-           (declaim (inline ,function))
-           (defun ,function ,args
-             ,body)))))
-
+  (flet ((make-fun (dname &optional f)
+           (let* ((name (if f
+                            (format nil "~af" dname)
+                            dname))
+                  (function (symbolicate "%" (string-upcase name)))
+                  (args (loop for i below num-args
+                              collect (intern (format nil "ARG~D" i))))
+                  (type (if f
+                            'single-float
+                            'double-float))
+                  (body
+                    (cond
+                      #-libmf
+                      (f
+                       `(coerce (,(symbolicate "%" (string-upcase dname))
+                                 ,@(loop for arg in args
+                                         collect `(coerce ,arg 'double-float)))
+                                'single-float))
+                      (t
+                       `(locally
+                            (declare (sb-c:flushable sb-c:%alien-funcall))
+                          (truly-the ;; avoid checking the result
+                           ,(type-specifier (fun-type-returns (info :function :type function)))
+                           (alien-funcall
+                            (extern-alien ,(format nil "~:[~;sb_~]~a" (and wrapper #+ucrt nil) name)
+                                          (function ,type
+                                                    ,@(loop repeat num-args
+                                                            collect type)))
+                            ,@args)))))))
+             (if transform
+                 `(sb-c:deftransform ,function (,args)
+                    ',body)
+                 `(progn
+                    (declaim (inline ,function))
+                    (defun ,function ,args
+                      ,body))))))
+    `(progn
+       ,(make-fun name)
+       ,(make-fun name t))))
 
 #+(or #+x86 x86-64 arm-vfp arm64 riscv) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
-  (def %sqrt (x)))
+  (def %sqrt (x))
+  (def %sqrtf (x)))
 
 ;;;; stubs for the Unix math library
 
@@ -537,8 +560,7 @@
            ;; IEEE 754 says (log -0.0) should be -inf
            (if (< number 0.0)
                (complex (log (- number)) (coerce pi '(dispatch-type number)))
-               (coerce (%log (coerce number 'double-float))
-                       '(dispatch-type number))))
+               (log number)))
           ((complex)
            (complex-log number))))))
 (declaim (end-block))
@@ -555,10 +577,8 @@
     (((foreach single-float double-float))
      (if (minusp number)
          (complex (coerce 0.0 '(dispatch-type number))
-                  (coerce (%sqrt (- (coerce number 'double-float)))
-                          '(dispatch-type number)))
-         (coerce (%sqrt (coerce number 'double-float))
-                 '(dispatch-type number))))
+                  (sqrt (- number)))
+          (sqrt number)))
     ((complex)
      (complex-sqrt number))))
 
@@ -577,9 +597,7 @@
          (rational
           (sqrt (+ (* rx rx) (* ix ix))))
          (single-float
-          (coerce (%hypot (coerce rx 'double-float)
-                          (coerce (truly-the single-float ix) 'double-float))
-                  'single-float))
+          (%hypotf rx ix))
          (double-float
           (%hypot rx (truly-the double-float ix))))))))
 
@@ -653,13 +671,12 @@
     ((rational)
      (if (or (> number 1) (< number -1))
          (complex-asin number)
-         (coerce (%asin (coerce number 'double-float)) 'single-float)))
+         (%asinf (coerce number 'single-float))))
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
              (< number (coerce -1 '(dispatch-type number))))
          (complex-asin (complex number))
-         (coerce (%asin (coerce number 'double-float))
-                 '(dispatch-type number))))
+         (asin number)))
     ((complex)
      (complex-asin number))))
 
@@ -670,13 +687,12 @@
     ((rational)
      (if (or (> number 1) (< number -1))
          (complex-acos number)
-         (coerce (%acos (coerce number 'double-float)) 'single-float)))
+         (%acosf (coerce number 'single-float))))
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
              (< number (coerce -1 '(dispatch-type number))))
          (complex-acos (complex number))
-         (coerce (%acos (coerce number 'double-float))
-                 '(dispatch-type number))))
+         (acos number)))
     ((complex)
      (complex-acos number))))
 
@@ -693,7 +709,17 @@
                            y
                            (float-sign y pi))
                        (float-sign y (sb-xc:/ pi 2)))
-                   (%atan2 y x))))
+                   (%atan2 y x)))
+             (atan2f (y x)
+               (declare (type single-float y x)
+                        (values single-float))
+               (if (zerop x)
+                   (if (zerop y)
+                       (if (not (float-sign-bit-set-p x))
+                           y
+                           (float-sign y (coerce pi 'single-float)))
+                       (float-sign y (sb-xc:/ (coerce pi 'single-float) 2)))
+                   (%atan2f y x))))
         (number-dispatch ((y real) (x real))
           ((double-float
             (foreach double-float single-float fixnum bignum ratio))
@@ -703,8 +729,7 @@
            (atan2 (coerce y 'double-float) x))
           (((foreach single-float fixnum bignum ratio)
             (foreach single-float fixnum bignum ratio))
-           (coerce (atan2 (coerce y 'double-float) (coerce x 'double-float))
-                   'single-float))))
+           (atan2f (coerce y 'single-float) (coerce x 'single-float)))))
       (number-dispatch ((y number))
         (handle-reals %atan y)
         ((complex)
@@ -762,12 +787,11 @@
      ;; acosh is complex if number < 1
      (if (< number 1)
          (complex-acosh number)
-         (coerce (%acosh (coerce number 'double-float)) 'single-float)))
+         (%acoshf (coerce number 'single-float))))
     (((foreach single-float double-float))
      (if (< number (coerce 1 '(dispatch-type number)))
          (complex-acosh (complex number))
-         (coerce (%acosh (coerce number 'double-float))
-                 '(dispatch-type number))))
+         (acosh number)))
     ((complex)
      (complex-acosh number))))
 
@@ -779,13 +803,12 @@
      ;; atanh is complex if |number| > 1
      (if (or (> number 1) (< number -1))
          (complex-atanh number)
-         (coerce (%atanh (coerce number 'double-float)) 'single-float)))
+         (%atanhf (coerce number 'single-float))))
     (((foreach single-float double-float))
      (if (or (> number (coerce 1 '(dispatch-type number)))
              (< number (coerce -1 '(dispatch-type number))))
          (complex-atanh (complex number))
-         (coerce (%atanh (coerce number 'double-float))
-                 '(dispatch-type number))))
+         (atanh number)))
     ((complex)
      (complex-atanh number))))
 

@@ -788,12 +788,20 @@
 (defknown double-float-low-bits (double-float) (unsigned-byte 32)
   (movable foldable flushable))
 
-(defknown (%tan %sinh %asinh %atanh %log %logb %log10 %tan-quick)
+(defknown (%tan %sinh %asinh %atanh %log %logb %log10 %log1p %log2 %tan-quick)
           (double-float) double-float
+  (movable foldable flushable))
+
+(defknown (%tanf %sinhf %asinhf %atanhf %logf %log10f %log1pf %log2f)
+          (single-float) single-float
   (movable foldable flushable))
 
 (defknown (%sin %cos %tanh %sin-quick %cos-quick)
   (double-float) (double-float -1.0d0 1.0d0)
+  (movable foldable flushable))
+
+(defknown (%sinf %cosf %tanhf)
+  (single-float) (single-float -1.0f0 1.0f0)
   (movable foldable flushable))
 
 (defknown (%asin %atan)
@@ -802,17 +810,35 @@
                 #.(coerce (sb-xc:/ pi 2) 'double-float))
   (movable foldable flushable))
 
+(defknown (%asinf %atanf)
+  (single-float)
+  (single-float  #.(coerce (sb-xc:- (sb-xc:/ pi 2)) 'single-float)
+                 #.(coerce (sb-xc:/ pi 2) 'single-float))
+  (movable foldable flushable))
+
 (defknown (%acos)
   (double-float) (double-float 0.0d0 #.(coerce pi 'double-float))
   (movable foldable flushable))
+
+(defknown (%acosf)
+    (single-float) (single-float 0.0f0 #.(coerce pi 'single-float))
+    (movable foldable flushable))
 
 (defknown (%cosh)
   (double-float) (double-float 1.0d0)
   (movable foldable flushable))
 
+(defknown (%coshf)
+  (single-float) (single-float 1.0f0)
+  (movable foldable flushable))
+
 (defknown (%acosh %exp %sqrt)
   (double-float) (double-float 0.0d0)
   (movable foldable flushable))
+
+(defknown (%acoshf %expf %sqrtf)
+    (single-float) (single-float 0.0f0)
+    (movable foldable flushable))
 
 (defknown %expm1
   (double-float) (double-float -1d0)
@@ -822,9 +848,17 @@
   (double-float double-float) (double-float 0d0)
   (movable foldable flushable))
 
+(defknown (%hypotf)
+    (single-float single-float) (single-float 0f0)
+    (movable foldable flushable))
+
 (defknown (%pow)
   (double-float double-float) double-float
   (movable foldable flushable))
+
+(defknown (%powf)
+    (single-float single-float) single-float
+    (movable foldable flushable))
 
 (defknown (%atan2)
   (double-float double-float)
@@ -832,16 +866,18 @@
                 #.(coerce pi 'double-float))
   (movable foldable flushable))
 
+(defknown (%atan2f)
+    (single-float single-float)
+    (single-float #.(coerce (sb-xc:- pi) 'single-float)
+                  #.(coerce pi 'single-float))
+    (movable foldable flushable))
+
 (defknown (%scalb)
   (double-float double-float) double-float
   (movable foldable flushable))
 
 (defknown (%scalbn)
   (double-float (signed-byte 32)) double-float
-  (movable foldable flushable))
-
-(defknown (%log1p %log2)
-  (double-float) double-float
   (movable foldable flushable))
 
 (defknown (%unary-truncate %unary-round) (real) integer
