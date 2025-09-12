@@ -1090,7 +1090,7 @@
                          ;; access interpreter's lexical vars
                          ;; Prevent SETF on the variable from getting
                          ;; "Destructive function (SETF SVREF) called on constant data"
-                         (macroize sym `(svref (load-time-value ,payload) ,i)))
+                         (macroize sym `(svref (load-time-value ,payload modifiable-constant) ,i)))
                         (t
                          (let ((leaf (sb-c::make-lambda-var
                                       sym
