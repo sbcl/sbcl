@@ -2793,16 +2793,21 @@ expansion happened."
       (t
        (specifier-type 'real)))))
 
+(defmacro new-numeric-union-type (aspects ranges)
+  `(let ((ranges ,ranges))
+     ;; rebinding staves off dynamic-extent imposed by NEW-CTYPE
+     (new-ctype numeric-union-type 0 ,aspects ranges)))
+
 (def-type-translator complex ((:context context) &optional (typespec '*))
   (declare (inline !compute-numtype-aspect-id))
   (if (eq typespec '*)
       (specifier-type '(complex real))
       (labels ((complex1 (component-type)
-                 (new-ctype numeric-union-type
-                            0 (get-numtype-aspects :complex
-                                                   (numeric-type-class component-type)
-                                                   (numeric-type-format component-type))
-                            (numeric-union-type-ranges component-type))))
+                 (new-numeric-union-type
+                  (get-numtype-aspects :complex
+                                       (numeric-type-class component-type)
+                                       (numeric-type-format component-type))
+                  (numeric-union-type-ranges component-type))))
         (let ((ctype (upgraded-complex-part-ctype typespec context)))
           ;; this is the two types NIL and (EQL 0)
           (if (csubtypep ctype (sb-kernel:specifier-type '(eql 0)))
@@ -5392,7 +5397,7 @@ expansion happened."
                (t x))))
       (let ((low (normalize-low-zero low))
             (high (normalize-high-zero high)))
-        (new-ctype numeric-union-type 0 (get-numtype-aspects complexp class format)
+        (new-numeric-union-type (get-numtype-aspects complexp class format)
                    (case class
                      (integer
                       (vector range-integer-run low high))
@@ -6333,13 +6338,13 @@ expansion happened."
                               range-integer-run
                               range-ratio-run)
                           member member))
-          (new-ctype numeric-union-type 0
-                     (get-numtype-aspects :real
-                                          (case mask
-                                            (#.range-integer-run 'integer)
-                                            (t 'rational))
-                                          nil)
-                     (coerce (reverse result) 'vector))))
+          (new-numeric-union-type
+           (get-numtype-aspects :real
+                                (case mask
+                                  (#.range-integer-run 'integer)
+                                  (t 'rational))
+                                nil)
+           (coerce (reverse result) 'vector))))
       *empty-type*))
 
 (defun member-float (type members)
@@ -6373,9 +6378,9 @@ expansion happened."
                             (push high result))))))
           (loop for member in (sort (copy-list members) #'fp<)
                 do (store member member))
-          (new-ctype numeric-union-type 0
-                     (get-numtype-aspects :real 'float type)
-                     (coerce (reverse result) 'vector))))
+          (new-numeric-union-type
+           (get-numtype-aspects :real 'float type)
+           (coerce (reverse result) 'vector))))
       *empty-type*))
 
 (define-type-method (numeric-union :simple-union2) (type1 type2)
@@ -6409,18 +6414,18 @@ expansion happened."
                     (multiple-value-bind (ranges mask) (union-rational (numeric-union-type-ranges type1)
                                                                        (numeric-union-type-ranges type2))
 
-                      (new-ctype numeric-union-type 0
-                                 (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                                      (case mask
-                                                        (#.range-integer-run 'integer)
-                                        ; FIXME: add a new class for ratios, for faster operations that use different types.
-                                                        (t 'rational))
-                                                      nil)
-                                 ranges))))))
+                      (new-numeric-union-type
+                       (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                            (case mask
+                                              (#.range-integer-run 'integer)
+                                              ;; FIXME: add a new class for ratios, for faster operations that use different types.
+                                              (t 'rational))
+                                            nil)
+                       ranges))))))
           (t
-           (new-ctype numeric-union-type 0 aspects1
-                      (union-float (numeric-union-type-ranges type1)
-                                   (numeric-union-type-ranges type2)))))))
+           (new-numeric-union-type aspects1
+                                   (union-float (numeric-union-type-ranges type1)
+                                                (numeric-union-type-ranges type2)))))))
 
 (define-type-method (numeric-union :simple-intersection2) (type1 type2)
   (declare (inline !compute-numtype-aspect-id))
@@ -6454,20 +6459,20 @@ expansion happened."
                                                                              (numeric-union-type-ranges type2))
                         (if (= (length ranges) 0)
                             *empty-type*
-                            (new-ctype numeric-union-type 0
-                                       (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                                            (case mask
-                                                              (#.range-integer-run 'integer)
-                                                              (t 'rational))
-                                                            nil)
-                                       ranges)))))
+                            (new-numeric-union-type
+                             (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                                  (case mask
+                                                    (#.range-integer-run 'integer)
+                                                    (t 'rational))
+                                                  nil)
+                             ranges)))))
                *empty-type*))
           (t
            (let ((ranges (intersect-float (numeric-union-type-ranges type1)
                                           (numeric-union-type-ranges type2))))
              (if (= (length ranges) 0)
                  *empty-type*
-                 (new-ctype numeric-union-type 0 aspects1 ranges)))))))
+                 (new-numeric-union-type aspects1 ranges)))))))
 
 (define-type-method (numeric-union :complex-intersection2) (type1 type2)
   (declare (inline !compute-numtype-aspect-id))
@@ -6498,20 +6503,20 @@ expansion happened."
                                                                                      (numeric-union-type-ranges type1))
                                (if (= (length ranges) 0)
                                    *empty-type*
-                                   (new-ctype numeric-union-type 0
-                                              (get-numtype-aspects (numtype-aspects-complexp aspects1)
-                                                                   (case mask
-                                                                     (#.range-integer-run 'integer)
-                                                                     (t 'rational))
-                                                                   nil)
-                                              ranges)))))
+                                   (new-numeric-union-type
+                                    (get-numtype-aspects (numtype-aspects-complexp aspects1)
+                                                         (case mask
+                                                           (#.range-integer-run 'integer)
+                                                           (t 'rational))
+                                                         nil)
+                                    ranges)))))
                       type2))
                  (t
                   (let ((ranges (difference-float (numeric-union-type-ranges type2)
                                                   (numeric-union-type-ranges type1))))
                     (if (= (length ranges) 0)
                         *empty-type*
-                        (new-ctype numeric-union-type 0 aspects1 ranges)))))))
+                        (new-numeric-union-type aspects1 ranges)))))))
         (:call-other-method)))
 
 (define-type-method (numeric-union :complex-union2) (type1 type2)
@@ -6579,18 +6584,18 @@ expansion happened."
               for low = (aref ranges (+ i 1))
               for high = (aref ranges (+ i 2))
               collect
-              (new-ctype numeric-union-type 0
-                         (get-numtype-aspects (numtype-aspects-complexp aspects)
-                                              (case run
-                                                (#.range-integer-run 'integer)
-                                                (t 'rational))
-                                              nil)
-                         (vector run low high)))
+              (new-numeric-union-type
+               (get-numtype-aspects (numtype-aspects-complexp aspects)
+                                    (case run
+                                      (#.range-integer-run 'integer)
+                                      (t 'rational))
+                                    nil)
+               (vector run low high)))
         (loop for i below (length ranges) by 2
               for low = (aref ranges i)
               for high = (aref ranges (1+ i))
               collect
-              (new-ctype numeric-union-type 0 aspects (vector low high))))))
+              (new-numeric-union-type aspects (vector low high))))))
 
 (defun numeric-union-bounds (type)
   (let ((ranges (numeric-union-type-ranges type))
@@ -6603,17 +6608,17 @@ expansion happened."
   (let ((ranges (numeric-union-type-ranges type))
         (aspects (numeric-union-type-aspects type)))
     (if (memq (numtype-aspects-class aspects) '(integer rational))
-        (new-ctype numeric-union-type 0
-                   aspects
-                   (vector (ecase (numtype-aspects-class aspects)
-                             (rational range-rational-run)
-                             (integer range-integer-run))
-                           (aref ranges 1)
-                           (aref ranges (1- (length ranges)))))
-        (new-ctype numeric-union-type 0
-                   aspects
-                   (vector (aref ranges 0)
-                           (aref ranges (1- (length ranges))))))))
+        (new-numeric-union-type
+         aspects
+         (vector (ecase (numtype-aspects-class aspects)
+                   (rational range-rational-run)
+                   (integer range-integer-run))
+                 (aref ranges 1)
+                 (aref ranges (1- (length ranges)))))
+        (new-numeric-union-type
+         aspects
+         (vector (aref ranges 0)
+                 (aref ranges (1- (length ranges))))))))
 
 (defun numeric-union-typep (object type)
   (if (eq type (specifier-type 'number))

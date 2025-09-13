@@ -1032,3 +1032,6 @@
     (assert (and (not answer) (not certain))))
   (multiple-value-bind (answer certain) (subtypep 'jn-even 'jn-odd)
     (assert (and (not answer) (not certain)))))
+
+(with-test (:name :member-type-stack-allocation)
+  (assert (typep 10 (opaque-identity `(member ,@(loop repeat 100000 for i by 2 collect i))))))
