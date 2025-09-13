@@ -626,23 +626,32 @@
            (let* ((simple (and (unsupplied-or-nil adjustable)
                                (unsupplied-or-nil displaced-to)
                                (unsupplied-or-nil fill-pointer)))
+                  (dimensions
+                    (cond ((constant-lvar-p dims)
+                           (let* ((val (lvar-value dims))
+                                  (cdims (ensure-list val)))
+                             (unless (check-array-dimensions val node)
+                               (return-from derive-make-array-type))
+                             (if simple
+                                 cdims
+                                 (length cdims))))
+                          ((or (csubtypep (lvar-type dims)
+                                          (specifier-type 'integer))
+                               (supplied-and-true fill-pointer))
+                           '(*))
+                          ((combination-case dims
+                             (list *
+                               (make-list (length args) :initial-element '*))
+                             (list* *
+                               (when (eq (lvar-type (car (last args)))
+                                         (specifier-type 'null))
+                                 (make-list (1- (length args)) :initial-element '*)))))
+                          (t
+                           '*)))
                   (spec
                     `(,(if simple 'simple-array 'array)
                       ,element-type
-                      ,(cond ((constant-lvar-p dims)
-                              (let* ((val (lvar-value dims))
-                                     (cdims (ensure-list val)))
-                                (unless (check-array-dimensions val node)
-                                  (return-from derive-make-array-type))
-                                (if simple
-                                    cdims
-                                    (length cdims))))
-                             ((or (csubtypep (lvar-type dims)
-                                             (specifier-type 'integer))
-                                  (supplied-and-true fill-pointer))
-                              '(*))
-                             (t
-                              '*)))))
+                      ,dimensions)))
              (if (and (not simple)
                       (or (supplied-and-true adjustable)
                           (supplied-and-true displaced-to)

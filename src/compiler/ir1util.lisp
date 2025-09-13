@@ -333,7 +333,8 @@
         (case name
           ,@(loop for (name arg-spec . body) in cases
                   collect (list name
-                                `(when (combination-matches-args args ',arg-spec)
+                                `(when ,(or (eq arg-spec '*)
+                                            `(combination-matches-args args ',arg-spec))
                                   ,@body))))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)

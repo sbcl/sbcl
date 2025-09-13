@@ -996,3 +996,13 @@
   ;;    (make-array (list a b) :adjustable n))
   ;;  (array t (* *)))
   )
+
+(with-test (:name :make-array-list-derive-type)
+  (assert-type
+   (lambda (a b p)
+     (make-array (list a b) :displaced-to p))
+   (array t (* *)))
+  (assert-type
+   (lambda (a b p)
+     (make-array (list* a b nil) :displaced-to p))
+   (array t (* *))))
