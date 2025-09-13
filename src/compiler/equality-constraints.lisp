@@ -1278,5 +1278,5 @@
 (defoptimizer (%other-pointer-p constraint-propagate-if) ((x))
   (values x (specifier-type 'other-pointer)))
 
-(defoptimizer (%array-rank= constraint-propagate-if) ((x n))
+(defoptimizer (array-rank= constraint-propagate-if) ((x n))
   (values x (specifier-type `(array * ,(lvar-value n)))))

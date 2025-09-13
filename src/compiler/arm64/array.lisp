@@ -53,7 +53,7 @@
   (any-reg) positive-fixnum sb-kernel:%set-array-dimension)
 
 (define-vop ()
-  (:translate %array-rank)
+  (:translate array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -64,7 +64,7 @@
     (inst add res res 1)))
 
 (define-vop ()
-  (:translate %array-rank=)
+  (:translate array-rank=)
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:temporary (:scs (unsigned-reg)) x)

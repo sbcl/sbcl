@@ -201,9 +201,9 @@
                                                    (specifier-type 'simple-array))))
                `(simple-array-p object))
               ((and (eq current-predicate 'vectorp)
-                    (vop-existsp :translate %array-rank=)
+                    (vop-existsp :translate array-rank=)
                     (and (csubtypep otype (specifier-type 'array))))
-               `(%array-rank= object 1))
+               `(array-rank= object 1))
               ;; (typep (the (or list fixnum) x) 'integer) =>
               ;; (typep x 'fixnum)
               ((let ((new-predicate
@@ -1099,9 +1099,9 @@
                                       `(simple-array-header-p ,original-obj)
                                       `(arrayp ,original-obj))
                                  ,@(when (eq (array-type-dimensions stype) '*)
-                                     (if (vop-existsp :translate %array-rank=)
-                                         `((%array-rank= ,obj ,(length dims)))
-                                         `((= (%array-rank ,obj) ,(length dims))))))))
+                                     (if (vop-existsp :translate array-rank=)
+                                         `((array-rank= ,obj ,(length dims)))
+                                         `((= (array-rank ,obj) ,(length dims))))))))
                        ,@(loop for d in dims
                                for i from 0
                                unless (or (eq '* d)
@@ -1111,7 +1111,7 @@
                      t))
             ((not dims)
              (values `(,header-test
-                       (= (%array-rank ,obj) 0))
+                       (= (array-rank ,obj) 0))
                      t))
             ((not (array-type-complexp type))
              (if (csubtypep stype (specifier-type 'vector))

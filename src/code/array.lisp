@@ -31,9 +31,6 @@
   (def %array-displaced-p)
   (def %array-displaced-from))
 
-(defun %array-rank (array)
-  (%array-rank array))
-
 (defun %array-dimension (array axis)
   (%array-dimension array axis))
 
@@ -1028,7 +1025,7 @@ of specialized arrays is supported."
            (array array))
   (let ((length (length subscripts)))
     (cond ((array-header-p array)
-           (let ((rank (%array-rank array)))
+           (let ((rank (array-rank array)))
              (unless (= rank length)
                (error "Wrong number of subscripts, ~W, for array of rank ~W."
                       length rank))
@@ -1061,7 +1058,7 @@ of specialized arrays is supported."
   (declare (dynamic-extent subscripts))
   (let ((length (length subscripts)))
     (cond ((array-header-p array)
-           (let ((rank (%array-rank array)))
+           (let ((rank (array-rank array)))
              (unless (= rank length)
                (error "Wrong number of subscripts, ~W, for array of rank ~W."
                       length rank))
@@ -1207,7 +1204,7 @@ of specialized arrays is supported."
 
 (defun array-rank (array)
   "Return the number of dimensions of ARRAY."
-  (%array-rank array))
+  (array-rank array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
@@ -1216,9 +1213,9 @@ of specialized arrays is supported."
          (unless (= axis-number 0)
            (error "Vector axis is not zero: ~S" axis-number))
          (length (the (simple-array * (*)) array)))
-        ((>= axis-number (%array-rank array))
+        ((>= axis-number (array-rank array))
          (error "Axis number ~W is too big; ~S only has ~D dimension~:P."
-                axis-number array (%array-rank array)))
+                axis-number array (array-rank array)))
         (t
          (%array-dimension array axis-number))))
 
@@ -1227,7 +1224,7 @@ of specialized arrays is supported."
   (declare (explicit-check))
   (cond ((array-header-p array)
          (do ((results nil (cons (%array-dimension array index) results))
-              (index (1- (%array-rank array)) (1- index)))
+              (index (1- (array-rank array)) (1- index)))
              ((minusp index) results)))
         ((typep array 'vector)
          (list (length array)))
@@ -1669,7 +1666,7 @@ of specialized arrays is supported."
                        (setf (%array-fill-pointer from) 0
                              (%array-available-elements from) 0
                              (%array-displaced-p from) (array-dimensions array))
-                       (dotimes (i (%array-rank from))
+                       (dotimes (i (array-rank from))
                          (%set-array-dimension from i 0)))))))))
     (if newp
         (setf (%array-displaced-from array) nil)
@@ -1810,7 +1807,7 @@ function to be removed without further warning."
                  (return nil)))))))
 
 (defun copy-array-header (array)
-  (let* ((rank (%array-rank array))
+  (let* ((rank (array-rank array))
          (size (%array-available-elements array))
          (result (make-array-header simple-array-widetag
                                     rank)))

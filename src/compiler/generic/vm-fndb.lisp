@@ -191,10 +191,8 @@
   (flushable))
 (defknown %set-array-dimension (array index index) (values)
   ())
-(defknown %array-rank (array) %array-rank
-  (flushable))
 
-(defknown (%array-rank= widetag=) (t t) boolean
+(defknown (array-rank= widetag=) (t t) boolean
   (flushable))
 
 (defknown vector-data (array index) (values simple-array index)

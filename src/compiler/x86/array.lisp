@@ -51,7 +51,7 @@
 (symbol-macrolet ((rank-disp
                     (- (/ array-rank-position n-byte-bits) other-pointer-lowtag)))
 (define-vop ()
-  (:translate %array-rank)
+  (:translate array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -64,7 +64,7 @@
     (inst and res array-rank-mask)))
 
 (define-vop ()
-  (:translate %array-rank=)
+  (:translate array-rank=)
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))
   (:info rank)

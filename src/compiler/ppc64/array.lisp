@@ -59,7 +59,7 @@
   (:variant array-dimensions-offset other-pointer-lowtag))
 
 (define-vop ()
-  (:translate %array-rank)
+  (:translate array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))

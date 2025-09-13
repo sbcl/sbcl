@@ -1909,27 +1909,6 @@
            finally (return :maybe)))
     (t :maybe)))
 
-;; Let type derivation handle constant cases. We only do easy strength
-;; reduction.
-(deftransform array-rank ((array) (array) * :node node)
-  (let ((array-type (lvar-type array)))
-    (cond ((and (array-type-p array-type)
-                (listp (array-type-dimensions array-type)))
-           (length (array-type-dimensions array-type)))
-          ;; We need an extra case in here to best handle a known vector, because
-          ;; if we try to add a transform on ARRAY-HEADER-P (returning false for
-          ;; known simple-array of rank 1), that would fail to optimize where we know
-          ;; the thing is a vector but possibly non-simple. So then the IF below
-          ;; would still have both if its consequents considered plausible.
-          ((csubtypep array-type (specifier-type 'vector))
-           1)
-          ((and (array-type-p array-type)
-                (eq (array-type-complexp array-type) t))
-           '(%array-rank array))
-          (t
-           (delay-ir1-transform node :constraint) ; Why?
-           `(%array-rank array)))))
-
 (defun derive-array-rank (ctype)
   (let ((array (specifier-type 'array)))
     (flet ((over (x)
@@ -1982,9 +1961,6 @@
                (specifier-type `(member ,@ranks))))))))
 
 (defoptimizer (array-rank derive-type) ((array))
-  (derive-array-rank (lvar-type array)))
-
-(defoptimizer (%array-rank derive-type) ((array))
   (derive-array-rank (lvar-type array)))
 
 ;;; If we know the dimensions at compile time, just use it. Otherwise,

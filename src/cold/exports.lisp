@@ -1488,7 +1488,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%ARRAY-DIMENSION" "%ARRAY-DISPLACED-P"
            "%ARRAY-DISPLACED-FROM"
            "%ARRAY-DISPLACEMENT" "%ARRAY-FILL-POINTER"
-           "%ARRAY-RANK" "%ARRAY-RANK="
+           "%ARRAY-RANK" "ARRAY-RANK="
            "SIMPLE-ARRAY-HEADER-OF-RANK-P"
            "%ARRAY-ATOMIC-INCF/WORD"
            "%ASH/RIGHT"
