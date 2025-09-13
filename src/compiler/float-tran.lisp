@@ -594,7 +594,7 @@
 ;;; Handle some simple transformations.
 
 (deftransform abs ((x) ((and (real 0)
-                             (not (member -0f0 -0d0))))) ;; exclude -0.0
+                             (not (member -0f0 -0d0)))) * :important nil)
   'x)
 
 (deftransform abs ((x) ((complex double-float)) double-float)
