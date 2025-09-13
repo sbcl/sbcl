@@ -968,4 +968,16 @@
    (lambda (x e)
      (declare ((array * (*)) x))
      (make-array (array-dimensions x) :element-type e))
-   (simple-array * (*))))
+   (simple-array * (*)))
+  (assert-type
+   (lambda (n e)
+     (make-array (list n) :element-type e))
+   (simple-array * (*)))
+  (assert-type
+   (lambda (n e)
+     (make-array (cons n nil) :element-type e))
+   (simple-array * (*)))
+  (assert-type
+   (lambda (e)
+     (make-array (list* 10 nil) :element-type e))
+   (simple-array * (10))))

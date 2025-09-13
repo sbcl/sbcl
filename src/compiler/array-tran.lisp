@@ -1432,28 +1432,48 @@
       ;; (make-array (array-dimensions x)): avoid consing a list in
       ;; ARRAY-DIMENSIONS if the rank is known.
       (array-dimensions (*)
-                        (catch 'give-up-ir1-transform
-                          (let ((dimensions (array-type-dimensions-or-give-up
-                                             (lvar-type (car args))))
-                                (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
-                            (when (and (listp dimensions)
-                                       (splice-fun-args dims 'array-dimensions 1 nil))
-                              (let ((dims (loop for axis from 0
-                                                for dim in dimensions
-                                                collect (if (and simple
-                                                                 (neq dim '*))
-                                                            dim
-                                                            `(array-dimension dims ,axis)))))
-                                (return-from make-array
-                                  `(make-array
-                                    ,(if (cdr dims)
-                                         `(list ,@dims)
-                                         (car dims))
-                                    ,@(build-key-args initial-element initial-contents
-                                                      element-type
-                                                      adjustable fill-pointer
-                                                      displaced-to
-                                                      displaced-index-offset)))))))))
+        (catch 'give-up-ir1-transform
+          (let ((dimensions (array-type-dimensions-or-give-up
+                             (lvar-type (car args))))
+                (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
+            (when (and (listp dimensions)
+                       (splice-fun-args dims 'array-dimensions 1 nil))
+              (let ((dims (loop for axis from 0
+                                for dim in dimensions
+                                collect (if (and simple
+                                                 (neq dim '*))
+                                            dim
+                                            `(array-dimension dims ,axis)))))
+                (return-from make-array
+                  `(make-array
+                    ,(if (cdr dims)
+                         `(list ,@dims)
+                         (car dims))
+                    ,@(build-key-args initial-element initial-contents
+                                      element-type
+                                      adjustable fill-pointer
+                                      displaced-to
+                                      displaced-index-offset))))))))
+      (list (*)
+        (when (splice-fun-args dims 'list 1 nil)
+          (return-from make-array
+            `(make-array
+              (the index dims)
+              ,@(build-key-args initial-element initial-contents
+                                element-type
+                                adjustable fill-pointer
+                                displaced-to
+                                displaced-index-offset)))))
+      (list* (* nil)
+        (when (splice-fun-args dims 'list* #'first nil)
+          (return-from make-array
+            `(make-array
+              (the index dims)
+              ,@(build-key-args initial-element initial-contents
+                                element-type
+                                adjustable fill-pointer
+                                displaced-to
+                                displaced-index-offset))))))
     (delay-ir1-transform node :constraint)
     (when (and initial-contents initial-element)
       (abort-ir1-transform "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
@@ -1711,8 +1731,12 @@
 
 #-ubsan
 (deftransforms (%make-array sb-vm::%make-simple-array) ((dims widetag n-bits)
-                                                        (integer t t))
-  `(sb-vm::allocate-vector-with-widetag widetag dims n-bits))
+                                                        ((or integer (cons integer null)) t t))
+  `(sb-vm::allocate-vector-with-widetag widetag
+                                        ,(if (csubtypep (lvar-type dims) (specifier-type 'integer))
+                                                     'dims
+                                                     `(car dims))
+                                        n-bits))
 
 
 ;;;; ADJUST-ARRAY
