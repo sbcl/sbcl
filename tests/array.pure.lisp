@@ -951,3 +951,16 @@
    (((make-array '(5 5))) (condition 'type-error))
    (((make-array '(5 5) :adjustable t)) (condition 'type-error))
    (((make-array 5 :fill-pointer t :initial-element 3)) 3)))
+
+(with-test (:name :make-array+array-dimensions)
+  (assert-type
+   (lambda (x)
+     (declare ((simple-array t (1 2)) x))
+     (make-array (array-dimensions x)))
+   (simple-array t (1 2)))
+  (assert-type
+   (lambda (x)
+     (declare ((or (array single-float (1 2))
+                   (array double-float (1 2))) x))
+     (make-array (array-dimensions x) :element-type 'fixnum))
+   (simple-array fixnum (* *))))

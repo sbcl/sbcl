@@ -1553,6 +1553,11 @@
                     (fill vector (the ,(sb-vm:saetp-specifier saetp) initial-element)))
                   array)))))))
 
+(defmacro build-key-args (&rest args)
+  `(append ,@(loop for key in args
+                 collect `(when ,key
+                            (list ,(keywordicate key) ',key)))))
+
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
 ;;; and displaced-to keywords ensures that it will be simple.
@@ -1569,6 +1574,26 @@
                           *
                           :node call)
   (block make-array
+    (combination-case dims
+      ;; (make-array (array-dimensions x)): avoid consing a list in
+      ;; ARRAY-DIMENSIONS if the rank is known.
+      (array-dimensions (*)
+       (catch 'give-up-ir1-transform
+         (let ((dimensions (array-type-dimensions-or-give-up
+                            (lvar-type (car args))))
+               (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
+           (when (and (listp dimensions)
+                      (splice-fun-args dims 'array-dimensions 1 nil))
+             (return-from make-array
+               `(make-array
+                 ;; This list will be recognized by the transforms below
+                 (list ,@(loop for axis from 0
+                               for dim in dimensions
+                               collect (if (and simple
+                                                (neq dim '*))
+                                           dim
+                                           `(array-dimension dims ,axis))))
+                 ,@(build-key-args element-type initial-element initial-contents adjustable fill-pointer))))))))
     ;; Recognize vector construction where the length is spelled as (LIST n)
     ;; or (LIST* n nil). Don't care if FUN-LEXICALLY-NOTINLINE-P on those because
     ;; you can't portably observe whether they're called (tracing them isn't allowed).
