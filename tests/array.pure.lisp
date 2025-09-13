@@ -981,3 +981,18 @@
    (lambda (e)
      (make-array (list* 10 nil) :element-type e))
    (simple-array * (10))))
+
+(with-test (:name :make-array-list-adjustable)
+  (assert-type
+   (lambda (a b)
+     (make-array (list a b) :adjustable t))
+   (and (array t (* *)) (not simple-array)))
+  (assert-type
+   (lambda (a b)
+     (make-array (list a b) :adjustable nil))
+   (simple-array t (* *)))
+  ;; (assert-type
+  ;;  (lambda (a b n)
+  ;;    (make-array (list a b) :adjustable n))
+  ;;  (array t (* *)))
+  )

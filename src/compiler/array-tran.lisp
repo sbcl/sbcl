@@ -934,8 +934,10 @@
                        (if (not dims) ; If 0-dimensional, use :INITIAL-ELEMENT instead
                            (setq k :initial-element element v)
                            (setq contents v)))
-                      (:adjustable ; reject if anything other than literal NIL
-                       (when (or adjustable (car v)) (return nil))
+                      (:adjustable ; reject if anything other than literal T or NIL
+                       (unless (and (not adjustable)
+                                    (typep (car v) 'boolean))
+                         (return nil))
                        (setq adjustable v))
                       (t
                        ;; Reject :FILL-POINTER, :DISPLACED-{TO,INDEX-OFFSET},
@@ -944,6 +946,8 @@
                     (unless (member k '(:adjustable))
                       (setq keys (nconc keys (list k (car v)))))))
       (return-from make-array (values nil t)))
+    (when adjustable
+      (setf adjustable (car adjustable)))
     (when contents
       (multiple-value-bind (data shape)
           (rewrite-initial-contents (length dims) (car contents) env)
@@ -969,14 +973,19 @@
                                   `(the index ,d)))))
            (dims (if axis-bindings (mapcar #'car axis-bindings) dims))
            (size (make-symbol "SIZE"))
+           (type (list (cond ((eq et unsupplied) t)
+                             (et-constp (constant-form-value et env))
+                             (t '*))
+                       (if dims-constp dims (length dims))))
+           (type (if adjustable
+                     `(and (array ,@type) (not simple-array))
+                     `(simple-array ,@type)))
            (alloc-form
-            `(truly-the (simple-array
-                         ,(cond ((eq et unsupplied) t)
-                                (et-constp (constant-form-value et env))
-                                (t '*))
-                         ,(if dims-constp dims (length dims)))
+            `(truly-the ,type
               (make-array-header*
-               sb-vm:simple-array-widetag
+               ,(if adjustable
+                    sb-vm:complex-array-widetag
+                    sb-vm:simple-array-widetag)
                ,@(sb-vm::make-array-header-inits
                   `(make-array ,size ,@keys) size dims)))))
       `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
@@ -1635,16 +1644,16 @@
                     (flush-dest dummy)
                     (setf (combination-args call) (delete dummy (combination-args call)))
                     (car args))))
-        ;; Don't want (list (list x)) to become a valid dimension specifier.
-        (assert-lvar-type it (specifier-type 'index) (%coerce-to-policy call))
-        (return-from make-array
-          (transform-make-array-vector it
-                                       element-type
-                                       initial-element
-                                       initial-contents
-                                       call
-                                       :adjustable adjustable
-                                       :fill-pointer fill-pointer)))
+      ;; Don't want (list (list x)) to become a valid dimension specifier.
+      (assert-lvar-type it (specifier-type 'index) (%coerce-to-policy call))
+      (return-from make-array
+        (transform-make-array-vector it
+                                     element-type
+                                     initial-element
+                                     initial-contents
+                                     call
+                                     :adjustable adjustable
+                                     :fill-pointer fill-pointer)))
     (unless (constant-lvar-p dims)
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))
