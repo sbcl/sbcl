@@ -1410,6 +1410,11 @@
                            'sb-vm::fill-vector-initial-contents)
                       ,(or c-length 'dims) ,data-alloc-form initial-contents)))))))))
 
+(defmacro build-key-args (&rest args)
+  `(append ,@(loop for key in args
+                 collect `(when ,key
+                            (list ,(keywordicate key) ',key)))))
+
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
 ;;; specific must come first, otherwise suboptimal transforms will result for
 ;;; some forms.
@@ -1422,141 +1427,163 @@
                                      displaced-index-offset)
                           (t &rest t) *
                           :node node)
-  (delay-ir1-transform node :constraint)
-  (when (and initial-contents initial-element)
-    (abort-ir1-transform "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
-  (when (and displaced-index-offset
-             (not displaced-to))
-    (abort-ir1-transform "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
-  (when (and displaced-to
-             (or initial-element initial-contents))
-    (if (types-equal-or-intersect (lvar-type displaced-to)
-                                  (specifier-type 'null))
-        (give-up-ir1-transform ":DISPLACED-TO potentially used with ~S"
+  (block make-array
+    (combination-case dims
+      ;; (make-array (array-dimensions x)): avoid consing a list in
+      ;; ARRAY-DIMENSIONS if the rank is known.
+      (array-dimensions (*)
+                        (catch 'give-up-ir1-transform
+                          (let ((dimensions (array-type-dimensions-or-give-up
+                                             (lvar-type (car args))))
+                                (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
+                            (when (and (listp dimensions)
+                                       (splice-fun-args dims 'array-dimensions 1 nil))
+                              (let ((dims (loop for axis from 0
+                                                for dim in dimensions
+                                                collect (if (and simple
+                                                                 (neq dim '*))
+                                                            dim
+                                                            `(array-dimension dims ,axis)))))
+                                (return-from make-array
+                                  `(make-array
+                                    ,(if (cdr dims)
+                                         `(list ,@dims)
+                                         (car dims))
+                                    ,@(build-key-args initial-element initial-contents
+                                                      element-type
+                                                      adjustable fill-pointer
+                                                      displaced-to
+                                                      displaced-index-offset)))))))))
+    (delay-ir1-transform node :constraint)
+    (when (and initial-contents initial-element)
+      (abort-ir1-transform "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
+    (when (and displaced-index-offset
+               (not displaced-to))
+      (abort-ir1-transform "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+    (when (and displaced-to
+               (or initial-element initial-contents))
+      (if (types-equal-or-intersect (lvar-type displaced-to)
+                                    (specifier-type 'null))
+          (give-up-ir1-transform ":DISPLACED-TO potentially used with ~S"
+                                 (if initial-element
+                                     :initial-element
+                                     :initial-contents))
+          (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
                                (if initial-element
                                    :initial-element
-                                   :initial-contents))
-        (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
-                             (if initial-element
-                                 :initial-element
-                                 :initial-contents))))
-  (let ((fp-type (and fill-pointer
-                      (lvar-type fill-pointer))))
-    (when (and fp-type
-               (csubtypep fp-type (specifier-type '(or index (eql t)))))
-      (let* ((dims (and (constant-lvar-p dims)
-                        (lvar-value dims)))
-             (length (cond ((integerp dims)
-                            dims)
-                           ((singleton-p dims)
-                            (car dims)))))
-        (cond ((not dims))
-              ((not length)
-               (compiler-warn "Only vectors can have fill pointers."))
-              ((and (csubtypep fp-type (specifier-type 'index))
-                    (not (types-equal-or-intersect fp-type
-                                                   (specifier-type `(integer 0 ,length)))))
-               (compiler-warn "Invalid fill-pointer ~s for a vector of length ~s."
-                              (type-specifier fp-type)
-                              length))))))
-  (macrolet ((maybe-arg (arg)
-               `(and ,arg `(,,(keywordicate arg) ,',arg))))
-    (block nil
-      (let* ((eltype (cond ((not element-type) t)
-                           ((not (constant-lvar-p element-type))
-                            (let ((uses (lvar-uses element-type)))
-                              (when (splice-fun-args element-type 'array-element-type 1 nil)
+                                   :initial-contents))))
+    (let ((fp-type (and fill-pointer
+                        (lvar-type fill-pointer))))
+      (when (and fp-type
+                 (csubtypep fp-type (specifier-type '(or index (eql t)))))
+        (let* ((dims (and (constant-lvar-p dims)
+                          (lvar-value dims)))
+               (length (cond ((integerp dims)
+                              dims)
+                             ((singleton-p dims)
+                              (car dims)))))
+          (cond ((not dims))
+                ((not length)
+                 (compiler-warn "Only vectors can have fill pointers."))
+                ((and (csubtypep fp-type (specifier-type 'index))
+                      (not (types-equal-or-intersect fp-type
+                                                     (specifier-type `(integer 0 ,length)))))
+                 (compiler-warn "Invalid fill-pointer ~s for a vector of length ~s."
+                                (type-specifier fp-type)
+                                length))))))
+    (macrolet ((maybe-arg (arg)
+                 `(and ,arg `(,,(keywordicate arg) ,',arg))))
+      (block nil
+        (let* ((eltype (cond ((not element-type) t)
+                             ((not (constant-lvar-p element-type))
+                              (let ((uses (lvar-uses element-type)))
+                                (when (splice-fun-args element-type 'array-element-type 1 nil)
+                                  (return
+                                    `(multiple-value-bind (widetag shift)
+                                         (with-source-path ,(node-source-path uses)
+                                           (sb-vm::array-underlying-widetag-and-shift element-type))
+                                       (%make-array
+                                        dims
+                                        widetag
+                                        shift
+                                        ,@(maybe-arg initial-element)
+                                        ,@(maybe-arg initial-contents)
+                                        ,@(maybe-arg adjustable)
+                                        ,@(maybe-arg fill-pointer)
+                                        ,@(maybe-arg displaced-to)
+                                        ,@(maybe-arg displaced-index-offset))))))
+                              #-ubsan
+                              (when (not (or initial-element initial-contents
+                                             adjustable fill-pointer displaced-to displaced-index-offset))
                                 (return
                                   `(multiple-value-bind (widetag shift)
-                                       (with-source-path ,(node-source-path uses)
-                                         (sb-vm::array-underlying-widetag-and-shift element-type))
-                                     (%make-array
-                                      dims
-                                      widetag
-                                      shift
-                                      ,@(maybe-arg initial-element)
-                                      ,@(maybe-arg initial-contents)
-                                      ,@(maybe-arg adjustable)
-                                      ,@(maybe-arg fill-pointer)
-                                      ,@(maybe-arg displaced-to)
-                                      ,@(maybe-arg displaced-index-offset))))))
-                            #-ubsan
-                            (when (not (or initial-element initial-contents
-                                           adjustable fill-pointer displaced-to displaced-index-offset))
-                              (return
-                                `(multiple-value-bind (widetag shift)
-                                     (sb-vm::%vector-widetag-and-n-bits-shift element-type)
-                                   (%make-array dims widetag shift))))
-                            (give-up-ir1-transform
-                             "ELEMENT-TYPE is not constant."))
-                           (t
-                            (lvar-value element-type))))
-             (eltype-type (ir1-transform-specifier-type eltype))
-             (saetp (if (unknown-type-p eltype-type)
-                        (give-up-ir1-transform
-                         "ELEMENT-TYPE ~s is not a known type"
-                         eltype-type)
-                        (find eltype-type
-                              sb-vm:*specialized-array-element-type-properties*
-                              :key #'sb-vm:saetp-ctype
-                              :test #'csubtypep)))
-             (creation-form `(%make-array
-                              dims
-                              ,(if saetp
-                                   (sb-vm:saetp-typecode saetp)
-                                   (give-up-ir1-transform))
-                              ,(sb-vm:saetp-n-bits-shift saetp)
-                              ,@(maybe-arg initial-contents)
-                              ,@(maybe-arg adjustable)
-                              ,@(maybe-arg fill-pointer)
-                              ,@(maybe-arg displaced-to)
-                              ,@(maybe-arg displaced-index-offset))))
-        (cond ((not initial-element) creation-form)
-              ;; with ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
-              ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
-              ;; to scribble on the array. Same for allocators that don't prezero
-              #-ubsan
-              ((and (constant-lvar-p initial-element)
-                    (eql (lvar-value initial-element)
-                         (sb-vm:saetp-initial-element-default saetp)))
-               creation-form)
-              (t
-               ;; error checking for target, disabled on the host because
-               ;; (CTYPE-OF #\Null) is not possible.
-               #-sb-xc-host
-               (when (constant-lvar-p initial-element)
-                 (let ((value (lvar-value initial-element)))
-                   (cond
-                     ((not (ctypep value (sb-vm:saetp-ctype saetp)))
-                      ;; this case will cause an error at runtime, so we'd
-                      ;; better WARN about it now.
-                      (warn 'array-initial-element-mismatch
-                            :format-control "~@<~S is not a ~S (which is the ~
+                                       (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+                                     (%make-array dims widetag shift))))
+                              (give-up-ir1-transform
+                               "ELEMENT-TYPE is not constant."))
+                             (t
+                              (lvar-value element-type))))
+               (eltype-type (ir1-transform-specifier-type eltype))
+               (saetp (if (unknown-type-p eltype-type)
+                          (give-up-ir1-transform
+                           "ELEMENT-TYPE ~s is not a known type"
+                           eltype-type)
+                          (find eltype-type
+                                sb-vm:*specialized-array-element-type-properties*
+                                :key #'sb-vm:saetp-ctype
+                                :test #'csubtypep)))
+               (creation-form `(%make-array
+                                dims
+                                ,(if saetp
+                                     (sb-vm:saetp-typecode saetp)
+                                     (give-up-ir1-transform))
+                                ,(sb-vm:saetp-n-bits-shift saetp)
+                                ,@(maybe-arg initial-contents)
+                                ,@(maybe-arg adjustable)
+                                ,@(maybe-arg fill-pointer)
+                                ,@(maybe-arg displaced-to)
+                                ,@(maybe-arg displaced-index-offset))))
+          (cond ((not initial-element) creation-form)
+                ;; with ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
+                ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
+                ;; to scribble on the array. Same for allocators that don't prezero
+                #-ubsan
+                ((and (constant-lvar-p initial-element)
+                      (eql (lvar-value initial-element)
+                           (sb-vm:saetp-initial-element-default saetp)))
+                 creation-form)
+                (t
+                 ;; error checking for target, disabled on the host because
+                 ;; (CTYPE-OF #\Null) is not possible.
+                 #-sb-xc-host
+                 (when (constant-lvar-p initial-element)
+                   (let ((value (lvar-value initial-element)))
+                     (cond
+                       ((not (ctypep value (sb-vm:saetp-ctype saetp)))
+                        ;; this case will cause an error at runtime, so we'd
+                        ;; better WARN about it now.
+                        (warn 'array-initial-element-mismatch
+                              :format-control "~@<~S is not a ~S (which is the ~
                                          ~S of ~S).~@:>"
-                            :format-arguments
-                            (list
-                             value
-                             (type-specifier (sb-vm:saetp-ctype saetp))
-                             'upgraded-array-element-type
-                             eltype)))
-                     ((multiple-value-bind (typep surep)
-                          (ctypep value eltype-type)
-                        (and (not typep) surep))
-                      ;; This case will not cause an error at runtime, but
-                      ;; it's still worth STYLE-WARNing about.
-                      (compiler-style-warn 'initial-element-mismatch-style-warning
-                                           :format-control "~S is not a ~S."
-                                           :format-arguments (list value eltype))))))
-               `(let ((array ,creation-form))
-                  (multiple-value-bind (vector)
-                      (%data-vector-and-index array 0)
-                    (fill vector (the ,(sb-vm:saetp-specifier saetp) initial-element)))
-                  array)))))))
-
-(defmacro build-key-args (&rest args)
-  `(append ,@(loop for key in args
-                 collect `(when ,key
-                            (list ,(keywordicate key) ',key)))))
+                              :format-arguments
+                              (list
+                               value
+                               (type-specifier (sb-vm:saetp-ctype saetp))
+                               'upgraded-array-element-type
+                               eltype)))
+                       ((multiple-value-bind (typep surep)
+                            (ctypep value eltype-type)
+                          (and (not typep) surep))
+                        ;; This case will not cause an error at runtime, but
+                        ;; it's still worth STYLE-WARNing about.
+                        (compiler-style-warn 'initial-element-mismatch-style-warning
+                                             :format-control "~S is not a ~S."
+                                             :format-arguments (list value eltype))))))
+                 `(let ((array ,creation-form))
+                    (multiple-value-bind (vector)
+                        (%data-vector-and-index array 0)
+                      (fill vector (the ,(sb-vm:saetp-specifier saetp) initial-element)))
+                    array))))))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
@@ -1574,26 +1601,6 @@
                           *
                           :node call)
   (block make-array
-    (combination-case dims
-      ;; (make-array (array-dimensions x)): avoid consing a list in
-      ;; ARRAY-DIMENSIONS if the rank is known.
-      (array-dimensions (*)
-       (catch 'give-up-ir1-transform
-         (let ((dimensions (array-type-dimensions-or-give-up
-                            (lvar-type (car args))))
-               (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
-           (when (and (listp dimensions)
-                      (splice-fun-args dims 'array-dimensions 1 nil))
-             (return-from make-array
-               `(make-array
-                 ;; This list will be recognized by the transforms below
-                 (list ,@(loop for axis from 0
-                               for dim in dimensions
-                               collect (if (and simple
-                                                (neq dim '*))
-                                           dim
-                                           `(array-dimension dims ,axis))))
-                 ,@(build-key-args element-type initial-element initial-contents adjustable fill-pointer))))))))
     ;; Recognize vector construction where the length is spelled as (LIST n)
     ;; or (LIST* n nil). Don't care if FUN-LEXICALLY-NOTINLINE-P on those because
     ;; you can't portably observe whether they're called (tracing them isn't allowed).
