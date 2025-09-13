@@ -1444,6 +1444,7 @@
                                                  (neq dim '*))
                                             dim
                                             `(array-dimension dims ,axis)))))
+                (delete-lvar-cast-if (specifier-type 'type-specifier) element-type)
                 (return-from make-array
                   `(make-array
                     ,(if (cdr dims)
