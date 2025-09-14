@@ -212,132 +212,70 @@
 (defun expt (base power)
   "Return BASE raised to the POWER."
   (declare (explicit-check))
-  (labels (;; determine if the double float is an integer.
-           ;;  0 - not an integer
-           ;;  1 - an odd int
-           ;;  2 - an even int
-           (isint (ihi lo)
-             (declare (type (unsigned-byte 31) ihi)
-                      (type (unsigned-byte 32) lo)
-                      (optimize (speed 3) (safety 0)))
-             (let ((isint 0))
-               (declare (type fixnum isint))
-               (cond ((>= ihi #x43400000)     ; exponent >= 53
-                      (setq isint 2))
-                     ((>= ihi #x3ff00000)
-                      (let ((k (- (ash ihi -20) #x3ff)))      ; exponent
-                        (declare (type (mod 53) k))
-                        (cond ((> k 20)
-                               (let* ((shift (- 52 k))
-                                      (j (logand (ash lo (- shift))))
-                                      (j2 (ash j shift)))
-                                 (declare (type (mod 32) shift)
-                                          (type (unsigned-byte 32) j j2))
-                                 (when (= j2 lo)
-                                   (setq isint (- 2 (logand j 1))))))
-                              ((= lo 0)
-                               (let* ((shift (- 20 k))
-                                      (j (ash ihi (- shift)))
-                                      (j2 (ash j shift)))
-                                 (declare (type (mod 32) shift)
-                                          (type (unsigned-byte 31) j j2))
-                                 (when (= j2 ihi)
-                                   (setq isint (- 2 (logand j 1))))))))))
-               isint))
+  (labels (;; determine if the double float is an integer
+           #+64-bit
+           (isint (n)
+             (or (zerop n)
+                 (let* ((bits (sb-kernel:double-float-bits n))
+                        (exponent (ldb sb-vm:double-float-exponent-byte bits)))
+                   (cond
+                     ((> exponent (+ sb-vm:double-float-bias sb-vm:double-float-digits)))
+                     ((> exponent sb-vm:double-float-bias)
+                      (not (logtest bits
+                                    (1- (ash 1 (- (+ sb-vm:double-float-bias sb-vm:double-float-digits)
+                                                  exponent))))))))))
+           #-64-bit
+           (isint (x)
+             (let* ((hi (double-float-high-bits x))
+                    (lo (double-float-low-bits x))
+                    (ihi (logand hi #x7fffffff)))
+               (declare (type (unsigned-byte 31) ihi)
+                        (type (unsigned-byte 32) lo)
+                        (optimize (speed 3) (safety 0)))
+               (let ((isint 0))
+                 (declare (type fixnum isint))
+                 (cond ((>= ihi #x43400000) ; exponent >= 53
+                        (setq isint 2))
+                       ((>= ihi #x3ff00000)
+                        (let ((k (- (ash ihi -20) #x3ff))) ; exponent
+                          (declare (type (mod 53) k))
+                          (cond ((> k 20)
+                                 (let* ((shift (- 52 k))
+                                        (j (logand (ash lo (- shift))))
+                                        (j2 (ash j shift)))
+                                   (declare (type (mod 32) shift)
+                                            (type (unsigned-byte 32) j j2))
+                                   (when (= j2 lo)
+                                     (setq isint (- 2 (logand j 1))))))
+                                ((= lo 0)
+                                 (let* ((shift (- 20 k))
+                                        (j (ash ihi (- shift)))
+                                        (j2 (ash j shift)))
+                                   (declare (type (mod 32) shift)
+                                            (type (unsigned-byte 31) j j2))
+                                   (when (= j2 ihi)
+                                     (setq isint (- 2 (logand j 1))))))))))
+                 (/= isint 0))))
            (real-expt (x y rtype)
              (let ((x (coerce x 'double-float))
                    (y (coerce y 'double-float)))
-               (declare (double-float x y))
-               (let* ((x-hi (double-float-high-bits x))
-                      (x-lo (double-float-low-bits x))
-                      (x-ihi (logand x-hi #x7fffffff))
-                      (y-hi (double-float-high-bits y))
-                      (y-lo (double-float-low-bits y))
-                      (y-ihi (logand y-hi #x7fffffff)))
-                 (declare (type (signed-byte 32) x-hi y-hi)
-                          (type (unsigned-byte 31) x-ihi y-ihi)
-                          (type (unsigned-byte 32) x-lo y-lo))
-                 ;; y==zero: x**0 = 1
-                 (when (zerop (logior y-ihi y-lo))
-                   (return-from real-expt (coerce 1d0 rtype)))
-                 ;; +-NaN return x+y
-                 ;; FIXME: Hardcoded qNaN/sNaN values are not portable.
-                 (when (or (> x-ihi #x7ff00000)
-                           (and (= x-ihi #x7ff00000) (/= x-lo 0))
-                           (> y-ihi #x7ff00000)
-                           (and (= y-ihi #x7ff00000) (/= y-lo 0)))
-                   (return-from real-expt (coerce (+ x y) rtype)))
-                 (let ((yisint (if (< x-hi 0) (isint y-ihi y-lo) 0)))
-                   (declare (type fixnum yisint))
-                   ;; special value of y
-                   (when (and (zerop y-lo) (= y-ihi #x7ff00000))
-                     ;; y is +-inf
-                     (return-from real-expt
-                       (cond ((and (= x-ihi #x3ff00000) (zerop x-lo))
-                              ;; +-1**inf is NaN
-                              (coerce (- y y) rtype))
-                             ((>= x-ihi #x3ff00000)
-                              ;; (|x|>1)**+-inf = inf,0
-                              (if (>= y-hi 0)
-                                  (coerce y rtype)
-                                  (coerce 0 rtype)))
-                             (t
-                              ;; (|x|<1)**-,+inf = inf,0
-                              (if (< y-hi 0)
-                                  (coerce (- y) rtype)
-                                  (coerce 0 rtype))))))
-
-                   (let ((abs-x (abs x)))
-                     (declare (double-float abs-x))
-                     ;; special value of x
-                     (when (and (zerop x-lo)
-                                (or (= x-ihi #x7ff00000) (zerop x-ihi)
-                                    (= x-ihi #x3ff00000)))
-                       ;; x is +-0,+-inf,+-1
-                       (let ((z (if (< y-hi 0)
-                                    (/ 1 abs-x)       ; z = (1/|x|)
-                                    abs-x)))
-                         (declare (double-float z))
-                         (when (< x-hi 0)
-                           (cond ((and (= x-ihi #x3ff00000) (zerop yisint))
-                                  ;; (-1)**non-int
-                                  (let ((y*pi (* y pi)))
-                                    (declare (double-float y*pi))
-                                    (return-from real-expt
-                                      (complex
-                                       (coerce (%cos y*pi) rtype)
-                                       (coerce (%sin y*pi) rtype)))))
-                                 ((= yisint 1)
-                                  ;; (x<0)**odd = -(|x|**odd)
-                                  (setq z (- z)))))
-                         (return-from real-expt (coerce z rtype))))
-
-                     (if (>= x-hi 0)
-                         ;; x>0
-                         (coerce (%pow x y) rtype)
-                         ;; x<0
-                         (let ((pow (%pow abs-x y)))
-                           (declare (double-float pow))
-                           (case yisint
-                             (1 ; odd
-                              (coerce (* -1d0 pow) rtype))
-                             (2 ; even
-                              (coerce pow rtype))
-                             (t ; non-integer
-                              (let ((y*pi (* y pi)))
-                                (declare (double-float y*pi))
-                                (complex
-                                 (coerce (* pow (%cos y*pi))
-                                         rtype)
-                                 (coerce (* pow (%sin y*pi))
-                                         rtype))))))))))))
+               (cond ((or (>= x 0)
+                          (= x double-float-negative-infinity)
+                          (isint y))
+                      (coerce (%pow x y) rtype))
+                     (t
+                      (let ((y*pi (* y pi))
+                            (pow (%pow (- x) y)))
+                        (complex
+                         (coerce (* pow (%cos y*pi)) rtype)
+                         (coerce (* pow (%sin y*pi)) rtype)))))))
            (complex-expt (base power)
              (if (zerop power)
                  (1+ (* base power))
                  (if (and (zerop base) (plusp (realpart power)))
                      (* base power)
                      (exp (* power (log base)))))))
-    (declare (inline real-expt complex-expt))
+    (declare (inline real-expt complex-expt isint))
     (number-dispatch ((base number) (power number))
       (((foreach fixnum (or bignum ratio) (complex rational)) integer)
        (intexp base power))
