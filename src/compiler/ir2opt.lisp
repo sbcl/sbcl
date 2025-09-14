@@ -198,8 +198,6 @@
                   (let ((intermediate-tn (make-representation-tn (tn-primitive-type res)
                                                                  (sc-number (tn-sc res))
                                                                  (tn-type tn))))
-                    (when (sc-is tn sb-vm::constant)
-                      (break "~a" move))
                     (multiple-value-bind (node block before)
                         (cond #+arm64
                               ((member (vop-name move) '(sb-vm::move-to-word/fixnum
@@ -536,31 +534,32 @@
   (maybe-convert-one-cmov branch-if)
   nil)
 
-(defun next-start-vop (block)
-  (loop thereis (ir2-block-start-vop block)
-        while (and (= (length (ir2block-predecessors block)) 1)
-                   (setf block (ir2-block-next block)))))
-
-(defun branch-destination (branch &optional (true t))
-  (let (branch-if)
-   (unless (typep (vop-codegen-info branch) '(cons t (cons t)))
-     (let ((next (vop-next branch)))
-       (if (and next
-                (eq (vop-name next) 'branch-if))
-           (setf branch (setf branch-if next))
-           (return-from branch-destination))))
-   (destructuring-bind (label not-p &rest rest) (vop-codegen-info branch)
-     (declare (ignore rest))
-     (values (if (eq not-p true)
-                 (if (eq branch (ir2-block-last-vop (vop-block branch)))
-                     (next-start-vop (ir2-block-next (vop-block branch)))
-                     (let ((next (next-vop branch)))
-                       (and (eq (vop-name next) 'branch)
-                            (next-start-vop (gethash (car (vop-codegen-info next)) *2block-info*)))))
-                 (let ((dest (gethash label *2block-info*)))
-                   (when dest
-                     (next-start-vop dest))))
-             branch-if))))
+(defun branch-destination (branch &optional (true t) blockp)
+  (flet ((next-start-vop (block)
+           (if blockp
+               block
+               (loop thereis (ir2-block-start-vop block)
+                     while (and (= (length (ir2block-predecessors block)) 1)
+                                (setf block (ir2-block-next block)))))))
+   (let (branch-if)
+     (unless (typep (vop-codegen-info branch) '(cons t (cons t)))
+       (let ((next (vop-next branch)))
+         (if (and next
+                  (eq (vop-name next) 'branch-if))
+             (setf branch (setf branch-if next))
+             (return-from branch-destination))))
+     (destructuring-bind (label not-p &rest rest) (vop-codegen-info branch)
+       (declare (ignore rest))
+       (values (if (eq not-p true)
+                   (if (eq branch (ir2-block-last-vop (vop-block branch)))
+                       (next-start-vop (ir2-block-next (vop-block branch)))
+                       (let ((next (next-vop branch)))
+                         (and (eq (vop-name next) 'branch)
+                              (next-start-vop (gethash (car (vop-codegen-info next)) *2block-info*)))))
+                   (let ((dest (gethash label *2block-info*)))
+                     (when dest
+                       (next-start-vop dest))))
+               branch-if)))))
 
 ;;; Replace (BOUNDP X) + (BRANCH-IF) + {(SYMBOL-VALUE X) | anything}
 ;;; by (FAST-SYMBOL-VALUE X) + (UNBOUND-MARKER-P) + BRANCH-IF
@@ -885,7 +884,8 @@
                                (setf zero-extend t)))
                       (eq (tn-ref-tn (vop-args vop)) value)))
                (chain (vop &optional (collect t))
-                 (let ((next (branch-destination vop nil)))
+                 (let ((next (branch-destination vop nil))
+                       not-p-chained)
                    (cond ((and next
                                (cond ((eq (vop-name vop) 'symbolp)
                                       (and (not null)
@@ -896,17 +896,24 @@
                                      (t t)))
                           (when collect
                             (push vop vops))
+                          (setf not-p-chained t)
                           (cond ((good-vop-p next)
                                  (chain next))
                                 ((not stop)
                                  (setf stop (vop-block next)))))
                          ((not stop)
-                          (setf stop (vop-block vop)))))
-                 (let ((true (branch-destination vop)))
-                   (when (and true
-                              (good-vop-p true))
-                     (push true vops)
-                     (chain true nil))))
+                          (unless (setf stop (if vops
+                                                 (vop-block vop)
+                                                 ;; can't fall back to the first vop
+                                                 (setf stop (branch-destination vop nil t))))
+                            (return-from chain))))
+                   (let ((true (branch-destination vop)))
+                     (when (and true
+                                (good-vop-p true))
+                       (unless not-p-chained
+                         (push vop vops))
+                       (push true vops)
+                       (chain true nil)))))
                (ir2-block-label (block)
                  (or (ir2-block-%label block)
                      (setf (ir2-block-%label block) (gen-label)))))
@@ -983,21 +990,29 @@
                       (eq (vop-name vop) 'structure-typep)
                       (eq (tn-ref-tn (vop-args vop)) value)))
                (chain (vop &optional (collect t))
-                 (let ((next (branch-destination vop nil)))
+                 (let ((next (branch-destination vop nil))
+                       not-p-chained)
                    (cond (next
                           (when collect
                             (push vop vops))
+                          (setf not-p-chained t)
                           (cond ((good-vop-p next)
                                  (chain next))
                                 ((not stop)
                                  (setf stop (vop-block next)))))
                          ((not stop)
-                          (setf stop (vop-block vop)))))
-                 (let ((true (branch-destination vop)))
-                   (when (and true
-                              (good-vop-p true))
-                     (push true vops)
-                     (chain true nil))))
+                          (unless (setf stop (if vops
+                                                 (vop-block vop)
+                                                 ;; can't fall back to the first vop
+                                                 (setf stop (branch-destination vop nil t))))
+                            (return-from chain))))
+                   (let ((true (branch-destination vop)))
+                     (when (and true
+                                (good-vop-p true))
+                       (unless not-p-chained
+                         (push vop vops))
+                       (push true vops)
+                       (chain true nil)))))
                (ir2-block-label (block)
                  (or (ir2-block-%label block)
                      (setf (ir2-block-%label block) (gen-label)))))

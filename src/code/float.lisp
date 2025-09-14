@@ -195,6 +195,7 @@
 
 ;;;; float predicates and environment query
 
+#-sb-xc-host
 (declaim (inline float-denormalized-p float-infinity-p float-nan-p
                  float-trapping-nan-p))
 
