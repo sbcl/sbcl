@@ -69,7 +69,6 @@
 ;;; as appropriate.
 (macrolet ((def (type)
              `(defun ,(symbolicate 'scale- type '-maybe-overflow) (x exp)
-                (declare (inline float-infinity-p float-nan-p))
                 (cond
                   ((float-infinity-p x)
                    ;; Infinity is infinity, no matter how small...

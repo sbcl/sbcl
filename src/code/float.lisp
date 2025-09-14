@@ -195,8 +195,8 @@
 
 ;;;; float predicates and environment query
 
-(declaim (maybe-inline float-denormalized-p float-infinity-p float-nan-p
-                       float-trapping-nan-p))
+(declaim (inline float-denormalized-p float-infinity-p float-nan-p
+                 float-trapping-nan-p))
 
 (defmacro sfloat-bits-subnormalp (bits)
   `(zerop (ldb sb-vm:single-float-exponent-byte ,bits)))

@@ -1230,8 +1230,7 @@ the first."
      (>= (bignum-compare x y) 0))))
 
 (defun two-arg-= (x y)
-  (declare (inline float-infinity-p)
-           (explicit-check))
+  (declare (explicit-check))
   (number-dispatch ((x number) (y number))
     (basic-compare =
                    ;; An infinite value is never equal to a finite value.

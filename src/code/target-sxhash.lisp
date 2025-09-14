@@ -389,7 +389,6 @@
                    (hi (symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))
                    (bignum-hash (symbolicate 'sxhash-bignum- type)))
                `(let ((key ,key))
-                  (declare (inline float-infinity-p))
                   (cond (;; This clause allows FIXNUM-sized integer
                          ;; values to be handled without consing.
                          (<= ,lo key ,hi)
