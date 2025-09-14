@@ -896,24 +896,6 @@
     ;; by one.
     (1- exponent)))
 
-;;; Compute an integer N such that 1 <= |2^N * x| < 2.
-;;; For the special cases, the following values are used:
-;;;    x             logb
-;;;   NaN            NaN
-;;;   +/- infinity   +infinity
-;;;   0              -infinity
-(defun logb (x)
-  (declare (type double-float x))
-  (cond ((float-nan-p x)
-         x)
-        ((float-infinity-p x) double-float-positive-infinity)
-        ((zerop x)
-         ;; The answer is negative infinity, but we are supposed to
-          ;; signal divide-by-zero, so do the actual division
-         (/ -1.0d0 x))
-        (t
-          (logb-finite x))))
-
 ;;; This function is used to create a complex number of the
 ;;; appropriate type:
 ;;;   Create complex number with real part X and imaginary part Y
