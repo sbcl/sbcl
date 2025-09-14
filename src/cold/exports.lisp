@@ -581,7 +581,6 @@ possibly temporarily, because it might be used internally.")
 
    ;; error-reporting facilities
 
-   "ARGUMENTS-OUT-OF-DOMAIN-ERROR"
    "CLOSED-STREAM-ERROR" "CLOSED-SAVED-STREAM-ERROR"
    "COMPILED-PROGRAM-ERROR"
    "COMPILER-MACRO-KEYWORD-PROBLEM"

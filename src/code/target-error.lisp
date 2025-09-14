@@ -1164,10 +1164,6 @@ with that condition (or with no condition) will be returned."
 (define-condition simple-reference-warning (reference-condition simple-warning)
   ())
 
-(define-condition arguments-out-of-domain-error
-    (arithmetic-error reference-condition)
-  ())
-
 ;; per CLHS: "The consequences are unspecified if functions are ...
 ;; multiply defined in the same file." so we are within reason to do any
 ;; unspecified behavior at compile-time and/or time, but the compiler was
