@@ -228,7 +228,7 @@
                                                   exponent))))))))))
            #-64-bit
            (isint (x)
-             (or (zerop n)
+             (or (zerop x)
                  (let* ((hi (double-float-high-bits x))
                         (lo (double-float-low-bits x))
                         (ihi (logand hi #x7fffffff)))
