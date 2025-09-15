@@ -330,12 +330,21 @@
      (when (combination-p combination)
        (let ((name (lvar-fun-name (combination-fun combination)))
              (args (combination-args combination)))
-        (case name
-          ,@(loop for (name arg-spec . body) in cases
-                  collect (list name
-                                `(when ,(or (eq arg-spec '*)
-                                            `(combination-matches-args args ',arg-spec))
-                                  ,@body))))))))
+         (case name
+           ,@(loop while cases
+                   for (name arg-spec . body) = (pop cases)
+                   collect (list name
+                                 `(cond (,(or (eq arg-spec '*)
+                                              `(combination-matches-args args ',arg-spec))
+                                         ,@body)
+                                        ,@(when (and cases
+                                                     (subsetp (ensure-list (caar cases))
+                                                              (ensure-list name)))
+                                            (destructuring-bind (name arg-spec . body) (pop cases)
+                                              `(((and (member name ',(ensure-list name))
+                                                      ,(or (eq arg-spec '*)
+                                                           `(combination-matches-args args ',arg-spec)))
+                                                 ,@body))))))))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)

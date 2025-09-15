@@ -4761,10 +4761,49 @@
   (def logior)
   (def logxor)
   (def logtest :folded (logand) :combine logand)
-  (def + :type rational :folded (+ -))
-  (def - :type rational :folded (+ -) :flip +)
   (def * :type rational :folded (* /))
   (def / :type rational :folded (* /) :flip * :no-ratios *))
+
+(deftransform + ((x z) (rational (constant-arg rational)) * :important nil :node n)
+  "associate +/(+ -) of constants"
+  (or (combination-case x
+        ((- +) (* constant)
+         (let ((constant (funcall name (lvar-value z) (lvar-value (second args)))))
+           (splice-fun-args x name #'first)
+           `(+ x ,constant)))
+        (- (constant *)
+         (let ((constant (+ (lvar-value z) (lvar-value (first args)))))
+           (splice-fun-args x name #'second)
+           `(- ,constant x))))
+      (give-up-ir1-transform)))
+
+(deftransform - ((x z) (rational (constant-arg rational)) * :important nil :node n)
+  "associate -/(+ -) of constants"
+  (or (combination-case x
+        ((- +) (* constant)
+         (let ((constant (- (funcall name (lvar-value (second args)))
+                            (lvar-value z))))
+           (splice-fun-args x name #'first)
+           `(+ x ,constant)))
+        (- (constant *)
+         (let ((constant (- (lvar-value (first args)) (lvar-value z))))
+           (splice-fun-args x name #'second)
+           `(- ,constant x))))
+      (give-up-ir1-transform)))
+
+(deftransform - ((z y) ((constant-arg rational) rational) * :important nil :node n)
+  "associate -/(+ -) of constants"
+  (or (combination-case y
+        ((- +) (* constant)
+         (let ((constant (- (lvar-value z)
+                            (funcall name (lvar-value (second args))))))
+           (splice-fun-args y name #'first)
+           `(- ,constant y)))
+        (- (constant *)
+         (let ((constant (- (lvar-value z) (lvar-value (first args)))))
+           (splice-fun-args y name #'second)
+           `(+ ,constant y))))
+      (give-up-ir1-transform)))
 
 ;;; Transform (logior a (- (mask-field (byte 1 n) a)))
 ;;; to (mask-signed-field n a)
