@@ -1554,6 +1554,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "LOG-DOUBLE-FLOAT" "LOG-SINGLE-FLOAT"
            "LOG-DOUBLE-FLOAT2" "LOG-SINGLE-FLOAT2"
            "SQRT-DOUBLE-FLOAT" "SQRT-SINGLE-FLOAT"
+           "EXPT-DOUBLE-FLOAT" "EXPT-SINGLE-FLOAT"
            #+long-float "%LONG-FLOAT"
            "%MAKE-ARRAY"
            "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE"

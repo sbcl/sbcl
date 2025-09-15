@@ -311,6 +311,11 @@
 (defknown log-single-float2 (single-float single-float) (or single-float (complex single-float))
   (movable foldable flushable fixed-args))
 
+(defknown expt-double-float (double-float double-float) (or double-float (complex double-float))
+  (movable foldable flushable fixed-args))
+(defknown expt-single-float (single-float single-float) (or single-float (complex single-float))
+  (movable foldable flushable fixed-args))
+
 (defknown sqrt (number) irrational
   (movable foldable flushable))
 (defknown isqrt (unsigned-byte) unsigned-byte

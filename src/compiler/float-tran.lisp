@@ -590,6 +590,14 @@
         ((csubtypep (lvar-type number) (specifier-type 'single-float))
          'sqrt-single-float)))
 
+(defoptimizer (expt rewrite-full-call) ((base power) node)
+  (cond ((csubtypep (lvar-type base) (specifier-type 'double-float))
+         (and (csubtypep (lvar-type power) (specifier-type 'double-float))
+              'expt-double-float))
+        ((csubtypep (lvar-type base) (specifier-type 'single-float))
+         (and (csubtypep (lvar-type power) (specifier-type 'single-float))
+              'expt-single-float))))
+
 
 ;;; Handle some simple transformations.
 

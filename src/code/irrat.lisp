@@ -203,6 +203,7 @@
          (locally (declare (notinline expt))
            (expt 10 power)))))
 
+(declaim (maybe-inline expt))
 ;;; If an integer power of a rational, use INTEXP above. Otherwise, do
 ;;; floating point stuff. If both args are real, we try %POW right
 ;;; off, assuming it will return 0 if the result may be complex. If
@@ -211,7 +212,8 @@
 ;;; from the general complex case.
 (defun expt (base power)
   "Return BASE raised to the POWER."
-  (declare (explicit-check))
+  (declare (explicit-check)
+           (maybe-inline expt))
   (labels (;; determine if the double float is an integer
            #+64-bit
            (isint (n)
@@ -322,6 +324,22 @@
       (((complex double-float)
         (foreach complex double-float single-float))
        (complex-expt base power)))))
+
+(defun expt-double-float (base power)
+  (declare (inline expt)
+           (double-float base power))
+  (expt base power))
+
+(defun expt-single-float (base power)
+  (declare (inline expt)
+           (single-float base power))
+  (expt base power))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (s '(expt))
+    (clear-info :function :inlining-data s)
+    (clear-info :function :inlinep s)
+    (clear-info :source-location :declaration s)))
 
 (defun sqrt-double-float (number)
   (if (< number 0)
