@@ -549,6 +549,14 @@
 (deftransform expt ((x y) (double-float double-float) double-float)
   `(%pow x y))
 
+(deftransform expt ((x y) (single-float integer) single-float)
+  #+libmf
+  `(%powf x (%single-float y))
+  #-libmf
+  `(%single-float (%pow (%double-float x) (%double-float y))))
+(deftransform expt ((x y) (double-float integer) double-float)
+  `(%pow x (%double-float y)))
+
 ;;; ANSI says log with base zero returns zero.
 (deftransform log ((x y) (single-float single-float) single-float :node node)
   (delay-ir1-transform node :ir1-phases)
