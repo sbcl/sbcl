@@ -1332,7 +1332,7 @@
 ;; second way shown above, we would have to bind INITIAL-CONTENTS,
 ;; to ensure its evaluation before the allocation,
 ;; causing difficulty if doing any futher macro-like processing.
-(defknown fill-array (sequence simple-array) (simple-array)
+(defknown fill-array (sequence array) (array)
   (flushable no-verify-arg-count)
   :derive-type #'result-type-last-arg
   :result-arg 1)

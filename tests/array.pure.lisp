@@ -991,6 +991,11 @@
    (lambda (a b)
      (make-array (list a b) :adjustable nil))
    (simple-array t (* *)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b s)
+         (make-array (list a b) :initial-contents s :adjustable t))
+    ((2 2 '((1 2) (3 4))) #2a((1 2) (3 4)) :test #'equalp))
   ;; (assert-type
   ;;  (lambda (a b n)
   ;;    (make-array (list a b) :adjustable n))

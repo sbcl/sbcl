@@ -200,8 +200,8 @@
 
 (defknown simple-array-header-of-rank-p (t %array-rank) boolean
   (flushable))
-(defknown sb-kernel::check-array-shape (simple-array list)
-  (simple-array)
+(defknown sb-kernel::check-array-shape (array list)
+  (array)
   (flushable no-verify-arg-count)
   :derive-type #'result-type-first-arg
   :result-arg 0)
