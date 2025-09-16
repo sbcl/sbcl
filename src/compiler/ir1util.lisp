@@ -331,20 +331,21 @@
        (let ((name (lvar-fun-name (combination-fun combination)))
              (args (combination-args combination)))
          (case name
-           ,@(loop while cases
-                   for (name arg-spec . body) = (pop cases)
-                   collect (list name
-                                 `(cond (,(or (eq arg-spec '*)
-                                              `(combination-matches-args args ',arg-spec))
-                                         ,@body)
-                                        ,@(when (and cases
-                                                     (subsetp (ensure-list (caar cases))
-                                                              (ensure-list name)))
-                                            (destructuring-bind (name arg-spec . body) (pop cases)
-                                              `(((and (member name ',(ensure-list name))
-                                                      ,(or (eq arg-spec '*)
-                                                           `(combination-matches-args args ',arg-spec)))
-                                                 ,@body))))))))))))
+           ,@(labels ((gen (&optional sub)
+                        (destructuring-bind (name arg-spec . body) (pop cases)
+                          (list name
+                                `(cond (,(or (eq arg-spec '*)
+                                             `(combination-matches-args args ',arg-spec))
+                                        ,@body)
+                                       ,@(unless sub
+                                           (loop while (and cases
+                                                            (subsetp (ensure-list (caar cases))
+                                                                     (ensure-list name)))
+                                                 collect
+                                                 `((case name
+                                                     ,(gen t))))))))))
+               (loop while cases
+                     collect (gen))))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
