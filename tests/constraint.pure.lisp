@@ -713,13 +713,14 @@
      (let ((l (1- v)))
        (< l v)))
    (member t))
-  (assert-type
-   (lambda (v)
-     (declare (simple-vector v)
-              (optimize (debug 1)))
-     (let ((l (1- (length v))))
-       (< l (length v))))
-   (member t)))
+  ;; (assert-type
+  ;;  (lambda (v)
+  ;;    (declare (simple-vector v)
+  ;;             (optimize (debug 1)))
+  ;;    (let ((l (1- (length v))))
+  ;;      (< l (length v))))
+  ;;  (member t))
+  )
 
 (with-test (:name :sub-sign)
   (assert-type

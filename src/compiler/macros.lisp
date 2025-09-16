@@ -1026,16 +1026,22 @@ specify bindings for printer control variables.")
              (lambda (x)
                (when (symbolp x)
                  (let* ((str (string x))
-                        (float (search pattern str)))
-                   (when float
-                     (symbolicate (subseq str 0 float)
-                                  with
-                                  (subseq str (+ float (length pattern)))))))))
+                        (start (search pattern str)))
+                   (when start
+                     (if (equal str pattern)
+                         with
+                         (symbolicate (subseq str 0 start)
+                                      with
+                                      (subseq str (+ start (length pattern))))))))))
            (gen (vars body)
              (if vars
                  (loop for with in (cdar vars)
                        append
                        (gen (cdr vars)
-                            (subst-if-with (test (string (caar vars)) with) body)))
+                            (let ((body body))
+                              (loop for v in (ensure-list (caar vars))
+                                    for w in (ensure-list with)
+                                    do (setf body (subst-if-with (test (string v) w) body)))
+                              body)))
                  body)))
     `(progn ,@(gen vars body))))

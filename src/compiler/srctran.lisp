@@ -6150,6 +6150,26 @@
           (t
            (give-up-ir1-transform)))))
 
+;;; (< (- x 1) y) => (<= x y)
+(make-defs ((($fun $offset-x $offset-y)
+             (< -1 1)
+             (> 1 -1)))
+  (deftransform $fun ((x y) (integer integer) * :important nil)
+    (or
+     (combination-case x
+       ((- +) (* constant)
+        (let ((c (funcall name (lvar-value (second args)))))
+          (when (= c $offset-x)
+            (splice-fun-args x name #'first)
+            `($fun= x y)))))
+     (combination-case y
+       ((- +) (* constant)
+        (let ((c (funcall name (lvar-value (second args)))))
+          (when (= c $offset-y)
+            (splice-fun-args y name #'first)
+            `($fun= x y)))))
+     (give-up-ir1-transform))))
+
 ;;; (< (+/- x cosntant1) constant2)
 (make-defs (($fun < > =))
   (deftransform $fun ((x y) (rational (constant-arg rational)) * :important nil)
