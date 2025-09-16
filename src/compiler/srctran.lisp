@@ -6150,6 +6150,21 @@
           (t
            (give-up-ir1-transform)))))
 
+;;; (< (+/- x cosntant1) constant2)
+(make-defs (($fun < > =))
+  (deftransform $fun ((x y) (rational (constant-arg rational)) * :important nil)
+    (or (combination-case x
+          ((- +) (* constant)
+           (let ((constant (- (lvar-value y)
+                              (funcall name (lvar-value (second args))))))
+             (splice-fun-args x name #'first)
+             `($fun x ,constant)))
+          (- (constant *)
+             (let ((constant (- (lvar-value (first args)) (lvar-value y))))
+               (splice-fun-args x name #'second)
+               `($fun ,constant x))))
+        (give-up-ir1-transform))))
+
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))
 
