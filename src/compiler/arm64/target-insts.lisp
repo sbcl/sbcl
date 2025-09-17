@@ -458,6 +458,12 @@
                   ((= imm5 #b1000)
                    "2D")))))
 
+(defun print-simd-float-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q size offset) value
+    (format stream "V~d.~a" offset
+            (decode-vector-size q (logior #b10 size)))))
+
 (defun print-sys-reg (value stream dstate)
   (declare (ignore dstate))
   (princ (decode-sys-reg value) stream))
