@@ -6182,7 +6182,11 @@
           (- (constant *)
              (let ((constant (- (lvar-value (first args)) (lvar-value y))))
                (splice-fun-args x name #'second)
-               `($fun ,constant x))))
+               `($fun ,constant x)))
+          (%negate (*)
+           (let ((constant (- (lvar-value y))))
+             (splice-fun-args x name #'first)
+             `($fun ,constant x))))
         (give-up-ir1-transform))))
 
 (defun word-sized-type-p (type)
@@ -6192,71 +6196,137 @@
 (defun word-sized-lvar-p (lvar)
   (word-sized-type-p (lvar-type lvar)))
 
+(defun word-interval-p (interval)
+  (let ((low (interval-low interval))
+        (high (interval-high interval)))
+    (when (and low high)
+      (or (and (<= 0 low)
+               (<= high (1- (expt 2 sb-vm:n-word-bits))))
+          (and (<= (- (expt 2 (1- sb-vm:n-word-bits))) low)
+               (<= high (1- (expt 2 (1- sb-vm:n-word-bits)))))))))
+
 ;;; (< (+ x c1) (+ y c2)) -> (< x (+ y (- c2 c1)))
 (make-defs (($fun < > eql eq))
   (deftransform $fun ((x y) (rational rational) * :important nil)
     (let (c1
+          sub-c1
+          (sub-accessor1 #'second)
           mc1
           arg1)
-      (combination-case x
-        ((- +) (* constant)
-         (setf arg1 (first args)
-               c1 (funcall name (lvar-value (second args)))))
-        (* (* constant)
-         (setf mc1 (lvar-value (second args)))))
-      (or (cond (c1
-                 (let* (arg2
-                        (c2 (combination-case y
-                              ((- +) (* constant)
-                               (setf arg2 (first args))
-                               (funcall name (lvar-value (second args)))))))
-                   (flet ((overflow-p (arg result constant)
-                            (when (and (/= constant 0)
-                                       (word-sized-lvar-p arg)
-                                       (word-sized-lvar-p result))
-                              (let ((interval (interval-add (type-approximate-interval (lvar-type arg))
-                                                            (make-interval :low constant :high constant))))
-                                (not (word-sized-type-p (make-numeric-type :class 'integer :complexp :real
-                                                                           :low (interval-low interval)
-                                                                           :high (interval-high interval))))))))
-                     (when c2
-                       (let ((new-c (- c2 c1))
-                             swap)
-                         ;; Don't want to perform the transform if
-                         ;; adding the new constant will cause an
-                         ;; overflow into bignums.
-                         (unless (when (overflow-p arg2 y new-c)
-                                   (setf swap t
-                                         new-c (- c1 c2))
-                                   (overflow-p arg1 x new-c))
-                          (splice-fun-args x :any #'first)
-                          (aver (splice-fun-args y :any #'first nil))
-                          (cond ((zerop new-c)
-                                 (give-up-ir1-transform)) ;; splice-fun-args did the job
-                                (swap
-                                 `($fun (+ x ,new-c) y))
-                                (t
-                                 `($fun x (+ y ,new-c))))))))))
-                (mc1
-                 (let ((mc2 (combination-case y
-                              (* (* constant)
+      (labels ((overflow-add-p (arg result constant)
+                 ;; Don't want to perform the transform if
+                 ;; adding the new constant will cause an
+                 ;; overflow into bignums.
+                 (when (and (/= constant 0)
+                            (word-sized-lvar-p arg)
+                            (word-sized-lvar-p result))
+                   (not (word-interval-p (interval-add (type-approximate-interval (lvar-type arg))
+                                                       (make-interval :low constant :high constant))))))
+               (overflow-sub-p (arg result constant)
+                 (when (and (word-sized-lvar-p arg)
+                            (word-sized-lvar-p result))
+                   (not (word-interval-p (interval-sub (make-interval :low constant :high constant)
+                                                       (type-approximate-interval (lvar-type arg))))))))
+        (combination-case x
+          ((- +) (* constant)
+           (setf arg1 (first args)
+                 c1 (funcall name (lvar-value (second args)))))
+          (- (constant *)
+           (setf arg1 (second args)
+                 sub-c1 (lvar-value (first args))))
+          (%negate (*)
+           (setf arg1 (first args)
+                 sub-c1 0
+                 sub-accessor1 #'first))
+          (* (* constant)
+           (setf mc1 (lvar-value (second args)))))
+        (or (cond (c1
+                   (let* (arg2
+                          c2
+                          sub-c2
+                          (sub-accessor2 #'second))
+                     (combination-case y
+                       ((- +) (* constant)
+                        (setf arg2 (first args)
+                              c2 (funcall name (lvar-value (second args)))))
+                       (- (constant *)
+                        (setf arg2 (second args)
+                              sub-c2 (lvar-value (first args))))
+                       (%negate (*)
+                        (setf arg2 (first args)
+                              sub-c2 0
+                              sub-accessor2 #'first)))
+                     (cond (c2
+                            (let ((new-c (- c2 c1))
+                                  swap)
+                              (unless (when (overflow-add-p arg2 y new-c)
+                                        (setf swap t
+                                              new-c (- c1 c2))
+                                        (overflow-add-p arg1 x new-c))
+                                (splice-fun-args x :any #'first)
+                                (aver (splice-fun-args y :any #'first nil))
+                                (cond ((zerop new-c)
+                                       (give-up-ir1-transform)) ;; splice-fun-args did the job
+                                      (swap
+                                       `($fun (+ x ,new-c) y))
+                                      (t
+                                       `($fun x (+ y ,new-c)))))))
+                           (sub-c2
+                            (let ((new-c (- sub-c2 c1)))
+                              (unless (overflow-sub-p arg2 y new-c)
+                                (splice-fun-args x :any #'first)
+                                (aver (splice-fun-args y :any sub-accessor2 nil))
+                                `($fun x (- ,new-c y))))))))
+                  (sub-c1
+                   (let* (arg2
+                          c2
+                          sub-c2
+                          (sub-accessor2 #'second))
+                     (declare (ignorable arg2))
+                     (combination-case y
+                       ((- +) (* constant)
+                        (setf arg2 (first args)
+                              c2 (funcall name (lvar-value (second args)))))
+                       (- (constant *)
+                        (setf arg2 (second args)
+                              sub-c2 (lvar-value (first args))))
+                       (%negate (*)
+                        (setf arg2 (first args)
+                              sub-c2 0
+                              sub-accessor2 #'first)))
+                     (cond (c2
+                            (let ((new-c (- sub-c1 c2)))
+                              (unless (overflow-sub-p arg1 x new-c)
+                                (splice-fun-args x :any sub-accessor1)
+                                (aver (splice-fun-args y :any #'first nil))
+                                `($fun (- ,new-c x) y))))
+                           (sub-c2
+                            (let ((new-c (- sub-c1 sub-c2)))
+                              (splice-fun-args x :any sub-accessor1)
+                              (aver (splice-fun-args y :any sub-accessor2 nil))
+                              (if (zerop new-c)
+                                  `($fun y x)
+                                  `($fun (+ y ,new-c) x)))))))
+                  (mc1
+                   (let ((mc2 (combination-case y
+                                (* (* constant)
                                  (lvar-value (second args))))))
-                   (when mc2
-                     (let (swap)
-                       (when (> mc1 mc2)
-                         (rotatef mc1 mc2)
-                         (setf swap t))
-                       (multiple-value-bind (q r) (truncate mc2 mc1)
-                         (when (zerop r)
-                           (splice-fun-args x :any #'first)
-                           (aver (splice-fun-args y :any #'first nil))
-                           (cond ((= q 1)
-                                  (give-up-ir1-transform)) ;; splice-fun-args did the job
-                                 (swap
-                                  `($fun (* x ,q) y))
-                                 (t
-                                  `($fun x (* y ,q)))))))))))
-          (give-up-ir1-transform)))))
+                     (when mc2
+                       (let (swap)
+                         (when (> mc1 mc2)
+                           (rotatef mc1 mc2)
+                           (setf swap t))
+                         (multiple-value-bind (q r) (truncate mc2 mc1)
+                           (when (zerop r)
+                             (splice-fun-args x :any #'first)
+                             (aver (splice-fun-args y :any #'first nil))
+                             (cond ((= q 1)
+                                    (give-up-ir1-transform)) ;; splice-fun-args did the job
+                                   (swap
+                                    `($fun (* x ,q) y))
+                                   (t
+                                    `($fun x (* y ,q)))))))))))
+            (give-up-ir1-transform))))))
 
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
   `(not (> x most-positive-fixnum)))
