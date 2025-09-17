@@ -6239,7 +6239,11 @@
                  sub-c1 0
                  sub-accessor1 #'first))
           (* (* constant)
-           (setf mc1 (lvar-value (second args)))))
+           (setf mc1 (lvar-value (second args))))
+          (ash (* constant)
+           (let ((c (lvar-value (second args))))
+             (when (plusp c)
+               (setf mc1 (ash 1 c))))))
         (or (cond (c1
                    (let* (arg2
                           c2
@@ -6310,7 +6314,11 @@
                   (mc1
                    (let ((mc2 (combination-case y
                                 (* (* constant)
-                                 (lvar-value (second args))))))
+                                 (lvar-value (second args)))
+                                (ash (* constant)
+                                 (let ((c (lvar-value (second args))))
+                                   (when (plusp c)
+                                     (ash 1 c)))))))
                      (when mc2
                        (let (swap)
                          (when (> mc1 mc2)
