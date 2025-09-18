@@ -3487,6 +3487,20 @@
             (t
              (give-up-ir1-transform))))))
 
+;;; (ash #b1 (+ n 2)) -> (ash #b100 n)
+(deftransform ash ((integer amount) ((constant-arg integer) integer))
+  (let ((shift
+          (combination-case (amount (specifier-type 'integer))
+            ((+ -) (* constant)
+             (funcall name (lvar-value (second args)))))))
+    (or (when (and shift
+                   (plusp shift))
+          (let ((shifted (ash (lvar-value integer) shift)))
+            (when (fixnump shifted)
+              (splice-fun-args amount :any #'first t (specifier-type 'integer))
+              `(ash ,shifted amount))))
+        (give-up-ir1-transform))))
+
 ;;; Not declaring it as actually being RATIO because it is used as one
 ;;; of the legs in the EXPT transform below and that may result in
 ;;; some unwanted type conflicts, e.g. (random (expt 2 (the integer y)))

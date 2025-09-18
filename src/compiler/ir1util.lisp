@@ -311,41 +311,50 @@
                     (combination-matches-args (combination-args combination) args))
            name))))
 
-(defun combination-matches* (names args combination &key cast-type)
-  (typecase combination
+(defun combination/cast-name (node &optional cast-type)
+  (typecase node
     (combination
-     (let* ((fun (combination-fun combination))
+     (let* ((fun (combination-fun node))
             (name (lvar-fun-name fun)))
-       (when (and (memq name names)
-                  (combination-matches-args (combination-args combination) args))
-         (values name combination (combination-args combination)))))
+       (values name node)))
     (cast
      (when (and cast-type
-                (eq (cast-type-to-check combination) cast-type))
-       (combination-matches* names args (lvar-uses (cast-value combination)))))))
+                (eq (cast-type-to-check node) cast-type))
+       (combination/cast-name (lvar-uses (cast-value node)))))))
+
+(defun combination-matches* (names args combination &key cast-type)
+  (multiple-value-bind (name combination)
+      (combination/cast-name combination cast-type)
+    (when combination
+      (when (and (memq name names)
+                 (combination-matches-args (combination-args combination) args))
+        (values name combination (combination-args combination))))))
 
 ;;; Will bind NAME, COMBINATION, ARGS
 (defmacro combination-case (lvar &body cases)
-  `(let ((combination (lvar-uses ,lvar)))
-     (when (combination-p combination)
-       (let ((name (lvar-fun-name (combination-fun combination)))
-             (args (combination-args combination)))
-         (case name
-           ,@(labels ((gen (&optional sub)
-                        (destructuring-bind (name arg-spec . body) (pop cases)
-                          (list name
-                                `(cond (,(or (eq arg-spec '*)
-                                             `(combination-matches-args args ',arg-spec))
-                                        ,@body)
-                                       ,@(unless sub
-                                           (loop while (and cases
-                                                            (subsetp (ensure-list (caar cases))
-                                                                     (ensure-list name)))
-                                                 collect
-                                                 `((case name
-                                                     ,(gen t))))))))))
-               (loop while cases
-                     collect (gen))))))))
+  (multiple-value-bind (lvar cast)
+      (if (consp lvar)
+          (values (first lvar) (second lvar))
+          (values lvar nil))
+   `(multiple-value-bind (name combination) (combination/cast-name (lvar-uses ,lvar) ,cast)
+      (when combination
+        (let ((args (combination-args combination)))
+          (case name
+            ,@(labels ((gen (&optional sub)
+                         (destructuring-bind (name arg-spec . body) (pop cases)
+                           (list name
+                                 `(cond (,(or (eq arg-spec '*)
+                                              `(combination-matches-args args ',arg-spec))
+                                         ,@body)
+                                        ,@(unless sub
+                                            (loop while (and cases
+                                                             (subsetp (ensure-list (caar cases))
+                                                                      (ensure-list name)))
+                                                  collect
+                                                  `((case name
+                                                      ,(gen t))))))))))
+                (loop while cases
+                      collect (gen)))))))))
 
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
