@@ -6291,11 +6291,16 @@
                                       (t
                                        `($fun x (+ y ,new-c)))))))
                            (sub-c2
-                            (let ((new-c (- sub-c2 c1)))
-                              (unless (overflow-sub-p arg2 y new-c)
+                            (let ((new-c (- sub-c2 c1))
+                                  (swap t))
+                              (unless (when (overflow-sub-p arg2 y new-c)
+                                        (setf swap t)
+                                        (overflow-sub-p arg1 x new-c))
                                 (splice-fun-args x :any #'first)
                                 (aver (splice-fun-args y :any sub-accessor2 nil))
-                                `($fun x (- ,new-c y))))))))
+                                (if swap
+                                    `($fun y (- ,new-c x))
+                                    `($fun x (- ,new-c y)))))))))
                   (sub-c1
                    (let* (arg2
                           c2
@@ -6314,18 +6319,31 @@
                               sub-c2 0
                               sub-accessor2 #'first)))
                      (cond (c2
-                            (let ((new-c (- sub-c1 c2)))
-                              (unless (overflow-sub-p arg1 x new-c)
+                            (let ((new-c (- sub-c1 c2))
+                                  swap)
+                              (unless (when (overflow-sub-p arg1 x new-c)
+                                        (setf swap t)
+                                        (overflow-sub-p arg2 y new-c))
                                 (splice-fun-args x :any sub-accessor1)
                                 (aver (splice-fun-args y :any #'first nil))
-                                `($fun (- ,new-c x) y))))
+                                (if swap
+                                    `($fun (- ,new-c y) x)
+                                    `($fun (- ,new-c x) y)))))
                            (sub-c2
-                            (let ((new-c (- sub-c1 sub-c2)))
-                              (splice-fun-args x :any sub-accessor1)
-                              (aver (splice-fun-args y :any sub-accessor2 nil))
-                              (if (zerop new-c)
-                                  `($fun y x)
-                                  `($fun (+ y ,new-c) x)))))))
+                            (let ((new-c (- sub-c1 sub-c2))
+                                  swap)
+                              (unless (when (overflow-add-p arg2 y new-c)
+                                        (setf swap t
+                                              new-c (- sub-c2 sub-c1))
+                                        (overflow-add-p arg1 x new-c))
+                                (splice-fun-args x :any sub-accessor1)
+                                (aver (splice-fun-args y :any sub-accessor2 nil))
+                                (cond ((zerop new-c)
+                                       `($fun y x))
+                                      (swap
+                                       `($fun y (+ x ,new-c)))
+                                      (t
+                                       `($fun (+ y ,new-c) x)))))))))
                   (mc1
                    (let ((mc2 (combination-case y
                                 (* (* constant)
