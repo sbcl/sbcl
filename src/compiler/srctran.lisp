@@ -3634,7 +3634,8 @@
                                   (and (cast-type-check dest)
                                        (single-value-type (cast-type-to-check dest))))
                                  ((and (combination-p dest)
-                                       (equal (combination-fun-debug-name dest) '(transform-for check-bound))
+                                       (member (combination-fun-debug-name dest) '((transform-for check-bound) %check-bound)
+                                               :test #'equal)
                                        (eq (third (combination-args dest)) lvar))
                                   (if fixnum
                                       (specifier-type 'index)

@@ -259,7 +259,7 @@
                  (refs (leaf-refs var)))
             (loop for ref in refs
                   for lvar = (node-lvar ref)
-                  when (and lvar (almost-immediately-used-p lvar (lambda-bind fun)))
+                  when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
                   do (return (values (lvar-dest lvar) lvar))))
           (values dest lvar)))))
 

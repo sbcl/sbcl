@@ -604,3 +604,9 @@
                                    (a (if d c b)))
                               (print 1)
                               (> (the word a) 10)))))))
+
+(with-test (:name :overflow-svref
+            :skipped-on (not (or :arm64 :x86-64)))
+  (assert (not (ir-full-calls
+                `(lambda (x n)
+                   (svref x (+ n 1)))))))
