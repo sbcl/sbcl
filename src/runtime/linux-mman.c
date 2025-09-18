@@ -20,7 +20,7 @@ static void dumpmaps()
     } else { // couldn't read that virtual file? just wow
       char msg[40];
       int n = snprintf(msg, sizeof msg, "errno %d opening maps\n", errno);
-      write(2, msg, n);
+      ignore_value(write(2, msg, n));
     }
 }
 
