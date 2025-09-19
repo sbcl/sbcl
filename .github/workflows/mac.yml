@@ -5,7 +5,7 @@ on: [push]
 jobs:
   build:
 
-    runs-on: ${{ matrix.arch == 'arm64' && 'macos-14' || 'macOS-13' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'macos-15' || 'macos-15-intel' }}
     timeout-minutes: 60
     strategy: 
       matrix:
