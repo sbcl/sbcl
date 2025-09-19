@@ -3114,15 +3114,15 @@
              ;; cast can be moved to that use.
              (when (and good-types-not-immediately-used
                         (not multiple-bad-uses))
-               (setf (cast-silent-conflict
-                      (if (exit-p bad-use)
-                          (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
-                                            (cast-context cast)
-                                            t)
-                          (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
-                                            (cast-context cast)
-                                            t)))
-                     :style-warning)
+               (let ((new-cast (if (exit-p bad-use)
+                                   (assert-lvar-type (exit-value bad-use) asserted (lexenv-policy (node-lexenv cast))
+                                                     (cast-context cast)
+                                                     t)
+                                   (assert-node-type bad-use asserted (lexenv-policy (node-lexenv cast))
+                                                     (cast-context cast)
+                                                     t))))
+                 (setf (cast-silent-conflict new-cast) :style-warning
+                       (node-source-path new-cast) (node-source-path cast)))
                (delete-filter cast lvar value)
                t))))))
 
