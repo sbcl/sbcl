@@ -1110,3 +1110,13 @@
                (specifier-type '(cons (and (not array) (not integer)) (and atom (not integer))))))
   (assert (eql (specifier-type '(or (and (not integer) (not stream) (not standard-object)) (and (not stream) standard-object)))
                (specifier-type '(and (not integer) (not stream))))))
+
+(with-test (:name :float-zero-typep)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (typep x '(single-float * (0.0))))
+    ((0.0) nil)
+    ((-0.0) nil)
+    ((1.0) nil)
+    ((-1.0) t)))

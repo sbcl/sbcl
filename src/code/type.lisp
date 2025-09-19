@@ -5417,7 +5417,7 @@ expansion happened."
               (float-sign-bit-set-p high))
          (values low (list (sb-xc:- high)) high))
         ((typep high '(cons (satisfies fp-zero-p)))
-         (values low (abs (car high))))
+         (values low (list (abs (car high)))))
         (t
          (values low high nil))))
 
