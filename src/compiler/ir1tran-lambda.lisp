@@ -1208,7 +1208,9 @@
                   (lexenv-flushable *lexenv*)
                   (lexenv-lambda *lexenv*)
                   *lexenv*)))
-           (*inlining* (1+ *inlining*))
+           (*inlining* (if (> *transforming* 0)
+                           *inlining*
+                           (1+ *inlining*)))
            (clambda (progn
                       (when notinlines
                         (setf (lexenv-funs *lexenv*)
