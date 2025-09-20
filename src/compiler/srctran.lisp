@@ -6212,20 +6212,20 @@
            (let ((multiplier (lvar-value (second args))))
              (unless (zerop multiplier)
                (let* ((constant (/ (lvar-value y) multiplier))
-                      (arg-1 'x)
-                      (arg-2 constant))
+                      (arg1 'x)
+                      (arg2 constant))
                  (when (minusp multiplier)
-                   (rotatef arg-1 arg-2))
+                   (rotatef arg1 arg2))
                  (splice-fun-args x name #'first)
                  (cond ((or (integerp constant)
                             (csubtypep (lvar-type x) (specifier-type 'integer)))
-                        `($fun ,arg-1 ,arg-2))
+                        `($fun ,arg1 ,arg2))
                        (t
-                        ;; Do the fixnum case here, (two-arg-< fixnum ratio)
+                        ;; Do the fixnum case here, (two-arg< fixnum ratio)
                         ;; is more expensive than an extra multiplication.
                         `(if (fixnump x)
-                             ($fun ,arg-1 ,arg-2)
-                             ($fun ,arg-1 ,arg-2)))))))))
+                             ($fun ,arg1 ,arg2)
+                             ($fun ,arg1 ,arg2)))))))))
         (give-up-ir1-transform))))
 
 (defun word-sized-type-p (type)
@@ -6378,19 +6378,23 @@
                                      (ash 1 c)))))))
                      (when mc2
                        (let (swap)
-                         (when (> mc1 mc2)
+                         (when (> (abs mc1) (abs mc2))
                            (rotatef mc1 mc2)
                            (setf swap t))
                          (multiple-value-bind (q r) (truncate mc2 mc1)
                            (when (zerop r)
                              (splice-fun-args x :any #'first)
                              (aver (splice-fun-args y :any #'first nil))
-                             (cond ((= q 1)
-                                    (give-up-ir1-transform)) ;; splice-fun-args did the job
-                                   (swap
-                                    `($fun (* x ,q) y))
-                                   (t
-                                    `($fun x (* y ,q)))))))))))
+                             (multiple-value-bind (arg1 arg2)
+                                 (cond ((= q 1)
+                                        (values 'x 'y))
+                                       (swap
+                                        (values `(* x ,q) 'y))
+                                       (t
+                                        (values 'x `(* y ,q))))
+                               (when (minusp mc1)
+                                 (rotatef arg1 arg2))
+                               `($fun ,arg1 ,arg2)))))))))
             (give-up-ir1-transform))))))
 
 (deftransform < ((x y) (integer (eql #.(1+ most-positive-fixnum))) * :important nil)
