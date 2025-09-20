@@ -3603,14 +3603,10 @@
 (define-vop (bignum-length get-header-data)
   (:translate sb-bignum:%bignum-length)
   (:policy :fast-safe)
-  (:results (res :scs (unsigned-reg any-reg)))
+  (:results (res :scs (unsigned-reg)))
   (:generator 6
-     #.(assert (subtypep 'sb-bignum:bignum-length '(unsigned-byte 32)))
-       (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
-    (sc-case res
-      (any-reg
-       (inst shl res n-fixnum-tag-bits))
-      (t))))
+    #.(assert (subtypep 'sb-bignum:bignum-length '(unsigned-byte 32)))
+    (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))))
 
 (define-vop (bignum-set-length set-header-data)
   (:translate sb-bignum:%bignum-set-length)
