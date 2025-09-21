@@ -46,11 +46,9 @@
 ;;;; visible at GENESIS time.
 
 #-win32
-(progn
-  (define-alien-routine wrapped-environ (* c-string))
-  (defun posix-environ ()
-    "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
-    (c-strings->string-list (wrapped-environ))))
+(defun posix-environ ()
+  "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
+  (c-strings->string-list (extern-alien environ (* c-string))))
 
 #+win32
 (progn

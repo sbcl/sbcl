@@ -390,12 +390,6 @@ uid_homedir(uid_t uid)
  * variable locations change between compile time and run time.)
  */
 
-char **
-wrapped_environ()
-{
-    return environ;
-}
-
 #ifdef LISP_FEATURE_WIN32
 #include <windows.h>
 #include <time.h>
