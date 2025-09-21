@@ -74,13 +74,18 @@
                    (err (dlerror)))
                (when (or (not (zerop result)) (not err))
                  (return-from find-dynamic-foreign-symbol-address result)))))
-      ;; Search the loaded libraries first, *runtime-dlhandle* on some
-      ;; BSDs will actually search all symbols and might pick up the wrong
-      ;; thing.
-      (dolist (obj *shared-objects*)
-        (let ((handle (shared-object-handle obj)))
-          (when handle
-            (sym handle))))
+      (cond #+linux
+            ;; Linux has environ defined in libc.so and in the main
+            ;; executable. Get it from *runtime-dlhandle*
+            ((equal symbol "environ"))
+            (t
+             ;; Search the loaded libraries first, *runtime-dlhandle* on some
+             ;; BSDs will actually search all symbols and might pick up the wrong
+             ;; thing.
+             (dolist (obj *shared-objects*)
+               (let ((handle (shared-object-handle obj)))
+                 (when handle
+                   (sym handle))))))
       (unless *runtime-dlhandle*
         (bug "Cannot resolve foreign symbol: lost *runtime-dlhandle*"))
       (sym *runtime-dlhandle*))))
