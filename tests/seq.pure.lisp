@@ -1007,3 +1007,23 @@
               ((simple-string 10) x))
      (coerce x 'list))
    cons))
+
+(with-test (:name :position-if-nil)
+  (assert-type
+   (lambda (f)
+     (position-if f nil))
+   null)
+  (assert-type
+   (lambda (f)
+     (declare (optimize speed))
+     (position-if f nil))
+   null)
+  (assert-type
+   (lambda (f)
+     (find-if f nil))
+   null)
+  (assert-type
+   (lambda (f)
+     (declare (optimize speed))
+     (find-if f nil))
+   null))

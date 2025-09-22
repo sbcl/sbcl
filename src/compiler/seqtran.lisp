@@ -2196,35 +2196,37 @@
     (specifier-type `(or (integer ,min ,max) null))))
 
 (defun position-derive-type (item sequence start end key test test-not)
-  (multiple-value-bind (min max)
-      (index-into-sequence-derive-type sequence start end :inclusive nil)
-    (when (>= max min)
-      (let ((integer-range `(integer ,min ,max))
-            (definitely-foundp nil))
-        ;; Figure out whether this call will not return NIL.
-        ;; This could be smarter about the keywords args, but the primary intent
-        ;; is to avoid a style-warning about arithmetic in such forms such as
-        ;;  (1+ (position (the (member :x :y) item) #(:foo :bar :x :y))).
-        ;; In that example, a more exact bound could be determined too.
-        (cond ((or (not (constant-lvar-p sequence))
-                   start end key test test-not
-                   (not item)))
-              (t
-               (let ((const-seq (lvar-value sequence))
-                     (item-type (lvar-type item)))
-                 (when (and (or (vectorp const-seq) (proper-list-p const-seq))
-                            (member-type-p item-type))
-                   (setq definitely-foundp t) ; assume best case
-                   (block nil
-                     (mapc-member-type-members
-                      (lambda (possibility)
-                        (unless (find possibility const-seq)
-                          (setq definitely-foundp nil)
-                          (return)))
-                      item-type))))))
-        (specifier-type (if definitely-foundp
-                            integer-range
-                            `(or ,integer-range null)))))))
+  (if (eq (lvar-type sequence) (specifier-type 'null))
+      (specifier-type 'null)
+      (multiple-value-bind (min max)
+          (index-into-sequence-derive-type sequence start end :inclusive nil)
+        (when (>= max min)
+          (let ((integer-range `(integer ,min ,max))
+                (definitely-foundp nil))
+            ;; Figure out whether this call will not return NIL.
+            ;; This could be smarter about the keywords args, but the primary intent
+            ;; is to avoid a style-warning about arithmetic in such forms such as
+            ;;  (1+ (position (the (member :x :y) item) #(:foo :bar :x :y))).
+            ;; In that example, a more exact bound could be determined too.
+            (cond ((or (not (constant-lvar-p sequence))
+                       start end key test test-not
+                       (not item)))
+                  (t
+                   (let ((const-seq (lvar-value sequence))
+                         (item-type (lvar-type item)))
+                     (when (and (or (vectorp const-seq) (proper-list-p const-seq))
+                                (member-type-p item-type))
+                       (setq definitely-foundp t) ; assume best case
+                       (block nil
+                         (mapc-member-type-members
+                          (lambda (possibility)
+                            (unless (find possibility const-seq)
+                              (setq definitely-foundp nil)
+                              (return)))
+                          item-type))))))
+            (specifier-type (if definitely-foundp
+                                integer-range
+                                `(or ,integer-range null))))))))
 
 (defun equal-type (type)
   (let ((result type))
@@ -2264,42 +2266,44 @@
 
 (defun find-derive-type (item sequence key test start end from-end &optional test-not)
   (declare (ignore start end from-end))
-  (let ((type *universal-type*)
-        (key-identity-p (or (not key)
-                            (lvar-value-is key nil)
-                            (lvar-fun-is key '(identity)))))
-    (flet ((fun-accepts-type (fun-lvar argument)
-             (when fun-lvar
-               (let ((fun-type (lvar-fun-type fun-lvar t t)))
-                 (when (fun-type-p fun-type)
-                   (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
-                     (when arg
-                       (setf type
-                             (type-intersection type arg)))))))))
-      (when (and item
-                 key-identity-p
-                 (not test-not))
-        ;; Maybe FIND returns ITEM itself or a comparable type
-        (cond ((or (not test)
-                   (lvar-fun-is test '(eq eql char=))
-                   (lvar-value-is test nil))
-               (setf type (lvar-type item)))
-              ((lvar-fun-is test '(equal))
-               (setf type (equal-type (lvar-type item))))
-              ((lvar-fun-is test '(equalp char-equal))
-               (setf type (equalp-type (lvar-type item))))))
-      ;; Should return something the functions can accept
-      (if key-identity-p
-          (unless (and test-not test)
-            (fun-accepts-type (or test-not test) (if item 1 0))) ;; the -if variants.
-          (fun-accepts-type key 0)))
-    (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
-      (unless (eq upgraded-type *wild-type*)
-        (setf type
-              (type-intersection type upgraded-type))))
-    (unless (eq type *empty-type*)
-      (type-union type
-                  (specifier-type 'null)))))
+  (if (eq (lvar-type sequence) (specifier-type 'null))
+      (specifier-type 'null)
+      (let ((type *universal-type*)
+            (key-identity-p (or (not key)
+                                (lvar-value-is key nil)
+                                (lvar-fun-is key '(identity)))))
+        (flet ((fun-accepts-type (fun-lvar argument)
+                 (when fun-lvar
+                   (let ((fun-type (lvar-fun-type fun-lvar t t)))
+                     (when (fun-type-p fun-type)
+                       (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
+                         (when arg
+                           (setf type
+                                 (type-intersection type arg)))))))))
+          (when (and item
+                     key-identity-p
+                     (not test-not))
+            ;; Maybe FIND returns ITEM itself or a comparable type
+            (cond ((or (not test)
+                       (lvar-fun-is test '(eq eql char=))
+                       (lvar-value-is test nil))
+                   (setf type (lvar-type item)))
+                  ((lvar-fun-is test '(equal))
+                   (setf type (equal-type (lvar-type item))))
+                  ((lvar-fun-is test '(equalp char-equal))
+                   (setf type (equalp-type (lvar-type item))))))
+          ;; Should return something the functions can accept
+          (if key-identity-p
+              (unless (and test-not test)
+                (fun-accepts-type (or test-not test) (if item 1 0))) ;; the -if variants.
+              (fun-accepts-type key 0)))
+        (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
+          (unless (eq upgraded-type *wild-type*)
+            (setf type
+                  (type-intersection type upgraded-type))))
+        (unless (eq type *empty-type*)
+          (type-union type
+                      (specifier-type 'null))))))
 
 (defoptimizer (find derive-type) ((item sequence &key key test test-not
                                         start end from-end))
@@ -2869,8 +2873,10 @@
                                    :node node
                                    :policy (> speed space))
                 "expand inline"
-                (%find/position-if-list-expansion ',condition sequence
-                                                  from-end start end node))))
+                (if (eq (lvar-type sequence) (specifier-type 'null))
+                    (give-up-ir1-transform)
+                    (%find/position-if-list-expansion ',condition sequence
+                                                      from-end start end node)))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
 
