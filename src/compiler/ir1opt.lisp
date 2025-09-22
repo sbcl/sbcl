@@ -400,6 +400,7 @@
       (let ((cast (insert-cast-before dest lvar type policy
                                       context)))
         (use-lvar cast internal-lvar)
+        (maybe-terminate-block cast nil)
         cast))))
 
 (defun assert-node-type (node type policy &optional context not-asserted)
