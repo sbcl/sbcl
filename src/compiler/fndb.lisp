@@ -2161,11 +2161,11 @@
 (defknown %find-position
     (t sequence t index sequence-end (function (t)) (function (t t)))
   (values t (or index null))
-  (flushable call no-verify-arg-count))
+  (flushable foldable call no-verify-arg-count))
 (defknown (%find-position-if %find-position-if-not)
   (function sequence t index sequence-end function)
   (values t (or index null))
-  (call no-verify-arg-count))
+  (foldable flushable call no-verify-arg-count))
 (defknown effective-find-position-test (function-designator function-designator)
   function
   (flushable foldable))
