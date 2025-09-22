@@ -632,7 +632,7 @@
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest (read-only proper-sequence)) consed-sequence
-  (foldable-read-only)
+  (foldable-read-only mv-deriver)
   :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown %concatenate-to-string (&rest (read-only sequence)) simple-string
@@ -666,7 +666,10 @@
                                                     (rest-args :sequence t))
                                                    (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
-    consed-sequence (call foldable-read-only))
+    consed-sequence
+    (call foldable-read-only mv-deriver)
+  :derive-type (creation-result-type-specifier-nth-arg 0 t))
+
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence
   (call no-verify-arg-count foldable-read-only))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
@@ -681,7 +684,7 @@
                                          (nth-arg 0 :sequence t))
                     &rest proper-sequence)
   sequence
-  (call)
+  (call mv-deriver)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t))
 
@@ -734,7 +737,7 @@
 
 (defknown replace ((modifying sequence) (read-only proper-sequence) &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
-  sequence ()
+  sequence (mv-deriver)
   :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t)
   :result-arg 0)
@@ -748,7 +751,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
-  (flushable call)
+  (flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown substitute
@@ -760,7 +763,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
-  (flushable call)
+  (flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (remove-if remove-if-not)
@@ -771,7 +774,7 @@
    (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
-  (flushable call)
+  (flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown (substitute-if substitute-if-not)
@@ -782,7 +785,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
-  (flushable call)
+  (flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown delete
@@ -793,7 +796,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
-  (call important-result)
+  (call important-result mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown nsubstitute
@@ -804,7 +807,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
-  (call)
+  (call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (delete-if delete-if-not)
@@ -813,7 +816,7 @@
    (:end sequence-end) (:count sequence-count)
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
-  (call important-result)
+  (call important-result mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
@@ -822,7 +825,7 @@
      (:end sequence-end) (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
-  (call)
+  (call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown remove-duplicates
@@ -836,7 +839,7 @@
             (:from-end t)
             (:key (function-designator ((nth-arg 0 :sequence t)))))
   consed-sequence
-  (flushable call)
+  (flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 0))
 
 (defknown delete-duplicates
@@ -850,7 +853,7 @@
    (:from-end t) (:end sequence-end)
    (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
-  (call important-result)
+  (call important-result mv-deriver)
   :derive-type (sequence-result-nth-arg 0))
 
 (defknown find
@@ -1339,7 +1342,7 @@
 
 (defknown vector (&rest t) simple-vector (flushable foldable-read-only))
 
-(defknown aref (array &rest index) t (foldable)
+(defknown aref (array &rest index) t (foldable mv-deriver)
   :call-type-deriver #'array-call-type-deriver)
 (defknown row-major-aref (array index) t (foldable)
   :call-type-deriver (lambda (call trusted)
@@ -1724,7 +1727,7 @@
 (defknown format ((or (member nil t) stream string)
                   (or string function) &rest t)
   (or string null)
-    ())
+    (mv-deriver))
 (defknown sb-format::format-error* (string list &rest t &key &allow-other-keys)
     nil)
 (defknown sb-format:format-error (string &rest t) nil)

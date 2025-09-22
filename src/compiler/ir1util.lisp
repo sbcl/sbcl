@@ -3660,13 +3660,13 @@ is :ANY, the function name is not checked."
         (nthcdr (+ first 2) path))))
 
 (defun combination-derive-type-for-arg-types (combination types)
-  (let* ((info (combination-fun-info combination))
+  (let* ((info (basic-combination-fun-info combination))
          (deriver (and info
                        (fun-info-derive-type info))))
     (when deriver
       (handler-bind ((warning #'muffle-warning))
         (let ((mock (copy-structure combination)))
-          (setf (combination-args mock)
+          (setf (basic-combination-args mock)
                 (loop for type in types
                       collect (if (lvar-p type)
                                   type

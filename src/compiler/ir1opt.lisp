@@ -2625,15 +2625,36 @@
                  (t
                   (propagate-let-args node lambda)))))
         (:full
-         (let* ((fun-changed (lvar-reoptimize fun)))
-           (loop for arg in (basic-combination-args node)
+         (let* ((fun-changed (lvar-reoptimize fun))
+                (name (lvar-fun-name fun))
+                (args (basic-combination-args node)))
+           (loop for arg in args
                  do
                  (setf (lvar-reoptimize arg) nil))
            (when fun-changed
              (setf (lvar-reoptimize fun) nil)
-             (let ((type (lvar-fun-type fun t t)))
-               (when (fun-type-p type)
-                 (derive-node-type node (fun-type-returns type))))
+             (let ((info (info :function :info name)))
+               (let ((type (lvar-fun-type fun t t)))
+                 (when (fun-type-p type)
+                   (derive-node-type node (fun-type-returns type))))
+               (when (and info
+                          (ir1-attributep (fun-info-attributes info) mv-deriver))
+                 (let* (unknown
+                        (known-types
+                          (loop for arg in args
+                                append
+                                (multiple-value-bind (types count) (values-types (lvar-derived-type arg))
+                                  (cond ((eq count :unknown)
+                                         (setf unknown t)
+                                         (load-time-value (list *universal-type*)))
+                                        (t
+                                         types)))
+                                until unknown)))
+                   (when known-types
+                     (setf (basic-combination-fun-info node) info)
+                     (let ((type (combination-derive-type-for-arg-types node known-types)))
+                       (when type
+                         (derive-node-type node type)))))))
              (maybe-terminate-block node nil)
              (let ((use (lvar-uses fun)))
                (when (and (ref-p use) (functional-p (ref-leaf use)))
@@ -2642,7 +2663,7 @@
                    (or (maybe-let-convert (ref-leaf use))
                        (maybe-convert-to-assignment (ref-leaf use)))))))
            (unless (or (eq (basic-combination-kind node) :local)
-                       (eq (lvar-fun-name fun) '%throw))
+                       (eq name '%throw))
              (ir1-optimize-mv-call node))))
         (:error))))
 

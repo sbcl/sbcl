@@ -4912,3 +4912,14 @@
     ((#'list) 2)
     (((lambda () (throw t 3))) 3)
     (((lambda () (throw t t))) (condition 'type-error))))
+
+(with-test (:name :apply-type-derivation)
+  (assert-type
+   (lambda (r)
+     (apply #'concatenate 'vector r))
+   simple-vector)
+  (assert-type
+   (lambda (a r)
+     (declare ((array double-float) a))
+     (apply #'aref a r))
+   double-float))

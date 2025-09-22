@@ -403,8 +403,7 @@
                                        preserve-vector-type
                                        string-designator)
   (lambda (call)
-    (declare (type combination call))
-    (let ((lvar (nth n (combination-args call))))
+    (let ((lvar (nth n (basic-combination-args call))))
       (when lvar
         (let* ((type (lvar-type lvar))
                (result type))
@@ -450,8 +449,8 @@
 ;;; Derive the type to be the type specifier which is the Nth arg.
 (defun result-type-specifier-nth-arg (n)
   (lambda (call)
-    (declare (type combination call))
-    (let ((lvar (nth n (combination-args call))))
+    (declare (type basic-combination call))
+    (let ((lvar (nth n (basic-combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (careful-specifier-type (lvar-value lvar))))))
 
@@ -466,10 +465,9 @@
 ;;;    => (SIMPLE-BIT-VECTOR 9)
 ;;; 2. Because we *know* that a hairy array won't be produced,
 ;;;    why does derivation preserve the non-simpleness, if so specified?
-(defun creation-result-type-specifier-nth-arg (n)
+(defun creation-result-type-specifier-nth-arg (n &optional nil-nil)
   (lambda (call)
-    (declare (type combination call))
-    (let ((lvar (nth n (combination-args call))))
+    (let ((lvar (nth n (basic-combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (let* ((specifier (lvar-value lvar))
                (lspecifier (if (atom specifier) (list specifier) specifier)))
@@ -486,6 +484,9 @@
                (declare (ignore simple-string))
                (careful-specifier-type
                 `(simple-array character ,@(if size (list size) '((*)))))))
+            ((and nil-nil
+                  (eq specifier 'nil))
+             (specifier-type 'null))
             (t
              (let ((ctype (careful-specifier-type specifier)))
                (cond ((not (array-type-p ctype))

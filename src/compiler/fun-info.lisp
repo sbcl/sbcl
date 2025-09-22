@@ -96,7 +96,9 @@
   fixed-args
   unboxed-return
   ;; Can be constant-folded if it's not retained or modified
-  foldable-read-only)
+  foldable-read-only
+  ;; The type deriver can be called on multiple value calls
+  mv-deriver)
 
 (defstruct (fun-info (:copier nil)
                      #-sb-xc-host (:pure t)
