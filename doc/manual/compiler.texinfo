@@ -720,19 +720,9 @@ variable in the loop body.
 @comment  node-name,  next,  previous,  up
 @subsection Implementation Limitations
 
-Ideally, the compiler would consider @emph{all} type declarations to
-be assertions, so that adding type declarations to a program, no
-matter how incorrect they might be, would @emph{never} cause undefined
-behavior. However, the compiler is known to fall short of this goal:
-
-@itemize
-
-@item
-@emph{Proclaimed} constraints on argument and result types of a
-function are supposed to be checked by the function. If the function
-type is proclaimed before function definition, type checks are
-inserted by the compiler, but the standard allows the reversed order,
-in which case the compiler will trust the declaration.
+If an FTYPE is placed after the function definition the function won't
+perform any type checks, and the calls to the function will blindly
+trust the declared types.
 @code{(optimize (debug 3))} will not trust any FTYPE declarations.
 
 @node Compiler Policy
