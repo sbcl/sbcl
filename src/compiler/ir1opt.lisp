@@ -1303,27 +1303,25 @@
 ;;;
 ;;; Why do we need to consider LVAR type? -- APD, 2003-07-30
 (defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
-  (declare (type (or basic-combination cast ref) node))
-  (let* ((block (node-block node))
-         (lvar (node-lvar node))
-         (ctran (node-next node))
-         (tail (component-tail (block-component block)))
-         (succ (first (block-succ block))))
-    (declare (ignore lvar))
-    (unless (or (and (eq node (block-last block)) (eq succ tail))
-                (block-delete-p block)
-                (node-tail-p node)
-                ;; Even if the combination will never return, don't
-                ;; terminate if this is the tail call of a XEP: doing
-                ;; that would inhibit TCO.
-                (xep-tail-combination-p node)
-                ;; Do not consider the block for termination if this
-                ;; is a LET-like combination, since the successor of
-                ;; this node is the body of the LET.
-                (and (combination-p node)
-                     (eq (combination-kind node) :local)
-                     (functional-somewhat-letlike-p (combination-lambda node))))
-      (when (eq (node-derived-type node) *empty-type*)
+  (declare (type node node))
+  (when (eq (node-derived-type node) *empty-type*)
+    (let* ((block (node-block node))
+           (ctran (node-next node))
+           (tail (component-tail (block-component block)))
+           (succ (first (block-succ block))))
+      (unless (or (and (eq node (block-last block)) (eq succ tail))
+                  (block-delete-p block)
+                  (node-tail-p node)
+                  ;; Even if the combination will never return, don't
+                  ;; terminate if this is the tail call of a XEP: doing
+                  ;; that would inhibit TCO.
+                  (xep-tail-combination-p node)
+                  ;; Do not consider the block for termination if this
+                  ;; is a LET-like combination, since the successor of
+                  ;; this node is the body of the LET.
+                  (and (combination-p node)
+                       (eq (combination-kind node) :local)
+                       (functional-somewhat-letlike-p (combination-lambda node))))
         (cond (ir1-converting-not-optimizing-p
                (cond
                  ((block-last block)
