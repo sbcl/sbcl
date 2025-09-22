@@ -995,3 +995,13 @@
      (declare (word x))
      (sb-bignum:%bignum-length x))
    (integer 1 2)))
+
+(with-test (:name :minus-eql-to-eq-reduction)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a c)
+         (declare (integer c))
+         (when (integerp a)
+           (eql (- a c) 0)))
+      (((eval '(expt 2 64)) (eval '(expt 2 64))) t)
+      ((1 2) nil)))

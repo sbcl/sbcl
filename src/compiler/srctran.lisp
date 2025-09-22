@@ -6194,7 +6194,7 @@
      (give-up-ir1-transform))))
 
 ;;; (< (+/- x cosntant1) constant2)
-(make-defs (($fun < > eql eq))
+(make-defs (($fun < > eql))
   (deftransform $fun ((x y) (rational (constant-arg rational)) * :important nil)
     (or (combination-case x
           ((- +) (* constant)
@@ -6253,7 +6253,7 @@
                (<= high (1- (expt 2 (1- sb-vm:n-word-bits)))))))))
 
 ;;; (< (+ x c1) (+ y c2)) -> (< x (+ y (- c2 c1)))
-(make-defs (($fun < > eql eq))
+(make-defs (($fun < > eql))
   (deftransform $fun ((x y) (rational rational) * :important nil)
     (let (c1
           sub-c1
