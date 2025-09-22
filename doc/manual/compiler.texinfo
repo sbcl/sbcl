@@ -734,6 +734,7 @@ type is proclaimed before function definition, type checks are
 inserted by the compiler, but the standard allows the reversed order,
 in which case the compiler will trust the declaration.
 @code{(optimize (debug 3))} will not trust any FTYPE declarations.
+@end itemize
 
 @node Compiler Policy
 @comment  node-name,  next,  previous,  up
