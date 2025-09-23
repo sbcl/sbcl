@@ -925,14 +925,17 @@
              (make-two-way-stream (sb-sys:make-fd-stream i :input t :buffering :none :element-type '(unsigned-byte 8))
                                   (sb-sys:make-fd-stream o :output t :buffering :none :element-type '(unsigned-byte 8))))))
     (let ((pipe (make-non-blocking-pipe))
-          (buf (make-array 1 :element-type '(unsigned-byte 8))))
+          (buf (make-array 1 :element-type '(unsigned-byte 8)))
+          (pipe-buffer-length 0))
       (unwind-protect
            (progn
              ;; Fill the pipe buffer
-             (loop while (sb-unix:unix-write (sb-sys:fd-stream-fd (two-way-stream-output-stream pipe)) buf 0 1))
+             (loop while (sb-unix:unix-write (sb-sys:fd-stream-fd (two-way-stream-output-stream pipe)) buf 0 1)
+                   do
+                   (incf pipe-buffer-length))
              (write-sequence (coerce #(1 2 3 4) '(vector (unsigned-byte 8))) pipe)
-             (let ((in (make-array 65536 :element-type '(unsigned-byte 8)
-                                         :initial-element 255)))
+             (let ((in (make-array pipe-buffer-length :element-type '(unsigned-byte 8)
+                                                      :initial-element 255)))
                (read-sequence in pipe)
                (assert (every #'zerop in)))
              (write-sequence (make-array 4 :element-type '(unsigned-byte 8) :initial-element 0) pipe)
