@@ -7173,7 +7173,7 @@
 ;;; We disable this transform in the cross-compiler to save memory in
 ;;; the target image; most of the uses of FORMAT in the compiler are for
 ;;; error messages, and those don't need to be particularly fast.
-#+sb-xc
+#-sb-xc-host
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
                       :policy (>= speed space))
   (unless (constant-lvar-p control)
@@ -7203,20 +7203,20 @@
        (declare (ignore control))
        (format dest ,expr ,@arg-names))))
 
-(deftransform format ((stream control &rest args) (stream function &rest t))
+(deftransform format ((stream control &rest args) (stream function &rest t) * :important nil)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (stream control ,@arg-names)
        (funcall control stream ,@arg-names)
        nil)))
 
-(deftransform format ((tee control &rest args) ((member t) function &rest t))
+(deftransform format ((tee control &rest args) ((member t) function &rest t) * :important nil)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (tee control ,@arg-names)
        (declare (ignore tee))
        (funcall control *standard-output* ,@arg-names)
        nil)))
 
-(deftransform format ((stream control &rest args) (null function &rest t))
+(deftransform format ((stream control &rest args) (null function &rest t) * :important nil)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (stream control ,@arg-names)
        (declare (ignore stream))
@@ -7234,7 +7234,7 @@
                        (pop args)))))
    (null args)))
 
-(deftransform format ((stream control &rest args) (null (constant-arg string) &rest t))
+(deftransform format ((stream control &rest args) (null (constant-arg string) &rest t) * :important nil)
   (let ((tokenized
           (handler-case
               (sb-format::tokenize-control-string (coerce (lvar-value control) 'simple-string))
