@@ -262,6 +262,8 @@
 (define-vop (signed-byte-64-p-move-to-word signed-byte-64-p)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
+  (:info target not-p move)
+  (:ignore move)
   (:translate)
   (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
@@ -426,6 +428,8 @@
 (define-vop (unsigned-byte-64-p-move-to-word unsigned-byte-64-p)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
+  (:info target not-p move)
+  (:ignore move)
   (:translate)
   (:generator 10
     (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
@@ -492,7 +496,8 @@
   ;; depends on their storage class.
   (:results (rs :scs (signed-reg))
             (ru :scs (unsigned-reg)))
-  (:info target not-p target-unsigned not-p-unsigned unsigned-fall-through)
+  (:info target not-p target-unsigned not-p-unsigned unsigned-fall-through move1 move2)
+  (:ignore move1 move2)
   (:result-types signed-num unsigned-num)
   (:translate)
   (:generator 10

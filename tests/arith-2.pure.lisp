@@ -1005,3 +1005,17 @@
            (eql (- a c) 0)))
       (((eval '(expt 2 64)) (eval '(expt 2 64))) t)
       ((1 2) nil)))
+
+(with-test (:name :unsigned-byte-64-p-move-to-word)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a m)
+      (if (typep a '(unsigned-byte 64))
+          (let ((j a))
+            (declare ((unsigned-byte 64) j))
+            (loop repeat 2
+                  sum
+                  (+ (funcall m (logand j #xFFFFFF))
+                     (funcall m (logand j #xFFFFFF)))))))
+   ((1234 #'+) 4936)
+   ((3 #'-) -12)))

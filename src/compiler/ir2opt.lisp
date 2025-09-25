@@ -1168,62 +1168,100 @@
           (setf (ir2-block-%label next) (gen-label))))))
 
 
-(flet ((opt (vop new-vop &optional not-vop)
-         (multiple-value-bind (dest branch-if) (branch-destination vop)
-           (vop-bind (in) () vop
-             (when (and dest
-                        (singleton-p (ir2block-predecessors (vop-block dest)))
-                        (eq (vop-name dest) 'sb-vm::move-to-word/integer))
-               (vop-bind (in2) () dest
-                 (when (eq in in2)
-                   (cond ((and (vop-existsp :named sb-vm::un/signed-byte-64-p-move-to-word)
-                               (let ((vop2 (branch-destination vop nil)))
-                                 (and vop2
-                                      (eq (vop-name vop2) not-vop)
-                                      (singleton-p (ir2block-predecessors (vop-block dest)))
-                                      (let ((dest2 (branch-destination vop2)))
-                                        (when (and dest2
-                                                   (singleton-p (ir2block-predecessors (vop-block dest2)))
-                                                   (eq (vop-name dest2) 'sb-vm::move-to-word/integer))
-                                          (vop-bind (in21) () vop2
-                                            (vop-bind (in22) () dest2
-                                              (when (and (eq in21 in)
-                                                         (eq in22 in))
-                                                (emit-and-insert-vop
-                                                 (vop-node vop) (vop-block vop)
-                                                 (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
-                                                 (reference-tn-refs (vop-args vop) nil)
-                                                 (reference-tn-ref-list (list (vop-results dest)
-                                                                              (vop-results dest2))
-                                                                        t)
-                                                 vop
-                                                 (append (vop-codegen-info vop)
-                                                         (vop-codegen-info vop2)
-                                                         (list (vop-label (branch-destination vop2 nil)))))
-                                                (delete-vop vop)
-                                                (delete-vop vop2)
-                                                (delete-vop dest)
-                                                (delete-vop dest2)
-                                                t)))))))))
-                         (t
-                          (emit-and-insert-vop
-                           (vop-node vop) (vop-block vop)
-                           (template-or-lose new-vop)
-                           (reference-tn-refs (vop-args vop) nil)
-                           (reference-tn-refs (vop-results dest) t)
-                           vop (vop-codegen-info (or branch-if vop)))
-                          (delete-vop vop)
-                          (when branch-if
-                            (delete-vop branch-if))
-                          (delete-vop dest))))))))
-         nil))
+(labels ((make-mov-vop (vop)
+           (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                (template-or-lose 'sb-vm::word-move)
+                                (reference-tn-refs (vop-results vop) nil)
+                                (reference-tn-refs (vop-results vop) t)
+                                vop))
+         (opt (vop new-vop &optional not-vop)
+           (multiple-value-bind (dest branch-if) (branch-destination vop)
+             (vop-bind (in) () vop
+               (when (and dest
+                          (singleton-p (ir2block-predecessors (vop-block dest)))
+                          (eq (vop-name dest) 'sb-vm::move-to-word/integer))
+                 (vop-bind (in2) () dest
+                   (when (eq in in2)
+                     (cond ((and (vop-existsp :named sb-vm::un/signed-byte-64-p-move-to-word)
+                                 (let ((vop2 (branch-destination vop nil)))
+                                   (and vop2
+                                        (eq (vop-name vop2) not-vop)
+                                        (singleton-p (ir2block-predecessors (vop-block dest)))
+                                        (let ((dest2 (branch-destination vop2)))
+                                          (when (and dest2
+                                                     (singleton-p (ir2block-predecessors (vop-block dest2)))
+                                                     (eq (vop-name dest2) 'sb-vm::move-to-word/integer))
+                                            (vop-bind (in21) () vop2
+                                              (vop-bind (in22) () dest2
+                                                (when (and (eq in21 in)
+                                                           (eq in22 in))
+                                                  (let ((move1 (make-mov-vop dest))
+                                                        (move2 (make-mov-vop dest2)))
+                                                    (emit-and-insert-vop
+                                                     (vop-node vop) (vop-block vop)
+                                                     (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
+                                                     (reference-tn-refs (vop-args vop) nil)
+                                                     (reference-tn-ref-list (list (vop-results dest)
+                                                                                  (vop-results dest2))
+                                                                            t)
+                                                     vop
+                                                     (append (vop-codegen-info vop)
+                                                             (vop-codegen-info vop2)
+                                                             (list (vop-label (branch-destination vop2 nil))
+                                                                   move1 move2))))
+                                                  (delete-vop vop)
+                                                  (delete-vop vop2)
+                                                  (delete-vop dest)
+                                                  (delete-vop dest2)
+                                                  t)))))))))
+                           (t
+                            (let ((move (make-mov-vop dest)))
+                              (emit-and-insert-vop
+                               (vop-node vop) (vop-block vop)
+                               (template-or-lose new-vop)
+                               (reference-tn-refs (vop-args vop) nil)
+                               (reference-tn-refs (vop-results dest) t)
+                               vop (append (vop-codegen-info (or branch-if vop)) (list move)))
+                              (delete-vop vop)
+                              (when branch-if
+                                (delete-vop branch-if))
+
+                              (delete-vop dest)))))))))
+           nil)
+         (remove-stack-results* (res arg)
+           (let ((load-tn (tn-ref-load-tn res)))
+             (when load-tn
+               (aver (eq (tn-ref-tn res)
+                         (tn-ref-tn arg)))
+               (change-tn-ref-tn res load-tn)
+               (change-tn-ref-tn arg load-tn)
+               (setf (tn-ref-load-tn res) nil
+                     (tn-ref-load-tn arg) nil))))
+         (remove-stack-results (vop)
+           (let* ((move (car (last (vop-codegen-info vop)))))
+             (remove-stack-results* (vop-results vop) (vop-args move)))))
+
   (when-vop-existsp (:named sb-vm::signed-byte-64-p-move-to-word)
-   (defoptimizer (vop-optimize signed-byte-64-p select-representations) (vop)
-     (opt vop 'sb-vm::signed-byte-64-p-move-to-word
-          'unsigned-byte-64-p)))
+    (defoptimizer (vop-optimize signed-byte-64-p select-representations) (vop)
+      (opt vop 'sb-vm::signed-byte-64-p-move-to-word
+           'unsigned-byte-64-p))
+    (defoptimizer (vop-optimize sb-vm::signed-byte-64-p-move-to-word regalloc) (vop)
+      (remove-stack-results vop)))
+
   (when-vop-existsp (:named sb-vm::unsigned-byte-64-p-move-to-word)
-   (defoptimizer (vop-optimize unsigned-byte-64-p select-representations) (vop)
-     (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))))
+    (defoptimizer (vop-optimize unsigned-byte-64-p select-representations) (vop)
+      (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))
+
+    (defoptimizer (vop-optimize sb-vm::unsigned-byte-64-p-move-to-word regalloc) (vop)
+      (remove-stack-results vop)))
+
+  (when-vop-existsp (:named sb-vm::un/signed-byte-64-p-move-to-word)
+    (defoptimizer (vop-optimize sb-vm::un/signed-byte-64-p-move-to-word regalloc) (vop)
+      (destructuring-bind (move1 move2) (last (vop-codegen-info vop) 2)
+        (let* ((res1 (vop-results vop))
+               (res2 (tn-ref-across res1)))
+          (remove-stack-results* res1 (vop-args move1))
+          (remove-stack-results* res2 (vop-args move2)))))))
 
 (when-vop-existsp (:named sb-vm::rebind)
   (defoptimizer (vop-optimize fast-symbol-value) (vop)
