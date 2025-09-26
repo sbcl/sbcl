@@ -354,8 +354,7 @@
 (define-vop (signed-byte-64-p-move-to-word type-predicate)
   (:args (value :scs (any-reg descriptor-reg) :to :save))
   (:arg-refs value-ref)
-  (:info target not-p flags move)
-  (:ignore move)
+  (:info target not-p flags)
   (:results (r :scs (unsigned-reg signed-reg)))
   (:result-types signed-num)
   (:translate)
@@ -507,8 +506,6 @@
 (define-vop (unsigned-byte-64-p-move-to-word type-predicate)
   (:results (r :scs (signed-reg unsigned-reg) :from :load))
   (:result-types unsigned-num)
-  (:info target not-p move)
-  (:ignore move)
   (:generator 10
     (let* ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
            (not-signed-byte-64-p (not (types-equal-or-intersect (tn-ref-type args) (specifier-type 'signed-word))))

@@ -1168,19 +1168,23 @@
           (setf (ir2-block-%label next) (gen-label))))))
 
 #+nil ; FIXME: disabled for sbcl-2.5.9 release from lack of testing time.  re-enable early in 2.5.9.x
-(labels ((make-mov-vop (vop)
-           (emit-and-insert-vop (vop-node vop) (vop-block vop)
-                                (template-or-lose 'sb-vm::word-move)
-                                (reference-tn-refs (vop-results vop) nil)
-                                (reference-tn-refs (vop-results vop) t)
-                                vop))
+(labels ((make-mov-vop (tn vop)
+           ;; Ensure that the result won't go to a stack tn
+           (let ((new-tn (make-restricted-tn (tn-primitive-type tn)
+                                             (sc-number (tn-sc tn)) (tn-type tn))))
+             (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                  (template-or-lose 'sb-vm::word-move)
+                                  (reference-tn new-tn nil)
+                                  (reference-tn tn t)
+                                  vop)
+             new-tn))
          (opt (vop new-vop &optional not-vop)
            (multiple-value-bind (dest branch-if) (branch-destination vop)
              (vop-bind (in) () vop
                (when (and dest
                           (singleton-p (ir2block-predecessors (vop-block dest)))
                           (eq (vop-name dest) 'sb-vm::move-to-word/integer))
-                 (vop-bind (in2) () dest
+                 (vop-bind (in2) (out2) dest
                    (when (eq in in2)
                      (cond ((and (vop-existsp :named sb-vm::un/signed-byte-64-p-move-to-word)
                                  (let ((vop2 (branch-destination vop nil)))
@@ -1192,76 +1196,47 @@
                                                      (singleton-p (ir2block-predecessors (vop-block dest2)))
                                                      (eq (vop-name dest2) 'sb-vm::move-to-word/integer))
                                             (vop-bind (in21) () vop2
-                                              (vop-bind (in22) () dest2
+                                              (vop-bind (in22) (out22) dest2
                                                 (when (and (eq in21 in)
                                                            (eq in22 in))
-                                                  (let ((move1 (make-mov-vop dest))
-                                                        (move2 (make-mov-vop dest2)))
+                                                  (let ((dest-tn1 (make-mov-vop out2 dest))
+                                                        (dest-tn2 (make-mov-vop out22 dest2)))
                                                     (emit-and-insert-vop
                                                      (vop-node vop) (vop-block vop)
                                                      (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
                                                      (reference-tn-refs (vop-args vop) nil)
-                                                     (reference-tn-ref-list (list (vop-results dest)
-                                                                                  (vop-results dest2))
+                                                     (reference-tn-ref-list (list dest-tn1 dest-tn2)
                                                                             t)
                                                      vop
                                                      (append (vop-codegen-info vop)
                                                              (vop-codegen-info vop2)
-                                                             (list (vop-label (branch-destination vop2 nil))
-                                                                   move1 move2))))
+                                                             (list (vop-label (branch-destination vop2 nil))))))
                                                   (delete-vop vop)
                                                   (delete-vop vop2)
                                                   (delete-vop dest)
                                                   (delete-vop dest2)
                                                   t)))))))))
                            (t
-                            (let ((move (make-mov-vop dest)))
+                            (let ((dest-tn (make-mov-vop out2 dest)))
                               (emit-and-insert-vop
                                (vop-node vop) (vop-block vop)
                                (template-or-lose new-vop)
                                (reference-tn-refs (vop-args vop) nil)
-                               (reference-tn-refs (vop-results dest) t)
-                               vop (append (vop-codegen-info (or branch-if vop)) (list move)))
+                               (reference-tn dest-tn t)
+                               vop (vop-codegen-info (or branch-if vop)))
                               (delete-vop vop)
                               (when branch-if
                                 (delete-vop branch-if))
-
                               (delete-vop dest)))))))))
-           nil)
-         (remove-stack-results* (res arg)
-           (let ((load-tn (tn-ref-load-tn res)))
-             (when load-tn
-               (aver (eq (tn-ref-tn res)
-                         (tn-ref-tn arg)))
-               (change-tn-ref-tn res load-tn)
-               (change-tn-ref-tn arg load-tn)
-               (setf (tn-ref-load-tn res) nil
-                     (tn-ref-load-tn arg) nil))))
-         (remove-stack-results (vop)
-           (let* ((move (car (last (vop-codegen-info vop)))))
-             (remove-stack-results* (vop-results vop) (vop-args move)))))
+           nil))
 
   (when-vop-existsp (:named sb-vm::signed-byte-64-p-move-to-word)
     (defoptimizer (vop-optimize signed-byte-64-p select-representations) (vop)
       (opt vop 'sb-vm::signed-byte-64-p-move-to-word
-           'unsigned-byte-64-p))
-    (defoptimizer (vop-optimize sb-vm::signed-byte-64-p-move-to-word regalloc) (vop)
-      (remove-stack-results vop)))
-
+           'unsigned-byte-64-p)))
   (when-vop-existsp (:named sb-vm::unsigned-byte-64-p-move-to-word)
     (defoptimizer (vop-optimize unsigned-byte-64-p select-representations) (vop)
-      (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))
-
-    (defoptimizer (vop-optimize sb-vm::unsigned-byte-64-p-move-to-word regalloc) (vop)
-      (remove-stack-results vop)))
-
-  (when-vop-existsp (:named sb-vm::un/signed-byte-64-p-move-to-word)
-    (defoptimizer (vop-optimize sb-vm::un/signed-byte-64-p-move-to-word regalloc) (vop)
-      (destructuring-bind (move1 move2) (last (vop-codegen-info vop) 2)
-        (let* ((res1 (vop-results vop))
-               (res2 (tn-ref-across res1)))
-          (remove-stack-results* res1 (vop-args move1))
-          (remove-stack-results* res2 (vop-args move2)))))))
+      (opt vop 'sb-vm::unsigned-byte-64-p-move-to-word))))
 
 (when-vop-existsp (:named sb-vm::rebind)
   (defoptimizer (vop-optimize fast-symbol-value) (vop)
