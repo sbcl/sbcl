@@ -3,13 +3,13 @@
 changes relative to sbcl-2.5.8:
   * minor incompatible change: remove (SETF SB-EXT:POSIX-GETENV), which only
     ever existed as an operator in SBCL on Windows.
-  * minor incompatible change: (LOG -0.0) now returns -0.0, somewhat more
-    consistenly with SQRT.
+  * minor incompatible change: (LOG -0.0) now returns
+    SINGLE-FLOAT-NEGATIVE-INFINITY, more consistently with IEEE 754.
   * minor incompatible change: (EXPT 0.0 0.0) now returns 1.0, rather than
     signalling an error.
   * platform support
     ** restore functionality on NetBSD.  (thanks to Masatoshi SANO)
-    ** fix building SBCL as a shaed library on ARM64.  (lp#2122059, reported
+    ** fix building SBCL as a shared library on ARM64.  (lp#2122059, reported
        by Guillaume LE VAILLANT)
   * optimization: TYPEP with array types does less work in many cases.
   * optimization: COMPLEMENT on a known function can be transformed away in
