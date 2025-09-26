@@ -1,5 +1,36 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.8:
+  * minor incompatible change: remove (SETF SB-EXT:POSIX-GETENV), which only
+    ever existed as an operator in SBCL on Windows.
+  * minor incompatible change: (LOG -0.0) now returns -0.0, somewhat more
+    consistenly with SQRT.
+  * minor incompatible change: (EXPT 0.0 0.0) now returns 1.0, rather than
+    signalling an error.
+  * platform support
+    ** restore functionality on NetBSD.  (thanks to Masatoshi SANO)
+    ** fix building SBCL as a shaed library on ARM64.  (lp#2122059, reported
+       by Guillaume LE VAILLANT)
+  * optimization: TYPEP with array types does less work in many cases.
+  * optimization: COMPLEMENT on a known function can be transformed away in
+    more cases.
+  * optimization: calls to local functions with &REST arguments can be
+    optimized in more cases.
+  * optimization: bound checks can be eliminated in ROW-MAJOR-AREF based on
+    constraints relating the index to the available array elements.
+    (lp#2121253, thanks to Vasily Postnicov)
+  * optimization: function type declarations no longer inhibit inlining local
+    functions.  (lp#2121351, reported by kbhit)
+  * optimization: bulk movement of memory in the system is implemented with
+    less overhead around memmove().
+  * optimization: MAKE-ARRAY with dimensions coming from ARRAY-DIMENSIONS on
+    an array with known dimensions avoids consing an intermediate dimensions
+    list.
+  * optimization: a number of arithmetic operators and relations in
+    combination with some constant arguments do partial expression
+    simplification at compile-time.  (lp#2122063 for %NEGATE thanks to Vasily
+    Postnicov)
+
 changes in sbcl-2.5.8 relative to sbcl-2.5.7:
   * minor incompatible change: SB-THREAD:MAIN-THREAD-P can only be applied to
     threads, not arbitrary lisp objects.
@@ -38,7 +69,7 @@ changes in sbcl-2.5.7 relative to sbcl-2.5.6:
   * bug fix: internal compiler error in a failure of stack analysis during
     propagation of dynamic-extent.  (lp#2113935)
   * bug fix: address regression in type inference for TRUNCATE and other
-    division-related operators.  (lp#2115305, reported by Vasiliy Postnicov)
+    division-related operators.  (lp#2115305, reported by Vasily Postnicov)
   * bug fix: cleanup of the main thread is performed more carefully when SBCL
     is used as a shared library.  (lp#2115669, reported by Fedorov Alexander)
   * bug fix: the compiler does not lose track of the types of specialized
@@ -259,7 +290,7 @@ changes in sbcl-2.5.2 relative to sbcl-2.5.1:
     longer causes an internal compiler error.  (lp#2059950, reported by
     bohonghuang)
   * bug fix: treat inlined functions analogously to constants in the compiler.
-    (lp#2095560, reported by Vasiliy Postnicov)
+    (lp#2095560, reported by Vasily Postnicov)
   * bug fix: FTYPE declarations for &optional and &key arguments do not
     include default values when checking types.
   * bug fix: Storing coverage data no longer leads to miscompilations allowing
