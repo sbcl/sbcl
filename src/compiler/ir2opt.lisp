@@ -1204,8 +1204,7 @@
                                                      (vop-node vop) (vop-block vop)
                                                      (template-or-lose 'sb-vm::un/signed-byte-64-p-move-to-word)
                                                      (reference-tn-refs (vop-args vop) nil)
-                                                     (reference-tn-ref-list (list dest-tn1 dest-tn2)
-                                                                            t)
+                                                     (reference-tn-list (list dest-tn1 dest-tn2) t)
                                                      vop
                                                      (append (vop-codegen-info vop)
                                                              (vop-codegen-info vop2)
