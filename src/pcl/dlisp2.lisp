@@ -51,13 +51,13 @@
                 (2 (if class-slot-p
                        (emit-reader/writer-macro :boundp 2 t)
                        (emit-reader/writer-macro :boundp 2 nil)))))
-     (:writer (ecase 1-or-2-class
-                (1 (if class-slot-p
-                       (emit-reader/writer-macro :makunbound 1 t)
-                       (emit-reader/writer-macro :makunbound 1 nil)))
-                (2 (if class-slot-p
-                       (emit-reader/writer-macro :makunbound 2 t)
-                       (emit-reader/writer-macro :makunbound 2 nil))))))
+     (:makunbound (ecase 1-or-2-class
+                    (1 (if class-slot-p
+                           (emit-reader/writer-macro :makunbound 1 t)
+                           (emit-reader/writer-macro :makunbound 1 nil)))
+                    (2 (if class-slot-p
+                           (emit-reader/writer-macro :makunbound 2 t)
+                           (emit-reader/writer-macro :makunbound 2 nil))))))
    nil))
 
 (defun emit-one-or-n-index-reader/writer-function
