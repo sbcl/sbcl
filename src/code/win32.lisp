@@ -500,7 +500,7 @@ UNIX epoch: January 1st 1970."
              native-namestring 0 (addr file-attributes))))
 
 (defun native-probe-file-name (native-namestring)
-  "Return truename \(using GetLongPathName\) as primary value,
+  "Return truename \(using GetFullPathName and GetLongPathName\) as primary value,
 File kind as secondary.
 
 Unless kind is false, null truename shouldn't be interpreted as error or file
@@ -513,7 +513,11 @@ absense."
               (syscall (("GetLongPathName" t) dword
                         system-string long-pathname-buffer dword)
                        (and (plusp result) (decode-system-string buffer))
-                       native-namestring buffer 32768)
+                       (syscall (("GetFullPathName" t) dword
+                                 system-string dword long-pathname-buffer (* system-string))
+                                (and (plusp result) (decode-system-string buffer))
+                                native-namestring 32768 buffer nil)
+                       buffer 32768)
               (and result
                    (attribute-file-kind
                     (slot file-attributes 'attributes))))
