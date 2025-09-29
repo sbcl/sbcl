@@ -565,8 +565,7 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
 #define THREAD_STRUCT_SIZE \
   (THREAD_ALIGNMENT_BYTES + \
    thread_control_stack_size + BINDING_STACK_SIZE + ALIEN_STACK_SIZE + \
-   THREAD_CSP_PAGE_SIZE + \
-   (THREAD_HEADER_SLOTS*N_WORD_BYTES) + dynamic_values_bytes + \
+   THREAD_CSP_PAGE_SIZE + dynamic_values_bytes + \
    sizeof (struct extra_thread_data) + ALT_STACK_SIZE)
 
 /* this is called from any other thread to create the new one, and
@@ -597,7 +596,7 @@ void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
  *   (2) = binding stack start. size = BINDING_STACK_SIZE
  *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
  *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
- *   (5) = per_thread_data.     size = (THREAD_HEADER_SLOTS+TLS_SIZE) words
+ *   (5) = per_thread_data.     size = TLS_SIZE words
  *   (6) = arbitrarily-sized "extra" data and signal stack.
  *
  *   (0) and (1) may coincide; (4) and (5) may coincide
@@ -638,8 +637,7 @@ alloc_thread_struct(void* spaces) {
                      BINDING_STACK_SIZE + ALIEN_STACK_SIZE;
 
     // Refer to the ASCII art in the block comment above
-    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE
-                                + THREAD_HEADER_SLOTS*N_WORD_BYTES);
+    struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     // Out of caution I'm supposing that the last thread to use this memory

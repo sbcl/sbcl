@@ -859,7 +859,7 @@ handle_access_violation(os_context_t *ctx,
         return 0;
     }
 
-    if ((1+THREAD_HEADER_SLOTS)+(lispobj*)fault_address == (lispobj*)self) {
+    if (1+(lispobj*)fault_address == (lispobj*)self) {
         thread_in_safety_transition(ctx);
         return 0;
     }

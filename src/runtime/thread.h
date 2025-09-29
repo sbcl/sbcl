@@ -276,7 +276,7 @@ void thread_in_lisp_raised(os_context_t *ctx);
 void thread_interrupted(os_context_t *ctx);
 extern void thread_register_gc_trigger();
 
-#define csp_around_foreign_call(thread) *(((lispobj*)thread)-(1+THREAD_HEADER_SLOTS))
+#define csp_around_foreign_call(thread) *(((lispobj*)thread)-1)
 
 static inline
 void push_gcing_safety(struct gcing_safety *into)

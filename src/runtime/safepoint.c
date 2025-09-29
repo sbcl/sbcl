@@ -287,7 +287,7 @@ thread_blocks_gc(struct thread *thread)
 static inline bool
 set_thread_csp_access(struct thread* th, bool writable)
 {
-    os_protect((char*)th - (THREAD_HEADER_SLOTS*N_WORD_BYTES) - THREAD_CSP_PAGE_SIZE,
+    os_protect((char*)th - THREAD_CSP_PAGE_SIZE,
                THREAD_CSP_PAGE_SIZE,
                writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
                : (OS_VM_PROT_READ));
@@ -1070,7 +1070,7 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
         return 1;
     }
 
-    if ((1+THREAD_HEADER_SLOTS)+(lispobj*)fault_address == (lispobj*)self) {
+    if (1+(lispobj*)fault_address == (lispobj*)self) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         arrange_return_to_c_function(ctx, handle_csp_safepoint_violation, 0);
 #else

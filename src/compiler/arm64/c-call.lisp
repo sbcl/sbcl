@@ -225,7 +225,7 @@
     (load-foreign-symbol res foreign-symbol :dataref t)))
 
 #+sb-safepoint
-(defconstant thread-saved-csp-slot (- (1+ sb-vm::thread-header-slots)))
+(defconstant thread-saved-csp-slot -1)
 
 (defconstant-eqx +destroyed-c-registers+
   (loop for i from 0 to 18 collect i)

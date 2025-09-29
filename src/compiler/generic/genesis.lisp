@@ -3559,7 +3559,6 @@ static inline struct code* fun_code_header(struct simple_fun* fun) {
 
       (:language-agnostic
        (when (eq name 'sb-vm::thread)
-         (format t "~%#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
          (dovector (x sb-vm::+thread-header-slot-names+)
            (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
              (format t "#define ~a ~d~%" (c-name (string s)) (symbol-value s))))
