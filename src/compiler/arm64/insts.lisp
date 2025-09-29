@@ -3628,7 +3628,7 @@
   (def zip1 #b011)
   (def uzp2 #b101)
   (def trn2 #b110)
-  (def zip #b111))
+  (def zip2 #b111))
 
 
 ;;; Inline constants
