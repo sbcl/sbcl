@@ -1167,7 +1167,6 @@
       (or (ir2-block-%label next)
           (setf (ir2-block-%label next) (gen-label))))))
 
-#+nil ; FIXME: disabled for sbcl-2.5.9 release from lack of testing time.  re-enable early in 2.5.9.x
 (labels ((make-mov-vop (tn vop)
            ;; Ensure that the result won't go to a stack tn
            (let ((new-tn (make-restricted-tn (tn-primitive-type tn)
