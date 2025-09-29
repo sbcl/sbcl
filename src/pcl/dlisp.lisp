@@ -157,8 +157,16 @@
 
 ;;; FIXME: What do these variables mean?
 (defvar *precompiling-lap* nil)
+(defvar *emit-function-p* t)
+
+;;; Should PCL call compile at runtime to optimize cache functions?
+(defvar *optimize-cache-functions-p* t)
 
 (defun emit-default-only (metatypes applyp)
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-default-only
+        (emit-default-only-function metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
       (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp '(emf)
@@ -264,12 +272,23 @@
       (:makunbound `(progn (setf ,read-form +slot-unbound+) ,(car arglist)))
       (:writer `(setf ,read-form ,(car arglist))))))
 
+(defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
+  (let ((*emit-function-p* nil)
+        (*precompiling-lap* t))
+    (values
+     (emit-reader/writer reader/writer 1-or-2-class class-slot-p))))
+
 ;; If CACHED-INDEX-P is false, then the slot location is a constant and
 ;; the cache holds layouts eligible to use that index.
 ;; If true, then the cache is a map of layout -> index.
 (defun emit-one-or-n-index-reader/writer (reader/writer
                                           cached-index-p
                                           class-slot-p)
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-one-or-n-index-reader/writer
+        (emit-one-or-n-index-reader/writer-function
+         reader/writer cached-index-p class-slot-p))))
   (multiple-value-bind (arglist metatypes)
       (ecase reader/writer
         ((:reader :boundp :makunbound)
@@ -289,6 +308,14 @@
                     (when cached-index-p 'index)
                     (unless class-slot-p '(slots)))))))
 
+(defmacro emit-one-or-n-index-reader/writer-macro
+    (reader/writer cached-index-p class-slot-p)
+  (let ((*emit-function-p* nil)
+        (*precompiling-lap* t))
+    (values
+     (emit-one-or-n-index-reader/writer reader/writer cached-index-p
+                                        class-slot-p))))
+
 (defun emit-miss (miss-fn args applyp)
   (if applyp
       `(apply ,miss-fn ,@args .rest.)
@@ -303,6 +330,11 @@
 ;;  METATYPES must be acceptable to EMIT-FETCH-WRAPPER.
 ;;  APPLYP says whether there is a &MORE context.
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-checking-or-caching
+        (emit-checking-or-caching-function
+         cached-emf-p return-value-p metatypes applyp))))
   (multiple-value-bind (lambda-list args rest-arg more-arg)
       (make-dlap-lambda-list (length metatypes) applyp)
     (generating-lisp

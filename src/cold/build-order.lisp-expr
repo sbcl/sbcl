@@ -667,6 +667,7 @@
  ("src/pcl/fngen"
   "src/pcl/cache"
   "src/pcl/dlisp"
+  "src/pcl/dlisp2"
   "src/pcl/boot"
   "src/pcl/vector"
   "src/pcl/slots-boot"
