@@ -521,7 +521,14 @@
         (cif
          ;; Don't want comparisons of constants against constants
          ;; from reaching the VOPs.
-         (ir1-optimize-if node t))))))
+         (ir1-optimize-if node t))
+        (cast
+         ;; Simply clearing node-reoptimize will stop cast-type-check
+         ;; from working.
+         (when (and (cast-%type-check node)
+                    (values-subtypep (lvar-derived-type (cast-value node))
+                                     (cast-type-to-check node)))
+           (setf (cast-%type-check node) nil)))))))
 
 ;;; Only handle constant folding, some VOPs do not work
 ;;; on constants.
