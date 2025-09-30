@@ -185,16 +185,28 @@
               char
               (the character char)))))
 
+;; This should be identical to TWO-WAY-MISC except for :UNREAD, I
+;; think.
 (defun echo-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
-         (out (two-way-stream-output-stream stream)))
+         (out (two-way-stream-output-stream stream))
+         (in-ansi-stream-p (ansi-stream-p in))
+         (out-ansi-stream-p (ansi-stream-p out)))
     (stream-misc-case (operation)
+      ;; Input operations forward to IN.
       (:listen
-       (if (ansi-stream-p in)
-           (%ansi-stream-listen in)
+       (if in-ansi-stream-p
+           (call-ansi-stream-misc in operation arg1)
            (stream-misc-dispatch in operation arg1)))
       (:unread (setf (echo-stream-unread-stuff stream) t)
                (unread-char arg1 in))
+      (:clear-input (clear-input in))
+      ;; Output operations forward to OUT
+      ((:finish-output :force-output :clear-output
+        :charpos :line-length)
+       (if out-ansi-stream-p
+           (call-ansi-stream-misc out operation arg1)
+           (stream-misc-dispatch out operation arg1)))
       (:element-type
        (let ((in-type (stream-element-type in))
              (out-type (stream-element-type out)))
@@ -209,10 +221,10 @@
       (:close
        (set-closed-flame stream))
       (t
-       (or (if (ansi-stream-p in)
+       (or (if in-ansi-stream-p
                (call-ansi-stream-misc in operation arg1)
                (stream-misc-dispatch in operation arg1))
-           (if (ansi-stream-p out)
+           (if out-ansi-stream-p
                (call-ansi-stream-misc out operation arg1)
                (stream-misc-dispatch out operation arg1)))))))
 

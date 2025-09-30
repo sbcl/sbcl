@@ -945,3 +945,134 @@
                (assert (equalp in #(1 2 3 4)))))
         (close (two-way-stream-output-stream pipe))
         (close (two-way-stream-input-stream pipe))))))
+
+;;; Two-way and echo streams have historically forwarded the both
+;;; :FRESH-LINE and :CHARPOS operations to their input stream
+;;; components, and echo streams forwarded the 4 buffer operations to
+;;; both components.
+;; We need an output stream class that can do WRITE-CHAR in order to
+;; exercise FRESH-LINE.
+(defclass null-character-input-stream (fundamental-character-input-stream) ())
+
+(defclass null-character-output-stream (fundamental-character-output-stream) ())
+(defmethod stream-write-char ((s null-character-output-stream) character))
+
+(with-test (:name :two-way-and-echo-ansi-misc-op-forwarding)
+  ;; We can verify that misc ops don't forward to the
+  ;; wrong-directional component by using Gray Streams that /don't/
+  ;; add methods the to the relevant generic function. First some test
+  ;; invariants, to future-proof that testing (in case people change
+  ;; which Gray Streams classes get default methods).
+  (assert (null (find-method #'stream-clear-input ()
+                             '(fundamental-character-output-stream) nil)))
+  (dolist (fun '(stream-line-column     ; :CHARPOS
+                 stream-line-length     ; :LINE-LENGTH
+                 stream-clear-output
+                 stream-finish-output stream-force-output))
+    ;; Note: omitting STREAM-START-LINE-P and
+    ;; STREAM-ADVANCE-TO-COLUMN, because it seems nothing in SBCL
+    ;; calls these.
+    (assert (null (find-method (coerce fun 'function) ()
+                               '(fundamental-character-input-stream) nil))))
+  ;; Here's the actual test.
+  (flet ((try-misc-ops (composite)
+           (clear-input composite)
+           ;; FRESH-LINE calls :CHARPOS calls STREAM-LINE-COLUMN
+           (fresh-line composite)
+           (clear-output composite)
+           (finish-output composite)
+           (force-output composite)
+           ;; When *PRINT-RIGHT-MARGIN* is false, the pretty printer
+           ;; (probably always?) calls :LINE-LENGTH, which calls
+           ;; STREAM-LINE-LENGTH.
+           (let ((*print-pretty* t) (*print-right-margin* nil))
+             (format composite "~<~@{~A~^ ~:_~}~:>"
+                     (loop repeat 32 collect "1111")))))
+    (with-open-stream (input (make-instance 'null-character-input-stream))
+      (with-open-stream (output (make-instance 'null-character-output-stream))
+        (with-open-stream (composite (make-two-way-stream input output))
+          (try-misc-ops composite))))
+    (with-open-stream (input (make-instance 'null-character-input-stream))
+      (with-open-stream (output (make-instance 'null-character-output-stream))
+        (with-open-stream (composite (make-echo-stream input output))
+          (try-misc-ops composite))))))
+
+;;; Or, if you like to test interesting behavior rather than how
+;;; two-way, echo, and Gray Streams get implemented...
+;; Make this substantially smaller than any default line width the
+;; printer uses for any stream.
+(defparameter *short-line-length* 13)
+(defclass short-output-stream
+     (fundamental-character-output-stream)
+     ((charpos :initform 0 :reader stream-line-column)
+      (line-length :initform *short-line-length* :reader stream-line-length)))
+
+;; I don't believe FORMAT deduces output columns from a control string
+;; (e.g., "abc~&def" could be statically converted to "abc~%def", I
+;; guess). In case it might ever, try to confuse it by pulling out
+;; certain parameters so the format controls will be more opaque.
+(defvar *prefix* "abc")
+(defvar *suffix* "def")
+;; This list needs to be long enough that line wrapping will be
+;; likely, and each element must be shorter than *SHORT-LINE-LENGTH*.
+(defvar *long-list* (loop repeat 32 collect "1111"))
+
+(with-test (:name :two-way-and-echo-charpos-and-line-length)
+  (macrolet
+      ((with-stream-for-output ((var ctor) &body body)
+         `(with-open-stream (%in (make-concatenated-stream))
+            (with-open-stream (%out (make-instance 'short-output-stream))
+              (with-open-stream (%input-component (make-two-way-stream %in %out))
+                (with-output-to-string (%output-component)
+                  (with-open-stream
+                      (,var (funcall ,ctor %input-component %output-component))
+                    ,@body)))))))
+    (labels ((test-fresh-line (constructor)
+               ;; Test invariants
+               (assert (not (find #\newline (princ-to-string *prefix*))))
+               (assert (not (find #\newline (princ-to-string *suffix*))))
+               (let ((string (with-stream-for-output (stream constructor)
+                               (format stream "~A~&~A" *prefix* *suffix*))))
+                 (assert (find #\newline string))))
+             (test-tabulation (constructor)
+               (let* ((string (with-stream-for-output (stream constructor)
+                                (format stream "~A~7,1T~A" *prefix* *suffix*)))
+                      (position (search (princ-to-string *suffix*) string
+                                        :from-end t))
+                      (prefix-length (length (princ-to-string *prefix*))))
+                 (flet ((valid-tabulation-position (position colnum colinc startcol)
+                          (or
+                           ;; POSITION should be at colnum*k or colnum*k+colinc
+                           (member (mod position colnum) (list 0 colinc))
+                           ;; "at worst the '~T' operation will simply
+                           ;; output two spaces." (Do we do this?)
+                           (and (= position (+ startcol 2))
+                                (string= "  " string :start2 startcol
+                                         :end2 position)))))
+                   (assert (valid-tabulation-position position 7 1 prefix-length)))))
+             (lines-wrapped-okay-p (string)
+               (assert (find #\newline string))
+               (with-input-from-string (in string)
+                 (loop
+                   (multiple-value-bind (line eof-missing-p)
+                       (read-line in nil)
+                     (if (or (null line) eof-missing-p)
+                         (return t) ; don't worry about the last line
+                         ;; The line wrapping should not use the
+                         ;; input component's line width
+                         (assert (> (length line) *short-line-length*)))))))
+             (test-justification (constructor)
+               (let ((string (with-stream-for-output (stream constructor)
+                               (format stream "~{~<~%~:;~A~>~^ ~}" *long-list*))))
+                 (assert (lines-wrapped-okay-p string))))
+             (test-pretty-printing (constructor)
+               (let ((string (with-stream-for-output (stream constructor)
+                               (let ((*print-pretty* t) (*print-right-margin* nil))
+                                 (format stream "~<~@{~A~^ ~:_~}~:>"
+                                         *long-list*)))))
+                 (assert (lines-wrapped-okay-p string)))))
+      (dolist (ctor '(make-two-way-stream make-echo-stream))
+        (test-fresh-line ctor)
+        (test-tabulation ctor)
+        (test-justification ctor)
+        (test-pretty-printing ctor)))))

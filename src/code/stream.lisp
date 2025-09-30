@@ -890,9 +890,6 @@
       ;; FD-STREAMS, when running FILE-POSITION, do not update the
       ;; CHARPOS, and consequently there will be much wrongness.
       ;;
-      ;; FIXME: see also TWO-WAY-STREAM treatment of :CHARPOS -- why
-      ;; is it testing the :charpos of an input stream?
-      ;;
       ;; -- CSR, 2004-02-04
       (:charpos
        (dolist (stream streams 0)
@@ -1066,16 +1063,20 @@
          (in-ansi-stream-p (ansi-stream-p in))
          (out-ansi-stream-p (ansi-stream-p out)))
     (stream-misc-case (operation)
+      ;; Input operations forward to IN.
       (:listen
        (if in-ansi-stream-p
            (%ansi-stream-listen in)
+           ;; Why LISTEN rather than STREAM-MISC-DISPATCH?
            (listen in)))
-      ((:finish-output :force-output :clear-output)
+      (:unread (unread-char arg1 in))
+      (:clear-input (clear-input in))
+      ;; Output operations forward to OUT
+      ((:finish-output :force-output :clear-output
+        :charpos :line-length)
        (if out-ansi-stream-p
            (call-ansi-stream-misc out operation arg1)
            (stream-misc-dispatch out operation arg1)))
-      (:clear-input (clear-input in))
-      (:unread (unread-char arg1 in))
       (:element-type
        (let ((in-type (stream-element-type in))
              (out-type (stream-element-type out)))
