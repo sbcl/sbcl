@@ -55,11 +55,11 @@
 #define reg_NARGS       REG(23)
 #define reg_NFP         REG(24)
 #define reg_OCFP        REG(25)
-#define reg_CFP         REG(26)
+#define reg_NULL        REG(26)
+#define reg_wNULL       w26
 #define reg_CSP         REG(27)
 #define reg_TMP         REG(9)
 #define reg_wTMP        w9
-#define reg_NULL        REG(29)
-#define reg_wNULL       w29
+#define reg_CFP        REG(29)
 #define reg_LR          REG(30)
 #define reg_NSP         REG(31)

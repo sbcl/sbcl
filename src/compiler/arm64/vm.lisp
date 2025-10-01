@@ -56,10 +56,10 @@
   (defreg nargs 23)
   (defreg nfp 24)
   (defreg ocfp 25)
-  (defreg cfp 26)
+  (defreg null 26)
   (defreg csp 27)
   (defreg cardtable 28) ; preserved across C calls
-  (defreg null 29)
+  (defreg cfp 29)
   (defreg lr 30)
   (defreg nsp 31)
   (defreg zr 31)
