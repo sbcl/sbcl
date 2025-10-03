@@ -2646,17 +2646,14 @@
                    (derive-node-type node (fun-type-returns type))))
                (when (and info
                           (ir1-attributep (fun-info-attributes info) mv-deriver))
-                 (let* (unknown
-                        (known-types
+                 (let* ((known-types
                           (loop for arg in args
                                 append
                                 (multiple-value-bind (types count) (values-types (lvar-derived-type arg))
                                   (cond ((eq count :unknown)
-                                         (setf unknown t)
-                                         (load-time-value (list *universal-type*)))
+                                         (loop-finish))
                                         (t
-                                         types)))
-                                until unknown)))
+                                         types))))))
                    (when known-types
                      (setf (basic-combination-fun-info node) info)
                      (let ((type (combination-derive-type-for-arg-types node known-types)))

@@ -4922,4 +4922,8 @@
    (lambda (a r)
      (declare ((array double-float) a))
      (apply #'aref a r))
-   double-float))
+   double-float)
+  (assert-type
+   (lambda (r)
+     (apply #'make-array 1 :element-type t r))
+   (vector t)))

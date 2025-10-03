@@ -1275,7 +1275,7 @@
                       (:fill-pointer (or index boolean))
                       (:displaced-to (or array null))
                       (:displaced-index-offset index))
-  array (flushable foldable-read-only))
+  array (flushable foldable-read-only mv-deriver))
 
 (defknown %make-array ((or index list)
                        (unsigned-byte #.sb-vm:n-widetag-bits)
