@@ -224,7 +224,7 @@
   (:generator 2
     (load-foreign-symbol res foreign-symbol :dataref t)))
 
-#+sb-safepoint
+#+(or sb-safepoint nonstop-foreign-call)
 (defconstant thread-saved-csp-slot -1)
 
 (defconstant-eqx +destroyed-c-registers+
@@ -246,7 +246,7 @@
         (storew-pair csp-tn thread-control-frame-pointer-slot temp thread-control-stack-pointer-slot thread-tn)
         ;; OK to run GC without stopping this thread from this point
         ;; on.
-        #+sb-safepoint
+        #+(or sb-safepoint nonstop-foreign-call)
         (storew csp-tn thread-tn thread-saved-csp-slot)
         (cond ((stringp function)
                (invoke-foreign-routine function cfunc))
@@ -267,9 +267,9 @@
                        (make-random-tn (sc-or-lose 'descriptor-reg) reg)
                        0))
         ;; No longer OK to run GC except at safepoints.
-        #+sb-safepoint
-        (storew zr-tn thread-tn thread-saved-csp-slot)
-        (storew zr-tn thread-tn thread-control-stack-pointer-slot))
+        #+(or sb-safepoint nonstop-foreign-call)
+        (storew zr-tn thread-tn thread-saved-csp-slot))
+      (storew zr-tn thread-tn thread-control-stack-pointer-slot)
       return
       #-sb-thread
       (progn

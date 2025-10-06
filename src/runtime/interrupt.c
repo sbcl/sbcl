@@ -1391,7 +1391,6 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         maybe_save_gc_mask_and_block_deferrables(context);
         return;
     }
-
     event0("stop_for_gc");
 
     if (!thread->state_word.control_stack_guard_page_protected) {
@@ -1478,6 +1477,70 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     }
 }
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+
+bool set_thread_foreign_call_trigger(struct thread* th, bool writable)
+{
+    os_protect((char*)th - THREAD_CSP_PAGE_SIZE,
+               THREAD_CSP_PAGE_SIZE,
+               writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
+               : (OS_VM_PROT_READ));
+    return csp_around_foreign_call(th) != 0;
+}
+
+int
+handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_address)
+{
+    struct thread *th = get_sb_vm_thread();
+
+    if ((lispobj*)fault_address == &csp_around_foreign_call(th)) {
+        if (arch_pseudo_atomic_atomic(th)) {
+            write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
+            arch_set_pseudo_atomic_interrupted(th);
+            maybe_save_gc_mask_and_block_deferrables(context);
+            set_thread_foreign_call_trigger(th, 1);
+            return 1;
+        }
+        int exiting = csp_around_foreign_call(th) != 0;
+        sigset_t mask;
+
+        if (read_TLS(GC_INHIBIT,th) == NIL) {
+            if (exiting) {
+                /* gc_stop_the_world has left this thread untouched,
+                   wait for gc_start_the_world */
+                pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
+                mutex_acquire(exit_lock);
+                mutex_release(exit_lock);
+            }
+            else {
+                /* gc_stop_the_world has either already sent a signal
+                   or will send it soon, wait for it. */
+                sigfillset(&mask);
+                sigdelset(&mask, SIG_STOP_FOR_GC);
+                sigsuspend(&mask);
+            }
+        } else { /* Inside without-gcing */
+            /* Unprotect the page to be able to proceed */
+            set_thread_foreign_call_trigger(th, 1);
+            /* Stop upon exiting from without-gcing */
+            if (exiting) {
+                pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
+                write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
+                mutex_acquire(exit_lock);
+                mutex_release(exit_lock);
+            } else {
+                if (read_TLS(STOP_FOR_GC_PENDING, th) == NIL) {
+                    sigfillset(&mask);
+                    sigdelset(&mask, SIG_STOP_FOR_GC);
+                    sigsuspend(&mask);
+                }
+            }
+        }
+        return 1;
+    }
+    return 0;
+}
+#endif
 #endif
 
 void

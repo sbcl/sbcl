@@ -709,6 +709,11 @@ alloc_thread_struct(void* spaces) {
     os_sem_init(&extra_data->state_not_running_sem, 0);
     os_sem_init(&extra_data->state_not_stopped_sem, 0);
 #endif
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    gc_assert(!pthread_mutex_init(&extra_data->foreign_exit_lock, NULL));
+#endif
+
 #if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD
     os_sem_init(&extra_data->sprof_sem, 0);
 #endif

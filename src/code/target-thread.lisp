@@ -2044,6 +2044,12 @@ session."
                 #+sb-safepoint
                 (setq *thruption-pending* nil)
                 (handle-thread-exit))))))))))
+  #+nonstop-foreign-call
+  (setf *interrupts-enabled* nil
+        ;; the thread allocation regions are closed upon exit, which
+        ;; will transition to foreign code upon exit from here, can't
+        ;; run GC at the same time.
+        *gc-inhibit* t)
   ;; this returns to C, so return a single value
   0)
 ) ; end PROGN for #+sb-thread

@@ -3434,6 +3434,15 @@ garbage_collect_generation(generation_index_t generation, int raise,
         }
     }
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    /* Signal handlers might run concurrently with the GC */
+    for (int i = 0; i < NSIG; i++) {
+        lispobj fun = lisp_sig_handlers[i];
+        if(functionp(fun))
+            pin_exact_root(fun);
+    }
+#endif
+
     // Thread creation optionally no longer synchronizes the creating and
     // created thread. When synchronized, the parent thread is responsible
     // for pinning the start function for handoff to the created thread.
@@ -3514,7 +3523,16 @@ garbage_collect_generation(generation_index_t generation, int raise,
         /* Scrub the unscavenged control stack space, so that we can't run
          * into any stale pointers in a later GC (this is done by the
          * stop-for-gc handler in the other threads). */
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+        for_each_thread(th) {
+            /* Threads stopped by gc_stop_the_world scrub the stack on
+             * their own in sig_stop_for_gc_handler. */
+            if (csp_around_foreign_call(th) != 0)
+                scrub_thread_control_stack(th);
+        }
+#else
         scrub_control_stack();
+#endif
 # endif
     }
 #endif
@@ -4260,6 +4278,12 @@ bool continue_after_memoryfault_on_unprotected_pages = 0;
 
 int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* fault_addr)
 {
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (handle_foreign_call_trigger(context, fault_addr))
+        return 1;
+#endif
+
     page_index_t page_index = find_page_index(fault_addr);
 
     /* Check whether the fault is within the dynamic space. */

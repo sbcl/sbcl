@@ -33,7 +33,7 @@
 #define ENABLE_PAGE_PROTECTION 1
 #endif
 
-#if defined LISP_FEATURE_CHENEYGC || defined LISP_FEATURE_SB_SAFEPOINT
+#if defined LISP_FEATURE_CHENEYGC || defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_NONSTOP_FOREIGN_CALL
 // safepoint traps always require a signal handler
 #define INSTALL_SIG_MEMORY_FAULT_HANDLER 1
 #elif defined LISP_FEATURE_GENERATIONAL

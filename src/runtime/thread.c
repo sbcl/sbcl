@@ -463,6 +463,7 @@ init_new_thread(struct thread *th,
                 init_thread_data __attribute__((unused)) *scribble,
                 int guardp)
 {
+
     ASSIGN_CURRENT_THREAD(th);
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
@@ -486,7 +487,7 @@ init_new_thread(struct thread *th,
      * list and we're just adding this thread to it, there is no
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
      * it is not). */
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+#if defined(LISP_FEATURE_SB_SAFEPOINT) || defined(LISP_FEATURE_NONSTOP_FOREIGN_CALL)
     csp_around_foreign_call(th) = (lispobj)scribble;
 #endif
     __attribute__((unused)) int lock_ret = mutex_acquire(&all_threads_lock);
@@ -1020,24 +1021,49 @@ void gc_stop_the_world()
         if (th != me) {
             gc_assert(th->os_thread != 0);
             struct extra_thread_data *semaphores = thread_extra_data(th);
+            bool foreign = 0;
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+            gc_assert(mutex_acquire(&semaphores->foreign_exit_lock));
+            foreign = set_thread_foreign_call_trigger(th, 0);
+#endif
+
             os_sem_wait(&semaphores->state_sem);
             int state = get_thread_state(th);
             if (state == STATE_RUNNING) {
-                rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
-                /* This used to bogusly check for ESRCH.
-                 * I changed the ESRCH case to just fall into lose() */
-                if (rc) lose("cannot suspend thread %p: %d, %s",
-                     // KLUDGE: assume that os_thread can be cast as pointer.
-                     // See comment in 'interr.h' about that.
-                     (void*)th->os_thread, rc, strerror(rc));
+                if (!foreign) {
+                    rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
+                    /* This used to bogusly check for ESRCH.
+                     * I changed the ESRCH case to just fall into lose() */
+                    if (rc) lose("cannot suspend thread %p: %d, %s",
+                                 // KLUDGE: assume that os_thread can be cast as pointer.
+                                 // See comment in 'interr.h' about that.
+                                 (void*)th->os_thread, rc, strerror(rc));
+                }
             }
             os_sem_post(&semaphores->state_sem);
         }
     }
     for_each_thread(th) {
         if (th != me) {
-            __attribute__((unused)) int state = thread_wait_until_not(STATE_RUNNING, th);
-            gc_assert(state != STATE_RUNNING);
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+            if (csp_around_foreign_call(th))
+            {
+                if (read_TLS(GC_INHIBIT,th) != NIL) {
+                    /* It's a foreign call but inside without-gcing,
+                       handle_foreign_call_trigger will set
+                       *stop-for-gc-pending*, need to unlock the exit
+                       lock to reach the end of without-gcing* */
+                    pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
+                    mutex_release(exit_lock);
+                    thread_wait_until_not(STATE_RUNNING, th);
+                    mutex_acquire(exit_lock);
+                }
+            }
+            else
+#endif
+            {
+                thread_wait_until_not(STATE_RUNNING, th);
+            }
         }
     }
     event0("/gc_stop_the_world:end");
@@ -1071,14 +1097,22 @@ void gc_start_the_world()
     for_each_thread(th) {
         gc_assert(th->os_thread);
         if (th != me) {
-          /* I don't know if a normal load is fine here. I think we can't read
-           * any value other than what was already observed?
-           * No harm in being cautious though with regard to compiler reordering */
+            /* I don't know if a normal load is fine here. I think we can't read
+             * any value other than what was already observed?
+             * No harm in being cautious though with regard to compiler reordering */
             int state = get_thread_state(th);
-            if (state != STATE_DEAD) {
-                if(state != STATE_STOPPED)
-                    lose("gc_start_the_world: bad thread state %x", state);
-                set_thread_state(th, STATE_RUNNING, 0);
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+            bool foreign = csp_around_foreign_call(th);
+            set_thread_foreign_call_trigger(th, 1);
+            gc_assert(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
+            if (!foreign)
+#endif
+            {
+                if (state != STATE_DEAD) {
+                    if (state != STATE_STOPPED)
+                        lose("gc_start_the_world: bad thread state %x", state);
+                    set_thread_state(th, STATE_RUNNING, 0);
+                }
             }
         }
     }

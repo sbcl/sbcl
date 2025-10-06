@@ -2244,7 +2244,10 @@
   (:emitter
    (emit-hint segment 0)))
 
-
+(define-instruction wfe (segment)
+  (:printer hint ((imm #b010)))
+  (:emitter
+   (emit-hint segment #b010)))
 
 ;;; Floating point
 

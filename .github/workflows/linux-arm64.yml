@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        options: [--with-sb-thread]
+        options: ["", --with-nonstop-foreign-call]
         # subfeatures: ['']
         # include:
         #   - { subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval }
@@ -33,18 +33,18 @@ jobs:
     - name: make binary
       run: |
         name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-linux-arm64
-        mkdir sbcl-linux-binary-arm64
+        mkdir sbcl-linux-binary-arm64${{ matrix.options }}
         cd ..
         mv sbcl $name
         ./$name/binary-distribution.sh $name
         bzip2 $name-binary.tar
         mv $name sbcl
-        mv $name-binary.tar.bz2 sbcl/sbcl-linux-binary-arm64
+        mv $name-binary.tar.bz2 sbcl/sbcl-linux-binary-arm64${{ matrix.options }}
     - name: save binary
       uses: actions/upload-artifact@v4
       with:
-        name: sbcl-linux-binary-arm64
-        path: sbcl-linux-binary-arm64
+        name: sbcl-linux-binary-arm64${{ matrix.options }}
+        path: sbcl-linux-binary-arm64${{ matrix.options }}
 
     - name: test
       run: cd tests; ./run-tests.sh --slow
