@@ -79,8 +79,9 @@
 ;;; RANDOM
 (macrolet ((frob (fun type)
              `(deftransform random ((num &optional state)
-                                    (,type &optional t) *)
+                                    (,type &optional t) * :node node)
                 "Use inline float operations."
+                (delay-ir1-transform node :constraint)
                 '(,fun num (or state *random-state*)))))
   (frob %random-single-float single-float)
   (frob %random-double-float double-float))

@@ -906,6 +906,9 @@
              c)))
     c))
 
+(defoptimizer (random constraint-propagate-result) ((num &optional state) node)
+  (list (list '< num)))
+
 (defun subseq-bounds (sequence start end gen)
   (let* ((null-p (types-equal-or-intersect (lvar-type end) (specifier-type 'null)))
          (end (if null-p
