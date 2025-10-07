@@ -661,7 +661,13 @@
                             (supplied-and-true displaced-to)
                             (supplied-and-true fill-pointer)))
                    (careful-specifier-type `(and ,spec (not simple-array)))
-                   (careful-specifier-type spec)))))
+                   (careful-specifier-type spec))))
+           (derive-constant (element-type)
+             (derive
+              (let ((ctype (careful-specifier-type element-type)))
+                (cond
+                  ((or (null ctype) (contains-unknown-type-p ctype)) '*)
+                  (t (upgraded-array-element-type element-type)))))))
     (cond ((not element-type)
            (if (typep node 'mv-combination)
                (derive '*)
@@ -674,13 +680,11 @@
           ((ctype-p element-type)
            (derive (type-specifier element-type)))
           ((constant-lvar-p element-type)
-           (derive
-            (let ((ctype (careful-specifier-type
-                          (lvar-value element-type))))
-              (cond
-                ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                (t (upgraded-array-element-type
-                    (lvar-value element-type)))))))
+           (derive-constant (lvar-value element-type)))
+          ((member-type-p (lvar-type element-type))
+           (sb-kernel::%type-union
+            (loop for type in (member-type-members (lvar-type element-type))
+                  collect (derive-constant type))))
           ((csubtypep (lvar-type element-type) (specifier-type '(member character base-char)))
            (type-union #+sb-unicode
                        (derive 'character)
@@ -2478,6 +2482,8 @@
                                    #+x86-64 (simple-array double-float (*))
                                    (simple-array t (*)))
                              index))
+  (unless (array-type-p (lvar-type array))
+    (give-up-ir1-transform))
   (let ((et (array-type-specialized-element-type (lvar-type array))))
     (if (eq et *universal-type*)
         `(cas (svref array index) old new)

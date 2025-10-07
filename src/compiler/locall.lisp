@@ -1268,7 +1268,10 @@
            (aver (node-tail-p call))
            (setf (lambda-return call-fun) return)
            (setf (return-lambda return) call-fun)
-           (setf (lambda-return fun) nil)))
+           (setf (lambda-return fun) nil)
+           (let ((call-type (node-derived-type call)))
+             (do-uses (use (return-result return))
+               (derive-node-type use call-type)))))
     ;; Delayed because otherwise next-block could become deleted
     (dolist (call maybe-terminate-calls)
       (maybe-terminate-block call nil)))

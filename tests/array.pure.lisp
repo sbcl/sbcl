@@ -1011,3 +1011,11 @@
    (lambda (a b p)
      (make-array (list* a b nil) :displaced-to p))
    (array t (* *))))
+
+(with-test (:name :make-array-member-element-type)
+  (assert-type
+   (lambda (d)
+     (make-array 1 :element-type (if d
+                                     'double-float
+                                     'single-float)))
+   (or (simple-array double-float (1)) (simple-array single-float (1)))))
