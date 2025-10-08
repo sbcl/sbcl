@@ -247,21 +247,23 @@
             ((cast-p dest)
              (lvar-dest-var (node-lvar dest)))))))
 
-(defun immediately-used-let-dest (lvar node &optional flushable)
-  (let ((dest (lvar-dest lvar)))
-    (when (almost-immediately-used-p lvar node :flushable flushable)
-      (if (and (combination-p dest)
-               (eq (combination-kind dest) :local))
-          (let* ((fun (combination-lambda dest))
-                 (n (position-or-lose lvar
-                                      (combination-args dest)))
-                 (var (nth n (lambda-vars fun)))
-                 (refs (leaf-refs var)))
-            (loop for ref in refs
-                  for lvar = (node-lvar ref)
-                  when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
-                  do (return (values (lvar-dest lvar) lvar))))
-          (values dest lvar)))))
+(defun immediately-used-let-dest (node &optional flushable)
+  (let ((lvar (node-lvar node)))
+    (when lvar
+      (let ((dest (lvar-dest lvar)))
+        (when (almost-immediately-used-p lvar node :flushable flushable)
+          (if (and (combination-p dest)
+                   (eq (combination-kind dest) :local))
+              (let* ((fun (combination-lambda dest))
+                     (n (position-or-lose lvar
+                                          (combination-args dest)))
+                     (var (nth n (lambda-vars fun)))
+                     (refs (leaf-refs var)))
+                (loop for ref in refs
+                      for lvar = (node-lvar ref)
+                      when (and lvar (almost-immediately-used-p lvar (lambda-bind fun) :flushable flushable))
+                      do (return (values (lvar-dest lvar) lvar))))
+              (values dest lvar)))))))
 
 (defun mv-bind-dest (lvar nth-value &optional single-use)
   (when (and lvar

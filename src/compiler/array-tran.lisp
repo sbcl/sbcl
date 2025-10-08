@@ -146,6 +146,19 @@
        'aref-context)))
   (lvar-type new-value))
 
+(defoptimizers externally-checkable-type
+    (hairy-data-vector-set/check-bounds
+     hairy-data-vector-set
+     vector-hairy-data-vector-set/check-bounds
+     vector-hairy-data-vector-set
+     string-hairy-data-vector-set/check-bounds
+     string-hairy-data-vector-set)
+    ((array index value) node lvar context)
+  (if (and (eq value lvar)
+           (member context '(nil aref-context)))
+      (type-array-element-type (lvar-type array))
+      :next))
+
 (defun supplied-and-true (arg)
   (and arg
        (not (types-equal-or-intersect (lvar-type arg)

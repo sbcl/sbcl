@@ -216,48 +216,53 @@
 
 ;;; If LVAR is an argument of a function, return a type which the
 ;;; function checks LVAR for.
-(defun lvar-externally-checkable-type (lvar)
+(defun lvar-externally-checkable-type (lvar context)
   (declare (type lvar lvar))
   (let ((dest (lvar-dest lvar)))
     (when (basic-combination-p dest)
       (multiple-value-bind (full-p %%primitive-name) (call-full-like-p dest)
         (cond (%%primitive-name
-               (let ((arg (1- (position lvar (basic-combination-args dest)))))
-                 (when (logbitp arg full-p)
-                   (return-from lvar-externally-checkable-type
-                    (coerce-to-values
-                     (nth arg (fun-type-required (info :function :type %%primitive-name))))))))
+               (unless context
+                 (let ((arg (1- (position lvar (basic-combination-args dest)))))
+                   (when (logbitp arg full-p)
+                     (return-from lvar-externally-checkable-type
+                       (coerce-to-values
+                        (nth arg (fun-type-required (info :function :type %%primitive-name)))))))))
               (full-p
                (let ((info (and (eq (basic-combination-kind dest) :known)
                                 (basic-combination-fun-info dest))))
-                 (if (and info
-                          (functionp (fun-info-externally-checkable-type info)))
-                     (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar)))
-                       (when type
-                         (return-from lvar-externally-checkable-type
-                           (coerce-to-values type))))
-                     (map-combination-args-and-types
-                      (lambda (arg type &rest args)
-                        (declare (ignore args))
-                        (when (eq arg lvar)
-                          (return-from lvar-externally-checkable-type
-                            (coerce-to-values type))))
-                      dest
-                      :defined-here t :asserted-type t)))))))
+                 (when (and info
+                            (functionp (fun-info-externally-checkable-type info)))
+                   (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar context)))
+                     (unless (eq type :next)
+                       (return-from lvar-externally-checkable-type
+                         (when type
+                           (coerce-to-values type))))))
+                 (unless context
+                  (map-combination-args-and-types
+                   (lambda (arg type &rest args)
+                     (declare (ignore args))
+                     (when (eq arg lvar)
+                       (return-from lvar-externally-checkable-type
+                         (coerce-to-values type))))
+                   dest
+                   :defined-here t :asserted-type t)))))))
     *wild-type*))
 
 ;;; Return T is the cast appears to be from the declaration of the callee,
 ;;; and should be checked externally -- that is, by the callee and not the caller.
 (defun cast-externally-checkable-p (cast)
   (declare (type cast cast))
-  (let ((lvar (node-lvar cast)))
-    (multiple-value-bind (dest lvar) (and lvar (immediately-used-let-dest lvar cast))
-      (cond ((and (cast-context cast)
-                  (policy cast (or (> debug 1)
-                                   (and (> debug 0)
-                                        (>= debug speed)))))
-             nil)
-            ((and (basic-combination-p dest)
+  (multiple-value-bind (dest lvar) (immediately-used-let-dest cast)
+    (let ((context
+            ;; Don't remove casts with a context
+            (and
+             (cast-context cast)
+             (policy cast (or (> debug 1)
+                              (and (> debug 0)
+                                   (>= debug speed))))
+             (cast-context cast))))
+      (cond ((and (basic-combination-p dest)
                   (not (info :function :specialized-xep
                              (lvar-fun-name (basic-combination-fun dest))))
                   (or (not (basic-combination-fun-info dest))
@@ -269,10 +274,11 @@
                           (let ((leaf (nth-value 2 (lvar-fun-type (basic-combination-fun dest)))))
                             (and leaf
                                  (memq (leaf-where-from leaf) '(:declared-verify :defined-here)))))
-               (values-subtypep (lvar-externally-checkable-type lvar)
+               (values-subtypep (lvar-externally-checkable-type lvar context)
                                 (cast-type-to-check cast))))
             ;; Two consecutive casts
-            ((and (cast-p dest)
+            ((and (not context)
+                  (cast-p dest)
                   (cast-type-check dest)
                   (atom (lvar-uses (node-lvar cast)))
                   (atom (lvar-uses (cast-value dest))))

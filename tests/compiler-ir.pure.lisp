@@ -610,3 +610,10 @@
   (assert (not (ir-full-calls
                 `(lambda (x n)
                    (svref x (+ n 1)))))))
+
+(with-test (:name :setf-aref-type-checks)
+  (assert (= (count-type-checks
+              `(lambda (a n)
+                 (setf (aref (the (OR (ARRAY SINGLE-FLOAT) (ARRAY DOUBLE-FLOAT)) a) 0)
+                       n)))
+             1)))

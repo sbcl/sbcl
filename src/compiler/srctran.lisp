@@ -3633,27 +3633,25 @@
     `(* integer ,(ash 1 shift))))
 
 (defun cast-or-check-bound-type (node &optional type fixnum)
-  (let ((lvar (node-lvar node)))
-    (when lvar
-      (unless (and type
-                   (csubtypep (single-value-type (node-derived-type node)) type))
-        (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest lvar node t)
-          (let ((cast-type (cond ((cast-p dest)
-                                  (and (cast-type-check dest)
-                                       (single-value-type (cast-type-to-check dest))))
-                                 ((and (combination-p dest)
-                                       (member (combination-fun-debug-name dest) '((transform-for check-bound) %check-bound)
-                                               :test #'equal)
-                                       (eq (third (combination-args dest)) dest-lvar))
-                                  (if fixnum
-                                      (specifier-type 'index)
-                                      (specifier-type 'sb-vm:signed-word))))))
-            (when cast-type
-              (let ((result-type (type-intersection cast-type (single-value-type (node-derived-type node)))))
-                (when (and (not (eq result-type *empty-type*))
-                           (or (not type)
-                               (csubtypep result-type type)))
-                  (values cast-type result-type))))))))))
+  (unless (and type
+               (csubtypep (single-value-type (node-derived-type node)) type))
+    (multiple-value-bind (dest dest-lvar) (immediately-used-let-dest node t)
+      (let ((cast-type (cond ((cast-p dest)
+                              (and (cast-type-check dest)
+                                   (single-value-type (cast-type-to-check dest))))
+                             ((and (combination-p dest)
+                                   (member (combination-fun-debug-name dest) '((transform-for check-bound) %check-bound)
+                                           :test #'equal)
+                                   (eq (third (combination-args dest)) dest-lvar))
+                              (if fixnum
+                                  (specifier-type 'index)
+                                  (specifier-type 'sb-vm:signed-word))))))
+        (when cast-type
+          (let ((result-type (type-intersection cast-type (single-value-type (node-derived-type node)))))
+            (when (and (not (eq result-type *empty-type*))
+                       (or (not type)
+                           (csubtypep result-type type)))
+              (values cast-type result-type))))))))
 
 ;;; (the fixnum (+ x fixnum)) can use inline arithmetic because X can only be a singed word.
 (when-vop-existsp (:translate overflow+)
