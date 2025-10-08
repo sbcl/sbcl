@@ -1018,4 +1018,9 @@
      (make-array 1 :element-type (if d
                                      'double-float
                                      'single-float)))
-   (or (simple-array double-float (1)) (simple-array single-float (1)))))
+   (or (simple-array double-float (1)) (simple-array single-float (1))))
+  (assert-type
+   (lambda (a n)
+     (declare ((or (array single-float) (array double-float)) a))
+     (setf (aref a 0) n))
+   float))
