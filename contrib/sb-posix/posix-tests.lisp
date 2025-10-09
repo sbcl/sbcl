@@ -498,7 +498,8 @@
         (unwind-protect
              (let ((buf (make-array 10 :element-type '(unsigned-byte 8))))
                (values
-                (sb-posix:read fd (sb-sys:vector-sap buf) 10)
+                (sb-sys:with-pinned-objects (buf)
+                  (sb-posix:read fd (sb-sys:vector-sap buf) 10))
                 (code-char (aref buf 0))
                 (code-char (aref buf 1))
                 (code-char (aref buf 2))))
@@ -555,7 +556,9 @@
             (retval nil))
         (unwind-protect
              (let ((buf (coerce "foo" 'simple-base-string)))
-               (setf retval (sb-posix:write fd (sb-sys:vector-sap buf) 3)))
+               (setf retval
+                     (sb-sys:with-pinned-objects (buf)
+                       (sb-posix:write fd (sb-sys:vector-sap buf) 3))))
           (sb-posix:close fd))
 
         (with-open-file (inf tmpname) (values retval (read-line inf)))))

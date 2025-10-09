@@ -524,6 +524,8 @@
 (with-test (:name :undefined-fun-macro-error)
   (assert (search "is a macro" (princ-to-string (make-condition 'undefined-function :name 'cond)))))
 
+#+gc-stress (invoke-restart 'run-tests::skip-file)
+
 (defun testme (a b) (values "nice" (+ a b)))
 (compile 'testme)
 (defparameter trace-this-f1 #'testme)

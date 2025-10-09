@@ -7,7 +7,7 @@ and a secondary value, the number of characters consumed."
            (declare (simple-base-string chars))
            ;; On x86, dx arrays are quicker to make than aliens.
            (sb-int:dx-let ((end (make-array 1 :element-type 'sb-ext:word)))
-             (sb-sys:with-pinned-objects (chars)
+             (sb-sys:with-pinned-objects (chars #-c-stack-is-control-stack end)
                (let* ((base (sb-sys:sap+ (sb-sys:vector-sap chars) offset))
                       (answer
                        (handler-case

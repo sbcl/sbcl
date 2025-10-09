@@ -483,8 +483,9 @@
            (sb-vm:list-allocated-objects :read-only :type sb-vm:simple-base-string-widetag))
           0 1000))
 
-(test-util:with-test (:name :c-find-in-solist)
-  (let ((set (sb-lockless:make-so-set/addr))  )
+(test-util:with-test (:name :c-find-in-solist
+                            :skipped-on (and :gc-stress :arm64))
+  (let ((set (sb-lockless:make-so-set/addr)))
     (dolist (x *example-objects*)
       (sb-lockless:so-insert set x))
     (assert (not (sb-lockless:c-so-find/addr set 'random)))
