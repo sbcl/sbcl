@@ -201,19 +201,13 @@ GNAME(call_into_lisp):
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
 #ifdef LISP_FEATURE_SB_THREAD
-	ldp     reg_OCFP,reg_CFP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
+	ldp     reg_CFP, reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
-	ldr	reg_OCFP, =GNAME(current_control_frame_pointer)
-	ldr	reg_CFP, =GNAME(current_control_stack_pointer)
-	ldr	reg_OCFP, [reg_OCFP]
+	ldr	reg_CFP, =GNAME(current_control_frame_pointer)
+	ldr	reg_CSP, =GNAME(current_control_stack_pointer)
 	ldr	reg_CFP, [reg_CFP]
+	ldr	reg_CSP, [reg_CSP]
 #endif
-
-	// Allocate our frame and set up the Lisp stack pointer
-        add     reg_CSP, reg_CFP, #16
-
-	// Set up the "frame link"
-	str     reg_OCFP, [reg_CFP]
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 #ifdef LISP_FEATURE_SB_THREAD
@@ -230,6 +224,10 @@ GNAME(call_into_lisp):
 	ldr     reg_NL3, =GNAME(foreign_function_call_active)
 	str     xzr, [reg_NL3]
 #endif
+
+	// Set up the "frame link"
+	str     reg_CFP, [reg_CSP]
+        mov     reg_CFP, reg_CSP
 
 	// Load our function args.
 	cbz reg_NARGS, Lno_args
