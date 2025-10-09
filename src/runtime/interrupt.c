@@ -1494,13 +1494,6 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
     struct thread *th = get_sb_vm_thread();
 
     if ((lispobj*)fault_address == &csp_around_foreign_call(th)) {
-        if (arch_pseudo_atomic_atomic(th)) {
-            write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
-            arch_set_pseudo_atomic_interrupted(th);
-            maybe_save_gc_mask_and_block_deferrables(context);
-            set_thread_foreign_call_trigger(th, 1);
-            return 1;
-        }
         int exiting = csp_around_foreign_call(th) != 0;
         sigset_t mask;
 

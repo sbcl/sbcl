@@ -208,28 +208,6 @@ GNAME(call_into_lisp):
 	ldr	reg_OCFP, [reg_OCFP]
 	ldr	reg_CFP, [reg_CFP]
 #endif
-        ENTER_PA
-
-	// Clear FFCA, so the runtime knows that we're "in lisp".
-#ifdef LISP_FEATURE_SB_THREAD
-#if defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_NONSTOP_FOREIGN_CALL
-	ldr     x3, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-        str     x3, [sp,#-16]!
-        cbz     x3, 1f
-	str     xzr, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-1:      
-
-#endif
-        str     xzr,[reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
-#else
-	ldr     reg_NL3, =GNAME(foreign_function_call_active)
-	str     xzr, [reg_NL3]
-#endif
-	// We need to set up the lisp stack pointer and the basics of
-	// our stack frame while we're still in P-A.  Any sooner and
-	// our stack frame can be clobbered by a stray interrupt, any
-	// later and we can end up with a half-configured stack frame
-	// when we catch a stray interrupt.
 
 	// Allocate our frame and set up the Lisp stack pointer
         add     reg_CSP, reg_CFP, #16
@@ -237,7 +215,21 @@ GNAME(call_into_lisp):
 	// Set up the "frame link"
 	str     reg_OCFP, [reg_CFP]
 
-	LEAVE_PA
+	// Clear FFCA, so the runtime knows that we're "in lisp".
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+	ldr     x3, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
+        str     x3, [sp,#-16]!
+        cbz     x3, 1f
+	str     xzr, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
+1:
+
+#endif
+        str     xzr,[reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
+#else
+	ldr     reg_NL3, =GNAME(foreign_function_call_active)
+	str     xzr, [reg_NL3]
+#endif
 
 	// Load our function args.
 	cbz reg_NARGS, Lno_args
@@ -270,7 +262,7 @@ Lno_args:
 // Save the lisp stack and frame pointers.
 #ifdef LISP_FEATURE_SB_THREAD
 	stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-#if defined LISP_FEATURE_SB_SAFEPOINT || defined LISP_FEATURE_NONSTOP_FOREIGN_CALL
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
         ldr     x3, [sp],#16
         cbz     x3, 1f
 	str     reg_CSP, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
