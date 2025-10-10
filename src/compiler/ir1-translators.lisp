@@ -1295,8 +1295,9 @@ care."
         (dest-lvar (make-lvar))
         (type (or (lexenv-find var type-restrictions)
                   (leaf-type var))))
-    (ir1-convert start dest-ctran dest-lvar `(the ,(type-specifier type)
-                                                  ,value))
+    (ir1-convert start dest-ctran dest-lvar (wrap-if (neq type *universal-type*)
+                                                     `(the ,(type-specifier type))
+                                                     value))
     (let ((res (make-set var dest-lvar)))
       (setf (lvar-dest dest-lvar) res)
       (cond (result ; SETQ with a result counts as a REF also

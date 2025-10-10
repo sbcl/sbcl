@@ -431,7 +431,7 @@
       object)))
 (compile 'alloc-large-code)
 
-#+generational
+#+(and generational (not gc-stress))
 (deftest allocation-information.6
     ;; Remember, all tests run after all toplevel forms have executed,
     ;; so if this were (DEFGLOBAL *LARGE-CODE* ... ) or something,
