@@ -667,7 +667,7 @@
                   (and (eql (machine-ea-base value)
                             (car (sb-disassem::dstate-known-register-contents dstate)))
                        (eq (cdr (sb-disassem::dstate-known-register-contents dstate))
-                           'sb-vm::linkage-table)
+                           'sb-vm::lisp-linkage-table)
                        (integerp (machine-ea-disp value))
                        (not (machine-ea-index value)))))
              (declare (ignorable linkage))
