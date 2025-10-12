@@ -381,7 +381,7 @@
 ;;; stack-allocatable parts in the uses of LVAR. If there is one,
 ;;; bound LVAR's extent by DYNAMIC-EXTENT and return T. If LVAR
 ;;; already has a different dynamic extent set, we don't do anything.
-(defun find-stack-allocatable-parts (lvar dynamic-extent)
+(defun find-stack-allocatable-parts (lvar dynamic-extent &optional check-nesting)
   (declare (type lvar lvar)
            (type cdynamic-extent dynamic-extent))
   (when (lvar-dynamic-extent lvar)
@@ -406,14 +406,12 @@
                        (and stack-alloc-result
                             (funcall stack-alloc-result use)))
                (setq found-subpart-p t)
-               ;; Don't propagate through &REST, for sanity.
-               (unless (eq (combination-fun-source-name use nil)
-                           '%listify-rest-args)
-                 (dolist (arg (combination-args use))
-                   (when (and arg (not (eq result-arg arg)))
-                     (find-stack-allocatable-parts arg dynamic-extent))))))))
+               (dolist (arg (combination-args use))
+                 (when (and arg (not (eq result-arg arg)))
+                   (find-stack-allocatable-parts arg dynamic-extent t)))))))
         (ref
          (let ((leaf (ref-leaf use)))
+
            (typecase leaf
              (lambda-var
               ;; LET lambda var with no SETS.
@@ -433,7 +431,11 @@
               (when (functional-kind-eq leaf external)
                 (let* ((fun (functional-entry-fun leaf))
                        (enclose (functional-enclose fun)))
-                  (when (and (environment-closure (get-lambda-environment leaf))
+                  (when (and (or (not check-nesting)
+                                 ;; Allow (let ((x (lambda () v))) (let ((d x)) (dynamic-extent d)))
+                                 ;; but not (let ((x (lambda () v))) (let ((d (list x))) (dynamic-extent d)))
+                                 (lexenv-contains-lambda leaf (node-lexenv dynamic-extent)))
+                             (environment-closure (get-lambda-environment leaf))
                              ;; To make sure the allocation is in the same
                              ;; stack frame as the dynamic extent.
                              (eq (node-home-lambda enclose)
