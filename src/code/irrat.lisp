@@ -742,7 +742,7 @@
          (complex-acosh number)
          (%acoshf (coerce number 'single-float))))
     (((foreach single-float double-float))
-     (if (< number (coerce 1 '(dispatch-type number)))
+     (if (< number 1)
          (complex-acosh (complex number))
          (acosh number)))
     ((complex)
@@ -754,17 +754,15 @@
   (number-dispatch ((number number))
     ((rational)
      ;; atanh is complex if |number| > 1
-     (if (or (> number 1) (< number -1))
-         (complex-atanh number)
-         (%atanhf (coerce number 'single-float))))
+     (if (<= -1 number 1)
+         (%atanhf (coerce number 'single-float))
+         (complex-atanh number)))
     (((foreach single-float double-float))
-     (if (or (> number (coerce 1 '(dispatch-type number)))
-             (< number (coerce -1 '(dispatch-type number))))
-         (complex-atanh (complex number))
-         (atanh number)))
+     (if (<= -1 number 1)
+         (atanh number)
+         (complex-atanh (complex number))))
     ((complex)
      (complex-atanh number))))
-
 
 ;;;; not-OLD-SPECFUN stuff
 ;;;;
