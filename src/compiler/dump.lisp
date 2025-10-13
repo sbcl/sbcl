@@ -1233,9 +1233,9 @@
                 (dump-fop 'fop-known-fun fasl-output))
                (:coverage-marks
                 ;; Avoid the coalescence done by DUMP-VECTOR
-                (dump-specialized-vector (make-array (cdr entry)
-                                                     :element-type '(unsigned-byte 8)
-                                                     :initial-element #xFF)
+                (dump-specialized-vector (sb-xc:make-array (cdr entry)
+                                                           :element-type '(unsigned-byte 8)
+                                                           :initial-element #xFF)
                                          fasl-output)))))))
 
       ;; Dump the debug info.
