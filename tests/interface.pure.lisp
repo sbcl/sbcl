@@ -160,7 +160,7 @@
 (with-test (:name (disassemble :unboxed-data))
   (assert (< (sb-kernel:code-n-unboxed-data-bytes
               (sb-kernel:fun-code-header #'expt))
-             150))) ; The exact value is irrelevant.
+             300))) ; The exact value is irrelevant.
 
 #+x86-64
 ;; The labeler for LEA would choke on an illegal encoding

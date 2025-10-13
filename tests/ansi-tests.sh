@@ -1,9 +1,14 @@
 #!/bin/sh -e
 
+# Usage: ansi-tests.sh [options]
+#
+# Currently the only option with any effect is `--coverage`, which
+# will collect coverage information from running the tests if the host
+# SBCL is built with :sb-cover-for-internals.
+
 if [ ! -e ansi-test ]; then
    git clone --depth 1 https://github.com/sbcl/ansi-test.git
 fi
-
 
 cd ansi-test
 rm -fr sandbox/scratch
@@ -13,7 +18,9 @@ rm -fr sandbox/scratch
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
                   --eval '(in-package :cl-test)' \
                   --eval '(disable-note :nil-vectors-are-strings)' \
+                  --eval '(when (member "--coverage" sb-ext:*posix-argv* :test (function equal)) (require :sb-cover) (funcall (intern "RESET-COVERAGE" "SB-COVER")))' \
                   --eval '(time (do-tests))' \
+                  --eval '(when (member "--coverage" sb-ext:*posix-argv* :test (function equal)) (funcall (intern "SAVE-COVERAGE-IN-FILE" "SB-COVER") "../../ansi-tests.coverage"))' \
                   --eval '(let* ((expected (list* "APROPOS-LIST.ERROR.2" "APROPOS.ERROR.2" "COMPILE-FILE.2"
  "DEFINE-COMPILER-MACRO.8" "DESTRUCTURING-BIND.ERROR.10"
  "EXP.ERROR.10" "EXP.ERROR.11" "EXP.ERROR.8"
@@ -72,4 +79,5 @@ rm -fr sandbox/scratch
    (cond ((or diff1 diff2)
            (format t "Difference ~@[added ~a~] ~@[removed ~a~]~%" diff1 diff2)
            (sb-ext:exit :code 1))
-         ((sb-ext:exit))))'
+         ((sb-ext:exit))))' \
+                  $*

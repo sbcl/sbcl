@@ -69,6 +69,8 @@
                   (search "MPFR" s))))))
 
 (defun perform (defsystem)
+  (when (member :sb-cover-for-internals sb-impl:+internal-features+)
+    (proclaim '(optimize sb-c::store-coverage-data)))
   (let* ((specified-sources (getf defsystem :components))
          ;; This path is basically arbitrary. I wanted to avoid creating
          ;; another directory under "obj/" but alas ...

@@ -1,7 +1,8 @@
 (unless (gethash 'sb-c:jump-table sb-c::*backend-template-names*)
   (invoke-restart 'run-tests::skip-file))
 
-(with-test (:name :symbol-case-as-jump-table)
+(with-test (:name :symbol-case-as-jump-table
+                  :fails-on :sb-cover-for-internals) ; lp#2131957
   ;; Assert that a prototypical example of (CASE symbol ...)
   ;; was converted to a jump table.
   (let ((c (sb-kernel:fun-code-header #'sb-debug::parse-trace-options)))
@@ -137,7 +138,8 @@
     ((#\a) 0)
     ((#\b) nil)))
 
-(with-test (:name :array-subtype-dispatch-table)
+(with-test (:name :array-subtype-dispatch-table
+                  :fails-on :sb-cover-for-internals) ; lp#2131957
   (assert (> (sb-kernel:code-jump-table-words
               (sb-kernel:fun-code-header #'sb-kernel:vector-subseq))
              20)))

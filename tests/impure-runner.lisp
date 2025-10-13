@@ -1,5 +1,6 @@
 (with-compilation-unit ()
   (let ((*evaluator-mode* :compile))
+    #+coverage (require :sb-cover)
     (load "test-util")
     (load "assertoid")))
 
@@ -42,7 +43,11 @@
                     (invoke-restart 'skip-file))))
         (let ((*package* (find-package :cl-user)))
           #+nil (sb-aprof:aprof-run test-fun :arguments (list file))
-          (funcall test-fun file)))
+          #+coverage (sb-cover:reset-coverage)
+          (funcall test-fun file)
+          #+coverage
+          (let ((name (concatenate 'string file ".coverage")))
+            (sb-cover:save-coverage-in-file name))))
     (skip-file ()
       (format t ">>>~a<<<~%"*failures*)))
   (report-test-status)

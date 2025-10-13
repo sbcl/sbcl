@@ -2835,11 +2835,22 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))
                (descriptor-bits fn))))) ; Store a taagged pointer to the function
       (do () ((>= header-index n-boxed-words))
-       (let ((constant (svref stack stack-index)))
-         (cond ((and (consp constant) (eq (car constant) :known-fun))
-                (push (list* (cdr constant) des header-index) *deferred-known-fun-refs*))
-               (t
-                (write-wordindexed des header-index constant))))
+        (let ((constant (svref stack stack-index)))
+          (cond ((and (consp constant) (eq (car constant) :known-fun))
+                 (push (list* (cdr constant) des header-index) *deferred-known-fun-refs*))
+                (t
+                 #+sb-cover-for-internals
+                 (when (and (= header-index (1- n-boxed-words))
+                            ;; (typep constant '(eql sb-c::coverage-map))
+                            (descriptor-p constant)
+                            (= (descriptor-lowtag constant) #.sb-vm:list-pointer-lowtag)
+                            (let ((car (cold-car constant)))
+                              (and (descriptor-p car)
+                                   (= (descriptor-lowtag car) #.sb-vm:other-pointer-lowtag)
+                                   (= (descriptor-widetag car) #.sb-vm:symbol-widetag)
+                                   (eql (warm-symbol car) 'sb-c::coverage-map))))
+                   (push (cold-cons :note-code-covered des) *!cold-toplevels*))
+                 (write-wordindexed des header-index constant))))
         (incf header-index)
         (incf stack-index)))
     des))
@@ -2927,17 +2938,30 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (+ (- (descriptor-bits (car *asm-routine-vector*)) sb-vm:other-pointer-lowtag)
      (ash (+ i sb-vm:vector-data-offset) sb-vm:word-shift)))
 
-;; The partial source info is not needed during the cold load, since
-;; it can't be interrupted.
+;; The partial source info is needed only for propagation of coverage
+;; information metadata, since the load can't be interrupted.
 (define-cold-fop (fop-note-partial-source-info)
-  (pop-stack)
-  (pop-stack)
-  (pop-stack)
+  (let ((plist (pop-stack))
+        (created (pop-stack))
+        (namestring (pop-stack)))
+    (setf (%fasl-input-partial-source-info (fasl-input))
+          (sb-c::make-debug-source :namestring (host-object-from-core namestring)
+                                   :created (host-object-from-core created)
+                                   :plist (host-object-from-core plist))))
   (values))
 
 (define-cold-fop (fop-note-full-calls)
   (sb-c::accumulate-full-calls (host-object-from-core (pop-stack)))
   (values))
+
+(define-cold-fop (fop-record-code-coverage)
+  (let ((paths (pop-stack)))
+    (push (cold-list :record-code-coverage
+                     (host-constant-to-core
+                      (sb-c::debug-source-namestring
+                       (%fasl-input-partial-source-info (fasl-input))))
+                     paths)
+          *!cold-toplevels*)))
 
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (code-obj fixups index count &optional asm-code

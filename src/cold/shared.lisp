@@ -305,6 +305,11 @@
           (pushnew :system-tlabs sb-xc:*features*))
         (when (target-featurep '(:and (:or :permgen :immobile-space) :x86-64))
           (pushnew :compact-instance-header sb-xc:*features*))
+        (when (target-featurep :sb-cover-for-internals)
+          ;; coverage of internals currently works substantially
+          ;; better if we preserve more information, and don't do
+          ;; various link-time optimizations.
+          (pushnew :sb-devel sb-xc:*features*))
         (when (target-featurep :immobile-space)
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)

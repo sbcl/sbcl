@@ -291,6 +291,11 @@
  ;; (Replaces use of SIG_STOP_FOR_GC.)
  ; :sb-safepoint
 
+ ;; Build the SBCL system itself with code coverage data marks (and sequences
+ ;; in the compiled code to set those marks).  Inevitably makes the system as
+ ;; a whole slower, but allows coverage of tests to be measured.
+ ; :sb-cover-for-internals
+
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

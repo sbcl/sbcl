@@ -16,10 +16,12 @@
 . ./subr.sh
 
 run_sbcl <<EOF
+  (when (member :sb-cover-for-internals sb-impl::+internal-features+)
+    (exit :code 2)) ; breaks static linkage somehow. lp#2131956
   #+(and linux elf sb-thread)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
- (exit :code 2) ; otherwise
+  (exit :code 2) ; otherwise
 EOF
 status=$?
 if [ $status != 0 ]; then # test can't be executed

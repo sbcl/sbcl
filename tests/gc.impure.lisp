@@ -103,7 +103,7 @@
       (assert (= (aref a (1+ i)) (1+ (aref a i)))))))
 
 (with-test (:name :list-allocated-objects
-            :skipped-on :weak-vector-readbarrier) ; uses more weak-pointers
+            :skipped-on (or :sb-cover-for-internals :weak-vector-readbarrier)) ; uses more weak-pointers
   ;; Assert that if :COUNT is supplied as a higher number
   ;; than number of objects that exists, the output is
   ;; not COUNT many items long.

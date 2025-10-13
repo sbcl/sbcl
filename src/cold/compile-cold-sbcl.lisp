@@ -75,7 +75,10 @@
        (sb-c:insert-step-conditions 0)
        ;; save FP and PC for alien calls -- or not
        (sb-c:alien-funcall-saves-fp-and-pc
-        ,(if (find :x86 sb-xc:*features*) 3 0)))))
+        ,(if (find :x86 sb-xc:*features*) 3 0))
+       ;; store coverage data
+       (sb-c:store-coverage-data
+        ,(if (find :sb-cover-for-internals sb-xc:*features*) 3 0)))))
 
 (defun in-target-cross-compilation-mode (fun)
   "Call FUN with everything set up appropriately for cross-compiling

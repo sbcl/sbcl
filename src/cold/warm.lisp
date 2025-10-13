@@ -43,7 +43,8 @@ sb-kernel::
             (safety 2) (speed 2)
             ;; never insert stepper conditions
             (sb-c:insert-step-conditions 0)
-            (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)))
+            (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)
+            (sb-c:store-coverage-data #+sb-cover-for-internals 3 #-sb-cover-for-internals 0)))
 
 (locally
     (declare (notinline find-symbol)) ; don't ask

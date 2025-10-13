@@ -4,6 +4,12 @@
   (push :slow *features*))
 (when (member "--gc-verify" *posix-argv* :test #'equal)
   (push :gc-verify *features*))
+(when (member "--coverage" *posix-argv* :test #'equal)
+  (assert (member :sb-cover-for-internals sb-impl::+internal-features+))
+  (push :coverage *features*))
+
+#+coverage
+(require :sb-cover)
 
 (load "test-util.lisp")
 (load "assertoid.lisp")
@@ -54,7 +60,8 @@
             ((string= arg "--no-color"))
             ((or (string= arg "--gc-stress")
                  (string= arg "--slow")
-                 (string= arg "--gc-verify")))
+                 (string= arg "--gc-verify")
+                 (string= arg "--coverage")))
             ((string= arg "--skip-to")
              (setf skip-to (pop remainder)))
             (t
@@ -543,7 +550,11 @@
                            (cons :interpreter *features*)
                            *features*)))
                 (let ((start (get-internal-real-time)))
+                  #+coverage (sb-cover:reset-coverage)
                   (funcall test-fun file)
+                  #+coverage
+                  (let ((name (concatenate 'string (namestring file) ".coverage")))
+                    (sb-cover:save-coverage-in-file name))
                   (log-file-elapsed-time file start log))))
             (skip-file ())))
         (sb-impl::disable-stepping)
@@ -579,6 +590,7 @@
            #+gc-stress "--eval" #+gc-stress "(push :gc-stress *features*)"
            #+gc-verify "--eval" #+gc-verify "(push :gc-verify *features*)"
            #+slow "--eval" #+slow "(push :slow *features*)"
+           #+coverage "--eval" #+coverage "(push :coverage *features*)"
            "--load" load
            "--eval" (write-to-string eval
                                      :right-margin 1000))
