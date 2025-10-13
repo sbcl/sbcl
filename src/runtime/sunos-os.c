@@ -62,6 +62,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 
     if (gencgc_handle_wp_violation(context, fault_addr)) return;
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (handle_foreign_call_trigger(context, fault_addr)) return;
+#endif
+
     if (!handle_guard_page_triggered(context, fault_addr))
             lisp_memory_fault_error(context, fault_addr);
 }

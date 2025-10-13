@@ -62,6 +62,10 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
     if (gencgc_handle_wp_violation(context, addr)) return;
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (handle_foreign_call_trigger(context, addr)) return;
+#endif
+
     if (!handle_guard_page_triggered(context, addr)) {
         //interrupt_handle_now(signal, info, context);
         lisp_memory_fault_error(context, addr);

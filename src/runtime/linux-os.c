@@ -294,6 +294,11 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 #ifdef LISP_FEATURE_GENCGC
     if (gencgc_handle_wp_violation(context, addr)) return;
 #endif
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (handle_foreign_call_trigger(context, addr)) return;
+#endif
+
     extern int diagnose_arena_fault(os_context_t*,char*);
 #ifdef LISP_FEATURE_SYSTEM_TLABS
     if (diagnose_arena_fault(context, addr)) return;

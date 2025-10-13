@@ -297,6 +297,10 @@ memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     if (handle_safepoint_violation(context, fault_addr)) return;
 #endif
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (handle_foreign_call_trigger(context, fault_addr)) return;
+#endif
+
 #ifdef LISP_FEATURE_GENCGC
     if (gencgc_handle_wp_violation(context, fault_addr)) return;
 #endif

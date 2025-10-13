@@ -4278,12 +4278,6 @@ bool continue_after_memoryfault_on_unprotected_pages = 0;
 
 int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* fault_addr)
 {
-
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-    if (handle_foreign_call_trigger(context, fault_addr))
-        return 1;
-#endif
-
     page_index_t page_index = find_page_index(fault_addr);
 
     /* Check whether the fault is within the dynamic space. */

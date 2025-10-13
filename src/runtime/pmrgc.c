@@ -910,7 +910,14 @@ garbage_collect_generation(generation_index_t generation, int raise,
     }
 #endif
 
-
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    /* Signal handlers might run concurrently with the GC */
+    for (int i = 0; i < NSIG; i++) {
+        lispobj fun = lisp_sig_handlers[i];
+        if(functionp(fun))
+            pin_exact_root(fun);
+    }
+#endif
     /* Scavenge all the rest of the roots. */
 
 #if GENCGC_IS_PRECISE
@@ -937,7 +944,16 @@ garbage_collect_generation(generation_index_t generation, int raise,
         /* Scrub the unscavenged control stack space, so that we can't run
          * into any stale pointers in a later GC (this is done by the
          * stop-for-gc handler in the other threads). */
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+        for_each_thread(th) {
+            /* Threads stopped by gc_stop_the_world scrub the stack on
+             * their own in sig_stop_for_gc_handler. */
+            if (csp_around_foreign_call(th) != 0)
+                scrub_thread_control_stack(th);
+        }
+#else
         scrub_control_stack();
+#endif
 # endif
     }
 #endif
