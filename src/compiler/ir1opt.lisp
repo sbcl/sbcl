@@ -538,8 +538,7 @@
         (kind (basic-combination-kind node)))
     (case kind
       (:known
-       (cond ((and (constant-fold-call-p node)
-                   (constant-fold-call node)))
+       (cond ((constant-fold-call node))
              ((and (ir1-attributep (fun-info-attributes info) commutative)
                    (= (length args) 2)
                    (constant-lvar-p (first args))
@@ -1248,8 +1247,7 @@
          (process-info)
          (unless (eq (combination-kind node) :error) ;; caused by derive-type
            (let ((attr (fun-info-attributes info)))
-             (when (and (constant-fold-call-p node)
-                        (constant-fold-call node))
+             (when (constant-fold-call node)
                (return-from ir1-optimize-combination))
              ;; Don't transform locally flushable functions,
              ;; their transforms won't know that they are flushable.
@@ -1868,9 +1866,7 @@
             (ir1-attributep attributes foldable)
             (not (ir1-attributep attributes call)))))))
 
-;;; Return T if the function is foldable and if it's marked as CALL
-;;; all function arguments are FOLDABLE too.
-(defun constant-fold-call-p (combination)
+(defun constant-fold-call (combination)
   (let* ((info (basic-combination-fun-info combination))
          (attr (fun-info-attributes info))
          (args (basic-combination-args combination)))
@@ -1896,16 +1892,28 @@
                             (and fun
                                  (constant-fold-arg-p fun)))
                           (constant-lvar-ignore-types-p arg))
-                (return-from constant-fold-call-p)))
+                (return-from constant-fold-call)))
             combination
             :info info
             :unknown-keys-fun
             (lambda (lvars)
               (declare (ignore lvars))
-              (return-from constant-fold-call-p)))
-           t)
+              (return-from constant-fold-call)))
+           (%constant-fold-call combination))
           (t
-           (every #'constant-lvar-ignore-types-p args)))))
+           (let (mu-constant)
+             (when (loop for arg in args
+                         for uses = (lvar-uses arg)
+                         always (cond ((atom uses)
+                                       (constant-lvar-ignore-types-p arg))
+                                      ((and (not mu-constant)
+                                            (loop for use in uses
+                                                  always (and (ref-p use)
+                                                              (constant-p (ref-leaf use)))))
+                                       (setf mu-constant arg))))
+               (if mu-constant
+                   (%constant-fold-call-multiple-uses combination mu-constant)
+                   (%constant-fold-call combination))))))))
 
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. If there is an error during the
@@ -1914,7 +1922,7 @@
 ;;;
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
-(defun constant-fold-call (call)
+(defun %constant-fold-call (call)
   (flet ((value (lvar)
            (if (lvar-p lvar)
                (let ((name (lvar-fun-name lvar t)))
@@ -1959,6 +1967,53 @@
                                        values)))
                   fun-name))
                t))))))
+;; fold
+;; (1+ (if a 1 2))
+;; to
+;; (if a 2 3)
+(defun %constant-fold-call-multiple-uses (call multi-use-lvar)
+  (flet ((value (lvar)
+           (if (lvar-p lvar)
+               (let ((name (lvar-fun-name lvar t)))
+                 (if name
+                     (fdefinition name)
+                     (lvar-value lvar t)))
+               lvar))
+         (ref-value (ref)
+           (let ((name (ref-fun-name ref t)))
+             (if name
+                 (fdefinition name)
+                 (constant-value (ref-leaf ref))))))
+    (with-ir1-environment-from-node call
+      (let* ((fun-name (lvar-fun-name (combination-fun call) t))
+             (args (combination-args call))
+             (fun-info-folder (fun-info-folder (combination-fun-info call)))
+             (folder (or fun-info-folder
+                         fun-name))
+             (values (loop for use in (lvar-uses multi-use-lvar)
+                           collect
+                           (multiple-value-bind (values win)
+                               (careful-call folder
+                                             (loop for arg in args
+                                                   collect (if (eq arg multi-use-lvar)
+                                                               (ref-value use)
+                                                               (value arg))))
+                             (unless (and win
+                                          (= (length values) 1)) ;; TODO: handle multiple values
+                               (return-from %constant-fold-call-multiple-uses))
+                             values))))
+        (erase-lvar-type multi-use-lvar)
+        (loop for ref in (lvar-uses multi-use-lvar)
+              for (value) in values
+              do (change-ref-leaf ref (find-constant value)
+                                  :recklessly t))
+        (let ((ll (make-gensym-list (length args))))
+         (transform-call call
+                         `(lambda ,ll
+                            (declare (ignorable ,@ll))
+                            ,(nth (position multi-use-lvar args) ll))
+                         fun-name))
+        t))))
 
 (defun fold-call-derived-to-constant (call)
   (when (flushable-combination-p call)

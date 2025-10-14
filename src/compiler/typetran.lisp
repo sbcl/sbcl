@@ -1653,7 +1653,7 @@
   (when (and (constant-lvar-p x) (constant-lvar-p type))
     (let ((value (lvar-value x)))
       (when (or (numberp value) (characterp value))
-        (constant-fold-call node)
+        (%constant-fold-call node)
         t))))
 
 ;;; Drops dimension information from vector types.

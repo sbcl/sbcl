@@ -7674,7 +7674,7 @@
 (defoptimizer (encode-universal-time optimizer)
     ((second minute hour date month year time-zone) node)
   (when (every #'constant-lvar-p (basic-combination-args node))
-    (constant-fold-call node)
+    (%constant-fold-call node)
     t))
 
 #-(and win32 (not sb-thread))

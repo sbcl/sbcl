@@ -617,3 +617,10 @@
                  (setf (aref (the (OR (ARRAY SINGLE-FLOAT) (ARRAY DOUBLE-FLOAT)) a) 0)
                        n)))
              1)))
+
+(with-test (:name :constant-fold-multiple-value-uses)
+  (assert (not (ir-full-calls
+                `(lambda (a)
+                   (1+ (if a
+                           1
+                           2d0)))))))
