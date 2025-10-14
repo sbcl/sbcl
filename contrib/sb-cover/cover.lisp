@@ -822,7 +822,7 @@ of the deepest (i.e. smallest) possible form is returned."
                          real-form
                          (car real-form))
           for positions = (gethash form source-map)
-          until (and positions (null (cdr positions)))
-          finally (destructuring-bind ((start end suppress)) positions
+          until positions
+          finally (destructuring-bind ((start end suppress)) (last positions)
                     (declare (ignore suppress))
                     (return (values (1- start) end))))))
