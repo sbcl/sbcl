@@ -751,7 +751,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
-  (flushable call mv-deriver)
+  (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown substitute
@@ -763,7 +763,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
-  (flushable call mv-deriver)
+  (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (remove-if remove-if-not)
@@ -774,7 +774,7 @@
    (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
-  (flushable call mv-deriver)
+  (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown (substitute-if substitute-if-not)
@@ -785,7 +785,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
-  (flushable call mv-deriver)
+  (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown delete
@@ -839,7 +839,7 @@
             (:from-end t)
             (:key (function-designator ((nth-arg 0 :sequence t)))))
   consed-sequence
-  (flushable call mv-deriver)
+  (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 0))
 
 (defknown delete-duplicates
