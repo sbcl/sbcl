@@ -722,17 +722,17 @@ returns NIL each time."
                         0)))))
          ,@body))))
 
+(declaim (inline %try-mutex))
 (defun %try-mutex (mutex)
   (declare (type mutex mutex) (optimize (speed 3)))
-
   #+sb-futex
-         ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-         (let ((id (current-vmthread-id)))
-           (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
-                  (setf (mutex-%owner mutex) id)
-                  t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
-                 ((= (mutex-%owner mutex) id)
-                  (error "Recursive lock attempt ~S." mutex))))
+  ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
+  (let ((id (current-vmthread-id)))
+    (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
+           (setf (mutex-%owner mutex) id)
+           t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
+          ((= (mutex-%owner mutex) id)
+           (error "Recursive lock attempt ~S." mutex))))
 
   #-sb-futex
   (progn (barrier (:read))
@@ -1203,6 +1203,7 @@ IF-NOT-OWNER is :FORCE)."
   (if (or timeout (deadlock-detection-policy-p env))
       `(values (deadlock-aware-condvar-wait ,queue ,mutex ,timeout))
       `(values (condvar-wait ,queue ,mutex))))
+(declaim (inline deadlock-aware-condvar-wait))
 (defun deadlock-aware-condvar-wait (queue mutex timeout)
   (multiple-value-call #'%condition-wait queue mutex t timeout (decode-timeout timeout)))
 (defun condvar-wait (queue mutex)
@@ -1248,6 +1249,7 @@ associated data:
       (push data *data*)
       (condition-notify *queue*)))
 "
+  (declare (explicit-check timeout))
   ;; %CONDITION-WAIT can return 3 values. In most situations the values are never used,
   ;; but the semaphore implementation uses them.
   (values (deadlock-aware-condvar-wait queue mutex timeout)))

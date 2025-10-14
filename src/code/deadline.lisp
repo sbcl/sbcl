@@ -196,12 +196,12 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
 ;;;
 ;;; If SECONDS is NIL and there is no *DEADLINE* all returned values
 ;;; are NIL.
-(declaim (ftype (function ((or null (real 0)))
-                          (values (or null internal-seconds)
-                                  (or null (mod 1000000))
-                                  (or null internal-seconds)
-                                  (or null (mod 1000000))
-                                  t))
+(declaim (ftype (sfunction ((or null (real 0)))
+                           (values (or null internal-seconds)
+                                   (or null (mod 1000000))
+                                   (or null internal-seconds)
+                                   (or null (mod 1000000))
+                                   boolean))
                 decode-timeout))
 (defun decode-timeout (seconds)
   "Decodes a relative timeout in SECONDS into five values, taking any
