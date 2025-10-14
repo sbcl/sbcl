@@ -24,6 +24,7 @@
 
 
 ;;; No instrumentation
+(sb-cover:clear-coverage)
 (compile-load "test-data-1")
 (report-expect-failure)
 
