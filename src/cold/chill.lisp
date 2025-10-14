@@ -19,7 +19,7 @@
   (:use "CL"))
 (in-package "SB-COLD")
 
-(setq *features* (union *features* sb-impl:+internal-features+))
+(setq *features* (cons :sb-xc (union *features* sb-impl:+internal-features+)))
 
 (defun backend-asm-package-name ()
   (package-name sb-assem::*backend-instruction-set-package*))
