@@ -919,10 +919,14 @@
           (return index))))))
 
 ;;; Bypass the character buffer, the caller must ensure that it's empty
-(defun fd-stream-read-sequence/utf-8-to-string (stream string start end &aux (index start))
+(macrolet ((def-fd-stream-read-sequence/utf-8 (name string-type simd-op newline-variant)
+               #-(and sb-unicode 64-bit little-endian)
+               (declare (ignore simd-op))
+`(defun ,name (stream string start end
+               &aux (index start) ,@(when (eql newline-variant :crlf) '(eof)))
   (declare (type fd-stream stream)
            (type index start end index)
-           (type (simple-array character (*)) string))
+           (type ,string-type string))
   (block outer
     (loop
      (do ((instead (fd-stream-instead stream)))
@@ -935,12 +939,12 @@
            (setf (fd-stream-listen stream) nil))
          (return index)))
      #+(and sb-unicode 64-bit little-endian)
-     (setf index
-           (sb-vm::simd-copy-utf8-to-character-string index end string (fd-stream-ibuf stream)))
+     (setf index (,simd-op index end string (fd-stream-ibuf stream)))
      (let* ((ibuf (fd-stream-ibuf stream))
             (head (buffer-head ibuf))
             (tail (buffer-tail ibuf))
             (sap (buffer-sap ibuf))
+            ,@(when (eql newline-variant :crlf) '(requested-refill))
             incomplete)
        (declare (type index head tail))
        (flet ((decode-break (reason)
@@ -948,53 +952,39 @@
                 (when (stream-decoding-error-and-handle stream reason 1)
                   (return-from outer index))
                 (return)))
-         (utf8-char-loop))
+         (utf8-char-loop :crlf ,(eql newline-variant :crlf)))
        (when (= index end)
          (setf (buffer-head ibuf) head)
          (return index))
        (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (when (or (not incomplete)
-                   (stream-decoding-error-and-handle stream (- tail head) 1))
-           (return index)))))))
-
-#+sb-unicode
-(defun fd-stream-read-sequence/utf-8-to-base-string (stream string start end &aux (index start))
-  (declare (type fd-stream stream)
-           (type index start end index)
-           (type simple-base-string string))
-  (block outer
-    (loop
-     (do ((instead (fd-stream-instead stream)))
-         ((= (fill-pointer instead) 0)
-          (setf (fd-stream-listen stream) nil))
-       (setf (aref string index) (vector-pop instead))
-       (incf index)
-       (when (= index end)
-         (when (= (fill-pointer instead) 0)
-           (setf (fd-stream-listen stream) nil))
-         (return index)))
-     #+(and sb-unicode 64-bit little-endian)
-     (setf index
-           (sb-vm::simd-copy-utf8-to-base-string index end string (fd-stream-ibuf stream)))
-     (let* ((ibuf (fd-stream-ibuf stream))
-            (head (buffer-head ibuf))
-            (tail (buffer-tail ibuf))
-            (sap (buffer-sap ibuf))
-            incomplete)
-       (declare (type index head tail))
-       (flet ((decode-break (reason)
-                (setf (buffer-head ibuf) head)
-                (when (stream-decoding-error-and-handle stream reason 1)
-                  (return-from outer index))
-                (return)))
-         (utf8-char-loop))
-       (when (= index end)
-         (setf (buffer-head ibuf) head)
-         (return index))
-       (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (when (or (not incomplete)
-                   (stream-decoding-error-and-handle stream (- tail head) 1))
-           (return index)))))))
+         (,@(if (eql newline-variant :crlf)
+                '(if requested-refill (setf eof t))
+                '(progn))
+            (when (or (not incomplete)
+                    (stream-decoding-error-and-handle stream (- tail head) 1))
+            (return index))))))))))
+  (def-fd-stream-read-sequence/utf-8
+      fd-stream-read-sequence/utf-8-to-string
+      (simple-array character (*))
+      sb-vm::simd-copy-utf8-to-character-string
+      :lf)
+  #+sb-unicode
+  (def-fd-stream-read-sequence/utf-8
+      fd-stream-read-sequence/utf-8-to-base-string
+      simple-base-string
+      sb-vm::simd-copy-utf8-to-base-string
+      :lf)
+  (def-fd-stream-read-sequence/utf-8
+      fd-stream-read-sequence/utf-8-crlf-to-character-string
+      (simple-array character (*))
+      sb-vm::simd-copy-utf8-crlf-to-character-string
+      :crlf)
+  #+sb-unicode
+  (def-fd-stream-read-sequence/utf-8
+      fd-stream-read-sequence/utf-8-crlf-to-base-string
+      simple-base-string
+      sb-vm::simd-copy-utf8-crlf-to-base-string
+      :crlf))
 
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64)))
@@ -1399,92 +1389,3 @@
       (setf (buffer-head ibuf) head)
       (truly-the index (values (truncate string-offset 4))))))
 
-(defun fd-stream-read-sequence/utf-8-crlf-to-character-string (stream string start end)
-  (declare (type fd-stream stream)
-           (type index start end)
-           (type (simple-array character (*)) string))
-  (let (eof
-        (index start))
-    (declare (index index))
-    (block outer
-      (loop
-       (do ((instead (fd-stream-instead stream)))
-           ((= (fill-pointer instead) 0)
-            (setf (fd-stream-listen stream) nil))
-         (setf (aref string index) (vector-pop instead))
-         (incf index)
-         (when (= index end)
-           (when (= (fill-pointer instead) 0)
-             (setf (fd-stream-listen stream) nil))
-           (return index)))
-       #+(and sb-unicode 64-bit little-endian)
-       (setf index
-             (sb-vm::simd-copy-utf8-crlf-to-character-string index end string (fd-stream-ibuf stream)))
-       (let* ((ibuf (fd-stream-ibuf stream))
-              (head (buffer-head ibuf))
-              (tail (buffer-tail ibuf))
-              (sap (buffer-sap ibuf))
-              requested-refill
-              incomplete)
-         (declare (type index head tail))
-         (flet ((decode-break (reason)
-                  (setf (buffer-head ibuf) head)
-                  (when (stream-decoding-error-and-handle stream reason 1)
-                    (return-from outer index))
-                  (return)))
-           (utf8-char-loop :crlf t))
-         (when (or (= end index)
-                   eof)
-           (setf (buffer-head ibuf) head)
-           (return index))
-         (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-           (if requested-refill
-               (setf eof t)
-               (when (or (not incomplete)
-                         (stream-decoding-error-and-handle stream (- tail head) 1))
-                 (return index)))))))))
-
-(defun fd-stream-read-sequence/utf-8-crlf-to-base-string (stream string start end)
-  (declare (type fd-stream stream)
-           (type index start end)
-           (type simple-base-string string))
-  (let (eof
-        (index start))
-    (declare (index index))
-    (block outer
-      (loop
-       (do ((instead (fd-stream-instead stream)))
-           ((= (fill-pointer instead) 0)
-            (setf (fd-stream-listen stream) nil))
-         (setf (aref string index) (vector-pop instead))
-         (incf index)
-         (when (= index end)
-           (when (= (fill-pointer instead) 0)
-             (setf (fd-stream-listen stream) nil))
-           (return index)))
-       #+(and sb-unicode 64-bit little-endian)
-       (setf index
-             (sb-vm::simd-copy-utf8-crlf-to-base-string index end string (fd-stream-ibuf stream)))
-       (let* ((ibuf (fd-stream-ibuf stream))
-              (head (buffer-head ibuf))
-              (tail (buffer-tail ibuf))
-              (sap (buffer-sap ibuf))
-              requested-refill
-              incomplete)
-         (declare (type index head tail))
-         (flet ((decode-break (reason)
-                  (setf (buffer-head ibuf) head)
-                  (when (stream-decoding-error-and-handle stream reason 1)
-                    (return-from outer index))
-                  (return)))
-           (utf8-char-loop :crlf t))
-         (when (or (= end index)
-                   eof)
-           (setf (buffer-head ibuf) head)
-           (return index))
-         (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-           (if requested-refill
-               (setf eof t)
-               (when (or (not incomplete)
-                         (stream-decoding-error-and-handle stream (- tail head) 1))
-                 (return index)))))))))
