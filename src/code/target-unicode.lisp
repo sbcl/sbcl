@@ -67,6 +67,8 @@
     (or (gethash keys *phash-cache-file-contents*)
         (let ((start (get-internal-real-time))
               (answer (sb-c:make-perfect-hash-lambda keys)))
+          (declare (ignorable start))
+          #+nil
           (format *debug-io* "~&Computed perfect hash of ~D keys: ~F sec (~S)~%"
                   (length keys)
                   (/ (- (get-internal-real-time) start) internal-time-units-per-second)
