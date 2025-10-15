@@ -63,12 +63,11 @@
    *posix-argv*
    (loop for i from 0
          for arg =
-         (possibly-base-stringize
-          (sb-alien:deref (sb-alien:extern-alien posix_argv
-                           (* (sb-alien:c-string #+win32 :external-format #+win32 :ucs-2)))
-                          i))
+         (sb-alien:deref (sb-alien:extern-alien posix_argv
+                          (* (sb-alien:c-string #+win32 :external-format #+win32 :ucs-2)))
+                         i)
          while arg
-         collect arg))
+         collect (possibly-base-stringize arg)))
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")
   ;; Temporary value, so that #'PARSE-NATIVE-NAMESTRING won't blow up
   ;; when we call it below.

@@ -136,7 +136,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   "Return the \"value\" part of the environment string \"name=value\" which
 corresponds to NAME, or NIL if there is none."
   (with-alien ((posix-getenv (function c-string (c-string :not-null t)) :extern "getenv"))
-    (possibly-base-stringize (alien-funcall posix-getenv name)))))
+    (acond ((alien-funcall posix-getenv name) (possibly-base-stringize it))))))
 
 ;;; from stdio.h
 

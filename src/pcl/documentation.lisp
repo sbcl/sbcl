@@ -25,7 +25,7 @@
 
 (defun (setf fun-doc) (new-value function)
   (declare (type (or null string) new-value))
-  (let ((new-value (possibly-base-stringize new-value)))
+  (let ((new-value (canonical-docstring new-value)))
     (typecase function
       (interpreted-function
        #+sb-fasteval
@@ -95,7 +95,7 @@
 ;;; It, and the corresponding reader, are not for use outside this file.
 (defun (setf %doc-info) (string name doc-type)
   (declare (type (or null string) string))
-  (let ((string (possibly-base-stringize string))
+  (let ((string (canonical-docstring string))
         (info-number
           (macrolet ((info-number (class type)
                        (meta-info-number (meta-info class type))))
@@ -260,7 +260,7 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (set-function-name-documentation x (possibly-base-stringize new-value))
+  (set-function-name-documentation x (canonical-docstring new-value))
   new-value)
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
@@ -268,7 +268,7 @@
     (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
-  (set-function-name-documentation x (possibly-base-stringize new-value))
+  (set-function-name-documentation x (canonical-docstring new-value))
   new-value)
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
@@ -279,7 +279,7 @@
 ;;; except for short form DEFSETF which is in the globaldb value directly.
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
   (let ((expander (info :setf :expander x))
-        (new-value (possibly-base-stringize new-value)))
+        (new-value (canonical-docstring new-value)))
     (typecase expander
       ((cons symbol) (setf (second expander) new-value))
       (cons (setf (documentation (cdr expander) 'function) new-value))
@@ -306,12 +306,12 @@
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  (setf (slot-value x '%documentation) (canonical-docstring new-value))
   new-value)
 
 (defmethod (setf documentation)
     (new-value (x method-combination) (doc-type (eql 'method-combination)))
-  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  (setf (slot-value x '%documentation) (canonical-docstring new-value))
   new-value)
 
 (defmethod (setf documentation)
@@ -324,7 +324,7 @@
 
 (defmethod (setf documentation)
     (new-value (x standard-method) (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) (possibly-base-stringize new-value))
+  (setf (slot-value x '%documentation) (canonical-docstring new-value))
   new-value)
 
 ;;; types, classes, and structure names
@@ -359,7 +359,7 @@
           (defmethod (setf documentation) (new-value
                                            (x symbol)
                                            (doc-type (eql ',doc-type)))
-            (let ((new-value (possibly-base-stringize new-value)))
+            (let ((new-value (canonical-docstring new-value)))
              (acond
                ((find-class x nil)
                 (setf (documentation it t) new-value))
@@ -373,7 +373,7 @@
 
   (define-type-documentation-methods class
       (slot-value x '%documentation)
-      (setf (slot-value x '%documentation) (possibly-base-stringize new-value)))
+      (setf (slot-value x '%documentation) (canonical-docstring new-value)))
 
   ;; although the CLHS doesn't mention this, it is reasonable to
   ;; assume that parallel treatment of condition-class was intended
@@ -403,7 +403,7 @@
 
 (defmethod (setf documentation)
     (new-value (slotd standard-slot-definition) (doc-type (eql 't)))
-  (setf (slot-value slotd '%documentation) (possibly-base-stringize new-value)))
+  (setf (slot-value slotd '%documentation) (canonical-docstring new-value)))
 
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.
