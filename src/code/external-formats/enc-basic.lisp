@@ -919,72 +919,69 @@
           (return index))))))
 
 ;;; Bypass the character buffer, the caller must ensure that it's empty
-(macrolet ((def-fd-stream-read-sequence/utf-8 (name string-type simd-op newline-variant)
-               #-(and sb-unicode 64-bit little-endian)
-               (declare (ignore simd-op))
-`(defun ,name (stream string start end
-               &aux (index start) ,@(when (eql newline-variant :crlf) '(eof)))
-  (declare (type fd-stream stream)
-           (type index start end index)
-           (type ,string-type string))
-  (block outer
-    (loop
-     (do ((instead (fd-stream-instead stream)))
-         ((= (fill-pointer instead) 0)
-          (setf (fd-stream-listen stream) nil))
-       (setf (aref string index) (vector-pop instead))
-       (incf index)
-       (when (= index end)
-         (when (= (fill-pointer instead) 0)
-           (setf (fd-stream-listen stream) nil))
-         (return index)))
-     #+(and sb-unicode 64-bit little-endian)
-     (setf index (,simd-op index end string (fd-stream-ibuf stream)))
-     (let* ((ibuf (fd-stream-ibuf stream))
-            (head (buffer-head ibuf))
-            (tail (buffer-tail ibuf))
-            (sap (buffer-sap ibuf))
-            ,@(when (eql newline-variant :crlf) '(requested-refill))
-            incomplete)
-       (declare (type index head tail))
-       (flet ((decode-break (reason)
-                (setf (buffer-head ibuf) head)
-                (when (stream-decoding-error-and-handle stream reason 1)
-                  (return-from outer index))
-                (return)))
-         (utf8-char-loop :crlf ,(eql newline-variant :crlf)))
-       (when (= index end)
-         (setf (buffer-head ibuf) head)
-         (return index))
-       (unless (catch 'eof-input-catcher (refill-input-buffer stream))
-         (,@(if (eql newline-variant :crlf)
-                '(if requested-refill (setf eof t))
-                '(progn))
-            (when (or (not incomplete)
-                    (stream-decoding-error-and-handle stream (- tail head) 1))
-            (return index))))))))))
-  (def-fd-stream-read-sequence/utf-8
-      fd-stream-read-sequence/utf-8-to-string
+(macrolet ((def (name string-type simd-op newline-variant)
+             #-(and sb-unicode 64-bit little-endian)
+             (declare (ignore simd-op))
+             `(defun ,name (stream string start end
+                            &aux (index start) ,@(when (eql newline-variant :crlf) '(eof)))
+                (declare (type fd-stream stream)
+                         (type index start end index)
+                         (type ,string-type string))
+                (tagbody
+                 loop
+                   (do ((instead (fd-stream-instead stream)))
+                       ((= (fill-pointer instead) 0)
+                        (setf (fd-stream-listen stream) nil))
+                     (setf (aref string index) (vector-pop instead))
+                     (incf index)
+                     (when (= index end)
+                       (when (= (fill-pointer instead) 0)
+                         (setf (fd-stream-listen stream) nil))
+                       (return index)))
+                   #+(and sb-unicode 64-bit little-endian)
+                   (setf index (,simd-op index end string (fd-stream-ibuf stream)))
+                   (let* ((ibuf (fd-stream-ibuf stream))
+                          (head (buffer-head ibuf))
+                          (tail (buffer-tail ibuf))
+                          (sap (buffer-sap ibuf))
+                          ,@(when (eql newline-variant :crlf) '(requested-refill))
+                          incomplete)
+                     (declare (type index head tail))
+                     (flet ((decode-break (reason)
+                              (setf (buffer-head ibuf) head)
+                              (if (stream-decoding-error-and-handle stream reason 1)
+                                  (return-from ,name index)
+                                  (go loop))))
+                       (utf8-char-loop :crlf ,(eql newline-variant :crlf)))
+                     (when (= index end)
+                       (setf (buffer-head ibuf) head)
+                       (return-from ,name index))
+                     (unless (catch 'eof-input-catcher (refill-input-buffer stream))
+                       (,@(if (eql newline-variant :crlf)
+                              '(if requested-refill (setf eof t))
+                              '(progn))
+                        (when (or (not incomplete)
+                                  (stream-decoding-error-and-handle stream (- tail head) 1))
+                          (return-from ,name index)))))
+                   (go loop)))))
+  (def fd-stream-read-sequence/utf-8-to-string
       (simple-array character (*))
-      sb-vm::simd-copy-utf8-to-character-string
-      :lf)
+    sb-vm::simd-copy-utf8-to-character-string
+    :lf)
   #+sb-unicode
-  (def-fd-stream-read-sequence/utf-8
-      fd-stream-read-sequence/utf-8-to-base-string
-      simple-base-string
-      sb-vm::simd-copy-utf8-to-base-string
-      :lf)
-  (def-fd-stream-read-sequence/utf-8
-      fd-stream-read-sequence/utf-8-crlf-to-character-string
+  (def fd-stream-read-sequence/utf-8-to-base-string
+    simple-base-string
+    sb-vm::simd-copy-utf8-to-base-string
+    :lf)
+  (def fd-stream-read-sequence/utf-8-crlf-to-character-string
       (simple-array character (*))
-      sb-vm::simd-copy-utf8-crlf-to-character-string
-      :crlf)
+    sb-vm::simd-copy-utf8-crlf-to-character-string
+    :crlf)
   #+sb-unicode
-  (def-fd-stream-read-sequence/utf-8
-      fd-stream-read-sequence/utf-8-crlf-to-base-string
-      simple-base-string
-      sb-vm::simd-copy-utf8-crlf-to-base-string
-      :crlf))
+  (def fd-stream-read-sequence/utf-8-crlf-to-base-string
+    simple-base-string
+    sb-vm::simd-copy-utf8-crlf-to-base-string
+    :crlf))
 
 #+(and sb-unicode 64-bit little-endian
        (not (or arm64 x86-64)))

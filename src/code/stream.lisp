@@ -2345,12 +2345,16 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                      (replace seq %frc-buffer%
                               :start1 start
                               :start2 %frc-index%)
+                     ;; Isn't this DONE-WITH-FAST-READ-CHAR?
                      (setf (ansi-stream-in-index %frc-stream%)
                            +ansi-stream-in-buffer-length+)
                      (incf start buffered))))
           (declare (inline refill-buffer copy))
           (cond
             ;; Read directly into the string when possible
+            ;; Caution: FD-STREAM-READ-SEQUENCE methods used to return
+            ;; NIL sometimes. Now they just do all of READ-SEQUENCE's
+            ;; contract. So don't worry about fall-thru here.
             ((and (> (- needed buffered)
                      (/ +ansi-stream-in-buffer-length+ 2))
                   (fd-stream-p stream)
