@@ -156,3 +156,8 @@
 (compile-load "test-data-sharp-plus-minus")
 (sharp-plus-minus 3)
 (report)
+
+(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
+(assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+(assert (= 5 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 5 (sb-cover::all-of (getf sb-cover::*counts* :expression))))
