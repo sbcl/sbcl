@@ -623,4 +623,9 @@
                 `(lambda (a)
                    (1+ (if a
                            1
-                           2d0)))))))
+                           2d0))))))
+  (assert (not (ir-full-calls
+                `(lambda (b)
+                   (truncate (if b
+                                 10 20d0)
+                             2))))))

@@ -1990,6 +1990,7 @@
              (fun-info-folder (fun-info-folder (combination-fun-info call)))
              (folder (or fun-info-folder
                          fun-name))
+             mv
              (values (loop for use in (lvar-uses multi-use-lvar)
                            collect
                            (multiple-value-bind (values win)
@@ -1998,21 +1999,40 @@
                                                    collect (if (eq arg multi-use-lvar)
                                                                (ref-value use)
                                                                (value arg))))
-                             (unless (and win
-                                          (= (length values) 1)) ;; TODO: handle multiple values
+                             (unless win
                                (return-from %constant-fold-call-multiple-uses))
+                             (unless (= (length values) 1)
+                               (setf mv t))
                              values))))
         (erase-lvar-type multi-use-lvar)
-        (loop for ref in (lvar-uses multi-use-lvar)
-              for (value) in values
-              do (change-ref-leaf ref (find-constant value)
-                                  :recklessly t))
-        (let ((ll (make-gensym-list (length args))))
-         (transform-call call
-                         `(lambda ,ll
-                            (declare (ignorable ,@ll))
-                            ,(nth (position multi-use-lvar args) ll))
-                         fun-name))
+        (cond (mv
+               (when (loop for ref in (lvar-uses multi-use-lvar)
+                           always (almost-immediately-used-p multi-use-lvar ref :flushable t
+                                                                                :no-multiple-value-lvars t))
+                 (loop for ref in (lvar-uses multi-use-lvar)
+                       for value in values
+                       do
+                       (replace-node ref `(values ,@(loop for v in value
+                                                          collect (list 'quote v))))
+                       (delete-ref ref))
+                 (use-lvar (insert-cast-after call multi-use-lvar *wild-type* **zero-typecheck-policy**)
+                           (node-lvar call))
+                 (flush-dest (combination-fun call))
+                 (dolist (arg args)
+                   (unless (eq arg multi-use-lvar)
+                     (flush-dest arg)))
+                 (unlink-node call)))
+              (t
+               (loop for ref in (lvar-uses multi-use-lvar)
+                     for (value) in values
+                     do (change-ref-leaf ref (find-constant value)
+                                         :recklessly t))
+               (let ((ll (make-gensym-list (length args))))
+                 (transform-call call
+                                 `(lambda ,ll
+                                    (declare (ignorable ,@ll))
+                                    ,(nth (position multi-use-lvar args) ll))
+                                 fun-name))))
         t))))
 
 (defun fold-call-derived-to-constant (call)
