@@ -236,8 +236,9 @@
                    (let ((type (funcall (fun-info-externally-checkable-type info) dest lvar context)))
                      (unless (eq type :next)
                        (return-from lvar-externally-checkable-type
-                         (when type
-                           (coerce-to-values type))))))
+                         (if type
+                             (coerce-to-values type)
+                             *wild-type*)))))
                  (unless context
                   (map-combination-args-and-types
                    (lambda (arg type &rest args)
