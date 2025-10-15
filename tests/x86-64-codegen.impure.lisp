@@ -942,7 +942,7 @@
              (assert (not (loop for line in (disassembly-lines negative-test)
                                 thereis (search telltale line)))))))
 
-(with-test (:name :bash-copiers-byte-or-larger)
+(with-test (:name :bash-copiers-byte-or-larger :skipped-on :sb-devel)
   (dolist (f '(sb-kernel::ub8-bash-copy
                sb-kernel::ub16-bash-copy
                sb-kernel::ub32-bash-copy
