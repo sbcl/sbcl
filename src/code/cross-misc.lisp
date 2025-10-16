@@ -464,3 +464,11 @@
 (defmacro with-source-form (source-form form)
   (declare (ignore source-form))
   form)
+
+(defun %numerator (x)
+  (check-type x ratio)
+  (numerator x))
+
+(defun %denominator (x)
+  (check-type x ratio)
+  (denominator x))

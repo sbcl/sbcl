@@ -172,7 +172,9 @@
   #+x86-64
   (def single-float-sign)
   #+64-bit
-  (def %make-double-float))
+  (def %make-double-float)
+  (def %numerator)
+  (def %denominator))
 
 #+sb-simd-pack
 (macrolet ((def (name)

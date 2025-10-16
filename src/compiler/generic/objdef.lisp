@@ -51,11 +51,11 @@
                                 :widetag ratio-widetag
                                 :alloc-trans %make-ratio)
   (numerator :type (and integer (not (eql 0)))
-             :ref-known (flushable movable)
+             :ref-known (foldable flushable movable)
              :ref-trans %numerator
              :init :arg)
   (denominator :type (integer 2)
-               :ref-known (flushable movable)
+               :ref-known (foldable flushable movable)
                :ref-trans %denominator
                :init :arg))
 
