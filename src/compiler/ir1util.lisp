@@ -364,7 +364,6 @@
                (when lvar
                  (setf (lvar-%derived-type lvar) nil)
                  (loop for annotation in (lvar-annotations lvar)
-                       when (lvar-type-annotation-p annotation)
                        do (setf (lvar-annotation-fired annotation) t))
                  (let ((dest (lvar-dest lvar)))
                    (cond ((cast-p dest)
