@@ -1901,18 +1901,33 @@
               (return-from constant-fold-call)))
            (%constant-fold-call combination))
           (t
-           (let (mu-constant)
+           (let (mu-constant
+                 mv-bind
+                 mv-bind-nth)
              (when (loop for arg in args
                          for uses = (lvar-uses arg)
                          always (cond ((atom uses)
-                                       (constant-lvar-ignore-types-p arg))
+                                       (or (constant-lvar-ignore-types-p arg)
+                                           (and (not mu-constant)
+                                                (ref-p uses)
+                                                (not (cdr (leaf-refs (ref-leaf uses))))
+                                                (multiple-value-bind (uses nth-value) (mv-principal-lvar-ref-use arg)
+                                                  (when (and nth-value
+                                                             (listp uses)
+                                                             (loop for use in uses
+                                                                   always (and (combination-is use '(values))
+                                                                               (constant-lvar-ignore-types-p (nth nth-value (combination-args use))))))
+                                                    (setf mu-constant arg
+                                                          mv-bind uses
+                                                          mv-bind-nth nth-value))))))
                                       ((and (not mu-constant)
                                             (loop for use in uses
                                                   always (and (ref-p use)
+                                                              use
                                                               (constant-p (ref-leaf use)))))
                                        (setf mu-constant arg))))
                (if mu-constant
-                   (%constant-fold-call-multiple-uses combination mu-constant)
+                   (%constant-fold-call-multiple-uses combination mu-constant mv-bind mv-bind-nth)
                    (%constant-fold-call combination))))))))
 
 ;;; Replace a call to a foldable function of constant arguments with
@@ -1971,7 +1986,7 @@
 ;; (1+ (if a 1 2))
 ;; to
 ;; (if a 2 3)
-(defun %constant-fold-call-multiple-uses (call multi-use-lvar)
+(defun %constant-fold-call-multiple-uses (call multi-use-lvar mv-bind nth-value)
   (flet ((value (lvar)
            (if (lvar-p lvar)
                (let ((name (lvar-fun-name lvar t)))
@@ -1991,17 +2006,22 @@
              (folder (or fun-info-folder
                          fun-name))
              mv
-             (values (loop for use in (lvar-uses multi-use-lvar)
+             (values (loop for use in (or mv-bind
+                                          (lvar-uses multi-use-lvar))
                            collect
                            (multiple-value-bind (values win)
                                (careful-call folder
                                              (loop for arg in args
                                                    collect (if (eq arg multi-use-lvar)
-                                                               (ref-value use)
+                                                               (if mv-bind
+                                                                   (value (nth nth-value (combination-args use)))
+                                                                   (ref-value use))
                                                                (value arg))))
                              (unless win
                                (return-from %constant-fold-call-multiple-uses))
                              (unless (= (length values) 1)
+                               (when mv-bind
+                                 (return-from %constant-fold-call-multiple-uses))
                                (setf mv t))
                              values))))
         (erase-lvar-type multi-use-lvar)
@@ -2023,10 +2043,19 @@
                      (flush-dest arg)))
                  (unlink-node call)))
               (t
-               (loop for ref in (lvar-uses multi-use-lvar)
-                     for (value) in values
-                     do (change-ref-leaf ref (find-constant value)
-                                         :recklessly t))
+               (if mv-bind
+                   (loop for use in mv-bind
+                         for values-arg = (nth nth-value (combination-args use))
+                         for ref = (lvar-uses values-arg)
+                         for (value) in values
+                         do
+                         (erase-lvar-type values-arg nth-value)
+                         (change-ref-leaf ref (find-constant value)
+                                             :recklessly t))
+                   (loop for ref in (lvar-uses multi-use-lvar)
+                         for (value) in values
+                         do (change-ref-leaf ref (find-constant value)
+                                             :recklessly t)))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call
                                  `(lambda ,ll

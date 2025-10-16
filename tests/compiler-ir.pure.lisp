@@ -628,4 +628,12 @@
                 `(lambda (b)
                    (truncate (if b
                                  10 20d0)
-                             2))))))
+                             2)))))
+  (assert (not
+           (ir-full-calls
+            `(lambda (d)
+               (multiple-value-bind (v w) (if d
+                                              (values 1 6)
+                                              (values 2 5))
+                 (values v
+                         (+ w 1/2))))))))
