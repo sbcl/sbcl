@@ -1691,7 +1691,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "CLASS-CLASSOID"
            "CODE-COMPONENT" "CODE-COMPONENT-P"
            "CODE-HEADER-REF" "CODE-HEADER-SET" "CODE-HEADER-WORDS"
-           "CODE-HEADER-FDEFN-RANGE"
            "CODE-JUMP-TABLE-WORDS"
            "CODE-INSTRUCTIONS" "CODE-N-UNBOXED-DATA-BYTES"
            "CODE-OBJECT-SIZE" "CODE-TRAILER-REF"

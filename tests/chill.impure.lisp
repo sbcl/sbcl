@@ -1,3 +1,4 @@
+#+parallel-test-runner (setq run-tests::*allowed-inputs* :any)
 
 (load "../src/cold/chill.lisp")
 
