@@ -112,11 +112,19 @@
                `(if ,test
                     (,(dsd-accessor-name then) object)
                     (,(dsd-accessor-name else) object)))))
-       (always-bound-struct-accessor-p (object slot-name)
+       (always-bound-struct-accessor-p (object slot-name &optional nullable)
+         ;; If NULLABLE is true then the caller can deal with the possibility
+         ;; of object being either NIL or a structure instance.
          (let ((c-slot-name (lvar-value slot-name)))
            (unless (interned-symbol-p c-slot-name)
              (give-up-ir1-transform "slot name is not an interned symbol"))
-           (let* ((type (lvar-type object))
+           (let* ((unmodified-type (lvar-type object))
+                  (type (if (and nullable
+                                 (union-type-p unmodified-type)
+                                 (member (specifier-type 'null)
+                                         (union-type-types unmodified-type)))
+                            (type-difference unmodified-type (specifier-type 'null))
+                            unmodified-type))
                   (dd (when (structure-classoid-p type)
                         (find-defstruct-description (classoid-name type))))
                   (dsd (when dd
@@ -153,6 +161,13 @@
                             :node node)
     (acond ((always-bound-struct-accessor-p object slot-name)
             `(,(dsd-accessor-name it) object))
+           ((always-bound-struct-accessor-p object slot-name t)
+            ;; CLHS says in SLOT-VALUE "An error is always signaled if object
+            ;; has metaclass built-in-class." which means that regardless
+            ;; of compilation policy, we need to signal an error on NIL.
+            `(if object
+                 (,(dsd-accessor-name it) object)
+                 (sb-pcl::nil-not-slot-object ',(lvar-value slot-name))))
            (t
             (delay-ir1-transform node :constraint)
             `(sb-pcl::%accessor-slot-value object ',(lvar-value slot-name)))))

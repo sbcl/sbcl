@@ -502,3 +502,7 @@
            :format-control "~S called on ~S, which is not yet finalized."
            :format-arguments (list 'class-slots class)
            :references '((:amop :generic-function class-slots)))))
+
+;;; The error case of the optimizer for slot-value on a structure-object
+;;; that could be NIL. Just shortens the call site by passing one arg.
+(defun nil-not-slot-object (slot-name) (slot-value nil slot-name))

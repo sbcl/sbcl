@@ -138,3 +138,18 @@
     (assert (find 'sb-pcl::structure-slot-value callees)))
   (let ((callees (ctu:find-named-callees #'configuration-structure-name-best)))
     (assert (not (find 'sb-pcl::structure-slot-value callees)))))
+
+(defun read-slot-of-maybe-struct (x)
+  (declare (type (or null cfg-struct-type3) x))
+  (with-slots (name) x name))
+
+(defmethod slot-missing ((class (eql (find-class 'null))) the-object slot op &optional new)
+  (declare (ignore new))
+  (if (and (eq slot 'name) (eq op 'slot-value)) :i-was-called))
+
+(with-test (:name :slot-value-nullable-instance)
+  (let ((callees (ctu:find-named-callees #'read-slot-of-maybe-struct)))
+    (assert (and (sb-int:singleton-p callees)
+                 (eq (car callees) 'sb-pcl::nil-not-slot-object)))
+    (assert (eq 'steve (read-slot-of-maybe-struct (make-cfg-struct-type3 :name 'steve))))
+    (assert (eq :i-was-called (read-slot-of-maybe-struct nil)))))
