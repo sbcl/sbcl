@@ -2434,7 +2434,7 @@
 ;;; of arguments changes, the transform must be prepared to return a
 ;;; lambda with a new lambda-list with the correct number of
 ;;; arguments.
-(defun splice-fun-args (lvar fun num-args &optional (give-up t) cast-type)
+(defun splice-fun-args (lvar fun num-args &optional (give-up t) cast-type delete-cast)
   "If LVAR is a call to FUN with NUM-ARGS args, change those arguments to feed
 directly to the LVAR-DEST of LVAR, which must be a combination. If FUN
 is :ANY, the function name is not checked."
@@ -2461,6 +2461,12 @@ is :ANY, the function name is not checked."
         (unless (or (eq fun :any)
                     (eq (lvar-fun-name inside-fun) fun))
           (give-up))
+
+        (when (and cast
+                   delete-cast)
+          (delete-cast cast nil)
+          (setf cast nil
+                num-args nil))
         (cond (cast
                (let ((args (make-gensym-list (length inside-args))))
                  (setf (node-derived-type cast)

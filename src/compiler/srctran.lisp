@@ -4267,6 +4267,18 @@
         `($fun (* x (%denominator y)) (%numerator y))
         (give-up-ir1-transform))))
 
+(make-defs (($fun truncate floor ceiling))
+  (deftransform $fun ((x y) (number (eql 1)) * :result result :important nil)
+    (or (and result
+             (lvar-single-value-p result)
+             (combination-case (x (specifier-type 'real))
+               (/ (* *)
+                (splice-fun-args x '/ nil t (specifier-type 'real) t)
+                `(lambda (a b y)
+                   (declare (ignore y))
+                   ($fun a b)))))
+        (give-up-ir1-transform))))
+
 (flet ((single-value-fun (combination name)
          (let ((lvar (node-lvar combination)))
            (when (or (lvar-single-value-p lvar)
