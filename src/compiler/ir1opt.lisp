@@ -2006,6 +2006,8 @@
              (folder (or fun-info-folder
                          fun-name))
              mv
+             single-value-mv
+             (single-value-p (lvar-single-value-p (node-lvar call)))
              (values (loop for use in (or mv-bind
                                           (lvar-uses multi-use-lvar))
                            collect
@@ -2019,16 +2021,19 @@
                                                                (value arg))))
                              (unless win
                                (return-from %constant-fold-call-multiple-uses))
-                             (unless (= (length values) 1)
-                               (when mv-bind
-                                 (return-from %constant-fold-call-multiple-uses))
-                               (setf mv t))
+                             (cond ((= (length values) 1))
+                                   (single-value-p
+                                    (setf single-value-mv t))
+                                   (mv-bind
+                                    (return-from %constant-fold-call-multiple-uses))
+                                   (t
+                                    (setf mv t)))
                              values))))
-        (erase-lvar-type multi-use-lvar)
         (cond (mv
                (when (loop for ref in (lvar-uses multi-use-lvar)
                            always (almost-immediately-used-p multi-use-lvar ref :flushable t
                                                                                 :no-multiple-value-lvars t))
+                 (erase-lvar-type multi-use-lvar)
                  (loop for ref in (lvar-uses multi-use-lvar)
                        for value in values
                        do
@@ -2041,28 +2046,35 @@
                  (dolist (arg args)
                    (unless (eq arg multi-use-lvar)
                      (flush-dest arg)))
-                 (unlink-node call)))
+                 (unlink-node call)
+                 t))
               (t
-               (if mv-bind
-                   (loop for use in mv-bind
-                         for values-arg = (nth nth-value (combination-args use))
-                         for ref = (lvar-uses values-arg)
-                         for (value) in values
-                         do
-                         (erase-lvar-type values-arg nth-value)
-                         (change-ref-leaf ref (find-constant value)
-                                             :recklessly t))
-                   (loop for ref in (lvar-uses multi-use-lvar)
-                         for (value) in values
-                         do (change-ref-leaf ref (find-constant value)
+               (cond (mv-bind
+                      (loop for use in mv-bind
+                            for values-arg = (nth nth-value (combination-args use))
+                            for ref = (lvar-uses values-arg)
+                            for (value) in values
+                            do
+                            (erase-lvar-type values-arg nth-value)
+                            (change-ref-leaf ref (find-constant value)
                                              :recklessly t)))
+                     (t
+                      (erase-lvar-type multi-use-lvar)
+                      (loop for ref in (lvar-uses multi-use-lvar)
+                            for (value) in values
+                            do (change-ref-leaf ref (find-constant value)
+                                                :recklessly t))))
+               (when single-value-mv
+                 (setf (node-derived-type call) *wild-type*)
+                 (erase-lvar-type (node-lvar call))
+                 (principal-lvar-single-valuify (node-lvar call)))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call
                                  `(lambda ,ll
                                     (declare (ignorable ,@ll))
                                     ,(nth (position multi-use-lvar args) ll))
-                                 fun-name))))
-        t))))
+                                 fun-name))
+               t))))))
 
 (defun fold-call-derived-to-constant (call)
   (when (flushable-combination-p call)

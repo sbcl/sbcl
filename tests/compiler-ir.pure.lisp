@@ -636,4 +636,12 @@
                                               (values 1 6)
                                               (values 2 5))
                  (values v
-                         (+ w 1/2))))))))
+                         (+ w 1/2)))))))
+  (assert (not
+           (ir-full-calls
+            `(lambda (d)
+               (let ((x (if d
+                            20
+                            40)))
+                 (setf * 20)
+                 (values (truncate x 1/3))))))))
