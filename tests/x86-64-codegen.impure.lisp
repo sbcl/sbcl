@@ -1417,3 +1417,8 @@
   ;; four raw words: jump table count word, two user data words, and a padding word
   (assert (= 32 (sb-kernel:code-n-unboxed-data-bytes
                  (sb-kernel:fun-code-header #'different-constants)))))
+
+(with-test (:name :push-cons)
+  (let ((f (compile nil '(lambda (alist x y) (push (cons x y) alist)))))
+    ;; should have 1 call to list-alloc-tramp, not one for the cons of x, y and one for push
+    (assert (= 1 (count 'sb-c:call (get-simple-fun-instruction-model f) :key 'second)))))

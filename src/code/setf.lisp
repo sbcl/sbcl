@@ -303,7 +303,13 @@
   ;; - One errs, says "Multiple store variables not expected"
   ;; - One pushes multiple values produced by OBJ form into multiple places.
   ;; - At least two produce an incorrect expansion that doesn't even work.
-  (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
+  ;;
+  ;; (PUSH (CONS key val) an-alist) is an extremely common idiom. If (and only if)
+  ;; ACONS has a translator, it is to be preferred in that usage.
+  (if (and (sb-c::vop-existsp :translate acons)
+           (typep obj '(cons (eql cons) (cons t (cons t null)))))
+      (expand-rmw-macro 'acons (cdr obj) place '() nil env '(k v))
+      (expand-rmw-macro 'cons (list obj) place '() nil env '(item))))
 
 (sb-xc:defmacro pushnew (obj place &rest keys &environment env)
   "Takes an object and a location holding a list. If the object is
