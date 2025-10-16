@@ -1023,4 +1023,9 @@
    (lambda (a n)
      (declare ((or (array single-float) (array double-float)) a))
      (setf (aref a 0) n))
-   float))
+   float)
+  (assert-type
+   (lambda (d)
+     (make-array 2 :element-type (if d 'a 'b)))
+   (simple-array * (2))
+   :allow-style-warnings t))

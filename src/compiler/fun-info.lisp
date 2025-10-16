@@ -179,6 +179,8 @@
   annotation
   ;; For functions with unboxed args/returns
   (folder nil :type (or function null))
+  ;; Must have a FOLDABLE attribute to invoke this
+  (fold-p nil :type (or function null))
   ;; :FULL means it behaves like a full call despite being implemented
   ;; via VOPs or ir2-convert.
   (externally-checkable-type nil :type (or function null (eql :full)))

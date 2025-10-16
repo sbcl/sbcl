@@ -1952,36 +1952,40 @@
                             (resolve-key-args args type)
                             args)))
            (args (mapcar #'value lvar-args))
-           (folder (fun-info-folder (combination-fun-info call))))
-      (multiple-value-bind (values win) (careful-call (or folder
-                                                          fun-name)
-                                                      args)
-        (cond ((not win)
-               ;; Ignore errors from dedicated folders, in lieu of adding fun-info-fold-p.
-               (unless folder
-                 (setf (combination-kind call) :error
-                       (combination-info call)
-                       (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values))
-                 t))
-              ((and (proper-list-of-length-p values 1))
-               (replace-combination-with-constant (first values) call))
-              (t
-               (let ((dummies (make-gensym-list (length args))))
-                 (transform-call
-                  call
-                  `(lambda ,dummies
-                     (declare (ignore ,@dummies))
-                     (values ,@(mapcar (lambda (x)
-                                         (let ((lvar
-                                                 (find x lvar-args :key #'value)))
-                                           ;; Don't lose any annotations
-                                           (if (and lvar
-                                                    (lvar-annotations lvar))
-                                               `(with-annotations ,(lvar-annotations lvar) ',x)
-                                               `',x)))
-                                       values)))
-                  fun-name))
-               t))))))
+           (info (combination-fun-info call))
+           (folder (fun-info-folder info))
+           (fold-p (fun-info-fold-p info)))
+      (when (or (not fold-p)
+                (apply fold-p args))
+       (multiple-value-bind (values win) (careful-call (or folder
+                                                           fun-name)
+                                                       args)
+         (cond ((not win)
+                ;; Ignore errors from dedicated folders, in lieu of adding fun-info-fold-p.
+                (unless folder
+                  (setf (combination-kind call) :error
+                        (combination-info call)
+                        (list #'compiler-style-warn "Lisp error during constant folding:~%~A" values))
+                  t))
+               ((and (proper-list-of-length-p values 1))
+                (replace-combination-with-constant (first values) call))
+               (t
+                (let ((dummies (make-gensym-list (length args))))
+                  (transform-call
+                   call
+                   `(lambda ,dummies
+                      (declare (ignore ,@dummies))
+                      (values ,@(mapcar (lambda (x)
+                                          (let ((lvar
+                                                  (find x lvar-args :key #'value)))
+                                            ;; Don't lose any annotations
+                                            (if (and lvar
+                                                     (lvar-annotations lvar))
+                                                `(with-annotations ,(lvar-annotations lvar) ',x)
+                                                `',x)))
+                                        values)))
+                   fun-name))
+                t)))))))
 ;; fold
 ;; (1+ (if a 1 2))
 ;; to
@@ -2002,23 +2006,27 @@
     (with-ir1-environment-from-node call
       (let* ((fun-name (lvar-fun-name (combination-fun call) t))
              (args (combination-args call))
-             (fun-info-folder (fun-info-folder (combination-fun-info call)))
-             (folder (or fun-info-folder
-                         fun-name))
+             (info (combination-fun-info call))
+             (fun-info-folder (fun-info-folder info))
+             (folder (or fun-info-folder fun-name))
+             (fold-p (fun-info-fold-p info))
              mv
              single-value-mv
              (single-value-p (lvar-single-value-p (node-lvar call)))
              (values (loop for use in (or mv-bind
                                           (lvar-uses multi-use-lvar))
+                           for constants = (loop for arg in args
+                                                 collect (if (eq arg multi-use-lvar)
+                                                             (if mv-bind
+                                                                 (value (nth nth-value (combination-args use)))
+                                                                 (ref-value use))
+                                                             (value arg)))
+                           do
+                           (when fold-p
+                             (unless (apply fold-p constants)
+                               (return-from %constant-fold-call-multiple-uses)))
                            collect
-                           (multiple-value-bind (values win)
-                               (careful-call folder
-                                             (loop for arg in args
-                                                   collect (if (eq arg multi-use-lvar)
-                                                               (if mv-bind
-                                                                   (value (nth nth-value (combination-args use)))
-                                                                   (ref-value use))
-                                                               (value arg))))
+                           (multiple-value-bind (values win) (careful-call folder constants)
                              (unless win
                                (return-from %constant-fold-call-multiple-uses))
                              (cond ((= (length values) 1))

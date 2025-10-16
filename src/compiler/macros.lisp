@@ -423,47 +423,56 @@
                                      (caadr what)
                                      (second what))
                                  "-OPTIMIZER")))))
-    (if (typep what '(cons (eql vop-optimize)))
-        `(progn
-           (defun ,name (,lambda-list)
-             ,@body)
-           ,@(loop for vop-name in (ensure-list (second what))
-                   collect
-                   `(set-vop-optimizer (template-or-lose ',vop-name)
-                                       ,(if (cddr what)
-                                            `(cons #',name ',(caddr what))
-                                            `#',name))))
-        (binding* (((forms decls) (parse-body body nil))
-                   ((var-decls more-decls) (extract-var-decls decls vars))
-                   ((binds lambda-vars)
-                    (parse-deftransform lambda-list node
-                                        `(return-from ,name
-                                           ,(if (and (consp what)
-                                                     (eq (second what)
-                                                         'equality-constraint))
-                                                :give-up
-                                                nil))))
-                   (args (gensym)))
-          (declare (ignore lambda-vars))
-          `(progn
-             ;; We can't stuff the BINDS as &AUX vars into the lambda list
-             ;; because there can be a RETURN-FROM in there.
-             (defun ,name (,node ,@vars &rest ,args)
-               (declare (ignorable ,node ,@(butlast vars))
-                        (ignore ,args))
-               ,@(if var-decls (list var-decls))
-               (binding* (,@binds)
-                 (declare (ignorable ,@(loop for (bind) in binds
-                                             if (consp bind)
-                                             append bind
-                                             else
-                                             collect bind)))
-                 ,@more-decls ,@forms))
-             ,@(when (consp what)
-                 `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
-                             (symbolicate "FUN-INFO-" (second what)))
-                          (fun-info-or-lose ',(first what)))
-                         #',name))))))))
+    (cond ((typep what '(cons (eql vop-optimize)))
+           `(progn
+              (defun ,name (,lambda-list)
+                ,@body)
+              ,@(loop for vop-name in (ensure-list (second what))
+                      collect
+                      `(set-vop-optimizer (template-or-lose ',vop-name)
+                                          ,(if (cddr what)
+                                               `(cons #',name ',(caddr what))
+                                               `#',name)))))
+          ((typep what '(cons t (cons (eql fold-p))))
+           `(progn
+              (defun ,name (,lambda-list)
+                ,@body)
+              (setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
+                        (symbolicate "FUN-INFO-" (second what)))
+                     (fun-info-or-lose ',(first what)))
+                    #',name)))
+          (t
+           (binding* (((forms decls) (parse-body body nil))
+                      ((var-decls more-decls) (extract-var-decls decls vars))
+                      ((binds lambda-vars)
+                       (parse-deftransform lambda-list node
+                                           `(return-from ,name
+                                              ,(if (and (consp what)
+                                                        (eq (second what)
+                                                            'equality-constraint))
+                                                   :give-up
+                                                   nil))))
+                      (args (gensym)))
+             (declare (ignore lambda-vars))
+             `(progn
+                ;; We can't stuff the BINDS as &AUX vars into the lambda list
+                ;; because there can be a RETURN-FROM in there.
+                (defun ,name (,node ,@vars &rest ,args)
+                  (declare (ignorable ,node ,@(butlast vars))
+                           (ignore ,args))
+                  ,@(if var-decls (list var-decls))
+                  (binding* (,@binds)
+                    (declare (ignorable ,@(loop for (bind) in binds
+                                                if (consp bind)
+                                                append bind
+                                                else
+                                                collect bind)))
+                    ,@more-decls ,@forms))
+                ,@(when (consp what)
+                    `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
+                                (symbolicate "FUN-INFO-" (second what)))
+                             (fun-info-or-lose ',(first what)))
+                            #',name)))))))))
 
 (defmacro defoptimizers (kind names (lambda-list
                                      &optional (node (gensym))

@@ -1558,8 +1558,12 @@
     (macrolet ((maybe-arg (arg)
                  `(and ,arg `(,,(keywordicate arg) ,',arg))))
       (block nil
-        (let* ((eltype (cond ((not element-type) t)
-                             ((not (constant-lvar-p element-type))
+        (let* ((eltype-type *universal-type*)
+               (eltype (cond ((not element-type)
+                              t)
+                             ((or (not (constant-lvar-p element-type))
+                                  (and (setf eltype-type (ir1-transform-specifier-type (lvar-value element-type)))
+                                       (contains-unknown-type-p eltype-type)))
                               (let ((uses (lvar-uses element-type)))
                                 (when (splice-fun-args element-type 'array-element-type 1 nil)
                                   (return
@@ -1587,7 +1591,6 @@
                                "ELEMENT-TYPE is not constant."))
                              (t
                               (lvar-value element-type))))
-               (eltype-type (ir1-transform-specifier-type eltype))
                (saetp (if (unknown-type-p eltype-type)
                           (give-up-ir1-transform
                            "ELEMENT-TYPE ~s is not a known type"
@@ -1617,6 +1620,7 @@
                            (sb-vm:saetp-initial-element-default saetp)))
                  creation-form)
                 (t
+                 eltype
                  ;; error checking for target, disabled on the host because
                  ;; (CTYPE-OF #\Null) is not possible.
                  #-sb-xc-host
@@ -2749,11 +2753,6 @@
 
 (deftransform sb-vm::%vector-widetag-and-n-bits-shift ((type))
   (cond
-    ((constant-lvar-p type)
-     (let ((saetp (find-saetp-by-ctype (careful-specifier-type (lvar-value type)))))
-       `(values ,(sb-vm:saetp-typecode saetp)
-                ,(sb-vm:saetp-n-bits-shift saetp))))
-
     ((csubtypep (lvar-type type) (specifier-type '(member character base-char)))
      `(cond #+sb-unicode
             ((eq type 'character)
@@ -2786,3 +2785,8 @@
             (setf result (type-intersection result
                                             (specifier-type `(not (eql ,sb-vm:simple-base-string-widetag)))))))))
     result))
+
+(defoptimizer (sb-vm::%vector-widetag-and-n-bits-shift fold-p) (type)
+  (let ((type (careful-specifier-type type)))
+    (and type
+         (not (contains-unknown-type-p type)))))
