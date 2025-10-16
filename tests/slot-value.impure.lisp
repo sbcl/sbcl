@@ -143,6 +143,8 @@
   (declare (type (or null cfg-struct-type3) x))
   (with-slots (name) x name))
 
+(compile 'read-slot-of-maybe-struct)
+
 (defmethod slot-missing ((class (eql (find-class 'null))) the-object slot op &optional new)
   (declare (ignore new))
   (if (and (eq slot 'name) (eq op 'slot-value)) :i-was-called))
