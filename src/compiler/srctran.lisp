@@ -4260,6 +4260,13 @@
                       (signed-word-checked-transform $fun x y cast fixnum-only 2))))))))
         (give-up-ir1-transform))))
 
+(make-defs (($fun truncate floor ceiling))
+  (deftransform $fun ((x y) (integer ratio) * :result result)
+    (if (and result
+             (lvar-single-value-p result))
+        `($fun (* x (%denominator y)) (%numerator y))
+        (give-up-ir1-transform))))
+
 (flet ((single-value-fun (combination name)
          (let ((lvar (node-lvar combination)))
            (when (or (lvar-single-value-p lvar)
