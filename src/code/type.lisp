@@ -2966,6 +2966,7 @@ expansion happened."
 ;;; is useful mainly for allowing types that are technically numbers,
 ;;; but not a NUMERIC-TYPE.
 (defun numeric-contagion (type1 type2 &key (rational t)
+                                           float
                                            unsigned)
   (cond ((and (numeric-type-p type1) (numeric-type-p type2))
          (let ((class1 (numeric-type-class type1))
@@ -3000,6 +3001,8 @@ expansion happened."
                                         (eq complexp2 :complex))
                                     :complex))))
                  ((eq class2 'float) (numeric-contagion type2 type1))
+                 (float
+                  (specifier-type 'single-float))
                  ((and (eq complexp1 :real) (eq complexp2 :real))
                   (if (or rational
                           (or (neq class1 'integer)
@@ -3016,10 +3019,6 @@ expansion happened."
                                  0))))
                  (t
                   (specifier-type 'number)))))
-        ((eq type1 (specifier-type 'ratio))
-         (numeric-contagion (specifier-type 'rational) type2))
-        ((eq type2 (specifier-type 'ratio))
-         (numeric-contagion type1 (specifier-type 'rational)))
         (t
          (flet ((try-union (a b)
                   (let (union)

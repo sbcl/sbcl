@@ -1051,3 +1051,58 @@
      (declare ((double-float * -1d0) x))
      (/ 10d0 x))
    (or (member -0.0d0) (double-float -10.0d0 (0.0d0)))))
+
+(with-test (:name :truncate-type)
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (nth-value 1 (truncate x)))
+   (double-float -1.0d0 1.0d0))
+  (assert-type
+   (lambda (x)
+     (declare (float x))
+     (nth-value 1 (truncate (abs x))))
+   (or (float (0.0) 1.0) (member 0f0 0d0)))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (nth-value 1 (floor x)))
+   (double-float 0d0 1.0d0))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (nth-value 1 (floor (abs x))))
+   (or (double-float (0d0) 1.0d0) (eql 0d0)))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (nth-value 1 (ceiling x)))
+   (double-float -1.0d0 0d0))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (nth-value 1 (ceiling (abs x))))
+   (double-float -1.0d0 0d0))
+  (assert-type
+   (lambda (x)
+     (declare (float x))
+     (nth-value 1 (ftruncate x)))
+   (float -1.0 1.0))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (ftruncate (abs x)))
+   (values (or (member 0.0d0) (double-float (0.0d0)))
+           (or (member 0.0d0) (double-float (0.0d0) 1.0d0)) &optional))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (fceiling (abs x)))
+   (values (or (member 0.0d0) (double-float (0.0d0)))
+           (double-float -1.0d0 0.0d0) &optional))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (ffloor (abs x)))
+   (values (or (member 0.0d0) (double-float (0.0d0)))
+           (double-float 0.0d0 1.0d0) &optional)))
