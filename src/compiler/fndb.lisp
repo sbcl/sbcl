@@ -283,7 +283,6 @@
 (defknown exp (number) irrational
   (movable foldable flushable recursive))
 
-
 (defknown expt (number number) number
   (movable foldable flushable recursive))
 
@@ -319,7 +318,7 @@
 (defknown sqrt (number) irrational
   (movable foldable flushable))
 (defknown isqrt (unsigned-byte) unsigned-byte
-  (movable foldable flushable recursive))
+  (movable foldable flushable))
 
 (defknown (abs phase signum) (number) number
   (movable foldable flushable))
@@ -332,15 +331,17 @@
 
 (defknown atan
   (number &optional real) irrational
-  (movable foldable unsafely-flushable recursive)
+  (movable foldable unsafely-flushable)
   :call-type-deriver #'atan-call-type-deriver)
 
-(defknown (tan sinh cosh tanh asinh)
-  (number) irrational (movable foldable flushable recursive))
-
-(defknown (asin acos acosh atanh)
-  (number) irrational
+(defknown (sinh cosh) (number) irrational
   (movable foldable flushable recursive))
+
+(defknown (tan tanh asinh) (number) irrational
+  (movable foldable flushable))
+
+(defknown (asin acos acosh atanh) (number) irrational
+  (movable foldable flushable))
 
 (defknown float (real &optional float) float
   (movable foldable flushable))
@@ -349,7 +350,7 @@
   (movable foldable flushable))
 
 (defknown (rationalize) (real) rational
-  (movable foldable flushable recursive))
+  (movable foldable flushable))
 
 (defknown numerator (rational) integer
   (movable foldable flushable))
@@ -365,11 +366,14 @@
   (real &optional real) (values integer real)
   (movable foldable flushable recursive))
 
-(defknown (sb-kernel::truncate1 sb-kernel::floor1 sb-kernel::ceiling1 sb-kernel::round1) (real real) integer
+(defknown (sb-kernel::floor1 sb-kernel::ceiling1) (real real) integer
+  (movable foldable flushable no-verify-arg-count))
+
+(defknown (sb-kernel::truncate1 sb-kernel::round1) (real real) integer
   (movable foldable flushable recursive no-verify-arg-count))
 
 (defknown (sb-kernel::ftruncate1 sb-kernel::ffloor1 sb-kernel::fceiling1 sb-kernel::fround1) (real real) float
-  (movable foldable flushable recursive no-verify-arg-count))
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown unary-truncate (real) (values integer real)
   (movable foldable flushable no-verify-arg-count))
@@ -993,7 +997,7 @@
                                           (:start index)
                                           (:end sequence-end))
   sequence
-  (recursive)
+  ()
   :derive-type #'result-type-first-arg)
 
 ;;;; from the "Manipulating List Structure" chapter:
@@ -1308,7 +1312,7 @@
                     #.sb-vm:simple-base-string-widetag)
             (member #+sb-unicode 5
                     3))
-    (flushable foldable recursive no-verify-arg-count))
+    (flushable foldable no-verify-arg-count))
 
 (defknown (sb-vm::initial-contents-list-error sb-vm::initial-contents-error) (t t) nil (no-verify-arg-count))
 (defknown sb-vm::fill-vector-initial-contents (t t sequence) t (no-verify-arg-count)
@@ -1755,7 +1759,7 @@
                                    :directory :name
                                    :type :version))
   generalized-boolean
-  (recursive))
+  ())
 
 (defknown pathname-match-p (pathname-designator pathname-designator)
   generalized-boolean
@@ -1955,7 +1959,7 @@
 
 (defknown apropos      (string-designator &optional package-designator t) (values))
 (defknown apropos-list (string-designator &optional package-designator t) list
-  (flushable recursive))
+  (flushable))
 
 (defknown get-decoded-time ()
   (values (integer 0 59) (integer 0 59) (integer 0 23) (integer 1 31)
