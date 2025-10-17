@@ -1305,9 +1305,10 @@
                              ;; to correctly handle signed zeros. We also need
                              ;; to watch out for positive or negative infinity.
                              (cond ((floatp (type-bound-number x))
-                                    (if y-low-p
-                                        (sb-xc:- (float-sign (type-bound-number x) 0.0))
-                                        (float-sign (type-bound-number x) 0.0)))
+                                     (sb-xc:/ (type-bound-number x)
+                                              (if y-low-p
+                                                  single-float-positive-infinity
+                                                  single-float-negative-infinity)))
                                    ((and integer
                                          (not (interval-contains-p 0 top)))
                                     '(0))
@@ -1765,7 +1766,8 @@
                                       (numeric-type-class result-type))
                            :format (numeric-type-format result-type)
                            :low (interval-low result)
-                           :high (interval-high result))))
+                           :high (interval-high result)
+                           :normalize-zeros nil)))
              (if (or (and (eq (numeric-type-class x) 'integer)
                           (interval-ratio-p y-interval))
                      (and (eq (numeric-type-class y) 'integer)
@@ -1817,7 +1819,8 @@
                                (numeric-type-class result-type))
                     :format (numeric-type-format result-type)
                     :low (interval-low result)
-                    :high (interval-high result))))
+                    :high (interval-high result)
+                    :normalize-zeros nil)))
              (if (or (and (eq (numeric-type-class x) 'integer)
                           (interval-ratio-p y-interval))
                      (and (eq (numeric-type-class y) 'integer)
@@ -1863,7 +1866,8 @@
                                (numeric-type-class result-type))
                     :format (numeric-type-format result-type)
                     :low (interval-low result)
-                    :high (interval-high result))))
+                    :high (interval-high result)
+                    :normalize-zeros nil)))
              (flet ((ratio-result-p (a a-interval b-interval)
                       (let (ratio)
                         (and (eq (numeric-type-class a) 'integer)
@@ -1948,11 +1952,13 @@
                   (type-union (make-numeric-type :class (numeric-type-class result-type)
                                                  :format (numeric-type-format result-type)
                                                  :low (interval-low (first result))
-                                                 :high (interval-high (first result)))
+                                                 :high (interval-high (first result))
+                                                 :normalize-zeros nil)
                               (make-numeric-type :class (numeric-type-class result-type)
                                                  :format (numeric-type-format result-type)
                                                  :low (interval-low (second result))
-                                                 :high (interval-high (second result)))))
+                                                 :high (interval-high (second result))
+                                                 :normalize-zeros nil)))
                  (t
                   ;; If the result type is a float, we need to be sure to coerce
                   ;; the bounds into the correct type.
@@ -1965,7 +1971,8 @@
                   (let ((numeric (make-numeric-type :class (numeric-type-class result-type)
                                                     :format (numeric-type-format result-type)
                                                     :low (interval-low result)
-                                                    :high (interval-high result))))
+                                                    :high (interval-high result)
+                                                    :normalize-zeros nil)))
                     (if (and y-integerp
                              (interval-ratio-p x-interval))
                         (type-intersection numeric (specifier-type 'ratio))

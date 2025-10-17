@@ -5101,7 +5101,8 @@ expansion happened."
                          :format (and (floatp num) (float-format-name num))
                          :complexp complexp
                          :low low
-                         :high high))))
+                         :high high
+                         :normalize-zeros nil))))
 
 ;;; The following function is a generic driver for approximating
 ;;; set-valued functions over types.  Putting this here because it'll

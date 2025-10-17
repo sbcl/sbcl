@@ -632,7 +632,9 @@
   (when (and (sc-is y sb-vm::descriptor-reg sb-vm::control-stack)
              (tn-ref-type x-tn-ref))
     (multiple-value-bind (constantp value) (type-singleton-p (tn-ref-type x-tn-ref))
-      (when constantp
+      (when (and constantp
+                 #+(or arm64 x86-64)
+                 (not (eql value 0f0)))
         (let* ((constant (find-constant value))
                (sc (constant-sc constant)))
           (when (or (not load-scs)

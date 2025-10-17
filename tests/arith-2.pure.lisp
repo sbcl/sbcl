@@ -1019,3 +1019,35 @@
                      (funcall m (logand j #xFFFFFF)))))))
    ((1234 #'+) 4936)
    ((3 #'-) -12)))
+
+(with-test (:name :arith-negative-zero)
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (+ (abs x) 0d0))
+   (or (member 0.0d0) (double-float (0.0d0))))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (- (abs x) -0d0))
+   (or (member 0.0d0) (double-float (0.0d0))))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (- -0d0 (abs x)))
+   (or (member -0.0d0) (double-float * (0.0d0))))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (* (abs x) 2d0))
+   (or (member 0.0d0) (double-float (0.0d0))))
+  (assert-type
+   (lambda (x y)
+     (declare (double-float x y))
+     (/ (abs x) (abs y)))
+   (or (member 0.0d0) (double-float (0.0d0))))
+  (assert-type
+   (lambda (x)
+     (declare ((double-float * -1d0) x))
+     (/ 10d0 x))
+   (or (member -0.0d0) (double-float -10.0d0 (0.0d0)))))
