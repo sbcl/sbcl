@@ -1665,65 +1665,6 @@
 (deftransform %unary-truncate ((x) (double-float))
   `(values (unary-truncate x)))
 
-(defun value-within-numeric-type (type)
-  (labels ((try (x)
-             (when (ctypep x type)
-               (return-from value-within-numeric-type x)))
-           (next-float (float)
-             (multiple-value-bind (frac exp sign)
-                 (integer-decode-float float)
-               (* (scale-float (float (1+ frac) float) exp)
-                  sign)))
-           (prev-float (float)
-             (multiple-value-bind (frac exp sign)
-                 (integer-decode-float float)
-               (* (scale-float (float (1- frac) float) exp)
-                  sign)))
-           (next (x)
-             (typecase x
-               (integer
-                (1+ x))
-               (float
-                (next-float x))
-               (t
-                0)))
-           (prev (x)
-             (typecase x
-               (integer
-                (1- x))
-               (float
-                (prev-float x))
-               (t
-                0)))
-           (ratio-between (low high)
-             (+ low (/ (- high low) 2)))
-           (numeric (x)
-             (when (numeric-type-p x)
-               (let ((lo (numeric-type-low x))
-                     (hi (numeric-type-high x)))
-                 (when (numberp lo)
-                   (try lo))
-                 (when (numberp hi)
-                   (try hi))
-                 (when (consp lo)
-                   (try (next (car lo))))
-                 (when (consp hi)
-                   (try (prev (car hi))))
-                 (when (and (typep lo '(cons rational))
-                            (typep hi '(cons rational)))
-                   (try (ratio-between (car lo) (car hi))))
-                 (when (csubtypep x (specifier-type 'rational))
-                   (try 0))
-                 (when (csubtypep x (specifier-type 'double-float))
-                   (try 0d0))
-                 (when (csubtypep x (specifier-type 'single-float))
-                   (try 0f0))))))
-    (typecase type
-      (numeric-type (numeric type))
-      ((or numeric-union-type union-type)
-       (mapc #'numeric (sb-kernel::flatten-numeric-union-types type))))
-    (error "Couldn't come up with a value for ~s" type)))
-
 #-(or sb-xc-host 64-bit)
 (progn
   (declaim (inline %make-double-float))
@@ -1784,9 +1725,8 @@
   (unless (or (lvar-single-value-p result)
               (mv-bind-unused-p result 1))
     (give-up-ir1-transform))
-  (let ((rem-type (second (values-type-required (node-derived-type node)))))
-    `(values (%unary-truncate x)
-             ,(value-within-numeric-type rem-type))))
+  (erase-node-type node t 1)
+  `(values (%unary-truncate x) 0))
 
 (macrolet ((def (type)
              `(deftransform unary-truncate ((number) (,type) * :node node)
