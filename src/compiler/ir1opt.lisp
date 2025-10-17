@@ -115,6 +115,11 @@
     (loop for use in uses
           for leaf = (ref-leaf use)
           collect (constant-value leaf))))
+
+(declaim (inline constant-ref-p))
+(defun constant-ref-p (ref)
+  (and (ref-p ref)
+       (constant-p (ref-leaf ref))))
 
 ;;;; interface for obtaining results of type inference
 
@@ -1916,15 +1921,14 @@
                                                              (listp uses)
                                                              (loop for use in uses
                                                                    always (and (combination-is use '(values))
-                                                                               (constant-lvar-ignore-types-p (nth nth-value (combination-args use))))))
+                                                                               (constant-ref-p
+                                                                                (lvar-uses (nth nth-value (combination-args use)))))))
                                                     (setf mu-constant arg
                                                           mv-bind uses
                                                           mv-bind-nth nth-value))))))
                                       ((and (not mu-constant)
                                             (loop for use in uses
-                                                  always (and (ref-p use)
-                                                              use
-                                                              (constant-p (ref-leaf use)))))
+                                                  always (constant-ref-p use)))
                                        (setf mu-constant arg))))
                (if mu-constant
                    (%constant-fold-call-multiple-uses combination mu-constant mv-bind mv-bind-nth)
