@@ -1927,12 +1927,12 @@
 
 (when-vop-existsp (:translate unsigned-byte-x-p)
   (deftransform unsigned-byte-x-p
-      ((value x) (t t) * :important nil :node node)
-    (ir1-transform-type-predicate value (specifier-type `(unsigned-byte ,(lvar-value x))) node))
+      ((object x) (t t) * :important nil :node node)
+    (ir1-transform-type-predicate object (specifier-type `(unsigned-byte ,(lvar-value x))) node))
 
   (deftransform unsigned-byte-x-p
-      ((value x) ((integer * #.most-positive-word) t) * :important nil)
-    `(#+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p x)))
+      ((object x) ((integer * #.most-positive-word) t) * :important nil)
+    `(#+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p object)))
 
 (deftransform %other-pointer-p ((object))
   (let ((type (lvar-type object)))
