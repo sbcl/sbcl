@@ -48,7 +48,8 @@
     (when (sb-int:system-package-p (find-package name))
       (sb-ext:unlock-package package))))
 
-(load (merge-pathnames "exports.lisp" *load-pathname*))
+(handler-bind ((sb-int:package-at-variance #'muffle-warning))
+  (load (merge-pathnames "exports.lisp" *load-pathname*)))
 
 (rename-package "SB-SEQUENCE" "SB-SEQUENCE"
                 (cons "SEQUENCE" (package-nicknames "SB-SEQUENCE")))

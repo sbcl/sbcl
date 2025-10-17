@@ -1,6 +1,8 @@
 #+parallel-test-runner (setq run-tests::*allowed-inputs* :any)
 
-(load "../src/cold/chill.lisp")
+(with-test (:name (:chill :loads-quietly))
+  (handler-bind ((warning (lambda (c) (error "Caught warning: ~A" c))))
+    (load "../src/cold/chill.lisp")))
 
 (defvar *build-order-data*
   (with-open-file (s "../src/cold/build-order.lisp-expr")
