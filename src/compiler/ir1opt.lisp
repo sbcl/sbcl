@@ -1916,7 +1916,7 @@
                                            (and (not mu-constant)
                                                 (ref-p uses)
                                                 (not (cdr (leaf-refs (ref-leaf uses))))
-                                                (multiple-value-bind (uses nth-value) (mv-principal-lvar-ref-use arg)
+                                                (multiple-value-bind (uses nth-value) (mv-principal-lvar-ref-use arg t t)
                                                   (when (and nth-value
                                                              (listp uses)
                                                              (loop for use in uses

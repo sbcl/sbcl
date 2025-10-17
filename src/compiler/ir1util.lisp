@@ -174,13 +174,15 @@
                      (funcall function use)))))
      (recurse-lvar lvar))))
 
-(defun mv-principal-lvar-ref-use (lvar)
+(defun mv-principal-lvar-ref-use (lvar &optional no-casts single-ref)
   (labels ((recurse (lvar)
              (let ((use (lvar-uses lvar)))
                (typecase use
                  (ref
                   (let ((var (ref-leaf use)))
                     (if (and (lambda-var-p var)
+                             (not (and single-ref
+                                       (cdr (leaf-refs var))))
                              (null (lambda-var-sets var)))
                         (functional-kind-case (lambda-var-home var)
                           (mv-let
@@ -190,7 +192,9 @@
                                    for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
                                    when (eq nvals :unknown) return nil
                                    when (<= n-value nvals) do (return-from mv-principal-lvar-ref-use
-                                                                (values (principal-lvar-use arg) n-value))
+                                                                (values (if no-casts
+                                                                            (lvar-uses arg)
+                                                                            (principal-lvar-use arg)) n-value))
                                    do (decf n-value nvals))
                              use))
                           (let
@@ -199,7 +203,8 @@
                            use))
                         use)))
                  (cast
-                  (recurse (cast-value use)))
+                  (unless no-casts
+                    (recurse (cast-value use))))
                  (t
                   use)))))
     (recurse lvar)))
