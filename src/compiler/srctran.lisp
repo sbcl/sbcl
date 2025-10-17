@@ -4259,7 +4259,7 @@
         (give-up-ir1-transform))))
 
 (make-defs (($fun truncate floor ceiling))
-  (deftransform $fun ((x y) (integer ratio) * :result result :node node)
+  (deftransform $fun ((x y) (integer ratio) * :result result :node node :important nil)
     (unless (and result
                  (lvar-single-value-p result))
       (give-up-ir1-transform))
@@ -4267,12 +4267,13 @@
     `($fun (* x (%denominator y)) (%numerator y))))
 
 (make-defs (($fun truncate floor ceiling))
-  (deftransform $fun ((x y) (number (eql 1)) * :result result :important nil)
+  (deftransform $fun ((x y) (number (eql 1)) * :node node :result result :important nil)
     (or (and result
              (lvar-single-value-p result)
              (combination-case (x (specifier-type 'real))
                (/ (* *)
                 (splice-fun-args x '/ nil t (specifier-type 'real) t)
+                (erase-node-type node t 1)
                 `(lambda (a b y)
                    (declare (ignore y))
                    ($fun a b)))))
