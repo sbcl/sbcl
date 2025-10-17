@@ -2073,8 +2073,7 @@
                             do (change-ref-leaf ref (find-constant value)
                                                 :recklessly t))))
                (when single-value-mv
-                 (setf (node-derived-type call) *wild-type*)
-                 (erase-lvar-type (node-lvar call))
+                 (erase-node-type call *wild-type*)
                  (principal-lvar-single-valuify (node-lvar call)))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call

@@ -358,6 +358,22 @@
                 (loop while cases
                       collect (gen)))))))))
 
+
+(defun erase-node-type (node type &optional nth-value)
+  (if (eq type t)
+      (setf (node-derived-type node)
+            (let ((derived (node-derived-type node)))
+              (make-values-type
+               (loop for i from 0
+                     for r in (values-type-required derived)
+                     collect (if (= i nth-value)
+                                 *universal-type*
+                                 r))
+               (values-type-optional derived)
+               (values-type-rest derived))))
+      (setf (node-derived-type node) type))
+  (erase-lvar-type (node-lvar node) nth-value))
+
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
     (labels ((erase (lvar)

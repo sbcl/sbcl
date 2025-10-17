@@ -4201,9 +4201,7 @@
       (let ((shift (- len))
             (mask (1- y-abs)))
         (cond (zerop
-               (setf (node-derived-type node)
-                     (values-specifier-type '(values integer unsigned-byte &optional)))
-               (erase-lvar-type result 1)
+               (erase-node-type node (values-specifier-type '(values integer unsigned-byte &optional)) 1)
                `(values
                  (values (truncate x y))
                  (logand x ,mask)))
@@ -4261,11 +4259,12 @@
         (give-up-ir1-transform))))
 
 (make-defs (($fun truncate floor ceiling))
-  (deftransform $fun ((x y) (integer ratio) * :result result)
-    (if (and result
-             (lvar-single-value-p result))
-        `($fun (* x (%denominator y)) (%numerator y))
-        (give-up-ir1-transform))))
+  (deftransform $fun ((x y) (integer ratio) * :result result :node node)
+    (unless (and result
+                 (lvar-single-value-p result))
+      (give-up-ir1-transform))
+    (erase-node-type node t 1)
+    `($fun (* x (%denominator y)) (%numerator y))))
 
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (number (eql 1)) * :result result :important nil)
@@ -4499,9 +4498,7 @@
                    (let* ((max-x most-positive-word)
                           (inv (mulinv abs-y max-x))
                           (cmp (truncate max-x abs-y)))
-                     (setf (node-derived-type node)
-                           (values-specifier-type '(values integer boolean &optional)))
-                     (erase-lvar-type result)
+                     (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                      (transform-call rem
                                      `(lambda (x z)
                                         (declare (ignore z))
@@ -4519,9 +4516,7 @@
                             (add (dpb 0 (byte zeros 0)
                                       (truncate (ash max-x -1) odd)))
                             (cmp (ash add (- 1 zeros))))
-                       (setf (node-derived-type node)
-                             (values-specifier-type '(values integer boolean &optional)))
-                       (erase-lvar-type result)
+                       (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                        (transform-call rem
                                        `(lambda (x z)
                                           (declare (ignore z))
@@ -4594,9 +4589,7 @@
          (cond ((oddp y)
                 (let* ((max-x (1- (ash 1 (integer-length max-x))))
                        (inv (mulinv y max-x)))
-                  (setf (node-derived-type node)
-                        (values-specifier-type '(values integer boolean &optional)))
-                  (erase-lvar-type result)
+                  (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                   (transform-call rem
                                   `(lambda (x z)
                                      (declare (ignore z))
@@ -4609,9 +4602,7 @@
                   (let* ((max-x most-positive-word)
                          (zeros (count-trailing-zeros y))
                          (inv (mulinv (ash y (- zeros)) max-x)))
-                    (setf (node-derived-type node)
-                          (values-specifier-type '(values integer boolean &optional)))
-                    (erase-lvar-type result)
+                    (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                     (transform-call rem
                                     `(lambda (x z)
                                        (declare (ignore z))
