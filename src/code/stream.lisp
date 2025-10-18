@@ -2313,12 +2313,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            (type ansi-stream stream)
            (type index start)
            (type (or null index) end))
-  (let* ((end (or end (length seq)))
-         (needed (- end start))
-         (read 0))
-    (prepare-for-fast-read-char stream
-      (declare (ignore %frc-method%))
-      (let ((buffered (- +ansi-stream-in-buffer-length+ %frc-index%)))
+  (prepare-for-fast-read-char stream
+    (declare (ignore %frc-method%))
+    (let* ((end (or end (length seq)))
+           (needed (- end start))
+           (read 0)
+           (buffered (- +ansi-stream-in-buffer-length+ %frc-index%)))
+      (block nil
         (labels ((refill-buffer ()
                    (prog1 (fast-read-char-refill stream nil)
                      (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
@@ -2338,23 +2339,18 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                      (incf %frc-index% len)
                      (when (or (eql needed read) (not (refill-buffer)))
                        (done-with-fast-read-char)
-                       (return-from ansi-stream-read-string-from-frc-buffer
-                         (+ start read)))))
+                       (return (+ start read)))))
                  (copy ()
                    (when (plusp buffered)
                      (replace seq %frc-buffer%
                               :start1 start
                               :start2 %frc-index%)
-                     ;; Isn't this DONE-WITH-FAST-READ-CHAR?
                      (setf (ansi-stream-in-index %frc-stream%)
                            +ansi-stream-in-buffer-length+)
                      (incf start buffered))))
           (declare (inline refill-buffer copy))
           (cond
             ;; Read directly into the string when possible
-            ;; Caution: FD-STREAM-READ-SEQUENCE methods used to return
-            ;; NIL sometimes. Now they just do all of READ-SEQUENCE's
-            ;; contract. So don't worry about fall-thru here.
             ((and (> (- needed buffered)
                      (/ +ansi-stream-in-buffer-length+ 2))
                   (fd-stream-p stream)
@@ -2364,23 +2360,27 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
                          (cond
                            ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
                             (copy)
-                            (fd-stream-read-sequence/utf-8-to-base-string stream seq start end))
+                            (return
+                              (fd-stream-read-sequence/utf-8-to-base-string stream seq start end)))
                            ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
                             (copy)
-                            (fd-stream-read-sequence/utf-8-crlf-to-base-string stream seq start end))))
+                            (return
+                              (fd-stream-read-sequence/utf-8-crlf-to-base-string stream seq start end)))))
                         ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8)
                          (copy)
-                         (fd-stream-read-sequence/utf-8-to-string stream seq start end))
+                         (return
+                           (fd-stream-read-sequence/utf-8-to-string stream seq start end)))
                         ((eq (ansi-stream-n-bin stream) #'fd-stream-read-n-characters/utf-8/crlf)
                          (copy)
-                         (fd-stream-read-sequence/utf-8-crlf-to-character-string stream seq start end)))))
+                         (return
+                           (fd-stream-read-sequence/utf-8-crlf-to-character-string stream seq start end))))))
             (t
              (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
                         (not (refill-buffer)))
                ;; EOF had been reached before we read anything
                ;; at all. But READ-SEQUENCE never signals an EOF error.
                (done-with-fast-read-char)
-               (return-from ansi-stream-read-string-from-frc-buffer start))
+               (return start))
              (loop (add-chunk)))))))))
 
 (declaim (maybe-inline read-sequence/read-function))
