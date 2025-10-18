@@ -467,7 +467,9 @@ static void decode_flagbits(int flags, char result[40]) {
     if (flags & MAP_PRIVATE) APPEND("Pvt");
     if (flags & MAP_ANON) APPEND("Anon");
     if (flags & MAP_NORESERVE) APPEND("NoRsv");
+#ifdef MAP_JIT
     if (flags & MAP_JIT) APPEND("JIT");
+#endif
 #undef APPEND
     strcpy(p, "}");
 }
@@ -476,7 +478,7 @@ void* traced_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t 
     decode_protbits(prot, decoded_prot);
     decode_flagbits(flags, decoded_flags);
     void* result = mmap(addr, length, prot, flags, fd, offset);
-    fprintf(mmgr_debug_logfile, "mmap(%p,%lx,%s,%s,%d,%llx)=%p\n", addr, length,
+    fprintf(mmgr_debug_logfile, "mmap(%p,%lx,%s,%s,%d,%lx)=%p\n", addr, length,
             decoded_prot, decoded_flags, fd, offset, result);
     return result;
 }

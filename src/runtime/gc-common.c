@@ -1513,7 +1513,7 @@ void finalizer_thread_stop () {
 #endif
 
 #ifdef TRACE_MMAP_SYSCALLS
-FILE* mmgr_debug_logfile;
+extern FILE* mmgr_debug_logfile;
 void set_page_type_impl(struct page* pte, int newval)
 {
     if (newval != pte->type) /* too "noisy" without this pre-test */
