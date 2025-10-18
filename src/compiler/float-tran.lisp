@@ -614,6 +614,10 @@
                              (not (member -0f0 -0d0)))) * :important nil)
   'x)
 
+(deftransform abs ((x) ((and (real * 0)
+                             (not (member 0f0 0d0)))) * :important nil)
+  '(%negate x))
+
 (deftransform abs ((x) ((complex double-float)) double-float)
   '(%hypot (realpart x) (imagpart x)))
 
