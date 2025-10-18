@@ -306,12 +306,16 @@
 
 (defun print-simd-reg-cmode (value stream dstate)
   (declare (ignore dstate))
-  (destructuring-bind (q cmode offset) value
+  (destructuring-bind (q cmode offset op) value
     (format stream "V~d.~a" offset
             (cond ((eq cmode #b1110)
-                   (if (zerop q)
-                       "8B"
-                       "16B"))
+                   (if (eq op 1)
+                       (if (zerop q)
+                           ""
+                           "2D")
+                       (if (zerop q)
+                           "8B"
+                           "16B")))
                   ((eq (logandc2 cmode #b10) #b1000)
                    (if (zerop q)
                        "4H"

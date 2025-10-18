@@ -31,17 +31,30 @@
 
 (define-move-fun (load-fp-immediate 1) (vop x y)
                  ((single-immediate) (single-reg)
-                  (double-immediate) (double-reg))
+                  (double-immediate) (double-reg)
+                  (complex-single-immediate) (complex-single-reg)
+                  (complex-double-immediate) (complex-double-reg))
   (let ((x (tn-value x)))
-    (cond ((or (eql x 0f0)
-               (eql x 0d0))
+    (cond ((eql x #c(0d0 0d0))
+           (inst movi y 0 :2d))
+          ((member x '(0f0 0d0 #c(0f0 0f0)))
            (inst fmov y zr-tn))
-          ((encode-fp-immediate  x)
+          ((encode-fp-immediate x)
            (inst fmov y x))
-          ((load-immediate-word tmp-tn (if (double-float-p x)
-                                           (double-float-bits x)
-                                           (single-float-bits x))
-                                t)
+          ((block nil
+             (load-immediate-word tmp-tn (typecase x
+                                           (double-float
+                                            (double-float-bits x))
+                                           (single-float
+                                            (single-float-bits x))
+                                           ((complex single-float)
+                                            (ldb (byte 64 0)
+                                                 (logior (ash (single-float-bits (imagpart x)) 32)
+                                                         (ldb (byte 32 0)
+                                                              (single-float-bits (realpart x))))))
+                                           (t
+                                            (return)))
+                                  t))
            (inst fmov y tmp-tn))
           (t
            (load-inline-constant y x)))))

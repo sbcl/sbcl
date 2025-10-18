@@ -195,15 +195,18 @@
               :save-p t
               :alternate-scs (double-stack))
 
+  (complex-single-immediate immediate-constant)
+  (complex-double-immediate immediate-constant)
+
   (complex-single-reg float-registers
                       :locations #.(loop for i below 32 collect i)
-                      :constant-scs ()
+                      :constant-scs (complex-single-immediate)
                       :save-p t
                       :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
                       :locations #.(loop for i below 32 collect i)
-                      :constant-scs ()
+                      :constant-scs (complex-double-immediate)
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
@@ -254,6 +257,10 @@
      double-immediate-sc-number)
     (single-float
      single-immediate-sc-number)
+    ((complex double-float)
+     complex-double-immediate-sc-number)
+    ((complex single-float)
+     complex-single-immediate-sc-number)
     (structure-object
      (when (eq value sb-lockless:+tail+)
        immediate-sc-number))))

@@ -3391,18 +3391,23 @@
   (o2 :field (byte 1 11))
   (op3 :field (byte 1 10) :value #b1)
   (imm :fields (list (byte 3 16) (byte 4 12) (byte 5 5)) :type 'simd-modified-imm)
-  (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0)) :type 'simd-reg-cmode))
+  (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0) (byte 1 29)) :type 'simd-reg-cmode))
 
 (macrolet
     ((def (name o2 op)
        `(define-instruction ,name (segment rd imm size &optional (shift 0))
-          ;; 8-bit
           (:printer simd-modified-imm ((o2 ,o2)
                                        (op ,op)))
+          ,@(when (eq name 'movi)
+              `((:printer simd-modified-imm ((o2 ,o2)
+                                             (op 1)
+                                             (cmode #b1110))
+                          '('movi :tab rd ", #" imm))))
           (:emitter
            (let ((abc 0)
                  (defgh 0)
-                 (cmode 0))
+                 (cmode 0)
+                 (op ,op))
              (setf abc (ldb (byte 3 5) imm)
                    defgh (ldb (byte 5 0) imm))
              (ecase size
@@ -3419,10 +3424,13 @@
                              (8 1)
                              (16 2)
                              (24 3))
-                           1))))
+                           1)))
+               ((:2d)
+                (setf op 1
+                      cmode #b1110)))
              (emit-simd-modified-imm segment
                                      (encode-vector-size size)
-                                     ,op
+                                     op
                                      abc
                                      cmode
                                      ,o2
