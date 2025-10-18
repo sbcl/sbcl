@@ -364,7 +364,6 @@
                 (loop while cases
                       collect (gen)))))))))
 
-
 (defun erase-node-type (node type &optional nth-value)
   (if (eq type t)
       (setf (node-derived-type node)
@@ -389,7 +388,17 @@
                        do (setf (lvar-annotation-fired annotation) t))
                  (let ((dest (lvar-dest lvar)))
                    (cond ((cast-p dest)
-                          (derive-node-type dest *wild-type* :from-scratch t)
+                          (let ((derived (node-derived-type dest)))
+                            (unless (eq derived *wild-type*)
+                              (derive-node-type dest
+                                                (make-values-type
+                                                 (make-list (length (values-type-required derived))
+                                                            :initial-element *universal-type*)
+                                                 (make-list (length (values-type-optional derived))
+                                                            :initial-element *universal-type*)
+                                                 (and (values-type-rest derived)
+                                                      *universal-type*))
+                                                :from-scratch t)))
                           (erase (node-lvar dest)))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
