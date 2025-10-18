@@ -233,6 +233,9 @@
   (defregtn lr any-reg)
   #+sb-thread
   (defregtn thread any-reg))
+
+(defglobal wzr-tn (make-random-tn (sc-or-lose '32-bit-reg) zr-offset))
+
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

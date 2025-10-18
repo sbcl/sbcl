@@ -645,15 +645,38 @@
               (:arg-types * tagged-num)
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
-              (:generator 1 (inst ,inst value (instance-slot-ea object index))))
+              (:generator 1
+                (inst ,inst value (instance-slot-ea object index))))
             (define-vop ()
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (any-reg immediate))
-                     (value :scs (,result-sc)))
+                     (value :scs (,result-sc ,@(case result-sc
+                                                (single-reg
+                                                 '(fp-single-immediate fp-single-zero))
+                                                (double-reg
+                                                 '(fp-double-zero))
+                                                (complex-single-reg
+                                                 '(fp-complex-single-zero))
+                                                ((unsigned-reg signed-reg)
+                                                 '((immediate (plausible-signed-imm32-operand-p (tn-value tn)))))))))
               (:arg-types * tagged-num ,result-type)
-              (:generator 1 (inst ,inst (instance-slot-ea object index) value))))))
+              (:generator 1
+                ,(if (eq result-sc 'complex-double-reg)
+                     `(inst ,inst (instance-slot-ea object index) value)
+                     `(sc-case value
+                        (,result-sc
+                         (inst ,inst (instance-slot-ea object index) value))
+                        (t
+                         (inst mov ,(case result-sc
+                                      (single-reg :dword)
+                                      (t :qword))
+                               (instance-slot-ea object index)
+                               ,(case result-sc
+                                  (single-reg '(single-float-bits (tn-value value)))
+                                  ((double-reg complex-single-reg) 0)
+                                  (t '(tn-value value))))))))))))
     (def word unsigned-reg unsigned-num mov)
     (def signed-word signed-reg signed-num mov)
     (def single single-reg single-float movss)

@@ -754,8 +754,8 @@
 ;;;; raw instance slot accessors
 
 (macrolet
-    ((define-raw-slot-vops (name value-primtype value-sc
-                            &optional (move-macro 'move))
+    ((def (name value-primtype value-sc
+           &optional (move-macro 'move))
        (labels ((emit-generator (instruction move-result)
                   `((sc-case index
                       (immediate
@@ -773,6 +773,11 @@
                        (inst ,instruction value (@ object offset))))
                     ,@(when move-result
                         `((,move-macro result value))))))
+         (multiple-value-bind (immediate-sc immediate-value)
+             (case name
+               (single (values 'single-immediate 0f0))
+               (double (values 'double-immediate 0d0))
+               (t (values 'immediate 0)))
            `(progn
               (define-vop ()
                 (:translate ,(symbolicate "%RAW-INSTANCE-REF/" name))
@@ -789,20 +794,22 @@
                 (:policy :fast-safe)
                 (:args (object :scs (descriptor-reg))
                        (index :scs (any-reg immediate))
-                       (value :scs (,value-sc)))
+                       (value :scs (,value-sc (,immediate-sc
+                                               (eql (tn-value tn) ,immediate-value)))))
                 (:arg-types * positive-fixnum ,value-primtype)
                 (:temporary (:scs (non-descriptor-reg)) offset)
-                (:generator 5 ,@(emit-generator 'str nil)))))))
-  (define-raw-slot-vops word unsigned-num unsigned-reg)
-  (define-raw-slot-vops signed-word signed-num signed-reg)
-  (define-raw-slot-vops single single-float single-reg
-    move-float)
-  (define-raw-slot-vops double double-float double-reg
-    move-float)
-  (define-raw-slot-vops complex-single complex-single-float complex-single-reg
-    move-float)
-  (define-raw-slot-vops complex-double complex-double-float complex-double-reg
-    move-complex-double))
+                (:generator 5
+                  (when (sc-is value ,immediate-sc)
+                    (setf value ,(if (eq name 'single)
+                                     'wzr-tn
+                                     'zr-tn)))
+                  ,@(emit-generator 'str nil))))))))
+  (def word unsigned-num unsigned-reg)
+  (def signed-word signed-num signed-reg)
+  (def single single-float single-reg move-float)
+  (def double double-float double-reg move-float)
+  (def complex-single complex-single-float complex-single-reg move-float)
+  (def complex-double complex-double-float complex-double-reg move-complex-double))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)

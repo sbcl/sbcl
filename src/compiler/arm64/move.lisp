@@ -39,7 +39,7 @@
              y)
             ((and (typep val '(unsigned-byte 32))
                   (cond ((encode-logical-immediate val 32)
-                         (inst orr (32-bit-reg y) zr-tn val)
+                         (inst orr (32-bit-reg y) wzr-tn val)
                          t)
                         ((zerop (ldb (byte 16 0) (lognot val)))
                          (inst movn (32-bit-reg y) (ldb (byte 16 16) (lognot val)) 16)

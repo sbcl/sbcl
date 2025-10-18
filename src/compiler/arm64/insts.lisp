@@ -25,7 +25,7 @@
             sb-vm::add-sub-immediate
             sb-vm::32-bit-reg sb-vm::single-reg sb-vm::double-reg
             sb-vm::complex-single-reg sb-vm::complex-double-reg
-            sb-vm::tmp-tn sb-vm::zr-tn sb-vm::nsp-offset)))
+            sb-vm::tmp-tn sb-vm::wzr-tn sb-vm::zr-tn sb-vm::nsp-offset)))
 
 
 
@@ -569,7 +569,7 @@
   `(let ((rn ,rn)
          (rm ,rm))
      (inst subs (if (sc-is rn 32-bit-reg)
-                    (32-bit-reg zr-tn)
+                    wzr-tn
                     zr-tn)
            rn rm)))
 
@@ -577,7 +577,7 @@
   `(let ((rn ,rn)
          (rm ,rm))
      (inst adds (if (sc-is rn 32-bit-reg)
-                    (32-bit-reg zr-tn)
+                    wzr-tn
                     zr-tn)
            rn rm)))
 
@@ -585,7 +585,7 @@
   `(let ((rd ,rd)
          (rm ,rm))
      (inst sub rd (if (sc-is rd 32-bit-reg)
-                      (32-bit-reg zr-tn)
+                      wzr-tn
                       zr-tn)
            rm)))
 
@@ -593,7 +593,7 @@
   `(let ((rd ,rd)
          (rm ,rm))
      (inst subs rd (if (sc-is rd 32-bit-reg)
-                       (32-bit-reg zr-tn)
+                       wzr-tn
                        zr-tn)
            rm)))
 
