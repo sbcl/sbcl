@@ -48,7 +48,44 @@
 #include "validate.h"
 
 int arch_os_thread_init(struct thread *thread) {
+#ifdef MEMORY_SANITIZER
+    extern __thread unsigned long __msan_param_tls[];
+    thread->msan_param_tls = (uword_t)&__msan_param_tls[0];
+#endif
     stack_t sigstack;
+#ifdef ADDRESS_SANITIZER // maybe skip setting up our own altstack
+    /* Asan seems to think it should call munmap() on the alternate signal stack because
+     * it believes that it - and only it - called sigaltstack to begin with, due to:
+     *   COMMON_FLAG(bool, use_sigaltstack, true,
+     *               "If set, uses alternate stack for signal handling.")
+     * in llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_flags.inc
+     * and
+     *   if (common_flags()->use_sigaltstack) SetAlternateSignalStack();
+     * which picks a kernel-assigned address. This ocurs before we get here.
+     *
+     * I suppose when running SBCL, you're supposed to pass a sanitizer flag,
+     * but how would users know? Our choices are either to avoid using our own altstack,
+     * or undo our altstack and put it back to the ASan-specified stack just before the
+     * thread is joined. The consequence of doing otherwise is to see the sanitizer
+     * trip over its own shoelaces after we've freed a thread struct, then it queries
+     * the OS for the altstack and frees that, which is a double-free, leading to:
+#0  __sanitizer::ReportMunmapFailureAndDie () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_common.cpp:67
+#1  0x0000000000364b3d in __sanitizer::UnmapOrDie () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_posix.cpp:62
+#2  0x00000000003662df in __sanitizer::UnsetAlternateSignalStack () at third_party/llvm/llvm-project/compiler-rt/lib/sanitizer_common/sanitizer_posix_libcdep.cpp:210
+#3  0x000000000034aceb in __asan::AsanThread::Destroy () at third_party/llvm/llvm-project/compiler-rt/lib/asan/asan_thread.cpp:135
+#4  0x00007f33072f0271 in __GI___nptl_deallocate_tsd () at ./nptl/nptl_deallocate_tsd.c:73
+#5  __GI___nptl_deallocate_tsd () at ./nptl/nptl_deallocate_tsd.c:22
+#6  0x00007f33072f2a4e in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:456
+#7  0x00007f33073707b8 in __GI___clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+     *
+     * In trying to track this down, I did first attempt to completely disable signal stacks,
+     * and then due to another bug I caused (in trying to use FORMAT after streams were closed)
+     * I got a stack overflow, and the sanitizer didn't help.*/
+    memset(&sigstack, 0, sizeof sigstack);
+    int res = sigaltstack(0, &sigstack);
+    if (res == 0 && sigstack.ss_sp) return 1;
+#endif
+    // why is this guard even here? It's always C_STACK_IS_CONTROL_STACK for x86-64
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
@@ -59,10 +96,6 @@ int arch_os_thread_init(struct thread *thread) {
     if(sigaltstack(&sigstack,0)<0) {
         lose("Cannot sigaltstack: %s",strerror(errno));
     }
-#endif
-#ifdef MEMORY_SANITIZER
-    extern __thread unsigned long __msan_param_tls[];
-    thread->msan_param_tls = (uword_t)&__msan_param_tls[0];
 #endif
     return 1;
 }
