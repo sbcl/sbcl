@@ -1025,7 +1025,8 @@
                :class 'float
                :format format
                :low (coerce-numeric-bound (interval-low bnd) format)
-               :high (coerce-numeric-bound (interval-high bnd) format))))
+               :high (coerce-numeric-bound (interval-high bnd) format)
+               :normalize-zeros nil)))
            (t
             ;; A positive float to a number is a number (for now)
             (specifier-type 'number))))
