@@ -1257,7 +1257,13 @@ void init_ldb_service()
     pthread_attr_init(&thr_attr);
     pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
     sigset_t oldmask;
-    pthread_sigmask(SIG_BLOCK, &deferrable_sigset, &oldmask);
+    sigset_t blockmask = deferrable_sigset;
+    /* This sigaddset is ok whether or not SIGCHLD was in deferrables.
+     * sb-safepoint doesn't have it there because most Lisp threads block a lot of
+     * signals all the time, so that signals go to the dedicated handler thread.
+     * ldb service needs to avoid being the recipient of such signals */
+    sigaddset(&blockmask, SIGCHLD);
+    pthread_sigmask(SIG_BLOCK, &blockmask, &oldmask);
     pthread_create(&ldb_service_thread, &thr_attr, ldb_service_main, 0);
     pthread_setname_np(ldb_service_thread, "ldbsvc");
     getsockname(listener, (struct sockaddr*)&sin, &addrlen);
