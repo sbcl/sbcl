@@ -39,6 +39,11 @@ typedef int os_vm_prot_t;
  * due to Linux signal handling pecularities. See thread "Signal
  * delivery order" from 2009-03-14 on kernel-devel@vger.kernel.org.
  * https://lkml.org/lkml/2009/3/14/133
+ *
+ * This is a sufficiently interesting issue that engendered much discussion and an
+ * eventual solution which should prevent any asynchronous signal from being picked
+ * to deliver when a synchronous trap (SEGV,ILL,etc) is pending and deliverable:
+ * https://github.com/torvalds/linux/commit/a27341cd5fcb7cf2d2d4726e9f324009f7162c00
  */
 #ifndef SIG_STOP_FOR_GC // choose you own signal if you must
 #define SIG_STOP_FOR_GC (SIGUSR2)
