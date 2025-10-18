@@ -944,14 +944,18 @@ and no value was provided for it." name)))))))))))
              collect arg)
        args)))
 
+(declaim (ftype (sfunction (function basic-combination
+                                     &key (:info t) (:unknown-keys-fun t)
+                                     (:defined-here t) (:asserted-type t) (:type t))
+                           null)
+                map-combination-args-and-types))
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
 (defun map-combination-args-and-types (fun call &key info
                                                      unknown-keys-fun
                                                      defined-here
                                                      asserted-type
                                                      type)
-  (declare (type function fun)
-           (type basic-combination call))
+  (declare (dynamic-extent fun unknown-keys-fun))
   (binding* ((type (or type
                        (lvar-fun-type (basic-combination-fun call) defined-here asserted-type)))
              (nil (fun-type-p type) :exit-if-null)
@@ -1004,7 +1008,8 @@ and no value was provided for it." name)))))))))))
               (call lvar (key-info-type key) (key-annotation name)))))
         (when (and unknown-keys-fun
                    unknown-keys)
-          (funcall unknown-keys-fun unknown-keys))))))
+          (funcall unknown-keys-fun unknown-keys)))))
+  nil)
 
 (defun assert-array-index-lvar-type (lvar type policy)
   (let ((internal-lvar (make-lvar))

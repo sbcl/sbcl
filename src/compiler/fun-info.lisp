@@ -188,7 +188,7 @@
   ;; A description of read-only arguments that can be constant folded.
   ;; An integer bitmap for positional arguments.
   ;; Sign-extended into a negative integer for &rest arguments.
-  (read-only-args nil)
+  (read-only-args nil :type (or null sb-xc:fixnum))
   (rewrite-full-call nil :type (or function null)))
 
 (defprinter (fun-info)

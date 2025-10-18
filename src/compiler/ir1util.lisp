@@ -210,6 +210,7 @@
     (recurse lvar)))
 
 (defun map-lvar-dest-casts (fun lvar)
+  (declare (dynamic-extent fun))
   (labels ((pld (lvar)
              (and lvar
                   (let ((dest (lvar-dest lvar)))
@@ -3163,6 +3164,7 @@ is :ANY, the function name is not checked."
 ;;; true will be examined, resetting LVAR-REOPTIMIZE to NIL before
 ;;; calling FUNCTION.
 (defun map-combination-arg-var (function combination &key reoptimize)
+  (declare (dynamic-extent function))
   (let ((args (basic-combination-args combination))
         (vars (lambda-vars (combination-lambda combination))))
     (flet ((reoptimize-p (arg)
@@ -3243,6 +3245,7 @@ is :ANY, the function name is not checked."
       (null x)))
 
 (defun map-lambda-var-refs-from-calls (function lambda-var)
+  (declare (dynamic-extent function))
   (when (not (lambda-var-sets lambda-var))
     (let* ((home (lambda-var-home lambda-var))
            (vars (lambda-vars home)))
@@ -3259,8 +3262,10 @@ is :ANY, the function name is not checked."
                   when (eq v lambda-var)
                   do (funcall function combination arg))))))))
 
+(declaim (ftype (sfunction (function t &key (:leaf-set t) (:multiple-uses t)) null) map-refs))
 (defun map-refs (function leaf/lvar &key leaf-set
                                          multiple-uses)
+  (declare (dynamic-extent function leaf-set multiple-uses))
   (let ((seen-calls))
     (labels ((recur (leaf/lvar)
                (typecase leaf/lvar
@@ -3307,7 +3312,8 @@ is :ANY, the function name is not checked."
                                           t)))))))
                           (t
                            (funcall function dest leaf/lvar))))))))
-      (recur leaf/lvar))))
+      (recur leaf/lvar))
+    nil))
 
 (defun propagate-lvar-annotations-to-refs (lvar var)
   (when (lvar-annotations lvar)
