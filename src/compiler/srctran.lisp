@@ -2049,11 +2049,11 @@
            (and b
                 (set-bound (sb-xc:- (type-bound-number b))
                            (consp b)))))
-    (let ((r
-            (modified-numeric-type
-             type
-             :low (negate-bound (numeric-type-high type))
-             :high (negate-bound (numeric-type-low type)))))
+    (let ((r (modified-numeric-type
+              type
+              :low (negate-bound (numeric-type-high type))
+              :high (negate-bound (numeric-type-low type))
+              :normalize-zeros nil)))
       (if (ratio-type-p type)
           (type-intersection r (specifier-type 'ratio))
           r))))

@@ -2723,12 +2723,14 @@ expansion happened."
                                 (format     (numeric-type-format     base))
                                 (complexp   (numeric-type-complexp   base))
                                 (low        (numeric-type-low        base))
-                                (high       (numeric-type-high       base)))
+                                (high       (numeric-type-high       base))
+                                (normalize-zeros t))
   (make-numeric-type :class class
                      :format format
                      :complexp complexp
                      :low low
-                     :high high))
+                     :high high
+                     :normalize-zeros normalize-zeros))
 
 ;;; If it's longer than N
 (defun weaken-numeric-type-union (n type)

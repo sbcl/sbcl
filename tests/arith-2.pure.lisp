@@ -1055,7 +1055,12 @@
    (lambda (x y)
      (declare (double-float x y))
      (expt (abs x) y))
-    (or (member 0.0d0) (double-float (0.0d0)))))
+   (or (member 0.0d0) (double-float (0.0d0))))
+  (assert-type
+   (lambda (x)
+     (declare (double-float x))
+     (- (abs x)))
+   (or (member -0.0d0) (double-float * (0.0d0)))))
 
 (with-test (:name :truncate-type)
   (assert-type
