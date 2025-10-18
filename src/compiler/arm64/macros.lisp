@@ -429,7 +429,11 @@
         (:policy :fast-safe)
         (:args (object :scs (descriptor-reg))
                (index :scs (any-reg unsigned-reg signed-reg immediate))
-               (value :scs (,@scs zero)))
+               (value :scs (,@scs ,(case el-type
+                                     (double-float
+                                      '(double-immediate (eql (tn-value tn) 0d0)))
+                                     (t
+                                      'zero)))))
         (:arg-types ,type tagged-num ,el-type)
         (:vop-var vop)
         ,@(if barrierp '((:gc-barrier 0 2)
@@ -438,6 +442,10 @@
           ,@(when barrierp
               '((when barrier
                   (emit-gengc-barrier object nil tmp-tn t))))
+          ,@(case el-type
+              (double-float
+               '((when (sc-is value double-immediate)
+                   (setf value zr-tn)))))
           (sc-case index
             (immediate
              (inst str value (@ object (load-store-offset
@@ -492,55 +500,58 @@
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
-  (let ((value `((value :scs ,scs
-                             :load-if (not (and (sc-is value immediate)
-                                                (eql (tn-value value) 0))))))
-        (setf-p (typep translate '(cons (eql setf)))))
-   `(define-vop (,name)
-      ,@(when translate
-          `((:translate ,translate)))
-      (:policy :fast-safe)
-      (:args ,@(when setf-p
-                 value)
-             (object :scs (descriptor-reg))
-             (index :scs (any-reg unsigned-reg signed-reg immediate))
-             ,@(unless setf-p
-                 value))
-      (:arg-types ,@(when setf-p
-                      `(,el-type))
-                  ,type
-                  tagged-num
-                  ,@(unless setf-p
-                      `(,el-type)))
-      (:generator 5
-        (when (sc-is value immediate)
-          (setf value zr-tn))
-        ,@(multiple-value-bind (op shift)
-              (ecase size
-                (:byte
-                 (values 'strb 0))
-                (:short
-                 (values 'strh 1))
-                ((:word :single-float)
-                 (values 'str 2)))
-            (let ((value (if (eq size :word)
-                             '(32-bit-reg value)
-                             'value)))
-              `((sc-case index
-                  (immediate
-                   (inst ,op ,value (@ object (load-store-offset
-                                               (+
-                                                (ash (tn-value index) ,shift)
-                                                (- (* ,offset n-word-bytes) ,lowtag))))))
-                  (t
-                   (let ((shift ,shift))
-                     (when (sc-is index any-reg)
-                       (decf shift n-fixnum-tag-bits))
-                     (inst add tmp-tn object (if (minusp shift)
-                                                 (asr index (- shift))
-                                                 (lsl index shift)))
-                     (inst ,op
-                           ,value (@ tmp-tn (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
+  (multiple-value-bind (immediate-sc immediate-value)
+     (case el-type
+       (single-float (values 'single-immediate 0f0))
+       (t (values 'immediate 0)))
+   (let ((value `((value :scs (,@scs (,immediate-sc
+                                      (eql (tn-value tn) ,immediate-value))))))
+         (setf-p (typep translate '(cons (eql setf)))))
+     `(define-vop (,name)
+        ,@(when translate
+            `((:translate ,translate)))
+        (:policy :fast-safe)
+        (:args ,@(when setf-p
+                   value)
+               (object :scs (descriptor-reg))
+               (index :scs (any-reg unsigned-reg signed-reg immediate))
+               ,@(unless setf-p
+                   value))
+        (:arg-types ,@(when setf-p
+                        `(,el-type))
+                    ,type
+                    tagged-num
+                    ,@(unless setf-p
+                        `(,el-type)))
+        (:generator 5
+          (when (sc-is value ,immediate-sc)
+            (setf value (32-bit-reg zr-tn)))
+          ,@(multiple-value-bind (op shift)
+                (ecase size
+                  (:byte
+                   (values 'strb 0))
+                  (:short
+                   (values 'strh 1))
+                  ((:word :single-float)
+                   (values 'str 2)))
+              (let ((value (if (eq size :word)
+                               '(32-bit-reg value)
+                               'value)))
+                `((sc-case index
+                    (immediate
+                     (inst ,op ,value (@ object (load-store-offset
+                                                 (+
+                                                  (ash (tn-value index) ,shift)
+                                                  (- (* ,offset n-word-bytes) ,lowtag))))))
+                    (t
+                     (let ((shift ,shift))
+                       (when (sc-is index any-reg)
+                         (decf shift n-fixnum-tag-bits))
+                       (inst add tmp-tn object (if (minusp shift)
+                                                   (asr index (- shift))
+                                                   (lsl index shift)))
+                       (inst ,op
+                             ,value (@ tmp-tn (- (* ,offset n-word-bytes) ,lowtag))))))))))))))
 
 (defun load-inline-constant (dst &rest constant-descriptor)
   (inst load-from-label dst (cdr (apply #'register-inline-constant constant-descriptor))))
