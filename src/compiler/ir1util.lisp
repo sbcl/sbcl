@@ -365,8 +365,8 @@
                       collect (gen)))))))))
 
 (defun erase-node-type (node type &optional nth-value)
-  (if (eq type t)
-      (setf (node-derived-type node)
+  (setf (node-derived-type node)
+        (if (eq type t)
             (let ((derived (node-derived-type node)))
               (make-values-type
                (loop for i from 0
@@ -375,8 +375,8 @@
                                  *universal-type*
                                  r))
                (values-type-optional derived)
-               (values-type-rest derived))))
-      (setf (node-derived-type node) type))
+               (values-type-rest derived)))
+            type))
   (erase-lvar-type (node-lvar node) nth-value))
 
 (defun erase-lvar-type (lvar &optional nth-value)
@@ -386,38 +386,35 @@
                  (setf (lvar-%derived-type lvar) nil)
                  (loop for annotation in (lvar-annotations lvar)
                        do (setf (lvar-annotation-fired annotation) t))
-                 (let ((dest (lvar-dest lvar)))
+                 (let ((dest (lvar-dest lvar))
+                       (lvar-type (lvar-derived-type lvar)))
                    (cond ((cast-p dest)
-                          (let ((derived (node-derived-type dest)))
-                            (unless (eq derived *wild-type*)
-                              (derive-node-type dest
-                                                (make-values-type
-                                                 (make-list (length (values-type-required derived))
-                                                            :initial-element *universal-type*)
-                                                 (make-list (length (values-type-optional derived))
-                                                            :initial-element *universal-type*)
-                                                 (and (values-type-rest derived)
-                                                      *universal-type*))
-                                                :from-scratch t)))
+                          (let* ((atype (cast-asserted-type dest))
+                                 (int (values-type-intersection lvar-type atype)))
+                            (derive-node-type dest int :from-scratch t))
                           (erase (node-lvar dest)))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
                                (not (memq dest seen)))
                           (push dest seen)
                           (let ((fun (combination-lambda dest)))
-                            (flet ((erase-var (var)
-                                     (setf (lambda-var-type var) *universal-type*)
+                            (flet ((erase-var (var type)
+                                     (setf (lambda-var-type var) type)
                                      (loop for ref in (leaf-refs var)
-                                           do (derive-node-type ref *wild-type* :from-scratch t)
+                                           do (derive-node-type ref type :from-scratch t)
                                               (erase (node-lvar ref)))))
                               (if (functional-kind-eq fun mv-let)
                                   (if nth-value
-                                      (erase-var (nth nth-value (lambda-vars fun)))
-                                      (mapc #'erase-var (lambda-vars fun)))
+                                      (erase-var (nth nth-value (lambda-vars fun))
+                                                 (values-type-nth nth-value lvar-type))
+                                      (mapc #'erase-var
+                                            (lambda-vars fun)
+                                            (values-type-in lvar-type (length (lambda-vars fun)))))
                                   (erase-var
                                    (nth (position-or-lose lvar
                                                           (basic-combination-args dest))
-                                        (lambda-vars fun)))))))
+                                        (lambda-vars fun))
+                                   (single-value-type lvar-type))))))
                          ((and (combination-p dest)
                                (lvar-fun-is (combination-fun dest) '(values))
                                (let ((mv (node-dest dest)))
@@ -426,7 +423,9 @@
                                    (let ((fun (combination-lambda mv)))
                                      (when (and (functional-p fun)
                                                 (functional-kind-eq fun mv-let))
-                                       (derive-node-type dest *wild-type* :from-scratch t)
+                                       (derive-node-type dest
+                                                         (make-values-type (mapcar #'lvar-type (combination-args dest)))
+                                                         :from-scratch t)
                                        (erase (node-lvar dest)))))))))))))
       (erase lvar))))
 
