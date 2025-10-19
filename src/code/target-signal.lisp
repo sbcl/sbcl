@@ -184,6 +184,7 @@
   (declare (ignore signal info context))
   (sb-impl::get-processes-status-changes))
 
+(with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
   (%install-handler sigint #'sigint-handler)
@@ -208,17 +209,21 @@
                                              :initial-element 0)))
     (with-pinned-objects (mask)
       #+(and unix sb-safepoint)
+      (progn
       ;; For safepoints we unblock SIGURG (to receive interrupt-thread),
       ;; SIGPROF (because why not), and SIGPIPE (because it's synchronous
       ;; and not in deferrables). Everything else stays blocked.
-      (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
         (alien-funcall sigaddset (vector-sap mask) sigurg)
         (alien-funcall sigaddset (vector-sap mask) sigprof)
         (alien-funcall sigaddset (vector-sap mask) sigpipe)
         (pthread-sigmask SIG_UNBLOCK mask nil))
       ;; The normal thing is to start with no signals blocked
-      #-(and unix sb-safepoint) (pthread-sigmask SIG_SETMASK mask nil)))
-  (values))
+      #-(and unix sb-safepoint)
+      (progn
+        (when (member :address-sanitizer *features*)
+          (alien-funcall sigaddset (vector-sap mask) sigchld))
+        (pthread-sigmask SIG_SETMASK mask nil))))
+  (values)))
 
 ;;;; etc.
 
@@ -231,17 +236,31 @@
 ;;;; Keyboard interrupts work by forwarding SIGINT from that thread
 ;;;; to the foreground thread via INTERRUPT-THREAD, which is the only
 ;;;; quasi-asynchronous signal allowed to run in arbitrary threads.
-#+sb-safepoint
-(progn
+;;;; Also when running under Address Sanitizer this thread is created.
 (define-load-time-global *sighandler-thread* nil)
 (declaim (type (or sb-thread:thread null) *sighandler-thread*))
 (defun signal-handler-loop ()
   ;; We could potentially use sigwaitinfo() to obtain more information about the signal,
   ;; but I don't see the point. This is just minimal functionality.
   (with-alien ((sigwait (function int system-area-pointer (* int)) :extern "sigwait")
+               (sigaddset (function int system-area-pointer int) :extern "sigaddset")
+               (sigdelset (function int system-area-pointer int) :extern "sigdelset")
                (mask (array (unsigned 8) #.sizeof-sigset_t))
                (num int))
+    #+sb-safepoint
     (pthread-sigmask SIG_BLOCK nil (alien-sap mask)) ; Retrieve current mask
+    #-sb-safepoint
+    (when (member :address-sanitizer *features*)
+      (setf (sap-ref-word (alien-sap mask) 0) (extern-alien "blockable_sigset" unsigned))
+      (alien-funcall sigdelset (alien-sap mask) sb-unix:sigusr2) ; stop-for-GC signal
+      (alien-funcall sigdelset (alien-sap mask) sb-unix:sigvtalrm) ; alternative GC signal
+      ;; Start with nearly all blockables blocked so that no signal but the ones
+      ;; waited on can be delivered inside the loop.
+      (pthread-sigmask SIG_BLOCK (alien-sap mask) nil)
+      (setf (sap-ref-word (alien-sap mask) 0) 0)
+      ;; Wait only for SIGTERM or SIGCHLD
+      (alien-funcall sigaddset (alien-sap mask) sb-unix:sigterm)
+      (alien-funcall sigaddset (alien-sap mask) sb-unix:sigchld))
     (loop (let ((result (alien-funcall sigwait (alien-sap mask) (addr num))))
             (when (and (= result 0) (= num sigterm) (not *sighandler-thread*))
               (return))
@@ -249,7 +268,7 @@
               (let ((fun (sap-ref-lispobj (foreign-symbol-sap "lisp_sig_handlers" t)
                                           (ash num sb-vm:word-shift))))
                 (when (functionp fun)
-                  (funcall fun num nil nil)))))))))
+                  (funcall fun num nil nil))))))))
 
 #+linux ; only for debugging. These drop out in the tree shaker
 (progn

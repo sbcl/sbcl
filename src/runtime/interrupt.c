@@ -77,6 +77,12 @@ int n_logevents;
 
 #ifdef ADDRESS_SANITIZER
 #include <sanitizer/asan_interface.h>
+/* Under ASan, SIGCHLD is not in deferrables because we need to handle it synchronously.
+ * If the signal goes to a native thread, the test in resignal_to_lisp_thread should not
+ * say there's corruption, just redirecting as usual is fine */
+#define WILLING_TO_RECEIVE_SIGNAL(s) (s==SIGCHLD||sigismember(&deferrable_sigset,signal))
+#else
+#define WILLING_TO_RECEIVE_SIGNAL(s) (sigismember(&deferrable_sigset,signal))
 #endif
 
 /*
@@ -204,7 +210,7 @@ pthread_key_t ignore_stop_for_gc;
 static void
 resignal_to_lisp_thread(int signal, os_context_t *context)
 {
-    if (!sigismember(&deferrable_sigset,signal)) {
+    if (!WILLING_TO_RECEIVE_SIGNAL(signal)) {
         corruption_warning_and_maybe_lose
 #ifdef LISP_FEATURE_SB_THREAD
             ("Received signal %d @ %lx in non-lisp"THREAD_ID_LABEL", resignaling to a lisp thread.",
@@ -346,7 +352,9 @@ static void sigaddset_deferrable(sigset_t *s) {
     sigaddset(s, SIGALRM);
     sigaddset(s, SIGURG);
     sigaddset(s, SIGTSTP);
+#ifndef ADDRESS_SANITIZER
     sigaddset(s, SIGCHLD);
+#endif
 #ifdef SIGIO
     sigaddset(s, SIGIO);
 #else
@@ -464,8 +472,15 @@ bool deferrables_blocked_p(sigset_t *sigset)
              | (sigismember(sigset, SIGWINCH)  << 0)
 #endif
                ;
-    if (mask == expected_mask) return 1;
-    if (!mask) return 0;
+
+    /* SIGCHLD's deferrability depends on whether the runtime was compiled with
+     * -fsanitize=address. If it was, the signal should remain permanently blocked,
+     * and zombie children are reaped by a waiter thread doing nothing but that. */
+    int relevant_bits =
+        expected_mask ^ (sigismember(&deferrable_sigset, SIGCHLD) ? 0 : (1<<3));
+
+    if ((mask & relevant_bits) == (expected_mask & relevant_bits)) return 1;
+    if (!(mask & relevant_bits)) return 0;
     char buf[3*64]; // assuming worst case 64 signals present in sigset
     sigset_tostring(sigset, buf, sizeof buf);
     lose("deferrable signals partially blocked: {%s}", buf);
