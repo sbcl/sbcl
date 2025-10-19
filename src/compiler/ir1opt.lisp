@@ -2045,13 +2045,13 @@
                (when (loop for ref in (lvar-uses multi-use-lvar)
                            always (almost-immediately-used-p multi-use-lvar ref :flushable t
                                                                                 :no-multiple-value-lvars t))
-                 (erase-lvar-type multi-use-lvar)
                  (loop for ref in (lvar-uses multi-use-lvar)
                        for value in values
                        do
                        (replace-node ref `(values ,@(loop for v in value
                                                           collect (list 'quote v))))
                        (delete-ref ref))
+                 (erase-lvar-type multi-use-lvar)
                  (use-lvar (insert-cast-after call multi-use-lvar *wild-type* **zero-typecheck-policy**)
                            (node-lvar call))
                  (flush-dest (combination-fun call))
@@ -2067,15 +2067,15 @@
                             for ref = (lvar-uses values-arg)
                             for (value) in values
                             do
-                            (erase-lvar-type values-arg nth-value)
                             (change-ref-leaf ref (find-constant value)
-                                             :recklessly t)))
+                                             :recklessly t)
+                            (erase-lvar-type values-arg nth-value)))
                      (t
-                      (erase-lvar-type multi-use-lvar)
                       (loop for ref in (lvar-uses multi-use-lvar)
                             for (value) in values
                             do (change-ref-leaf ref (find-constant value)
-                                                :recklessly t))))
+                                                :recklessly t))
+                      (erase-lvar-type multi-use-lvar)))
                (when single-value-mv
                  (erase-node-type call *wild-type*)
                  (principal-lvar-single-valuify (node-lvar call)))

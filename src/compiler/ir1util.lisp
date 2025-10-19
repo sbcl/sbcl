@@ -379,6 +379,7 @@
             type))
   (erase-lvar-type (node-lvar node) nth-value))
 
+;;; The uses need to have the correct type before calling this.
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
     (labels ((erase (lvar)
