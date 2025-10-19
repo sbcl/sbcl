@@ -2156,7 +2156,8 @@ interrupt_init(void)
     ll_install_handler(SIGXCPU, suspend_for_backtrace);
 #endif
 
-#ifndef LISP_FEATURE_WIN32
+    // to avoid installing this handler, #define SBCL_HANDLE_SIGABRT=0
+#if defined LISP_FEATURE_UNIX && (!defined SBCL_HANDLE_SIGABRT || SBCL_HANDLE_SIGABRT!=0)
     ll_install_handler(SIGABRT, sigabrt_handler);
 #endif
 #ifdef START_LDB_SERVICE_THREAD
