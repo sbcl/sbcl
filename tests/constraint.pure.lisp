@@ -1899,7 +1899,13 @@
    (lambda (m)
      (if (typep (nth-value 1 (truncate m 2.0)) 'double-float)
          m))
-   (or double-float null)))
+   (or double-float null))
+  (assert-type
+   (lambda (x)
+     (declare (integer x))
+     (the (integer 3 83461337) (truncate x -74))
+     x)
+   (integer -6176139011 -222)))
 
 (with-test (:name :ignore-delays
             :fails-on :arm)

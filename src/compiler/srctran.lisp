@@ -1278,20 +1278,29 @@
   (declare (type interval n d))
   ;; Simply doing interval-mul will lose the (1- d) part in
   ;; (truncate (+ n (1- d)) d)
-  (let ((range (interval-range-info>> n)))
-    (multiple-value-bind (add sub)
-        (ecase range
-          ((nil)
-           (values (load-time-value (make-interval :low -1 :high  1))
-                   (load-time-value (make-interval :low  1 :high -1))))
-          (+
-           (values (load-time-value (make-interval :low  0 :high  1))
-                   (load-time-value (make-interval :low  0 :high -1))))
-          (-
-           (values (load-time-value (make-interval :low -1 :high  0))
-                   (load-time-value (make-interval :low  1 :high  0)))))
-      (interval-add (interval-mul d (interval-add n add))
-                    sub))))
+  (let ((d-range (interval-range-info d)))
+    (ecase d-range
+      ((nil)
+       (destructuring-bind (d- d+) (interval-split 0 d t t)
+         (interval-merge-pair (interval-untruncate n d-)
+                              (interval-untruncate n d+))))
+      ((-)
+       (interval-neg (interval-untruncate n (interval-neg d))))
+      (+
+       (let ((n-range (interval-range-info>> n)))
+         (multiple-value-bind (add sub)
+             (ecase n-range
+               ((nil)
+                (values (load-time-value (make-interval :low -1 :high  1))
+                        (load-time-value (make-interval :low  1 :high -1))))
+               (+
+                (values (load-time-value (make-interval :low  0 :high  1))
+                        (load-time-value (make-interval :low  0 :high -1))))
+               (-
+                (values (load-time-value (make-interval :low -1 :high  0))
+                        (load-time-value (make-interval :low  1 :high  0)))))
+           (interval-add (interval-mul d (interval-add n add))
+                         sub)))))))
 
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
