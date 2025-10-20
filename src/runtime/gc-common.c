@@ -2367,8 +2367,16 @@ scrub_thread_control_stack(struct thread *th)
     __attribute__((sysv_abi))
 #endif
     ;
-    arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address);
-#else
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    if (th == get_sb_vm_thread())
+#endif
+    {
+        arch_scrub_control_stack(th, guard_page_address, hard_guard_page_address);
+        return;
+    }
+#endif
+
+#if !defined LISP_FEATURE_C_STACK_IS_CONTROL_STACK || defined LISP_FEATURE_NONSTOP_FOREIGN_CALL
     lispobj *sp = access_control_stack_pointer(th);
  scrub:
     if ((((os_vm_address_t)sp < (hard_guard_page_address + os_vm_page_size)) &&
@@ -2398,7 +2406,7 @@ scrub_thread_control_stack(struct thread *th)
             goto scrub;
     } while (((uword_t)++sp) & (BYTES_ZERO_BEFORE_END - 1));
 #endif
-#endif /* LISP_FEATURE_C_STACK_IS_CONTROL_STACK */
+#endif
 }
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)

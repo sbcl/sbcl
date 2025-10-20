@@ -10,7 +10,7 @@ jobs:
     strategy: 
       matrix:
         arch: [arm64, x86-64]
-        options: [--with-sb-thread, --with-mark-region-gc, --with-nonstop-foreign-call]
+        options: [--with-sb-thread, --with-mark-region-gc --with-nonstop-foreign-call, --with-nonstop-foreign-call]
       fail-fast: false
 
     steps:
@@ -24,13 +24,13 @@ jobs:
     - name: make binary
       run: |
         name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-darwin-${{ matrix.arch }}
-        mkdir sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
+        mkdir "sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}"
         cd ..
         mv sbcl $name
         ./$name/binary-distribution.sh $name
         bzip2 $name-binary.tar
         mv $name sbcl
-        mv $name-binary.tar.bz2 sbcl/sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
+        mv $name-binary.tar.bz2 "sbcl/sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}"
     - name: save binary
       uses: actions/upload-artifact@v4
       with:
