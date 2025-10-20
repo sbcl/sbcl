@@ -1115,4 +1115,8 @@
      (declare (double-float x))
      (ffloor (abs x)))
    (values (or (member 0.0d0) (double-float (0.0d0)))
-           (double-float 0.0d0 1.0d0) &optional)))
+           (double-float 0.0d0 1.0d0) &optional))
+  (assert-type
+   (lambda ()
+     (ffloor 0 -1))
+   (values (eql -0.0) (eql 0) &optional)))

@@ -865,7 +865,7 @@
           (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.
-(defun numeric-type->interval (x &optional integer)
+(defun numeric-type->interval (x &optional integer float)
   (declare (type numeric-union-type x))
   (let ((low (numeric-union-type-low x))
         (high (numeric-union-type-high x)))
@@ -879,7 +879,9 @@
                         (rational x)))
                      (t
                       x))))
-      (make-interval :low (cond ((not integer)
+      (make-interval :low (cond (float
+                                 (coerce-for-bound low float))
+                                ((not integer)
                                  low)
                                 ((eq integer 'rational)
                                  (rational-bound low))
@@ -892,8 +894,10 @@
                                  (unless (and (floatp low)
                                               (float-infinity-or-nan-p low))
                                    (ceiling low))))
-                     :high (cond ((not integer)
-                                  high)
+                     :high (cond (float
+                                  (coerce-for-bound high float))
+                                 ((not integer)
+                                     high)
                                  ((eq integer 'rational)
                                   (rational-bound high))
                                  ((consp high)
@@ -2145,11 +2149,10 @@
 (defvar *conservative-quotient-bound* t)
 
 (defun truncate-derive-type-quot (number-type divisor-type &optional float)
-  (let* ((rem-type (rem-result-type number-type divisor-type))
-         (number-interval (numeric-type->interval number-type))
-         (divisor-interval (numeric-type->interval divisor-type)))
+  (let* ((number-interval (numeric-type->interval number-type nil float))
+         (divisor-interval (numeric-type->interval divisor-type nil float)))
     (cond ((and (not float)
-                (eq rem-type 'integer))
+                (eq (rem-result-type number-type divisor-type) 'integer))
            ;; Since the remainder type is INTEGER, both args are
            ;; INTEGERs.
            (let* ((res (integer-truncate-derive-type
@@ -2160,8 +2163,8 @@
              (specifier-type (if (listp res) res 'integer))))
           (t
            (multiple-value-bind (quot conservative)
-               (if (and (eql (interval-high divisor-interval) 1)
-                        (eql (interval-low divisor-interval) 1))
+               (if (and (member (interval-high divisor-interval) '(1 1f0 1d0))
+                        (member (interval-low divisor-interval) '(1 1f0 1d0)))
                    (values number-interval nil)
                    (values (interval-div number-interval
                                          divisor-interval) t))
@@ -2270,7 +2273,6 @@
 (deftransform unary-truncate ((number) (integer))
   '(values number 0))
 
-
 (defun ftruncate-derive-type-quot-aux (number-type divisor-type same-arg)
   (declare (ignore same-arg))
   (when (and (numeric-type-real-p number-type)
@@ -2378,10 +2380,8 @@
          `(progn
            ;; Compute type of quotient (first) result.
            (defun ,q-aux (number-type divisor-type &optional float)
-             (let* ((number-interval
-                     (numeric-type->interval number-type))
-                    (divisor-interval
-                     (numeric-type->interval divisor-type))
+             (let* ((number-interval (numeric-type->interval number-type nil float))
+                    (divisor-interval (numeric-type->interval divisor-type nil float))
                     (div (interval-div number-interval
                                        divisor-interval))
                     (quot (if float
