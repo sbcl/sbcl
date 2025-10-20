@@ -564,34 +564,29 @@
       (declare (fixnum pos))
       (macrolet ((frob ()
                    `(progn
-                      (let ((fm (cond ((comma-p subform)
-                                       (comma-expr subform))
-                                      ((atom subform)
-                                       (return))
-                                      (t
-                                       (car subform)))))
-                        (when (comma-p fm)
-                          (setf fm (comma-expr fm)))
-                        (cond ((consp fm)
-                               ;; If it's a cons, recurse.
-                               (sub-find-source-paths fm (cons pos path)))
-                              ((eq 'quote fm)
-                               ;; Don't look into quoted constants.
-                               ;; KLUDGE: this can't actually know about constants.
-                               ;; e.g. (let ((quote (error "foo")))) or
-                               ;; (list quote (error "foo")) are not
-                               ;; constants and yet are ignored.
-                               (return))
-                              ((not (zerop pos))
-                               ;; Otherwise store the containing form. It's not
-                               ;; perfect, but better than nothing.
-                               (note-source-path subform pos path)))
-                        (incf pos))
-                      (when (comma-p subform)
-                        (return))
-                      (setq subform (cdr subform))
+                      (cond
+                        ;; (a b . ,c) -> (a b comma c)
+                        ((comma-p subform)
+                         (setq subform (list 'comma (comma-expr subform))))
+                        ((atom subform) (return)))
+                      (let ((fm (car subform)))
+                        (cond
+                          ((consp fm)
+                           (sub-find-source-paths fm (cons pos path)))
+                          ;; (a b ,c d) -> (a b (comma c) d)
+                          ((comma-p fm)
+                           (sub-find-source-paths (list 'comma (comma-expr fm)) (cons pos path)))
+                          ;; KLUDGE: this assumes all uses of the
+                          ;; QUOTE symbol are actual quotations, which
+                          ;; is not true in general [consider e.g.
+                          ;; (let ((quote (setq x 1))) ...)].
+                          ((eq 'quote fm) (return))
+                          ((not (zerop pos)) (note-source-path subform pos path))))
+                      (setq subform (cdr subform)
+                            pos (1+ pos))
                       (when (eq subform trail) (return)))))
         (loop
+         ;; circularity detection by hare and tortoise
          (frob)
          (frob)
          (setq trail (cdr trail)))))))

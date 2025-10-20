@@ -51,3 +51,20 @@
 
 (with-test (:name (:static macrolet :check-consistency))
   (check-consistency '(macrolet ((def (x y) `(defun ,x (1+ ,y)))) (def ffloor) (def fceiling))))
+
+(with-test (:name (:static :once-only :check-consistency))
+  (check-consistency '(defmacro once-only (specs &body body)
+                       (named-let frob ((specs specs)
+                                        (body body))
+                         (if (null specs)
+                             `(progn ,@body)
+                             (let ((spec (first specs)))
+                               ;; FIXME: should just be DESTRUCTURING-BIND of SPEC
+                               (unless (proper-list-of-length-p spec 2)
+                                 (error "malformed ONCE-ONLY binding spec: ~S" spec))
+                               (let* ((name (first spec))
+                                      (exp-temp (gensym "ONCE-ONLY")))
+                                 `(let ((,exp-temp ,(second spec))
+                                        (,name (gensym ,(symbol-name name))))
+                                    `(let ((,,name ,,exp-temp))
+                                       ,,(frob (rest specs) body))))))))))

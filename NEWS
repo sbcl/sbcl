@@ -1,5 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.10:
+  * incompatible change: the compiler's internal representation of "source
+    paths" for unquoted forms within backquotes has changed.  Other developer
+    tools using this representation, including callers of some exported
+    SB-INTROSPECT functions, will misreport the location of signalled
+    conditions and/or definitions in top-level forms including backquotes and
+    commas.
+
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:
     ** handling of "./" and "../" in pathname functions on Windows is improved.

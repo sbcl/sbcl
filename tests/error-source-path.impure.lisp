@@ -339,27 +339,25 @@
            x)))
    (2 2)))
 
-(with-test (:name :dotted-comma-source-paths)
-  (assert-condition-source-paths
-   (lambda ()
-     `(progn
-        . ,(progn
-             (progn (setq x 1)))))
-   (1 1 1 1 2)))
-
 (with-test (:name (:backquote-comma-error :lp1361502))
   (assert-condition-source-paths
    (lambda () `(1 2 3 4 ,(progn (/ 1 0))))
-   (1 4 1 2)))
+   (1 1 4 1 2)))
 
-(with-test (:name :double-comma-source-paths)
+(with-test (:name :dotted-comma-source-paths)
+  (assert-condition-source-paths
+   (lambda ()
+     `(progn . ,(progn (progn (setq x 1)))))
+   (1 1 2 1 2)))
+
+(with-test (:name :dotted-double-comma-source-paths)
   (assert-condition-source-paths
    (lambda ()
      ``(progn . ,,(progn (progn (setq x 1)))))
-   (1 1 1 1 1 2)))
+   (1 1 1 2 1 1 2)))
 
-(with-test (:name :triple-comma-source-paths)
+(with-test (:name :dotted-triple-comma-source-paths)
   (assert-condition-source-paths
    (lambda ()
      ```(progn . ,,,(progn (progn (setq x 1)))))
-   (2)))
+   (1 1 1 1 2 1 1 1 2)))

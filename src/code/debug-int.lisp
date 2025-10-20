@@ -3118,7 +3118,7 @@ register."
 
 ;;; This returns a table mapping form numbers to source-paths. A
 ;;; source-path indicates a descent into the TOPLEVEL-FORM form,
-;;; going directly to the subform corressponding to the form number.
+;;; going directly to the subform corresponding to the form number.
 ;;;
 ;;; The vector elements are in the same format as the compiler's
 ;;; NODE-SOURCE-PATH; that is, the first element is the form number and
@@ -3138,19 +3138,24 @@ register."
                        (trail form))
                    (declare (fixnum pos))
                    (macrolet ((frob ()
-                                '(progn
-                                  (when (atom subform) (return))
-                                  (let ((fm (car subform)))
-                                    (when (comma-p fm)
-                                      (setf fm (comma-expr fm)))
-                                    (cond ((consp fm)
-                                           (translate1 fm (cons pos path)))
-                                          ((eq 'quote fm)
-                                           ;; Don't look into quoted constants.
-                                           (return)))
-                                    (incf pos))
-                                  (setq subform (cdr subform))
-                                  (when (eq subform trail) (return)))))
+                                `(progn
+                                   (cond
+                                     ((comma-p subform)
+                                      (setq subform (list 'comma (comma-expr subform))))
+                                     ((atom subform) (return)))
+                                   (let ((fm (car subform)))
+                                     (cond
+                                       ((consp fm) (translate1 fm (cons pos path)))
+                                       ((comma-p fm)
+                                        (translate1 (list 'comma (comma-expr fm)) (list* pos path)))
+                                       ;; Don't look into quoted
+                                       ;; constants, but see also the
+                                       ;; comment in
+                                       ;; SB-C::SUB-FIND-SOURCE-PATH
+                                       ((eq 'quote fm) (return))))
+                                   (setq subform (cdr subform)
+                                         pos (1+ pos))
+                                   (when (eq subform trail) (return)))))
                      (loop
                        (frob)
                        (frob)
