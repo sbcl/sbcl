@@ -1119,4 +1119,9 @@
   (assert-type
    (lambda ()
      (ffloor 0 -1))
-   (values (eql -0.0) (eql 0) &optional)))
+   (values (eql -0.0) (eql 0) &optional))
+  (assert-type
+   (lambda (x)
+     (declare ((integer 6671 6672) x))
+     (values (ffloor -1333621864366 x)))
+   (single-float -1.9991334e8 -1.9988338e8)))

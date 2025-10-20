@@ -865,7 +865,7 @@
           (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.
-(defun numeric-type->interval (x &optional integer float)
+(defun numeric-type->interval (x &optional integer)
   (declare (type numeric-union-type x))
   (let ((low (numeric-union-type-low x))
         (high (numeric-union-type-high x)))
@@ -879,9 +879,7 @@
                         (rational x)))
                      (t
                       x))))
-      (make-interval :low (cond (float
-                                 (coerce-for-bound low float))
-                                ((not integer)
+      (make-interval :low (cond ((not integer)
                                  low)
                                 ((eq integer 'rational)
                                  (rational-bound low))
@@ -894,10 +892,8 @@
                                  (unless (and (floatp low)
                                               (float-infinity-or-nan-p low))
                                    (ceiling low))))
-                     :high (cond (float
-                                  (coerce-for-bound high float))
-                                 ((not integer)
-                                     high)
+                     :high (cond ((not integer)
+                                  high)
                                  ((eq integer 'rational)
                                   (rational-bound high))
                                  ((consp high)
@@ -2149,8 +2145,8 @@
 (defvar *conservative-quotient-bound* t)
 
 (defun truncate-derive-type-quot (number-type divisor-type &optional float)
-  (let* ((number-interval (numeric-type->interval number-type nil float))
-         (divisor-interval (numeric-type->interval divisor-type nil float)))
+  (let* ((number-interval (numeric-type->interval number-type))
+         (divisor-interval (numeric-type->interval divisor-type)))
     (cond ((and (not float)
                 (eq (rem-result-type number-type divisor-type) 'integer))
            ;; Since the remainder type is INTEGER, both args are
@@ -2170,7 +2166,7 @@
                                          divisor-interval) t))
              (let* ((*conservative-quotient-bound* conservative)
                     (quot (if float
-                              (ftruncate-quotient-bound quot)
+                              (ftruncate-quotient-bound quot divisor-interval)
                               (truncate-quotient-bound quot))))
                (make-numeric-type :class (if float
                                              'float
@@ -2380,12 +2376,11 @@
          `(progn
            ;; Compute type of quotient (first) result.
            (defun ,q-aux (number-type divisor-type &optional float)
-             (let* ((number-interval (numeric-type->interval number-type nil float))
-                    (divisor-interval (numeric-type->interval divisor-type nil float))
-                    (div (interval-div number-interval
-                                       divisor-interval))
+             (let* ((number-interval (numeric-type->interval number-type))
+                    (divisor-interval (numeric-type->interval divisor-type))
+                    (div (interval-div number-interval divisor-interval))
                     (quot (if float
-                              (,(symbolicate "F" q-name) div)
+                              (,(symbolicate "F" q-name) div divisor-interval)
                               (,q-name div))))
                (make-numeric-type :class (if float
                                              'float
@@ -2498,35 +2493,41 @@
            +
            (type-bound-number hi))))))
 
-(defun ffloor-quotient-bound (quot)
+(defun ffloor-quotient-bound (quot divisor)
   ;; Take the ffloor of the quotient and then massage it into what we
   ;; need.
-  (let ((lo (interval-low quot))
-        (hi (interval-high quot)))
-    (make-interval
-     ;; Take the ffloor of the lower bound. The result is always a
-     ;; closed lower bound.
-     :low
-     (and lo
-          (conservative-quotient-bound
-           (ffloor (type-bound-number lo))
-           sb-xc:-
-           (type-bound-number lo)))
-     :high
-     (and hi
-          (conservative-quotient-bound
-           (if (consp hi)
-               ;; An open bound. We need to be careful here because
-               ;; the ffloor of '(10.0) is 9, but the ffloor of
-               ;; 10.0 is 10.
-               (multiple-value-bind (q r) (ffloor (first hi))
-                 (if (zerop r)
-                     (sb-xc:- q 1)
-                     q))
-               ;; A closed bound, so the answer is obvious.
-               (ffloor hi))
-           sb-xc:+
-           (type-bound-number hi))))))
+  (let* ((lo (interval-low quot))
+         (hi (interval-high quot))
+         (new-lo
+           ;; Take the ffloor of the lower bound. The result is always a
+           ;; closed lower bound.
+           (and lo
+                (conservative-quotient-bound
+                 (ffloor (type-bound-number lo))
+                 sb-xc:-
+                 (type-bound-number lo))))
+         (new-hi
+           (and hi
+                (conservative-quotient-bound
+                 (if (consp hi)
+                     ;; An open bound. We need to be careful here because
+                     ;; the ffloor of '(10.0) is 9, but the ffloor of
+                     ;; 10.0 is 10.
+                     (multiple-value-bind (q r) (ffloor (first hi))
+                       (if (zerop r)
+                           (sb-xc:- q 1)
+                           q))
+                     ;; A closed bound, so the answer is obvious.
+                     (ffloor hi))
+                 sb-xc:+
+                 (type-bound-number hi)))))
+    (when (and (eql new-lo 0.0)
+               (not (or (floatp (type-bound-number lo))
+                        (floatp (type-bound-number hi))))
+               (not (eql (interval-range-info divisor) '+)))
+      (setf new-lo -0.0))
+    (make-interval :low (coerce-for-bound new-lo 'float)
+                   :high (coerce-for-bound new-hi 'float))))
 
 (defun floor-rem-bound (num div)
   (case (interval-range-info div)
@@ -2634,35 +2635,40 @@
            sb-xc:+
            (type-bound-number hi))))))
 
-(defun fceiling-quotient-bound (quot)
+(defun fceiling-quotient-bound (quot divisor)
   ;; Take the fceiling of the quotient and then massage it into what we
   ;; need.
-  (let ((lo (interval-low quot))
-        (hi (interval-high quot)))
-    (make-interval
-     :low
-     (and lo
-          (conservative-quotient-bound
-           (if (consp lo)
-               ;; An open bound. We need to be careful here because
-               ;; the fceiling of '(10.0) is 11, but the fceiling of
-               ;; 10.0 is 10.
-               (multiple-value-bind (q r) (fceiling (first lo))
-                 (if (zerop r)
-                     (sb-xc:+ q 1)
-                     q))
-               ;; A closed bound, so the answer is obvious.
-               (fceiling lo))
-           sb-xc:-
-           (type-bound-number lo)))
-     :high
-     ;; Take the fceiling of the upper bound. The result is always a
-     ;; closed upper bound.
-     (and hi
-          (conservative-quotient-bound
-           (fceiling (type-bound-number hi))
-           sb-xc:+
-           (type-bound-number hi))))))
+  (let* ((lo (interval-low quot))
+         (hi (interval-high quot))
+         (new-lo (and lo
+                      (conservative-quotient-bound
+                       (if (consp lo)
+                           ;; An open bound. We need to be careful here because
+                           ;; the fceiling of '(10.0) is 11, but the fceiling of
+                           ;; 10.0 is 10.
+                           (multiple-value-bind (q r) (fceiling (first lo))
+                             (if (zerop r)
+                                 (sb-xc:+ q 1)
+                                 q))
+                           ;; A closed bound, so the answer is obvious.
+                           (fceiling lo))
+                       sb-xc:-
+                       (type-bound-number lo))))
+         (new-hi
+           ;; Take the fceiling of the upper bound. The result is always a
+           ;; closed upper bound.
+           (and hi
+                (conservative-quotient-bound
+                 (fceiling (type-bound-number hi))
+                 sb-xc:+
+                 (type-bound-number hi)))))
+    (when (and (eql new-lo 0.0)
+               (not (or (floatp (type-bound-number lo))
+                        (floatp (type-bound-number hi))))
+               (not (eql (interval-range-info divisor) '+)))
+      (setf new-lo -0.0))
+    (make-interval :low (coerce-for-bound new-lo 'float)
+                   :high (coerce-for-bound new-hi 'float))))
 
 (defun ceiling-rem-bound (num div)
   (case (interval-range-info div)
@@ -2759,23 +2765,23 @@
        (interval-merge-pair (ceiling-quotient-bound neg)
                             (floor-quotient-bound pos))))))
 
-(defun ftruncate-quotient-bound (quot)
+(defun ftruncate-quotient-bound (quot divisor)
   ;; For positive quotients, truncate is exactly like floor. For
   ;; negative quotients, truncate is exactly like ceiling. Otherwise,
   ;; it's the union of the two pieces.
   (case (interval-range-info quot)
     (+
      ;; just like FLOOR
-     (ffloor-quotient-bound quot))
+     (ffloor-quotient-bound quot divisor))
     (-
      ;; just like CEILING
-     (fceiling-quotient-bound quot))
+     (fceiling-quotient-bound quot divisor))
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
      (destructuring-bind (neg pos) (interval-split 0 quot t t)
-       (interval-merge-pair (fceiling-quotient-bound neg)
-                            (ffloor-quotient-bound pos))))))
+       (interval-merge-pair (fceiling-quotient-bound neg divisor)
+                            (ffloor-quotient-bound pos divisor))))))
 
 (defun truncate-rem-bound (num div)
   ;; This is significantly more complicated than FLOOR or CEILING. We
