@@ -649,6 +649,13 @@ conservative_stack_scan(struct thread* th,
     }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    lispobj* csp = th->control_stack_pointer;
+    if (csp)
+      esp = (void*) csp;
+#endif
+
     int i;
     for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
         os_context_t *c = nth_interrupt_context(i, th);

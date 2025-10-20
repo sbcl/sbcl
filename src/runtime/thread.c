@@ -1023,7 +1023,8 @@ void gc_stop_the_world()
             struct extra_thread_data *semaphores = thread_extra_data(th);
             bool foreign = 0;
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-            gc_assert(mutex_acquire(&semaphores->foreign_exit_lock));
+            pthread_mutex_t *exit_lock = &semaphores->foreign_exit_lock;
+            gc_assert(mutex_acquire(exit_lock));
             foreign = set_thread_foreign_call_trigger(th, 0);
 #endif
 
@@ -1039,6 +1040,16 @@ void gc_stop_the_world()
                                  // See comment in 'interr.h' about that.
                                  (void*)th->os_thread, rc, strerror(rc));
                 }
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+                else if (read_TLS(GC_INHIBIT,th) != NIL) {
+                    /* It's a foreign call but inside without-gcing,
+                       handle_foreign_call_trigger will set
+                       *stop-for-gc-pending*, need to unlock the exit
+                       lock to reach the end of without-gcing* */
+                    semaphores->gc_inhibited = 1;
+                    gc_assert(mutex_release(exit_lock));
+                }
+#endif
             }
             os_sem_post(&semaphores->state_sem);
         }
@@ -1046,18 +1057,12 @@ void gc_stop_the_world()
     for_each_thread(th) {
         if (th != me) {
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-            if (csp_around_foreign_call(th))
+            lispobj csp = csp_around_foreign_call(th);
+            if (csp && !thread_extra_data(th)->gc_inhibited)
             {
-                if (read_TLS(GC_INHIBIT,th) != NIL) {
-                    /* It's a foreign call but inside without-gcing,
-                       handle_foreign_call_trigger will set
-                       *stop-for-gc-pending*, need to unlock the exit
-                       lock to reach the end of without-gcing* */
-                    pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
-                    mutex_release(exit_lock);
-                    thread_wait_until_not(STATE_RUNNING, th);
-                    mutex_acquire(exit_lock);
-                }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+                th->control_stack_pointer = (lispobj*)csp;
+#endif
             }
             else
 #endif
@@ -1104,8 +1109,19 @@ void gc_start_the_world()
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
             bool foreign = csp_around_foreign_call(th);
             set_thread_foreign_call_trigger(th, 1);
-            gc_assert(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
-            if (!foreign)
+
+            if (thread_extra_data(th)->gc_inhibited)
+                /* The lock is already released */
+                thread_extra_data(th)->gc_inhibited = 0;
+            else
+                gc_assert(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
+
+            if (foreign) {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+                th->control_stack_pointer = 0;
+#endif
+            }
+            else
 #endif
             {
                 if (state != STATE_DEAD) {

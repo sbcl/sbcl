@@ -712,6 +712,7 @@ alloc_thread_struct(void* spaces) {
 
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
     gc_assert(!pthread_mutex_init(&extra_data->foreign_exit_lock, NULL));
+    extra_data->gc_inhibited = 0;
 #endif
 
 #if defined LISP_FEATURE_UNIX && defined LISP_FEATURE_SB_THREAD

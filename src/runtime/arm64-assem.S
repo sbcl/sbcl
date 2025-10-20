@@ -263,7 +263,7 @@ Lno_args:
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
         ldr     x3, [sp],#16
         cbz     x3, 1f
-	str     reg_CSP, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
+	str     x3, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
 1:
 #endif
 #else

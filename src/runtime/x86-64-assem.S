@@ -72,6 +72,8 @@
 #define THREAD_BASE_REG %r13
 #define reg_NULL %r12
 
+#define THREAD_SAVED_CSP_OFFSET (- N_WORD_BYTES)
+
 #ifdef LISP_FEATURE_WIN32
 #define CARG1 %rcx
 #define CARG2 %rdx
@@ -191,8 +193,15 @@ Ltwo:	mov	8(%rbx),%rdi	# arg1
 Lone:	mov	0(%rbx),%rdx	# arg0
 Lzero:
 	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
-	/* Registers rax, rcx, rdx, rdi, and rsi are now live. */
-	xor	%rbx,%rbx	# available
+	
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+	mov     THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG), %r8
+        push    %r8
+        test    %r8, %r8
+        je      1f
+	movq     $0, THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG)
+1:
+#endif
 
 	/* Alloc new frame. */
 	push	%rbp            # Dummy for return address
@@ -208,6 +217,14 @@ Lcall:
 	jnc	LsingleValue
 	mov	%rbx, %rsp
 LsingleValue:
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+        pop    %r8
+        test   %r8, %r8
+        je     1f
+	movq   %r8, THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG)
+1:
+#endif
 
 	POP_C_NONVOLATILE_REGS
 

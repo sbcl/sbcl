@@ -68,6 +68,7 @@
        (mov ,rdi-tn ,(get-lisp-obj-address #'monkeybiz)) ; C arg 0 = Lisp function
        (mov ,rsi-tn ,rsp-tn)                             ; C arg 1 = argv
        (mov ,rdx-tn :ARGC)                               ; C arg 2 = argc
+       (mov ,rcx-tn ,thread-tn)                          ; C arg 3 = thread
        (mov ,rax-tn ,(sap-int
                       (alien-value-sap
                        (extern-alien "call_into_lisp"

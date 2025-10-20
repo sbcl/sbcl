@@ -1517,12 +1517,15 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
                 /* gc_stop_the_world has left this thread untouched,
                    wait for gc_start_the_world */
                 pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
-                mutex_acquire(exit_lock);
-                mutex_release(exit_lock);
+                gc_assert(mutex_acquire(exit_lock));
+                gc_assert(mutex_release(exit_lock));
             }
             else {
                 /* gc_stop_the_world has either already sent a signal
                    or will send it soon, wait for it. */
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+                th->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
+#endif
                 sigfillset(&mask);
                 sigdelset(&mask, SIG_STOP_FOR_GC);
                 sigsuspend(&mask);
@@ -1534,10 +1537,13 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
             if (exiting) {
                 pthread_mutex_t *exit_lock = &thread_extra_data(th)->foreign_exit_lock;
                 write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
-                mutex_acquire(exit_lock);
-                mutex_release(exit_lock);
+                gc_assert(mutex_acquire(exit_lock));
+                gc_assert(mutex_release(exit_lock));
             } else {
                 if (read_TLS(STOP_FOR_GC_PENDING, th) == NIL) {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+                    th->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
+#endif
                     sigfillset(&mask);
                     sigdelset(&mask, SIG_STOP_FOR_GC);
                     sigsuspend(&mask);

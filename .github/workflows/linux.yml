@@ -16,6 +16,7 @@ jobs:
           - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread }
           - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval }
           - { arch: x86-64, options: --with-mark-region-gc }
+          - { arch: x86-64, options: --with-nonstop-foreign-call }
 
       fail-fast: false
 

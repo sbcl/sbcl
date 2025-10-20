@@ -604,14 +604,24 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
                                       th->control_stack_end,
                                       th->lisp_thread);
         } else {
+            lispobj *sp;
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-            lispobj *sp = os_get_csp(th);
+             sp = os_get_csp(th);
 #else
-            int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
-            if (ici == 0) lose("can't find interrupt context");
-            lispobj sp = *os_context_register_addr(nth_interrupt_context(ici-1, th), reg_SP);
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+            lispobj* csp = th->control_stack_pointer;
+            if (csp) {
+                sp = csp;
+            }
+            else
 #endif
-            scan_thread_control_stack((lispobj*)sp, th->control_stack_end, th->lisp_thread);
+            {
+                int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
+                if (ici == 0) lose("can't find interrupt context");
+                sp = (lispobj*)*os_context_register_addr(nth_interrupt_context(ici-1, th), reg_SP);
+            }
+#endif
+            scan_thread_control_stack(sp, th->control_stack_end, th->lisp_thread);
         }
 #endif
         scan_thread_words((lispobj*)th->binding_stack_start,

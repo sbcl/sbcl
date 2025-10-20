@@ -277,7 +277,7 @@
            (inst mov res (static-constant-ea alien-linkage-table))
            (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref) res))))))
 
-#+sb-safepoint
+#+(or sb-safepoint nonstop-foreign-call)
 (defconstant thread-saved-csp-offset -1)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -285,9 +285,9 @@
     ;; Safepoints do not save interrupt contexts to be scanned during
     ;; GCing, it only looks at the stack, so if a register isn't
     ;; spilled it won't be visible to the GC.
-    #+sb-safepoint
+    #+(or sb-safepoint nonstop-foreign-call)
     '((:save-p t))
-    #-sb-safepoint
+    #-(or sb-safepoint nonstop-foreign-call)
     (let ((gprs (list '#:rcx '#:rdx #-win32 '#:rsi #-win32 '#:rdi
                       '#:r8 '#:r9 '#:r10 '#:r11))
           (vars))
@@ -379,8 +379,10 @@
                                     'float-registers))))
 
   ;; Store SP in thread struct, unless the enclosing block says not to
-  #+sb-safepoint
-  (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
+
+  #+(or sb-safepoint nonstop-foreign-call)
+  (when (and #+sb-safepoint
+             (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0)))
     (inst mov (thread-slot-ea thread-saved-csp-offset) rsp-tn))
 
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
@@ -429,7 +431,9 @@
   ;; Zero the saved CSP, unless this code shouldn't ever stop for GC
   #+sb-safepoint
   (when (policy (sb-c::vop-node vop) (/= sb-c:insert-safepoints 0))
-    (inst xor (thread-slot-ea thread-saved-csp-offset) rsp-tn)))
+    (inst xor (thread-slot-ea thread-saved-csp-offset) rsp-tn))
+  #+nonstop-foreign-call
+  (inst mov :qword (thread-slot-ea thread-saved-csp-offset) 0))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

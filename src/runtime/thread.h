@@ -66,6 +66,7 @@ struct extra_thread_data
 #endif
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
     pthread_mutex_t foreign_exit_lock;
+    int gc_inhibited;
 #endif
 
 #if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_UNIX

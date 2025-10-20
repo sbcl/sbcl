@@ -240,8 +240,14 @@ static os_context_t* get_register_context(struct thread* th)
 static lispobj* get_stackptr(struct thread* th)
 {
     if (th == get_sb_vm_thread()) return (lispobj*)cur_thread_stackptr_at_entry;
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    lispobj* csp = th->control_stack_pointer;
+    if (csp) return csp;
+#endif
+
     os_context_t* context = get_register_context(th);
     if (context) return (lispobj*)(uword_t)*os_context_sp_addr(context);
+
     lose("No stack pointer for %p", th);
 }
 

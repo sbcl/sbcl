@@ -404,7 +404,7 @@
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")
-         ("(and nonstop-foreign-call (not (and arm64 sb-thread (not sb-safepoint))))"
+         ("(and nonstop-foreign-call (not (and (or arm64 x86-64) sb-thread (not sb-safepoint))))"
           ":NONSTOP-FOREIGN-CALL not supported with this combination of features")))
       (failed-test-descriptions nil))
   (dolist (test feature-compatibility-tests)
