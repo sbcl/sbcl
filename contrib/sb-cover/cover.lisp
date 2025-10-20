@@ -662,31 +662,11 @@ The source locations are stored in SOURCE-MAP."
           (when fn
             (set-macro-character char (make-source-recorder fn source-map)
                                  term tab)))))
-    (set-macro-character #\` (make-source-recorder #'read-backq source-map))
-    (set-macro-character #\, (make-source-recorder #'read-comma source-map))
     (set-macro-character #\(
                          (make-source-recorder
                           (make-recording-read-list source-map)
                           source-map))
     tab))
-
-(defvar *backquote-level* 0)
-(defun read-backq (stream ignore)
-  (declare (ignore ignore))
-  (let ((*backquote-level* (1+ *backquote-level*)))
-    (list 'backquote (read stream t nil t))))
-(defun read-comma (stream ignore)
-  (declare (ignore ignore))
-  (unless (> *backquote-level* 0)
-    (when *read-suppress*
-      (return-from read-comma nil))
-    (error "comma found not within a corresponding backquote"))
-  (let ((flag-char (read-char stream)))
-    (case flag-char
-      ((#\. #\@))
-      (t (unread-char flag-char stream)))
-    (let ((*backquote-level* (1- *backquote-level*)))
-      (list 'comma (read stream t nil t)))))
 
 ;;; Ripped from SB-IMPL, since location recording on a cons-cell level
 ;;; can't be done just by simple read-table tricks.
