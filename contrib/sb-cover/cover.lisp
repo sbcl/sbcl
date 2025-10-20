@@ -376,25 +376,21 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          ;; for this function.
          (expr-records (convert-records (gethash file hashtable) :expression))
          (branch-records (convert-records (gethash file hashtable) :branch))
+         (eof-marker (cons nil nil))
          ;; Cache the source-maps
          (maps (with-input-from-string (stream source)
                  (loop with *current-package* = (find-package "CL-USER")
                        with map = nil
                        with form = nil
-                       with eof = nil
                        for i from 0
                        do (setf (values form map)
                                 (handler-case
-                                    (read-and-record-source-map stream)
-                                  (end-of-file ()
-                                    (setf eof t))
+                                    (read-and-record-source-map stream eof-marker)
                                   (error (error)
                                     (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
-                                    (values nil
-                                            (make-hash-table)))))
-                       until eof
-                       when map
-                       collect (cons form map)))))
+                                    (values nil (make-hash-table)))))
+                       when map collect (cons form map)
+                       when (eql form eof-marker) do (loop-finish)))))
     (mapcar (lambda (map)
               (maphash (lambda (k locations)
                          (declare (ignore k))
@@ -796,7 +792,7 @@ The source locations are stored in SOURCE-MAP."
                                       (return))))
   (assert (file-position stream end-position)))
 
-(defun read-and-record-source-map (stream)
+(defun read-and-record-source-map (stream eof-marker)
   "Read the next object from STREAM.
 Return the object together with a hashtable that maps
 subexpressions of the object to stream positions."
@@ -804,8 +800,11 @@ subexpressions of the object to stream positions."
          (start (file-position stream))
          (form (let ((*readtable* (make-source-recording-readtable *readtable* source-map))
                      (*package* *current-package*))
-                 (read stream)))
+                 (read stream nil eof-marker)))
          (end (file-position stream)))
+    (when (eql form eof-marker)
+      ;; we might have suppressed some content under #+ or similar
+      (return-from read-and-record-source-map (values form source-map)))
     (look-for-in-package-form-in-stream stream start end)
     ;; ensure that at least FORM is in the source-map
     (unless (gethash form source-map)
@@ -820,8 +819,13 @@ Return the form and the source-map."
     (dotimes (i n)
       (read stream)))
   (let ((*read-suppress* nil)
-        (*read-eval* nil))
-    (read-and-record-source-map stream)))
+        (*read-eval* nil)
+        (eof-marker (cons nil nil)))
+    (multiple-value-bind (form source-map)
+        (read-and-record-source-map stream eof-marker)
+      (if (eql form eof-marker)
+          (error 'end-of-file :stream stream)
+          (values form source-map)))))
 
 (defun source-path-stream-position (path stream)
   "Search the source-path PATH in STREAM and return its position."
