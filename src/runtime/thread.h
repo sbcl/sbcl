@@ -279,7 +279,7 @@ typedef struct init_thread_data {
 #define csp_around_foreign_call(thread) *(((lispobj*)thread)-1)
 #endif
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-bool set_thread_foreign_call_trigger(struct thread* th, bool writable);
+lispobj set_thread_foreign_call_trigger(struct thread* th, bool writable);
 int handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_address);
 #endif
 

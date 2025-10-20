@@ -1494,13 +1494,13 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
 
-bool set_thread_foreign_call_trigger(struct thread* th, bool writable)
+lispobj set_thread_foreign_call_trigger(struct thread* th, bool writable)
 {
     os_protect((char*)th - THREAD_CSP_PAGE_SIZE,
                THREAD_CSP_PAGE_SIZE,
                writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
                : (OS_VM_PROT_READ));
-    return csp_around_foreign_call(th) != 0;
+    return csp_around_foreign_call(th);
 }
 
 int
@@ -1541,9 +1541,6 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
                 gc_assert(mutex_release(exit_lock));
             } else {
                 if (read_TLS(STOP_FOR_GC_PENDING, th) == NIL) {
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-                    th->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
-#endif
                     sigfillset(&mask);
                     sigdelset(&mask, SIG_STOP_FOR_GC);
                     sigsuspend(&mask);
