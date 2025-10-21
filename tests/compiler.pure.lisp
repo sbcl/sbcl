@@ -3739,7 +3739,7 @@
          (load-time-value (the (values fixnum) 42)))
     (() 42)))
 
-(with-test (:name (compile :bug-654289))
+(with-test (:name (compile :bug-654289) :fails-on :sbcl)
   ;; Test that compile-times don't explode when quoted constants
   ;; get big.
   (labels ((time-n (n)

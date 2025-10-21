@@ -576,11 +576,6 @@
                           ;; (a b ,c d) -> (a b (comma c) d)
                           ((comma-p fm)
                            (sub-find-source-paths (list 'comma (comma-expr fm)) (cons pos path)))
-                          ;; KLUDGE: this assumes all uses of the
-                          ;; QUOTE symbol are actual quotations, which
-                          ;; is not true in general [consider e.g.
-                          ;; (let ((quote (setq x 1))) ...)].
-                          ((eq 'quote fm) (return))
                           ((not (zerop pos)) (note-source-path subform pos path))))
                       (setq subform (cdr subform)
                             pos (1+ pos))

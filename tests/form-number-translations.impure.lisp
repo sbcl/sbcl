@@ -68,3 +68,19 @@
                                         (,name (gensym ,(symbol-name name))))
                                     `(let ((,,name ,,exp-temp))
                                        ,,(frob (rest specs) body))))))))))
+
+(with-test (:name (:static :aver :check-consistency))
+  (check-consistency '(defmacro aver (expr)
+                       ;; Don't hold on to symbols, helping shake-packages.
+                       (labels ((replace-symbols (expr)
+                                  (typecase expr
+                                    (null expr)
+                                    (symbol
+                                     (symbol-name expr))
+                                    (cons
+                                     (cons (replace-symbols (car expr))
+                                           (replace-symbols (cdr expr))))
+                                    (t
+                                     expr))))
+                         `(unless ,expr
+                            (%failed-aver ',(replace-symbols expr)))))))

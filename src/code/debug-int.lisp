@@ -3147,12 +3147,7 @@ register."
                                      (cond
                                        ((consp fm) (translate1 fm (cons pos path)))
                                        ((comma-p fm)
-                                        (translate1 (list 'comma (comma-expr fm)) (list* pos path)))
-                                       ;; Don't look into quoted
-                                       ;; constants, but see also the
-                                       ;; comment in
-                                       ;; SB-C::SUB-FIND-SOURCE-PATH
-                                       ((eq 'quote fm) (return))))
+                                        (translate1 (list 'comma (comma-expr fm)) (list* pos path)))))
                                    (setq subform (cdr subform)
                                          pos (1+ pos))
                                    (when (eq subform trail) (return)))))

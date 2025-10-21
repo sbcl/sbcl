@@ -117,3 +117,34 @@
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
                   ;;    ` ( 0   1   , ( 1 +   x )   3   .   , ( i f   ( e v e n p   x )   ( l i s t   4 )   ( l i s t   5 ) ) ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 5 5 5 5 5 5 5 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(sb-cover:clear-coverage)
+(compile-load "test-data-quote")
+(assert (equalp (get-states "test-data-quote")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   q u o t e - c o m m a   ( x )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ` ( 1   ' , ( i f   (  e  v  e  n  p     x  )    ( 1 +   x )   ( +   x   2 ) )   , ( +   x   3 ) ) )
+                  0 1 1 2 2 2 2 2 2 2 2 2 2 10 10 10 10 10 10 10 10 10 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1)))
+
+(quote-comma 0)
+(assert (equalp (get-states "test-data-quote")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   q u o t e - c o m m a   ( x )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ` ( 1   ' , ( i f   ( e v e n p   x )   ( 1 +   x )   ( +   x   2 ) )   , ( +   x   3 ) ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 9 9 9 9 9 9 9 9 9 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(quote-comma 1)
+(assert (equalp (get-states "test-data-quote")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   q u o t e - c o m m a   ( x )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ` ( 1   ' , ( i f   ( e v e n p   x )   ( 1 +   x )   ( +   x   2 ) )   , ( +   x   3 ) ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 5 5 5 5 5 5 5 5 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
