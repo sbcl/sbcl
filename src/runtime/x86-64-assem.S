@@ -264,6 +264,11 @@ GNAME(funcall_alien_callback):
 #endif
         mov     $(3 << N_FIXNUM_TAG_BITS),%rcx
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+        push    THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG)
+	movq    $0, THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG)
+#endif
+
 	/* Alloc new frame. */
         push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
@@ -273,6 +278,9 @@ GNAME(funcall_alien_callback):
 	LOAD_PIC_VAR(linkage_space, %rax)
 	call	*(8*ENTER_ALIEN_CALLBACK_fname_index)(%rax)
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+	pop   THREAD_SAVED_CSP_OFFSET(THREAD_BASE_REG)
+#endif
 	POP_C_NONVOLATILE_REGS
 
 	leave
