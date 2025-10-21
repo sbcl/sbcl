@@ -382,7 +382,7 @@
 ;;; The uses need to have the correct type before calling this.
 (defun erase-lvar-type (lvar &optional nth-value)
   (let (seen)
-    (labels ((erase (lvar)
+    (labels ((erase (lvar nth-value)
                (when lvar
                  (setf (lvar-%derived-type lvar) nil)
                  (loop for annotation in (lvar-annotations lvar)
@@ -393,7 +393,7 @@
                           (let* ((atype (cast-asserted-type dest))
                                  (int (values-type-intersection lvar-type atype)))
                             (derive-node-type dest int :from-scratch t))
-                          (erase (node-lvar dest)))
+                          (erase (node-lvar dest) nth-value))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
                                (not (memq dest seen)))
@@ -403,7 +403,7 @@
                                      (setf (lambda-var-type var) type)
                                      (loop for ref in (leaf-refs var)
                                            do (derive-node-type ref type :from-scratch t)
-                                              (erase (node-lvar ref)))))
+                                              (erase (node-lvar ref) 0))))
                               (if (functional-kind-eq fun mv-let)
                                   (if nth-value
                                       (erase-var (nth nth-value (lambda-vars fun))
@@ -427,8 +427,9 @@
                                        (derive-node-type dest
                                                          (make-values-type (mapcar #'lvar-type (combination-args dest)))
                                                          :from-scratch t)
-                                       (erase (node-lvar dest)))))))))))))
-      (erase lvar))))
+                                       (erase (node-lvar dest)
+                                              (position lvar (combination-args dest))))))))))))))
+      (erase lvar nth-value))))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.

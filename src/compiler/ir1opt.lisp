@@ -2077,8 +2077,7 @@
                                                 :recklessly t))
                       (erase-lvar-type multi-use-lvar)))
                (when single-value-mv
-                 (erase-node-type call *wild-type*)
-                 (principal-lvar-single-valuify (node-lvar call)))
+                 (erase-node-type call *wild-type*))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call
                                  `(lambda ,ll
