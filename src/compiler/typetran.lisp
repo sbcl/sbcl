@@ -426,7 +426,7 @@
                      `(float-sign-bit-set-p ,n-object)))
             ((or (eql low 0d0)
                  (eql low 0f0))
-             (wrap-if high (gen high nil)
+             (wrap-if high (gen nil high)
                       `(not (float-sign-bit-set-p ,n-object))))
             (t
              (multiple-value-bind (low high zero)
