@@ -2077,7 +2077,8 @@
                                                 :recklessly t))
                       (erase-lvar-type multi-use-lvar)))
                (when single-value-mv
-                 (erase-node-type call *wild-type*))
+                 (setf (node-derived-type call) (lvar-derived-type multi-use-lvar)
+                       (lvar-%derived-type (node-lvar call)) nil))
                (let ((ll (make-gensym-list (length args))))
                  (transform-call call
                                  `(lambda ,ll
