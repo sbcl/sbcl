@@ -394,16 +394,23 @@
                                  (int (values-type-intersection lvar-type atype)))
                             (derive-node-type dest int :from-scratch t))
                           (erase (node-lvar dest) nth-value))
+                         ((and (combination-p dest)
+                               ;; Only the first value is used
+                               (and nth-value
+                                    (> nth-value 0))))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
                                (not (memq dest seen)))
                           (push dest seen)
                           (let ((fun (combination-lambda dest)))
                             (flet ((erase-var (var type)
-                                     (setf (lambda-var-type var) type)
-                                     (loop for ref in (leaf-refs var)
-                                           do (derive-node-type ref type :from-scratch t)
-                                              (erase (node-lvar ref) 0))))
+                                     (let ((type (if (lambda-var-sets var)
+                                                     *universal-type*
+                                                     type)))
+                                       (setf (lambda-var-type var) type)
+                                       (loop for ref in (leaf-refs var)
+                                             do (derive-node-type ref type :from-scratch t)
+                                                (erase (node-lvar ref) 0)))))
                               (if (functional-kind-eq fun mv-let)
                                   (if nth-value
                                       (erase-var (nth nth-value (lambda-vars fun))
