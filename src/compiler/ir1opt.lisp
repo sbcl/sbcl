@@ -1872,67 +1872,68 @@
             (not (ir1-attributep attributes call)))))))
 
 (defun constant-fold-call (combination)
-  (let* ((info (basic-combination-fun-info combination))
-         (attr (fun-info-attributes info))
-         (args (basic-combination-args combination)))
-    (cond ((not (or (ir1-attributep attr foldable)
-                    (and (ir1-attributep attr foldable-read-only)
-                         (let ((dest (node-dest combination)))
-                           (and (combination-p dest)
-                                (eq (combination-kind dest) :known)
-                                (let* ((info (combination-fun-info dest))
-                                       (read-only (fun-info-read-only-args info)))
-                                  (when read-only
-                                    (logbitp (position (node-lvar combination) (combination-args dest))
-                                             read-only))))))))
-           nil)
-          ((ir1-attributep attr call)
-           (map-combination-args-and-types
-            (lambda (arg type lvars &optional annotation)
-              (declare (ignore type lvars))
-              (unless (if (eql (car annotation) 'function-designator)
-                          (let ((fun (or (lvar-fun-name arg t)
-                                         (and (constant-lvar-ignore-types-p arg)
-                                              (lvar-value arg)))))
-                            (and fun
-                                 (constant-fold-arg-p fun)))
-                          (constant-lvar-ignore-types-p arg))
+  (when (node-lvar combination)
+    (let* ((info (basic-combination-fun-info combination))
+           (attr (fun-info-attributes info))
+           (args (basic-combination-args combination)))
+      (cond ((not (or (ir1-attributep attr foldable)
+                      (and (ir1-attributep attr foldable-read-only)
+                           (let ((dest (node-dest combination)))
+                             (and (combination-p dest)
+                                  (eq (combination-kind dest) :known)
+                                  (let* ((info (combination-fun-info dest))
+                                         (read-only (fun-info-read-only-args info)))
+                                    (when read-only
+                                      (logbitp (position (node-lvar combination) (combination-args dest))
+                                               read-only))))))))
+             nil)
+            ((ir1-attributep attr call)
+             (map-combination-args-and-types
+              (lambda (arg type lvars &optional annotation)
+                (declare (ignore type lvars))
+                (unless (if (eql (car annotation) 'function-designator)
+                            (let ((fun (or (lvar-fun-name arg t)
+                                           (and (constant-lvar-ignore-types-p arg)
+                                                (lvar-value arg)))))
+                              (and fun
+                                   (constant-fold-arg-p fun)))
+                            (constant-lvar-ignore-types-p arg))
+                  (return-from constant-fold-call)))
+              combination
+              :info info
+              :unknown-keys-fun
+              (lambda (lvars)
+                (declare (ignore lvars))
                 (return-from constant-fold-call)))
-            combination
-            :info info
-            :unknown-keys-fun
-            (lambda (lvars)
-              (declare (ignore lvars))
-              (return-from constant-fold-call)))
-           (%constant-fold-call combination))
-          (t
-           (let (mu-constant
-                 mv-bind
-                 mv-bind-nth)
-             (when (loop for arg in args
-                         for uses = (lvar-uses arg)
-                         always (cond ((atom uses)
-                                       (or (constant-lvar-ignore-types-p arg)
-                                           (and (not mu-constant)
-                                                (ref-p uses)
-                                                (not (cdr (leaf-refs (ref-leaf uses))))
-                                                (multiple-value-bind (uses nth-value) (mv-principal-lvar-ref-use arg t t)
-                                                  (when (and nth-value
-                                                             (listp uses)
-                                                             (loop for use in uses
-                                                                   always (and (combination-is use '(values))
-                                                                               (constant-ref-p
-                                                                                (lvar-uses (nth nth-value (combination-args use)))))))
-                                                    (setf mu-constant arg
-                                                          mv-bind uses
-                                                          mv-bind-nth nth-value))))))
-                                      ((and (not mu-constant)
-                                            (loop for use in uses
-                                                  always (constant-ref-p use)))
-                                       (setf mu-constant arg))))
-               (if mu-constant
-                   (%constant-fold-call-multiple-uses combination mu-constant mv-bind mv-bind-nth)
-                   (%constant-fold-call combination))))))))
+             (%constant-fold-call combination))
+            (t
+             (let (mu-constant
+                   mv-bind
+                   mv-bind-nth)
+               (when (loop for arg in args
+                           for uses = (lvar-uses arg)
+                           always (cond ((atom uses)
+                                         (or (constant-lvar-ignore-types-p arg)
+                                             (and (not mu-constant)
+                                                  (ref-p uses)
+                                                  (not (cdr (leaf-refs (ref-leaf uses))))
+                                                  (multiple-value-bind (uses nth-value) (mv-principal-lvar-ref-use arg t t)
+                                                    (when (and nth-value
+                                                               (listp uses)
+                                                               (loop for use in uses
+                                                                     always (and (combination-is use '(values))
+                                                                                 (constant-ref-p
+                                                                                  (lvar-uses (nth nth-value (combination-args use)))))))
+                                                      (setf mu-constant arg
+                                                            mv-bind uses
+                                                            mv-bind-nth nth-value))))))
+                                        ((and (not mu-constant)
+                                              (loop for use in uses
+                                                    always (constant-ref-p use)))
+                                         (setf mu-constant arg))))
+                 (if mu-constant
+                     (%constant-fold-call-multiple-uses combination mu-constant mv-bind mv-bind-nth)
+                     (%constant-fold-call combination)))))))))
 
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. If there is an error during the
