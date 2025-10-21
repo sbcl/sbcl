@@ -234,7 +234,8 @@
                  (var (nth n (lambda-vars fun)))
                  (refs (leaf-refs var)))
             (when (and refs
-                       (not (cdr refs)))
+                       (not (cdr refs))
+                       (not (lambda-var-sets var)))
               (let-lvar-dest (node-lvar (car refs)) single-use)))
           dest))))
 
@@ -282,7 +283,8 @@
           (let* ((var (nth nth-value (lambda-vars fun)))
                  (refs (leaf-refs var)))
             (when (and refs
-                       (not (cdr refs)))
+                       (not (cdr refs))
+                       (not (lambda-var-sets var)))
               (when (functional-kind-eq fun mv-let)
                 (let-lvar-dest (node-lvar (car refs)) single-use)))))))))
 
