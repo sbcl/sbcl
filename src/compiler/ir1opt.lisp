@@ -2069,7 +2069,7 @@
                             do
                             (change-ref-leaf ref (find-constant value)
                                              :recklessly t)
-                            (erase-lvar-type values-arg nth-value)))
+                            (erase-lvar-type values-arg)))
                      (t
                       (loop for ref in (lvar-uses multi-use-lvar)
                             for (value) in values
