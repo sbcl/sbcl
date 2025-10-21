@@ -28,15 +28,8 @@
         (declare (ignore k))
         (push (cdr v) result)))))
 
-;;; It's not actually clear to me what the coupling /should/ be.  The
-;;; source paths contain extra entries compared with the form number
-;;; translations, but somewhat bizarrely those extra entries are
-;;; associated with a form number that is one above what I would
-;;; expect (that is, they seem logically attached to the "next"
-;;; depth-first number rather than the "current" one).  What does seem
-;;; to be necessary is that all entries in TRANSLATIONS should have a
-;;; corresponding entry in SOURCE-PATHS.
-
+;;; All entries in TRANSLATIONS should have a corresponding entry in
+;;; SOURCE-PATHS.
 (defun find-unfound-translations (translations source-paths)
   (let ((unfound-translations nil))
     (sb-int:dovector (tr translations)
@@ -44,10 +37,24 @@
         (push tr unfound-translations)))
     unfound-translations))
 
+;;; The shortest source-paths for each form number should identify a
+;;; translated form.
+(defun find-untranslated-paths (translations source-paths)
+  (let ((untranslated-paths nil))
+    (let ((copy (copy-list source-paths)))
+      (setf copy (sort copy #'> :key #'length))
+      (setf copy (stable-sort copy #'< :key #'car))
+      (setf copy (remove-duplicates copy :key #'car))
+      (dolist (path copy untranslated-paths)
+        (unless (find path translations :test #'equal)
+          (push path untranslated-paths))))))
+
 (defun check-consistency (form)
   (let ((translations (translations form))
         (source-paths (source-paths form)))
-    (assert (null (find-unfound-translations translations source-paths)))))
+    (assert (null (find-unfound-translations translations source-paths)))
+    (assert (= (length translations) (1+ (reduce #'max source-paths :key #'car))))
+    (assert (null (find-untranslated-paths translations source-paths)))))
 
 (with-test (:name (:static macrolet :check-consistency))
   (check-consistency '(macrolet ((def (x y) `(defun ,x (1+ ,y)))) (def ffloor) (def fceiling))))
