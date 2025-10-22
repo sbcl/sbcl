@@ -3,15 +3,15 @@ freebsd_build_task:
   freebsd_instance:
     matrix:
       image_family: freebsd-14-2
-    cpu: 1
-    memory: 1G
+    cpu: 2
+    memory: 2G
 
   prepare_script:
     - pkg install -y sbcl gmake git
 
   build_script:
     - echo '"1.9.99.999"' > version.lisp-expr
-    - ./make.sh --with-sb-core-compression
+    - ./make.sh --with-sb-core-compression --with-sb-thread --with-nonstop-foreign-call
 
   test_script:
     - cd tests; ./run-tests.sh
