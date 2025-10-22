@@ -276,7 +276,7 @@
   (collect ((result))
     (dotimes (i 32 (result))
       (when (logbitp i mask)
-        (result (alien-funcall 
+        (result (alien-funcall
                  (eval '(extern-alien "sigabbrev_np" (function c-string int))) ;; might not exist
                  (1+ i)))))))
 (defun show-sigmasks (&aux (first t))
