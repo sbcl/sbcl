@@ -2,7 +2,7 @@
 (sb-thread:make-thread (lambda ()
                          (loop (gc :full t) (sleep 0.001)))
                        :name "gc stress")
-#+slow
+#+gc-verify
 (setf (sb-alien:extern-alien "verify_gens" char) 0
       (extern-alien "pre_verify_gen_0" int) 1)
 

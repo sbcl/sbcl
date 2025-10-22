@@ -1,5 +1,9 @@
 (when (member "--gc-stress" *posix-argv* :test #'equal)
   (push :gc-stress *features*))
+(when (member "--slow" *posix-argv* :test #'equal)
+  (push :slow *features*))
+(when (member "--gc-verify" *posix-argv* :test #'equal)
+  (push :gc-verify *features*))
 
 (load "test-util.lisp")
 (load "assertoid.lisp")
@@ -48,9 +52,9 @@
             ((string= arg "--report-skipped-tests")
              (setf *report-skipped-tests* t))
             ((string= arg "--no-color"))
-            ((string= arg "--slow")
-             (push :slow *features*))
-            ((string= arg "--gc-stress"))
+            ((or (string= arg "--gc-stress")
+                 (string= arg "--slow")
+                 (string= arg "--gc-verify")))
             ((string= arg "--skip-to")
              (setf skip-to (pop remainder)))
             (t
@@ -573,6 +577,8 @@
            "--noprint"
            "--disable-debugger"
            #+gc-stress "--eval" #+gc-stress "(push :gc-stress *features*)"
+           #+gc-verify "--eval" #+slow "(push :gc-verify *features*)"
+           #+slow "--eval" #+slow "(push :slow *features*)"
            "--load" load
            "--eval" (write-to-string eval
                                      :right-margin 1000))
@@ -589,9 +595,7 @@
      ,*break-on-failure*
      ,*break-on-expected-failure*
      ,*break-on-error*
-     ,(eq *test-evaluator-mode* :interpret)
-     ,(and (member :slow *features*)
-           t))))
+     ,(eq *test-evaluator-mode* :interpret))))
 
 (defun impure-runner (files test-fun log)
   (when files

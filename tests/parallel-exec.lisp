@@ -24,6 +24,16 @@
   (compile 'tlsf-dump)
   (push #'tlsf-checks sb-ext:*after-gc-hooks*))
 
+(when (find "--slow" *posix-argv* :test #'equal)
+  (push :slow *features*)
+  (setf *posix-argv* (remove "--slow" *posix-argv* :test #'equal)))
+(when (find "--gc-stress" *posix-argv* :test #'equal)
+  (push :gc-stress *features*)
+  (setf *posix-argv* (remove "--gc-stress" *posix-argv* :test #'equal)))
+(when (find "--gc-verify" *posix-argv* :test #'equal)
+  (push :gc-verify *features*)
+  (setf *posix-argv* (remove "--gc-verify" *posix-argv* :test #'equal)))
+
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread (not sb-safepoint))
