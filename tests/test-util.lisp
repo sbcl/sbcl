@@ -1,7 +1,12 @@
 #+gc-stress
-(sb-thread:make-thread (lambda ()
-                         (loop (gc :full t) (sleep 0.001)))
-                       :name "gc stress")
+(progn
+  #+sb-thread
+  (sb-thread:make-thread (lambda ()
+                           (loop (gc :full t) (sleep 0.001)))
+                         :name "gc stress")
+  #-sb-thread
+  (sb-ext:schedule-timer (make-timer (lambda () (gc :full t))) 0.1 :repeat-interval 0.005))
+
 #+gc-verify
 (setf (sb-alien:extern-alien "verify_gens" char) 0
       (extern-alien "pre_verify_gen_0" int) 1)

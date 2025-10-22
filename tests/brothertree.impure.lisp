@@ -264,7 +264,8 @@
   (define-c-wrapper c-find<= "brothertree_find_lesseql")
   (define-c-wrapper c-find>= "brothertree_find_greatereql"))
 
-(test-util:with-test (:name :find-inequality)
+(test-util:with-test (:name :find-inequality
+                      :broken-on :arm) ;; the result is not pinned
   (dotimes (i 10) ; try with various trees resulting from different shuffles
     (let* ((list (test-util:shuffle (loop for i from 100 by 100 repeat 25 collect i)))
            (tree (tree-from-list list)))
