@@ -577,7 +577,7 @@
            "--noprint"
            "--disable-debugger"
            #+gc-stress "--eval" #+gc-stress "(push :gc-stress *features*)"
-           #+gc-verify "--eval" #+slow "(push :gc-verify *features*)"
+           #+gc-verify "--eval" #+gc-verify "(push :gc-verify *features*)"
            #+slow "--eval" #+slow "(push :slow *features*)"
            "--load" load
            "--eval" (write-to-string eval
