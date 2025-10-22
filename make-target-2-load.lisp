@@ -553,7 +553,7 @@ Please check that all strings which were not recognizable to the compiler
 
 (setq sb-c:*compile-to-memory-space* :auto)
 (when (find-package "SB-INTERPRETER") (setq sb-ext:*evaluator-mode* :interpret))
-#+x86-64 (sb-ext:fold-identical-code :aggressive t :preserve-docstrings t)
+#+(and x86-64 (not sb-devel)) (sb-ext:fold-identical-code :aggressive t :preserve-docstrings t)
 
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
