@@ -8,10 +8,11 @@
 (with-test (:name :adjacent-barrier-elimination-sticky-marks
             :skipped-on (or :gc-stress
                             (:not :soft-card-marks)))
-  (setf (extern-alien "pre_verify_gen_0" int) 1)
-  (loop repeat 1000000
-        do (adjacent-barriers))
-  (setf (extern-alien "pre_verify_gen_0" int) 0))
+  (let ((pre_verify_gen_0 (extern-alien "pre_verify_gen_0" int)))
+   (setf (extern-alien "pre_verify_gen_0" int) 1)
+   (loop repeat 1000000
+         do (adjacent-barriers))
+   (setf (extern-alien "pre_verify_gen_0" int) pre_verify_gen_0)))
 
 
 ;;; The layout of FOO must not get promoted from gen0 to gen1.

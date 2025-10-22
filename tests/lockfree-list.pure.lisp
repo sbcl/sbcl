@@ -116,6 +116,7 @@
     (gc)
     (when show (show (list-head *lfl*) #'get-next "del "))))
 
+(defvar *old-verify-gens* (sb-alien:extern-alien "verify_gens" char))
 ;; Enable heap validity tester
 #+(and generational (not gc-stress)) (setf (sb-alien:extern-alien "verify_gens" char) 0)
 
@@ -526,3 +527,6 @@
                       (if (< i (1- nthreads)) (+ chunk-start chunk-size))))
         (incf chunk-start chunk-size))
       (tester lflist worklists))))
+
+#+(and generational (not gc-stress))
+(setf (sb-alien:extern-alien "verify_gens" char) *old-verify-gens*)

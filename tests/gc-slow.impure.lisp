@@ -55,22 +55,23 @@
 #+sb-thread
 (with-test (:name :concurrently-alloc-code)
   ;; this debug setting may or may not find a problem, but it can't hurt to try
-  (setf (extern-alien "pre_verify_gen_0" int) 1)
-  (let ((worker-th
-         (sb-thread:make-thread
-          (let ((stop (+ (get-internal-real-time)
-                         (* 1.5 internal-time-units-per-second))))
-            (lambda (&aux (n 0))
-              (loop while (<= (get-internal-real-time) stop)
-                    do (compile nil `(lambda () (print 20)))
-                       (incf n))
-              n)))))
-    (let ((gcs 0))
-      (loop (gc) (incf gcs)
-            (unless (sb-thread:thread-alive-p worker-th)
-              (return))
-            (sb-unix:nanosleep 0 (+ 1000000 (random 100000))))
-      (let ((compiles (sb-thread:join-thread worker-th)))
-        (format t "~&Compiled ~D times, GC'ed ~D times~%"
-                compiles gcs))))
-  (setf (extern-alien "pre_verify_gen_0" int) 0))
+  (let ((pre_verify_gen_0 (extern-alien "pre_verify_gen_0" int)))
+   (setf (extern-alien "pre_verify_gen_0" int) 1)
+   (let ((worker-th
+           (sb-thread:make-thread
+            (let ((stop (+ (get-internal-real-time)
+                           (* 1.5 internal-time-units-per-second))))
+              (lambda (&aux (n 0))
+                (loop while (<= (get-internal-real-time) stop)
+                      do (compile nil `(lambda () (print 20)))
+                         (incf n))
+                n)))))
+     (let ((gcs 0))
+       (loop (gc) (incf gcs)
+             (unless (sb-thread:thread-alive-p worker-th)
+               (return))
+             (sb-unix:nanosleep 0 (+ 1000000 (random 100000))))
+       (let ((compiles (sb-thread:join-thread worker-th)))
+         (format t "~&Compiled ~D times, GC'ed ~D times~%"
+                 compiles gcs))))
+   (setf (extern-alien "pre_verify_gen_0" int) pre_verify_gen_0)))
