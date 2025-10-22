@@ -276,8 +276,9 @@
   (collect ((result))
     (dotimes (i 32 (result))
       (when (logbitp i mask)
-        (result (alien-funcall (extern-alien "sigabbrev_np" (function c-string int))
-                               (1+ i)))))))
+        (result (alien-funcall 
+                 (eval '(extern-alien "sigabbrev_np" (function c-string int))) ;; might not exist
+                 (1+ i)))))))
 (defun show-sigmasks (&aux (first t))
   (dolist (file (directory "/proc/self/task/*"))
     (let ((tid (car (last (pathname-directory file)))))
