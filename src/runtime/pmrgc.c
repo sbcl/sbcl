@@ -659,10 +659,16 @@ conservative_stack_scan(struct thread* th,
     int i;
     for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
         os_context_t *c = nth_interrupt_context(i, th);
-        visit_context_registers(context_method, c, (void*)1);
-        lispobj* esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
-        if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end && (void*)esp1 < esp)
-            esp = esp1;
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+        if (c) // can be partially initialized due to a signal into a foreign call
+#endif
+        {
+            visit_context_registers(context_method, c, (void*)1);
+            lispobj* esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
+            if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end && (void*)esp1 < esp)
+                esp = esp1;
+        }
     }
     if (th == get_sb_vm_thread()) {
         if ((void*)cur_thread_approx_stackptr < esp) esp = cur_thread_approx_stackptr;
