@@ -6,7 +6,10 @@ changes relative to sbcl-2.5.9:
        (lp#2125908, reported by khbit)
     ** use x29 for the control frame pointer on arm64, improving backtrace
        tooling.
-    ** provide a plugin to lldb to display backtraces.
+    ** provide a plugin to lldb to display backtraces (contrib/lldb_bt.py).
+    ** an experimental option for performing GC without interrupting and
+       stopping foreign function calls. Enabled via --with-nonstop-foreign-call
+       (for arm64, x86-64 (outside of Windows, where that's already the case.))
   * bug fix: some interactions between TWO-WAY-STREAM (and ECHO-STREAM) and
     user-defined streams have been cleaned up.
   * bug fix: the SB-COVER contributed module can now annotate source files
@@ -23,8 +26,10 @@ changes relative to sbcl-2.5.9:
     with a known function.
   * optimization: fusion of type checking and move of 64-bit integers is
     enabled on arm64 and x86-64.
-  * optimization: allocation fusion for (PUSH (CONS A B) ALIST) on x86-64.
+  * optimization: allocation fusion for (PUSH (CONS A B) LIST) on x86-64.
   * optimization: improvements of type derivation for float rounding operations.
+  * optimization: constant folding when one of the arguments is
+    (if v constant1 constant2)
 
 changes in sbcl-2.5.9 relative to sbcl-2.5.8:
   * minor incompatible change: remove (SETF SB-EXT:POSIX-GETENV), which only
