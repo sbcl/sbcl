@@ -12,11 +12,13 @@ changes relative to sbcl-2.5.9:
   * bug fix: the SB-COVER contributed module can now annotate source files
     containing COMPLEX literals.  (A number of other more minor cosmetic
     issues have also been fixed).
+  * bug fix: compiler crash from reoptimizing with some stale type information.
+    (lp#2125944)
   * optimization: SLOT-VALUE calls with known slot-name on values which are of
     type (OR NULL <STRUCT>) are transformed to a null check and a structure
     access.
   * optimization: the compiler will apply constraints to the result of calling
-    RANDOM.  (Thanks to Vasily Postnicov)
+    RANDOM.  (lp#2126978, thanks to Vasily Postnicov)
   * optimization: the compiler will perform type derivation on CL:APPLY called
     with a known function.
   * optimization: fusion of type checking and move of 64-bit integers is
