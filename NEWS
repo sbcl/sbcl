@@ -1,5 +1,29 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.9:
+  * platform support:
+    ** handling of "./" and "../" in pathname functions on Windows is improved.
+       (lp#2125908, reported by khbit)
+    ** use x29 for the control frame pointer on arm64, improving backtrace
+       tooling.
+    ** provide a plugin to lldb to display backtraces.
+  * bug fix: some interactions between TWO-WAY-STREAM (and ECHO-STREAM) and
+    user-defined streams have been cleaned up.
+  * bug fix: the SB-COVER contributed module can now annotate source files
+    containing COMPLEX literals.  (A number of other more minor cosmetic
+    issues have also been fixed).
+  * optimization: SLOT-VALUE calls with known slot-name on values which are of
+    type (OR NULL <STRUCT>) are transformed to a null check and a structure
+    access.
+  * optimization: the compiler will apply constraints to the result of calling
+    RANDOM.  (Thanks to Vasily Postnicov)
+  * optimization: the compiler will perform type derivation on CL:APPLY called
+    with a known function.
+  * optimization: fusion of type checking and move of 64-bit integers is
+    enabled on arm64 and x86-64.
+  * optimization: allocation fusion for (PUSH (CONS A B) ALIST) on x86-64.
+  * optimization: improvements of type derivation for float rounding operations.
+
 changes in sbcl-2.5.9 relative to sbcl-2.5.8:
   * minor incompatible change: remove (SETF SB-EXT:POSIX-GETENV), which only
     ever existed as an operator in SBCL on Windows.
