@@ -24,13 +24,12 @@
   (compile 'tlsf-dump)
   (push #'tlsf-checks sb-ext:*after-gc-hooks*))
 
-(defvar *gc-stress* nil)
-
 (when (find "--slow" *posix-argv* :test #'equal)
   (push :slow *features*)
   (setf *posix-argv* (remove "--slow" *posix-argv* :test #'equal)))
 (when (find "--gc-stress" *posix-argv* :test #'equal)
-  (setf *gc-stress* t)
+  (push :gc-stress *features*)
+  (push :gc-stress-delay *features*)
   (setf *posix-argv* (remove "--gc-stress" *posix-argv* :test #'equal)))
 (when (find "--gc-verify" *posix-argv* :test #'equal)
   (push :gc-verify *features*)
@@ -191,12 +190,11 @@
                      ;; if exec fails, just exit with a wrong (not 104) status
                      (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                     (t
-                     (when cl-user::*gc-stress*
-                       (push :gc-stress *features*)
-                       (sb-thread:make-thread
-                        (lambda ()
-                          (loop (gc :full t) (sleep 0.001)))
-                        :name "gc stress"))
+                     #+gc-stress
+                     (sb-thread:make-thread
+                      (lambda ()
+                        (loop (gc :full t) (sleep 0.001)))
+                      :name "gc stress")
                      #+test-sprof (sb-sprof:start-profiling :sample-interval .001)
                      (setq sb-c::*static-vop-usage-counts* (make-hash-table :synchronized t))
                      (let ((*features* (cons :parallel-test-runner *features*)))

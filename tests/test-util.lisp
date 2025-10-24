@@ -1,4 +1,4 @@
-#+gc-stress
+#+(and gc-stress (not gc-stress-delay))
 (progn
   #+sb-thread
   (sb-thread:make-thread (lambda ()
