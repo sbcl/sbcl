@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.9:
+changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:
     ** handling of "./" and "../" in pathname functions on Windows is improved.
        (lp#2125908, reported by khbit)
