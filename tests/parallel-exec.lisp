@@ -179,7 +179,7 @@
               ;; Send this to the log file, not the terminal
               (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                     *error-output*))
-              
+
               (cond ((string= (pathname-type file) "test")
                      (let ((shell (or #+sunos (posix-getenv "SHELL") "/bin/sh")))
                        ;; exec the shell with the test and we'll pick up its exit code

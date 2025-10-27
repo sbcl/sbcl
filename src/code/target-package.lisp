@@ -774,27 +774,28 @@ error if any of PACKAGES is not a valid package designator."
 ;;; this.
 (defun assert-symbol-home-package-unlocked (name &optional format-control
                                             &rest format-arguments)
-  (let* ((symbol (etypecase name
-                   (symbol name)
-                   ;; Istm that the right way to declare that you want to allow
-                   ;; overriding the lock on (SETF X) is to list (SETF X) in
-                   ;; the declaration, not expect that X means itself and SETF.
-                   ;; Worse still, the syntax ({ENABLE|DISABLE}-..-locks (SETF X))
-                   ;; is broken, and yet we make no indication of it.
-                   ((cons (eql setf) cons) (second name))
-                   ;; Skip lists of length 1, single conses and
-                   ;; (class-predicate foo), etc.  FIXME: MOP and
-                   ;; package-lock interaction needs to be thought
-                   ;; about.
-                   (list
-                    (return-from assert-symbol-home-package-unlocked
-                      name))))
-         (package (sb-xc:symbol-package symbol)))
-    (when (package-lock-violation-p package symbol)
-      (package-lock-violation package
-                              :symbol symbol
-                              :format-control format-control
-                              :format-arguments (cons name format-arguments))))
+  (unless (> sb-c::*inlining* 0)
+    (let* ((symbol (etypecase name
+                     (symbol name)
+                     ;; Istm that the right way to declare that you want to allow
+                     ;; overriding the lock on (SETF X) is to list (SETF X) in
+                     ;; the declaration, not expect that X means itself and SETF.
+                     ;; Worse still, the syntax ({ENABLE|DISABLE}-..-locks (SETF X))
+                     ;; is broken, and yet we make no indication of it.
+                     ((cons (eql setf) cons) (second name))
+                     ;; Skip lists of length 1, single conses and
+                     ;; (class-predicate foo), etc.  FIXME: MOP and
+                     ;; package-lock interaction needs to be thought
+                     ;; about.
+                     (list
+                      (return-from assert-symbol-home-package-unlocked
+                        name))))
+           (package (sb-xc:symbol-package symbol)))
+      (when (package-lock-violation-p package symbol)
+        (package-lock-violation package
+                                :symbol symbol
+                                :format-control format-control
+                                :format-arguments (cons name format-arguments)))))
   name)
 
 
