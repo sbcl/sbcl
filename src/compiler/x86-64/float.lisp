@@ -1529,29 +1529,6 @@
   (:note "complex float imagpart")
   (:variant 1))
 
-
-;;; hack dummy VOPs to bias the representation selection of their
-;;; arguments towards a FP register, which can help avoid consing at
-;;; inappropriate locations
-(defknown double-float-reg-bias (double-float) (values))
-(define-vop (double-float-reg-bias)
-  (:translate double-float-reg-bias)
-  (:args (x :scs (double-reg double-stack) :load-if nil))
-  (:arg-types double-float)
-  (:policy :fast-safe)
-  (:note "inline dummy FP register bias")
-  (:ignore x)
-  (:generator 0))
-(defknown single-float-reg-bias (single-float) (values))
-(define-vop (single-float-reg-bias)
-  (:translate single-float-reg-bias)
-  (:args (x :scs (single-reg single-stack) :load-if nil))
-  (:arg-types single-float)
-  (:policy :fast-safe)
-  (:note "inline dummy FP register bias")
-  (:ignore x)
-  (:generator 0))
-
 (defknown swap-complex ((complex float)) (complex float)
     (foldable flushable movable always-translatable))
 (defoptimizer (swap-complex derive-type) ((x))
