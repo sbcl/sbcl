@@ -314,13 +314,15 @@
                             (specifier-type 'integer))
                     (let (did-something)
                       (do-uses (combination (cast-value node))
-                        (when (and (combination-matches* '(+ -) '(* *) combination)
+                        (when (and (or (combination-matches* '(+ -) '(* *) combination)
+                                       (combination-matches* '(%negate) '(*) combination))
                                    (almost-immediately-used-p (node-lvar combination) combination
                                                               :flushable t))
-                          (destructuring-bind (a b) (combination-args combination)
+                          (destructuring-bind (a &optional b) (combination-args combination)
                             (when (or (not (types-equal-or-intersect (lvar-type a)
                                                                      #1=(specifier-type '(or ratio (complex rational)))))
-                                      (not (types-equal-or-intersect (lvar-type b) #1#)))
+                                      (not (and b
+                                                (types-equal-or-intersect (lvar-type b) #1#))))
                               (when (cut-node combination)
                                 (setf did-something t))))))
                       (when did-something
