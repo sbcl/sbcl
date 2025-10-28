@@ -615,7 +615,17 @@
                        (inst jmp :nz nope)))
                 ;; Check if the remaining high bits are zero
                 (let ((bits (dpb 0 (byte left 0) -1)))
-                  (cond ((< left 32)
+                  (cond (unsigned-p
+                         (inst jmp :l yep)
+                         (cond ((< left 32)
+                                (inst test :qword (ea (- other-pointer-lowtag) value temp n-word-bytes) bits))
+                               (t
+                                (inst test :dword (ea (+ (- other-pointer-lowtag)
+                                                         (/ n-word-bytes 2))
+                                                      value temp n-word-bytes)
+                                      (ash bits -32)))))
+
+                        ((< left 32)
                          (inst mov last-digit (ea (- other-pointer-lowtag) value temp n-word-bytes))
                          (inst jmp :l fixnum)
                          (inst test last-digit bits))
