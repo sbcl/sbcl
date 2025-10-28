@@ -279,6 +279,16 @@
                                    ((and (csubtypep diff (specifier-type 'instance))
                                          (not (types-equal-or-intersect type (specifier-type 'instance))))
                                     `(not (%instancep object)))))))))
+              ;; (typep (or float (unsigned-byte 64)) '(unsigned-byte 64)) => integerp
+              ((and (not (member current-predicate '(integerp fixnump bignump)))
+                    (csubtypep type (specifier-type 'integer))
+                    (csubtypep (type-difference otype (specifier-type '(not integer))) type))
+               (if (csubtypep intersect (specifier-type 'fixnum))
+                   `(fixnump object)
+                   `(integerp object)))
+              ((and (csubtypep type (specifier-type 'unsigned-byte))
+                    (csubtypep (type-difference otype (specifier-type '(not unsigned-byte))) type))
+               `(typep object 'unsigned-byte))
               (t
                (give-up-ir1-transform)))))))
 
@@ -1921,18 +1931,10 @@
         "~@<open coding coercion to ~S not implemented.~:@>"
         tval)))))
 
-(deftransform #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p
-  ((value) (sb-vm:signed-word) * :important nil)
-  `(>= value 0))
-
 (when-vop-existsp (:translate unsigned-byte-x-p)
   (deftransform unsigned-byte-x-p
       ((object x) (t t) * :important nil :node node)
-    (ir1-transform-type-predicate object (specifier-type `(unsigned-byte ,(lvar-value x))) node))
-
-  (deftransform unsigned-byte-x-p
-      ((object x) ((integer * #.most-positive-word) t) * :important nil)
-    `(#+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p object)))
+    (ir1-transform-type-predicate object (specifier-type `(unsigned-byte ,(lvar-value x))) node)))
 
 (deftransform %other-pointer-p ((object))
   (let ((type (lvar-type object)))
