@@ -148,8 +148,7 @@
       (expand))))
 
 ;;; If the lvar OBJECT definitely is or isn't of the specified
-;;; type, then return T or NIL as appropriate. Otherwise quietly
-;;; GIVE-UP-IR1-TRANSFORM.
+;;; type, then return T or NIL as appropriate.
 (defun ir1-transform-type-predicate (object type node)
   (declare (type lvar object) (type ctype type))
   (let ((otype (lvar-type object)))
@@ -161,16 +160,6 @@
            (return-from ir1-transform-type-predicate nil)))
     (let ((intersect (type-intersection type otype))
           (current-predicate (combination-fun-source-name node)))
-      ;; If the object type is known to be (OR NULL <type>),
-      ;; it is almost always cheaper to test for not EQ to NIL.
-      ;; There is one exception:
-      ;;  - FIXNUMP is possibly cheaper than comparison to NIL, or definitely
-      ;;    not worse. For x86, NIL is a 4-byte immediate operand,
-      ;;    for lack of a null-tn register. FIXNUM-TAG-MASK is only 1 byte.
-      (when (type= otype (type-union (specifier-type 'null) type))
-        (let ((difference (type-difference type (specifier-type 'null))))
-          (unless (type= difference (specifier-type 'fixnum))
-            (return-from  ir1-transform-type-predicate `(not (null object))))))
       (flet ((memory-type-test-p (type)
                (and (types-equal-or-intersect
                      type
@@ -179,7 +168,14 @@
                                        boolean character
                              function list))))
                     (not (type= type (specifier-type 'instance))))))
-        (cond ((typep type 'alien-type-type)
+        (cond ((eq current-predicate 'fixnump)
+               ;; Get get cheaper than a fixnum test.
+               (give-up-ir1-transform))
+              ((type= otype (type-union (specifier-type 'null) type))
+               ;; If the object type is known to be (OR NULL <type>),
+               ;; it is almost always cheaper to test for not EQ to NIL.
+               `(not (null object)))
+              ((typep type 'alien-type-type)
                ;; We don't transform alien type tests until here, because
                ;; once we do that the rest of the type system can no longer
                ;; reason about them properly -- so we'd miss out on type
@@ -280,7 +276,7 @@
                                          (not (types-equal-or-intersect type (specifier-type 'instance))))
                                     `(not (%instancep object)))))))))
               ;; (typep (or float (unsigned-byte 64)) '(unsigned-byte 64)) => integerp
-              ((and (not (member current-predicate '(integerp fixnump bignump)))
+              ((and (not (member current-predicate '(integerp bignump)))
                     (csubtypep type (specifier-type 'integer))
                     (csubtypep (type-difference otype (specifier-type '(not integer))) type))
                (if (csubtypep intersect (specifier-type 'fixnum))
