@@ -387,8 +387,9 @@
           (return-from best-modular-version
             (values (car ugt) :untagged (cdr ugt))))))))
 
-(defoptimizer (logand optimizer) ((x y) node)
-  (let ((result-type (single-value-type (node-derived-type node))))
+(defoptimizer (logand optimizer) ((x y) node &optional result-type)
+  (let ((result-type (or result-type
+                         (single-value-type (node-derived-type node)))))
     (multiple-value-bind (low high)
         (integer-type-numeric-bounds result-type)
       (when (and (numberp low)
@@ -419,6 +420,11 @@
               )))))))
 
 (setf (fun-info-optimizer (fun-info-or-lose 'logandc2)) #'logand-optimizer-optimizer)
+(setf (fun-info-optimizer (fun-info-or-lose 'logtest))
+      (lambda (node)
+        (let ((type (logand-derive-type-optimizer node)))
+          (when type
+           (logand-optimizer-optimizer node type)))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
   (let ((result-type (single-value-type (node-derived-type node))))

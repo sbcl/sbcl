@@ -458,7 +458,9 @@
                 ;; We can't stuff the BINDS as &AUX vars into the lambda list
                 ;; because there can be a RETURN-FROM in there.
                 (defun ,name (,node ,@vars &rest ,args)
-                  (declare (ignorable ,node ,@(butlast vars))
+                  (declare (ignorable ,node ,@(remove-if (lambda (v)
+                                                           (member v lambda-list-keywords))
+                                                         (butlast vars)))
                            (ignore ,args))
                   ,@(if var-decls (list var-decls))
                   (binding* (,@binds)
