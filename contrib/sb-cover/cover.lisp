@@ -552,7 +552,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
   (format html-stream "<div>&#160;</div>")
   (format html-stream "<div class='state-5'>Both branches taken</div>")
   (format html-stream "<div class='state-6'>One branch taken</div>")
-  (format html-stream "<div class='state-10''>Neither branch taken</div>")
+  (format html-stream "<div class='state-10'>Neither branch taken</div>")
   (format html-stream "</div>")
   (format html-stream "<nobr><div><code>~%")
   (flet ((line (line)
