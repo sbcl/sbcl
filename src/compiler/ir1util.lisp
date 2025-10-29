@@ -3281,9 +3281,10 @@ is :ANY, the function name is not checked."
                   when (eq v lambda-var)
                   do (funcall function combination arg))))))))
 
-(declaim (ftype (sfunction (function t &key (:leaf-set t) (:multiple-uses t)) null) map-refs))
+(declaim (ftype (sfunction (function t &key (:leaf-set t) (:multiple-uses t) (:cast t)) null) map-refs))
 (defun map-refs (function leaf/lvar &key leaf-set
-                                         multiple-uses)
+                                         multiple-uses
+                                         cast)
   (declare (dynamic-extent function leaf-set multiple-uses))
   (let ((seen-calls))
     (labels ((recur (leaf/lvar)
@@ -3299,6 +3300,9 @@ is :ANY, the function name is not checked."
                     (cond ((and multiple-uses
                                 (consp (lvar-uses leaf/lvar)))
                            (funcall multiple-uses))
+                          ((and cast
+                                (cast-p dest))
+                           (recur (node-lvar dest)))
                           ((and (combination-p dest)
                                 (eq (combination-kind dest) :local))
                            (let ((lambda (combination-lambda dest)))

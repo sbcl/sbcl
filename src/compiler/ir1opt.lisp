@@ -1876,14 +1876,22 @@
            (args (basic-combination-args combination)))
       (cond ((not (or (ir1-attributep attr foldable)
                       (and (ir1-attributep attr foldable-read-only)
-                           (let ((dest (node-dest combination)))
-                             (and (combination-p dest)
-                                  (eq (combination-kind dest) :known)
-                                  (let* ((info (combination-fun-info dest))
-                                         (read-only (fun-info-read-only-args info)))
-                                    (when read-only
-                                      (logbitp (position (node-lvar combination) (combination-args dest))
-                                               read-only))))))))
+                           ;; (car (list 1)) => (car '(1))
+                           (block nil
+                             (map-refs
+                              (lambda (dest lvar)
+                                (unless (and (combination-p dest)
+                                             (eq (combination-kind dest) :known)
+                                             (let* ((info (combination-fun-info dest))
+                                                    (read-only (fun-info-read-only-args info)))
+                                               (when read-only
+                                                 (logbitp (position lvar (combination-args dest))
+                                                          read-only))))
+                                  (return)))
+                              (node-lvar combination)
+                              :leaf-set (lambda () (return))
+                              :cast t)
+                             t))))
              nil)
             ((ir1-attributep attr call)
              (map-combination-args-and-types

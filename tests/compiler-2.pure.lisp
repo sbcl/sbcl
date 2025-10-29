@@ -4927,3 +4927,11 @@
    (lambda (r)
      (apply #'make-array 1 :element-type t r))
    (vector t)))
+
+(with-test (:name :foldable-read-only)
+  (assert-type
+   (lambda ()
+     (let ((l (list 1)))
+       (values (car l)
+               (car l))))
+   (values (eql 1) (eql 1) &optional)))
