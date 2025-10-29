@@ -815,8 +815,8 @@
 (defun coercion-loses-precision-p (val type)
   (typecase val
     (single-float)
-    (double-float (subtypep type 'single-float))
-    (rational (subtypep type 'float))
+    (double-float (eq type 'single-float))
+    (rational (eq type 'float))
     (t (bug "Unexpected arguments to bounds coercion: ~S ~S" val type))))
 
 (defun coerce-for-bound (val type)
@@ -833,13 +833,13 @@
              (if (coercion-loses-precision-p val type)
                  xbound
                  (list xbound))))))
-    ((subtypep type 'double-float)
+    ((eq type 'double-float)
      (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
          (coerce val type)))
-    ((or (subtypep type 'single-float) (subtypep type 'float))
+    ((or (eq type 'single-float) (eq type 'float))
      ;; coerce to float returns a single-float
      (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
-         (coerce val type)))
+         (coerce val 'float)))
     (t (coerce val type))))
 
 (defun coerce-and-truncate-floats (val type)
@@ -850,15 +850,15 @@
               xbound
               (list xbound)))
         (cond
-          ((subtypep type 'double-float)
+          ((eq type 'double-float)
            (if (sb-xc:<= most-negative-double-float val most-positive-double-float)
-               (coerce val type)
+               (coerce val 'double-float)
                (if (sb-xc:< val most-negative-double-float)
                    most-negative-double-float most-positive-double-float)))
-          ((or (subtypep type 'single-float) (subtypep type 'float))
+          ((or (eq type 'single-float) (eq type 'float))
            ;; coerce to float returns a single-float
            (if (sb-xc:<= most-negative-single-float val most-positive-single-float)
-               (coerce val type)
+               (coerce val 'float)
                (if (sb-xc:< val most-negative-single-float)
                    most-negative-single-float most-positive-single-float)))
           (t (coerce val type))))))
