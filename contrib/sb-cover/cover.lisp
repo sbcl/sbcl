@@ -431,28 +431,14 @@ report, otherwise ignored. The default value is CL:IDENTITY.
           maps))
 
 (defun fill-with-state (source states state start end)
-  (let* ((pos (position #\Newline source
-                        :end start
-                        :from-end t))
-         (start-column (if pos
-                           (- start 1 pos)
-                           0))
-         (end-column 0))
-    (loop for i from start below end
-          for col from start-column
-          for char = (aref source i)
-          do (cond ((eql char #\Newline)
-                    (setf col -1))
-                   ((not (eql char #\Space))
-                    (setf end-column (max end-column col)))))
+  (let* ((pos (position #\Newline source :end start :from-end t))
+         (start-column (if pos (- start 1 pos) 0)))
     (loop for i from start below end
           for col from start-column
           for char = (aref source i)
           do (if (eql char #\Newline)
                  (setf col -1)
-                 (when (and (zerop (aref states i))
-                            #+nil (<= col end-column)
-                            (>= col start-column))
+                 (when (and (zerop (aref states i)) (>= col start-column))
                    (setf (aref states i) state))))))
 
 ;;; Convert tabs to spaces
