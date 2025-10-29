@@ -218,7 +218,7 @@ in RESTORE-COVERAGE."
   (refresh-coverage-info)
   (loop for file being the hash-keys of (code-coverage-hashtable)
         using (hash-value states)
-        collect (cons file states)))
+        collect (cons file (copy-tree states))))
 
 (defun restore-coverage (coverage-state)
   "Restore the code coverage data back to an earlier state produced by

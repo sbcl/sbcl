@@ -40,4 +40,6 @@
     (sb-sys:without-gcing
       (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*)))
     (sb-sys:without-gcing
-      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*)))))
+      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*)))
+    (sb-sys:without-gcing
+      (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))))
