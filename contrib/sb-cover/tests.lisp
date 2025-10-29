@@ -1,27 +1,4 @@
-(defpackage sb-cover-test (:use :cl))
-
-(in-package sb-cover-test)
-
-(defparameter *source-directory* cl-user::*source-directory*)
-(defparameter *output-directory* cl-user::*coverage-report-directory*)
-
-(defun compile-load (x)
-  (load (compile-file (merge-pathnames (merge-pathnames x ".*lisp") *source-directory*)
-                      :output-file *output-directory*)))
-
-(defun report ()
-  (handler-case
-      (sb-cover:report *output-directory*)
-    (warning (condition)
-      (error "Unexpected warning: ~A" condition))))
-
-(defun report-expect-failure ()
-  (handler-case
-      (progn
-        (sb-cover:report *output-directory*)
-        (error "Should've signaled a warning"))
-    (warning ())))
-
+(in-package "SB-COVER-TEST")
 
 ;;; No instrumentation
 (sb-cover:clear-coverage)
@@ -51,7 +28,7 @@
 (assert (= 2 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
 (assert (plusp (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 
-;;; Call the function again
+;;; Call the function
 (test1)
 (report)
 
