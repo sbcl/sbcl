@@ -367,97 +367,68 @@ report, otherwise ignored. The default value is CL:IDENTITY.
   (format html-stream "<html><head>")
   (write-styles html-stream)
   (format html-stream "</head><body>")
-  (let* ((source (detabify (read-file file external-format)))
-         (states (make-array (length source)
-                             :initial-element 0
-                             :element-type '(unsigned-byte 4)))
-         (hashtable (code-coverage-hashtable))
-         ;; Convert the code coverage records to a more suitable format
-         ;; for this function.
-         (expr-records (convert-records (gethash file hashtable) :expression))
-         (branch-records (convert-records (gethash file hashtable) :branch))
+  (multiple-value-bind (counts states source)
+      (compute-file-info file external-format)
+    (print-report html-stream file counts states source)
+    (format html-stream "</body></html>")
+    (list (getf counts :expression) (getf counts :branch))))
+
+(defun compute-file-info (file external-format)
+  ;; Go through all records, find the matching source in the file,
+  ;; and update STATES to contain the state of the record in the
+  ;; indexes matching the source location.
+  (let* ((source (read-source file external-format))
          ;; Cache the source-maps
-         (maps (with-input-from-string (stream source)
-                 (loop with *current-package* = (find-package "CL-USER")
-                       with map = nil
-                       with form = nil
-                       for i from 0
-                       do (setf (values form map)
-                                (handler-case (read-and-record-source-map stream)
-                                  (error (error)
-                                    (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
-                                    (values nil (make-hash-table)))))
-                       when map collect (cons form map)
-                       when (eql form sb-int:*eof-object*) do (loop-finish)))))
-    (mapcar (lambda (map)
-              (maphash (lambda (k locations)
-                         (declare (ignore k))
-                         (dolist (location locations)
-                           (destructuring-bind (start end suppress) location
-                             (when suppress
-                               (fill-with-state source states 15 (1- start)
-                                                end)))))
-                       (cdr map)))
-            maps)
-    ;; Go through all records, find the matching source in the file,
-    ;; and update STATES to contain the state of the record in the
-    ;; indexes matching the source location. We do this in two stages:
-    ;; the first stage records the character ranges, and the second stage
-    ;; does the update, in order from shortest to longest ranges. This
-    ;; ensures that for each index in STATES will reflect the state of
-    ;; the innermost containing form.
-    (let ((counts (list :branch (make-instance 'sample-count :mode :branch)
-                        :expression (make-instance 'sample-count
-                                                   :mode :expression))))
-      (let ((records (append branch-records expr-records))
-            (locations nil))
-        (dolist (record records)
-          (destructuring-bind (mode path state) record
-            (let* ((path (reverse path))
-                   (tlf (car path))
-                   (source-form (car (nth tlf maps)))
-                   (source-map (cdr (nth tlf maps)))
-                   (source-path (cdr path)))
-              (cond ((eql mode :branch)
-                     (let ((count (getf counts :branch)))
-                       ;; For branches mode each record accounts for two paths
-                       (incf (ok-of count)
-                             (ecase state
-                               (5 2)
-                               ((6 9) 1)
-                               (10 0)))
-                       (incf (all-of count) 2)))
-                    (t
-                     (let ((count (getf counts :expression)))
-                       (when (eql state 1)
-                         (incf (ok-of count)))
-                       (incf (all-of count)))))
-              (if source-map
-                  (handler-case
-                      (multiple-value-bind (start end)
-                          (source-path-source-position (cons 0 source-path)
-                                                       source-form
-                                                       source-map)
-                        (push (list start end source state) locations))
-                    (error ()
-                      (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
-                  (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))
-        ;; Now process the locations, from the shortest range to the longest
-        ;; one. If two locations have the same range, the one with the higher
-        ;; state takes precedence. The latter condition ensures that if
-        ;; there are both normal- and a branch-states for the same form,
-        ;; the branch-state will be used.
-        (setf locations (sort locations #'> :key #'fourth))
-        (dolist (location (stable-sort locations #'<
-                                       :key (lambda (location)
-                                              (- (second location)
-                                                 (first location)))))
-          (destructuring-bind (start end source state) location
-            (fill-with-state source states state start end))))
-      (print-report html-stream file counts states source)
-      (format html-stream "</body></html>")
-      (list (getf counts :expression)
-            (getf counts :branch)))))
+         (maps (read-and-record-source-maps source))
+         (states (initial-states source maps))
+         (counts (list :branch (make-instance 'sample-count :mode :branch)
+                       :expression (make-instance 'sample-count :mode :expression)))
+         (records (get-records file))
+         ;; We do this in two stages: the first stage records the
+         ;; character ranges, and the second stage does the update, in
+         ;; order from shortest to longest ranges. This ensures that
+         ;; for each index in STATES will reflect the state of the
+         ;; innermost containing form.
+         (locations (get-locations-recording-counts records maps counts file)))
+    ;; Now process the locations, from the shortest range to the longest
+    ;; one. If two locations have the same range, the one with the higher
+    ;; state takes precedence. The latter condition ensures that if
+    ;; there are both normal- and branch-states for the same form,
+    ;; the branch-state will be used.
+    (fill-states-from-locations source states locations)
+    (values counts states source)))
+
+(defun read-and-record-source-maps (source)
+  (with-input-from-string (stream source)
+    (loop with *current-package* = (find-package "CL-USER")
+          with map = nil
+          with form = nil
+          for i from 0
+          do (setf (values form map)
+                   (handler-case (read-and-record-source-map stream)
+                     (error (error)
+                       (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
+                       (values nil (make-hash-table)))))
+          when map collect (cons form map)
+          when (eql form sb-int:*eof-object*) do (loop-finish))))
+
+(defun initial-states (source maps)
+  (let ((states (make-array (length source) :initial-element 0 :element-type '(unsigned-byte 4))))
+    ;; we have read the source with our location-tracking reader; we
+    ;; now know what parts of the source were *READ-SUPPRESS*ed.
+    (note-suppressions source states maps)
+    states))
+
+(defun note-suppressions (source states maps)
+  (mapcar (lambda (map)
+            (maphash (lambda (k locations)
+                       (declare (ignore k))
+                       (dolist (location locations)
+                         (destructuring-bind (start end suppress) location
+                           (when suppress
+                             (fill-with-state source states 15 (1- start) end)))))
+                     (cdr map)))
+          maps))
 
 (defun fill-with-state (source states state start end)
   (let* ((pos (position #\Newline source
@@ -502,6 +473,54 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                        (return))
                      (setf col -1))
                    (write-char char stream))))))
+
+(defun get-records (file)
+  (let ((hashtable (code-coverage-hashtable)))
+    ;; Convert the code coverage records to a more suitable format for
+    ;; this function.
+    (append (convert-records (gethash file hashtable) :expression)
+            (convert-records (gethash file hashtable) :branch))))
+
+(defun get-locations-recording-counts (records maps counts file)
+  (let (locations)
+    (dolist (record records locations)
+      (destructuring-bind (mode path state) record
+        (let* ((path (reverse path))
+               (tlf (car path))
+               (source-form (car (nth tlf maps)))
+               (source-map (cdr (nth tlf maps)))
+               (source-path (cdr path)))
+          (cond ((eql mode :branch)
+                 (let ((count (getf counts :branch)))
+                   ;; For branches mode each record accounts for two paths
+                   (incf (ok-of count)
+                         (ecase state
+                           (5 2)
+                           ((6 9) 1)
+                           (10 0)))
+                   (incf (all-of count) 2)))
+                (t
+                 (let ((count (getf counts :expression)))
+                   (when (eql state 1)
+                     (incf (ok-of count)))
+                   (incf (all-of count)))))
+          (if source-map
+              (handler-case
+                  (multiple-value-bind (start end)
+                      (source-path-source-position (cons 0 source-path) source-form source-map)
+                    (push (list start end state) locations))
+                (error ()
+                  (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
+              (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))))
+
+(defun fill-states-from-locations (source states locations)
+  (setf locations (sort (copy-list locations) #'> :key #'third))
+  (dolist (location (stable-sort locations #'<
+                                 :key (lambda (location)
+                                        (- (second location)
+                                           (first location)))))
+    (destructuring-bind (start end state) location
+      (fill-with-state source states state start end))))
 
 (defvar *counts* nil)
 
@@ -619,6 +638,9 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
          list)))))
 
 ;;;; A mutant version of swank-source-path-parser from Swank/Slime.
+
+(defun read-source (filename external-format)
+  (detabify (read-file filename external-format)))
 
 (defun read-file (filename external-format)
   "Return the entire contents of FILENAME as a string."

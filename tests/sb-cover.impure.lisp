@@ -4,7 +4,7 @@
 (defpackage "SB-COVER-TEST"
   (:export
    "*OUTPUT-DIRECTORY*" "*SOURCE-DIRECTORY*"
-   "COMPILE-LOAD" "REPORT" "REPORT-EXPECT-FAILURE" "SOURCE-PATHNAME")
+   "COMPILE-LOAD" "GET-STATES" "REPORT" "REPORT-EXPECT-FAILURE" "SOURCE-PATHNAME")
   (:use "CL"))
 
 (defvar sb-cover-test:*output-directory*)
@@ -30,8 +30,14 @@
         (error "Should've signaled a warning"))
     (warning ())))
 
+(defun sb-cover-test:get-states (x)
+  (sb-cover::refresh-coverage-info)
+  (nth-value 1 (sb-cover::compute-file-info (namestring (sb-cover-test:source-pathname x)) :default)))
+
 (with-test (:name :sb-cover)
- (test-util:with-test-directory (sb-cover-test:*output-directory*)
-   ;; Weak pointers to toplevel forms need to survive the entire test run
-   (sb-sys:without-gcing
-     (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*)))))
+  (test-util:with-test-directory (sb-cover-test:*output-directory*)
+    ;; Weak pointers to toplevel forms need to survive the entire test run
+    (sb-sys:without-gcing
+      (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*)))
+    (sb-sys:without-gcing
+      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*)))))
