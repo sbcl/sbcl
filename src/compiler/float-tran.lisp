@@ -854,7 +854,7 @@
        (list (make-interval :low (or lo 0) :high (or hi 1)))))
     (t
      ;; Split the interval in half.
-     (destructuring-bind (y- y+)
+     (multiple-value-bind (y- y+)
          (interval-split 0 y t)
        (list (interval-expt-> x y-)
              (interval-expt-> x y+))))))
@@ -884,7 +884,7 @@
           (list (make-interval :low (or lo 1) :high hi))))
        (t
         ;; Split the interval in half
-        (destructuring-bind (y- y+)
+        (multiple-value-bind (y- y+)
             (interval-split 0 y t)
           (list (interval-expt-< x y-)
                 (interval-expt-< x y+))))))
@@ -898,7 +898,7 @@
            when (or high low)
            collect (interval-neg interval)))
     (t
-     (destructuring-bind (neg pos)
+     (multiple-value-bind (neg pos)
          (interval-split 0 x t t)
        (list (interval-expt-< neg y)
              (interval-expt-< pos y))))))
@@ -913,7 +913,7 @@
      ;; X <= 1
      (interval-expt-< x y))
     (t
-     (destructuring-bind (left right)
+     (multiple-value-bind (left right)
          (interval-split 1 x t t)
        (list (interval-expt left y)
              (interval-expt right y))))))

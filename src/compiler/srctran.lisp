@@ -945,10 +945,10 @@
 (defun interval-split (p x &optional close-lower close-upper)
   (declare (type number p)
            (type interval x))
-  (list (make-interval :low (copy-interval-limit (interval-low x))
-                       :high (if close-lower p (list p)))
-        (make-interval :low (if close-upper (list p) p)
-                       :high (copy-interval-limit (interval-high x)))))
+  (values (make-interval :low (copy-interval-limit (interval-low x))
+                         :high (if close-lower p (list p)))
+          (make-interval :low (if close-upper (list p) p)
+                         :high (copy-interval-limit (interval-high x)))))
 
 ;;; Return the closure of the interval. That is, convert open bounds
 ;;; to closed bounds.
@@ -1251,12 +1251,12 @@
           (y-range (interval-range-info y)))
       (cond ((null x-range)
              ;; Split x into two and multiply each separately
-             (destructuring-bind (x- x+) (interval-split 0 x t t)
+             (multiple-value-bind (x- x+) (interval-split 0 x t t)
                (interval-merge-pair (interval-mul x- y)
                                     (interval-mul x+ y))))
             ((null y-range)
              ;; Split y into two and multiply each separately
-             (destructuring-bind (y- y+) (interval-split 0 y t t)
+             (multiple-value-bind (y- y+) (interval-split 0 y t t)
                (interval-merge-pair (interval-mul x y-)
                                     (interval-mul x y+))))
             ((eq x-range '-)
@@ -1280,7 +1280,7 @@
   (let ((d-range (interval-range-info d)))
     (ecase d-range
       ((nil)
-       (destructuring-bind (d- d+) (interval-split 0 d t t)
+       (multiple-value-bind (d- d+) (interval-split 0 d t t)
          (interval-merge-pair (interval-untruncate n d-)
                               (interval-untruncate n d+))))
       ((-)
@@ -1336,7 +1336,7 @@
                      (bot-range (interval-range-info bot)))
                  (cond ((null bot-range)
                         (if integer
-                            (destructuring-bind (bot- bot+) (interval-split 0 bot t t)
+                            (multiple-value-bind (bot- bot+) (interval-split 0 bot t t)
                               (let ((r- (interval-div top bot-))
                                     (r+ (interval-div top bot+)))
                                 (or (interval-merge-pair r- r+)
@@ -1350,7 +1350,7 @@
                        ((null top-range)
                         ;; Split top into two positive and negative parts, and
                         ;; divide each separately
-                        (destructuring-bind (top- top+) (interval-split 0 top t t)
+                        (multiple-value-bind (top- top+) (interval-split 0 top t t)
                           (or (interval-merge-pair (interval-div top- bot)
                                                    (interval-div top+ bot))
                               (make-interval))))
@@ -1457,7 +1457,7 @@
     (-
      (interval-neg x))
     (t
-     (destructuring-bind (x- x+) (interval-split 0 x t t)
+     (multiple-value-bind (x- x+) (interval-split 0 x t t)
        (interval-merge-pair (interval-neg x-) x+)))))
 
 ;;; Compute the square of an interval.
@@ -2760,7 +2760,7 @@
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
-     (destructuring-bind (neg pos) (interval-split 0 quot t t)
+     (multiple-value-bind (neg pos) (interval-split 0 quot t t)
        (interval-merge-pair (ceiling-quotient-bound neg)
                             (floor-quotient-bound pos))))))
 
@@ -2778,7 +2778,7 @@
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
-     (destructuring-bind (neg pos) (interval-split 0 quot t t)
+     (multiple-value-bind (neg pos) (interval-split 0 quot t t)
        (interval-merge-pair (fceiling-quotient-bound neg divisor)
                             (ffloor-quotient-bound pos divisor))))))
 
@@ -2796,7 +2796,7 @@
        (-
         (ceiling-rem-bound num div))
        (otherwise
-        (destructuring-bind (neg pos) (interval-split 0 div t t)
+        (multiple-value-bind (neg pos) (interval-split 0 div t t)
           (interval-merge-pair (truncate-rem-bound num neg)
                                (truncate-rem-bound num pos))))))
     (-
@@ -2806,11 +2806,11 @@
        (-
         (floor-rem-bound num div))
        (otherwise
-        (destructuring-bind (neg pos) (interval-split 0 div t t)
+        (multiple-value-bind (neg pos) (interval-split 0 div t t)
           (interval-merge-pair (truncate-rem-bound num neg)
                                (truncate-rem-bound num pos))))))
     (otherwise
-     (destructuring-bind (neg pos) (interval-split 0 num t t)
+     (multiple-value-bind (neg pos) (interval-split 0 num t t)
        (interval-merge-pair (truncate-rem-bound neg div)
                             (truncate-rem-bound pos div))))))
 
