@@ -3653,7 +3653,11 @@ expansion happened."
        (do ((t2s (intersection-type-types type1) (cdr t2s)))
            ((null t2s) accumulator)
          (let ((union (type-union2 type2 (car t2s))))
-           (unless union
+           (when (or (not union)
+                     (and (union-type-p union)
+                          (or (intersection-type-p accumulator)
+                              (and (negation-type-p accumulator)
+                                   (intersection-type-p (negation-type-type accumulator))))))
              (return nil))
            (setf accumulator
                  (type-intersection accumulator union))))))))
