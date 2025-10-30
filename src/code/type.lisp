@@ -3663,8 +3663,7 @@ expansion happened."
            (when (or (not union)
                      (and (union-type-p union)
                           (or (intersection-type-p accumulator)
-                              (and (negation-type-p accumulator)
-                                   (intersection-type-p (negation-type-type accumulator))))))
+                              (negation-type-p accumulator))))
              (return nil))
            (setf accumulator
                  (type-intersection accumulator union))))))))
