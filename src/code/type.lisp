@@ -3662,7 +3662,7 @@ expansion happened."
          (let ((union (type-union2 type2 (car t2s))))
            (when (or (not union)
                      (and (union-type-p union)
-                          (or (intersection-type-p accumulator)
+                          (or (compound-type-p accumulator)
                               (negation-type-p accumulator))))
              (return nil))
            (setf accumulator
