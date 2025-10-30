@@ -2504,8 +2504,11 @@ expansion happened."
                    :specialized-element-type (array-type-specialized-element-type type)))
 
 (defun change-array-type (type &key (complexp :inherit)
-                                    element-type)
-  (make-array-type (array-type-dimensions type)
+                                    element-type
+                                    (dimensions :inherit))
+  (make-array-type (if (eq dimensions :inherit)
+                       (array-type-dimensions type)
+                       dimensions)
                    :complexp (if (eq complexp :inherit)
                                  (array-type-complexp type)
                                  complexp)
@@ -3627,14 +3630,18 @@ expansion happened."
                ;; => (or vector (not (array t)))
                ((and
                  (not (and (eq (array-type-complexp not-type1) :maybe)
-                           (eq (array-type-specialized-element-type not-type1) *wild-type*)))
+                           (eq (array-type-specialized-element-type not-type1) *wild-type*)
+                           (eq (array-type-dimensions not-type1) '*)))
                  (csubtypep type2 not-type1))
                 (type-union (change-array-type type2
                                                :complexp (if (eq (array-type-complexp not-type1) :maybe)
                                                              :inherit
                                                              :maybe)
                                                :element-type (unless (eq (array-type-specialized-element-type not-type1) *wild-type*)
-                                                               *wild-type*))
+                                                               *wild-type*)
+                                               :dimensions (if (eq (array-type-dimensions not-type1) '*)
+                                                               :inherit
+                                                               '*))
                             type1))
                ;; (or (vector t) (not (simple-array t)))
                ;; (or vector (not (simple-array t)))

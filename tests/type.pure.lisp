@@ -1103,7 +1103,10 @@
            (specifier-type '(or (vector t) (not simple-array)))))
   (assert (eq
            (specifier-type '(or (and vector (not (simple-array t))) simple-vector))
-           (specifier-type 'vector))))
+           (specifier-type 'vector)))
+  (assert (eq
+           (specifier-type '(or (not vector) bit-vector))
+           (specifier-type '(or (not vector) (array bit))))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql
