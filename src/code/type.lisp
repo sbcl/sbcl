@@ -3593,56 +3593,70 @@ expansion happened."
    :call-other-method))
 
 (define-type-method (array :complex-union2) (type1 type2)
-  (when (negation-type-p type1)
-    (let ((not-type1 (negation-type-type type1)))
-      (when (array-type-p not-type1)
-        (cond ((and
-                (not (array-type-complexp type2))
-                (eq (array-type-complexp not-type1) :maybe)
-                (csubtypep not-type1 (change-array-type-complexp type2 :maybe)))
-               ;; (or (not base-string) simple-base-string)
-               ;; => (not (and base-string (not simple-array)))
-               (make-negation-type
-                (change-array-type-complexp not-type1 t)))
-              ((and (eq (array-type-complexp not-type1) :maybe)
-                    (eq (array-type-complexp type2) t)
-                    (neq (array-type-specialized-element-type not-type1) *wild-type*)
-                    (equal (array-type-dimensions not-type1)
-                           (array-type-dimensions type2))
-                    (csubtypep type2 not-type1))
-               ;; (or (not (array t)) (and (array t) (not simple-array)))
-               ;; => (not (simple-array t))
-               (make-negation-type
-                (change-array-type-complexp type2 nil)))
-              ((and (eq (array-type-complexp not-type1) :maybe)
-                    (eq (array-type-complexp type2) t)
-                    (csubtypep not-type1
-                               (change-array-type-complexp type2 :maybe)))
-               ;; (or (not (vector * 10)) (and vector (not simple-array)))
-               ;; => (not (simple-array * (10)))
-               (make-negation-type
-                (change-array-type-complexp not-type1 nil)))
-              ;; (or (vector t) (not (array t)))
-              ;; => (or vector (not (array t)))
-              ((and
-                (not (and (eq (array-type-complexp not-type1) :maybe)
-                          (eq (array-type-specialized-element-type not-type1) *wild-type*)))
-                (csubtypep type2 not-type1))
-               (type-union (change-array-type type2
-                                              :complexp (if (eq (array-type-complexp not-type1) :maybe)
-                                                            :inherit
-                                                            :maybe)
-                                              :element-type (unless (eq (array-type-specialized-element-type not-type1) *wild-type*)
-                                                              *wild-type*))
-                           type1))
-              ;; (or (vector t) (not (simple-array t)))
-              ;; (or vector (not (simple-array t)))
-              ((and (neq (array-type-specialized-element-type not-type1) *wild-type*)
-                    (csubtypep type2
-                               (change-array-type-complexp not-type1 :maybe)))
-               (type-union (change-array-type type2
-                                              :element-type *wild-type*)
-                           type1)))))))
+  (typecase type1
+    (negation-type
+     (let ((not-type1 (negation-type-type type1)))
+       (when (array-type-p not-type1)
+         (cond ((and
+                 (not (array-type-complexp type2))
+                 (eq (array-type-complexp not-type1) :maybe)
+                 (csubtypep not-type1 (change-array-type-complexp type2 :maybe)))
+                ;; (or (not base-string) simple-base-string)
+                ;; => (not (and base-string (not simple-array)))
+                (make-negation-type
+                 (change-array-type-complexp not-type1 t)))
+               ((and (eq (array-type-complexp not-type1) :maybe)
+                     (eq (array-type-complexp type2) t)
+                     (neq (array-type-specialized-element-type not-type1) *wild-type*)
+                     (equal (array-type-dimensions not-type1)
+                            (array-type-dimensions type2))
+                     (csubtypep type2 not-type1))
+                ;; (or (not (array t)) (and (array t) (not simple-array)))
+                ;; => (not (simple-array t))
+                (make-negation-type
+                 (change-array-type-complexp type2 nil)))
+               ((and (eq (array-type-complexp not-type1) :maybe)
+                     (eq (array-type-complexp type2) t)
+                     (csubtypep not-type1
+                                (change-array-type-complexp type2 :maybe)))
+                ;; (or (not (vector * 10)) (and vector (not simple-array)))
+                ;; => (not (simple-array * (10)))
+                (make-negation-type
+                 (change-array-type-complexp not-type1 nil)))
+               ;; (or (vector t) (not (array t)))
+               ;; => (or vector (not (array t)))
+               ((and
+                 (not (and (eq (array-type-complexp not-type1) :maybe)
+                           (eq (array-type-specialized-element-type not-type1) *wild-type*)))
+                 (csubtypep type2 not-type1))
+                (type-union (change-array-type type2
+                                               :complexp (if (eq (array-type-complexp not-type1) :maybe)
+                                                             :inherit
+                                                             :maybe)
+                                               :element-type (unless (eq (array-type-specialized-element-type not-type1) *wild-type*)
+                                                               *wild-type*))
+                            type1))
+               ;; (or (vector t) (not (simple-array t)))
+               ;; (or vector (not (simple-array t)))
+               ((and (neq (array-type-specialized-element-type not-type1) *wild-type*)
+                     (csubtypep type2
+                                (change-array-type-complexp not-type1 :maybe)))
+                (type-union (change-array-type type2
+                                               :element-type *wild-type*)
+                            type1))))))
+    (intersection-type
+     ;; This is the same as in the intersection-simple-union2-type-method,
+     ;; but it doesn't stop if type-union produces a new union type:
+     ;; (or (and vector (not (simple-array t))) simple-vector)
+     ;; => vector
+     (let ((accumulator *universal-type*))
+       (do ((t2s (intersection-type-types type1) (cdr t2s)))
+           ((null t2s) accumulator)
+         (let ((union (type-union2 type2 (car t2s))))
+           (unless union
+             (return nil))
+           (setf accumulator
+                 (type-intersection accumulator union))))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
