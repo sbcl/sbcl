@@ -2503,6 +2503,17 @@ expansion happened."
                    :element-type (array-type-element-type type)
                    :specialized-element-type (array-type-specialized-element-type type)))
 
+(defun change-array-type (type &key (complexp :inherit)
+                                    element-type)
+  (make-array-type (array-type-dimensions type)
+                   :complexp (if (eq complexp :inherit)
+                                 (array-type-complexp type)
+                                 complexp)
+                   :element-type (or element-type
+                                     (array-type-element-type type))
+                   :specialized-element-type (or element-type
+                                                 (array-type-specialized-element-type type))))
+
 (define-type-method (negation :simple-intersection2) (type1 type2)
   (let ((not1 (negation-type-type type1))
         (not2 (negation-type-type type2)))
@@ -3610,7 +3621,28 @@ expansion happened."
                ;; (or (not (vector * 10)) (and vector (not simple-array)))
                ;; => (not (simple-array * (10)))
                (make-negation-type
-                (change-array-type-complexp not-type1 nil))))))))
+                (change-array-type-complexp not-type1 nil)))
+              ;; (or (vector t) (not (array t)))
+              ;; => (or vector (not (array t)))
+              ((and
+                (not (and (eq (array-type-complexp not-type1) :maybe)
+                          (eq (array-type-specialized-element-type not-type1) *wild-type*)))
+                (csubtypep type2 not-type1))
+               (type-union (change-array-type type2
+                                              :complexp (if (eq (array-type-complexp not-type1) :maybe)
+                                                            :inherit
+                                                            :maybe)
+                                              :element-type (unless (eq (array-type-specialized-element-type not-type1) *wild-type*)
+                                                              *wild-type*))
+                           type1))
+              ;; (or (vector t) (not (simple-array t)))
+              ;; (or vector (not (simple-array t)))
+              ((and (neq (array-type-specialized-element-type not-type1) *wild-type*)
+                    (csubtypep type2
+                               (change-array-type-complexp not-type1 :maybe)))
+               (type-union (change-array-type type2
+                                              :element-type *wild-type*)
+                           type1)))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).

@@ -1085,6 +1085,23 @@
                (specifier-type '(array t))))
   (assert (sb-kernel:intersection-type-p (specifier-type '(and (vector unknown) bit-vector)))))
 
+(with-test (:name :array-canonical-union)
+  (assert (eq
+           (specifier-type '(or simple-vector (not (simple-array t))))
+           (specifier-type '(or vector (not (simple-array t))))))
+  (assert (eq
+           (specifier-type '(or (vector t) (not (simple-array t))))
+           (specifier-type '(or vector (not (simple-array t))))))
+  (assert (eq
+           (specifier-type '(or (vector t) (not (array t))))
+           (specifier-type '(or vector (not (array t))))))
+  (assert (eq
+           (specifier-type '(or simple-vector (not (array t))))
+           (specifier-type '(or (simple-array * (*)) (not (array t))))))
+  (assert (eq
+           (specifier-type '(or simple-vector (not simple-array)))
+           (specifier-type '(or (vector t) (not simple-array))))))
+
 (with-test (:name :intersection-not-numeric)
   (assert (eql
            (specifier-type '(and (not (eql 1)) (not (eql 0))))
