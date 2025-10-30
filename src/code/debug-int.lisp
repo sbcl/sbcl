@@ -3128,11 +3128,13 @@ register."
 (defun form-number-translations (form tlf-number)
   (let ((seen nil)
         (translations (make-array 12 :fill-pointer 0 :adjustable t)))
-    (labels ((translate1 (form path)
+    (labels ((translate1 (form path depth)
                (unless (member form seen)
                  (push form seen)
                  (vector-push-extend (cons (fill-pointer translations) path)
                                      translations)
+                 (unless (< depth 100) ; ARB but has to be the same as in SUB-FIND-SOURCE-PATHS
+                   (return-from translate1))
                  (let ((pos 0)
                        (subform form)
                        (trail form))
@@ -3145,9 +3147,9 @@ register."
                                      ((atom subform) (return)))
                                    (let ((fm (car subform)))
                                      (cond
-                                       ((consp fm) (translate1 fm (cons pos path)))
+                                       ((consp fm) (translate1 fm (cons pos path) (1+ depth)))
                                        ((comma-p fm)
-                                        (translate1 (list 'comma (comma-expr fm)) (list* pos path)))))
+                                        (translate1 (list 'comma (comma-expr fm)) (list* pos path) (1+ depth)))))
                                    (setq subform (cdr subform)
                                          pos (1+ pos))
                                    (when (eq subform trail) (return)))))
@@ -3155,7 +3157,7 @@ register."
                        (frob)
                        (frob)
                        (setq trail (cdr trail))))))))
-      (translate1 form (list tlf-number)))
+      (translate1 form (list tlf-number) 0))
     (coerce translations 'simple-vector)))
 
 ;;; FORM is a top level form, and path is a source-path into it. This

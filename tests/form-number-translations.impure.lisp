@@ -22,7 +22,7 @@
 (defun source-paths (form)
   (let ((sb-c::*source-paths* (make-hash-table :test 'eq))
         (sb-c::*current-form-number* 0))
-    (sb-c::sub-find-source-paths form (list 0))
+    (sb-c::sub-find-source-paths form (list 0) 0)
     (let (result)
       (sb-int:dohash ((k v) sb-c::*source-paths* :result result)
         (declare (ignore k))
@@ -91,3 +91,10 @@
                                      expr))))
                          `(unless ,expr
                             (%failed-aver ',(replace-symbols expr)))))))
+
+(with-test (:name (:static :deep-tree :check-consistency))
+  (labels ((make-tree (n acc)
+             (cond ((zerop n) acc)
+                   (t (make-tree (1- n) (cons acc acc))))))
+    (check-consistency (eval `'(defmacro deep-tree (n)
+                                 (nthcdr n ',(make-tree 200 nil)))))))
