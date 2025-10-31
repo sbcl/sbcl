@@ -3661,15 +3661,18 @@ expansion happened."
        (do ((t1s (intersection-type-types type1) (cdr t1s)))
            ((null t1s))
          (let ((union (or (type-union2 type2 (car t1s))
-                          (return-from ARRAY-COMPLEX-UNION2-TYPE-METHOD))))
+                          (return-from array-complex-union2-type-method))))
            (if (typep union '(or compound-type negation-type))
                (push union unions)
                (setf non-compound (if non-compound
                                       (type-intersection non-compound union)
                                       union)))))
        (when non-compound
-         (loop for union in unions
+         (loop for (union . more) on unions
                do (setf non-compound (type-intersection non-compound union))
+               if (and more
+                       (typep non-compound '(or compound-type negation-type)))
+               return nil
                finally (return non-compound)))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
