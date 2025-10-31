@@ -3656,18 +3656,21 @@ expansion happened."
      ;; but it doesn't stop if type-union produces a new union type:
      ;; (or (and vector (not (simple-array t))) simple-vector)
      ;; => vector
-     (let ((accumulator *universal-type*))
-       (do ((t2s (intersection-type-types type1) (cdr t2s)))
-           ((null t2s) accumulator)
-         (let ((union (type-union2 type2 (car t2s))))
-           (when (or (not union)
-                     (and (or (compound-type-p union)
-                              (negation-type-p union))
-                          (or (compound-type-p accumulator)
-                              (negation-type-p accumulator))))
-             (return nil))
-           (setf accumulator
-                 (type-intersection accumulator union))))))))
+     (let (unions
+           non-compound)
+       (do ((t1s (intersection-type-types type1) (cdr t1s)))
+           ((null t1s))
+         (let ((union (or (type-union2 type2 (car t1s))
+                          (return-from ARRAY-COMPLEX-UNION2-TYPE-METHOD))))
+           (if (typep union '(or compound-type negation-type))
+               (push union unions)
+               (setf non-compound (if non-compound
+                                      (type-intersection non-compound union)
+                                      union)))))
+       (when non-compound
+         (loop for union in unions
+               do (setf non-compound (type-intersection non-compound union))
+               finally (return non-compound)))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
