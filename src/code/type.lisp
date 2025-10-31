@@ -3652,28 +3652,49 @@ expansion happened."
                                                :element-type *wild-type*)
                             type1))))))
     (intersection-type
-     ;; This is the same as in the intersection-simple-union2-type-method,
-     ;; but it doesn't stop if type-union produces a new union type:
-     ;; (or (and vector (not (simple-array t))) simple-vector)
-     ;; => vector
-     (let (unions
-           non-compound)
-       (do ((t1s (intersection-type-types type1) (cdr t1s)))
-           ((null t1s))
-         (let ((union (or (type-union2 type2 (car t1s))
-                          (return-from array-complex-union2-type-method))))
-           (if (typep union '(or compound-type negation-type))
-               (push union unions)
-               (setf non-compound (if non-compound
-                                      (type-intersection non-compound union)
-                                      union)))))
-       (when non-compound
-         (loop for (union . more) on unions
-               do (setf non-compound (type-intersection non-compound union))
-               if (and more
-                       (typep non-compound '(or compound-type negation-type)))
-               return nil
-               finally (return non-compound)))))))
+     (cond (;; (or (and simple-array (not (array t)) (not vector)) (simple-array t))
+            ;; => (or (and simple-array (not vector)) (simple-array t))
+            (and (neq (array-type-complexp type2) :maybe)
+                 (let (not-type
+                       supertype)
+                   (loop for type in (intersection-type-types type1)
+                         if (negation-type-p type)
+                         do (when (csubtypep (negation-type-type type)
+                                             (change-array-type-complexp type2 :maybe))
+                              (setf not-type type))
+                         else if (and
+                                  (array-type-p type)
+                                  (eq (array-type-complexp type)
+                                      (array-type-complexp type2))
+                                  (csubtypep type2 type))
+                         do (setf supertype t))
+                   (when (and not-type supertype)
+                     (type-union (%type-intersection (remove not-type
+                                                             (intersection-type-types type1)))
+                                 type2)))))
+           (t
+            ;; This is the same as in the intersection-simple-union2-type-method,
+            ;; but it doesn't stop if type-union produces a new union type:
+            ;; (or (and vector (not (simple-array t))) simple-vector)
+            ;; => vector
+            (let (unions
+                  non-compound)
+              (do ((t1s (intersection-type-types type1) (cdr t1s)))
+                  ((null t1s))
+                (let ((union (or (type-union2 type2 (car t1s))
+                                 (return-from array-complex-union2-type-method))))
+                  (if (typep union '(or compound-type negation-type))
+                      (push union unions)
+                      (setf non-compound (if non-compound
+                                             (type-intersection non-compound union)
+                                             union)))))
+              (when non-compound
+                (loop for (union . more) on unions
+                      do (setf non-compound (type-intersection non-compound union))
+                      if (and more
+                              (typep non-compound '(or compound-type negation-type)))
+                      return nil
+                      finally (return non-compound)))))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
