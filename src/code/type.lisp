@@ -3672,6 +3672,28 @@ expansion happened."
                      (type-union (%type-intersection (remove not-type
                                                              (intersection-type-types type1)))
                                  type2)))))
+           ;; (or (and (not (array t)) (and vector (not simple-array))) (simple-array * (*)))
+           ;; => (and vector (not (and (array t) (not simple-array))))
+           ((and (neq (array-type-complexp type2) :maybe)
+                 (let (not-type
+                       supertype)
+                   (loop for type in (intersection-type-types type1)
+                         if (negation-type-p type)
+                         do (let ((negation-type (negation-type-type type)))
+                              (when (and (array-type-p negation-type)
+                                         (eq (array-type-complexp negation-type) :maybe)
+                                         (csubtypep negation-type
+                                                    (change-array-type type2 :dimensions '* :complexp :maybe)))
+                                (setf not-type negation-type)))
+                         else if (array-type-p type)
+                         do (let ((union (type-union type type2)))
+                              (when (array-type-p union)
+                                (aver (not supertype))
+                                (setf supertype union))))
+                   (when (and not-type supertype)
+                     (type-intersection supertype
+                                        (make-negation-type
+                                         (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))
            (t
             ;; This is the same as in the intersection-simple-union2-type-method,
             ;; but it doesn't stop if type-union produces a new union type:

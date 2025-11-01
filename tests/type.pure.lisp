@@ -1111,7 +1111,14 @@
            (specifier-type '(or (and (not (array fixnum)) (not (array t)) vector) (vector t)))
            (specifier-type '(and (not (array fixnum)) vector))))
   (assert (eq (specifier-type '(or (and simple-array (not (array t)) (not vector)) (simple-array t)))
-              (specifier-type '(or (and simple-array (not vector)) (simple-array t))))))
+              (specifier-type '(or (and simple-array (not vector)) (simple-array t)))))
+  (assert (eq (specifier-type '(or (and vector (not (array t))) (simple-array * (*))))
+              (specifier-type '(and vector (not (and (array t) (not simple-array)))))))
+  (assert (eq (specifier-type '(or (and (not (array t)) (and vector (not simple-array))) (simple-array * (*))))
+              (specifier-type '(and vector (not (and (array t) (not simple-array)))))))
+  (assert (eq (specifier-type '(or (and (not (array t)) (and vector (not simple-array)))
+                                (and (not (array t)) (simple-array * (*)))))
+              (specifier-type '(and vector (not (array t)))))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql
