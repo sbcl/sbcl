@@ -3244,7 +3244,10 @@
      ;; union types
      (let ((s (the (simple-string 10) (eval "0123456789"))))
        (array-in-bounds-p s 9))
-     t)
+     t
+     (let ((a (make-array (list (random 20) 1))))
+       (array-in-bounds-p a 5 2))
+     nil)
     (must-not-optimize
      ;; don't trust non-simple array length in safety=1
      (let ((a (the (array * (10 20)) (make-array '(10 20) :adjustable t))))
@@ -3267,13 +3270,7 @@
        (array-in-bounds-p a (get-universal-time) 1))
      ;; unknown lower bound
      (let ((a (make-array '(5 30))))
-       (array-in-bounds-p a 0 (- (get-universal-time))))
-     ;; in theory we should be able to optimize
-     ;; the following but the current implementation
-     ;; doesn't cut it because the array type's
-     ;; dimensions get reported as (* *).
-     (let ((a (make-array (list (random 20) 1))))
-       (array-in-bounds-p a 5 2)))))
+       (array-in-bounds-p a 0 (- (get-universal-time)))))))
 
 ;;; optimizing (EXPT -1 INTEGER)
 (with-test (:name (expt -1 integer))

@@ -1005,12 +1005,17 @@
               (loop for d in dims for i from 0
                     collect (list (make-symbol (format nil "D~D" i))
                                   `(the index ,d)))))
-           (dims (if axis-bindings (mapcar #'car axis-bindings) dims))
+           (dim-vars (if axis-bindings (mapcar #'car axis-bindings) dims))
            (size (make-symbol "SIZE"))
            (type (list (cond ((eq et unsupplied) t)
                              (et-constp (constant-form-value et env))
                              (t '*))
-                       (if dims-constp dims (length dims))))
+                       (mapcar
+                        (lambda (dim)
+                          (if (constantp dim env)
+                              (constant-form-value dim env)
+                              '*))
+                        dims)))
            (type (if adjustable
                      `(and (array ,@type) (not simple-array))
                      `(simple-array ,@type)))
@@ -1021,9 +1026,9 @@
                     sb-vm:complex-array-widetag
                     sb-vm:simple-array-widetag)
                ,@(sb-vm::make-array-header-inits
-                  `(make-array ,size ,@keys) size dims)))))
-      `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
-         ,(cond ((or (not contents) (and dims-constp (equal dims data-dims)))
+                  `(make-array ,size ,@keys) size dim-vars)))))
+      `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dim-vars))))
+         ,(cond ((or (not contents) (and dims-constp (equal dim-vars data-dims)))
                  ;; If no :initial-contents, or definitely correct shape,
                  ;; then just call the constructor.
                  alloc-form)

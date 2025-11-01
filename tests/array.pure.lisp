@@ -408,7 +408,7 @@
              (ecase inline
                (inline
                 (assert failure-p)
-                (assert (= 1 (length warnings))))
+                (assert (= 2 (length warnings))))
                (notinline
                 (assert failure-p)
                 (assert (= 1 (length warnings)))))
