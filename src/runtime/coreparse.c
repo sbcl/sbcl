@@ -1015,6 +1015,8 @@ static bool compute_card_table_size(int saved_card_mask_nbits)
 
     // 2 Gigacards should suffice for now. That would span 2TiB of memory
     // using 1Kb card size, or more if larger card size.
+    // (I think 32 bits could be ok too. The AND instruction uses a 4-byte mask, so
+    // #xffffffff would be 0-extended and not sign-extended to the full register width)
     if (nbits > 31)
         lose("dynamic space too large");
 

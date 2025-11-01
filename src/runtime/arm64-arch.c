@@ -361,7 +361,7 @@ void gcbarrier_patch_code(void* where, int nbits)
 os_vm_address_t coreparse_alloc_space(int space_id, int attr,
                                       os_vm_address_t addr, os_vm_size_t size)
 {
-    __attribute__((unused)) int extra_request = 0;
+    __attribute__((unused)) long extra_request = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
         extra_request = ALIEN_LINKAGE_SPACE_SIZE;

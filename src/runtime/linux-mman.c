@@ -72,8 +72,7 @@ __attribute__((unused)) static void* try_find_hole(os_vm_size_t len)
 }
 
 os_vm_address_t
-os_alloc_gc_space(int __attribute__((unused)) space_id,
-                  int attributes, os_vm_address_t addr, os_vm_size_t len)
+os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
     attributes &= ~IS_GUARD_PAGE;
@@ -94,8 +93,8 @@ os_alloc_gc_space(int __attribute__((unused)) space_id,
 
     if (actual == MAP_FAILED) {
         if (errno == ENOMEM)
-            fprintf(stderr, "os_alloc_gc_space(%d,%p,%zu) failed with ENOMEM\n",
-                    attributes, addr, len);
+            fprintf(stderr, "os_alloc_gc_space(%d,%d,%p,%zu) failed with ENOMEM\n",
+                    space_id, attributes, addr, len);
         else
             perror("mmap");
         dumpmaps();

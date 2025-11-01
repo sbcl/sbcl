@@ -853,7 +853,7 @@ os_vm_address_t coreparse_alloc_space(int space_id, int attr,
 {
     if (size == 0) return addr;
 
-    int extra_below = 0, extra_above = 0;
+    long extra_below = 0, extra_above = 0;
     extern int lisp_code_in_elf();
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
