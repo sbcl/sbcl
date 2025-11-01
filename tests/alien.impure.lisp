@@ -16,6 +16,7 @@
 ;;;; more information.
 
 (cl:in-package :cl-user)
+(load "compiler-test-util.lisp")
 
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)
 ;;; was messed up so badly that trying to execute expressions like
@@ -585,6 +586,20 @@
         (assert (= i j k 1)))
       (multiple-value-bind (i j k) (funcall fun (addr a) (addr a) nil)
         (assert (= i j k 1))))))
+
+;;; Permanent fnames are omitted from the list of referenced Lisp linkage table
+;;; indices in the code header. Prevent that behavior.
+(sb-int:encapsulate 'sb-int:permanent-fname-p 'test-shim #'sb-int:constantly-nil)
+(with-test (:name :string-passing-no-conversion :skipped-on (:not :sb-unicode))
+  (flet ((has-call (arg-type)
+           (let ((f (compile nil`(lambda (s)
+                                   (with-alien ((getenv (function unsigned utf8-string) :extern))
+                                     (alien-funcall getenv (the ,arg-type s)))))))
+             (find 'sb-alien::string-to-c-string (ctu:find-named-callees f)))))
+    ;; Positive assertion that passing STRING may (in theory) do a conversion
+    (assert (has-call 'string))
+    ;; Negative assertion that passing SIMPLE-BASE-STRING will never do a conversion
+    (assert (not (has-call 'simple-base-string)))))
 
 (cl:in-package "SB-KERNEL")
 (test-util:with-test (:name :hash-consing)

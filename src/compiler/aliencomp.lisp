@@ -776,3 +776,27 @@
     (if (eq format :default)
         `(sb-alien::default-c-string-external-format)
         `',format)))
+;;; This transform which recognizes :UTF8 as an easy case if the argument is simple-base-string
+;;; does not have to additionally recognize :ASCII, which is done elsewhere - either deport-alloc-gen
+;;; or deport-alloc (I'm not sure which). An ETYPECASE is inserted over the possible choices of
+;;; Lisp arg type, one of which is SIMPLE-BASE-STRING, which undergoes no conversion
+;;; (assisted by SB-ALIEN::C-STRING-NEEDS-CONVERSION-P given :ASCII as the format).
+;;; However I noticed a premature optimization which either accidentally or intentionally
+;;; fails on non-simple strings. Consider the function F:
+;;; (defun f (s)
+;;;   (alien-funcall (extern-alien "getenv"
+;;;                   (function system-area-pointer (c-string :external-format :ascii)))
+;;;                  (the string s)))
+;;; * (f (make-array 4 :element-type 'base-char :displaced-to (coerce "HOME" 'simple-base-string)))
+;;; which gets:
+;;;    debugger invoked on a CASE-FAILURE @1201809010 in thread
+;;;    #<THREAD tid=663886 "main thread" RUNNING {1201758003}>:
+;;;      "HOME" fell through ETYPECASE expression.
+;;;      Wanted one of (NULL (ALIEN (* CHAR)) SIMPLE-BASE-STRING SIMPLE-STRING).
+;;;
+;;; That seems slightly amiss, but I am unwilling to deoptimize the above example by adding
+;;; more branching to the call-out, given absence of any complaints about it in forever.
+#+sb-unicode
+(deftransform sb-alien::string-to-c-string ((string type)
+                                            (simple-base-string (constant-arg (eql :utf8))))
+  'string)
