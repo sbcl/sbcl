@@ -3697,6 +3697,34 @@ expansion happened."
                        (type-intersection supertype
                                           (make-negation-type
                                            (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))
+             ;; (or (simple-array t) (and (not vector) (and (array t) (not simple-array))))
+             ;; => (and (array t) (not (and vector (not simple-array))))
+             ((let ((negation (find-if #'negation-type-p t1s)))
+                (and negation
+                     (array-type-p (negation-type-type negation))
+                     (let ((sans-negation (%type-intersection (remove negation t1s))))
+                       (or (and
+                            (let ((union (type-union type2 sans-negation)))
+                              (and (array-type-p union)
+                                   (eq (array-type-specialized-element-type union)
+                                       (array-type-specialized-element-type type2))
+                                   (values-subtypep (array-type-specialized-element-type type2)
+                                                    (array-type-specialized-element-type (negation-type-type negation)))
+                                   (type-intersection union
+                                                      (type-negation
+                                                       (change-array-type-complexp (negation-type-type negation)
+                                                                                   (case (array-type-complexp type2)
+                                                                                     (:maybe :maybe)
+                                                                                     ((nil) t))))))))
+                           ;; (or (vector t) (and (not vector) (and (array t) (not simple-array))))
+                           ;; => (or (vector t) (and (array t) (not simple-array)))
+                           (and (array-type-p sans-negation)
+                                (eq (array-type-specialized-element-type sans-negation)
+                                    (array-type-specialized-element-type type2))
+                                (eq (type-intersection type2 negation) *empty-type*)
+                                (neq (type-intersection type2 sans-negation) *empty-type*)
+                                (type-union type2 sans-negation)))))))
+
              (t
               ;; This is the same as in the intersection-simple-union2-type-method,
               ;; but it doesn't stop if type-union produces a new union type:
