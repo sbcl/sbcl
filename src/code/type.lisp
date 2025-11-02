@@ -3710,8 +3710,9 @@ expansion happened."
                               (and (array-type-p union)
                                    (eq (array-type-specialized-element-type union)
                                        (array-type-specialized-element-type type2))
-                                   (values-subtypep (array-type-specialized-element-type type2)
-                                                    (array-type-specialized-element-type (negation-type-type negation)))
+                                   (or (eq (array-type-specialized-element-type type2)
+                                           (array-type-specialized-element-type (negation-type-type negation)))
+                                       (eq (array-type-specialized-element-type (negation-type-type negation)) *wild-type*))
                                    (type-intersection union
                                                       (type-negation
                                                        (change-array-type-complexp (negation-type-type negation)
