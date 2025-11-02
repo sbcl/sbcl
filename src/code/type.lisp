@@ -3704,6 +3704,8 @@ expansion happened."
                      (array-type-p (negation-type-type negation))
                      (let ((sans-negation (%type-intersection (remove negation t1s))))
                        (or (and
+                            (neq (array-type-complexp type2)
+                                 (array-type-complexp (negation-type-type negation)))
                             (let ((union (type-union type2 sans-negation)))
                               (and (array-type-p union)
                                    (eq (array-type-specialized-element-type union)
