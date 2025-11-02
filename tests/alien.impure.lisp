@@ -601,6 +601,16 @@
     ;; Negative assertion that passing SIMPLE-BASE-STRING will never do a conversion
     (assert (not (has-call 'simple-base-string)))))
 
+(with-test (:name :not-quite-literal-alien-name :skipped-on (:not :unix))
+  ;; There are valid reasons for the first argument to EXTERN-ALIEN to be an expression
+  ;; producing a constant string such as through a global constant or a macro that selects
+  ;; a name based on environmental aspects such as compilation mode and/or foreign toolchain.
+  (let ((f (compile nil
+            '(lambda (s)
+              (macrolet ((something () "getenv"))
+                (alien-funcall (extern-alien (something) (function c-string c-string)) s))))))
+    (assert (string= (funcall f "SBCL_HOME") (sb-ext:posix-getenv "SBCL_HOME")))))
+
 (cl:in-package "SB-KERNEL")
 (test-util:with-test (:name :hash-consing)
   (assert (eq (parse-alien-type '(integer 9) nil)
