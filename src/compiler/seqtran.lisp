@@ -2768,6 +2768,15 @@
                           (t
                            (return)))
                      finally (return (sb-kernel::%type-union cdrs))))))))
+
+(deftransform car ((cons))
+  (or (combination-case cons
+        ((list list*) *
+         (when args
+           (splice-fun-args cons :any #'first)
+           'cons)))
+      (give-up-ir1-transform)))
+
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
