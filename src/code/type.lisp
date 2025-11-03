@@ -3677,7 +3677,7 @@ expansion happened."
              ;; (or (and (not (array t)) (and vector (not simple-array))) (simple-array * (*)))
              ;; => (and vector (not (and (array t) (not simple-array))))
              ((and (neq (array-type-complexp type2) :maybe)
-                   (let (not-type
+                   (let (not-types
                          supertype)
                      (loop for type in t1s
                            if (negation-type-p type)
@@ -3686,17 +3686,18 @@ expansion happened."
                                            (eq (array-type-complexp negation-type) :maybe)
                                            (csubtypep negation-type
                                                       (change-array-type type2 :dimensions '* :complexp :maybe)))
-                                  (setf not-type negation-type)))
+                                  (push negation-type not-types)))
                            else if (array-type-p type)
                            do (let ((union (type-union type type2)))
                                 (when (and (array-type-p union)
                                            (equal (array-type-dimensions union)
                                                   (array-type-dimensions type2)))
                                   (setf supertype union))))
-                     (when (and not-type supertype)
+                     (when (and not-types supertype)
                        (type-intersection supertype
-                                          (make-negation-type
-                                           (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))
+                                          (%type-intersection
+                                           (loop for not-type in not-types
+                                                 collect (make-negation-type (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))))
              ;; (or (simple-array t) (and (not vector) (and (array t) (not simple-array))))
              ;; => (and (array t) (not (and vector (not simple-array))))
              ((let ((negation (find-if #'negation-type-p t1s)))
