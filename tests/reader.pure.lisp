@@ -612,3 +612,28 @@
       (assert-read-eqlity "0.333R0" 333/1000)
       (assert-read-eqlity "1R-3" 1/1000)
       (assert-read-eqlity ".1R2" 10))))
+
+(with-test (:name :stricter-sharp-o-etc)
+  ;; I think strictness is to be preferred. Compare to other implementations
+  ;; on the first example below of (read-from-string "#x a")
+  ;;   ABCL:  java.lang.StringIndexOutOfBoundsException: Index 0 out of bounds for length 0
+  ;;   CLISP: token "" after #x is not a rational number in base 16
+  ;;   ECL:   Cannot parse the #X readmacro."
+  ;; SHARP-O-FOOBAR writeup says this is all Undefined Behavior.
+  ;; https://www.lispworks.com/documentation/HyperSpec/Issues/iss316_w.htm
+  (assert-error (read-from-string "#x a")) ; used to read as 10.
+  (assert-error (read-from-string "#x#+foo a b")) ; used to skip A then read as 11.
+  (assert-error (read-from-string "#x #+foo a b")) ; same
+  ;; This was accepted because the nested READ return the rational number 1
+  ;; due to complex number canonicalization.
+  (handler-case (values (read-from-string "#o#c(1 0)"))
+    (condition (c) (assert (equal (simple-condition-format-arguments c) '(#\o 8 |#C|))))
+    (:no-error (x) (error "Expected an error but got ~A" x)))
+  ;; this was accepted because the nested READ returned rational 5
+  (handler-case (values (read-from-string "#o#.(floor 5.0)"))
+    (condition (c) (assert (equal (simple-condition-format-arguments c) '(#\o 8 |#.|))))
+    (:no-error (x) (error "Expected an error but got ~A" x)))
+  ;; This reads a token spelled "#." because #\# is a nonterminating macro, and #\. is a token
+  ;; constituent when not a dot by itself (or all dots). And #\( terminates a token.
+  ;; The token "#." is then ignored by *read-suppress*
+  (assert (equal (read-from-string "#+notfeat #o#.(progn wat)") '(progn wat))))

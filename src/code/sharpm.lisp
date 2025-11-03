@@ -238,16 +238,10 @@
         ((not (<= 2 radix 36))
          (simple-reader-error stream "illegal radix for #R: ~D." radix))
         (t
-         ;; FIXME: (read-from-string "#o#x1f") should not work!
-         ;; The token should be comprised strictly of digits in the radix,
-         ;; though the docs say this is undefined behavior, so it's ok,
-         ;; other than it being something we should complain about
-         ;; for portability reasons.
-         ;; Some other things that shouldn't work:
-         ;; * (read-from-string "#x a") => 10
-         ;; * (read-from-string "#x #+foo a b") => 11
-         (let ((res (let ((*read-base* radix))
-                      (read stream t nil t))))
+         (let ((res (let ((char (read-char stream nil)))
+                      (if (and char (constituentp char *readtable*))
+                          (let ((*read-base* radix)) (read-token stream char))
+                          ""))))
            (unless (typep res 'rational)
              (simple-reader-error stream
                                   "#~A (base ~D.) value is not a rational: ~S."
