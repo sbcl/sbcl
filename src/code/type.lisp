@@ -3674,6 +3674,8 @@ expansion happened."
                        (type-union (%type-intersection (remove not-type
                                                                (intersection-type-types type1)))
                                    type2)))))
+             ;; (or (and simple-array (not (array t)) (not vector)) (simple-array t))
+              ;; => (or (and simple-array (not vector)) (simple-array t))
              ;; (or (and (not (array t)) (and vector (not simple-array))) (simple-array * (*)))
              ;; => (and vector (not (and (array t) (not simple-array))))
              ((and (neq (array-type-complexp type2) :maybe)
@@ -3698,6 +3700,28 @@ expansion happened."
                                           (%type-intersection
                                            (loop for not-type in not-types
                                                  collect (make-negation-type (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))))
+             ;; (or (and vector (not (simple-array base-char)) (not (simple-array t)) (not (simple-array character))) (simple-array character (*)))
+             ;; =>  (and vector (not (simple-array base-char)) (not (simple-array t)))
+             ((and (neq (array-type-complexp type2) :maybe)
+                   (let (not-type
+                         supertype)
+                     (loop for type in t1s
+                           if (negation-type-p type)
+                           do (let ((negation-type (negation-type-type type)))
+                                (when (and (array-type-p negation-type)
+                                           (eq (array-type-complexp negation-type)
+                                               (array-type-complexp type2))
+                                           (csubtypep negation-type
+                                                      (change-array-type type2 :dimensions '* :complexp :maybe)))
+                                  (setf not-type type)))
+                           else if (array-type-p type)
+                           do (let ((union (type-union type type2)))
+                                (when (and (array-type-p union)
+                                           (equal (array-type-dimensions union)
+                                                  (array-type-dimensions type2)))
+                                  (setf supertype union))))
+                     (when (and not-type supertype)
+                       (%type-intersection (remove not-type t1s))))))
              ;; (or (simple-array t) (and (not vector) (and (array t) (not simple-array))))
              ;; => (and (array t) (not (and vector (not simple-array))))
              ((let ((negation (find-if #'negation-type-p t1s)))
