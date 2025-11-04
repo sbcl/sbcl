@@ -148,3 +148,49 @@
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
                   ;;    ` ( 1   ' , ( i f   ( e v e n p   x )   ( 1 +   x )   ( +   x   2 ) )   , ( +   x   3 ) ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 5 5 5 5 5 5 5 5 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(sb-cover:clear-coverage)
+(defclass myclass () ((slot :initarg :slot)))
+(compile-load "test-data-method-walk")
+(assert (equalp (get-states "test-data-method-walk")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f m e t h o d   m e t h o d - w a l k   ( ( o   m y c l a s s ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( i f   (  n  u  l  l     *  p  r  i  n  t  -  l  e  v  e  l  *  )
+                  0 1 1 2 2 2 2 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10
+                  ;;            ( s l o t - v a l u e   o   ' s l o t )
+                  0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2
+                  ;;            ( 1 +   * p r i n t - l e v e l * ) ) )
+                  0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1)))
+
+(let ((*print-level* nil))
+  (method-walk (make-instance 'myclass :slot 3)))
+(assert (equalp (get-states "test-data-method-walk")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f m e t h o d   m e t h o d - w a l k   ( ( o   m y c l a s s ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( i f   ( n u l l   * p r i n t - l e v e l * )
+                  0 1 1 1 1 1 1 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9
+                  ;;            ( s l o t - v a l u e   o   ' s l o t )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;            ( 1 +   * p r i n t - l e v e l * ) ) )
+                  0 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1 1)))
+
+(let ((*print-level* 3))
+  (method-walk (make-instance 'myclass :slot 4)))
+(assert (equalp (get-states "test-data-method-walk")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f m e t h o d   m e t h o d - w a l k   ( ( o   m y c l a s s ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( i f   ( n u l l   * p r i n t - l e v e l * )
+                  0 1 1 1 1 1 1 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5
+                  ;;            ( s l o t - v a l u e   o   ' s l o t )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;            ( 1 +   * p r i n t - l e v e l * ) ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))

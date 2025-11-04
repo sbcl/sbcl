@@ -1807,13 +1807,7 @@ bootstrapping.
                (t form))))
       (let* ((sb-walker::*walk-form-preserve-source* t)
              (walked-lambda (walk-form method-lambda env #'walk-function)))
-        ;;; FIXME: the walker's rewriting of the source code causes
-        ;;; trouble when doing code coverage. The rewrites should be
-        ;;; removed, and the same operations done using
-        ;;; compiler-macros or tranforms.
-        (values (if (sb-c:policy env (= sb-c:store-coverage-data 0))
-                    walked-lambda
-                    method-lambda)
+        (values walked-lambda
                 call-next-method-p
                 (not (null parameters-setqd))
                 parameters-setqd)))))
