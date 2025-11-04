@@ -2777,6 +2777,23 @@
            'cons)))
       (give-up-ir1-transform)))
 
+(deftransform cdr ((cons))
+  (or (combination-case cons
+        ((list) *
+         (cond ((cdr args)
+                (setf (combination-args combination) (cdr args))
+                (flush-dest (car args))
+                'cons)))
+        ((list*) *
+         (cond ((cddr args)
+                (setf (combination-args combination) (cdr args))
+                (flush-dest (car args))
+                'cons)
+               ((cdr args)
+                (splice-fun-args cons :any #'second)
+                'cons))))
+      (give-up-ir1-transform)))
+
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
