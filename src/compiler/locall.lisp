@@ -1183,8 +1183,7 @@
 ;;; the RETURN-RESULT, because the return might have been deleted (if
 ;;; all calls were TR.)
 (defun unconvert-tail-calls (fun call next-block)
-  (let (maybe-terminate
-        used-lvar)
+  (let (maybe-terminate)
     (do-sset-elements (called (lambda-calls-or-closes fun))
       (when (lambda-p called)
         (dolist (ref (leaf-refs called))
@@ -1200,18 +1199,21 @@
                        (lvar (node-lvar call)))
                    (unlink-blocks block (first (block-succ block)))
                    (link-blocks block next-block)
-                   (if (eq (node-derived-type this-call) *empty-type*)
-                       ;; Delay terminating the block, because there may be more calls
-                       ;; to be processed here and this may prematurely delete NEXT-BLOCK
-                       ;; before we attach more preceding blocks to it.
-                       ;; Although probably if one call to a function
-                       ;; is derived to be NIL all other calls would
-                       ;; be NIL too, but that may not be available at the same time.
-                       ;; (Or something is smart in the future to
-                       ;; derive different results from different
-                       ;; calls.)
-                       (push this-call maybe-terminate)
-                       (add-lvar-use this-call (setf used-lvar lvar)))))
+                   (cond ((eq (node-derived-type this-call) *empty-type*)
+                          ;; Delay terminating the block, because there may be more calls
+                          ;; to be processed here and this may prematurely delete NEXT-BLOCK
+                          ;; before we attach more preceding blocks to it.
+                          ;; Although probably if one call to a function
+                          ;; is derived to be NIL all other calls would
+                          ;; be NIL too, but that may not be available at the same time.
+                          ;; (Or something is smart in the future to
+                          ;; derive different results from different
+                          ;; calls.)
+                          (push this-call maybe-terminate))
+                         (lvar
+                          (add-lvar-use this-call lvar)
+                          (setf (lvar-%derived-type lvar) nil)
+                          (assert-node-type this-call (node-derived-type call) **zero-typecheck-policy**)))))
                 (deleted)
                 ;; The called function might be an assignment in the
                 ;; case where we are currently converting that function.
@@ -1219,9 +1221,6 @@
                 ;; function.
                 (assignment
                  (aver (eq called fun)))))))))
-    (when used-lvar
-      (setf (lvar-%derived-type used-lvar) nil)
-      (assert-lvar-type used-lvar (node-derived-type call) **zero-typecheck-policy**))
     maybe-terminate))
 
 ;;; Deal with returning from a LET or assignment that we are
