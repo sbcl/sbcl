@@ -772,7 +772,10 @@
                                (let* ((val (lvar-value type))
                                       (ctype (if (ctype-p val)
                                                  val
-                                                 (careful-specifier-type val))))
+                                                 (block nil
+                                                   (handler-bind ((parse-unknown-type
+                                                                    (lambda (c) c (return))))
+                                                     (careful-specifier-type val))))))
                                  (when (and ctype
                                             (type-for-constraints-p ctype))
                                    (add 'typep

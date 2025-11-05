@@ -17,11 +17,6 @@
 
 (!begin-collecting-cold-init-forms)
 
-;;; ### Remaining incorrectnesses:
-;;;
-;;; There are all sorts of nasty problems with open bounds on FLOAT
-;;; types (and probably FLOAT types in general.)
-
 ;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
 ;;; compiler warnings can be emitted as appropriate.
 (define-condition parse-unknown-type (condition)
@@ -1596,7 +1591,9 @@
     (when builtin (return (fail spec)))
     ;; SPEC has a legal form, so return an unknown type.
     (unless (logtest (type-context-options context) +type-parse-signal-inhibit+)
-      (signal 'parse-unknown-type :specifier spec))
+      (block nil
+        (restart-case (signal 'parse-unknown-type :specifier spec)
+          (muffle-warning () (return)))))
   UNKNOWN
     (setf (type-context-options context)
           (logior (type-context-options context) +type-parse-cache-inhibit+))

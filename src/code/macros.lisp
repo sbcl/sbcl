@@ -1021,7 +1021,8 @@ invoked. In that case it will store into PLACE and start over."
       ;; For each clause, if it effectively an OR over acceptable instance types,
       ;; collect the layouts of those types.
       (loop for i from 0 for spec in type-specs
-            do (let ((parse (specifier-type spec)))
+            do (let ((parse (handler-bind ((parse-unknown-type #'muffle-warning))
+                              (specifier-type spec))))
                  (setf (aref layout-lists i) (or (get-layouts parse)
                                                  (return-from expand-struct-typecase nil)))))
       ;; The number of base types is an upper bound on the number of different TYPEP
@@ -1067,11 +1068,16 @@ invoked. In that case it will store into PLACE and start over."
                        (svref ,consts (1- #1#))))))))
         `(let ((,temp ,keyform))
            (case (sb-kernel::%typecase-index ,layout-lists ,temp ,all-sealed)
-             ,@(loop for i from 1 for clause in normal-clauses
+             ,@(loop for i from 1
+                     for clause in normal-clauses
                      collect `(,i
-                                   ;; CLAUSE is ((TYPEP #:G 'a-type) . forms)
-                                   (sb-c::%type-constraint ,temp ,(third (car clause)))
-                                   ,@(cdr clause)))
+                               ;; CLAUSE is ((TYPEP #:G 'a-type) . forms)
+                               (sb-c::%type-constraint
+                                ,temp
+                                ,(third (if (eq (caar clause) 'sb-c::with-source-form)
+                                            (third (car clause))
+                                            (car clause))))
+                               ,@(cdr clause)))
              (0 ,@(if errorp
                           `((etypecase-failure ,temp ',type-specs))
                           (cdr default)))))))))
@@ -1126,8 +1132,13 @@ invoked. In that case it will store into PLACE and start over."
                  (dolist (k case-keys)
                    (setf (gethash k keys-seen) record))))
              (testify (k)
-               `(,test ,keyform-value
-                       ,(if (and (eq test 'eql) (self-evaluating-p k)) k `',k))))
+               (wrap-if
+                (and (eq test 'typep)
+                     (sb-c::compiling-p lexenv))
+                `(sb-c::with-source-form ,clause)
+                `(,test
+                  ,keyform-value
+                  ,(if (and (eq test 'eql) (self-evaluating-p k)) k `',k)))))
         (unless (list-of-length-at-least-p clause 1)
           (with-current-source-form (cases)
             (warn "~S -- bad clause in ~S" clause name)
@@ -1222,7 +1233,9 @@ invoked. In that case it will store into PLACE and start over."
             do
         (with-current-source-form (clause)
           (let* ((key (car clause))
-                 (type (unless (eq key 'otherwise) (specifier-type key))))
+                 (type (unless (eq key 'otherwise)
+                         (handler-bind ((parse-unknown-type #'muffle-warning))
+                           (specifier-type key)))))
             (when (and type (neq type *empty-type*))
               (let ((existing
                      (loop for (prev . spec) in types

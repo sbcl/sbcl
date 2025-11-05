@@ -84,7 +84,8 @@
   (unless (unsupplied-or-nil env)
     (give-up-ir1-transform "environment argument present and not null"))
   (let* ((type (lvar-value type))
-         (ctype (ir1-transform-specifier-type type))
+         (ctype (handler-bind ((parse-unknown-type #'muffle-warning))
+                  (ir1-transform-specifier-type type)))
          (object-type (lvar-type object)))
     (prog1
         (cond ((csubtypep object-type ctype)
@@ -1534,7 +1535,7 @@
 (defun %source-transform-typep-simple (object type &optional ctype)
   (let ((ctype (or ctype
                    (handler-bind
-                       (((or parse-unknown-type sb-kernel::parse-deprecated-type)
+                       ((sb-kernel::parse-deprecated-type
                           (lambda (c)
                             c
                             (return-from %source-transform-typep-simple))))
