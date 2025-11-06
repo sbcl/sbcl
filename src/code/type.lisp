@@ -2495,24 +2495,32 @@ expansion happened."
       (values nil t)))
 
 (defun change-array-type-complexp (type complexp)
-  (make-array-type (array-type-dimensions type)
-                   :complexp complexp
-                   :element-type (array-type-element-type type)
-                   :specialized-element-type (array-type-specialized-element-type type)))
+  (if (negation-type-p type)
+      (make-negation-type
+       (change-array-type-complexp (negation-type-type type) complexp))
+      (make-array-type (array-type-dimensions type)
+                       :complexp complexp
+                       :element-type (array-type-element-type type)
+                       :specialized-element-type (array-type-specialized-element-type type))))
 
 (defun change-array-type (type &key (complexp :inherit)
                                     element-type
                                     (dimensions :inherit))
-  (make-array-type (if (eq dimensions :inherit)
-                       (array-type-dimensions type)
-                       dimensions)
-                   :complexp (if (eq complexp :inherit)
-                                 (array-type-complexp type)
-                                 complexp)
-                   :element-type (or element-type
-                                     (array-type-element-type type))
-                   :specialized-element-type (or element-type
-                                                 (array-type-specialized-element-type type))))
+  (if (negation-type-p type)
+      (make-negation-type
+       (change-array-type (negation-type-type type) :complexp complexp
+                                                    :element-type element-type
+                                                    :dimensions dimensions))
+      (make-array-type (if (eq dimensions :inherit)
+                           (array-type-dimensions type)
+                           dimensions)
+                       :complexp (if (eq complexp :inherit)
+                                     (array-type-complexp type)
+                                     complexp)
+                       :element-type (or element-type
+                                         (array-type-element-type type))
+                       :specialized-element-type (or element-type
+                                                     (array-type-specialized-element-type type)))))
 
 (define-type-method (negation :simple-intersection2) (type1 type2)
   (let ((not1 (negation-type-type type1))
@@ -3650,129 +3658,97 @@ expansion happened."
                             type1))))))
     (intersection-type
      (let ((t1s (intersection-type-types type1)))
-       (cond (;; (or (and simple-array (not (array t)) (not vector)) (simple-array t))
-              ;; => (or (and simple-array (not vector)) (simple-array t))
-              (and (let (not-type
-                         supertype)
-                     (loop for type in t1s
-                           if (negation-type-p type)
-                           do (when (csubtypep (negation-type-type type)
-                                               (change-array-type type2 :dimensions '* :complexp :maybe))
-                                (setf not-type type))
-                           else if (and
-                                    (array-type-p type)
-                                    (equal (array-type-dimensions type)
-                                           (array-type-dimensions type2))
-                                    (eq (array-type-complexp type)
-                                        (array-type-complexp type2))
-                                    (csubtypep type2 type))
-                           do (setf supertype t))
-                     (when (and not-type supertype)
-                       (type-union (%type-intersection (remove not-type
-                                                               (intersection-type-types type1)))
-                                   type2)))))
-             ;; (or (and simple-array (not (array t)) (not vector)) (simple-array t))
-              ;; => (or (and simple-array (not vector)) (simple-array t))
-             ;; (or (and (not (array t)) (and vector (not simple-array))) (simple-array * (*)))
-             ;; => (and vector (not (and (array t) (not simple-array))))
-             ((and (neq (array-type-complexp type2) :maybe)
-                   (let (not-types
-                         supertype)
-                     (loop for type in t1s
-                           if (negation-type-p type)
-                           do (let ((negation-type (negation-type-type type)))
-                                (when (and (array-type-p negation-type)
-                                           (eq (array-type-complexp negation-type) :maybe)
-                                           (csubtypep negation-type
-                                                      (change-array-type type2 :dimensions '* :complexp :maybe)))
-                                  (push negation-type not-types)))
-                           else if (array-type-p type)
-                           do (let ((union (type-union type type2)))
-                                (when (and (array-type-p union)
-                                           (equal (array-type-dimensions union)
-                                                  (array-type-dimensions type2)))
-                                  (setf supertype union))))
-                     (when (and not-types supertype)
-                       (type-intersection supertype
-                                          (%type-intersection
-                                           (loop for not-type in not-types
-                                                 collect (make-negation-type (change-array-type not-type :complexp (not (array-type-complexp type2)))))))))))
-             ;; (or (and vector (not (simple-array base-char)) (not (simple-array t)) (not (simple-array character))) (simple-array character (*)))
-             ;; =>  (and vector (not (simple-array base-char)) (not (simple-array t)))
-             ((and (neq (array-type-complexp type2) :maybe)
-                   (let (not-type
-                         supertype)
-                     (loop for type in t1s
-                           if (negation-type-p type)
-                           do (let ((negation-type (negation-type-type type)))
-                                (when (and (array-type-p negation-type)
-                                           (eq (array-type-complexp negation-type)
-                                               (array-type-complexp type2))
-                                           (csubtypep negation-type
-                                                      (change-array-type type2 :dimensions '* :complexp :maybe)))
-                                  (setf not-type type)))
-                           else if (array-type-p type)
-                           do (let ((union (type-union type type2)))
-                                (when (and (array-type-p union)
-                                           (equal (array-type-dimensions union)
-                                                  (array-type-dimensions type2)))
-                                  (setf supertype union))))
-                     (when (and not-type supertype)
-                       (%type-intersection (remove not-type t1s))))))
-             ;; (or (simple-array t) (and (not vector) (and (array t) (not simple-array))))
-             ;; => (and (array t) (not (and vector (not simple-array))))
-             ((let ((negation (find-if #'negation-type-p t1s)))
-                (and negation
-                     (array-type-p (negation-type-type negation))
-                     (let ((sans-negation (%type-intersection (remove negation t1s))))
-                       (or (and
-                            (neq (array-type-complexp type2)
-                                 (array-type-complexp (negation-type-type negation)))
-                            (let ((union (type-union type2 sans-negation)))
-                              (and (array-type-p union)
-                                   (eq (array-type-specialized-element-type union)
-                                       (array-type-specialized-element-type type2))
-                                   (or (eq (array-type-specialized-element-type type2)
-                                           (array-type-specialized-element-type (negation-type-type negation)))
-                                       (eq (array-type-specialized-element-type (negation-type-type negation)) *wild-type*))
-                                   (type-intersection union
-                                                      (type-negation
-                                                       (change-array-type-complexp (negation-type-type negation)
-                                                                                   (case (array-type-complexp type2)
-                                                                                     (:maybe :maybe)
-                                                                                     ((nil) t))))))))
-                           ;; (or (vector t) (and (not vector) (and (array t) (not simple-array))))
-                           ;; => (or (vector t) (and (array t) (not simple-array)))
-                           (and (array-type-p sans-negation)
-                                (eq (array-type-specialized-element-type sans-negation)
-                                    (array-type-specialized-element-type type2))
-                                (eq (type-intersection type2 negation) *empty-type*)
-                                (neq (type-intersection type2 sans-negation) *empty-type*)
-                                (type-union type2 sans-negation)))))))
+       (let (supertype
+             negations)
+         (if (and
+              (loop for type in t1s
+                    always (typecase type
+                             (array-type
+                              (when supertype
+                                ;; TODO: handle (and (array unknown1) (array unknown2))
+                                (return))
+                              (setf supertype type))
+                             (negation-type
+                              (let ((not-type (negation-type-type type)))
+                                (when (array-type-p not-type)
+                                  (push type negations))))))
+              supertype)
+             ;; Remove redundant negation types, remove the union if
+             ;; it partitions some array type together with the type1
+             ;; supertype
+             (let ((union (type-union2 supertype type2))
+                   did-something
+                   new-negations)
+               (flet ((dimensions-subtypep (type1 type2)
+                        (let ((dim1 (array-type-dimensions type1))
+                              (dim2 (array-type-dimensions type2)))
+                          (or (eq dim2 '*)
+                              (equal dim1 dim2)
+                              (and (listp dim1)
+                                   (= (length dim1) (length dim2))
+                                   (every (lambda (d1 d2)
+                                            (or (eq d2 '*)
+                                                (eql d1 d2)))
+                                          dim1 dim2)))))
+                      (et-subtypep (type1 type2)
+                        (let ((et1 (array-type-specialized-element-type type1))
+                              (et2 (array-type-specialized-element-type type2)))
+                          (or (eq et1 et2)
+                              (eq et2 *wild-type*)))))
+                 (let* ((union-supertype (or union supertype))
+                        (type2-supertype (change-array-type type2
+                                                            :complexp (if (eq (array-type-complexp union-supertype)
+                                                                              (array-type-complexp type2))
+                                                                          :maybe
+                                                                          :inherit)
+                                                            :dimensions (if (equal (array-type-dimensions union-supertype)
+                                                                                   (array-type-dimensions type2))
+                                                                            '*
+                                                                            :inherit)
+                                                            :element-type (if (eq (array-type-specialized-element-type union-supertype)
+                                                                                  (array-type-specialized-element-type type2))
+                                                                              *wild-type*))))
+                   (loop for not in negations
+                         for not-type = (negation-type-type not)
+                         do (cond ((csubtypep not-type type2-supertype)
+                                   (setf did-something t))
+                                  ((and union
+                                        (neq (array-type-complexp type2) :maybe)
+                                        (et-subtypep not-type type2-supertype)
+                                        (dimensions-subtypep not-type type2-supertype))
+                                   (setf did-something t)
+                                   (push (change-array-type not :complexp (not (array-type-complexp type2)))
+                                         new-negations))
+                                  (t
+                                   (setf union nil)
+                                   (push not new-negations))))))
+               (when did-something
+                 (if union
+                     (type-intersection union (%type-intersection new-negations))
+                     (type-union type2 (type-intersection supertype (%type-intersection new-negations))))))
 
-             (t
-              ;; This is the same as in the intersection-simple-union2-type-method,
-              ;; but it doesn't stop if type-union produces a new union type:
-              ;; (or (and vector (not (simple-array t))) simple-vector)
-              ;; => vector
-              (let (unions
-                    non-compound)
-                (do ((t1s t1s (cdr t1s)))
-                    ((null t1s))
-                  (let ((union (or (type-union2 type2 (car t1s))
-                                   (return-from array-complex-union2-type-method))))
-                    (if (typep union '(or compound-type negation-type))
-                        (push union unions)
-                        (setf non-compound (if non-compound
-                                               (type-intersection non-compound union)
-                                               union)))))
-                (when non-compound
-                  (loop for (union . more) on unions
-                        do (setf non-compound (type-intersection non-compound union))
-                        if (and more
-                                (typep non-compound '(or compound-type negation-type)))
-                        return nil
-                        finally (return non-compound))))))))))
+             ;; This is the same as in the intersection-simple-union2-type-method,
+             ;; but it doesn't stop if type-union produces a new union type:
+             ;; (or (and vector (not (simple-array t))) simple-vector)
+             ;; => vector
+             (let (unions
+                   non-compound)
+               (do ((t1s t1s (cdr t1s)))
+                   ((null t1s))
+                 (let ((union (or (type-union2 type2 (car t1s))
+                                  (return-from array-complex-union2-type-method))))
+                   (if (typep union '(or compound-type negation-type))
+                       (push union unions)
+                       (setf non-compound (if non-compound
+                                              (type-intersection non-compound union)
+                                              union)))))
+               (when non-compound
+                 (loop for (union . more) on unions
+                       do (setf non-compound (type-intersection non-compound union))
+                       if (and more
+                               (typep non-compound '(or compound-type negation-type)))
+                       return nil
+                       finally (return non-compound))))))))))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
 ;;; and return it in canonical form (as either '* or a list).
