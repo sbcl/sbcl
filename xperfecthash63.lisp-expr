@@ -8,6 +8,12 @@
   (let ((b (& (>> val 1) #xf)))
    (let ((a (>> (<< val 25) 28)))
     (^ a (aref tab b))))))")
+(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 2A 2C 32 34 7A)
+ "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 22 21 18 17 2 16 15 0 1)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 15 13 15 21 9 0 16 18 16 0 18 22)))
+  (let ((b (& (>> val 1) #xf)))
+   (let ((a (>> (<< val 25) 28)))
+    (^ a (aref tab b))))))")
 (#(0 2 4 1E 20 22 2A 2C)
  "(15 16 21 22 2 17 1 0)"
  "((& (+ (>> val 1) (>> val 3) (>> val 4)) 7))")
@@ -1232,6 +1238,9 @@
 (#(2DD4199E 42D83FFB 68B83D2D 84D01102 88E8BEBA ECF81B20)
  "(:ALLOW-OTHER-KEYS :HIGH :LOW :COMPLEXP :FORMAT :CLASS)"
  "((& (+ (>> val 3) (>> val 18)) 7))")
+(#(2DD4199E 42D83FFB 68B83D2D 84D01102 88E8BEBA ECF81B20 EE80FD9D)
+ "(:ALLOW-OTHER-KEYS :NORMALIZE-ZEROS :HIGH :LOW :COMPLEXP :FORMAT :CLASS)"
+ "((& (- val (>> val 15)) 7))")
 (#(2DF0AB1F 573C9675 5ACE528D CB5B4BC6 D7F08D68)
  "(SB-C::MORE REST SB-C::OPTIONAL SB-C::SUPPLIED-P SB-C::DELETED)"
  "((& (+ (>> val 6) (>> val 21)) 7))")
@@ -1631,6 +1640,9 @@
 (#(611D1FAD 80D0C591 AC841474 D2F86037)
  "(SHORT-FLOAT SINGLE-FLOAT DOUBLE-FLOAT LONG-FLOAT)"
  "((& (>> val 18) 3))")
+(#(6A3E03D5 A4528420 D0F360C2 D1F36255 D7F36BC7)
+ "(ASH * %NEGATE + -)"
+ "((& (+ (>> val 1) (>> val 6)) 7))")
 (#(6B08DE4D C4F34DDE C6F35104 C7F35297 EF039DEB)
  "(<= < >= > =)"
  "((& (+ val (>> val 10)) 7))")
@@ -1698,17 +1710,5 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
-(#(2DD4199E 42D83FFB 68B83D2D 84D01102 88E8BEBA ECF81B20 EE80FD9D)
- "(:ALLOW-OTHER-KEYS :NORMALIZE-ZEROS :HIGH :LOW :COMPLEXP :FORMAT :CLASS)"
- "((& (- val (>> val 15)) 7))")
-(#(6A3E03D5 A4528420 D0F360C2 D1F36255 D7F36BC7)
- "(ASH * %NEGATE + -)"
- "((& (+ (>> val 1) (>> val 6)) 7))")
-(#(0 2 4 6 8 A E 10 12 14 16 18 1A 1C 1E 20 22 24 2A 2C 32 34 7A)
- "(61 4 3 10 7 8 9 5 14 13 12 11 26 25 22 21 18 17 2 16 15 0 1)"
- "((let ((tab #a((16) (unsigned-byte 8) 0 13 1 7 15 13 15 21 9 0 16 18 16 0 18 22)))
-  (let ((b (& (>> val 1) #xf)))
-   (let ((a (>> (<< val 25) 28)))
-    (^ a (aref tab b))))))")
 )
 ;; EOF
