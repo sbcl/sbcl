@@ -16,7 +16,7 @@
 (defknown %sap-alien (system-area-pointer alien-type) alien-value
   (flushable movable))
 (defknown alien-sap (alien-value) system-area-pointer
-  (flushable movable))
+  (flushable movable)) ; (could be always-translatable depending on the backend)
 
 (defknown slot (alien-value symbol) t
   (flushable recursive))
@@ -449,6 +449,26 @@
 
 ;;;; ALIEN-SAP, %SAP-ALIEN, %ADDR, etc.
 
+;;; I enabled this as a sanity check to verfify that the compiler only inserts ALIEN-SAP
+;;; calls on things which are instances of ALIEN-VALUE. But this is not needed, and
+;;; it's actually inadequate because apparently both (ALIEN (* (FUNCTION ...))) and
+;;; (ALIEN (FUNCTION ...)) are acceptable to ALIEN-SAP.  So I didn't feel like coming up
+;;; with an exhaustive list of what to expect, for fear of leaving something out.
+#+sb-devel
+(defun pointerish-alientype-p (x) ; (tree-shaken out anyway)
+  (or (and (alien-type-type-p x)
+           (let ((type (alien-type-type-alien-type x)))
+             (or (alien-pointer-type-p type)
+                 (alien-array-type-p type))))
+      (and (union-type-p x)
+           (every #'pointerish-alientype-p (union-type-types x)))
+      (type= x (specifier-type 'alien-value))))
+
+;;; The IR1 transform for ALIEN-SAP tries to un-realize aliens by converting the
+;;; composition of sap-alien followed by alien-sap into an identity operation.
+;;; But sometimes ALIEN-SAP is just ALIEN-VALUE-SAP (i.e. %INSTANCE-REF)
+;;; However I didn't want to further complicate this, so If ALIEN-SAP remains in
+;;; the IR, then it's an ALIEN-VALUE (no need to check) and a vop can do the rest.
 (deftransform alien-sap ((alien))
   (let ((alien-node (lvar-uses alien)))
     (typecase alien-node

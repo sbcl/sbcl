@@ -504,3 +504,16 @@
   (:results (res :scs (any-reg)))
   (:result-types fixnum)
   (:generator 1 (inst #+mips addu #-mips add res x y)))
+
+;;; This vop is safe even if the user calls ALIEN-SAP by hand - the compiler will assert
+;;; the arg to be of type SB-ALIEN-INTERNALS:ALIEN-VALUE (unless checking is dsabled).
+;;; *** produces a bad build on ppc and ppc64 - why? ***
+#+(or arm64 riscv x86 x86-64)
+(define-vop (alien-sap)
+  (:translate alien-sap)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (r :scs (descriptor-reg)))
+  (:generator 1
+   (loadw r x (+ (get-dsd-index alien-value sb-kernel::sap) instance-slots-offset)
+          instance-pointer-lowtag)))
