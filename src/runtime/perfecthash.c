@@ -859,7 +859,7 @@ typedef uint8_t  ub1;\n");
       mem_stream_printf(f, infix ? "ub4 scramble[] = {\n" : "32)");
       for (i=0; i<=UB1MAXVAL; i+=4)
         mem_stream_printf(f,
-                infix ? "0x%.8x, 0x%.8x, 0x%.8x, 0x%.8x,\n" : " #x%8x #x%8x #x%8x #x%8x\n",
+                infix ? "0x%.8x, 0x%.8x, 0x%.8x, 0x%.8x,\n" : " #x%x #x%x #x%x #x%x\n",
                 scramble[i+0], scramble[i+1], scramble[i+2], scramble[i+3]);
     }
     else
