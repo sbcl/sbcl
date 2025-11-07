@@ -84,6 +84,11 @@ types for the Common Lisp expression reader."
    :type (simple-vector #.base-char-code-limit)
    :read-only t)
   ;; Characters above the BASE-CHAR range
+  ;; TODO: this should probably be changed back to an alist, or else we need to use
+  ;; a hash-table that is safe for readers if there is any write in progress.
+  ;; Or cons a new hash-table whenever we need to insert a new <k,v> pair.
+  ;; (":synchronized t" table would be waaay too much overhead per character)
+  ;; Same goes for the secondary dispatch table of dispatching charmacros.
   (extended-char-table *empty-extended-char-table* :type hash-table)
   (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert))
   ;; Element type to use when reading a string literal with no extended-chars.

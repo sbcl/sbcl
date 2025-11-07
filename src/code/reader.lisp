@@ -287,6 +287,7 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
   to)
 
 (defun %make-dispatch-macro-char (dtable)
+  ;; Make a closure that can be assigned as SET-MACRO-CHARACTER for a dispatching char
   (lambda (stream char)
     (declare (ignore char))
     (read-dispatch-char stream dtable)))
@@ -395,30 +396,33 @@ standard Lisp readtable when NIL."
                 ;; character?" but "non-terminating macro character?".
                 nil))))
 
-(defun get-dispatch-macro-char-table (disp-char readtable &optional (errorp t))
-  (cond ((%dispatch-macro-char-table (get-raw-cmt-entry disp-char readtable)))
-        (errorp (error "~S is not a dispatching macro character." disp-char))))
+(defun get-charmacro-dtable-or-err (disp-char readtable)
+  (or (%dispatch-macro-char-table (get-raw-cmt-entry disp-char readtable))
+      (error "~S is not a dispatching macro character." disp-char)))
 
+;;; Assign CHAR a closure as its secondary dispatch function.
+;;; If CHAR is already a dispatching macro, it is possible to reassign its syntax
+;;; - terminating-macro or constituent - without affecting its closure.
+;;; RT is specified to be of type READTABLE, and not a readtable designator,
+;;; so this can't, either accidentally or otherwise, cause *STANDARD-READTABLE* to
+;;; get more dispatch macro chars, because there is no access path to that readtable.
 (defun make-dispatch-macro-character (char &optional
                                       (non-terminating-p nil)
-                                      (rt *readtable*))
+                                      (rt *readtable*)
+                                      &aux (function (get-raw-cmt-entry char rt)))
   "Cause CHAR to become a dispatching macro character in readtable (which
    defaults to the current readtable). If NON-TERMINATING-P, the char will
    be non-terminating."
-  ;; This used to call ERROR if the character was already a dispatching
-  ;; macro but I saw no evidence of that in other implementations except cmucl.
-  ;; Without a portable way to inquire whether a character is dispatching,
-  ;; a file that frobs *READTABLE* can't be repeatedly loaded except
-  ;; by catching the error, so I removed it.
-  ;; RT is a readtable, not a readtable-designator, as per CLHS.
-  (unless (get-dispatch-macro-char-table char rt nil)
-    ;; Dispatch table is a cons whose whose CAR is a vector indexed by base char code
-    ;; and CDR is initially NIL, changed to a hashtable if there are extended chars.
-    (set-macro-character char
-                         (%make-dispatch-macro-char
-                          (list (make-array base-char-code-limit :initial-element nil)))
-                         non-terminating-p rt))
-  t)
+  ;; Punting to SET-MACRO-CHARACTER is the best way to set the syntax whether changed or not
+  (set-macro-character
+     char
+     (if (and function (%dispatch-macro-char-table function))
+         function
+         ;; Dispatch table is a cons whose whose CAR is a vector indexed by base char code
+         ;; and CDR is initially NIL, changed to a hashtable if there are extended chars.
+         (%make-dispatch-macro-char
+          (list (make-array base-char-code-limit :initial-element nil))))
+     non-terminating-p rt))
 
 (defun set-dispatch-macro-character (disp-char sub-char function
                                      &optional (rt-designator *readtable*))
@@ -431,7 +435,7 @@ standard Lisp readtable when NIL."
     (assert-not-standard-readtable readtable 'set-dispatch-macro-character)
     (when (digit-char-p sub-char)
       (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
-    (let ((dtable (get-dispatch-macro-char-table disp-char readtable)))
+    (let ((dtable (get-charmacro-dtable-or-err disp-char readtable)))
       ;; (SET-MACRO-CHARACTER #\$ (GET-MACRO-CHARACTER #\#)) will share
       ;; the dispatch table. Perhaps it should be copy-on-write?
       (if (typep sub-char 'base-char)
@@ -450,8 +454,8 @@ standard Lisp readtable when NIL."
                                      &optional (rt-designator *readtable*))
   "Return the macro character function for SUB-CHAR under DISP-CHAR
    or NIL if there is no associated function."
-  (let ((dtable (get-dispatch-macro-char-table
-                 disp-char (or rt-designator *standard-readtable*))))
+  (let ((dtable (get-charmacro-dtable-or-err disp-char
+                                             (or rt-designator *standard-readtable*))))
     (get-raw-cmt-dispatch-entry sub-char dtable)))
 
 
