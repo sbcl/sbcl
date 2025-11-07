@@ -29,7 +29,7 @@
   ;; Change #\$ to terminate tokens
   (make-dispatch-macro-character #\$) ; let NON-TERMINATING-P take its default of T
   ;; sub-characters should still exist
-  (assert (eq (set-dispatch-macro-character #\$ #\$) 'double-cash))
+  (assert (eq (get-dispatch-macro-character #\$ #\$) 'double-cash))
   (assert (equal (read-from-string "(foo some$!thing)")
                  '(FOO SOME "{cashbang}" THING)))
   (assert (equal (read-from-string "(foo some\\$thing)")
