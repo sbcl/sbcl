@@ -329,7 +329,9 @@
   (:policy :fast-safe)
   (:translate pointerp)
   (:generator 3
-    (if (location= temp value) (inst sub :dword value 3) (inst lea :dword temp (ea -3 value)))
+    ;; Since TEST will examine only the low 2 bits, it doesn't matter if we flip just
+    ;; those bits, or the low dword. The latter can be done without an immediate operand.
+    (if (location= temp value) (inst not :dword value) (inst lea :dword temp (ea -3 value)))
     (inst test :byte temp #b11)))
 
 ;; A fixnum or single-digit bignum satisfies signed-byte-64-p
@@ -671,7 +673,11 @@
                          (change-vop-flags vop '(:nz))))
                       (t
                        (if (location= temp value)
-                           (inst sub :dword value ,lowtag)
+                           ;; Similarly with POINTERP, this might avoid an immediate operand.
+                           ;; (Seems like we rarely if ever get here with LOCATION= though)
+                           ,(if (= (symbol-value lowtag) #b1111)
+                                '(inst not :dword value)
+                                `(inst xor :dword value ,lowtag))
                            (inst lea :dword temp (ea (- ,lowtag) value)))
                        (inst test :byte temp lowtag-mask))))))))
   (define functionp fun-pointer-lowtag)
