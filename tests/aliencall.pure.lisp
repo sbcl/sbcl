@@ -15,7 +15,7 @@
               ;; depending on #+/- unicode and all)
               (sb-sys:vector-sap "Ptr=%p\\n")
               x))))))
-    #+x86-64
+    #+(and x86-64 immobile-space (not win32))
     (let (typep callout other)
       (dolist (line lines)
         (when (search "CALL" line)
