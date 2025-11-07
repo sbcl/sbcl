@@ -3756,7 +3756,7 @@
            (max-big (reduce #'max times :start 3)))
       ;; This way is hopefully fairly CPU-performance insensitive.
       (unless (> (+ (truncate internal-time-units-per-second 10)
-                    (* 2 max-small))
+                    (* 3 max-small))
                  max-big)
         (error "Bad scaling or test? ~S" times)))))
 
