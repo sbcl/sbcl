@@ -779,6 +779,11 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; A FSM-like thingie that determines whether a symbol is a potential
 ;;; number or has evil characters in it.
+;;; CLHS 22.1.3.3
+;;;  When printing a symbol, the printer inserts enough single escape and/or multiple escape characters
+;;;  (backslashes and/or vertical-bars) so that if read were called with the same *readtable* and with
+;;;  *read-base* bound to the current output base, it would return the same symbol (if it is not
+;;;  apparently uninterned) or an uninterned symbol with the same print name (otherwise).
 (defun symbol-quotep (name readtable)
   (declare (simple-string name))
   (macrolet ((advance (tag &optional (at-end t))
