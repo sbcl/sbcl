@@ -194,3 +194,31 @@
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
                   ;;            ( 1 +   * p r i n t - l e v e l * ) ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(sb-cover:clear-coverage)
+(defun generate-code (x y)
+  `(if (evenp ,x) (1+ ,y) (1- ,y)))
+(compile-load "test-data-read-eval")
+;; It's a bit difficult to decide what the state of the READ-EVAL'd
+;; code should be without ever running the function; if something
+;; changes this test, that might be OK.
+(assert (equalp (get-states "test-data-read-eval")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   r e a d - e v a l   ( z   w )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    # . ( g e n e r a t e   c o d e   ' z   ' w ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(read-eval 2 3)
+;; ... but probably the main thing is that this shouldn't show any
+;; conditional-related states (or indeed read-suppressed states).
+(assert (equalp (get-states "test-data-read-eval")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   r e a d - e v a l   ( z   w )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    # . ( g e n e r a t e   c o d e   ' z   ' w ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))

@@ -494,9 +494,10 @@ report, otherwise ignored. The default value is CL:IDENTITY.
               (handler-case
                   (multiple-value-bind (start end)
                       (source-path-source-position (cons 0 source-path) source-form source-map)
-                    (push (list start end state) locations))
-                (error ()
-                  (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
+                    (when (and start end)
+                      (push (list start end state) locations)))
+                (error (e)
+                  (warn "~@<Error finding source location for source path ~A in file ~A: ~2I~_~A~@:>" source-path file e)))
               (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))))
 
 (defun fill-states-from-locations (source states locations)
@@ -694,6 +695,8 @@ The source locations are stored in SOURCE-MAP."
     (let ((*backquote-level* (1- *backquote-level*)))
       (list 'comma (read stream t nil t)))))
 
+(defstruct read-eval-marker)
+
 ;;; Ripped from SB-IMPL, since location recording on a cons-cell level
 ;;; can't be done just by simple read-table tricks.
 (defun make-recording-read-list (source-map)
@@ -732,8 +735,8 @@ The source locations are stored in SOURCE-MAP."
                (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (when listobj
-             (unless (consp (car listobj))
-               (setf (car listobj) (gensym))
+              (unless (or (consp (car listobj)) (read-eval-marker-p (car listobj)))
+                (setf (car listobj) (gensym))
                 (push (list start end *read-suppress*)
                       (gethash (car listobj) source-map)))
               (rplacd listtail listobj)
@@ -742,11 +745,14 @@ The source locations are stored in SOURCE-MAP."
 (defun suppress-sharp-dot (readtable)
   (when (get-macro-character #\# readtable)
     (let ((sharp-dot (get-dispatch-macro-character #\# #\. readtable)))
-      (set-dispatch-macro-character #\# #\.
-                                    (lambda (&rest args)
-                                      (let ((*read-suppress* t))
-                                        (apply sharp-dot args)))
-                                    readtable))))
+      (when sharp-dot
+        (set-dispatch-macro-character #\# #\.
+                                      (lambda (stream &rest args)
+                                        (declare (ignore args))
+                                        (let ((*backquote-level* 0))
+                                          (read stream t nil t)
+                                          (make-read-eval-marker))))
+                                      readtable))))
 
 (defun suppress-sharp-c (readtable)
   (when (get-macro-character #\# readtable)
@@ -832,34 +838,17 @@ Return the form and the source-map."
           (error 'end-of-file :stream stream)
           (values form source-map)))))
 
-(defun source-path-stream-position (path stream)
-  "Search the source-path PATH in STREAM and return its position."
-  (check-source-path path)
-  (destructuring-bind (tlf-number . path) path
-    (multiple-value-bind (form source-map) (read-source-form tlf-number stream)
-      (source-path-source-position (cons 0 path) form source-map))))
-
-(defun check-source-path (path)
-  (unless (and (consp path)
-               (every #'integerp path))
-    (error "The source-path ~S is not valid." path)))
-
-(defun source-path-string-position (path string)
-  (with-input-from-string (s string)
-    (source-path-stream-position path s)))
-
-(defun source-path-file-position (path filename)
-  (with-open-file (file filename)
-    (source-path-stream-position path file)))
-
 (defun source-path-source-position (path form source-map)
   "Return the start position of PATH from FORM and SOURCE-MAP.  All
 subforms along the path are considered and the start and end position
 of the deepest (i.e. smallest) possible form is returned."
   ;; compute all subforms along path
-  (let ((forms (loop for n in path
+  (let ((forms (loop for ns on path
+                     for n = (car ns)
                      for f = form then (nth n f)
                      collect f into forms
+                     if (read-eval-marker-p f)
+                       do (return-from source-path-source-position (values nil nil))
                      finally (return forms))))
     ;; select the first subform present in source-map
     (loop for real-form in (reverse forms)
