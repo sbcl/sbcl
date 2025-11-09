@@ -18,6 +18,7 @@
 (defpackage "SB-COLD"
   (:use "CL")
   (:export
+   "BACKEND-SUBFEATURES"
    "FIND-BOOTSTRAP-FILE"
    "PRESERVING-HOST-FUNCTION"
    "STEM-SOURCE-PATH"))
