@@ -618,7 +618,6 @@ void* new_thread_trampoline(void* arg)
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (lispthread->ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
-    SET_LISPTHREAD_TID(lispthread);
 
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
@@ -649,6 +648,13 @@ void* new_thread_trampoline(void* arg)
     th->control_stack_end = (lispobj*)&arg + 1;
 #endif
     init_new_thread(th, SCRIBBLE, 0);
+    /* On any platform using MMU-based protection to track dirty GC cards, assigning
+     * a slot of 'lispthread' MUST NOT occur until after init_new_thread so that this
+     * thread is considered to be "in lisp". Otherwise, if GC occurs just prior to
+     * new_thread_trampoline, and write-protects the thread instance, this store will
+     * fault, and the SIGSEGV handler would consider it in foreign code, and croak */
+    SET_LISPTHREAD_TID(LISPTHREAD(th));
+
     // Passing the untagged pointer ensures 2 things:
     // - that the pinning mechanism works as designed, and not just by accident.
     // - that the initial stack does not contain a lisp pointer after it is not needed.
