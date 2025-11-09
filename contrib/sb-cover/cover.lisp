@@ -337,7 +337,9 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                            (not (equal (pathname-directory (pathname source-file))
                                        (pathname-directory (pathname prev)))))
                    (format stream "<tr class='subheading'><td colspan='7'>~A</td></tr>~%"
-                           (namestring (make-pathname :directory (pathname-directory (pathname source-file))))))
+                           (namestring (make-pathname
+                                        :host (pathname-host (pathname source-file))
+                                        :directory (pathname-directory (pathname source-file))))))
               do (format stream "<tr class='~:[odd~;even~]'><td class='text-cell'><a href='~a.html'>~a</a></td>~{<td>~:[-~;~:*~a~]</td><td>~:[-~;~:*~a~]</td><td>~:[-~;~:*~5,1f~]</td>~}</tr>"
                          even
                          report-file
