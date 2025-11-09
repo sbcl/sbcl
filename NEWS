@@ -7,6 +7,9 @@ changes relative to sbcl-2.5.10:
     SB-INTROSPECT functions, will misreport the location of signalled
     conditions and/or definitions in top-level forms including backquotes and
     commas.
+  * bug fix: ENOUGH-NAMESTRING when the pathname and defaults arguments are
+    both logical pathnames with the same host returns a shorter string than
+    previously.
 
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:

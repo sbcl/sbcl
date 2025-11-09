@@ -1009,3 +1009,17 @@
         (setf (sb-sys:sap-ref-word sap offset) original-word))
       ;; Exactly one of the tested patterns is the unadulterated hash
       (assert (= n-matched 1)))))
+
+(with-test (:name :enough-namestring-logical-pathname)
+  (let ((namestring "SYS:SRC;FOO.LISP")
+        (pathname #p"SYS:SRC;FOO.LISP")
+        (defaults #p"SYS:SRC;"))
+    (assert (typep pathname 'logical-pathname))
+    (assert (equal (parse-namestring namestring) pathname))
+    ;; identity from CLHS `enough-namestring`
+    (assert (equal (merge-pathnames (enough-namestring pathname defaults) defaults)
+                   (merge-pathnames (parse-namestring pathname nil defaults) defaults)))
+    ;; probably the intended identity
+    (assert (equal (merge-pathnames (enough-namestring pathname defaults) defaults)
+                   (merge-pathnames (parse-namestring namestring nil defaults) defaults)))
+    (assert (equal ";FOO.LISP" (enough-namestring pathname defaults)))))
