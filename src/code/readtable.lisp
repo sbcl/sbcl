@@ -96,10 +96,9 @@ types for the Common Lisp expression reader."
   ;; functions. One of these functions called with appropriate
   ;; arguments whenever any non-WHITESPACE character is encountered
   ;; inside READ-PRESERVING-WHITESPACE. These functions are used to
-  ;; implement user-defined read-macros, system read-macros, and the
-  ;; number-symbol reader.
+  ;; implement system- and user-defined read-macros.
   (base-char-macro-array
-   (make-array base-char-code-limit :initial-element nil)
+   (make-array base-char-code-limit :initial-element 0)
    :type (simple-vector #.base-char-code-limit)
    :read-only t)
   ;; Characters above the BASE-CHAR range

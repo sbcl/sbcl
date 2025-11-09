@@ -203,8 +203,20 @@
     (list :metavar (read stream t nil t)))
   (assert (equal (read-from-string "$(x)") '(:metavar x)))
 
+  ;; What happens if the fun-designator is NIL? It used to remove the macro.
+  ;; I don't see evidence in the CLHS that this is correct, so now it implies
+  ;; that the character can't be read except where it behaves as a constituent.
+  ;; There is divided opinion amongst FOSS Lisp implementations I tested.
+  ;; Choice (1) fail at the call to SET-MACRO-CHARACTER
+  ;;   CLISP: (set-macro-character #\$ nil) => "undefined function NIL"
+  ;; Choice (2) remove the macro, causing #\$ become normal syntax.
+  ;;   ABCL and Closure both do this
+  ;; Choice (3) fail when reading the character #\$
+  ;;   GCL: "Cell error on NIL: Undefined function"
+  ;;   ECL: "The function NIL is undefined."
+  ;;   Clasp: "The function NIL is undefined."
   (set-macro-character #\$ nil) ; 'NIL never designates a function
-  (assert (eq (read-from-string "$") '$))
+  (assert-error (read-from-string "$"))
 
   ;; Do not accept extended-function-designators.
   ;; (circumlocute to prevent a compile-time error)
