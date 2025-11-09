@@ -222,3 +222,37 @@
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
                   ;;    # . ( g e n e r a t e   c o d e   ' z   ' w ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(sb-cover:clear-coverage)
+(defvar *flag* t)
+(compile-load "test-data-sharp-plus-sharp-dot")
+(assert (equalp (get-states "test-data-sharp-plus-sharp-dot")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   s h a r p - p l u s - s h a r p - d o t   ( x )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    # + # . ( c l : i f   s b - c o v e r - t e s t : : * f l a g *   ' ( a n d )   ' ( o r ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( 1 +   x )
+                  0 1 1 2 2 2 2 2 2
+                  ;;    # - # . ( c l : i f   s b - c o v e r - t e s t : : * f l a g *   ' ( a n d )   ' ( o r ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    (  1  -     x  )  )
+                  0 1 1 15 15 15 15 15 15 1)))
+
+(setf *flag* nil)
+(assert (equalp (get-states "test-data-sharp-plus-sharp-dot")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   s h a r p - p l u s - s h a r p - d o t   ( x )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    # + # . ( c l : i f   s b - c o v e r - t e s t : : * f l a g *   ' ( a n d )   ' ( o r ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    (  1  +     x  )
+                  0 1 1 15 15 15 15 15 15
+                  ;;    # - # . ( c l : i f   s b - c o v e r - t e s t : : * f l a g *   ' ( a n d )   ' ( o r ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( 1 -   x ) )
+                  0 1 1 2 2 2 2 2 2 1)))

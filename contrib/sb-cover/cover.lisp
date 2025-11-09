@@ -657,6 +657,9 @@ before and after of calling FN in the hashtable SOURCE-MAP."
 The source locations are stored in SOURCE-MAP."
   (let* ((tab (copy-readtable readtable))
          (*readtable* tab))
+    ;; Preserve sharp-dot in feature conditional expressions (so do
+    ;; this before SUPPRESS-SHARP-DOT).
+    (preserve-sharp-dot-in-sharp-plus-minus tab)
     ;; It is unspecified whether doing (SET-MACRO-CHARACTER c1 fn)
     ;; and then (SET-DISPATCH-MACRO-CHARACTER c1 c2 fn) should be allowed.
     ;; Portability concerns aside, it doesn't work in the latest code,
@@ -741,6 +744,29 @@ The source locations are stored in SOURCE-MAP."
                       (gethash (car listobj) source-map)))
               (rplacd listtail listobj)
               (setq listtail listobj))))))))
+
+(defun preserve-sharp-dot-in-sharp-plus-minus (readtable)
+  (when (get-macro-character #\# readtable)
+    (let ((sharp-dot (get-dispatch-macro-character #\# #\. readtable))
+          (sharp-plus (get-dispatch-macro-character #\# #\+ readtable))
+          (sharp-minus (get-dispatch-macro-character #\# #\- readtable)))
+      (when (and sharp-dot sharp-plus sharp-minus)
+        (let ((copy (copy-readtable readtable)))
+          (flet ((sharp-plus-minus (stream sub-char numarg)
+                   (declare (ignore numarg))
+                   (if (char= sub-char
+                              (if (sb-int:featurep (let ((*package* sb-int:*keyword-package*)
+                                                         (sb-impl::*reader-package* nil)
+                                                         (*read-suppress* nil)
+                                                         (*readtable* copy))
+                                                     (read stream t nil t)))
+                                  #\+ #\-))
+                       (read stream t nil t)
+                       (let ((*read-suppress* t))
+                         (read stream t nil t)
+                         (values)))))
+            (set-dispatch-macro-character #\# #\+ #'sharp-plus-minus)
+            (set-dispatch-macro-character #\# #\- #'sharp-plus-minus)))))))
 
 (defun suppress-sharp-dot (readtable)
   (when (get-macro-character #\# readtable)
