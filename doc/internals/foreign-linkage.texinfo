@@ -55,9 +55,7 @@ dynamic foreign variables. For those it indicates the need for the
 indirection either within a conditional branch in
 @code{FOREIGN-SYMBOL-SAP}, or via @code{:FOREIGN-DATAREF} fixup and
 @code{FOREIGN-SYMBOL-DATAREF-SAP} VOP: "this address holds the
-address of the foreign variable, not the variable itself". Within SBCL
-itself (in the fixups manifest in various VOPs) this fixup type is
-never used, as all foreign symbols used internally are static.
+address of the foreign variable, not the variable itself".
 
 One thing worth noting is that @code{FOREIGN-SYMBOL-SAP} and friends
 now have the potential side-effect of entering information in
