@@ -91,7 +91,7 @@
       (setf (aref (base-char-syntax-array readtable) (char-code char)) attributes
             (aref (base-char-macro-array readtable) (char-code char)) function)
       (let ((table (extended-char-table readtable)))
-        (cond ((or (pointerp function) (/= attributes +char-attr-constituent+))
+        (cond ((or (not (eql function 0)) (/= attributes +char-attr-constituent+))
                (when (eq table *empty-extended-char-table*) ; copy-on-write
                  (setf table (make-hash-table :test 'eq)
                        (extended-char-table readtable) table))

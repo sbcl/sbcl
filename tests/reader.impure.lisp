@@ -210,7 +210,7 @@
   ;; Choice (1) fail at the call to SET-MACRO-CHARACTER
   ;;   CLISP: (set-macro-character #\$ nil) => "undefined function NIL"
   ;; Choice (2) remove the macro, causing #\$ become normal syntax.
-  ;;   ABCL and Closure both do this
+  ;;   ABCL and Clozure both do this
   ;; Choice (3) fail when reading the character #\$
   ;;   GCL: "Cell error on NIL: Undefined function"
   ;;   ECL: "The function NIL is undefined."
