@@ -1141,7 +1141,11 @@
   (assert (eq (specifier-type '(or (simple-array * (*)) (and (not (array t)) vector)))
               (specifier-type '(and vector (not (and (array t) (not simple-array)))))))
   (assert (eq (specifier-type '(or (and (array t) (not (and vector (not simple-array)))) (vector t)))
-              (specifier-type '(array t)))))
+              (specifier-type '(array t))))
+  (assert (eq (specifier-type '(or (and (not integer) (not (and (array t) (not simple-array))) (not (and vector (not simple-array)))) (array t) vector))
+              (specifier-type '(not integer))))
+  (assert (eq (specifier-type '(or (and (not integer) (not (and (array t) (not simple-array))) (not (and vector (not simple-array)))) vector))
+              (specifier-type '(or (and (not integer) (not (and (array t) (not simple-array)))) vector)))))
 
 (with-test (:name :intersection-not-numeric)
   (assert (eql
