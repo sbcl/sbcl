@@ -694,6 +694,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
     (setf *read-suppress* nil))
   (let* ((eof-marker (cons nil nil))
          (form (read in nil eof-marker)))
+    (declare (dynamic-extent eof-marker))
     (if (eq form eof-marker)
         (exit)
         form)))
