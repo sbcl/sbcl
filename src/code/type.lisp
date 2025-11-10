@@ -3631,12 +3631,15 @@ expansion happened."
                 ;; => (not (simple-array * (10)))
                 (make-negation-type
                  (change-array-type-complexp not-type1 nil)))
-               ;; (or (vector t) (not (array t)))
-               ;; => (or vector (not (array t)))
+               ;; (or (vector t) (not (array t))) => (or vector (not (array t)))
+               ;; (or (vector t) (not vector)) => (or (array t) (not vector))
                ((and
                  (not (and (eq (array-type-complexp not-type1) :maybe)
                            (eq (array-type-specialized-element-type not-type1) *wild-type*)
                            (eq (array-type-dimensions not-type1) '*)))
+                 (or (eq (array-type-dimensions not-type1) '*)
+                     (equal (array-type-dimensions not-type1)
+                            (array-type-dimensions type2)))
                  (csubtypep type2 not-type1))
                 (type-union (change-array-type type2
                                                :complexp (if (eq (array-type-complexp not-type1) :maybe)
