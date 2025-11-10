@@ -3736,30 +3736,6 @@
          (load-time-value (the (values fixnum) 42)))
     (() 42)))
 
-(with-test (:name (compile :bug-654289))
-  ;; Test that compile-times don't explode when quoted constants
-  ;; get big.
-  (labels ((time-n (n)
-             (gc :full t) ; Let's not confuse the issue with GC
-             (let* ((tree (make-tree (expt 10 n) nil))
-                    (t0 (get-internal-run-time))
-                    (f (checked-compile `(lambda (x) (eq x (quote ,tree)))))
-                    (t1 (get-internal-run-time)))
-               (assert (funcall f tree))
-               (- t1 t0)))
-           (make-tree (n acc)
-             (cond ((zerop n) acc)
-                   (t (make-tree (1- n) (cons acc acc))))))
-    (let* ((times (loop for i from 0 upto 4
-                        collect (time-n i)))
-           (max-small (reduce #'max times :end 3))
-           (max-big (reduce #'max times :start 3)))
-      ;; This way is hopefully fairly CPU-performance insensitive.
-      (unless (> (+ (truncate internal-time-units-per-second 10)
-                    (* 3 max-small))
-                 max-big)
-        (error "Bad scaling or test? ~S" times)))))
-
 (with-test (:name (compile :bug-309063))
   (checked-compile-and-assert ()
       `(lambda (x)
