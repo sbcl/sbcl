@@ -1029,3 +1029,11 @@
      (make-array 2 :element-type (if d 'a 'b)))
    (simple-array * (2))
    :allow-style-warnings t))
+
+(with-test (:name :make-array-dimension-mix)
+  (checked-compile-and-assert
+   ()
+   `(lambda (d)
+      (make-array (if d 2 '(1))))
+   ((t) #(0 0) :test #'equalp)
+   ((nil) #(0) :test #'equalp)))

@@ -1786,9 +1786,12 @@
 (deftransforms (%make-array sb-vm::%make-simple-array) ((dims widetag n-bits)
                                                         ((or integer (cons integer null)) t t))
   `(sb-vm::allocate-vector-with-widetag widetag
-                                        ,(if (csubtypep (lvar-type dims) (specifier-type 'integer))
-                                                     'dims
-                                                     `(car dims))
+                                        ,(cond ((csubtypep (lvar-type dims) (specifier-type 'integer))
+                                                'dims)
+                                               ((csubtypep (lvar-type dims) (specifier-type 'cons))
+                                                `(car dims))
+                                               (t
+                                                (give-up-ir1-transform)))
                                         n-bits))
 
 
