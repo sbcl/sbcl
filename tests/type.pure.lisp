@@ -1150,6 +1150,10 @@
   (assert (not (typep #(1 2) '(or (vector t 1) (not vector)))))
   (assert (not (typep "a" '(or (vector t 1) (not vector))))))
 
+(with-test (:name :array-intersection)
+  (assert (eq (sb-kernel:array-type-element-type (specifier-type '(and (simple-array nil) (array nil))))
+              (specifier-type 'nil))))
+
 (with-test (:name :intersection-not-numeric)
   (assert (eql
            (specifier-type '(and (not (eql 1)) (not (eql 0))))

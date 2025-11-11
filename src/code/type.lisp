@@ -3535,6 +3535,8 @@ expansion happened."
                                          ((eq eltype1 *wild-type*)
                                           eltype2)
                                          ((eq eltype2 *wild-type*) eltype1)
+                                         ((eq eltype1 *empty-type*) eltype1)
+                                         ((eq eltype2 *empty-type*) eltype2)
                                          (t (let ((int (type-intersection eltype1 eltype2)))
                                               (if (eq int *empty-type*)
                                                   *universal-type*
