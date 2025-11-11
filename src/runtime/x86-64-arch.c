@@ -460,8 +460,8 @@ sigill_handler(int __attribute__((unused)) signal,
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
         return sigtrap_handler(signal, siginfo, context);
 #else
-        /* If and only if 0xCE is our error trap opcode, then UD2 ends pseudo-atomic sequences.
-         * Apart from error breaks, the normal instruction stream is fully decodable by 'gdb'
+        /* UD2 ends pseudo-atomic sequences and has no trailing bytes that encode the
+         * reason for the trap. So the normal instruction stream is fully decodable by 'gdb'
          * - which shows 0xCE as "(bad)" - or other tools, being devoid of arbitrary bytes
          * that encode error metadata after the trapping instruction */
         return interrupt_handle_pending(context);
