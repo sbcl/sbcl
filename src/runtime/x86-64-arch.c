@@ -430,12 +430,6 @@ sigtrap_handler(int __attribute__((unused)) signal,
                 siginfo_t __attribute__((unused)) *info,
                 os_context_t *context)
 {
-#ifdef LISP_FEATURE_INT1_BREAKPOINTS
-    // ICEBP instruction = handle-pending-interrupt following pseudo-atomic
-    if (((unsigned char*)OS_CONTEXT_PC(context))[-1] == 0xF1)
-        return interrupt_handle_pending(context);
-#endif
-
     unsigned int trap;
 
     if (single_stepping) {
@@ -463,7 +457,15 @@ sigill_handler(int __attribute__((unused)) signal,
     unsigned char* pc = (void*)OS_CONTEXT_PC(context);
     if (UNALIGNED_LOAD16(pc) == UD2_INST) {
         OS_CONTEXT_PC(context) += 2;
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
         return sigtrap_handler(signal, siginfo, context);
+#else
+        /* If and only if 0xCE is our error trap opcode, then UD2 ends pseudo-atomic sequences.
+         * Apart from error breaks, the normal instruction stream is fully decodable by 'gdb'
+         * - which shows 0xCE as "(bad)" - or other tools, being devoid of arbitrary bytes
+         * that encode error metadata after the trapping instruction */
+        return interrupt_handle_pending(context);
+#endif
     }
     // Interrupt if overflow (INTO) raises SIGILL in 64-bit mode
     if (*(unsigned char *)pc == INTO_INST) {

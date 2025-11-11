@@ -213,8 +213,8 @@
       ;; using the process signal mask.
       #+partial-sw-int-avoidance (inst call (ea (make-fixup 'synchronous-trap :assembly-routine)))
       #-partial-sw-int-avoidance (progn
-      #+int1-breakpoints (inst icebp)
-      #-int1-breakpoints (inst break pending-interrupt-trap))
+      #+int4-breakpoints (inst ud2)
+      #-int4-breakpoints (inst break pending-interrupt-trap))
       OUT)))
 
 (defmacro define-allocator (name &body body &aux (g (cdr (assoc :generator body))))

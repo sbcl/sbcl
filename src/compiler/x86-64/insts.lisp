@@ -2257,10 +2257,9 @@
 ;;; However, if trying to debug code which also gets an "actual" SIGILL, this still poses
 ;;; a problem for gdb. To workaround that we can emit a call to a asm routine which
 ;;; has essentially the same effect as the signal.
-;;; Orthogonal to the preceding choices, INT1 can be used for pseudo-atomic-interrupted
-;;; but that doesn't work on all systems.
 (define-instruction break (segment &optional (code nil codep))
   (:printer byte-imm ((op #xCC)) :default :print-name 'int3 :control #'break-control)
+  #+ud2-breakpoints ; do NOT decode UD2 as BREAK unless using ud2-breakpoints
   (:printer word-imm ((op #x0B0F)) :default :print-name 'ud2 :control #'break-control)
   ;; INTO always signals SIGILL in 64-bit code. Using it avoids conflicting with gdb's
   ;; use of sigtrap and shortens the error break by 1 byte relative to UD2.
@@ -2298,6 +2297,11 @@
    (emit-prefixes segment rm reg :dword)
    (emit-bytes segment #x0F #xB9)
    (emit-ea segment rm reg)))
+
+#-ud2-breakpoints ; UD2 is a perfectly ordinary UD2 instruction in this case
+(define-instruction ud2 (segment)
+  (:printer two-bytes ((op '(#x0F #x0B))))
+  (:emitter (emit-word segment #x0B0F)))
 
 (define-instruction iret (segment)
   (:printer byte ((op #xCF)))
