@@ -18,28 +18,31 @@
 ;;; ctran. Otherwise insert code coverage instrumentation after
 ;;; START, and return the new ctran.
 (defun instrument-coverage (start mode form
-                            &aux (metadata (coverage-metadata *compilation*)))
+                            &aux (code-coverage-records (coverage-records *compilation*)))
   ;; We don't actually use FORM for anything, it's just convenient to
   ;; have around when debugging the instrumentation.
   (declare (ignore form))
   (if (and *allow-instrumenting*
-           metadata
+           code-coverage-records
            (policy *lexenv* (> store-coverage-data 0)))
       (let ((path (source-path-original-source *current-path*)))
         (when mode
           (push mode path))
-        ;; If this source path has already been instrumented in this
-        ;; block, don't instrument it again.
-        (if (member (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-            start
-            (let ((next (make-ctran))
-                  (*allow-instrumenting* nil))
-              (setf (gethash path (code-coverage-records metadata)) t)
-              (push (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-              (ir1-convert start next nil `(%mark-covered ',path))
-              next)))
+        (let* ((block (ctran-block start))
+               (source-path-marks (block-source-path-marks block)))
+          ;; If this source path has already been instrumented in this
+          ;; block, don't instrument it again.
+          (if (and source-path-marks (gethash path source-path-marks))
+              start
+              (let ((next (make-ctran))
+                    (*allow-instrumenting* nil))
+                (setf (gethash path code-coverage-records) t)
+                (unless source-path-marks
+                  (setf source-path-marks (make-hash-table :test 'equal)
+                        (block-source-path-marks block) source-path-marks))
+                (setf (gethash path source-path-marks) t)
+                (ir1-convert start next nil `(%mark-covered ',path))
+                next))))
       start))
 
 ;;; In contexts where we don't have a source location for FORM

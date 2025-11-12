@@ -62,14 +62,6 @@
 (declaim (type object *compile-object*))
 
 (defvar *emit-cfasl* nil)
-
-(declaim (inline code-coverage-records code-coverage-blocks))
-;; Used during compilation to map code paths to the matching
-;; instrumentation conses.
-(defun code-coverage-records (x) (car x))
-;; Used during compilation to keep track of with source paths have been
-;; instrumented in which blocks.
-(defun code-coverage-blocks (x) (cdr x))
 
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
@@ -1635,8 +1627,7 @@ necessary, since type inference may take arbitrarily long to converge.")
           ;; *or* code for another image which is sanitized.
           ;; And we can also cross-compile assuming msan.
           (member :msan sb-xc:*features*)
-          (cons (make-hash-table :test 'equal)
-                (make-hash-table :test 'equal))
+          (make-hash-table :test 'equal)
           *block-compile-argument*
           *entry-points-argument*
           cfasl))
@@ -1679,8 +1670,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                         #-sb-xc-host
                         (core-object (fix-core-source-info info object))
                         (null)))))
-                (let ((code-coverage-records
-                        (code-coverage-records (coverage-metadata *compilation*))))
+                (let ((code-coverage-records (coverage-records *compilation*)))
                   (unless (zerop (hash-table-count code-coverage-records))
                     ;; Dump the code coverage records into the fasl.
                     (dump-code-coverage-records

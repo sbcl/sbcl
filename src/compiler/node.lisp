@@ -519,7 +519,10 @@
   (xrefs nil :type list)
   ;; Cache the environment of a block during lifetime analysis. :NONE
   ;; if no cached value has been stored yet.
-  (environment-cache :none :type (or null environment (member :none))))
+  (environment-cache :none :type (or null environment (member :none)))
+  ;; A table for keeping track of which source-paths have already had
+  ;; a %MARK-COVERAGE function converted for them.
+  (source-path-marks nil :type (or null hash-table)))
 (defmethod print-object ((cblock cblock) stream)
   (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)

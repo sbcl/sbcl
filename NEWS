@@ -10,6 +10,8 @@ changes relative to sbcl-2.5.10:
   * bug fix: ENOUGH-NAMESTRING when the pathname and defaults arguments are
     both logical pathnames with the same host returns a shorter string than
     previously.
+  * bug fix: the compiler retains fewer temporary data structures when
+    compiling code with coverage data.
 
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:

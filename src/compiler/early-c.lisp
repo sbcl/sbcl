@@ -218,7 +218,7 @@ possible.")
 
 (defstruct (compilation (:constructor make-compilation
                                       (&optional msan-unpoison
-                                                 coverage-metadata
+                                                 coverage-records
                                                  block-compile entry-points compile-toplevel-object))
                         (:copier nil)
                         (:predicate nil)
@@ -231,7 +231,7 @@ possible.")
   ;; any DECLAIMs for later replay. The logic is explained in EVAL-COMPILE-TLF.
   ;; This slot is set to NIL before use and reset when done.
   (saved-optimize-decls :none)
-  (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
+  (coverage-records nil :type (or hash-table null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)
   ;; Which GC the code generator should target. The codegen is basically the same for now
