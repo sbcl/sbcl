@@ -121,6 +121,11 @@ tree structure resulting from the evaluation of EXPRESSION."
          (not (or (fun-type-optional type)
                   (fun-type-keyp type)
                   (fun-type-rest type)))
+         ;; Don't mix block compilation and specialized xeps. It
+         ;; appears to break things and it's unclear which calling
+         ;; convention needs to be preferred.
+         (not (and (boundp 'sb-c:*compilation*)
+                   (sb-c::block-compile sb-c:*compilation*)))
          (multiple-value-bind (llks required) (parse-lambda-list lambda-list)
            (and (zerop llks)
                 (= (length required)
