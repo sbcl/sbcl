@@ -3665,7 +3665,8 @@ expansion happened."
      (let ((t1s (intersection-type-types type1)))
        (let (supertype
              negations
-             other)
+             other
+             not-simple-array-p)
          (or (when (and
                     (loop for type in t1s
                           always (typecase type
@@ -3676,9 +3677,12 @@ expansion happened."
                                     (setf supertype type))
                                    (negation-type
                                     (let ((not-type (negation-type-type type)))
-                                      (if (array-type-p not-type)
-                                          (push type negations)
-                                          (push type other))))
+                                      (cond ((array-type-p not-type)
+                                             (when (eq not-type (specifier-type 'simple-array))
+                                               (setf not-simple-array-p t))
+                                             (push type negations))
+                                            (t
+                                             (push type other)))))
                                    (t
                                     (push type other))))
                     negations)
@@ -3747,12 +3751,17 @@ expansion happened."
                               (type-intersection union intersections)
                               (type-union type2 (type-intersection supertype intersections)))))))
                    (t
-                    (loop for not in negations
-                          for not-type = (negation-type-type not)
-                          do (cond ((csubtypep not-type type2)
-                                    (setf did-something t))
-                                   (t
-                                    (push not new-negations))))
+                    (let ((type2-supertype (if (and not-simple-array-p
+                                                    (eq (array-type-complexp type2) t))
+                                               (change-array-type type2
+                                                                  :complexp :maybe)
+                                               type2)))
+                     (loop for not in negations
+                           for not-type = (negation-type-type not)
+                           do (cond ((csubtypep not-type type2-supertype)
+                                     (setf did-something t))
+                                    (t
+                                     (push not new-negations)))))
                     (when did-something
                       (type-union type2 (%type-intersection new-negations)))))))
              ;; This is the same as in the intersection-simple-union2-type-method,
