@@ -4161,10 +4161,12 @@ expansion happened."
        (null (set-difference list2 list1))))
 
 (defun class-type-p (type)
-  (or (classoid-p type)
-      (eq type *extended-sequence-type*)
+  (or (eq type *extended-sequence-type*)
       (eq type *funcallable-instance-type*)
-      (eq type *instance-type*)))
+      (eq type *instance-type*)
+      (and (classoid-p type)
+           (not (structure-classoid-p type))
+           (not (classoid-non-instance-p type)))))
 
 ;;; FIXME: This will look eeriely familiar to readers of the UNION
 ;;; :SIMPLE-INTERSECTION2 :COMPLEX-INTERSECTION2 method.  That's

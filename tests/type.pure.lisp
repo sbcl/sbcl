@@ -1190,7 +1190,9 @@
   (assert (not (eq (specifier-type '(not (or (and function (not stream)) (and stream (not function)))))
                    (specifier-type '(or stream (not function))))))
   (assert (eq (specifier-type '(or (and (not double-float) (not stream) (not standard-object)) (and standard-object function stream)))
-              (specifier-type '(or function (and (not double-float) (not stream) (not standard-object)))))))
+              (specifier-type '(or function (and (not double-float) (not stream) (not standard-object))))))
+  (assert (eq (specifier-type '(or (and (not function) (not standard-object) (not symbol)) (and (not function) standard-object)))
+              (specifier-type '(and (not function) (not symbol))))))
 
 (with-test (:name :cons-intersection)
   (assert (eql (specifier-type '(and (cons (not array) atom) (cons (not integer) (not integer))))
