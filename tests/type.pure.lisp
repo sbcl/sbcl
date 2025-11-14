@@ -1158,7 +1158,12 @@
   (assert (eq (specifier-type '(or (simple-array t) (and (not vector) (not (and (array t) (not simple-array))))))
               (specifier-type '(or (simple-array t) (and (not (array t)) (not vector))))))
   (assert (eq (specifier-type '(or (and vector (not (simple-array t))) (not (simple-array base-char))))
-              (specifier-type '(or vector (not (simple-array base-char)))))))
+              (specifier-type '(or vector (not (simple-array base-char))))))
+  (assert (not (find (specifier-type '(not (and (array t) (not simple-array))))
+                     (sb-kernel:intersection-type-types
+                      (find-if #'sb-kernel:intersection-type-p
+                               (sb-kernel:union-type-types
+                                (specifier-type '(or (and array (not vector) (not (and (array t) (not simple-array)))) (simple-array t))))))))))
 
 (with-test (:name :array-intersection)
   (assert (eq (sb-kernel:array-type-element-type (specifier-type '(and (simple-array nil) (array nil))))

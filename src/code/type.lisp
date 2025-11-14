@@ -3740,7 +3740,8 @@ expansion happened."
                                                       (eq (array-type-complexp type2) t))
                                                  (change-array-type type2
                                                                     :complexp :maybe)
-                                                 type2))))
+                                                 type2)))
+                        union-negations)
                    (loop for not in negations
                          for not-type = (negation-type-type not)
                          do (cond ((csubtypep not-type type2-supertype)
@@ -3750,9 +3751,13 @@ expansion happened."
                                         (et-subtypep not-type type2-supertype)
                                         (dimensions-subtypep not-type type2-supertype)
                                         (complexp-intersectp not-type type2-supertype))
-                                   (setf did-something t)
-                                   (push (change-array-type not :complexp (not (array-type-complexp type2)))
-                                         new-negations))
+                                   (cond ((eq (array-type-complexp not-type) :maybe)
+                                          (push (change-array-type not :complexp (not (array-type-complexp type2)))
+                                                union-negations))
+                                         (t
+                                          (setf did-something t)
+                                          (push (change-array-type not :complexp (not (array-type-complexp type2)))
+                                                new-negations))))
                                   ((and (neq (array-type-complexp type2) :maybe)
                                         (neq (array-type-complexp not-type) :maybe)
                                         (neq (array-type-complexp not-type)
@@ -3765,6 +3770,9 @@ expansion happened."
                                   (t
                                    (setf union nil)
                                    (push not new-negations))))
+                   (when (and union union-negations)
+                     (setf new-negations (nconc union-negations new-negations)
+                           did-something t))
                    (when did-something
                      (let ((intersections (%type-intersection new-negations)))
                        (if union
