@@ -1242,14 +1242,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                     (convert-and-maybe-compile form path)))))))))
 
   (values))
-
-(defun copy-hash-table (hash-table)
-  (let ((new (make-hash-table :test (hash-table-test hash-table)
-                              :size (hash-table-size hash-table))))
-    (maphash (lambda (key value)
-               (setf (gethash key new) value))
-             hash-table)
-    new))
 
 ;;;; load time value support
 ;;;;
