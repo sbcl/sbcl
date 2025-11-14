@@ -1156,7 +1156,9 @@
   (assert (eq (specifier-type '(or (simple-array t) (and vector (not (and (array t) (not simple-array))))))
               (specifier-type '(or (simple-array t) (and (not (array t)) vector)))))
   (assert (eq (specifier-type '(or (simple-array t) (and (not vector) (not (and (array t) (not simple-array))))))
-              (specifier-type '(or (simple-array t) (and (not (array t)) (not vector)))))))
+              (specifier-type '(or (simple-array t) (and (not (array t)) (not vector))))))
+  (assert (eq (specifier-type '(or (and vector (not (simple-array t))) (not (simple-array base-char))))
+              (specifier-type '(or vector (not (simple-array base-char)))))))
 
 (with-test (:name :array-intersection)
   (assert (eq (sb-kernel:array-type-element-type (specifier-type '(and (simple-array nil) (array nil))))

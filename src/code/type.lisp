@@ -2647,8 +2647,15 @@ expansion happened."
                         (%type-intersection new)
                         (car new))
                     type2)))
-     (t
-      nil))))
+     ;; (or (and vector (not (simple-array t))) (not (simple-array base-char)))
+     ;; => (or vector (not (simple-array base-char)))
+     ((and (array-type-p not-type2)
+           (intersection-type-p type1))
+      (let ((t1s (intersection-type-types type1)))
+        (loop for type in t1s
+              when (and (negation-type-p type)
+                        (not (types-equal-or-intersect (negation-type-type type) not-type2)))
+              return (type-union type2 (%type-intersection (remove type t1s)))))))))
 
 (define-type-method (negation :simple-=) (type1 type2)
   (type= (negation-type-type type1) (negation-type-type type2)))
