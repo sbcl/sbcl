@@ -10,6 +10,7 @@
   (:export #:report
            #:get-coverage
            #:reset-coverage #:clear-coverage
+           #:merge-coverage #:merge-coverage-from-file
            #:restore-coverage #:restore-coverage-from-file
            #:save-coverage #:save-coverage-in-file
            #:store-coverage-data))
@@ -220,6 +221,22 @@ in RESTORE-COVERAGE."
         using (hash-value states)
         collect (cons file (copy-tree states))))
 
+(defun merge-coverage (coverage-state)
+  "Merge the code coverage data to include covered code from an earlier
+state produced by SAVE-COVERAGE."
+  ;; This does not update coverage stored in code object headers
+  (loop for (file . states) in coverage-state
+        do (let ((image-states (gethash file (code-coverage-hashtable)))
+                 (table (make-hash-table :test 'equal)))
+             (when image-states
+               (loop for cons in image-states
+                     do (setf (gethash (car cons) table) cons))
+               (loop for (key . value) in states
+                     if value
+                     do (let ((state (gethash key table)))
+                          (when state
+                            (setf (cdr state) value))))))))
+
 (defun restore-coverage (coverage-state)
   "Restore the code coverage data back to an earlier state produced by
 SAVE-COVERAGE."
@@ -245,6 +262,15 @@ file designated by PATHNAME."
     (with-standard-io-syntax
       (let ((*package* (find-package :sb-cover)))
         (write (save-coverage) :stream stream)))
+    (values)))
+
+(defun merge-coverage-from-file (pathname)
+  "READ the contents of the file designated by PATHNAME and pass the
+result to MERGE-COVERAGE."
+  (with-open-file (stream pathname :direction :input)
+    (with-standard-io-syntax
+      (let ((*package* (find-package :sb-cover)))
+        (merge-coverage (read stream))))
     (values)))
 
 (defun restore-coverage-from-file (pathname)
