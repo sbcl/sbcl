@@ -2756,15 +2756,13 @@
     (let ((zerop (types-equal-or-intersect (tn-ref-type arg-ref)
                                            (specifier-type '(eql 0)))))
       (assemble ()
+        (unless (location= res arg)
+          ;; BSR leaves the target unmodified on zero, producing a dependency
+          (zeroize res))
         (inst bsr res arg)
         (when zerop
-          (inst jmp :z ZERO))
+          (inst jmp :z DONE))
         (inst inc :dword res)
-        (when zerop
-          (inst jmp DONE))
-        ZERO
-        (when zerop
-          (zeroize res))
         DONE))))
 
 ;; The code on which this was based existed in no less than three varieties,
