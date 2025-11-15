@@ -2721,7 +2721,7 @@
   (:translate integer-length)
   (:note "inline (signed-byte 64) integer-length")
   (:policy :fast-safe)
-  (:args (arg :scs (signed-reg) :target res))
+  (:args (arg :scs (signed-reg) :to :save))
   (:arg-refs arg-ref)
   (:arg-types signed-num)
   (:results (res :scs (unsigned-reg)))
@@ -2731,11 +2731,8 @@
                                            (specifier-type '(integer -1 0)))))
       (assemble ()
         (move res arg)
-        (inst test res res)
-        (inst jmp :ge POS)
-        (if zerop
-            (inst xor res -1) ;; affect flags
-            (inst not res))
+        (inst sar res 63)
+        (inst xor res arg) ;; invert if negative
         POS
         (when zerop
           (inst jmp :z DONE))
@@ -2764,20 +2761,6 @@
           (inst jmp :z DONE))
         (inst inc :dword res)
         DONE))))
-
-;; The code on which this was based existed in no less than three varieties,
-;; differing in response to 0 input: produce NIL, -1, or signal an error.
-;; To avoid a thorny issue of proper semantics, this VOP is used only by
-;; %BIT-POSITION which happens to declare zero safety, but always pre-checks
-;; for zero. (the ltn-policy of :fast is actually irrelevant)
-(define-vop (unsigned-word-find-first-bit)
-  (:policy :fast)
-  (:args (arg :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:results (res :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 1
-    (inst bsf res arg)))
 
 ;; INTEGER-LENGTH is implemented by using the BSR instruction, which
 ;; returns the position of the first 1-bit from the right. And that needs
@@ -2811,20 +2794,30 @@
   (:translate integer-length)
   (:note "inline fixnum integer-length")
   (:policy :fast-safe)
-  (:args (arg :scs (any-reg) :target res))
+  (:args (arg :scs (any-reg) :to :save))
   (:arg-types tagged-num)
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 25
     (move res arg)
-    (when (> n-fixnum-tag-bits 1)
-      (inst sar res (1- n-fixnum-tag-bits)))
-    (inst test res res)
-    (inst jmp :ge POS)
-    (inst not res)
-    POS
+    (inst sar res 63)
+    (inst xor res arg) ;; invert if negative
     (inst or res 1)
     (inst bsr res res)))
+
+;; The code on which this was based existed in no less than three varieties,
+;; differing in response to 0 input: produce NIL, -1, or signal an error.
+;; To avoid a thorny issue of proper semantics, this VOP is used only by
+;; %BIT-POSITION which happens to declare zero safety, but always pre-checks
+;; for zero. (the ltn-policy of :fast is actually irrelevant)
+(define-vop (unsigned-word-find-first-bit)
+  (:policy :fast)
+  (:args (arg :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (inst bsf res arg)))
 
 ;;;; binary conditional VOPs
 
