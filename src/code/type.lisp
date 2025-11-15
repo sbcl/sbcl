@@ -21,6 +21,9 @@
 ;;; compiler warnings can be emitted as appropriate.
 (define-condition parse-unknown-type (condition)
   ((specifier :reader parse-unknown-type-specifier :initarg :specifier))
+  (:report (lambda (condition stream)
+             (format stream "Unknown type ~/sb-ext:print-symbol-with-prefix/ parsed"
+                     (parse-unknown-type-specifier condition))))
   (:default-initargs
    :specifier (missing-arg)))
 
