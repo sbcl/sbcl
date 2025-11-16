@@ -117,7 +117,7 @@
          (ref-leaf ref))))
 
 ;;; Look through casts and variables, m-v-bind+values
-(defun map-all-uses (function lvar)
+(defun map-all-uses (function lvar &optional (cast t))
   (declare (dynamic-extent function))
   (let (seen)
    (labels ((recurse-lvar (lvar)
@@ -168,7 +168,8 @@
                              (t
                               (funcall function use)))))
 
-                    ((cast-p use)
+                    ((and cast
+                          (cast-p use))
                      (recurse-lvar (cast-value use)))
                     (t
                      (funcall function use)))))
@@ -1035,10 +1036,13 @@
         (reoptimize-lvar lvar)
         cast))))
 
-(defun insert-ref-before (leaf node)
+(defun insert-ref-before (leaf node &optional reuse-lvar)
   (with-ir1-environment-from-node node
     (let ((ref (make-ref leaf))
-          (lvar (make-lvar node)))
+          (lvar (if reuse-lvar
+                    (prog1 (node-lvar node)
+                      (%delete-lvar-use node))
+                    (make-lvar node))))
       (insert-node-before node ref)
       (push ref (leaf-refs leaf))
       (setf (leaf-ever-used leaf) t)
@@ -3337,6 +3341,15 @@ is :ANY, the function name is not checked."
                            (funcall function dest leaf/lvar))))))))
       (recur leaf/lvar))
     nil))
+
+(defun lambda-add-var (lambda lvar)
+  (let ((call (node-dest (car (lambda-refs lambda))))
+        (new-var (make-lambda-var (gensym "TEMP"))))
+    (setf (lambda-var-home new-var) lambda)
+    (push new-var (lambda-vars lambda))
+    (push lvar (combination-args call))
+    (setf (lvar-dest lvar) call)
+    new-var))
 
 (defun propagate-lvar-annotations-to-refs (lvar var)
   (when (lvar-annotations lvar)

@@ -2769,30 +2769,89 @@
                            (return)))
                      finally (return (sb-kernel::%type-union cdrs))))))))
 
+(defun fold-list-accessors (cons)
+  (let ((var (lvar-lambda-var cons))
+        cars cdrs
+        use name)
+    (map-all-uses (lambda (node)
+                    (when use
+                      (return-from fold-list-accessors))
+                    (setf use node)) cons nil)
+    (when (setf name (combination-is use '(list list*)))
+      (map-refs (lambda (ref lvar)
+                  (declare (ignore lvar))
+                  (let ((name (combination-is ref '(car cdr))))
+                    (cond (name
+                           (if (eq name 'cdr)
+                               (push ref cdrs)
+                               (push ref cars)))
+                          (t
+                           (return-from fold-list-accessors)))))
+                var
+                :leaf-set #'give-up-ir1-transform
+                :multiple-uses #'give-up-ir1-transform)
+      (let* ((args (combination-args use))
+             (cons-p (and (eq name 'list*)
+                          (= (length args) 2))))
+        (when (and (or cars cdrs)
+                   (> (length args)
+                      (if (eq name 'list*)
+                          1
+                          0)))
+          (let ((car (pop args)))
+            (setf (combination-args use) args)
+            (if cars
+                (let ((var (lambda-add-var (lambda-var-home var) car)))
+                  (loop for car in cars
+                        do
+                        (insert-ref-before var car t)
+                        (flush-combination car)))
+                (flush-dest car)))
+          (cond ((not args)
+                 (erase-node-type use (values-specifier-type '(values null &optional))))
+                (cdrs
+                 (when cons-p
+                   (setf (combination-args use) nil
+                         var (lambda-add-var (lambda-var-home var) (car args))))
+                 (loop for cdr in cdrs
+                       do (insert-ref-before var cdr t)
+                          (flush-combination cdr)))
+                (t
+                 (mapc #'flush-dest args))))))
+    nil))
+
 (deftransform car ((cons))
   (or (combination-case cons
         ((list list*) *
-         (when args
+         (when (> (length args)
+                  (if (eq name 'list*)
+                      1
+                      0))
            (splice-fun-args cons :any #'first)
            'cons)))
+      (fold-list-accessors cons)
       (give-up-ir1-transform)))
 
 (deftransform cdr ((cons))
-  (or (combination-case cons
-        ((list) *
-         (cond ((cdr args)
-                (setf (combination-args combination) (cdr args))
-                (flush-dest (car args))
-                'cons)))
-        ((list*) *
-         (cond ((cddr args)
-                (setf (combination-args combination) (cdr args))
-                (flush-dest (car args))
-                'cons)
-               ((cdr args)
-                (splice-fun-args cons :any #'second)
-                'cons))))
-      (give-up-ir1-transform)))
+  (block nil
+   (or (combination-case cons
+         ((list) *
+          (cond ((cdr args)
+                 (setf (combination-args combination) (cdr args))
+                 (flush-dest (car args))
+                 'cons)
+                (t
+                 (return nil))))
+         ((list*) *
+          (cond ((cddr args)
+                 (setf (combination-args combination) (cdr args))
+                 (flush-dest (car args))
+                 'cons)
+                ((cdr args)
+                 (splice-fun-args cons :any #'second)
+                 'cons))))
+       (fold-list-accessors cons)
+       (give-up-ir1-transform))))
 
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
