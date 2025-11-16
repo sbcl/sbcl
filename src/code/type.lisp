@@ -4290,6 +4290,21 @@ expansion happened."
                                 (eq (negation-type-type type1) type)))
                     return (type-union type1
                                        (%type-intersection (remove type (intersection-type-types type2)))))))
+        ;; (or (and vector (not (array fixnum))) (and (not integer) (not (array t))))
+        ;; => (or vector (and (not integer) (not (array t))))
+        ((and (intersection-type-p type1)
+              (flet ((try (type1 type2)
+                       (loop for t1 in (intersection-type-types type1)
+                             when
+                             (and (negation-type-p t1)
+                                  (loop for t2 in (intersection-type-types type2)
+                                        always (and (negation-type-p t2)
+                                                    (not (types-equal-or-intersect (negation-type-type t1)
+                                                                                   (negation-type-type t2))))))
+                             return (type-union (%type-intersection (remove t1 (intersection-type-types type1)))
+                                                type2))))
+                (or (try type1 type2)
+                    (try type1 type2)))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))
