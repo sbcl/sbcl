@@ -2762,18 +2762,6 @@
         (inst inc :dword res)
         DONE))))
 
-;; INTEGER-LENGTH is implemented by using the BSR instruction, which
-;; returns the position of the first 1-bit from the right. And that needs
-;; to be incremented to get the width of the integer, and BSR doesn't
-;; work on 0, so it needs a branch to handle 0.
-
-;; But fixnums are tagged by being shifted left n-fixnum-tag-bits times,
-;; untagging by shifting right n-fixnum-tag-bits-1 times (and if
-;; n-fixnum-tag-bits = 1, no shifting is required), will make the
-;; resulting integer one bit wider, making the increment unnecessary.
-;; Then, to avoid calling BSR on 0, OR the result with 1. That sets the
-;; first bit to 1, and if all other bits are 0, BSR will return 0,
-;; which is the correct value for INTEGER-LENGTH.
 (define-vop (positive-fixnum-len)
   (:translate integer-length)
   (:note "inline positive fixnum integer-length")
@@ -2785,10 +2773,11 @@
   (:arg-refs arg-ref)
   (:generator 24
     (let ((size (if (csubtypep (tn-ref-type arg-ref) (specifier-type '(unsigned-byte 31)))
-                              :dword :qword)))
-      (move res arg size)
-      (inst or size res 1)
-      (inst bsr size res res))))
+                    :dword :qword)))
+      (unless (location= res arg)
+        ;; BSR leaves the target unmodified on zero
+        (zeroize res))
+      (inst bsr size res arg))))
 
 (define-vop (fixnum-len)
   (:translate integer-length)
@@ -2802,7 +2791,6 @@
     (move res arg)
     (inst sar res 63)
     (inst xor res arg) ;; invert if negative
-    (inst or res 1)
     (inst bsr res res)))
 
 ;; The code on which this was based existed in no less than three varieties,
