@@ -1163,7 +1163,10 @@
                      (sb-kernel:intersection-type-types
                       (find-if #'sb-kernel:intersection-type-p
                                (sb-kernel:union-type-types
-                                (specifier-type '(or (and array (not vector) (not (and (array t) (not simple-array)))) (simple-array t))))))))))
+                                (specifier-type '(or (and array (not vector) (not (and (array t) (not simple-array)))) (simple-array t)))))))))
+  (assert (eq (specifier-type `(or (and (vector character) (not simple-array))
+                                   (and vector (not (array base-char)) (not (array character)))))
+              (specifier-type '(and vector (not (array base-char)) (not (simple-array character)))))))
 
 (with-test (:name :array-intersection)
   (assert (eq (sb-kernel:array-type-element-type (specifier-type '(and (simple-array nil) (array nil))))
