@@ -1459,10 +1459,12 @@
 ;;; Handle (the double-float (+ x 10)), where X must be a double-float
 (deftransform float-cast-contagion ((x y) * * :node node :defun-only t)
   (flet ((contagion (type test)
-           (let ((x-var 'x)
-                 (y-var 'y)
-                 (x-float-p (types-equal-or-intersect (lvar-type x) type))
-                 (y-float-p (types-equal-or-intersect (lvar-type y) type)))
+           (let* ((x x)
+                  (y y)
+                  (x-var 'x)
+                  (y-var 'y)
+                  (x-float-p (types-equal-or-intersect (lvar-type x) type))
+                  (y-float-p (types-equal-or-intersect (lvar-type y) type)))
              (unless (or (and x-float-p y-float-p)
                          (not (or x-float-p y-float-p)))
                (when y-float-p
