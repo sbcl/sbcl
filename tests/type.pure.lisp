@@ -1238,6 +1238,11 @@
      (declare ((not (or complex double-float)) a))
      (+ a 1f0))
    single-float)
+  (assert-type
+   (lambda (a)
+     (declare ((not double-float) a))
+     (1+ a))
+   (or single-float rational complex))
   (assert (eq (specifier-type 'complex)
               (specifier-type '(and number (not real)))))
   (assert (eq (specifier-type '(or rational complex single-float))

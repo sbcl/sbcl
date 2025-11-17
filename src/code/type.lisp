@@ -3054,6 +3054,16 @@ expansion happened."
                                  (typep (numeric-type-low type1) 'unsigned-byte)
                                  (typep (numeric-type-low type2) 'unsigned-byte)
                                  0))))
+                 ((and (eq complexp1 :real)
+                       (member class1 '(integer rational))
+                       (eq complexp2 :complex)
+                       (eq class2 'rational))
+                  (specifier-type '(or rational (complex rational))))
+                 ((and (eq complexp2 :real)
+                       (member class2 '(integer rational))
+                       (eq complexp1 :complex)
+                       (eql class1 'rational))
+                  (specifier-type '(or rational (complex rational))))
                  (t
                   (specifier-type 'number)))))
         (t
