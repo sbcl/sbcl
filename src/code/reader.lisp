@@ -1602,7 +1602,9 @@ extended <package-name>::<form-in-package> syntax."
                                  (if (token-buf-only-base-chars buf)
                                      (%readtable-symbol-preference rt)
                                      'character)
-                                 nil)))))))))
+                                 ;; reader-package behaves as if *package* were that package.
+                                 ;; Hence it should be allowed to create new symbols.
+                                 (eq pkg *reader-package*))))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

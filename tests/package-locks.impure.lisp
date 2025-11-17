@@ -677,4 +677,11 @@
      (progv vars vals))
    (('(test:*special*) nil) (condition 'symbol-package-locked-error))))
 
-
+(with-test (:name :reader-package)
+  (lock-package (make-package "SOMEPACKAGE"))
+  (let ((form (read-from-string "somepackage::(cl:defvar myvar 3)")))
+    (assert (eq (symbol-package (second form)) (find-package "SOMEPACKAGE"))))
+  ;; I don't see why deleting a package can't be done if locked. Locking should concern
+  ;; the contents of the package, not what packages are in my system. Anyway, different problem.
+  (unlock-package "SOMEPACKAGE")
+  (delete-package "SOMEPACKAGE"))
