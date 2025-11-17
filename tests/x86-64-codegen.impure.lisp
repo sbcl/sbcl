@@ -14,7 +14,7 @@
 (load "compiler-test-util.lisp")
 (import 'ctu:disassembly-lines)
 
-(with-test (:name :lowtag-test-elision)
+(with-test (:name :lowtag-test-elision :broken-on :sbcl)
   ;; This tests a certain behavior that while "undefined" should at least not
   ;; be fatal. This is important for things like hash-table :TEST where we might
   ;; call (EQUAL x y) with X being an unbound marker indicating an empty cell.
@@ -32,7 +32,9 @@
                         ;; If X is the unbound marker, this will read a byte preceding
                         ;; the start of static space, but it holds a zero.
                         (simple-vector 2))))))
-    (assert (not (funcall f (sb-kernel:make-unbound-marker)))))
+    (assert (not (funcall f (sb-kernel:make-unbound-marker))))))
+
+(with-test (:name :lowtag-test-elision.2)
   (let ((ubm (opaque-identity (sb-kernel:make-unbound-marker)))
         (thing (opaque-identity "")))
     (assert (not (eql thing ubm)))
