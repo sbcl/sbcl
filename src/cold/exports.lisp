@@ -1629,7 +1629,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%SET-SIGNED-SAP-REF-8" "%SET-STACK-REF"
            "%SIN" "%SINH" "%SINF" "%SINHF"
            "%SQRT" "%SQRTF"
-           "%SINGLE-FLOAT"
+           "%SINGLE-FLOAT" "%SINGLE-FLOAT-NO-DOUBLE-FLOAT"
            "%SXHASH-BIT-VECTOR" "%SXHASH-SIMPLE-BIT-VECTOR"
            "%SXHASH-STRING" "%SXHASH-SIMPLE-STRING"
            "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TANH" "%TANF" "%TANHF"

@@ -673,6 +673,14 @@
   #+long-float
   (frob %long-float long-float))
 
+(defun %single-float-no-double-float (x)
+  (declare (explicit-check x))
+  (number-dispatch ((x (and real (not double-float))))
+    (((foreach single-float sb-vm:signed-word word))
+     (coerce x 'single-float))
+    ((ratio) (single-float-ratio x))
+    ((bignum) (bignum-to-single-float x))))
+
 ;;; Convert a ratio to a float. We avoid any rounding error by doing an
 ;;; integer division. Accuracy is important to preserve print-read
 ;;; consistency, since this is ultimately how the reader reads a float. We

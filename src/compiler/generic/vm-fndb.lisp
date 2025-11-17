@@ -754,6 +754,9 @@
 (defknown %double-float (real) double-float
   (movable foldable unboxed-return))
 
+(defknown %single-float-no-double-float ((and real (not double-float))) single-float
+  (movable foldable unboxed-return))
+
 (defknown bignum-to-single-float (bignum) single-float
   (movable foldable unboxed-return))
 (defknown bignum-to-double-float (bignum) double-float
