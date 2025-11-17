@@ -4008,6 +4008,7 @@
         ;; not a lot of standard functions which are usually used
         ;; with REDUCE and which benefit from improved type
         ;; derivation.
+        ;; Addendum: there's COMBINATION-DERIVE-TYPE-FOR-ARG-TYPES now.
         (or
          (when (and element-type
                     (neq element-type *wild-type*)
@@ -4035,7 +4036,10 @@
                   (some #'try '(double-float single-float float unsigned-byte integer rational real))))
                (logior
                 (when (csubtypep element-type (specifier-type 'integer))
-                  element-type)))))
+                  (if initial-value
+                      (when (csubtypep initial-value-type (specifier-type 'integer))
+                        (%two-arg-derive-type element-type initial-value-type #'logior-derive-type-aux))
+                      element-type))))))
          (let ((fun-result (single-value-type (fun-type-returns fun-type))))
            (cond (initial-value-type
                   (type-union initial-value-type fun-result))

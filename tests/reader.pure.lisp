@@ -338,7 +338,7 @@
       (set-syntax-from-char #\! #\! rt)
       (assert (eq '!! (maybe-bang))))))
 
-(with-test (:name :read-in-package-syntax :fails-on :sbcl)
+(with-test (:name :read-in-package-syntax)
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
   (assert (equal '(cl-user::yes-this-is-sbcl)

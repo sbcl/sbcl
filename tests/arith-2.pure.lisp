@@ -1125,3 +1125,9 @@
      (declare ((integer 6671 6672) x))
      (values (ffloor -1333621864366 x)))
    (single-float -1.9991334e8 -1.9988338e8)))
+
+(with-test (:name :reduce-logior-type)
+  (assert-type
+   (lambda (a)
+     (reduce 'logior (the (simple-array (unsigned-byte 8)) a) :initial-value -7))
+   (integer -7 -1)))
