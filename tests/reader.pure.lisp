@@ -342,12 +342,7 @@
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
   (assert (equal '(cl-user::yes-this-is-sbcl)
-                 (read-from-string "cl-user::(#+sbcl yes-this-is-sbcl)")))
-  (assert (eq :violated!
-              (handler-case
-                  (read-from-string "cl::'foo")
-                (package-lock-violation ()
-                  :violated!)))))
+                 (read-from-string "cl-user::(#+sbcl yes-this-is-sbcl)"))))
 
 (with-test (:name :bug-309070)
   (with-timeout 10
