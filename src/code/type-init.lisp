@@ -57,6 +57,12 @@
     (aver (not (unknown-type-p ctype)))
     (setf (sb-vm:saetp-ctype saetp) ctype)))
 
+(setf (info :type :kind 'number) :primitive
+      (info :type :builtin 'number)
+      #+sb-xc-host
+      (specifier-type '(or real complex))
+      #-sb-xc-host (specifier-type 'number))
+
 #+sb-xc-host
 (dolist (x *builtin-classoids*)
   (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)
@@ -65,6 +71,7 @@
     (when trans-p
       (let ((classoid (classoid-cell-classoid (find-classoid-cell name :create t)))
             (type (specifier-type translation)))
+        (assert (not (unknown-type-p type)) (type) "Unknown type ~a" type)
         (when (typep (built-in-classoid-translation classoid) 'ctype)
           (aver (eq (built-in-classoid-translation classoid) type)))
         (setf (built-in-classoid-translation classoid) type)

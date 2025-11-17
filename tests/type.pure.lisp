@@ -1231,3 +1231,16 @@
     ((-0.0) nil)
     ((-1.0) nil)
     ((-2.0) nil)))
+
+(with-test (:name :number-union-type)
+  (assert-type
+   (lambda (a)
+     (declare ((not (or complex double-float)) a))
+     (+ a 1f0))
+   single-float)
+  (assert (eq (specifier-type 'complex)
+              (specifier-type '(and number (not real)))))
+  (assert (eq (specifier-type '(or rational complex single-float))
+              (specifier-type '(and number (not double-float)))))
+  (assert (eq (specifier-type '(or real complex))
+              (specifier-type 'number))))

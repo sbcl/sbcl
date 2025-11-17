@@ -2804,16 +2804,6 @@ expansion happened."
         (t
          type)))
 
-(!cold-init-forms
-  (setf (info :type :kind 'number) :primitive)
-  (setf (info :type :builtin 'number)
-        #+sb-xc-host
-        (hashset-insert *numeric-union-type-hashset*
-                        (!alloc-numeric-union-type #.(make-ctype-bits 'numeric-union)
-                                                   (get-numtype-aspects nil nil nil)
-                                                   (vector nil nil)))
-        #-sb-xc-host (specifier-type 'number)))
-
 (defun upgraded-complex-part-ctype (typespec &optional context)
   (let ((ctype (specifier-type typespec context)))
     (cond
@@ -4446,7 +4436,7 @@ expansion happened."
     ;; This is order-sensitive. Prefer to recognize SEQUENCE
     ;; and extract 4 components (NULL,CONS,VECTOR,EXTENDED-SEQUENCE)
     ;; before considering LIST and extracting 2, etc.
-    '(sequence list real float complex bignum)))
+    '(sequence list number real float complex bignum)))
 
 (defun union-unparse (flags types)
   (declare (ignorable flags))

@@ -1118,8 +1118,6 @@
     (numeric-union-type
      (<= (length (numeric-union-type-ranges x)) 3))))
 
-
-
 (defun numeric-type-low (x)
   (let ((ranges (numeric-union-type-ranges x)))
     (ecase (length ranges)
