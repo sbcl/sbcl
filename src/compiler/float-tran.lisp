@@ -1436,25 +1436,31 @@
 
 
 ;;;; float contagion
-(deftransform single-float-real-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type y) (specifier-type 'single-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) x (%single-float y))))
 
-(deftransform real-single-float-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type x) (specifier-type 'single-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) (%single-float x) y)))
+(make-defs (($type single-float double-float))
+  (deftransform $type-real-contagion ((x y) * * :node node :defun-only t)
+    (if (csubtypep (lvar-type y) (specifier-type '$type))
+        (give-up-ir1-transform)
+        `(,(lvar-fun-name (basic-combination-fun node)) x (%$type y))))
 
-(deftransform double-float-real-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type y) (specifier-type 'double-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) x (%double-float y))))
+  (deftransform real-$type-contagion ((x y) * * :node node :defun-only t)
+    (if (csubtypep (lvar-type x) (specifier-type '$type))
+        (give-up-ir1-transform)
+        `(,(lvar-fun-name (basic-combination-fun node)) (%$type x) y)))
 
-(deftransform real-double-float-contagion ((x y) * * :node node :defun-only t)
-  (if (csubtypep (lvar-type x) (specifier-type 'double-float))
-      (give-up-ir1-transform)
-      `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y)))
+  (deftransform $type-number-contagion ((x y) * * :node node :defun-only t)
+    (if (and (not (csubtypep (lvar-type y) (specifier-type '$type)))
+             (or (csubtypep (lvar-type y) (specifier-type 'real))
+                 (cast-or-check-bound-type node (specifier-type 'real))))
+        `(,(lvar-fun-name (basic-combination-fun node)) x (%$type y))
+        (give-up-ir1-transform)))
+
+  (deftransform number-$type-contagion ((x y) * * :node node :defun-only t)
+    (if (and (not (csubtypep (lvar-type x) (specifier-type '$type)))
+             (or (csubtypep (lvar-type x) (specifier-type 'real))
+                 (cast-or-check-bound-type node (specifier-type 'real))))
+        `(,(lvar-fun-name (basic-combination-fun node)) (%$type x) y)
+        (give-up-ir1-transform))))
 
 ;;; Handle (the double-float (+ x 10)), where X must be a double-float
 (deftransform float-cast-contagion ((x y) * * :node node :defun-only t)
@@ -1527,14 +1533,14 @@
          `(,(lvar-fun-name (basic-combination-fun node)) (%double-float x) y))))
 
 (flet ((def (op)
-         (%deftransform op nil '(function (single-float real) single-float)
-                        #'single-float-real-contagion nil)
-         (%deftransform op nil '(function (real single-float) single-float)
-                        #'real-single-float-contagion nil)
-         (%deftransform op nil '(function (double-float real))
-                        #'double-float-real-contagion nil)
-         (%deftransform op nil '(function (real double-float))
-                        #'real-double-float-contagion nil)
+         (%deftransform op nil '(function (single-float number) single-float)
+                        #'single-float-number-contagion nil)
+         (%deftransform op nil '(function (number single-float) single-float)
+                        #'number-single-float-contagion nil)
+         (%deftransform op nil '(function (double-float number))
+                        #'double-float-number-contagion nil)
+         (%deftransform op nil '(function (number double-float))
+                        #'number-double-float-contagion nil)
 
          (%deftransform op nil '(function ((complex single-float) real) (complex single-float))
                         #'single-float-real-contagion nil)
