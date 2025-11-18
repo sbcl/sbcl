@@ -1270,7 +1270,9 @@
 (defun complex-derive-type-aux-2 (re-type im-type same-arg)
   (declare (ignore same-arg))
   (if (and (numeric-type-p re-type)
-           (numeric-type-p im-type))
+           (numeric-type-p im-type)
+           (not (eq (numeric-type-complexp re-type) :complex))
+           (not (eq (numeric-type-complexp im-type) :complex)))
       ;; Need to check to make sure numeric-contagion returns the
       ;; right type for what we want here.
 
