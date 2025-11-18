@@ -141,6 +141,12 @@
       (when (location= res then)
         (rotatef then else)
         (setf not-p (not not-p)))
+      (cond ((and (sc-is then immediate)
+                  (null (tn-value then)))
+             (setf then null-tn))
+            ((and (sc-is else immediate)
+                  (null (tn-value else)))
+             (setf else null-tn)))
       (flet ((load-immediate (dst constant-tn
                               &optional (sc-reg dst))
                (let ((bits (immediate-tn-repr constant-tn
@@ -151,7 +157,7 @@
                      (setf size :qword))
                  (if (nil-relative-p bits)
                      (move-immediate dst bits)
-                 ;; Can't use ZEROIZE, since XOR will affect the flags.
+                     ;; Can't use ZEROIZE, since XOR will affect the flags.
                      (inst mov dst bits)))))
         (cond ((null (rest flags))
                (cond ((sc-is else immediate)
