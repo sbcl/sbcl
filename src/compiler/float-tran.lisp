@@ -817,7 +817,7 @@
   ;; values at the lower and upper bounds of the input domain.
   (frob acos -1d0 1d0 0 pi :increasingp nil)
   (frob acosh 1d0 nil nil nil)
-  (frob atanh -1d0 1d0 -1 1)
+  (frob atanh -1d0 1d0 nil nil)
   ;; Kahan says that (sqrt -0.0) is -0.0, so use a specifier that
   ;; includes -0.0.
   (frob sqrt -0.0d0 nil 0 nil))

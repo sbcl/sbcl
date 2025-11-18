@@ -1131,3 +1131,9 @@
    (lambda (a)
      (reduce 'logior (the (simple-array (unsigned-byte 8)) a) :initial-value -7))
    (integer -7 -1)))
+
+(with-test (:name :atanh-type)
+  (assert-type
+   (lambda (n)
+     (atanh (the (real -1 1) n)))
+   float))
