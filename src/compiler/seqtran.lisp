@@ -2809,17 +2809,14 @@
                 (flush-dest car)))
           (when cons-p
             (erase-node-type use (values-specifier-type '(values t &optional))))
-          (cond
-                ((not args)
+          (cond ((not args)
                  (erase-node-type use (values-specifier-type '(values null &optional))))
                 (cdrs
                  (when cons-p
                    (aver (splice-fun-args (node-lvar use) :any 1)))
                  (loop for cdr in cdrs
                        do (insert-ref-before var cdr t)
-                          (flush-combination cdr)))
-                (t
-                 (mapc #'flush-dest args))))))
+                          (flush-combination cdr)))))))
     nil))
 
 (deftransform car ((cons))
