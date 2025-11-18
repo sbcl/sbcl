@@ -6389,6 +6389,24 @@
                              ($fun ,arg1 ,arg2)))))))))
         (give-up-ir1-transform))))
 
+;;; (= (abs x) 0) => (= x 0)
+(make-defs (($fun = eq eql))
+  (deftransform $fun ((x y) (real (constant-arg (real 0 0))) * :important nil)
+    (or (combination-case x
+          (abs (*)
+           (splice-fun-args x name 1)
+           nil))
+        (give-up-ir1-transform))))
+
+(deftransform > ((x y) (real (constant-arg (real 0 0))) * :node node :important nil)
+  (or (unless (and (policy node (plusp float-accuracy))
+                   (types-equal-or-intersect (lvar-type x) (specifier-type 'float)))
+        (combination-case x
+          (abs (*)
+           (splice-fun-args x name 1)
+           `(not (= x ,(lvar-value y))))))
+      (give-up-ir1-transform)))
+
 (defun word-sized-type-p (type)
   (or (csubtypep type (specifier-type 'word))
       (csubtypep type (specifier-type 'sb-vm:signed-word))))

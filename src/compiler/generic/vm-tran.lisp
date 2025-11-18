@@ -24,7 +24,8 @@
 (define-source-transform char-int (x)
   `(char-code ,x))
 
-(deftransform abs ((x) (rational))
+(deftransform abs ((x) (rational) * :node node)
+  (delay-ir1-transform node :constraint)
   '(if (< x 0) (- x) x))
 
 (deftransform make-symbol ((string) (simple-string))
