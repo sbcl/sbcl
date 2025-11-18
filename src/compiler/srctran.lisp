@@ -2107,6 +2107,13 @@
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux))
 
+(deftransform abs ((x) (number) * :node node)
+  (or (combination-case (x)
+        ((%negate) (*)
+         (splice-fun-args x name 1)
+         nil))
+      (give-up-ir1-transform)))
+
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
   ;; integer if both args are integers; a rational if both args are
