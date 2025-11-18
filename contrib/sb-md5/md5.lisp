@@ -68,7 +68,9 @@
    #:md5sum-sequence #:md5sum-string #:md5sum-stream #:md5sum-file))
 
 (in-package sb-md5)
-(eval-when (:compile-toplevel :load-toplevel :execute)
+
+#+sbcl
+(eval-when (:compile-toplevel :execute)
   (sb-ext:restrict-compiler-policy 'space 1) ; lp#1988683
   (setf (sb-int:system-package-p *package*) t))
 
@@ -973,6 +975,10 @@ according to my additional test suite")
 #+sbcl
 (eval-when (:compile-toplevel :execute)
   (setq *features* *old-features*))
+
+#+sbcl
+(eval-when (:compile-toplevel :execute)
+  (sb-ext:restrict-compiler-policy 'space 0))
 
 #+(and :lispworks (or (not :lispworks4) :lispworks4.4))
 (eval-when (:compile-toplevel :execute)

@@ -12,6 +12,8 @@ changes relative to sbcl-2.5.10:
     previously.
   * bug fix: the compiler retains fewer temporary data structures when
     compiling code with coverage data.
+  * bug fix: requiring the SB-MD5 contrib module no longer installs a
+    restriction on the SPACE optimization quality.
 
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:
