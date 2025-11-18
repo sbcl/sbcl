@@ -2807,12 +2807,14 @@
                         (insert-ref-before var car t)
                         (flush-combination car)))
                 (flush-dest car)))
-          (cond ((not args)
+          (when cons-p
+            (erase-node-type use (values-specifier-type '(values t &optional))))
+          (cond
+                ((not args)
                  (erase-node-type use (values-specifier-type '(values null &optional))))
                 (cdrs
                  (when cons-p
-                   (setf (combination-args use) nil
-                         var (lambda-add-var (lambda-var-home var) (car args))))
+                   (aver (splice-fun-args (node-lvar use) :any 1)))
                  (loop for cdr in cdrs
                        do (insert-ref-before var cdr t)
                           (flush-combination cdr)))
