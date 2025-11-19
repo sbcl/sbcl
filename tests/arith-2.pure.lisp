@@ -1137,3 +1137,19 @@
    (lambda (n)
      (atanh (the (real -1 1) n)))
    float))
+
+(with-test (:name :unknown-*-transform)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f n)
+      (declare (fixnum f)
+               ((unsigned-byte 65) n))
+      (the fixnum (* f n)))
+   ((0 (expt 2 64)) 0)
+   ((2 2) 4))
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (declare (type fixnum f))
+      (the fixnum (* f 25152445588928537400)))
+   ((0) 0)))

@@ -4056,11 +4056,13 @@
                           (or (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql #.(- most-negative-fixnum)))))
                               (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql -1))))))
                          `(* (the fixnum x) y)
-                         `(* (the sb-vm:signed-word x) y)))
+                         `(if (eq y 0)
+                              0
+                              (* (the* (sb-vm:signed-word :silent-conflict t) x) y))))
                     (t
                      (delay-ir1-transform node :ir1-phases)
                      (delete-lvar-cast-if (specifier-type '(or real (complex rational))) x)
-                     `(if (typep x 'fixnum)
+                     `(if (fixnump x)
                           (* (truly-the fixnum x) y)
                           (*-by-fixnum-to-fixnum x y))))))))
       (give-up-ir1-transform)))
