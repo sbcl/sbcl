@@ -4090,7 +4090,11 @@
                     ((and (csubtypep (lvar-type x) (specifier-type 'integer))
                           (csubtypep (lvar-type y) (specifier-type 'integer)))
                      (delay-ir1-transform node :constraint)
-                     `(* (the sb-vm:signed-word x) (the sb-vm:signed-word y)))
+                     `(if (or (eq x 0)
+                              (eq y 0))
+                          0
+                          (* (the* (sb-vm:signed-word :silent-conflict t) x)
+                             (the* (sb-vm:signed-word :silent-conflict t) y))))
                     (t
                      (delay-ir1-transform node :ir1-phases)
                      (delete-lvar-cast-if (specifier-type 'number) y)
