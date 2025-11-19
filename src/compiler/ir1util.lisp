@@ -311,6 +311,8 @@
                      (arg-m (pop specs)))
                  (or (eq arg arg-m)
                      (eq arg-m '*)
+                     (and (ctype-p arg-m)
+                          (csubtypep (lvar-type arg) arg-m))
                      (and (constant-lvar-p arg)
                           (or (eq arg-m 'constant)
                               (eql (lvar-value arg) arg-m)))))))
@@ -355,7 +357,12 @@
                          (destructuring-bind (name arg-spec . body) (pop cases)
                            (list name
                                  `(cond (,(or (eq arg-spec '*)
-                                              `(combination-matches-args args ',arg-spec))
+                                              `(combination-matches-args args
+                                                                         (load-time-value
+                                                                          (list ,@(loop for spec in arg-spec
+                                                                                        collect (if (typep spec '(cons (eql type)))
+                                                                                                    `(specifier-type ',(second spec))
+                                                                                                    `',spec))))))
                                          ,@body)
                                         ,@(unless sub
                                             (loop while (and cases
