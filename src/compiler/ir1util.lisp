@@ -920,7 +920,8 @@
          ;; We pick an arbitrary unique leaf so that IR1-convert will
          ;; reference it.
          (placeholder (make-constant 0))
-         (form (funcall function placeholder)))
+         (form (funcall function placeholder))
+         (*transforming* (1+ *transforming*)))
     (with-ir1-environment-from-node dest
       (ensure-block-start ctran)
       (let* ((old-block (ctran-block ctran))
