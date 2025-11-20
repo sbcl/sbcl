@@ -5791,12 +5791,37 @@
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y)))
-    (flet ((unroll-constant (x y)
+    (flet ((unroll-constant (x y y-type)
              (when (constant-lvar-p x)
                (let ((value (lvar-value x)))
                  (cond ((typep value '(simple-array * (0)))
                         `(and (vectorp ,y)
                               (zerop (length ,y))))
+                       ;; (equalp vector #(1 2 3 4))
+                       ((and (typep value '(simple-array * (*)))
+                             (<= (length value)
+                                 (cond ((csubtypep y-type (specifier-type '(simple-array * (*))))
+                                        4)
+                                       ((csubtypep y-type (specifier-type 'vector))
+                                        2)
+                                       (-1))))
+                        (let (test)
+                          (cond ((every #'symbolp value)
+                                 (setf test 'eq))
+                                (t
+                                 (let ((types (ctype-array-specialized-element-types y-type)))
+                                   (when (and (listp types)
+                                              (loop for v across value
+                                                    always (and (numberp v)
+                                                                (loop for type in types
+                                                                      always (and (numeric-type-p type)
+                                                                                  (ctypep v type))))))
+                                     (setf test '=)))))
+                          (when test
+                            `(and (= (length ,y) ,(length value))
+                                  ,@(loop for v across value
+                                          for i from 0
+                                          collect `(,test (aref ,y ,i) ',v))))))
                        ((typep value '(cons symbol null))
                         `(and (,(if (car value)
                                     'listp
@@ -5825,8 +5850,8 @@
       (cond ((same-leaf-ref-p x y) t)
             ((array-type-dimensions-mismatch x-type y-type)
              nil)
-            ((unroll-constant x 'y))
-            ((unroll-constant y 'x))
+            ((unroll-constant x 'y y-type))
+            ((unroll-constant y 'x x-type))
             ((unroll-list x 'x 'y))
             ((unroll-list y 'y 'x))
             (t
