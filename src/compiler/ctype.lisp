@@ -78,8 +78,10 @@
                 (dest (lvar-dest lvar)))
        (when (and (cast-p dest)
                   (eq (cast-type-to-check dest) *wild-type*))
-         (values-type-intersection
-          dtype (cast-asserted-type dest))))
+         (let ((int
+                 (values-type-intersection dtype (cast-asserted-type dest))))
+           (unless (eq int *empty-type*)
+             int))))
      dtype)))
 
 ;;;; stuff for checking a call against a function type
