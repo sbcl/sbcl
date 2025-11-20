@@ -326,7 +326,10 @@
                               (when (cut-node combination)
                                 (setf did-something t))))))
                       (when did-something
-                        (change-return-type node (values-specifier-type '(values integer &optional))))
+                        (change-return-type node
+                                            (if (type-single-value-p (node-derived-type node))
+                                                (values-specifier-type '(values integer &optional))
+                                                (values-specifier-type '(values integer)))))
                       nil)))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
