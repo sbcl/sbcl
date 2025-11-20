@@ -4067,10 +4067,10 @@
                           (*-by-fixnum-to-fixnum x y))))))))
       (give-up-ir1-transform)))
 
-(deftransform * ((x y) (t fixnum) * :node node :priority :last)
+(deftransform * ((x y) (t fixnum) * :node node :priority :last :important nil)
   (unknown-*-transform x y node))
 
-(deftransform * ((y x) (fixnum t) * :node node :priority :last)
+(deftransform * ((y x) (fixnum t) * :node node :priority :last :important nil)
   (unknown-*-transform x y node))
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
