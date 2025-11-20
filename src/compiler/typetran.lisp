@@ -1850,7 +1850,7 @@
                        (not (contains-unknown-type-p (array-type-element-type tspec)))
                        ;; just for requesting (array nil (*)), you lose
                        (neq (array-type-specialized-element-type tspec) *empty-type*)
-                       (consp (array-type-dimensions tspec)))
+                       (typep (array-type-dimensions tspec) '(cons t null)))
                   (values tspec
                           `(typep x ',(type-specifier tspec))
                           (car (array-type-dimensions tspec))
