@@ -741,7 +741,9 @@
                    (dolist (ref (leaf-refs lambda))
                      (let* ((lvar (node-lvar ref))
                             (combination (lvar-dest lvar)))
-                       (setf (node-derived-type combination) type)
+                       (setf (node-derived-type ref) (specifier-type 'function)
+                             (lvar-%derived-type lvar) nil
+                             (node-derived-type combination) type)
                        (principal-lvar-single-valuify (node-lvar combination))
                        (reoptimize-lvar (node-lvar combination))))
                    (setf (return-result-type node) type
