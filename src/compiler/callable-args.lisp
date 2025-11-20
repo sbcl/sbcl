@@ -275,56 +275,65 @@
 (defun lvar-fun-type (lvar &optional defined-here asserted-type)
   (let* ((use (principal-lvar-use lvar))
          (lvar-type (lvar-type lvar)))
-    (cond ((ref-p use)
-           (multiple-value-bind (type fun-name leaf asserted) (node-fun-type use defined-here asserted-type)
-             (let* ((lvar-type (unless asserted-type
-                                 (or (and (intersection-type-p lvar-type)
-                                          (find-if #'fun-type-p (intersection-type-types lvar-type)))
-                                     lvar-type)))
-                    (int (cond ((and (not (eq lvar-type type))
-                                     (fun-type-p lvar-type))
-                                ;; save the cast type
-                                (setf asserted nil)
-                                (type-intersection type lvar-type))
-                               (t
-                                type))))
-               (values (if (neq int *empty-type*)
-                           int
-                           lvar-type)
-                       fun-name leaf asserted))))
-          ((and (listp use)
-                (every #'ref-p use))
-           (let ((union *empty-type*)
-                 (all-asserted t))
-             (loop for ref in use
-                   do
-                   (multiple-value-bind (type fun-name leaf asserted) (node-fun-type ref defined-here asserted-type)
-                     (declare (ignore fun-name))
-                     (unless (and (global-var-p leaf)
-                                  (eq (global-var-kind leaf) :global-function)
-                                  (eq (global-var-%source-name leaf) nil))
-                       (let* ((lvar-type (unless asserted-type
-                                           (or (and (intersection-type-p lvar-type)
-                                                   (find-if #'fun-type-p (intersection-type-types lvar-type)))
-                                              lvar-type)))
-                              (int  (cond ((and (not (eq lvar-type type))
-                                                (fun-type-p lvar-type))
-                                           ;; save the cast type
-                                           (setf asserted nil)
-                                           (type-intersection type lvar-type))
-                                          (t
-                                           type))))
-                         (setf all-asserted (and all-asserted asserted)
-                               union (type-union union int))))))
-             (values union '.anonymous. nil all-asserted)))
-          (t
-           (values lvar-type
-                   (typecase use
-                     (node
-                      (node-source-form use))
+    (flet ((maybe-intersection (type1 type2)
+             (let ((int (type-intersection type1 type2)))
+               (cond ((eq int *empty-type*)
+                      type1)
+                     ((and (fun-type-p int)
+                           (eq (fun-type-returns int) *empty-type*)
+                           (not (or (eq (fun-type-returns type1) *empty-type*)
+                                    (eq (fun-type-returns type2) *empty-type*))))
+                      type1)
                      (t
-                      '.anonymous.))
-                   nil nil)))))
+                      int)))))
+      (cond ((ref-p use)
+             (multiple-value-bind (type fun-name leaf asserted) (node-fun-type use defined-here asserted-type)
+               (let* ((lvar-type (unless asserted-type
+                                   (or (and (intersection-type-p lvar-type)
+                                            (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                       lvar-type)))
+                      (int (cond ((and (not (eq lvar-type type))
+                                       (fun-type-p lvar-type))
+                                  ;; save the cast type
+                                  (setf asserted nil)
+                                  (maybe-intersection lvar-type type))
+                                 (t
+                                  type))))
+                 (values int
+                         fun-name leaf asserted))))
+            ((and (listp use)
+                  (every #'ref-p use))
+             (let ((union *empty-type*)
+                   (all-asserted t))
+               (loop for ref in use
+                     do
+                     (multiple-value-bind (type fun-name leaf asserted) (node-fun-type ref defined-here asserted-type)
+                       (declare (ignore fun-name))
+                       (unless (and (global-var-p leaf)
+                                    (eq (global-var-kind leaf) :global-function)
+                                    (eq (global-var-%source-name leaf) nil))
+                         (let* ((lvar-type (unless asserted-type
+                                             (or (and (intersection-type-p lvar-type)
+                                                      (find-if #'fun-type-p (intersection-type-types lvar-type)))
+                                                 lvar-type)))
+                                (int (cond ((and (not (eq lvar-type type))
+                                                 (fun-type-p lvar-type))
+                                            ;; save the cast type
+                                            (setf asserted nil)
+                                            (maybe-intersection lvar-type type))
+                                           (t
+                                            type))))
+                           (setf all-asserted (and all-asserted asserted)
+                                 union (type-union union int))))))
+               (values union '.anonymous. nil all-asserted)))
+            (t
+             (values lvar-type
+                     (typecase use
+                       (node
+                        (node-source-form use))
+                       (t
+                        '.anonymous.))
+                     nil nil))))))
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
   (if (or (not leaf)
