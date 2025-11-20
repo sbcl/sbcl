@@ -6886,10 +6886,14 @@ expansion happened."
                        (typep-rational object range-integer-run (numeric-union-type-ranges type)))))
                    (single-float
                     (and (eq (numeric-type-format type) 'single-float)
-                         (typep-float object (numeric-union-type-ranges type))))
+                         (if (float-nan-p object)
+                             (equalp (numeric-union-type-ranges type) #(nil nil))
+                             (typep-float object (numeric-union-type-ranges type)))))
                    (double-float
                     (and (eq (numeric-type-format type) 'double-float)
-                         (typep-float object (numeric-union-type-ranges type))))
+                         (if (float-nan-p object)
+                             (equalp (numeric-union-type-ranges type) #(nil nil))
+                             (typep-float object (numeric-union-type-ranges type)))))
                    (ratio
                     (and (eq (numeric-type-class type) 'rational)
                          (typep-rational object range-ratio-run (numeric-union-type-ranges type)))))))
