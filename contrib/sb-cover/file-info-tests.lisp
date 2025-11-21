@@ -208,20 +208,42 @@
                   0
                   ;;( d e f u n   r e a d - e v a l   ( z   w )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-                  ;;    # . ( g e n e r a t e   c o d e   ' z   ' w ) )
+                  ;;    # . ( g e n e r a t e - c o d e   ' z   ' w ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
 
 (read-eval 2 3)
 ;; ... but probably the main thing is that this shouldn't show any
-;; conditional-related states (or indeed read-suppressed states).
+;; read-suppressed states, or ideally any conditional states either.
 (assert (equalp (get-states "test-data-read-eval")
                 ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
                 #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
                   0
                   ;;( d e f u n   r e a d - e v a l   ( z   w )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
-                  ;;    # . ( g e n e r a t e   c o d e   ' z   ' w ) )
+                  ;;    # . ( g e n e r a t e - c o d e   ' z   ' w ) )
                   0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
+
+(sb-cover:clear-coverage)
+(compile-load "test-data-read-eval-cdr")
+;; see related comments about "test-data-read-eval"
+(assert (equalp (get-states "test-data-read-eval-cdr")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   r e a d - e v a l - c d r   ( z   w )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( p r o g n   .   # . ( l i s t   ( g e n e r a t e - c o d e   ' z   ' w ) ) ) )
+                  0 1 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1)))
+
+(read-eval-cdr 2 3)
+(assert (equalp (get-states "test-data-read-eval-cdr")
+                ;;( i n - p a c k a g e   s b - c o v e r - t e s t )
+                #(1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  0
+                  ;;( d e f u n   r e a d - e v a l - c d r   ( z   w )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+                  ;;    ( p r o g n   .   # . ( l i s t   ( g e n e r a t e - c o d e   ' z   ' w ) ) ) )
+                  0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)))
 
 (sb-cover:clear-coverage)
 (defvar *flag* t)

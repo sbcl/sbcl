@@ -892,6 +892,12 @@ Return the form and the source-map."
           (error 'end-of-file :stream stream)
           (values form source-map)))))
 
+(defun nth-or-marker (n list)
+  (cond
+    ((read-eval-marker-p list) list)
+    ((= n 0) (car list))
+    (t (nth-or-marker (1- n) (cdr list)))))
+
 (defun source-path-source-position (path form source-map)
   "Return the start position of PATH from FORM and SOURCE-MAP.  All
 subforms along the path are considered and the start and end position
@@ -899,7 +905,7 @@ of the deepest (i.e. smallest) possible form is returned."
   ;; compute all subforms along path
   (let ((forms (loop for ns on path
                      for n = (car ns)
-                     for f = form then (nth n f)
+                     for f = form then (nth-or-marker n f)
                      collect f into forms
                      if (read-eval-marker-p f)
                        do (return-from source-path-source-position (values nil nil))
