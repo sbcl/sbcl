@@ -159,6 +159,11 @@
   (def-type-predicate-wrapper sb-c::string-designator-p)
   (def-type-predicate-wrapper vectorp))
 
+(sb-c::when-vop-existsp (:translate sb-c::unsigned-byte-x-p)
+  (defun sb-c::unsigned-byte-x-p (x width)
+    (and (typep x 'unsigned-byte)
+         (< x (ash 1 width)))))
+
 (sb-c::when-vop-existsp (:translate car-eq-if-listp)
   (defun car-eq-if-listp (value object)
     (car-eq-if-listp value object)))
