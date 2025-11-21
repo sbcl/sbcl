@@ -2236,14 +2236,10 @@
   (:results (result :scs (any-reg control-stack)))
   (:result-types tagged-num)
   (:note "inline ASH")
-  (:variant nil)
-  (:variant-vars modularp)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 2
     (cond ((= amount 0) (bug "shifting by 0"))
           ((>= amount 64) ; shifting left (zero fill)
-           (unless modularp
-             (bug "Impossible: fixnum ASH left exceeds word length"))
            (zeroize result))
           ((encodable-as-lea) (generate-lea))
           (t
@@ -2368,7 +2364,6 @@
 
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-c/fixnum=>fixnum)
-  (:variant :modular)
   (:translate ash-left-modfx))
 
 (define-vop (fast-ash-left/unsigned-mod64=>unsigned

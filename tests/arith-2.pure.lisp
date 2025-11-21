@@ -1177,3 +1177,12 @@
      (declare ((real * 0) x))
      (ash x y))
    (integer * 0)))
+
+(with-test (:name :ash-overflow)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (fixnum a))
+         (truly-the bit (ash a 90)))
+    ((0) 0)
+    ((1) 0)))
