@@ -1170,3 +1170,10 @@
       (the fixnum (* f 25152445588928537400)))
    ((0) 0)
    ((1) (condition 'type-error))))
+
+(with-test (:name :ash-negative-type)
+  (assert-type
+   (lambda (x y)
+     (declare ((real * 0) x))
+     (ash x y))
+   (integer * 0)))
