@@ -2509,8 +2509,7 @@
            (if (or (floatp n)
                    (safe-single-coercion-p n))
                (ffloor n)
-               (return-from ffloor-quotient-bound
-                 (load-time-value (make-interval))))))
+               (return-from ffloor-quotient-bound (make-interval)))))
    (let* ((lo (interval-low quot))
           (hi (interval-high quot))
           (new-lo
@@ -2657,8 +2656,7 @@
            (if (or (floatp n)
                    (safe-single-coercion-p n))
                (fceiling n)
-               (return-from fceiling-quotient-bound
-                 (load-time-value (make-interval))))))
+               (return-from fceiling-quotient-bound (make-interval)))))
     (let* ((lo (interval-low quot))
            (hi (interval-high quot))
            (new-lo (and lo
