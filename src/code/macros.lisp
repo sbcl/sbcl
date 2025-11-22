@@ -149,7 +149,8 @@ tree structure resulting from the evaluation of EXPRESSION."
     (values
      `(named-lambda ,xep-name ,vars
         (declare (notinline ,name)
-                 (muffle-conditions warning))
+                 (muffle-conditions warning)
+                 (optimize inhibit-warnings))
         (funcall ',name ,@vars))
      xep-name)))
 
