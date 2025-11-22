@@ -270,8 +270,8 @@
               (values not-target target)
               (values target not-target))
         (assemble ()
-          (inst asr r value n-fixnum-tag-bits)
           (when fixnum-p
+            (inst asr r value n-fixnum-tag-bits)
             (inst tbz* value 0 yep))
           (unless (fixnum-or-other-pointer-tn-ref-p args t)
             (test-type value temp nope t (other-pointer-lowtag)))
