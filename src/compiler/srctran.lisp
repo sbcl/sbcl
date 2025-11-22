@@ -2505,38 +2505,44 @@
 (defun ffloor-quotient-bound (quot divisor)
   ;; Take the ffloor of the quotient and then massage it into what we
   ;; need.
-  (let* ((lo (interval-low quot))
-         (hi (interval-high quot))
-         (new-lo
-           ;; Take the ffloor of the lower bound. The result is always a
-           ;; closed lower bound.
-           (and lo
-                (conservative-quotient-bound
-                 (ffloor (type-bound-number lo))
-                 sb-xc:-
-                 (type-bound-number lo))))
-         (new-hi
-           (and hi
-                (conservative-quotient-bound
-                 (if (consp hi)
-                     ;; An open bound. We need to be careful here because
-                     ;; the ffloor of '(10.0) is 9, but the ffloor of
-                     ;; 10.0 is 10.
-                     (multiple-value-bind (q r) (ffloor (first hi))
-                       (if (zerop r)
-                           (sb-xc:- q 1)
-                           q))
-                     ;; A closed bound, so the answer is obvious.
-                     (ffloor hi))
-                 sb-xc:+
-                 (type-bound-number hi)))))
-    (when (and (eql new-lo 0.0)
-               (not (or (floatp (type-bound-number lo))
-                        (floatp (type-bound-number hi))))
-               (not (eql (interval-range-info divisor) '+)))
-      (setf new-lo -0.0))
-    (make-interval :low (coerce-for-bound new-lo 'float)
-                   :high (coerce-for-bound new-hi 'float))))
+  (flet ((safe-ffloor (n)
+           (if (or (floatp n)
+                   (safe-single-coercion-p n))
+               (ffloor n)
+               (return-from ffloor-quotient-bound
+                 (load-time-value (make-interval))))))
+   (let* ((lo (interval-low quot))
+          (hi (interval-high quot))
+          (new-lo
+            ;; Take the ffloor of the lower bound. The result is always a
+            ;; closed lower bound.
+            (and lo
+                 (conservative-quotient-bound
+                  (safe-ffloor (type-bound-number lo))
+                  sb-xc:-
+                  (type-bound-number lo))))
+          (new-hi
+            (and hi
+                 (conservative-quotient-bound
+                  (if (consp hi)
+                      ;; An open bound. We need to be careful here because
+                      ;; the ffloor of '(10.0) is 9, but the ffloor of
+                      ;; 10.0 is 10.
+                      (multiple-value-bind (q r) (safe-ffloor (first hi))
+                        (if (zerop r)
+                            (sb-xc:- q 1)
+                            q))
+                      ;; A closed bound, so the answer is obvious.
+                      (safe-ffloor hi))
+                  sb-xc:+
+                  (type-bound-number hi)))))
+     (when (and (eql new-lo 0.0)
+                (not (or (floatp (type-bound-number lo))
+                         (floatp (type-bound-number hi))))
+                (not (eql (interval-range-info divisor) '+)))
+       (setf new-lo -0.0))
+     (make-interval :low (coerce-for-bound new-lo 'float)
+                    :high (coerce-for-bound new-hi 'float)))))
 
 (defun floor-rem-bound (num div)
   (case (interval-range-info div)
@@ -2647,37 +2653,43 @@
 (defun fceiling-quotient-bound (quot divisor)
   ;; Take the fceiling of the quotient and then massage it into what we
   ;; need.
-  (let* ((lo (interval-low quot))
-         (hi (interval-high quot))
-         (new-lo (and lo
-                      (conservative-quotient-bound
-                       (if (consp lo)
-                           ;; An open bound. We need to be careful here because
-                           ;; the fceiling of '(10.0) is 11, but the fceiling of
-                           ;; 10.0 is 10.
-                           (multiple-value-bind (q r) (fceiling (first lo))
-                             (if (zerop r)
-                                 (sb-xc:+ q 1)
-                                 q))
-                           ;; A closed bound, so the answer is obvious.
-                           (fceiling lo))
-                       sb-xc:-
-                       (type-bound-number lo))))
-         (new-hi
-           ;; Take the fceiling of the upper bound. The result is always a
-           ;; closed upper bound.
-           (and hi
-                (conservative-quotient-bound
-                 (fceiling (type-bound-number hi))
-                 sb-xc:+
-                 (type-bound-number hi)))))
-    (when (and (eql new-lo 0.0)
-               (not (or (floatp (type-bound-number lo))
-                        (floatp (type-bound-number hi))))
-               (not (eql (interval-range-info divisor) '+)))
-      (setf new-lo -0.0))
-    (make-interval :low (coerce-for-bound new-lo 'float)
-                   :high (coerce-for-bound new-hi 'float))))
+  (flet ((safe-fceiling (n)
+           (if (or (floatp n)
+                   (safe-single-coercion-p n))
+               (fceiling n)
+               (return-from fceiling-quotient-bound
+                 (load-time-value (make-interval))))))
+    (let* ((lo (interval-low quot))
+           (hi (interval-high quot))
+           (new-lo (and lo
+                        (conservative-quotient-bound
+                         (if (consp lo)
+                             ;; An open bound. We need to be careful here because
+                             ;; the fceiling of '(10.0) is 11, but the fceiling of
+                             ;; 10.0 is 10.
+                             (multiple-value-bind (q r) (safe-fceiling (first lo))
+                               (if (zerop r)
+                                   (sb-xc:+ q 1)
+                                   q))
+                             ;; A closed bound, so the answer is obvious.
+                             (safe-fceiling lo))
+                         sb-xc:-
+                         (type-bound-number lo))))
+           (new-hi
+             ;; Take the fceiling of the upper bound. The result is always a
+             ;; closed upper bound.
+             (and hi
+                  (conservative-quotient-bound
+                   (safe-fceiling (type-bound-number hi))
+                   sb-xc:+
+                   (type-bound-number hi)))))
+      (when (and (eql new-lo 0.0)
+                 (not (or (floatp (type-bound-number lo))
+                          (floatp (type-bound-number hi))))
+                 (not (eql (interval-range-info divisor) '+)))
+        (setf new-lo -0.0))
+      (make-interval :low (coerce-for-bound new-lo 'float)
+                     :high (coerce-for-bound new-hi 'float)))))
 
 (defun ceiling-rem-bound (num div)
   (case (interval-range-info div)
