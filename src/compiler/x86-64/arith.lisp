@@ -4557,7 +4557,9 @@
                                  (cond
                                    ((eq lo (fixnumize 1))
                                     (inst test size x x)
-                                    (inst jmp (if not-p :le :g) target))
+                                    (inst jmp (if (eq size :dword)
+                                                  (if not-p :z :nz)
+                                                  (if not-p :le :g)) target))
                                    (t
                                     (inst cmp size x (imm lo))
                                     (inst jmp (if (eq size :dword)

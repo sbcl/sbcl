@@ -1186,3 +1186,14 @@
          (truly-the bit (ash a 90)))
     ((0) 0)
     ((1) 0)))
+
+(with-test (:name :range-unsigned-comparison)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (typep a '(integer 1 2147483647)))
+    ((-1) nil)
+    ((1) t)
+    ((2147483647) t)
+    ((2147483648) nil)
+    ((0.0) nil)))
