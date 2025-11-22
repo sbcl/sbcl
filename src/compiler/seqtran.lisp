@@ -2172,6 +2172,7 @@
   (let* ((int-s (and start
                      (type-approximate-interval (lvar-type start))))
          (int-e (and end
+                     (not (types-equal-or-intersect (lvar-type end) (specifier-type 'null)))
                      (type-approximate-interval (type-intersection (lvar-type end) (specifier-type 'integer)))))
          (min-result (or (and int-s
                               (interval-low int-s))

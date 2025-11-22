@@ -1027,3 +1027,11 @@
      (declare (optimize speed))
      (find-if f nil))
    null))
+
+(with-test (:name :mismastch-or-null)
+  (assert-type
+   (lambda (a b e)
+     (declare ((or null (eql 4)) e)
+              ((simple-string 9) a))
+     (mismatch a b :start1 5 :end1 e))
+   (or (integer 5 9) null)))
