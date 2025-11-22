@@ -186,7 +186,9 @@
 
 (defun unboxed-specialized-return-p (name)
   (and (typep name '(cons (eql sb-impl::specialized-xep)))
-       (let ((type (values-specifier-type (cadddr name))))
+       (let* ((specifier (cadddr name))
+              (type (and (neq specifier '*)
+                         (values-specifier-type (cadddr name)))))
          (and (values-type-p type)
               (not (or (values-type-optional type)
                        (values-type-rest type)))

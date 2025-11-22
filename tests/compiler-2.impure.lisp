@@ -246,7 +246,7 @@
            (lambda () (values m (incf j)))))))))
 
 
-(declaim (ftype (function (t double-float &optional) (values t &optional)) specialized-xep-ignored-var))
+(declaim (ftype (function (t double-float)) specialized-xep-ignored-var))
 (defun specialized-xep-ignored-var (a d)
   (declare (ignore a))
   d)
