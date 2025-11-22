@@ -246,3 +246,15 @@
            (lambda () (values m (incf j)))))))))
 
 
+(declaim (ftype (function (t double-float &optional) (values t &optional)) specialized-xep-ignored-var))
+(defun specialized-xep-ignored-var (a d)
+  (declare (ignore a))
+  d)
+
+(with-test (:name :specialized-xep-ignored-var)
+ (checked-compile-and-assert
+  ()
+  `(lambda (d)
+     (specialized-xep-ignored-var 1 d))
+  ((2d0) 2d0)
+  ((-2d0) -2d0)))
