@@ -668,8 +668,6 @@
                                        (location= number result)))))
   (:result-types tagged-num)
   (:note "inline ASH")
-  (:variant nil)
-  (:variant-vars modularp)
   (:generator 2
     (cond ((and (= amount 1) (not (location= number result)))
            (inst lea result (make-ea :dword :base number :index number)))
@@ -688,9 +686,6 @@
                         (inst sar result (- amount))
                         (inst and result (lognot fixnum-tag-mask)))))
                  ((plusp amount)
-                  (unless modularp
-                    (aver (not "Impossible: fixnum ASH should not be called with
-constant shift greater than word length")))
                   (if (sc-is result any-reg)
                       (inst xor result result)
                       (inst mov result 0)))
@@ -1492,7 +1487,6 @@ constant shift greater than word length")))
 
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-c/fixnum=>fixnum)
-  (:variant :modular)
   (:translate ash-left-modfx))
 
 (define-vop (fast-ash-left-modfx/fixnum=>fixnum
