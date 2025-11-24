@@ -3442,23 +3442,54 @@ expansion happened."
                '(cons array-type null)))))
 
 (define-type-method (array :simple-union2) (type1 type2)
-  (multiple-value-bind
-        (result-eltype result-stype eltype-supertype)
-      (unite-array-types-element-types type1 type2)
-    (multiple-value-bind
-          (result-complexp complexp-supertype)
-        (unite-array-types-complexp type1 type2)
-      (multiple-value-bind
-            (result-dimensions dimensions-supertype)
-          (unite-array-types-dimensions type1 type2)
-        (when (and (not (eq result-dimensions :incompatible))
-                   (not (eq result-eltype :incompatible))
-                   (unite-array-types-supertypes-compatible-p
-                    eltype-supertype complexp-supertype dimensions-supertype))
-          (make-array-type result-dimensions
-           :complexp result-complexp
-           :element-type result-eltype
-           :specialized-element-type result-stype))))))
+  (or
+   (multiple-value-bind
+         (result-eltype result-stype eltype-supertype)
+       (unite-array-types-element-types type1 type2)
+     (multiple-value-bind
+           (result-complexp complexp-supertype)
+         (unite-array-types-complexp type1 type2)
+       (multiple-value-bind
+             (result-dimensions dimensions-supertype)
+           (unite-array-types-dimensions type1 type2)
+         (when (and (not (eq result-dimensions :incompatible))
+                    (not (eq result-eltype :incompatible))
+                    (unite-array-types-supertypes-compatible-p
+                     eltype-supertype complexp-supertype dimensions-supertype))
+           (make-array-type result-dimensions
+                            :complexp result-complexp
+                            :element-type result-eltype
+                            :specialized-element-type result-stype)))))
+   ;; (or (and array (not simple-array)) (simple-array t))
+   ;; => (or (and array (not simple-array)) (array t))
+   (labels ((dimensions-subtypep (type1 type2)
+              (let ((dim1 (array-type-dimensions type1))
+                    (dim2 (array-type-dimensions type2)))
+                (or (eq dim2 '*)
+                    (equal dim1 dim2)
+                    (and (listp dim1)
+                         (= (length dim1) (length dim2))
+                         (every (lambda (d1 d2)
+                                  (or (eq d2 '*)
+                                      (eql d1 d2)))
+                                dim1 dim2)))))
+            (et-subtypep (type1 type2)
+              (let ((et1 (array-type-specialized-element-type type1))
+                    (et2 (array-type-specialized-element-type type2)))
+                (or (eq et1 et2)
+                    (eq et2 *wild-type*))))
+            (try (type1 type2)
+              (let ((c1 (array-type-complexp type1))
+                    (c2 (array-type-complexp type2)))
+                (when (and (not (eq c1 c2))
+                           (not (or (eq c1 :maybe)
+                                    (eq c2 :maybe)))
+                           (et-subtypep type1 type2)
+                           (dimensions-subtypep type1 type2))
+                  (type-union (change-array-type type1 :complexp :maybe)
+                              type2)))))
+     (or (try type1 type2)
+         (try type2 type1)))))
 
 (defun array-type-force-specialized (type)
   (flet ((compound (type)
@@ -3731,6 +3762,11 @@ expansion happened."
                         (new-negations other)
                         (union (when supertype
                                  (type-union2 supertype type2)))
+                        (widened (and (union-type-p union)
+                                      (find type2 (union-type-types union) :test-not #'eq)))
+                        (widenp t)
+                        (union (and (array-type-p union)
+                                    union))
                         (union-supertype (or union supertype))
                         (type2-supertype (if union-supertype
                                              (change-array-type type2
@@ -3778,18 +3814,31 @@ expansion happened."
                                          new-negations))
                                   (t
                                    (when (intersectp not-type type2-supertype)
+                                     (if (and (not widened)
+                                              (et-subtypep type2 not-type)
+                                              (eq (array-type-complexp type2)
+                                                  (array-type-complexp not-type))
+                                              (neq (array-type-dimensions type2) '*)
+                                              (equal (array-type-dimensions type2)
+                                                     (array-type-dimensions not-type)))
+                                         (setf widened
+                                               (change-array-type type2 :dimensions '*))
+                                         (setf widenp nil))
                                      (setf union nil))
                                    (push not new-negations))))
                    (when (and union union-negations)
                      (setf new-negations (nconc union-negations new-negations)
                            did-something t))
-                   (when did-something
+                   (unless widenp
+                     (setf widened nil))
+                   (when (or did-something widened)
                      (let ((intersections (%type-intersection new-negations)))
                        (if union
                            (type-intersection union intersections)
-                           (type-union type2 (if supertype
-                                                 (type-intersection supertype intersections)
-                                                 intersections))))))))
+                           (type-union (or widened type2)
+                                       (if supertype
+                                           (type-intersection supertype intersections)
+                                           intersections))))))))
              ;; This is the same as in the intersection-simple-union2-type-method,
              ;; but it doesn't stop if type-union produces a new union type:
              ;; (or (and vector (not (simple-array t))) simple-vector)
