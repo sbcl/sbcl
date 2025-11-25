@@ -1536,7 +1536,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%EXIT"
            "%EXP" "%EXPM1"
            "%EXPF" "%EXPM1F"
-           "ASH-RIGHT"
+           "ASH-RIGHT" "ASH-RIGHT-TWO-WORDS"
            "FILL-POINTER-ERROR"
            "%FIND-POSITION"
            "%FIND-POSITION-VECTOR-MACRO" "%FIND-POSITION-IF"

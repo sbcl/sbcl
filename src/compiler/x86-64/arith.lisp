@@ -4791,3 +4791,16 @@
     (aver (not (= count 0)))
     (move result integer)
     (inst ror result count)))
+
+(define-vop ()
+  (:policy :fast-safe)
+  (:translate ash-right-two-words)
+  (:args (a :scs (unsigned-reg) :target result)
+         (b :scs (unsigned-reg) :to :save))
+  (:info count)
+  (:arg-types unsigned-num unsigned-num (:constant (mod 64)))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (move result a)
+    (inst shrd result b count)))

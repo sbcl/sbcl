@@ -513,6 +513,36 @@
               `(lambda (value amount1 amount2)
                  (logand (ash value (+ amount1 amount2))
                          ,(1- (ash 1 (+ width (lvar-value amount))))))))))))
+
+(define-source-transform ash-right-mod64 (x count)
+  `(let ((x ,x)
+         (count ,count))
+     (typecase x
+       (fixnum
+        (logand most-positive-word (ash (truly-the fixnum x) count)))
+       (sb-vm:signed-word
+        (logand most-positive-word (ash (truly-the sb-vm:signed-word x) count)))
+       (bignum
+        (ash-right-two-words (sb-bignum:%bignum-ref (truly-the bignum x) 1)
+                             (sb-bignum:%bignum-ref (truly-the bignum x) 0)
+                             (- count))))))
+
+(define-source-transform ash-right-modfx (x count)
+  `(let ((x ,x)
+         (count ,count))
+     (typecase x
+       (fixnum
+        (mask-signed-field sb-vm:n-fixnum-bits
+                           (ash (truly-the fixnum x) count)))
+       (sb-vm:signed-word
+        (mask-signed-field sb-vm:n-fixnum-bits
+                           (ash (truly-the sb-vm:signed-word x) count)))
+       (bignum
+        (mask-signed-field sb-vm:n-fixnum-bits
+                           (ash-right-two-words (sb-bignum:%bignum-ref (truly-the bignum x) 1)
+                                                (sb-bignum:%bignum-ref (truly-the bignum x) 0)
+                                                (- count)))))))
+
 (macrolet
     ((def (left-name name kind width signedp)
        (declare (ignorable name))
@@ -544,10 +574,16 @@
                                   (csubtypep integer-type (specifier-type `(signed-byte ,sb-vm:n-word-bits)))))
                          ',name)
                         ((and (not (csubtypep integer-type (specifier-type 'word)))
-                              (not (csubtypep integer-type (specifier-type 'sb-vm:signed-word)))
-                              (csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum))))
-                         (cut-to-width integer ,kind width ,signedp)
-                         t)))))
+                              (not (csubtypep integer-type (specifier-type 'sb-vm:signed-word))))
+                         (cond ((csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum)))
+                                (cut-to-width integer ,kind width ,signedp)
+                                t)
+                               #+(or arm64 x86-64)
+                               ((and (constant-lvar-p count)
+                                     (typep (lvar-value count) `(integer ,(- sb-vm:n-word-bits) 0)))
+                                ',(if signedp
+                                      'ash-right-modfx
+                                      'ash-right-mod64))))))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (t (constant-arg (eql 0))))

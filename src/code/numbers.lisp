@@ -1485,6 +1485,10 @@ and the number of 0 bits if INTEGER is negative."
     ((bignum)
      (bignum-ashift-right integer count))))
 
+(defun ash-right-two-words (word2 word1 count)
+  (logand most-positive-word
+          (ash (dpb word2 (byte sb-vm:n-word-bits sb-vm:n-word-bits) word1) (- count))))
+
 (defun integer-length (integer)
   "Return the number of non-sign bits in the twos-complement representation
   of INTEGER."

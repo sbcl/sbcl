@@ -505,6 +505,18 @@
   integer
   (movable foldable flushable no-verify-arg-count))
 
+(defknown ash-right-two-words (word word (mod #.sb-vm:n-word-bits))
+  word
+  (movable foldable flushable always-translatable))
+
+(defknown ash-right-mod64 (integer (integer #.(- sb-vm:n-word-bits) 0))
+  word
+  (movable foldable flushable always-translatable))
+
+(defknown ash-right-modfx (integer (integer #.(- sb-vm:n-word-bits) 0))
+  fixnum
+  (movable foldable flushable always-translatable))
+
 (defknown (logcount integer-length) (integer) bit-index
   (movable foldable flushable))
 ;;; FIXME: According to the ANSI spec, it's legal to use any
