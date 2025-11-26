@@ -6465,7 +6465,7 @@
                 (when (zerop (lvar-value y))
                   (aver (splice-fun-args x name #'first nil))
                   `($fun x 0)))
-           (/ (* *)
+           (/ (* (type (not (eql 0))))
               (when (zerop (lvar-value y))
                 (destructuring-bind (a b) args
                   (declare (ignore a))
@@ -6475,7 +6475,7 @@
                         ((csubtypep (lvar-type b) (specifier-type '(rational * 0)))
                          (aver (splice-fun-args x name #'first nil))
                          `($fun 0 x))))))
-           (floor (* (type unsigned-byte))
+           (floor (* (type (rational (0))))
                   (when (zerop (lvar-value y))
                     (aver (splice-fun-args x name #'first nil))
                     `($fun x 0)))))
