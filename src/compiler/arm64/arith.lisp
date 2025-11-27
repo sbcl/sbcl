@@ -458,23 +458,25 @@
                        (lambda ()
                          (inst neg tmp-tn tmp-tn)))
                      vop 'division-by-zero-error error-x)))))
-
-      (cond ((csubtypep (tn-ref-type x-ref) (specifier-type '(integer * 0)))
+      (when zero
+        (inst cbz y zero))
+      (cond ((or (sc-is x immediate)
+                 (csubtypep (tn-ref-type x-ref) (specifier-type '(integer * 0))))
              (if (sc-is x immediate)
                  (load-immediate-word tmp-tn (- (tn-value x)))
                  (inst neg tmp-tn x))
-             (when zero
-               (inst cbz y zero))
              (inst udiv quo tmp-tn y)
              (inst neg quo quo))
             (t
-             (when zero
-               (inst cbz y zero))
              (inst cmp x 0)
              (inst csneg tmp-tn x x :ge)
              (inst udiv quo tmp-tn y)
              (inst csneg quo quo quo :ge))))
     (unless (eq (tn-kind rem) :unused)
+      (when (sc-is x immediate)
+        (or (load-immediate-word tmp-tn (tn-value x) t)
+            (inst neg tmp-tn tmp-tn))
+        (setf x tmp-tn))
       (inst msub rem quo y x))))
 
 (define-vop (truncate-mod64 fast-truncate/signed=>signed)
