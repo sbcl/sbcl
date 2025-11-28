@@ -3574,6 +3574,7 @@
 ;;; Per the processor manual, TEST clears OF and CF, so presumably
 ;;; there is not a branch-if on either of those flags.
 ;;; It shouldn't be a problem that removal of TEST leaves more flags affected.
+#+nil ;; it doesn't account for multiple flag-reading instructions
 (defpattern "ALU + test" ((add adc sub sbb and or xor neg sar shl shr) (test)) (stmt next)
   (binding* (((size1 dst1 src1) (parse-2-operands stmt))
              ((size2 dst2 src2) (parse-2-operands next))
@@ -3614,16 +3615,14 @@
                         :nl :nle :ng :nge)
                        (and (eq size2 size1)
                             ;; Assume there's no overflow for signed arithmetic
-                            ;; Excluding
-                            ;; sb-vm::fast--/fixnum=>fixnum
-                            ;; sb-vm::fast--/signed=>signed
-                            ;; sb-vm::fast---c/fixnum=>fixnum
-                            ;; sb-vm::fast---c/signed=>signed
-                            ;; because subtracting two negative numbers will set OF.
                             (memq (vop-name (sb-assem::stmt-vop stmt))
-                                  '(sb-vm::fast-+/fixnum=>fixnum
+                                  '(sb-vm::fast--/fixnum=>fixnum
+                                    sb-vm::fast-+/fixnum=>fixnum
+                                    sb-vm::fast--/signed=>signed
                                     sb-vm::fast-+/signed=>signed
+                                    sb-vm::fast---c/fixnum=>fixnum
                                     sb-vm::fast-+-c/fixnum=>fixnum
+                                    sb-vm::fast---c/signed=>signed
                                     sb-vm::fast-+-c/signed=>signed
                                     sb-vm::fast-negate/fixnum
                                     sb-vm::fast-negate/signed))))))))
