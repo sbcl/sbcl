@@ -87,12 +87,34 @@ External Format}).
 Designates the supported external format that has @var{keyword} as one
 of its names. (See @ref{Supported External Formats}).
 
-@item (@var{keyword} :replacement @var{replacement})
+@item (@var{keyword} . @var{options-plist})
 Designates an external format that is like the one designated by
-@var{keyword} but does not signal an error in case a character or octet
-sequence cannot be en- or decoded. Instead, it inserts @var{replacement}
-at the position in question. @var{replacement} has to be a string
-designator, that is a character or string.
+@var{keyword} with options as specified in @var{options-plist}.
+
+@end table
+
+Valid options for @var{options-plist} are:
+
+@table @code
+
+@item :newline @var{newline}
+
+An external format with an explicit @code{:newline} option is like its
+@var{keyword} parent, but recognizes certain characters or character
+sequences as newlines.  For @code{:lf} (the default), the
+@code{#\Linefeed} character is treated as @code{#\Newline} for both
+input and output.  For @code{:cr}, @code{#\Return} is treated as
+@code{#\Newline}, while for @code{:crlf} the two-character sequence
+@code{#\Return #\Linefeed} is translated to and from @code{#\Newline}.
+
+@item :replacement @var{replacement}
+
+An external format with an explicit @code{:replacement} option is like
+its @var{keyword} parent, but does not signal an error in case a
+character or octet sequence cannot be en- or decoded. Instead, it
+inserts @var{replacement} at the position in
+question. @var{replacement} has to be a string designator, that is a
+character or string.
 
 For example:
 @lisp
