@@ -61,6 +61,26 @@ else
     echo $VERSION | perl -pe 'die "Invalid version number: $_\n" if !/^\d+\.\d+\.\d+$/'
 fi
 
+YEAR=$(date +%y)
+MONTH=$(date +%m)
+
+if [ "$MONTH" = "12" ]
+then
+   MONTH=0
+fi
+
+EXPECTED_VERSION="${YEAR:0:1}.${YEAR:1:1}.${MONTH}"
+
+if [ "$VERSION" \!= "$EXPECTED_VERSION" ]
+then
+    echo "Expected version '$EXPECTED_VERSION', got '$VERSION'"
+    read -n 1 -p "Continue anyway? " A; echo
+    if [ "$A" \!= "y" ]
+    then
+       exit 1
+    fi
+fi
+
 if [ -z "$1" ]
 then
     rev=origin/master
