@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.10:
+changes in sbcl-2.5.11 relative to sbcl-2.5.10:
   * incompatible change: the compiler's internal representation of "source
     paths" for unquoted forms within backquotes has changed.  Other developer
     tools using this representation, including callers of some exported
