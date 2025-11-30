@@ -7,6 +7,24 @@ changes relative to sbcl-2.5.10:
     SB-INTROSPECT functions, will misreport the location of signalled
     conditions and/or definitions in top-level forms including backquotes and
     commas.
+  * minor incompatible change: undefined syntaxes following
+    *READ-BASE*-related reader macros (such as #B, #O, #X, #R) now signal
+    reader errors.
+  * minor incompatible change: the convenience reader syntax pkg::(...) no
+    longer triggers package locks for the PKG package.
+  * minor incompatible change: building with the SB-DEVEL feature inhibits
+    identical code folding at the end of the build of the SBCL system itself.
+  * enhancement: improve the compiler's knowledge of the dimensions of the
+    result of MAKE-ARRAY.  (lp#2130477, thanks to Vasily Postnicov)
+  * enhancement: the SB-COVER contributed module has been made substantially
+    more robust; collecting coverage no longer inhibits various CLOS
+    optimizations.  (For SBCL developers, it is now capable of reporting on
+    the coverage of the SBCL system itself, provided it is built with the new
+    :SB-COVER-FOR-INTERNALS build-time feature.)
+  * bug fix: REQUIREing the SB-MD5 contributed module no longer installs a
+    compiler optimization policy restriction of SPACE being at least 1.
+  * bug fix: don't miscompute the sizes of garbage collector data structures
+    for running with dynamic space heap sizes above 128GiB.
   * bug fix: ENOUGH-NAMESTRING when the pathname and defaults arguments are
     both logical pathnames with the same host returns a shorter string than
     previously.
@@ -14,6 +32,40 @@ changes relative to sbcl-2.5.10:
     compiling code with coverage data.
   * bug fix: requiring the SB-MD5 contrib module no longer installs a
     restriction on the SPACE optimization quality.
+  * bug fix: internal compiler floating point error while compiling certain calls
+    to CEILING.  (lp#2132231)
+  * bug fix: miscompilation of TYPEP on intersections of types including
+    rational ranges.  (lp#2132207)
+  * bug fix: miscompilation of MISMATCH from insufficiently cautious type
+    derivation.  (lp#2132187)
+  * bug fix: internal compiler error while compiling ASH from an incorrect
+    consistency check.  (lp#2132156)
+  * bug fix: internal compiler error from missing constant-folding stub for
+    internal function.  (lp#2132126)
+  * bug fix: miscompilation of GET-PROPERTIES at low SAFETY optimization
+    qualities.  (lp#2131985)
+  * bug fix: internal compiler error while generating code for multiplications
+    of fixnums where the result is also asserted to be a fixnum. (lp#2131894)
+  * bug fix: the asserted real range of ATANH was incorrectly stated as
+    [-1,1].  (lp#2131711)
+  * bug fix: incorrect type error resulting from wrong type derivation of
+    REDUCE #'LOGIOR.  (lp#2131699)
+  * bug fix: specialized XEPs should not be generated during
+    block-compilation or interpretation.  (lp#2131118)
+  * bug fix: fix a wrong compiler transform for MAKE-ARRAY leading to
+    miscompilation.  (lp#2131048)
+  * bug fix: miscompilation of type checks of (UNSIGNED-BYTE <X>) for large
+    <X>.  (lp#2130028)
+  * bug fix: it is now possible to inline functions containing SPECIAL
+    declarations on symbols in locked packages.  (lp#2129827, reported by
+    Scott L. Burson)
+  * bug fix: various internal compiler errors.  (lp#2132022, lp#2129649)
+  * bug fix: various wrong results and inconsistencies from SUBTYPEP on CONS
+    types.  (lp#2130374, lp#2130424, lp#2130441, lp#2130457, lp#2130508,
+    lp#2130518, lp#2130526, lp#2130542, lp#2130588, lp#2130950, lp#2131079,
+    lp#2131149, lp#2131179, lp#2131186, lp#2131271, lp#2131618, lp#2130262)
+  * optimization: LOGTEST participates in compiler transforms related to
+    modular (machine-sized) arithmetic.
 
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:
