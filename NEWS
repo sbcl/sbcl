@@ -60,12 +60,14 @@ changes relative to sbcl-2.5.10:
     declarations on symbols in locked packages.  (lp#2129827, reported by
     Scott L. Burson)
   * bug fix: various internal compiler errors.  (lp#2132022, lp#2129649)
-  * bug fix: various wrong results and inconsistencies from SUBTYPEP on CONS
+  * bug fix: various wrong results and inconsistencies from SUBTYPEP on ARRAY
     types.  (lp#2130374, lp#2130424, lp#2130441, lp#2130457, lp#2130508,
     lp#2130518, lp#2130526, lp#2130542, lp#2130588, lp#2130950, lp#2131079,
     lp#2131149, lp#2131179, lp#2131186, lp#2131271, lp#2131618, lp#2130262)
   * optimization: LOGTEST participates in compiler transforms related to
     modular (machine-sized) arithmetic.
+  * optimization: more arithmetic combinations simplifications.
+  * optimization: (car (list a)) doesn't allocate a list.
 
 changes in sbcl-2.5.10 relative to sbcl-2.5.9:
   * platform support:
