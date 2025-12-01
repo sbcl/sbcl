@@ -459,3 +459,10 @@
               (list l))
      (copy-list l))
    list))
+
+(defun try-dx-acons (a b c expected)
+  (sb-int:dx-let ((my-alist (acons a b c)))
+    (equal expected my-alist)))
+(compile 'try-dx-acons)
+(with-test (:name :compiled-acons)
+  (assert (try-dx-acons 1 2 3 '((1 . 2) . 3))))

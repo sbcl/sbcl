@@ -486,27 +486,43 @@
 ;;;   ((a . b) . b)
 ;;; INIT-LIST can figure out if any of the above patterns match the args.
 ;;;
-;;; Also: Since alists tend to be persistent storage structures, there is probably
-;;; not a lot of benefit to ACONS recognizing DX, though it couldn't hurt to have it,
-;;; perhaps to temporarily add a key to a mapping.
+;;; I'm skeptical that users declare the result of ACONS dynamic-extent. It would
+;;; make no sense for a persistent structure. However, is is certainly possible for
+;;; freeform data. Indeed the DYNAMIC-EXTENT-CONDITIONAL-ALLOCATION.PARTIAL test
+;;; will fail without support for dx allocation here.
 (define-allocator (acons)
   (:args (key :scs (any-reg descriptor-reg constant immediate control-stack))
          (val :scs (any-reg descriptor-reg constant immediate control-stack))
          (tail :scs (any-reg descriptor-reg constant immediate control-stack)))
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) alloc)
-  (:temporary (:sc unsigned-reg :to (:result 0)) temp)
+  (:temporary (:sc unsigned-reg :to (:result 0)
+               :unused-if (node-stack-allocate-p (sb-c::vop-node vop)))
+              temp)
   (:results (result :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:node-var node)
   (:translate acons)
   (:policy :fast-safe)
   (:generator 10
-    (let ((nbytes (* cons-size 2 n-word-bytes)))
-      (instrument-alloc +cons-primtype+ nbytes (list temp alloc))
-      (allocating ()
-        (allocation +cons-primtype+ nbytes 0 alloc temp)
-        ;; the outer cons is at the lower address
-        (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
-        (storew temp alloc cons-car-slot 0)
-        (init-list alloc temp result #(1 2 3) (list tail key val))))))
+    (cond
+      ((node-stack-allocate-p node)
+       (unless (aligned-stack-p)
+         (inst and rsp-tn (lognot lowtag-mask)))
+       (list-ctor-push-elt val alloc) ; ALLOC serves as a temp
+       (list-ctor-push-elt key alloc)
+       (list-ctor-push-elt tail alloc)
+       (inst lea result (ea (+ 8 list-pointer-lowtag) rsp-tn))
+       (inst push result)
+       (inst sub result 16))
+      (t
+       (let ((nbytes (* cons-size 2 n-word-bytes)))
+         (instrument-alloc +cons-primtype+ nbytes (list temp alloc))
+         (allocating ()
+           (allocation +cons-primtype+ nbytes 0 alloc temp)
+           ;; the outer cons is at the lower address
+           (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
+           (storew temp alloc cons-car-slot 0)
+           (init-list alloc temp result #(1 2 3) (list tail key val))))))))
 
 ;;; CONS-2 is similar to ACONS, except that instead of producing
 ;;;  ((X . Y) . Z) it produces (X Y . Z)

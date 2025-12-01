@@ -385,6 +385,8 @@
 ;;; ...conses
 (defoptimizer (cons stack-allocate-result) ((&rest args))
   (bug "Shouldn't get here")) ; due to source-transform of cons -> list*
+(when-vop-existsp (:translate acons)
+  (defoptimizer (acons stack-allocate-result) ((&rest args)) t))
 (defoptimizer (%make-complex stack-allocate-result) ((&rest args))
   t)
 

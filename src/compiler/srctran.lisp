@@ -145,6 +145,12 @@
     (if (sb-vm::env-system-tlab-p env)
         `(cons (cons ,key ,datum) ,alist)
         (values nil t))))
+
+(when-vop-existsp (:translate acons) ; (list* (list* a b) c) -> (acons a b c)
+  (deftransform list* ((car cdr))
+    (splice-fun-args car 'list* 2)
+    '(lambda (a b c) (acons a b c))))
+
 (defoptimizer (list derive-type) ((&rest args))
   (if args
       (specifier-type 'cons)
