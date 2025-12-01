@@ -3574,15 +3574,20 @@
 ;;; Per the processor manual, TEST clears OF and CF, so presumably
 ;;; there is not a branch-if on either of those flags.
 ;;; It shouldn't be a problem that removal of TEST leaves more flags affected.
-#+nil ;; it doesn't account for multiple flag-reading instructions
-(defpattern "ALU + test" ((add adc sub sbb and or xor neg sar shl shr) (test)) (stmt next)
+
+;; TODO:
+;; add adc sub sbb neg sar shl shr
+;; set OF and CF, and while the code below does check for the next
+;; instruction reading this flag, there might be multiple flag-reading
+;; instructions.
+(defpattern "ALU + test" ((and or xor) (test)) (stmt next)
   (binding* (((size1 dst1 src1) (parse-2-operands stmt))
              ((size2 dst2 src2) (parse-2-operands next))
              (next-next (stmt-next next)))
     (declare (ignore src1))
     (when (and (not (stmt-labels next))
                (gpr-tn-p dst2)
-               (location= dst1 dst2) ; they can have different SCs
+               (location= dst1 dst2)    ; they can have different SCs
                (eq dst2 src2)
                next-next
                ;; Zero shifts do not affect the flags
@@ -3600,32 +3605,32 @@
                                               (return (second (stmt-operands next))))
                                              (t
                                               (return))))))))
-                (or (and (memq (stmt-mnemonic stmt) '(and xor or)) ;; the same flags are set
-                         (or (eq size2 size1)
-                             (and (memq flag '(:ne :e :nz :z))
-                                  (eq size1 :dword)
-                                  (eq size2 :qword))))
-                    (case flag
-                      ;; TODO: figure out when it would be correct to omit TEST for the carry flag
-                      ((:s :ns)
-                       (eq size2 size1))
-                      ((:ne :e :nz :z)
-                       (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))
-                      ((:ge :g :le :l
-                        :nl :nle :ng :nge)
-                       (and (eq size2 size1)
-                            ;; Assume there's no overflow for signed arithmetic
-                            (memq (vop-name (sb-assem::stmt-vop stmt))
-                                  '(sb-vm::fast--/fixnum=>fixnum
-                                    sb-vm::fast-+/fixnum=>fixnum
-                                    sb-vm::fast--/signed=>signed
-                                    sb-vm::fast-+/signed=>signed
-                                    sb-vm::fast---c/fixnum=>fixnum
-                                    sb-vm::fast-+-c/fixnum=>fixnum
-                                    sb-vm::fast---c/signed=>signed
-                                    sb-vm::fast-+-c/signed=>signed
-                                    sb-vm::fast-negate/fixnum
-                                    sb-vm::fast-negate/signed))))))))
+                 (or (and (memq (stmt-mnemonic stmt) '(and xor or)) ;; the same flags are set
+                          (or (eq size2 size1)
+                              (and (memq flag '(:ne :e :nz :z))
+                                   (eq size1 :dword)
+                                   (eq size2 :qword))))
+                     (case flag
+                       ;; TODO: figure out when it would be correct to omit TEST for the carry flag
+                       ((:s :ns)
+                        (eq size2 size1))
+                       ((:ne :e :nz :z)
+                        (or (eq size2 size1) (and (eq size1 :dword) (eq size2 :qword))))
+                       ((:ge :g :le :l
+                         :nl :nle :ng :nge)
+                        (and (eq size2 size1)
+                             ;; Assume there's no overflow for signed arithmetic
+                             (memq (vop-name (sb-assem::stmt-vop stmt))
+                                   '(sb-vm::fast--/fixnum=>fixnum
+                                     sb-vm::fast-+/fixnum=>fixnum
+                                     sb-vm::fast--/signed=>signed
+                                     sb-vm::fast-+/signed=>signed
+                                     sb-vm::fast---c/fixnum=>fixnum
+                                     sb-vm::fast-+-c/fixnum=>fixnum
+                                     sb-vm::fast---c/signed=>signed
+                                     sb-vm::fast-+-c/signed=>signed
+                                     sb-vm::fast-negate/fixnum
+                                     sb-vm::fast-negate/signed))))))))
       (delete-stmt next)
       next-next)))
 
