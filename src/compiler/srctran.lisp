@@ -8094,25 +8094,21 @@
 
 (deftransform read-byte ((stream &optional eof-error-p eof-value))
   (delete-lvar-cast-if (specifier-type 'stream) stream)
-  `(block nil
-     (or (and (sb-impl::ansi-stream-p stream)
-              (let* ((buffer (ansi-stream-in-buffer stream))
-                     (index (ansi-stream-in-index stream)))
-                (if buffer
-                    (when (/= index sb-impl::+ansi-stream-in-buffer-length+)
-                      (prog1
-                          (aref buffer index)
-                        (setf (ansi-stream-in-index stream) (1+ index))))
-                    (return (funcall (ansi-stream-bin stream) stream ,(if eof-error-p
-                                                                          'eof-error-p
-                                                                          t) eof-value)))))
-         (locally (declare (notinline read-byte))
+  `(if (sb-impl::ansi-stream-p stream)
+       (let ((index (ansi-stream-in-index stream)))
+         ;; ANSI stream with no in-buffer must have IN-INDEX = +ANSI-STREAM-IN-BUFFER-LENGTH+
+         (if (/= index sb-impl::+ansi-stream-in-buffer-length+)
+             (prog1 (aref (truly-the vector (ansi-stream-in-buffer stream)) index)
+               (setf (ansi-stream-in-index stream) (1+ index)))
+             (funcall (ansi-stream-bin stream) stream ,(if eof-error-p 'eof-error-p t)
+                      eof-value)))
+       (locally (declare (notinline read-byte))
            (read-byte stream
                       ,@(loop for (lvar var) on (list eof-error-p 'eof-error-p
                                                       eof-value 'eof-value)
                               by #'cddr
                               when lvar
-                              collect var))))))
+                              collect var)))))
 
 (deftransform peek-char ((&optional peek-type stream eof-error-p eof-value recursive-p)
                          (null &rest t))
