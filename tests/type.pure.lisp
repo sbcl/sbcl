@@ -1174,7 +1174,9 @@
   (assert (eq (specifier-type '(or (and array (not simple-array)) (simple-array t)))
               (specifier-type '(or (and array (not simple-array)) (array t)))))
   (assert (eq (specifier-type '(or (and array (not (array character)) (not vector)) (vector t)))
-              (specifier-type '(or (and array (not (array character)) (not vector)) (array t))))))
+              (specifier-type '(or (and array (not (array character)) (not vector)) (array t)))))
+  (assert (not (eq (specifier-type '(or (and simple-base-string (not (vector * 1))) (vector character 1)))
+                   (specifier-type '(or (array character) (and simple-base-string (not (vector * 1)))))))))
 
 (with-test (:name :array-intersection)
   (assert (eq (sb-kernel:array-type-element-type (specifier-type '(and (simple-array nil) (array nil))))

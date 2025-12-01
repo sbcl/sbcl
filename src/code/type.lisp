@@ -3815,12 +3815,15 @@ expansion happened."
                                   (t
                                    (when (intersectp not-type type2-supertype)
                                      (if (and (not widened)
+                                              widenp
                                               (et-subtypep type2 not-type)
                                               (eq (array-type-complexp type2)
                                                   (array-type-complexp not-type))
                                               (neq (array-type-dimensions type2) '*)
                                               (equal (array-type-dimensions type2)
-                                                     (array-type-dimensions not-type)))
+                                                     (array-type-dimensions not-type))
+                                              (or (not supertype)
+                                                  (intersectp type2 supertype)))
                                          (setf widened
                                                (change-array-type type2 :dimensions '*))
                                          (setf widenp nil))
