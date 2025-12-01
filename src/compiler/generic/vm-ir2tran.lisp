@@ -384,7 +384,7 @@
 
 ;;; ...conses
 (defoptimizer (cons stack-allocate-result) ((&rest args))
-  t)
+  (bug "Shouldn't get here")) ; due to source-transform of cons -> list*
 (defoptimizer (%make-complex stack-allocate-result) ((&rest args))
   t)
 
