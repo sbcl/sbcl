@@ -721,9 +721,6 @@ standard Lisp readtable when NIL."
                  ((whitespace[2]p char rt))
                  (t
                   (when outermost-p
-                    ;; Calling FILE-POSITION at each token seems to slow down
-                    ;; the reader by somewhere between 8x to 10x.
-                    ;; Once per outermost form is acceptably fast though.
                     (setf (form-tracking-stream-form-start-byte-pos stream)
                           ;; pretend we queried the position before reading CHAR
                           (- (file-position stream)

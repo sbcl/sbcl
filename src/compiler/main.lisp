@@ -942,7 +942,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                 ;; READER-ERRORs already know their position in the file.
                               :condition condition
                               :stream stream))
-            ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
+            ;; ANSI, in its wisdom, says that READ should signal END-OF-FILE
             ;; (and that this is not a READER-ERROR) when it encounters end of
             ;; file in the middle of something it's trying to read,
             ;; making it unfortunately indistinguishable from legal EOF.
