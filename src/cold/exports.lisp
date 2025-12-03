@@ -2358,7 +2358,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
            "%WITH-OUTPUT-TO-STRING"
            "INLINE-VOP"
-           "WRAP-IF" "COND-DISPATCH")
+           "WRAP-IF" "COND-DISPATCH"
+           "MAKE-DEFS"
+           "COPY-REMOVE" "COPY-REMOVE-IF" "COPY-REMOVE-IF-NOT")
   #+sb-simd-pack
   (:export "SIMD-PACK"
            "SIMD-PACK-P"

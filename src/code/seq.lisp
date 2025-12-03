@@ -2067,103 +2067,141 @@ many elements are copied."
 
 ;;; LIST-REMOVE-MACRO does not include (removes) each element that satisfies
 ;;; the predicate.
-(defmacro list-remove-macro (pred reverse?)
-    (if reverse?
-        `(let* ((sequence (reverse (the list sequence)))
-                (end (or end length))
-                (%start (- length end))
-                (%end (- length start))
-                (splice (list nil))
-                (tail (and (/= %end length)
-                           (nthcdr %end sequence)))
-                (results ;; It's already copied by REVERSE, so it can
-                  ;; be modified here
-                  (if (plusp %start)
-                      (let* ((tail (nthcdr (1- %start) sequence))
-                             (remaining (cdr tail)))
-                        (setf (cdr tail) nil)
-                        (prog1 splice
-                          (rplacd splice sequence)
-                          (setf splice tail
-                                sequence remaining)))
-                      splice)))
-           (declare (dynamic-extent splice))
-           (do ((this-element)
-                (number-zapped 0))
-               ((cond ((eq tail sequence)
-                       (rplacd splice tail)
-                       t)
-                      ((= number-zapped count)
-                       (rplacd splice sequence)
-                       t))
-                (nreverse (the list (cdr results))))
-             (declare (index number-zapped))
-             (setf this-element (pop sequence))
-             (if ,pred
-                 (incf number-zapped)
-                 (setf splice (cdr (rplacd splice (list this-element)))))))
-        `(let ((save sequence)
-               (list (nthcdr start sequence)))
-           (collect (((result append-tail)))
-             (if (eq count (1- most-positive-fixnum))
-                 (if end
-                     (loop for i from start below end
-                           do (let ((current list)
-                                    (this-element (pop list)))
-                                (cond (,pred
-                                       (loop for x on save
-                                             until (eq x current)
-                                             do (result (car x)))
-                                       (setf save list)))))
-                     (loop while list
-                           do (let ((current list)
-                                    (this-element (pop list)))
-                                (cond (,pred
-                                       (loop for x on save
-                                             until (eq x current)
-                                             do (result (car x)))
-                                       (setf save list))))))
-                 (let ((number-zapped 0))
-                   (declare (index number-zapped))
-                   (if end
-                       (loop for i from start below end
-                             while (< number-zapped count)
-                             do (let ((current list)
-                                      (this-element (pop list)))
-                                  (cond (,pred
-                                         (incf number-zapped)
-                                         (loop for x on save
-                                               until (eq x current)
-                                               do (result (car x)))
-                                         (setf save list)))))
-                       (loop while (and list
-                                        (< number-zapped count))
-                             do (let ((current list)
-                                      (this-element (pop list)))
-                                  (cond (,pred
-                                         (incf number-zapped)
-                                         (loop for x on save
-                                               until (eq x current)
-                                               do (result (car x)))
-                                         (setf save list))))))))
-             (let ((result (result)))
-               (cond (result
-                      (append-tail save)
-                      result)
-                     (t
-                      save)))))))
+(defmacro list-remove-macro (pred reverse? &optional always-copy)
+  (cond (reverse?
+         `(let* ((sequence (reverse (the list sequence)))
+                 (end (or end length))
+                 (%start (- length end))
+                 (%end (- length start))
+                 (splice (list nil))
+                 (tail (and (/= %end length)
+                            (nthcdr %end sequence)))
+                 (results ;; It's already copied by REVERSE, so it can
+                   ;; be modified here
+                   (if (plusp %start)
+                       (let* ((tail (nthcdr (1- %start) sequence))
+                              (remaining (cdr tail)))
+                         (setf (cdr tail) nil)
+                         (prog1 splice
+                           (rplacd splice sequence)
+                           (setf splice tail
+                                 sequence remaining)))
+                       splice)))
+            (declare (dynamic-extent splice))
+            (do ((this-element)
+                 (number-zapped 0))
+                ((cond ((eq tail sequence)
+                        (rplacd splice tail)
+                        t)
+                       ((= number-zapped count)
+                        (rplacd splice sequence)
+                        t))
+                 (nreverse (the list (cdr results))))
+              (declare (index number-zapped))
+              (setf this-element (pop sequence))
+              (if ,pred
+                  (incf number-zapped)
+                  (setf splice (cdr (rplacd splice (list this-element))))))))
+        (always-copy
+         `(let ((list sequence))
+            (collect (((result)))
+              (loop for i below start
+                    do (result (pop list)))
+              (if (eq count (1- most-positive-fixnum))
+                  (if end
+                      (progn
+                        (loop for i from start below end
+                              do (let ((this-element (pop list)))
+                                   (unless ,pred
+                                     (result this-element))))
+                        (loop while list
+                              do (result (pop list))))
+                      (loop while list
+                            do (let ((this-element (pop list)))
+                                 (unless ,pred
+                                   (result this-element)))))
+                  (let ((number-zapped 0))
+                    (declare (index number-zapped))
+                    (if end
+                        (loop for i from start below end
+                              while (< number-zapped count)
+                              do (let ((this-element (pop list)))
+                                   (if ,pred
+                                       (incf number-zapped)
+                                       (result this-element))))
+                        (loop while (and list
+                                         (< number-zapped count))
+                              do (let ((this-element (pop list)))
+                                   (if ,pred
+                                       (incf number-zapped)
+                                       (result this-element)))))
+                    (loop while list
+                          do (result (pop list)))))
+              (result))))
+        (t
+         `(let ((save sequence)
+                (list (nthcdr start sequence)))
+            (collect (((result append-tail)))
+              (if (eq count (1- most-positive-fixnum))
+                  (if end
+                      (loop for i from start below end
+                            do (let ((current list)
+                                     (this-element (pop list)))
+                                 (when ,pred
+                                   (loop for x on save
+                                         until (eq x current)
+                                         do (result (car x)))
+                                   (setf save list))))
+                      (loop while list
+                            do (let ((current list)
+                                     (this-element (pop list)))
+                                 (when ,pred
+                                   (loop for x on save
+                                         until (eq x current)
+                                         do (result (car x)))
+                                   (setf save list)))))
+                  (let ((number-zapped 0))
+                    (declare (index number-zapped))
+                    (if end
+                        (loop for i from start below end
+                              while (< number-zapped count)
+                              do (let ((current list)
+                                       (this-element (pop list)))
+                                   (when ,pred
+                                     (incf number-zapped)
+                                     (loop for x on save
+                                           until (eq x current)
+                                           do (result (car x)))
+                                     (setf save list))))
+                        (loop while (and list
+                                         (< number-zapped count))
+                              do (let ((current list)
+                                       (this-element (pop list)))
+                                   (when ,pred
+                                     (incf number-zapped)
+                                     (loop for x on save
+                                           until (eq x current)
+                                           do (result (car x)))
+                                     (setf save list)))))))
+              (let ((result (result)))
+                (cond (result
+                       (append-tail save)
+                       result)
+                      (t
+                       save))))))))
 
-(defmacro list-remove (pred)
-  `(list-remove-macro ,pred nil))
+(defmacro list-remove (pred &optional always-copy)
+  `(list-remove-macro ,pred nil ,always-copy))
 
 (defmacro list-remove-from-end (pred)
   `(list-remove-macro ,pred t))
 
-(defmacro normal-list-remove ()
+(defmacro normal-list-remove (&optional always-copy)
   `(list-remove
     (if test-not
         (not (funcall test-not item (apply-key key this-element)))
-        (funcall test item (apply-key key this-element)))))
+        (funcall test item (apply-key key this-element)))
+    ,always-copy))
 
 (defmacro normal-list-remove-from-end ()
   `(list-remove-from-end
@@ -2171,79 +2209,95 @@ many elements are copied."
         (not (funcall test-not item (apply-key key this-element)))
         (funcall test item (apply-key key this-element)))))
 
-(defmacro if-list-remove ()
+(defmacro if-list-remove (&optional always-copy)
   `(list-remove
-    (funcall predicate (apply-key key this-element))))
+    (funcall predicate (apply-key key this-element))
+    ,always-copy))
 
 (defmacro if-list-remove-from-end ()
   `(list-remove-from-end
     (funcall predicate (apply-key key this-element))))
 
-(defmacro if-not-list-remove ()
+(defmacro if-not-list-remove (&optional always-copy)
   `(list-remove
-    (not (funcall predicate (apply-key key this-element)))))
+    (not (funcall predicate (apply-key key this-element)))
+    ,always-copy))
 
 (defmacro if-not-list-remove-from-end ()
   `(list-remove-from-end
     (not (funcall predicate (apply-key key this-element)))))
 
-(define-sequence-traverser remove
-    (item sequence &rest args &key from-end test test-not start
-     end count key)
-  "Return a copy of SEQUENCE with elements satisfying the test (default is
-   EQL) with ITEM removed."
-  (declare (type fixnum start)
-           (dynamic-extent args))
-  (declare (explicit-check sequence :result))
-  (seq-dispatch-checking=>seq
-   sequence
-   (if from-end
-       (normal-list-remove-from-end)
-       (normal-list-remove))
-   (let ((end (or end length)))
-     (declare (type index end))
+(make-defs ((($fun $copy)
+             (remove nil)
+             (copy-remove t)))
+  (define-sequence-traverser $fun
+      (item sequence &rest args &key from-end test test-not start
+            end count key)
+    ($unless $copy
+             "Return a copy of SEQUENCE with elements satisfying the test (default is
+   EQL) with ITEM removed.")
+    (declare (type fixnum start)
+             (dynamic-extent args))
+    (declare (explicit-check sequence :result))
+    (seq-dispatch-checking=>seq
+     sequence
      (if from-end
-         (normal-mumble-remove-from-end)
-         (normal-mumble-remove)))
-   (apply #'sb-sequence:remove item sequence args)))
+         (normal-list-remove-from-end)
+         (normal-list-remove $copy))
+     (let ((end (or end length)))
+       (declare (type index end))
+       (if from-end
+           (normal-mumble-remove-from-end)
+           (normal-mumble-remove)))
+     (($if $copy copy-seq values)
+      (apply #'sb-sequence:remove item sequence args)))))
 
-(define-sequence-traverser remove-if
-    (predicate sequence &rest args &key from-end start end count key)
-  "Return a copy of sequence with elements satisfying PREDICATE removed."
-  (declare (type fixnum start)
-           (dynamic-extent args))
-  (declare (explicit-check sequence :result))
-  (seq-dispatch-checking=>seq sequence
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if from-end
-          (if-list-remove-from-end)
-          (if-list-remove)))
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if from-end
-          (if-mumble-remove-from-end)
-          (if-mumble-remove)))
-    (apply #'sb-sequence:remove-if predicate sequence args)))
-
-(define-sequence-traverser remove-if-not
-    (predicate sequence &rest args &key from-end start end count key)
-  "Return a copy of sequence with elements not satisfying PREDICATE removed."
-  (declare (type fixnum start)
-           (dynamic-extent args))
-  (declare (explicit-check sequence :result))
-  (seq-dispatch-checking=>seq sequence
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if from-end
-          (if-not-list-remove-from-end)
-          (if-not-list-remove)))
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if from-end
-          (if-not-mumble-remove-from-end)
-          (if-not-mumble-remove)))
-    (apply #'sb-sequence:remove-if-not predicate sequence args)))
+(make-defs ((($fun $copy)
+             (remove-if nil)
+             (copy-remove-if t)))
+ (define-sequence-traverser $fun
+     (predicate sequence &rest args &key from-end start end count key)
+   ($unless $copy
+            "Return a copy of sequence with elements satisfying PREDICATE removed.")
+   (declare (type fixnum start)
+            (dynamic-extent args))
+   (declare (explicit-check sequence :result))
+   (seq-dispatch-checking=>seq sequence
+                               (let ((end (or end length)))
+                                 (declare (type index end))
+                                 (if from-end
+                                     (if-list-remove-from-end)
+                                     (if-list-remove $copy)))
+                               (let ((end (or end length)))
+                                 (declare (type index end))
+                                 (if from-end
+                                     (if-mumble-remove-from-end)
+                                     (if-mumble-remove)))
+                               (($if $copy copy-seq values)
+                                (apply #'sb-sequence:remove-if predicate sequence args)))))
+(make-defs ((($fun $copy)
+             (remove-if-not nil)
+             (copy-remove-if-not t)))
+ (define-sequence-traverser $fun
+     (predicate sequence &rest args &key from-end start end count key)
+   ($unless $copy
+            "Return a copy of sequence with elements not satisfying PREDICATE removed.")
+   (declare (type fixnum start)
+            (dynamic-extent args))
+   (declare (explicit-check sequence :result))
+   (seq-dispatch-checking=>seq sequence
+                               (let ((end (or end length)))
+                                 (declare (type index end))
+                                 (if from-end
+                                     (if-not-list-remove-from-end)
+                                     (if-not-list-remove $copy)))
+                               (let ((end (or end length)))
+                                 (declare (type index end))
+                                 (if from-end
+                                     (if-not-mumble-remove-from-end)
+                                     (if-not-mumble-remove)))
+                               (($if $copy copy-seq values)
+                                (apply #'sb-sequence:remove-if-not predicate sequence args)))))
 
 ;;;; REMOVE-DUPLICATES
 

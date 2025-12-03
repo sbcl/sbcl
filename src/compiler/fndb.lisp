@@ -758,7 +758,7 @@
                                           :preserve-vector-type t)
   :result-arg 0)
 
-(defknown remove
+(defknown (remove copy-remove)
     (t proper-sequence &rest t &key (:from-end t)
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
@@ -782,7 +782,7 @@
   (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
-(defknown (remove-if remove-if-not)
+(defknown (remove-if remove-if-not copy-remove-if copy-remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) proper-sequence
    &rest t &key (:from-end t)
    (:count sequence-count)

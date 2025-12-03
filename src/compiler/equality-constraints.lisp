@@ -894,7 +894,8 @@
 (defoptimizer (make-sequence constraint-propagate-result) ((type length &rest args) node)
   (list (list 'vector-length length)))
 
-(defoptimizers constraint-propagate-result (remove delete remove-if delete-if remove-if-not delete-if-not)
+(defoptimizers constraint-propagate-result (remove delete remove-if delete-if remove-if-not delete-if-not
+                                            copy-remove copy-remove-if-not copy-remove-if)
     ((x sequence &rest args &key from-end test test-not start end count key) node gen)
   (let (c)
     (let ((var (ok-lvar-lambda-var sequence gen)))

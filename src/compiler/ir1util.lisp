@@ -352,6 +352,7 @@
    `(multiple-value-bind (name combination) (combination/cast-name (lvar-uses ,lvar) ,cast)
       (when combination
         (let ((args (combination-args combination)))
+          (declare (ignorable args))
           (case name
             ,@(labels ((gen (&optional sub)
                          (destructuring-bind (name arg-spec . body) (pop cases)

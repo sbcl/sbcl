@@ -1338,6 +1338,7 @@
     (find-if find-if-not position-if position-if-not
      remove-if remove-if-not delete-if delete-if-not
      count-if count-if-not
+     copy-remove copy-remove-if copy-remove-if-not
      reduce remove-duplicates delete-duplicates)
     ((x sequence &key start end &allow-other-keys) node)
   (check-sequence-ranges sequence start end node))
@@ -1980,7 +1981,8 @@
                       ((and sequence (not vector) (not list)) t &optional t))
   '(sb-sequence:subseq seq start end))
 
-(deftransform copy-seq ((seq) (vector))
+(deftransform copy-seq ((seq) (vector) * :node node)
+  (delay-ir1-transform node :constraint)
   (let ((type (lvar-type seq)))
     (cond ((inlineable-copy-vector-p type)
            (let ((element-type (type-specifier (array-type-specialized-element-type type))))
@@ -1996,6 +1998,53 @@
 
 (deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
   '(sb-sequence:copy-seq seq))
+
+(deftransforms (copy-seq) ((seq) * * :node node)
+  (or (combination-case (seq)
+        (remove *
+         ;; Vectors are always copied anyway.
+         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+           (change-full-call combination 'copy-remove))
+         'seq)
+        (remove-if *
+         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+           (change-full-call combination 'copy-remove-if))
+         'seq)
+        (remove-if-not *
+         (unless (csubtypep (lvar-type seq) (specifier-type 'vector))
+           (change-full-call combination 'copy-remove-if-not))
+         'seq))
+      (give-up-ir1-transform)))
+
+(make-defs ((($fun $proper)
+             (copy-list nil)
+             (list-copy-seq t)))
+ (deftransform $fun ((seq) * * :node node)
+   (or (combination-case (seq (specifier-type 'list))
+         (remove *
+          (change-full-call combination 'copy-remove)
+          'seq)
+         (remove-if *
+          (change-full-call combination 'copy-remove-if)
+          'seq)
+         (remove-if-not *
+          (change-full-call combination 'copy-remove-if-not)
+          'seq))
+       (when (policy node (or (> speed space) (> instrument-consing 1)))
+         ;; If speed is more important than space, or cons profiling is wanted,
+         ;; then inline the whole copy loop.
+         (delay-ir1-transform node :constraint)
+         `(copy-list-macro seq :check-proper-list $proper))
+       (give-up-ir1-transform))))
+
+;; Vectors are always copied
+(make-defs ((($fun $with)
+             (copy-remove remove)
+             (copy-remove-if remove-if)
+             (copy-remove-if-not remove-if-not)))
+  (defoptimizer ($fun rewrite-full-call) ((x seq &rest args) node)
+    (when (csubtypep (lvar-type seq) (specifier-type 'vector))
+      '$with)))
 
 (deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
                                key from-end)
@@ -4121,7 +4170,7 @@
 
 (defoptimizers optimizer
     (remove delete count find position
-     sublis nsublis)
+     sublis nsublis copy-remove)
     ((item sequence &rest args &key
            ((test test-keyword))
            ((test-not test-not-keyword))
@@ -4169,6 +4218,7 @@
 
 (defoptimizers optimizer
     (remove-if remove-if-not
+               copy-remove-if copy-remove-if-not
                delete-if delete-if-not
                count-if count-if-not
                find-if find-if-not
