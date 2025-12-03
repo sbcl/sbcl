@@ -6430,9 +6430,15 @@
            (let* ((y (lvar-value y))
                   (b (lvar-value (second args)))
                   (m (* y b)))
-             (when (integerp m)
+             (when (and (integerp m)
+                        (not (eql b 0)))
                (aver (splice-fun-args x name #'first nil))
-               `($fun x ,m))))
+               (cond ($when
+                      (member '$fun '(< >))
+                      ((minusp b)
+                       `($fun ,m x)))
+                     (t
+                      `($fun x ,m))))))
           ($when (eq '$fun '<)
            (/ (* (type (not (eql 0))))
               (when (zerop (lvar-value y))
