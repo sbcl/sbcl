@@ -38,12 +38,18 @@
     (warning (condition)
       (error "Unexpected warning: ~A" condition))))
 
+(defglobal *new-code* nil)
+(defun preserve-code (underlying-fun object reason)
+  (declare (ignore underlying-fun reason))
+  (push object *new-code*)
+  object)
+(compile 'preserve-code)
+;; Weak pointers to toplevel forms need to survive the entire test run
+(sb-int:encapsulate 'sb-fasl::possibly-log-new-code 'override #'preserve-code)
+
 (with-test (:name :sb-cover)
   (test-util:with-test-directory (sb-cover-test:*output-directory*)
-    ;; Weak pointers to toplevel forms need to survive the entire test run
-    (sb-sys:without-gcing
-      (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*)))
-    (sb-sys:without-gcing
-      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*)))
-    (sb-sys:without-gcing
-      (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))))
+      (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*))
+      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*))
+      (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))
+  (assert (> (length *new-code*) 100)))
