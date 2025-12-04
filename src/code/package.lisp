@@ -113,7 +113,8 @@
   ;; is tested first.
   (mru-table-index 0 :type index)
   ;; packages that use this package
-  (%used-by nil :type (or null weak-pointer))
+  ;; :NONE means not used by any package, NIL means the value hasn't been memoized
+  (%used-by nil :type (or (member nil :none) weak-pointer))
   ;; SYMBOL-TABLEs of internal & external symbols
   (internal-symbols nil :type symbol-table)
   (external-symbols nil :type symbol-table)
