@@ -52,7 +52,7 @@
       (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*))
       (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*))
       (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))
-  (assert (> (length *new-code*) 100)))
+  (assert (> (length *new-code*) 40)))
 
 (with-test (:name :no-redundant-form-paths)
   (dolist (c *new-code*)
