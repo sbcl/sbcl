@@ -315,33 +315,70 @@
                 subseqp
                 vars
                 (args (loop for arg in args
-                            if (and subseq
-                                    (or
-                                     (and (lvar-matches arg :fun-names '(vector-subseq subseq))
-                                          ;; Nothing should be modifying the original sequence
-                                          (almost-immediately-used-p arg (lvar-use arg) :flushable t))
-                                     (lvar-matches arg :fun-names '(list vector))))
-                            append (let ((call (lvar-uses arg)))
-                                     (setf new t
-                                           subseqp t)
-                                     (if (lvar-matches arg :fun-names '(list vector))
-                                         (destructuring-bind (&rest elements) (combination-args call)
-                                           (splice-fun-args arg :any nil)
-                                           (list* ''sb-impl::%splice
-                                                  (length elements)
-                                                  (loop for elt in elements
-                                                        for sym = (gensym)
-                                                        do
-                                                        (push sym vars)
-                                                        collect sym)))
-                                         (destructuring-bind (sequence start &optional end) (combination-args call)
-                                           (declare (ignorable sequence start))
-                                           (splice-fun-args arg :any (if end 3 2))
-                                           (list ''sb-impl::%subseq
-                                                 (car (push (gensym) vars))
-                                                 (car (push (gensym) vars))
-                                                 (when end
-                                                   (car (push (gensym) vars)))))))
+                            for transform =
+                            (when subseq
+                              (combination-case (arg (specifier-type 'sequence))
+                                ((list vector) *
+                                 (splice-fun-args arg :any nil)
+                                 (list* ''sb-impl::%splice
+                                        (length args)
+                                        (loop for elt in args
+                                              for sym = (gensym)
+                                              do
+                                              (push sym vars)
+                                              collect sym)))
+                                ((subseq vector-subseq) *
+                                 ;; Nothing should be modifying the original sequence
+                                 (when (almost-immediately-used-p arg (lvar-use arg) :flushable t)
+                                   (destructuring-bind (sequence start &optional end) args
+                                     (declare (ignorable sequence start))
+                                     (splice-fun-args arg :any (if end 3 2))
+                                     (list ''sb-impl::%subseq
+                                           (car (push (gensym) vars))
+                                           (car (push (gensym) vars))
+                                           (when end
+                                             (car (push (gensym) vars)))))))
+                                (make-array *
+                                 (multiple-value-bind (args unknown) (resolve-key-args args (info :function :type name))
+                                   (unless unknown
+                                     (destructuring-bind (length &key element-type initial-element initial-contents
+                                                                      fill-pointer adjustable displaced-to displaced-index-offset)
+                                         args
+                                       (when (and initial-element
+                                                  (not (or initial-contents
+                                                           fill-pointer
+                                                           adjustable
+                                                           displaced-to
+                                                           displaced-index-offset)))
+                                         (block nil
+                                           (let ((element-type (when element-type
+                                                                 (if (constant-lvar-p element-type)
+                                                                     (careful-specifier-type (lvar-value element-type))
+                                                                     (return)))))
+                                             (when (splice-fun-args arg :any (lambda (args)
+                                                                               (declare (ignore args))
+                                                                               (list length initial-element))
+                                                                    nil (specifier-type 'sequence) t)
+                                               (list ''sb-impl::%repeat
+                                                     (car (push (gensym) vars))
+                                                     (wrap-if element-type
+                                                              `(the ,(type-specifier element-type))
+                                                              (car (push (gensym) vars))))))))))))
+                                (%make-list *
+                                 (destructuring-bind (length initial-element) args
+                                   (when (splice-fun-args arg :any (lambda (args)
+                                                                     (declare (ignore args))
+                                                                     (if initial-element
+                                                                         (list length initial-element)
+                                                                         length)))
+                                     (list ''sb-impl::%repeat
+                                           (car (push (gensym) vars))
+                                           (and initial-element
+                                                (car (push (gensym) vars)))))))))
+                            if transform
+                            append (progn (setf new t
+                                                subseqp t)
+                                          transform)
                             else if (or (eq (lvar-type arg) (specifier-type 'null))
                                         (csubtypep (lvar-type arg) (specifier-type '(simple-array * (0)))))
                             do (setf new t)
@@ -387,17 +424,21 @@
              (return-from concatenate-subseq-type type))))
     (loop while args
           do (let ((arg (pop args)))
-               (cond ((and (constant-lvar-p arg)
-                           (eq (lvar-value arg) 'sb-impl::%subseq))
+               (if (constant-lvar-p arg)
+                   (case (lvar-value arg)
+                     (sb-impl::%subseq
                       (check (pop args) (specifier-type 'sequence))
                       (check (pop args) (specifier-type 'index))
                       (check (pop args) (specifier-type '(or null index))))
-                     ((and (constant-lvar-p arg)
-                           (eq (lvar-value arg) 'sb-impl::%splice))
+                     (sb-impl::%splice
                       (loop repeat (lvar-value (pop args))
                             do (pop args)))
+                     (sb-impl::%repeat
+                      (check (pop args) (specifier-type '(or index (cons index null))))
+                      (pop args))
                      (t
-                      (check arg (specifier-type 'sequence))))))))
+                      (check arg (specifier-type 'sequence))))
+                   (check arg (specifier-type 'sequence)))))))
 
 (defoptimizer (%concatenate-to-string-subseq externally-checkable-type) ((&rest args) node lvar)
   (concatenate-subseq-type lvar args))

@@ -2515,12 +2515,10 @@ is :ANY, the function name is not checked."
         (unless (or (eq fun :any)
                     (eq (lvar-fun-name inside-fun) fun))
           (give-up))
-
         (when (and cast
                    delete-cast)
           (delete-cast cast nil)
-          (setf cast nil
-                num-args nil))
+          (setf cast nil))
         (cond (cast
                (let ((args (make-gensym-list (length inside-args))))
                  (setf (node-derived-type cast)

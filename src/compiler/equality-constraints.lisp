@@ -972,6 +972,19 @@
                         (incf max-sum n)
                         (loop repeat n
                               do (pop args))))
+                     ((and subseq
+                           (constant-lvar-p arg)
+                           (eq (lvar-value arg) 'sb-impl::%repeat))
+                      (let* ((length (pop args))
+                             (int (type-approximate-interval (lvar-type length))))
+                        (cond (int
+                               (incf min-sum (or (interval-low int) 0))
+                               (if (interval-high int)
+                                   (incf max-sum (interval-high int))
+                                   (setf max nil)))
+                              (t
+                               (setf max nil))))
+                      (pop args))
                      (t
                       (let ((int (type-approximate-interval (type-intersection (or (vector-length-type (lvar-type arg))
                                                                                    *universal-type*)

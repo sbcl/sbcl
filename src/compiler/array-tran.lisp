@@ -1183,6 +1183,8 @@
     (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
                          (type-specifier (lvar-type fill-pointer))
                          c-length))
+  ;; Let (concatenate ... (make-array n)) do its transforms
+  (delay-ir1-transform call :constraint)
   (let* ((expressly-adjustable (cond ((not adjustable) nil)
                                      ((not (constant-lvar-p adjustable)) :maybe)
                                      (t (and (lvar-value adjustable) t))))
@@ -1390,7 +1392,6 @@
 
             ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
-             (delay-ir1-transform call :constraint)
              (let* ((listp (csubtypep (lvar-type initial-contents) (specifier-type 'list)))
                     (inline-fill (cond ((and (lvar-matches initial-contents :fun-names '(reverse nreverse
                                                                                          sb-impl::list-reverse
