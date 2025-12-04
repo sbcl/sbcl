@@ -543,6 +543,9 @@
                                                 (sb-bignum:%bignum-ref (truly-the bignum x) 0)
                                                 (- count)))))))
 
+(deftransform ash-right-two-words ((w2 w1 count) (t t (eql #.sb-vm:n-word-bits)) * :important nil)
+  'w2)
+
 (macrolet
     ((def (left-name name kind width signedp)
        (declare (ignorable name))

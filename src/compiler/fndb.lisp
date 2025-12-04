@@ -505,7 +505,7 @@
   integer
   (movable foldable flushable no-verify-arg-count))
 
-(defknown ash-right-two-words (word word (mod #.sb-vm:n-word-bits))
+(defknown ash-right-two-words (word word (integer 0 #.sb-vm:n-word-bits))
   word
   (movable foldable flushable always-translatable))
 
