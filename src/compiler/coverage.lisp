@@ -95,5 +95,6 @@
       (vop mark-covered node block
            (vector-push-extend (ir2-block-covered-paths-ref blocK)
                                (ir2-component-coverage-map 2comp))))
-    (push (lvar-value path) (car (ir2-block-covered-paths-ref block)))
+    ;; Duplicate form paths could sneak in, but repetition is meaningless
+    (pushnew (lvar-value path) (car (ir2-block-covered-paths-ref block)) :test 'equal)
     (values)))

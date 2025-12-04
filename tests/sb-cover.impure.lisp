@@ -53,3 +53,11 @@
       (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*))
       (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))
   (assert (> (length *new-code*) 100)))
+
+(with-test (:name :no-redundant-form-paths)
+  (dolist (c *new-code*)
+    (let ((map (sb-cover::%find-coverage-map c)))
+      (when map
+        (sb-int:dovector (paths map)
+          (let ((x (remove-duplicates paths :test 'equal)))
+            (assert (= (length x) (length paths)))))))))
