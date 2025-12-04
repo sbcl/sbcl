@@ -878,20 +878,6 @@ subexpressions of the object to stream positions."
             (gethash form source-map)))
     (values form source-map)))
 
-(defun read-source-form (n stream)
-  "Read the Nth toplevel form number with source location recording.
-Return the form and the source-map."
-  (let ((*read-suppress* t))
-    (dotimes (i n)
-      (read stream)))
-  (let ((*read-suppress* nil)
-        (*read-eval* nil))
-    (multiple-value-bind (form source-map)
-        (read-and-record-source-map stream)
-      (if (eql form sb-int:*eof-object*)
-          (error 'end-of-file :stream stream)
-          (values form source-map)))))
-
 (defun nth-or-marker (n list)
   (cond
     ((read-eval-marker-p list) list)
