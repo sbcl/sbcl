@@ -376,10 +376,9 @@
 ;;; ease of guarding against differences in host compilers with
 ;;; respect to coalescing structure in (host) fasl files, which might
 ;;; then be used in compiling the target.
+(declaim (ftype (function (list) list) hash-cons))
 (defun hash-cons (list)
-  (declare (type list list)
-           #-sb-xc-host
-           (notinline gethash3 %puthash))
+  #-sb-xc-host (declare (notinline gethash3 %puthash))
   (let ((table (make-hash-table :test 'equal)))
     (labels ((hc (thing)
                (cond
