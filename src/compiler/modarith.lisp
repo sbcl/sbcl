@@ -540,9 +540,11 @@
                          (sb-bignum:%bignum-ref (truly-the bignum x) index)
                          (sb-bignum::%sign-digit x length))))
               (declare (inline extend-ref))
-              (ash-right-two-words (extend-ref ,(1+ words))
-                                   (extend-ref ,words)
-                                   ,bits))))))))
+              ,(if (zerop bits)
+                   `(extend-ref ,words)
+                   `(ash-right-two-words (extend-ref ,(1+ words))
+                                         (extend-ref ,words)
+                                         ,bits)))))))))
 
 (deftransform ash-right-modfx ((x count) (t (constant-arg (integer #.(- sb-vm:n-word-bits) 0))))
   `(typecase x
@@ -576,9 +578,11 @@
                          (sb-bignum::%sign-digit x length))))
               (declare (inline extend-ref))
               (mask-signed-field sb-vm:n-fixnum-bits
-                                 (ash-right-two-words (extend-ref ,(1+ words))
-                                                      (extend-ref ,words)
-                                                      ,bits)))))))))
+                                 ,(if (zerop bits)
+                                      `(extend-ref ,words)
+                                      `(ash-right-two-words (extend-ref ,(1+ words))
+                                                            (extend-ref ,words)
+                                                            ,bits))))))))))
 
 (deftransform ash-right-two-words ((w2 w1 count) (t t (eql #.sb-vm:n-word-bits)) * :important nil)
   'w2)
