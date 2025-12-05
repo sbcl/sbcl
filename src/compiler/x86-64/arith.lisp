@@ -4804,3 +4804,18 @@
   (:generator 1
     (move result b)
     (inst shrd result a count)))
+
+(define-vop (ash-right-two-words-variable)
+  (:policy :fast-safe)
+  (:translate ash-right-two-words)
+  (:args (a :scs (unsigned-reg) :to :save)
+         (b :scs (unsigned-reg) :target result)
+         (count :scs (unsigned-reg) :target ecx))
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) ecx)
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 2
+    (move result b)
+    (move ecx count :dword)
+    (inst shrd result a :cl)))

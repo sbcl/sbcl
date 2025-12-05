@@ -514,7 +514,7 @@
                  (logand (ash value (+ amount1 amount2))
                          ,(1- (ash 1 (+ width (lvar-value amount))))))))))))
 
-(deftransform ash-right-mod64 ((x count) (t (constant-arg (integer #.(- sb-vm:n-word-bits) 0))))
+(deftransform ash-into-word-mod ((x count) (t (constant-arg (integer #.(- sb-vm:n-word-bits) 0))))
   `(typecase x
      (fixnum
       (logand most-positive-word (ash (truly-the fixnum x) count)))
@@ -525,12 +525,28 @@
                            (sb-bignum:%bignum-ref (truly-the bignum x) 0)
                            (- count)))))
 
-(deftransform ash-right-mod64 ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
+(deftransform ash-into-word-mod ((x count) * * :important nil :priority :last)
+  `(if (minusp count)
+       (typecase x
+         (fixnum
+          (logand most-positive-word (ash (truly-the fixnum x) count)))
+         (bignum
+          (multiple-value-bind (words bits) (truncate (- count) sb-vm:n-word-bits)
+            (let ((length (%bignum-length (truly-the bignum x))))
+              (flet ((extend-ref (index)
+                       (if (< index length)
+                           (sb-bignum:%bignum-ref (truly-the bignum x) index)
+                           (sb-bignum::%sign-digit x length))))
+                (declare (inline extend-ref))
+                (ash-right-two-words (extend-ref (1+ words))
+                                     (extend-ref words)
+                                     bits))))))
+       (logand most-positive-word (ash x (truly-the unsigned-byte count)))))
+
+(deftransform ash-into-word-mod ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
   (let ((count (- (lvar-value count))))
     (multiple-value-bind (words bits) (truncate count sb-vm:n-word-bits)
       `(typecase x
-         (fixnum
-          (logand most-positive-word (ash (truly-the fixnum x) count)))
          (sb-vm:signed-word
           (logand most-positive-word (ash (truly-the sb-vm:signed-word x) count)))
          (bignum
@@ -546,7 +562,7 @@
                                          (extend-ref ,words)
                                          ,bits)))))))))
 
-(deftransform ash-right-modfx ((x count) (t (constant-arg (integer #.(- sb-vm:n-word-bits) 0))))
+(deftransform ash-into-word-modfx ((x count) (t (constant-arg (integer #.(- sb-vm:n-word-bits) 0))))
   `(typecase x
      (fixnum
       (mask-signed-field sb-vm:n-fixnum-bits
@@ -560,13 +576,30 @@
                                               (sb-bignum:%bignum-ref (truly-the bignum x) 0)
                                               (- count))))))
 
-(deftransform ash-right-modfx ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
-  (let ((count (- (lvar-value count))))
-    (multiple-value-bind (words bits) (truncate count sb-vm:n-word-bits)
-      `(typecase x
+(deftransform ash-into-word-modfx ((x count) * * :important nil :priority :last)
+  `(if (minusp count)
+       (typecase x
          (fixnum
           (mask-signed-field sb-vm:n-fixnum-bits
                              (ash (truly-the fixnum x) count)))
+         (bignum
+          (multiple-value-bind (words bits) (truncate (- count) sb-vm:n-word-bits)
+            (let ((length (%bignum-length (truly-the bignum x))))
+              (flet ((extend-ref (index)
+                       (if (< index length)
+                           (sb-bignum:%bignum-ref (truly-the bignum x) index)
+                           (sb-bignum::%sign-digit x length))))
+                (declare (inline extend-ref))
+                (mask-signed-field sb-vm:n-fixnum-bits
+                                   (ash-right-two-words (extend-ref (1+ words))
+                                                        (extend-ref words)
+                                                        bits)))))))
+       (logand most-positive-word (ash x (truly-the unsigned-byte count)))))
+
+(deftransform ash-into-word-modfx ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
+  (let ((count (- (lvar-value count))))
+    (multiple-value-bind (words bits) (truncate count sb-vm:n-word-bits)
+      `(typecase x
          (sb-vm:signed-word
           (mask-signed-field sb-vm:n-fixnum-bits
                              (ash (truly-the sb-vm:signed-word x) count)))
@@ -623,11 +656,11 @@
                                 (cut-to-width integer ,kind width ,signedp)
                                 t)
                                #+(or arm64 x86-64)
-                               ((and (constant-lvar-p count)
-                                     (typep (lvar-value count) `(integer * -1)))
+                               ((and (csubtypep count-type (specifier-type 'fixnum))
+                                     (not (csubtypep count-type (specifier-type 'unsigned-byte))))
                                 ',(if signedp
-                                      'ash-right-modfx
-                                      'ash-right-mod64))))))))
+                                      'ash-into-word-modfx
+                                      'ash-into-word-mod))))))))
             (setf (gethash ',left-name (modular-class-versions (find-modular-class ',kind ',signedp)))
                   `(ash ,',width))
             (deftransform ,left-name ((integer count) (t (constant-arg (eql 0))))

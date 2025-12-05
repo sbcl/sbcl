@@ -3744,3 +3744,18 @@
   (:result-types unsigned-num)
   (:generator 1
     (inst extr result a b count)))
+
+(define-vop (ash-right-two-words-variable)
+  (:policy :fast-safe)
+  (:translate ash-right-two-words)
+  (:args (a :scs (unsigned-reg))
+         (b :scs (unsigned-reg))
+         (count :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 2
+    (inst mvn tmp-tn count)
+    (inst lslv tmp-tn a tmp-tn)
+    (inst lsrv result b count)
+    (inst orr result result (lsl tmp-tn 1))))

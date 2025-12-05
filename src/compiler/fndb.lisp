@@ -509,11 +509,11 @@
   word
   (movable foldable flushable always-translatable))
 
-(defknown ash-right-mod64 (integer (integer * 0))
+(defknown ash-into-word-mod (integer integer)
   word
   (movable foldable flushable always-translatable))
 
-(defknown ash-right-modfx (integer (integer * 0))
+(defknown ash-into-word-modfx (integer integer)
   fixnum
   (movable foldable flushable always-translatable))
 
