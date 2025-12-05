@@ -526,22 +526,33 @@
                            (- count)))))
 
 (deftransform ash-into-word-mod ((x count) * * :important nil :priority :last)
-  `(if (minusp count)
-       (typecase x
-         (fixnum
-          (logand most-positive-word (ash (truly-the fixnum x) count)))
-         (bignum
-          (multiple-value-bind (words bits) (truncate (- count) sb-vm:n-word-bits)
-            (let ((length (%bignum-length (truly-the bignum x))))
-              (flet ((extend-ref (index)
-                       (if (< index length)
-                           (sb-bignum:%bignum-ref (truly-the bignum x) index)
-                           (sb-bignum::%sign-digit x length))))
-                (declare (inline extend-ref))
-                (ash-right-two-words (extend-ref (1+ words))
-                                     (extend-ref words)
-                                     bits))))))
-       (logand most-positive-word (ash x (truly-the unsigned-byte count)))))
+  (let* ((minusp (csubtypep (lvar-type count) (specifier-type '(integer * 0))))
+         (right
+           `(typecase x
+              (fixnum
+               (logand most-positive-word (ash (truly-the fixnum x) ,(if minusp
+                                                                         `(- count)
+                                                                         `count))))
+              (bignum
+               (multiple-value-bind (words bits) (truncate ,(if minusp
+                                                                `count
+                                                                `(- count))
+                                                           sb-vm:n-word-bits)
+                 (let ((length (%bignum-length (truly-the bignum x))))
+                   (flet ((extend-ref (index)
+                            (if (< index length)
+                                (sb-bignum:%bignum-ref (truly-the bignum x) (truly-the bignum-index index))
+                                (sb-bignum::%sign-digit (truly-the bignum x) length))))
+                     (declare (inline extend-ref))
+                     (ash-right-two-words (extend-ref (1+ words))
+                                          (extend-ref words)
+                                          (truly-the (mod ,sb-vm:n-word-bits) bits)))))))))
+    (if minusp
+        `(let ((count (- count)))
+           ,right)
+        `(if (minusp count)
+             ,right
+             (logand most-positive-word (ash x (truly-the unsigned-byte count)))))))
 
 (deftransform ash-into-word-mod ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
   (let ((count (- (lvar-value count))))
@@ -554,7 +565,7 @@
             (flet ((extend-ref (index)
                      (if (< index length)
                          (sb-bignum:%bignum-ref (truly-the bignum x) index)
-                         (sb-bignum::%sign-digit x length))))
+                         (sb-bignum::%sign-digit (truly-the bignum x) length))))
               (declare (inline extend-ref))
               ,(if (zerop bits)
                    `(extend-ref ,words)
@@ -577,24 +588,35 @@
                                               (- count))))))
 
 (deftransform ash-into-word-modfx ((x count) * * :important nil :priority :last)
-  `(if (minusp count)
-       (typecase x
-         (fixnum
-          (mask-signed-field sb-vm:n-fixnum-bits
-                             (ash (truly-the fixnum x) count)))
-         (bignum
-          (multiple-value-bind (words bits) (truncate (- count) sb-vm:n-word-bits)
-            (let ((length (%bignum-length (truly-the bignum x))))
-              (flet ((extend-ref (index)
-                       (if (< index length)
-                           (sb-bignum:%bignum-ref (truly-the bignum x) index)
-                           (sb-bignum::%sign-digit x length))))
-                (declare (inline extend-ref))
-                (mask-signed-field sb-vm:n-fixnum-bits
-                                   (ash-right-two-words (extend-ref (1+ words))
-                                                        (extend-ref words)
-                                                        bits)))))))
-       (logand most-positive-word (ash x (truly-the unsigned-byte count)))))
+  (let* ((minusp (csubtypep (lvar-type count) (specifier-type '(integer * 0))))
+         (right
+           `(typecase x
+              (fixnum
+               (mask-signed-field sb-vm:n-fixnum-bits
+                                  (ash (truly-the fixnum x) ,(if minusp
+                                                                 `(- count)
+                                                                 `count))))
+              (bignum
+               (multiple-value-bind (words bits) (truncate ,(if minusp
+                                                                `count
+                                                                `(- count))
+                                                           sb-vm:n-word-bits)
+                 (let ((length (%bignum-length (truly-the bignum x))))
+                   (flet ((extend-ref (index)
+                            (if (< index length)
+                                (sb-bignum:%bignum-ref (truly-the bignum x) (truly-the bignum-index index))
+                                (sb-bignum::%sign-digit (truly-the bignum x) length))))
+                     (declare (inline extend-ref))
+                     (mask-signed-field sb-vm:n-fixnum-bits
+                                        (ash-right-two-words (extend-ref (1+ words))
+                                                             (extend-ref words)
+                                                             bits)))))))))
+    (if minusp
+        `(let ((count (- count)))
+           ,right)
+        `(if (minusp count)
+             ,right
+             (logand most-positive-word (ash x (truly-the unsigned-byte count)))))))
 
 (deftransform ash-into-word-modfx ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
   (let ((count (- (lvar-value count))))

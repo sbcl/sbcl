@@ -240,6 +240,7 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/thread" :not-host #-sb-devel :block-compile) ; provides *CURRENT-THREAD* for target-signal
 
+ ("src/code/bignum"          :not-host #-(or bignum-assertions sb-devel) :block-compile)
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,
  ;; which wants to be inlined, and which when inlined becomes RANDOM-CHUNK,
@@ -320,7 +321,6 @@
  ("src/code/foreign"         :not-host)
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
- ("src/code/bignum"          :not-host #-(or bignum-assertions sb-devel) :block-compile)
  ("src/code/numbers"         :not-host)
  ("src/code/float-trap"      :not-host)
  ("src/code/target-float"    :not-host)

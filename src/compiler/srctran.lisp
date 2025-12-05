@@ -3419,8 +3419,14 @@
              ((<= width sb-vm:n-word-bits)
               `(%ldb size posn (logand int most-positive-word)))))
       (t
-       (delay-ir1-transform node :ir1-phases)
-       (give-up-ir1-transform "not a word-sized integer")))))
+       (if-vop-existsp (:translate ash-right-two-words)
+         (progn
+           (delay-ir1-transform node :constraint)
+           `(logandc2 (ash int (- posn))
+                      (ash -1 size)))
+         (progn
+           (delay-ir1-transform node :ir1-phases)
+           (give-up-ir1-transform "not a word-sized integer")))))))
 
 (deftransform %mask-field ((size posn int) ((integer 0 #.sb-vm:n-word-bits) fixnum integer) word)
   "convert to inline logical operations"
