@@ -1291,15 +1291,13 @@
       (truncate count digit-size)
     (let* ((right-half (ldb (byte digit-size 0)
                             (ash fixnum remaining)))
-           (sign-bit-p
-             (logbitp (1- digit-size) right-half))
            (left-half (ash fixnum
                            (- remaining digit-size)))
            ;; Even if the left-half is 0 or -1 it might need to be sign
            ;; extended based on the left-most bit of the right-half
-           (left-half-p (if sign-bit-p
-                            (/= left-half -1)
-                            (/= left-half 0)))
+           (left-half-p (/= left-half
+                            (ash (sb-c::mask-signed-field digit-size right-half)
+                                 (- (1- digit-size)))))
            (length (+ right-zero-digits
                       (if left-half-p 2 1))))
       (when (> length maximum-bignum-length)

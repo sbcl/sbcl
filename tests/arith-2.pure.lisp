@@ -1212,9 +1212,9 @@
   (checked-compile-and-assert
       ()
       `(lambda (p d)
-         (declare ((signed-byte #.sb-vm:n-word-bits) p)
-                  ((unsigned-byte #1=#.(1- sb-vm:n-word-bits)) d))
-         (+ (ash p #1#) d))
+         (declare ((signed-byte 64) p)
+                  ((unsigned-byte 63) d))
+         (+ (ash p 63) d))
     ((0 5) 5)
     ((4 4) 36893488147419103236)
     ((-5 5) -46116860184273879035))
@@ -1230,8 +1230,8 @@
   (checked-compile-and-assert
       ()
       `(lambda (p d)
-         (declare ((unsigned-byte #1#) d))
-         (+ (ash p #1#) d))
+         (declare ((unsigned-byte 63) d))
+         (+ (ash p 63) d))
     ((0 5) 5)
     ((4 4) 36893488147419103236)
     ((-5 5) -46116860184273879035))
