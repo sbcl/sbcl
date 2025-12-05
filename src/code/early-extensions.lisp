@@ -945,7 +945,7 @@ NOTE: This interface is experimental and subject to change."
 (declaim (inline swapped-args-fun))
 (defun swapped-args-fun (fun)
   (declare (type function fun))
-  (lambda (x y)
+  (named-lambda "FUN" (x y) ; prevent the lambda from retaining #:SWAPPED-ARGS-FUN
     (funcall fun y x)))
 
 ;;; Return the numeric value of a type bound, i.e. an interval bound

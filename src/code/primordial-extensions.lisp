@@ -340,7 +340,12 @@
                       it)
                  (acond ,@rest)))))))
 
-(defvar *!removable-symbols* nil)
+(defvar *!removable-symbols*
+  '(("SB-INT" uncross hash-cons swapped-args-fun char-case-info packed-info-field
+     type-bound-number
+     prepare-for-fast-read-char fast-read-char done-with-fast-read-char
+     fast-read-var-u-integer fast-read-u-integer fast-read-s-integer
+     clear-flag)))
 
 (defun %defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))
