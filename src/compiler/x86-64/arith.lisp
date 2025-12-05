@@ -755,21 +755,34 @@
   (:vop-var vop)
   (:node-var node)
   (:generator 10
-    (sc-case shift
-      (immediate
-       (inst mov rax (ash 1 (tn-value shift))))
-      (t
-       (move rcx shift :dword)
-       (inst mov rax 1)
-       (inst shl rax :cl)))
-    (inst imul x)
-    (inst lea rax (ea add rax))
-    (inst mov :byte twodigit 1)         ; = "yes"
-    (inst jmp :o allocate)
+    (let ((shift (if (sc-is shift immediate)
+                     (tn-value shift)
+                     shift)))
+      (cond ((and (fixnump shift)
+                  (< shift 63))
+             (inst mov rax (ash 1 shift))
+             (inst imul x)
+             (inst lea rax (ea add rax))
+             (inst mov :byte twodigit 1)
+             (inst jmp :o allocate))
+            (t
+             (unless (fixnump shift)
+               (move rcx shift)
+               (setf shift :cl))
+             (move rax x)
+             (inst cqo)
+             (inst shld rdx rax shift)
+             (inst shl rax shift)
+             (inst mov twodigit rax)
+             (inst add rax add)
+             (inst sar twodigit 63)
+             (inst cmp rdx twodigit)
+             (inst mov :byte twodigit 1)
+             (inst jmp :ne allocate))))
     (move r rax)
     (inst shl r 1)
     (inst jmp :no DONE)
-    (zeroize twodigit)                  ; = "no"
+    (zeroize twodigit)
     allocate
     (wordpair-to-bignum r twodigit rax rdx node)
     DONE))
