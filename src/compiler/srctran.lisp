@@ -2256,11 +2256,19 @@
                (setf rem (interval-func #'(lambda (x)
                                             (coerce-for-bound x rem-type))
                                         rem)))
-             (make-numeric-type :class class
-                                :format format
-                                :low (interval-low rem)
-                                :high (interval-high rem)
-                                :normalize-zeros nil))))))
+             ;; KLUDGE: the interval arithmetic doesn't handle -0.0 well
+             (let ((low (interval-low rem))
+                   (high (interval-high rem)))
+               (when (and (or (eql high -0f0)
+                              (eql high -0d0))
+                          (or (eql low 0f0)
+                              (eql low 0d0)))
+                 (rotatef low high))
+              (make-numeric-type :class class
+                                 :format format
+                                 :low low
+                                 :high high
+                                 :normalize-zeros nil)))))))
 
 (defun truncate-derive-type-quot-aux (num div same-arg)
   (declare (ignore same-arg))
