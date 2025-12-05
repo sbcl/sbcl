@@ -517,8 +517,16 @@
   fixnum
   (movable foldable flushable always-translatable))
 
+(defknown ash-left-add (integer (integer 0 #.sb-vm:n-word-bits) word)
+    integer
+    (movable foldable flushable no-verify-arg-count))
+
+(defknown ash-left-word-add (integer word)
+    integer
+    (movable foldable flushable no-verify-arg-count))
+
 (defknown (logcount integer-length) (integer) bit-index
-  (movable foldable flushable))
+    (movable foldable flushable))
 ;;; FIXME: According to the ANSI spec, it's legal to use any
 ;;; nonnegative indices for BYTE arguments, not just BIT-INDEX. It's
 ;;; hard to come up with useful ways to do this, but it is possible to

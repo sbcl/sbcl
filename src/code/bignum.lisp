@@ -1188,18 +1188,18 @@
            (type unsigned-byte x)
            (type (or null bignum-length) bignum-len))
   (if (fixnump x)
-    (multiple-value-bind (digits n-bits) (truncate x digit-size)
-      (let* ((bignum-len (or bignum-len (%bignum-length bignum)))
-             (res-len (+ digits bignum-len 1)))
-        (when (> res-len maximum-bignum-length)
-          (error "can't represent result of left shift"))
-        (if (zerop n-bits)
-          (bignum-ashift-left-digits bignum bignum-len digits)
-          (bignum-ashift-left-unaligned bignum digits n-bits res-len))))
-    ;; Left shift by a number too big to be represented as a fixnum
-    ;; would exceed our memory capacity, since a fixnum is big enough
-    ;; to index any array, including a bit array.
-    (error "can't represent result of left shift")))
+      (multiple-value-bind (digits n-bits) (truncate x digit-size)
+        (let* ((bignum-len (or bignum-len (%bignum-length bignum)))
+               (res-len (+ digits bignum-len 1)))
+          (when (> res-len maximum-bignum-length)
+            (error "can't represent result of left shift"))
+          (if (zerop n-bits)
+              (bignum-ashift-left-digits bignum bignum-len digits)
+              (bignum-ashift-left-unaligned bignum digits n-bits res-len))))
+      ;; Left shift by a number too big to be represented as a fixnum
+      ;; would exceed our memory capacity, since a fixnum is big enough
+      ;; to index any array, including a bit array.
+      (error "can't represent result of left shift")))
 
 (defun bignum-ashift-left-digits (bignum bignum-len digits)
   (declare (type bignum-length bignum-len digits))
@@ -1241,6 +1241,47 @@
             (logior (%digit-logical-shift-right (%bignum-ref bignum i)
                                                  remaining-bits)
                      (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
+
+(declaim (inline bignum-ashift-left-unaligned-add))
+(defun bignum-ashift-left-unaligned-add (bignum n-bits res-len add)
+  (declare (type bignum-length res-len)
+           (type (mod #.digit-size) n-bits)
+           (word add))
+  (let* ((remaining-bits (- digit-size n-bits))
+         (res-len-1 (1- res-len))
+         (res (%allocate-bignum res-len)))
+    (declare (type bignum-length res-len res-len-1))
+    (do ((i 0 (1+ i))
+         (j 1 (1+ j)))
+        ((= j res-len-1)
+         (setf (%bignum-ref res 0)
+               (logior (%ashl (%bignum-ref bignum 0) n-bits)
+                       add))
+         (setf (%bignum-ref res j)
+               (%ashr (%bignum-ref bignum i) remaining-bits))
+         (%normalize-bignum res res-len))
+      (declare (type bignum-index i j))
+      (setf (%bignum-ref res j)
+            (logior (%digit-logical-shift-right (%bignum-ref bignum i)
+                                                remaining-bits)
+                    (%ashl (%bignum-ref bignum (1+ i)) n-bits))))))
+
+(defun bignum-ashift-left-add (bignum x add)
+  (declare (type bignum bignum)
+           (type (integer 0 #.digit-size) x)
+           (word add))
+  (multiple-value-bind (digits n-bits) (truncate x digit-size)
+    (let* ((bignum-len (%bignum-length bignum))
+           (res-len (+ digits bignum-len 1)))
+      (when (> res-len maximum-bignum-length)
+        (error "can't represent result of left shift"))
+      (if (zerop n-bits)
+          (progn
+            (let ((b
+                   (bignum-ashift-left-digits bignum bignum-len digits)))
+              (setf (%bignum-ref b 0) add)
+              b))
+          (bignum-ashift-left-unaligned-add bignum n-bits res-len add)))))
 
 ;;; FIXNUM is assumed to be non-zero and the result of the shift should be a bignum
 (defun bignum-ashift-left-fixnum (fixnum count)

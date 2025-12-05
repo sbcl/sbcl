@@ -737,6 +737,85 @@
     (unsigned-wordpair-to-bignum r multidigit rax rdx node)
     DONE))
 
+(define-vop (ash-left-add-signed)
+  (:translate ash-left-add)
+  (:args (x :scs (signed-reg))
+         (shift :scs (unsigned-reg immediate) :target rcx)
+         (add :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num unsigned-num)
+  (:temporary (:sc signed-reg :offset rax-offset) rax)
+  (:temporary (:sc signed-reg :offset rdx-offset) rdx)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)
+               :unused-if (sc-is shift immediate)) rcx)
+  (:temporary (:sc signed-reg :from :eval) twodigit)
+  (:temporary (:sc complex-double-reg :offset 0) scratch)
+  (:ignore scratch)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 10
+    (sc-case shift
+      (immediate
+       (inst mov rax (ash 1 (tn-value shift))))
+      (t
+       (move rcx shift :dword)
+       (inst mov rax 1)
+       (inst shl rax :cl)))
+    (inst imul x)
+    (inst lea rax (ea add rax))
+    (inst mov :byte twodigit 1)         ; = "yes"
+    (inst jmp :o allocate)
+    (move r rax)
+    (inst shl r 1)
+    (inst jmp :no DONE)
+    (zeroize twodigit)                  ; = "no"
+    allocate
+    (wordpair-to-bignum r twodigit rax rdx node)
+    DONE))
+
+(define-vop (ash-left-add-unsigned)
+  (:translate ash-left-add)
+  (:args (x :scs (unsigned-reg))
+         (shift :scs (unsigned-reg immediate) :target rcx)
+         (add :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)
+               :unused-if (sc-is shift immediate)) rcx)
+  (:temporary (:sc signed-reg :from (:argument 2)) multidigit)
+  (:temporary (:sc complex-double-reg :offset 0) scratch)
+  (:ignore scratch)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:node-var node)
+  (:generator 10
+    (sc-case shift
+      (immediate
+       (inst mov rax (ash 1 (tn-value shift))))
+      (t
+       (move rcx shift :dword)
+       (inst mov rax 1)
+       (inst shl rax :cl)))
+    (inst mul x)
+    (inst lea rax (ea add rax))
+    (inst mov :byte multidigit 1) ; might need 2 or 3 digits to represent
+    ;; OF implies RDX nonzero. Sign bit of RDX gets tested in asm routine
+    (inst jmp :o allocate)
+    (move r rax)
+    (inst shl r 1)                      ; n-fixnum-tag-bits
+    ;; If we shifted out a 1 bit from the low digit, then it's a 2-digit bignum
+    (inst jmp :c allocate)
+    ;; If not-CF and not-OF then the top 2 bits of the low digit are both zero
+    ;; and the result is a fixnum, otherwise a 1-digit bignumm
+    (inst jmp :no DONE)
+    (zeroize multidigit)
+    allocate
+    (unsigned-wordpair-to-bignum r multidigit rax rdx node)
+    DONE))
+
 (defun signed=>bignum-in-reg (node reg) ; arg/result in same reg
   (call-reg-specific-asm-routine node "ALLOC-SIGNED-BIGNUM-IN-" reg))
 

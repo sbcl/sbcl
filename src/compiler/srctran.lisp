@@ -3842,6 +3842,44 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
+;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
+(when-vop-existsp (:translate ash-left-add)
+  (deftransform + ((a b) (integer integer) * :node node :result result :important nil)
+    (or (when (and result
+                   (not (word-sized-lvar-p result)))
+          (flet ((try (a b ll)
+                   (combination-case a
+                     ((ash *) (* constant)
+                      (let* ((m (lvar-value (second args)))
+                             (shift (if (eq name 'ash)
+                                        m
+                                        (and (plusp m)
+                                             (= (logcount m) 1)
+                                             (1- (integer-length m))))))
+                        (when (and shift
+                                   (<= shift sb-vm:n-word-bits)
+                                   (csubtypep (lvar-type b) (make-numeric-type :class 'integer
+                                                                               :low 0
+                                                                               :high (1- (ash 1 shift)))))
+                          (delay-ir1-transform node :ir1-phases)
+                          (splice-fun-args a name #'first)
+                          `(lambda ,ll
+                             (ash-left-add int ,shift add))))))))
+            (or (try a b '(int add))
+                (try b a '(add int)))))
+        (give-up-ir1-transform)))
+
+  (deftransform ash-left-add ((integer count add) (t (eql #.sb-vm:n-word-bits) t))
+    `(ash-left-word-add integer add))
+
+  (deftransform ash-left-word-add ((integer add) (sb-vm:signed-word t))
+    `(if (zerop integer)
+         add
+         (let ((bignum (%allocate-bignum 2)))
+           (setf (%bignum-ref bignum 0) add
+                 (%bignum-ref bignum 1) (logand most-positive-word integer))
+           bignum))))
+
 (defun cast-or-check-bound-type (node &optional type fixnum)
   (unless (and type
                (csubtypep (single-value-type (node-derived-type node)) type))

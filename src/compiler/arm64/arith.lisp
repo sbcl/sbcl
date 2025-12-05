@@ -2163,6 +2163,84 @@
       (storew high tmp-tn 2))
     DONE))
 
+(define-vop (ash-left-add-signed)
+  (:translate ash-left-add)
+  (:args (x :scs (signed-reg))
+         (shift :scs (unsigned-reg immediate))
+         (add :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num unsigned-num)
+  (:temporary (:sc signed-reg) high low)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 10
+    (sc-case shift
+      (immediate
+       (let ((shift (tn-value shift)))
+         (inst add low add (lsl x shift))
+         (inst asr high x (- n-word-bits shift))))
+      (t
+       (inst lsl low x shift)
+       (inst add low low add)
+       (inst mvn tmp-tn shift)
+       (inst asr high x 1)
+       (inst asr high high tmp-tn)))
+    (inst mov header (bignum-header-for-length 2))
+    (inst cmp high (asr low 63))
+    (inst b :ne allocate)
+    (inst adds r low low)
+    (inst b :vc done)
+    (inst mov header (bignum-header-for-length 1))
+    #+bignum-assertions
+    (inst mov high 0)
+    allocate
+    (with-fixed-allocation
+        (r lr nil (+ 2 bignum-digits-offset))
+      (storew-pair header 0 low bignum-digits-offset tmp-tn)
+      (storew high tmp-tn 2))
+    DONE))
+
+(define-vop (ash-left-add-unsigned)
+  (:translate ash-left-add)
+  (:args (x :scs (unsigned-reg))
+         (shift :scs (unsigned-reg immediate))
+         (add :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg) high low)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 12
+    (sc-case shift
+      (immediate
+       (let ((shift (tn-value shift)))
+         (inst add low add (lsl x shift))
+         (inst lsr high x (- n-word-bits shift))))
+      (t
+       (inst lsl low x shift)
+       (inst add low low add)
+       (inst mvn tmp-tn shift)
+       (inst lsr high x 1)
+       (inst lsr high high tmp-tn)))
+    (inst mov header (bignum-header-for-length 3))
+    (inst tbnz high 63 allocate)
+    (inst mov header (bignum-header-for-length 2))
+    (inst cbnz high allocate)
+    (inst tbnz low 63 allocate)
+    (inst adds r low low)
+    (inst b :vc done)
+    (inst mov header (bignum-header-for-length 1))
+    allocate
+    (with-fixed-allocation
+        (r lr nil (+ 2 bignum-digits-offset))
+      (storew-pair header 0 low bignum-digits-offset tmp-tn)
+      (storew high tmp-tn 2))
+    DONE))
+
 (define-vop (+/signed=>integer)
   (:translate +)
   (:args (x :scs (signed-reg))
