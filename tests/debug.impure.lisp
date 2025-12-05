@@ -205,7 +205,7 @@
 (with-test (:name (trace :report nil :smoke))
   (let ((output (with-traced-function (trace-this :report nil)
                   (assert (eq 'ok (trace-this))))))
-    (assert (sequence:emptyp output))))
+    (assert (string= output ""))))
 
 (with-test (:name (trace :report nil :print))
   (let ((output (with-traced-function

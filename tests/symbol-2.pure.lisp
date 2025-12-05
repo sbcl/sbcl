@@ -23,7 +23,7 @@
                                     (type-error-expected-type e)))
                     ;; Check that it prints without an error.
                     (let ((string (princ-to-string e)))
-                      (assert (not (sequence:emptyp string)))
+                      (assert (string/= "" string))
                       :ok)))))))
 
 ;;; This enforces the rules given in CLHS 11.1.2.1.1 Constraints on

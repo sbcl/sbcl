@@ -1899,7 +1899,7 @@
     (multiple-value-bind (res err) (ignore-errors (funcall fun t))
       (assert (not res))
       (assert (typep err 'program-error))
-      (assert (not (sequence:emptyp (princ-to-string err)))))))
+      (assert (string/= "" (princ-to-string err))))))
 
 (with-test (:name (compile random :distribution))
   (let ((fun (checked-compile '(lambda (x) (random (if x 10 20))))))
