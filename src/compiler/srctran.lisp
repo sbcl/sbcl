@@ -3870,15 +3870,7 @@
         (give-up-ir1-transform)))
 
   (deftransform ash-left-add ((integer count add) (t (eql #.sb-vm:n-word-bits) t))
-    `(ash-left-word-add integer add))
-
-  (deftransform ash-left-word-add ((integer add) (sb-vm:signed-word t))
-    `(if (zerop integer)
-         add
-         (let ((bignum (%allocate-bignum 2)))
-           (setf (%bignum-ref bignum 0) add
-                 (%bignum-ref bignum 1) (logand most-positive-word integer))
-           bignum))))
+    `(ash-left-word-add integer add)))
 
 (defun cast-or-check-bound-type (node &optional type fixnum)
   (unless (and type

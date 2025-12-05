@@ -2202,6 +2202,35 @@
       (storew high tmp-tn 2))
     DONE))
 
+(define-vop ()
+  (:translate ash-left-word-add)
+  (:args (x :scs (signed-reg))
+         (add :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:temporary (:sc signed-reg) header  #+bignum-assertions high)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 10
+    #+bignum-assertions
+    (progn (move high x)
+           (setf x high))
+    (inst mov header (bignum-header-for-length 2))
+    (inst cmp x (asr add 63))
+    (inst b :ne allocate)
+    (inst adds r add add)
+    (inst b :vc done)
+    (inst mov header (bignum-header-for-length 1))
+    #+bignum-assertions
+    (inst mov x 0)
+    allocate
+    (with-fixed-allocation
+        (r lr nil (+ 2 bignum-digits-offset))
+      (storew-pair header 0 add bignum-digits-offset tmp-tn)
+      (storew x tmp-tn 2))
+    DONE))
+
 (define-vop (ash-left-add-unsigned)
   (:translate ash-left-add)
   (:args (x :scs (unsigned-reg))
