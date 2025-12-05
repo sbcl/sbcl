@@ -3002,8 +3002,11 @@
      (let ((lo (numeric-type-low x-type))
            (hi (numeric-type-high x-type)))
        (cond ((and lo hi)
-              (specifier-type `(integer ,(%bignum-length lo)
-                                        ,(%bignum-length hi))))
+              (let ((lo (%bignum-length lo))
+                    (hi (%bignum-length hi)))
+                (when (> lo hi)
+                  (rotatef lo hi))
+                (specifier-type `(integer ,lo ,hi))))
              (lo
               (when (> lo 0)
                 (specifier-type `(integer ,(%bignum-length lo)))))
