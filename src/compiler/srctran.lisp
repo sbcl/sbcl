@@ -3706,6 +3706,7 @@
         ((+ -) (* constant)
          (let ((shift (funcall name (lvar-value (second args)))))
            (when (and (plusp shift)
+                      (fixnump shift)
                       (not (and (word-sized-lvar-p amount)
                                 (let ((int-add (type-approximate-interval (lvar-type (first args))))
                                       (int-amount (type-approximate-interval (lvar-type amount))))
@@ -5197,40 +5198,56 @@
   "convert (* x 0) to 0"
   0)
 
-(deftransform %negate ((x) * * :node node)
-  "Combine - with +, -, *"
+(defun negate-lvar (x node &optional type)
   (flet ((float-safe-p ()
            (or (policy node (zerop float-accuracy))
                (not (types-equal-or-intersect
                      (lvar-type x)
-                     (specifier-type '(or float (complex float)))))
-               (give-up-ir1-transform "the arguments are not rational"))))
-    (or
-     (combination-case x
-       ;; (- (- x)) => x
-       (%negate (*)
-         (splice-fun-args x '%negate 1)
-         'x)
-       ;; (- (* x c)) => (* x -c)
-       (* (* constant)
-          (splice-fun-args x '* 2)
-          `(lambda (x y)
-             (declare (ignore y))
-             (* x ,(- (lvar-value (second args))))))
-       ;; (- (- x y)) => (- y x)
-       (- (* *)
-          (when (float-safe-p)
-            (splice-fun-args x '- 2)
-            `(lambda (x y)
-               (- y x))))
-       ;; (- (+ x c)) => (- -c x)
-       (+ (* constant)
-          (when (float-safe-p)
-            (splice-fun-args x '+ 2)
-            `(lambda (x y)
-               (declare (ignore y))
-               (- ,(- (lvar-value (second args))) x)))))
-     (give-up-ir1-transform))))
+                     (specifier-type '(or float (complex float))))))))
+    (multiple-value-bind (constant ref) (lvar-constant x)
+      (cond (constant
+             (erase-node-type ref *wild-type* nil node)
+             (change-ref-leaf ref (make-constant (- (constant-value constant))))
+             t)
+            (t
+             (combination-case (x type)
+               ;; (- (- x)) => x
+               (%negate (*)
+                (erase-node-type combination *wild-type* nil node)
+                (when (splice-fun-args x '%negate #'first nil type)
+                  'x))
+               ;; (- (- x y)) => (- y x)
+               (- (* *)
+                (when (float-safe-p)
+                  (erase-node-type combination *wild-type* nil node)
+                  (transform-call combination
+                                  `(lambda (x y)
+                                     (- y x))
+                                  'negate-lvar)
+                  t))
+               ;; (- (+ x c)) => (- -c x)
+               (+ (* constant)
+                (when (float-safe-p)
+                  (erase-node-type combination *wild-type* nil t)
+                  (transform-call combination
+                                  `(lambda (x y)
+                                     (- (- y) x))
+                                  'negate-lvar)
+                  t))
+               ((* /) (* *)
+                (or (negate-lvar (first args) node)
+                    (negate-lvar (second args) node)))
+               (truncate (* *)
+                (or (negate-lvar (first args) node (specifier-type 'real))
+                    (negate-lvar (second args) node (specifier-type 'real))))
+               (ash (* (type unsigned-byte))
+                (negate-lvar (first args) node (specifier-type 'integer)))))))))
+
+(deftransform %negate ((x) * * :node node)
+  "Combine - with +, -, *"
+  (if (negate-lvar x node)
+      'x
+      (give-up-ir1-transform)))
 
 ;;; Return T if in an arithmetic op including lvars X and Y, the
 ;;; result type is not affected by the type of X. That is, Y is at

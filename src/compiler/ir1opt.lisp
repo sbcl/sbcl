@@ -52,7 +52,7 @@
                      (if (constant-p (setf leaf (ref-leaf principal-use)))
                          (when (or ignore-types
                                    (ctypep (constant-value leaf) type))
-                           leaf)
+                           (values leaf principal-use))
                          (process-lvar (lambda-var-ref-lvar principal-use))))))))
       (process-lvar lvar))))
 

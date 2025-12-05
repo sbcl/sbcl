@@ -1250,3 +1250,16 @@
          (+ (ash p 64) d))
     ((-1 17757265153539649207) -689478920169902409)
     ((-1 0) -18446744073709551616)))
+
+(with-test (:name :remove-negate)
+  (flet ((test (form count)
+           (assert (= (count 'sb-kernel:%negate
+                             (ctu:ir1-named-calls form nil))
+                      count))))
+    (test `(lambda (x y)
+             (declare (integer x y))
+             (- (* x (- 5 y))))
+          0)
+    (test `(lambda (x y)
+             (- (truncate (- x) y)))
+          0)))

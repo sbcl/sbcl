@@ -375,7 +375,7 @@
                 (loop while cases
                       collect (gen)))))))))
 
-(defun erase-node-type (node type &optional nth-value)
+(defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
         (if (eq type t)
             (let ((derived (node-derived-type node)))
@@ -388,10 +388,10 @@
                (values-type-optional derived)
                (values-type-rest derived)))
             type))
-  (erase-lvar-type (node-lvar node) nth-value))
+  (erase-lvar-type (node-lvar node) nth-value erase-calls))
 
 ;;; The uses need to have the correct type before calling this.
-(defun erase-lvar-type (lvar &optional nth-value)
+(defun erase-lvar-type (lvar &optional nth-value erase-calls)
   (let (seen)
     (labels ((erase (lvar nth-value)
                (when lvar
@@ -408,7 +408,12 @@
                          ((and (combination-p dest)
                                ;; Only the first value is used
                                (and nth-value
-                                    (> nth-value 0))))
+                                    (> nth-value 0)))
+                          (when (and erase-calls
+                                     (not (eq dest erase-calls))
+                                     (eq (combination-kind dest) :known))
+                            (derive-node-type dest *wild-type* :from-scratch t)
+                            (erase (node-lvar dest) nil)))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
                                (not (memq dest seen)))
@@ -446,7 +451,13 @@
                                                          (make-values-type (mapcar #'lvar-type (combination-args dest)))
                                                          :from-scratch t)
                                        (erase (node-lvar dest)
-                                              (position lvar (combination-args dest))))))))))))))
+                                              (position lvar (combination-args dest)))))))))
+                         ((and erase-calls
+                               (not (eq dest erase-calls))
+                               (combination-p dest)
+                               (eq (combination-kind dest) :known))
+                          (derive-node-type dest *wild-type* :from-scratch t)
+                          (erase (node-lvar dest) nil)))))))
       (erase lvar nth-value))))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
