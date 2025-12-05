@@ -493,12 +493,16 @@
 
 ;;;; No bogus violations from defclass with accessors in a locked
 ;;;; package. Reported by by Francois-Rene Rideau.
+;;;; Frankly I think this is the opposite of correct, and that user-extensible
+;;;; interfaces don't belong in locked packages, but the design is pretty much
+;;;; cast in concrete at this point.
 (with-test (:name (defclass :accessor :package-locked))
-  (assert (package-locked-p :sb-gray))
+  (assert (sb-pcl::generic-function-p #'sb-impl::inspected-parts))
+  (assert (package-locked-p :sb-impl))
   (let ((fun (checked-compile
               '(lambda ()
                 (defclass fare-class ()
-                  ((line-column :initform 0 :reader sb-gray:stream-line-column)))))))
+                  ((line-column :initform 0 :reader sb-impl::inspected-parts)))))))
     (multiple-value-bind (class run-errors) (ignore-errors (funcall fun))
       (assert (not run-errors))
       (assert (eq class (find-class 'fare-class))))))
