@@ -531,7 +531,6 @@ necessary, since type inference may take arbitrarily long to converge.")
               (if (fasl-output-p *compile-object*)
                   (and (eq *compile-file-to-memory-space* :immobile)
                        (neq (component-kind component) :toplevel)
-                       (policy *lexenv* (/= sb-c:store-coverage-data 3))
                        :immobile)
                   (if (core-object-ephemeral *compile-object*)
                       :dynamic
