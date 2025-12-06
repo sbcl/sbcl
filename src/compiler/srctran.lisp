@@ -5236,7 +5236,7 @@
                ;; (- (+ x c)) => (- -c x)
                (+ (* constant)
                 (when (float-safe-p)
-                  (erase-node-type combination *wild-type* nil t)
+                  (erase-node-type combination *wild-type* nil node)
                   (transform-call combination
                                   `(lambda (x y)
                                      (- (- y) x))
