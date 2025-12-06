@@ -3772,7 +3772,12 @@ expansion happened."
                         (union (when supertype
                                  (type-union2 supertype type2)))
                         (widened (and (union-type-p union)
-                                      (find type2 (union-type-types union) :test-not #'eq)))
+                                      (let* ((types (union-type-types union))
+                                             (a (first types)))
+                                        (if (or (eq a type2)
+                                                (eq a supertype))
+                                            (second types)
+                                            a))))
                         (widenp t)
                         (union (and (array-type-p union)
                                     union))
