@@ -375,6 +375,12 @@
                 (loop while cases
                       collect (gen)))))))))
 
+(defun erase-lvar-uses-type (lvar type &optional erase-calls)
+  (do-uses (node lvar)
+    (setf (node-derived-type node)
+          type))
+  (erase-lvar-type lvar nil erase-calls))
+
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
         (if (eq type t)
@@ -1060,8 +1066,10 @@
   (with-ir1-environment-from-node node
     (let ((ref (make-ref leaf))
           (lvar (if reuse-lvar
-                    (prog1 (node-lvar node)
-                      (%delete-lvar-use node))
+                    (if (lvar-p reuse-lvar)
+                        reuse-lvar
+                        (prog1 (node-lvar node)
+                          (%delete-lvar-use node)))
                     (make-lvar node))))
       (insert-node-before node ref)
       (push ref (leaf-refs leaf))
@@ -2653,6 +2661,18 @@ is :ANY, the function name is not checked."
       (flush-combination combination)
       t)))
 
+(defun replace-lvar-with-constant (lvar value)
+  (let ((uses (lvar-uses lvar))
+        (constant (make-constant value)))
+    (typecase uses
+      (ref
+       (change-ref-leaf uses constant))
+      (node
+       (insert-ref-before constant uses t))
+      (cons
+       (let ((dest (lvar-dest lvar)))
+         (mapc #'%delete-lvar-use uses)
+         (insert-ref-before constant dest lvar))))))
 
 ;;;; leaf hackery
 
