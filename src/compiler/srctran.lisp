@@ -5214,8 +5214,8 @@
                      (specifier-type '(or float (complex float))))))))
     (cond ((constant-lvar-p x)
            (let ((negated (- (lvar-value x))))
-             (erase-lvar-uses-type x *wild-type* node)
-             (replace-lvar-with-constant x negated))
+             (replace-lvar-with-constant x negated)
+             (erase-lvar-type x nil node))
            t)
           (t
            (combination-case (x type)

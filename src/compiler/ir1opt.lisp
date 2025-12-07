@@ -1172,6 +1172,16 @@
                (return-from check-proper-sequences))))
      combination :info info)))
 
+(defun derive-combination-type (combination &optional (show *show-transforms-p*))
+  (let* ((info (basic-combination-fun-info combination))
+         (fun (fun-info-derive-type info)))
+    (when fun
+      (let ((res (funcall fun combination)))
+        (when res
+          (when (eq show :derive-type)
+            (show-type-derivation combination res))
+          (coerce-to-values res))))))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
   (declare (type combination node))
@@ -1190,14 +1200,10 @@
            (process-info ()
              (check-important-result node info)
              (check-proper-sequences node info)
-             (let ((fun (fun-info-derive-type info)))
-               (when fun
-                 (let ((res (funcall fun node)))
-                   (when res
-                     (when (eq show :derive-type)
-                       (show-type-derivation node res))
-                     (derive-node-type node (coerce-to-values res))
-                     (maybe-terminate-block node nil)))))))
+             (let ((type (derive-combination-type node show)))
+               (when type
+                 (derive-node-type node type)
+                 (maybe-terminate-block node nil)))))
       (ecase kind
         (:local
          (let ((fun (combination-lambda node)))

@@ -375,12 +375,6 @@
                 (loop while cases
                       collect (gen)))))))))
 
-(defun erase-lvar-uses-type (lvar type &optional erase-calls)
-  (do-uses (node lvar)
-    (setf (node-derived-type node)
-          type))
-  (erase-lvar-type lvar nil erase-calls))
-
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
         (if (eq type t)
@@ -399,7 +393,15 @@
 ;;; The uses need to have the correct type before calling this.
 (defun erase-lvar-type (lvar &optional nth-value erase-calls)
   (let (seen)
-    (labels ((erase (lvar nth-value)
+    (labels ((handle-combination (combination)
+               (when (and erase-calls
+                          (not (eq combination erase-calls))
+                          (eq (combination-kind combination) :known))
+                 (let ((type (derive-combination-type combination)))
+                   (aver (not (eq type *empty-type*)))
+                   (derive-node-type combination type :from-scratch t)
+                   (erase (node-lvar combination) nil))))
+             (erase (lvar nth-value)
                (when lvar
                  (setf (lvar-%derived-type lvar) nil)
                  (loop for annotation in (lvar-annotations lvar)
@@ -415,11 +417,7 @@
                                ;; Only the first value is used
                                (and nth-value
                                     (> nth-value 0)))
-                          (when (and erase-calls
-                                     (not (eq dest erase-calls))
-                                     (eq (combination-kind dest) :known))
-                            (derive-node-type dest *wild-type* :from-scratch t)
-                            (erase (node-lvar dest) nil)))
+                          (handle-combination dest))
                          ((and (basic-combination-p dest)
                                (eq (basic-combination-kind dest) :local)
                                (not (memq dest seen)))
@@ -445,25 +443,20 @@
                                                           (basic-combination-args dest))
                                         (lambda-vars fun))
                                    (single-value-type lvar-type))))))
-                         ((and (combination-p dest)
-                               (lvar-fun-is (combination-fun dest) '(values))
-                               (let ((mv (node-dest dest)))
-                                 (when (and (mv-combination-p mv)
-                                            (eq (basic-combination-kind mv) :local))
-                                   (let ((fun (combination-lambda mv)))
-                                     (when (and (functional-p fun)
-                                                (functional-kind-eq fun mv-let))
-                                       (derive-node-type dest
-                                                         (make-values-type (mapcar #'lvar-type (combination-args dest)))
-                                                         :from-scratch t)
-                                       (erase (node-lvar dest)
-                                              (position lvar (combination-args dest)))))))))
-                         ((and erase-calls
-                               (not (eq dest erase-calls))
-                               (combination-p dest)
-                               (eq (combination-kind dest) :known))
-                          (derive-node-type dest *wild-type* :from-scratch t)
-                          (erase (node-lvar dest) nil)))))))
+                         ((combination-p dest)
+                          (if (lvar-fun-is (combination-fun dest) '(values))
+                              (let ((mv (node-dest dest)))
+                                (when (and (mv-combination-p mv)
+                                           (eq (basic-combination-kind mv) :local))
+                                  (let ((fun (combination-lambda mv)))
+                                    (when (and (functional-p fun)
+                                               (functional-kind-eq fun mv-let))
+                                      (derive-node-type dest
+                                                        (make-values-type (mapcar #'lvar-type (combination-args dest)))
+                                                        :from-scratch t)
+                                      (erase (node-lvar dest)
+                                             (position lvar (combination-args dest)))))))
+                              (handle-combination dest))))))))
       (erase lvar nth-value))))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
@@ -2666,7 +2659,7 @@ is :ANY, the function name is not checked."
         (constant (make-constant value)))
     (typecase uses
       (ref
-       (change-ref-leaf uses constant))
+       (change-ref-leaf uses constant :recklessly t))
       (node
        (insert-ref-before constant uses t))
       (cons
