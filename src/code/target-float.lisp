@@ -31,6 +31,11 @@
                       (t
                        (multiple-value-bind (sig old-exp sign) (,(symbolicate 'integer-decode- type) x)
                          (let* ((digits (float-digits x))
+                                ;; Normalize the significand if it's denormal
+                                (shift (- digits (integer-length sig)))
+                                (sig (truly-the ,(symbolicate  type '-significand)
+                                                (ash sig shift)))
+                                (old-exp (- old-exp shift))
                                 (new-exp (+ exp old-exp digits
                                             ,(case type
                                                (single-float 'sb-vm:single-float-bias)

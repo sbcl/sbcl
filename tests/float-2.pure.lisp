@@ -654,3 +654,11 @@ fractional bits."
                   ,@forms))))
   (test-rounders))
 
+(with-test (:name :scale-float-denormals)
+  (assert (= (scale-float (scale-float (opaque-identity (expt 2.0d0 -1021))
+                                       (opaque-identity -5))
+                          (opaque-identity 5))
+             (expt 2.0d0 -1021)))
+  (assert (= (scale-float (opaque-identity least-positive-single-float)
+                          (opaque-identity 0))
+             least-positive-single-float)))
