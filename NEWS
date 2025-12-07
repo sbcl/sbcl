@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.5.11:
+  * bug fix: the SB-COVER reporting utilities can now annotate source files
+    containing array literals using #A(<dims> <eltype> . <contents>) syntax.
+    (lp#2134290)
+
 changes in sbcl-2.5.11 relative to sbcl-2.5.10:
   * incompatible change: the compiler's internal representation of "source
     paths" for unquoted forms within backquotes has changed.  Other developer

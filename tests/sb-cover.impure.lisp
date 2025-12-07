@@ -4,7 +4,8 @@
 (defpackage "SB-COVER-TEST"
   (:export
    "*OUTPUT-DIRECTORY*" "*SOURCE-DIRECTORY*"
-   "COMPILE-LOAD" "GET-STATES" "REPORT" "REPORT-EXPECT-FAILURE" "SOURCE-PATHNAME")
+   "COMPILE-LOAD" "GET-STATES" "REPORT" "REPORT-EXPECT-FAILURE" "SOURCE-PATHNAME"
+   "SOURCE-RECORDING-READTABLE")
   (:use "CL"))
 
 (defvar sb-cover-test:*output-directory*)
@@ -38,6 +39,9 @@
     (warning (condition)
       (error "Unexpected warning: ~A" condition))))
 
+(defun sb-cover-test:source-recording-readtable ()
+  (sb-cover::make-source-recording-readtable (copy-readtable nil) (make-hash-table :test 'eq)))
+
 (defglobal *new-code* nil)
 (defun preserve-code (underlying-fun object reason)
   (declare (ignore underlying-fun reason))
@@ -49,10 +53,26 @@
 
 (with-test (:name :sb-cover)
   (test-util:with-test-directory (sb-cover-test:*output-directory*)
-      (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*))
-      (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*))
-      (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))
+    (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*))
+    (load (merge-pathnames "file-info-tests.lisp" sb-cover-test:*source-directory*))
+    (load (merge-pathnames "save-restore-tests.lisp" sb-cover-test:*source-directory*)))
   (assert (> (length *new-code*) 40)))
+
+;;; the return values tested here don't actually need to be as
+;;; specific as COMPLEX, ARRAY (etc.): probably ATOM would do (though
+;;; we might as well test for the slightly stronger consistency that
+;;; we happen to have implemented).  In case of future conflict,
+;;; probably weaken these tests rather than contort the
+;;; implementation.
+(with-test (:name (:sb-cover read :sharp-c))
+  (let ((*readtable* (sb-cover-test:source-recording-readtable)))
+    (assert (typep (read-from-string "#c(0 0)") 'complex))
+    (assert (typep (read-from-string "#C(0d0 1/2)") 'complex))))
+
+(with-test (:name (:sb-cover read :sharp-a))
+  (let ((*readtable* (sb-cover-test:source-recording-readtable)))
+    (assert (typep (read-from-string "#2A((1 2) (3 4))") 'array))
+    (assert (typep (read-from-string "#a(4 base-char . \"abcd\")") 'array))))
 
 (with-test (:name :no-redundant-form-paths)
   (dolist (c *new-code*)

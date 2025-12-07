@@ -693,6 +693,7 @@ The source locations are stored in SOURCE-MAP."
     ;; Portability concerns aside, it doesn't work in the latest code,
     ;; but first changing the function for #. and then # in that order works.
     (suppress-sharp-dot tab)
+    (suppress-sharp-a tab)
     (suppress-sharp-c tab)
     (dotimes (code 128)
       (let ((char (code-char code)))
@@ -820,9 +821,26 @@ The source locations are stored in SOURCE-MAP."
                  (let ((thing (read stream t nil t)))
                    (cond
                      (*read-suppress* nil)
-                     ((and (listp thing) (= (length thing) 2)) #c(0 0))
+                     ((and (listp thing) (= (length thing) 2)) #c(1 1))
                      (t (sb-int:simple-reader-error stream "illegal complex number format: #C~S" thing))))))
           (set-dispatch-macro-character #\# #\c #'sharp-c-replacement readtable))))))
+
+(defun suppress-sharp-a (readtable)
+  (when (get-macro-character #\# readtable)
+    (let ((sharp-a (get-dispatch-macro-character #\# #\a readtable)))
+      (when sharp-a
+        (flet ((sharp-a-replacement (stream subchar numarg)
+                 (declare (ignore subchar))
+                 (let ((thing (read stream t nil t)))
+                   (cond
+                     (*read-suppress* nil)
+                     ;; regular #2A(...) syntax
+                     ((and numarg (typep thing 'sequence)) #())
+                     ;; extended #A(dims element-type &rest contents) syntax
+                     ((not numarg) #())
+                     (t (sb-int:simple-reader-error stream "illegal literal array format: #~DA~S"
+                                                    numarg thing))))))
+          (set-dispatch-macro-character #\# #\a #'sharp-a-replacement readtable))))))
 
 ;;; The detection logic for "IN-PACKAGE" is stolen from swank's
 ;;; source-path-parser.lisp.
