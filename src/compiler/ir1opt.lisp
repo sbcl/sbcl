@@ -1136,7 +1136,8 @@
 ;;;; combination IR1 optimization
 
 (declaim (start-block ir1-optimize-combination maybe-terminate-block
-                      validate-call-type recognize-known-call))
+                      validate-call-type recognize-known-call
+                      derive-combination-type))
 
 (defun check-important-result (node info)
   (when (and (ir1-attributep (fun-info-attributes info) important-result)
