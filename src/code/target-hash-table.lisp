@@ -13,6 +13,8 @@
 (in-package "SB-IMPL")
 
 
+(defvar *show-putweak* nil)
+
 (!begin-collecting-cold-init-forms)
 
 (declaim (ftype (sfunction (hash-table t maybe-truncated-hash)
@@ -2649,37 +2651,51 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
   (declare (ignore default))
   (%puthash key table new-value))
 
-(defun hash-table-next-smashed-kv (hash-table)
+(defun transfer-culled-cells (hash-table)
   ;; Entries culled by GC are linked into a plain old list of cons cells,
   ;; because we can atomically manipulate that. We can't atomically operate
   ;; on the array-qua-list representation, both because we don't support
   ;; numeric arrays in (CAS AREF) and lockfree deletion from interior nodes
   ;; of singly-linked lists is tricky (a concurrent insert can get lost).
-  (when (hash-table-smashed-cells hash-table)
-    (binding* ((data (atomic-pop (hash-table-smashed-cells hash-table)))
-               ((kv-index bucket) (etypecase data
-                                   (fixnum (values (ldb (byte 14 14) data)
-                                                   (ldb (byte 14 0) data)))
-                                   (cons (values (car data) (cdr data)))))
-               (index-vector (hash-table-index-vector hash-table))
-               (next-vector (hash-table-next-vector hash-table))
-               (this (aref index-vector bucket))
-               (successor (aref next-vector this)))
-      (if (= kv-index this)
-          ;; This pair started a chain. Removing it is easy
-          (setf (aref index-vector bucket) successor)
-          ;; Else, find the kv-index in the chain and snap it out.
-          (do ((predecessor this)
-               (this successor))
-              ((= this 0) (signal-corrupt-hash-table hash-table))
-            (let ((successor (aref next-vector this)))
-              (when (= kv-index this)
-                (return (setf (aref next-vector predecessor) successor)))
-              (setq predecessor this this successor))))
-      ;; Set the 'next' at kv-index to the head of the ordinary freelist
-      ;; so that when INSERT-AT pops the freelist, it stays correct.
-      (setf (aref next-vector kv-index) (hash-table-next-free-kv hash-table))
-      kv-index)))
+  (unless (hash-table-smashed-cells hash-table)
+    (return-from transfer-culled-cells))
+  (let ((index-vector (hash-table-index-vector hash-table))
+        (next-vector (hash-table-next-vector hash-table))
+        (list (hash-table-smashed-cells hash-table)))
+    (loop ; take ownership of the entire list in one CAS operation
+     (let ((old (cas (hash-table-smashed-cells hash-table) list nil)))
+       (if (eq old list) (return))
+       (setq list old)))
+    ;; TODO: special case if count = 0 then just reestablish the
+    ;; initial conditions without processing one cell at a time.
+    (loop
+      (when (null list) (return))
+      (binding* ((data (car list))
+                 ((kv-index bucket) (etypecase data
+                                      (fixnum (values (ldb (byte 14 14) data)
+                                                      (ldb (byte 14 0) data)))
+                                      (cons (values (car data) (cdr data)))))
+                 (this (aref index-vector bucket))
+                 (successor (aref next-vector this)))
+        (let ((cdr (cdr list)))
+          ;; Break up the the list in case GC sees an interior cell as an ambiguous root
+          (rplacd list 0)
+          (setq list cdr))
+        (if (= kv-index this)
+            ;; This pair started a chain. Removing it is easy
+            (setf (aref index-vector bucket) successor)
+            ;; Else, find the kv-index in the chain and snap it out.
+            (do ((predecessor this)
+                 (this successor))
+                ((= this 0) (signal-corrupt-hash-table hash-table))
+              (let ((successor (aref next-vector this)))
+                (when (= kv-index this)
+                  (return (setf (aref next-vector predecessor) successor)))
+                (setq predecessor this this successor))))
+        ;; Update the list headed by hash-table-next-free-kv and linked
+        ;; through the 'next' vector.
+        (setf (aref next-vector kv-index) (hash-table-next-free-kv hash-table)
+              (hash-table-next-free-kv hash-table) kv-index)))))
 
 ;;; We don't need the looping and checking for GC activiy in PUTHASH
 ;;; because insertion can not co-occur with any other operation,
@@ -2853,13 +2869,17 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 
   (defun puthash/weak (key hash-table value)
     (declare (type hash-table hash-table) (optimize speed))
+    ;; Delaying the transfer of culled cells could causee the linked list
+    ;; denoting the cells to itself be promoted into a higher generation.
+    ;; Ideally the list would be off-heap and not subject to GC. Attempting to
+    ;; do that would engender two other problems: (1) knowing when to free the list
+    ;; if the table becomes garbage and we had not yet processed - and thus freed -
+    ;; the list. (2) GC can't call malloc()
+    (transfer-culled-cells hash-table)
     (with-weak-hash-table-entry
       (declare (ignore predecessor))
       (cond ((= physical-index 0)
-             ;; There are two kinds of freelists. Prefer a smashed cell
-             ;; so that we might shorten the chain it belonged to.
-             (insert-at (or (hash-table-next-smashed-kv hash-table)
-                            (hash-table-next-free-kv hash-table))
+             (insert-at (hash-table-next-free-kv hash-table)
                         hash-table key hash address-sensitive-p value))
             ((or (empty-ht-slot-p (cas (weak-kvv-ref kv-vector (1+ physical-index))
                                        probed-value value))
@@ -3240,19 +3260,20 @@ table itself."
 (defun hash-table-freelist (tbl)
   (hash-table-chain tbl (hash-table-next-free-kv tbl)))
 
-(defun show-chains (tbl &aux (nv (hash-table-next-vector tbl))
+(defun show-chains (tbl &optional print &aux (nv (hash-table-next-vector tbl))
                         (tot-len 0) (max-len 0) (n-chains 0))
-  (flet ((show-chain (label next &aux (len 0))
+  (flet ((show-chain (label next &optional print &aux (len 0))
            (unless (eql next 0)
              (write-string label)
              (loop (format t " ~d" next)
+                   (when print (format t "=~A" (aref (hash-table-pairs tbl) (ash next 1))))
                    (incf len)
                    (when (zerop (setq next (aref nv next))) (return)))
              (terpri))
            len))
     (loop for x across (hash-table-index-vector tbl)
           for i from 0
-          do (let ((len (show-chain (format nil "Bucket ~d:" i) x)))
+          do (let ((len (show-chain (format nil "Bucket ~d:" i) x print)))
                (when (plusp len)
                  (incf tot-len len)
                  (setf max-len (max len max-len))

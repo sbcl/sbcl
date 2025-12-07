@@ -1761,7 +1761,12 @@ scav_vector_t(lispobj *where, lispobj header)
 }
 
 /* Walk through the chain whose first element is *FIRST and remove
- * dead weak entries.
+ * dead weak entries. Such entries are linked into a list which is distinct
+ * from the list of free entries linked through the table's "next" vector.
+ * Because GC can run in the middle of any hash-table modification -
+ * since we no longer use WITHOUT-GCING around every weak table operation -
+ * this has to avoid touching the table structure itself. But it's fairly easy
+ * to create an ordinary list which is amenable to SB-EXT:ATOMIC-POP.
  * Return the new value for 'should rehash'.
  *
  * This operation might have to touch a hash-table that is currently
