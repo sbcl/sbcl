@@ -399,7 +399,13 @@
                           (eq (combination-kind combination) :known))
                  (let ((type (derive-combination-type combination)))
                    (aver (not (eq type *empty-type*)))
-                   (derive-node-type combination type :from-scratch t)
+                   (derive-node-type combination
+                                     (or type
+                                         (let ((type (lvar-type (combination-fun combination))))
+                                           (if (fun-type-p type)
+                                               (fun-type-returns type)
+                                               *wild-type*)))
+                                     :from-scratch t)
                    (erase (node-lvar combination) nil))))
              (erase (lvar nth-value)
                (when lvar
