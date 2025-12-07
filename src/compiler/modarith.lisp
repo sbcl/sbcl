@@ -554,6 +554,12 @@
              ,right
              (logand most-positive-word (ash x (truly-the unsigned-byte count)))))))
 
+(defun ash-into-word-mod (x count)
+  (logand (ash x count) most-positive-word))
+
+(defun ash-into-word-modfx (x count)
+  (mask-signed-field sb-vm:n-fixnum-bits (ash x count)))
+
 (deftransform ash-into-word-mod ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
   (let ((count (- (lvar-value count))))
     (multiple-value-bind (words bits) (truncate count sb-vm:n-word-bits)
