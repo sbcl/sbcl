@@ -138,6 +138,10 @@
   ;; is (UNSIGNED-BYTE 32).
   '(unsigned-byte #.(the (integer 0 32) (1+ +max-hash-table-bits+))))
 
+(declaim (inline adaptive-hash-fun-state-p))
+(defun adaptive-hash-fun-state-p (state)
+  (<= 0 state))
+
 ;;; Hash KEY again after a hash function change. This is like
 ;;; HASH-KEY, but it's not inline, and it does not return
 ;;; ADDRESS-BASED-P because we assume that hash function changes
@@ -149,7 +153,7 @@
            (optimize (safety 0)))
   (let ((hash-fun (hash-table-hash-fun hash-table)))
     (the maybe-truncated-hash
-         (values (if (<= 0 hash-fun-state)
+         (values (if (adaptive-hash-fun-state-p hash-fun-state)
                      (funcall hash-fun key hash-fun-state)
                      (funcall hash-fun key))))))
 
@@ -2036,6 +2040,7 @@ if there is no such entry. Entries can be added using SETF."
 
   (defun ht-hash-setup (hash-fun-name stateful-hash-p)
     (cond ((null hash-fun-name)
+           (aver (not stateful-hash-p))
            '((hash (clip-hash (the fixnum
                                (funcall (hash-table-hash-fun hash-table) key))))
              (address-based-p nil)))
@@ -2448,16 +2453,11 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defmacro with-weak-hash-table-entry (&body body)
   `(with-pinned-objects (key)
      (binding* (((hash0 address-sensitive-p)
-                 ;; I'm pretty sure this is not how this code is supposed to look,
-                 ;; but it worked for me.
-                 (if (eq (hash-table-hash-fun hash-table) #'adaptive-equal-hash)
-                     (funcall (hash-table-hash-fun hash-table) key
-                              #+64-bit (hash-table-hash-fun-state hash-table)
-                              ;; adaptive-equal-hash says (truly-the fixnum sxstate) though the
-                              ;; slot's initial value is something like #x3999BA85 which accords
-                              ;; with its declared type of sb-vm:signed-word, but is non-fixnum.
-                              #-64-bit 0)
-                     (funcall (hash-table-hash-fun hash-table) key)))
+                 (let ((hash-fun (hash-table-hash-fun hash-table))
+                       (hash-fun-state (hash-table-hash-fun-state hash-table)))
+                   (if (adaptive-hash-fun-state-p hash-fun-state)
+                       (funcall hash-fun key hash-fun-state)
+                       (funcall hash-fun key))))
                 (address-sensitive-p
                  (and address-sensitive-p
                       (not (logtest (hash-table-flags hash-table) hash-table-userfun-flag))))

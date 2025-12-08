@@ -81,14 +81,14 @@
   (puthash-impl #'error :type (sfunction * t))
   (remhash-impl #'error :type (sfunction * t))
   ;; If non-negative, this gets passed to HASH-TABLE-HASH-FUN as its
-  ;; second argument (see HASH-KEY and HT-HASH-SETUP). For a given
+  ;; second argument (see REHASH-KEY and HT-HASH-SETUP). For a given
   ;; HASH-TABLE-TEST, the same HASH-FUN-STATE cannot be an argument
   ;; for the different HASH-FUNs. Thus, it completely identifies the
   ;; hash function. It may be changed during the lifetime of the hash
   ;; table, which allows us to do adaptive hashing.
   (%hash-fun-state 0
-   ;; HASH-FUN-STATE easily fits into a fixnum, but having it unboxed
-   ;; as a signed word allows EQ-HASH/SMALL in EQ-HASH/COMMON to be
+   ;; HASH-FUN-STATE fits into a fixnum, but having it unboxed as a
+   ;; signed word allows EQ-HASH/SMALL in EQ-HASH/COMMON to be
    ;; compiled a bit more tightly.
    :type sb-vm:signed-word)
   ;; The Key-Value pair vector.
