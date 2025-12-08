@@ -2452,7 +2452,11 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
                  ;; but it worked for me.
                  (if (eq (hash-table-hash-fun hash-table) #'adaptive-equal-hash)
                      (funcall (hash-table-hash-fun hash-table) key
-                              (hash-table-hash-fun-state hash-table))
+                              #+64-bit (hash-table-hash-fun-state hash-table)
+                              ;; adaptive-equal-hash says (truly-the fixnum sxstate) though the
+                              ;; slot's initial value is something like #x3999BA85 which accords
+                              ;; with its declared type of sb-vm:signed-word, but is non-fixnum.
+                              #-64-bit 0)
                      (funcall (hash-table-hash-fun hash-table) key)))
                 (address-sensitive-p
                  (and address-sensitive-p
