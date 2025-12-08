@@ -520,7 +520,7 @@
       (logand most-positive-word (ash (truly-the fixnum x) count)))
      (sb-vm:signed-word
       (logand most-positive-word (ash (truly-the sb-vm:signed-word x) count)))
-     (bignum
+     (t
       (ash-right-two-words (sb-bignum:%bignum-ref (truly-the bignum x) 1)
                            (sb-bignum:%bignum-ref (truly-the bignum x) 0)
                            (- count)))))
@@ -566,7 +566,7 @@
       `(typecase x
          (sb-vm:signed-word
           (logand most-positive-word (ash (truly-the sb-vm:signed-word x) count)))
-         (bignum
+         (t
           (let ((length (%bignum-length (truly-the bignum x))))
             (flet ((extend-ref (index)
                      (if (< index length)
@@ -587,7 +587,7 @@
      (sb-vm:signed-word
       (mask-signed-field sb-vm:n-fixnum-bits
                          (ash (truly-the sb-vm:signed-word x) count)))
-     (bignum
+     (t
       (mask-signed-field sb-vm:n-fixnum-bits
                          (ash-right-two-words (sb-bignum:%bignum-ref (truly-the bignum x) 1)
                                               (sb-bignum:%bignum-ref (truly-the bignum x) 0)
@@ -602,7 +602,7 @@
                                   (ash (truly-the fixnum x) ,(if minusp
                                                                  `(- count)
                                                                  `count))))
-              (bignum
+              (t
                (multiple-value-bind (words bits) (truncate ,(if minusp
                                                                 `count
                                                                 `(- count))
@@ -631,7 +631,7 @@
          (sb-vm:signed-word
           (mask-signed-field sb-vm:n-fixnum-bits
                              (ash (truly-the sb-vm:signed-word x) count)))
-         (bignum
+         (t
           (let ((length (%bignum-length (truly-the bignum x))))
             (flet ((extend-ref (index)
                      (if (< index length)
