@@ -2448,7 +2448,12 @@ nnnn 1_    any       linear scan (don't try to read when rehash already in progr
 (defmacro with-weak-hash-table-entry (&body body)
   `(with-pinned-objects (key)
      (binding* (((hash0 address-sensitive-p)
-                 (funcall (hash-table-hash-fun hash-table) key))
+                 ;; I'm pretty sure this is not how this code is supposed to look,
+                 ;; but it worked for me.
+                 (if (eq (hash-table-hash-fun hash-table) #'adaptive-equal-hash)
+                     (funcall (hash-table-hash-fun hash-table) key
+                              (hash-table-hash-fun-state hash-table))
+                     (funcall (hash-table-hash-fun hash-table) key)))
                 (address-sensitive-p
                  (and address-sensitive-p
                       (not (logtest (hash-table-flags hash-table) hash-table-userfun-flag))))
