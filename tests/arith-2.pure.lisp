@@ -1262,4 +1262,14 @@
           0)
     (test `(lambda (x y)
              (- (truncate (- x) y)))
+          0)
+    (test `(lambda (x y)
+             (- (if x
+                    (- x)
+                    (- y))))
+          0)
+    (test `(lambda (x y)
+             (- (if x
+                    4
+                    (- y))))
           0)))

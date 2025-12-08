@@ -2000,7 +2000,7 @@
   '(sb-sequence:copy-seq seq))
 
 (deftransforms (copy-seq) ((seq) * * :node node)
-  (or (combination-case (seq)
+  (or (combination-case seq
         (remove *
          ;; Vectors are always copied anyway.
          (unless (csubtypep (lvar-type seq) (specifier-type 'vector))

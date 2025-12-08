@@ -2151,7 +2151,7 @@
   (one-arg-derive-type num #'abs-derive-type-aux))
 
 (deftransform abs ((x) (number) * :node node)
-  (or (combination-case (x)
+  (or (combination-case x
         ((%negate) (*)
          (splice-fun-args x name 1)
          nil))
@@ -5206,49 +5206,77 @@
   "convert (* x 0) to 0"
   0)
 
-(defun negate-lvar (x node &optional type)
+(defun negate-lvar (x outer-node &optional test)
   (flet ((float-safe-p ()
-           (or (policy node (zerop float-accuracy))
+           (or (policy outer-node (zerop float-accuracy))
                (not (types-equal-or-intersect
                      (lvar-type x)
                      (specifier-type '(or float (complex float))))))))
-    (cond ((constant-lvar-p x)
-           (let ((negated (- (lvar-value x))))
-             (replace-lvar-with-constant x negated)
-             (erase-lvar-type x nil node))
-           t)
-          (t
-           (combination-case (x type)
-             ;; (- (- x)) => x
-             (%negate (*)
-              (erase-node-type combination *wild-type* nil node)
-              (splice-fun-args x '%negate #'first nil type))
-             ;; (- (- x y)) => (- y x)
-             (- (* *)
-              (when (float-safe-p)
-                (erase-node-type combination *wild-type* nil node)
-                (transform-call combination
-                                `(lambda (x y)
-                                   (- y x))
-                                'negate-lvar)
-                t))
-             ;; (- (+ x c)) => (- -c x)
-             (+ (* constant)
-              (when (float-safe-p)
-                (erase-node-type combination *wild-type* nil node)
-                (transform-call combination
-                                `(lambda (x y)
-                                   (- (- y) x))
-                                'negate-lvar)
-                t))
-             ((* /) (* *)
-              (or (negate-lvar (first args) node)
-                  (negate-lvar (second args) node)))
-             (truncate (* *)
-              (or (negate-lvar (first args) node (specifier-type 'real))
-                  (negate-lvar (second args) node (specifier-type 'real))))
-             (ash (* (type unsigned-byte))
-              (negate-lvar (first args) node (specifier-type 'integer))))))))
+    (labels ((negate-lvar (x &optional type test)
+               (let ((uses (lvar-uses x)))
+                 (if (listp uses)
+                     (let (left negated)
+                       (loop for use in uses
+                             do (if (and (not (node-next use))
+                                         (immediately-used-p x use)
+                                         (negate-node use type t))
+                                    (push use negated)
+                                    (setf left t)))
+                       (when negated
+                         (cond (left
+                                nil)
+                               (test)
+                               (t
+                                (loop for use in uses
+                                      do (negate-node use type nil))
+                                t))))
+                     (negate-node uses type test))))
+             (negate-node (node type test)
+               (multiple-value-bind (constant value) (constant-node-p node)
+                 (if constant
+                     (let ((negated (- value)))
+                       (unless test
+                         (replace-node-with-constant node negated)
+                         (erase-lvar-type (node-lvar node) nil outer-node))
+                       t)
+                     (combination-case (x type :node node)
+                       ;; (- (- x)) => x
+                       (%negate (*)
+                        (unless test
+                          (erase-node-type combination *wild-type* nil outer-node)
+                          (transform-call combination
+                                          `(lambda (x) x)
+                                          'negate-lvar))
+                        t)
+                       ;; (- (- x y)) => (- y x)
+                       (- (* *)
+                        (when (float-safe-p)
+                          (unless test
+                            (erase-node-type combination *wild-type* nil outer-node)
+                            (transform-call combination
+                                            `(lambda (x y)
+                                               (- y x))
+                                            'negate-lvar))
+                          t))
+                       ;; (- (+ x c)) => (- -c x)
+                       (+ (* constant)
+                        (when (float-safe-p)
+                          (unless test
+                            (erase-node-type combination *wild-type* nil outer-node)
+                            (transform-call combination
+                                            `(lambda (x y)
+                                               (- (- y) x))
+                                            'negate-lvar))
+                          t))
+                       ((* /) (* *)
+                        (or (negate-lvar (first args) nil test)
+                            (negate-lvar (second args) nil test)))
+                       (truncate (* *)
+                        (or (negate-lvar (first args) (specifier-type 'real) test)
+                            (negate-lvar (second args) (specifier-type 'real) test)))
+                       (ash (* (type unsigned-byte))
+                        (negate-lvar (first args) (specifier-type 'integer) test)))))))
+      (negate-lvar x nil test))))
 
 (deftransform %negate ((x) * * :node node)
   "Combine - with +, -, *"

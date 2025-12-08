@@ -345,35 +345,37 @@
 
 ;;; Will bind NAME, COMBINATION, ARGS
 (defmacro combination-case (lvar &body cases)
-  (multiple-value-bind (lvar cast)
+  (multiple-value-bind (node cast)
       (if (consp lvar)
-          (values (first lvar) (second lvar))
-          (values lvar nil))
-   `(multiple-value-bind (name combination) (combination/cast-name (lvar-uses ,lvar) ,cast)
-      (when combination
-        (let ((args (combination-args combination)))
-          (declare (ignorable args))
-          (case name
-            ,@(labels ((gen (&optional sub)
-                         (destructuring-bind (name arg-spec . body) (pop cases)
-                           (list name
-                                 `(cond (,(or (eq arg-spec '*)
-                                              `(combination-matches-args args
-                                                                         (load-time-value
-                                                                          (list ,@(loop for spec in arg-spec
-                                                                                        collect (if (typep spec '(cons (eql type)))
-                                                                                                    `(specifier-type ',(second spec))
-                                                                                                    `',spec))))))
-                                         ,@body)
-                                        ,@(unless sub
-                                            (loop while (and cases
-                                                             (subsetp (ensure-list (caar cases))
-                                                                      (ensure-list name)))
-                                                  collect
-                                                  `((case name
-                                                      ,(gen t))))))))))
-                (loop while cases
-                      collect (gen)))))))))
+          (destructuring-bind (lvar cast &key node) lvar
+            (values (or node
+                        `(lvar-uses ,lvar)) cast))
+          (values `(lvar-uses ,lvar) nil))
+    `(multiple-value-bind (name combination) (combination/cast-name ,node ,cast)
+       (when combination
+         (let ((args (combination-args combination)))
+           (declare (ignorable args))
+           (case name
+             ,@(labels ((gen (&optional sub)
+                          (destructuring-bind (name arg-spec . body) (pop cases)
+                            (list name
+                                  `(cond (,(or (eq arg-spec '*)
+                                               `(combination-matches-args args
+                                                                          (load-time-value
+                                                                           (list ,@(loop for spec in arg-spec
+                                                                                         collect (if (typep spec '(cons (eql type)))
+                                                                                                     `(specifier-type ',(second spec))
+                                                                                                     `',spec))))))
+                                          ,@body)
+                                         ,@(unless sub
+                                             (loop while (and cases
+                                                              (subsetp (ensure-list (caar cases))
+                                                                       (ensure-list name)))
+                                                   collect
+                                                   `((case name
+                                                       ,(gen t))))))))))
+                 (loop while cases
+                       collect (gen)))))))))
 
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
@@ -2660,18 +2662,13 @@ is :ANY, the function name is not checked."
       (flush-combination combination)
       t)))
 
-(defun replace-lvar-with-constant (lvar value)
-  (let ((uses (lvar-uses lvar))
-        (constant (make-constant value)))
-    (typecase uses
+(defun replace-node-with-constant (node value)
+  (let ((constant (make-constant value)))
+    (typecase node
       (ref
-       (change-ref-leaf uses constant :recklessly t))
-      (node
-       (insert-ref-before constant uses t))
-      (cons
-       (let ((dest (lvar-dest lvar)))
-         (mapc #'%delete-lvar-use uses)
-         (insert-ref-before constant dest lvar))))))
+       (change-ref-leaf node constant :recklessly t))
+      (t
+       (insert-ref-before constant node t)))))
 
 ;;;; leaf hackery
 

@@ -56,6 +56,17 @@
                          (process-lvar (lambda-var-ref-lvar principal-use))))))))
       (process-lvar lvar))))
 
+(defun constant-node-p (node)
+  (let* ((type (node-derived-type node))
+         leaf)
+    (if (and (ref-p node)
+             (constant-p (setf leaf (ref-leaf node)))
+             ;; Complex arrays get turned into simple arrays when compiling to a fasl.
+             (not (typep (constant-value leaf) '(and array (not simple-array)))))
+        (values t (constant-value leaf))
+        ;; check for EQL types and singleton numeric types
+        (type-singleton-p type))))
+
 (defun constant-lvar-ignore-types-p (lvar &optional (singleton-types t))
   (declare (type lvar lvar))
   (or (let ((constant (lvar-constant lvar t)))
