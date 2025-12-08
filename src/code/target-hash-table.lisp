@@ -323,6 +323,11 @@
                    (list 'eq-hash/safe* key)))
         (let (,@(when count-collisions-p `((,count-collisions-p nil))))
           ,@body)))
+     ((eql ,state +hft-non-adaptive+)
+      (macrolet ((eq-hash* (key)
+                   (list 'eq-hash/non-adaptive* key)))
+        (let (,@(when count-collisions-p `((,count-collisions-p nil))))
+          ,@body)))
      (t
       (aver nil))))
 
@@ -509,9 +514,14 @@
 ;;;; hash (SXSTATE-LIMIT) and what the likely maximum number of keys
 ;;;; is in any bucket (SXSTATE-MAX-CHAIN-LENGTH).
 
+;;; For testing
+(export '(+sxstate-max-chain-length-bits+ +sxstate-limit-bits+
+          +highest-sxstate-limit+ make-sxstate sxstate-limit
+          sxstate-max-chain-length))
+
 (defconstant +sxstate-max-chain-length-bits+ 4)
 (defconstant +sxstate-limit-bits+
-  #-64-bit (- sb-vm:n-fixnum-bits +sxstate-max-chain-length-bits+)
+  #-64-bit (- (1- sb-vm:n-fixnum-bits) +sxstate-max-chain-length-bits+)
   ;; Chosen for ease of extracting the limit (e.g. AND REG, -2 on
   ;; x86-64).
   #+64-bit 31)
@@ -604,6 +614,8 @@
                       (logbitp bit ,(ldb (byte 32 0) mask))
                       (logbitp (- bit 32) ,(ash mask -32)))))))
 
+;; For testing
+(export 'truncated-hash-p)
 ;;; ADAPTIVE-EQUAL-HASH indicates in the highest bit just above
 ;;; CLIPPED-HASH whether the hash was computed from a truncated
 ;;; version of the key.
@@ -957,7 +969,7 @@ Examples:
     (multiple-value-bind (kind test test-fun hash-fun hash-fun-state)
         (cond ((or (eq test #'eq) (eq test 'eq))
                (if weakness
-                   (values 0 'eq #'eq #'eq-hash/non-adaptive +hft-eq-mid+)
+                   (values 0 'eq #'eq #'eq-hash/non-adaptive +hft-non-adaptive+)
                    (values 0 'eq #'eq #'eq-hash/common +hft-eq-mid+)))
               ((or (eq test #'eql) (eq test 'eql))
                (values 1 'eql #'eql #'eql-hash +hft-non-adaptive+))

@@ -600,14 +600,14 @@
 
 (with-test (:name :eq-hash-switch-to-mid/weak)
   (let ((h (make-hash-table :test 'eq :weakness :value)))
-    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-eq-mid+))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-non-adaptive+))
     (loop for i below 20
           do (setf (gethash (cons nil nil) h) i))
     ;; Weak hash tables are not adaptive, currently.
-    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-eq-mid+))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-non-adaptive+))
     (loop for i upfrom +flat-limit/eq+ below 8000
           do (setf (gethash i h) i))
-    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-eq-mid+))))
+    (assert (= (sb-impl::hash-table-hash-fun-state h) +hft-non-adaptive+))))
 
 (with-test (:name :eq-hash-growth-from-non-flat-init)
   (let ((h (make-hash-table :size 222 :test 'eq)))
@@ -626,7 +626,7 @@
                                                       (load-factor 1))
   (declare (type fixnum n-repeats))
   (loop
-    for k-bits upfrom 0 below max-bits
+    for k-bits upfrom 2 below max-bits
     collect (let* ((k (expt 2 k-bits))
                    ;; +MIN-HASH-TABLE-SIZE+ implies at least 8 buckets.
                    (n-buckets (sb-int::power-of-two-ceiling
@@ -667,28 +667,17 @@
   ;; al.
   (let ((cutoffs (estimate-uniform-multinomial-maximum-cutoff
                   10 20000 :verbose nil)))
-    (loop for n-bits upfrom 0
+    (loop for n-bits upfrom 2
           for cutoff in cutoffs
           do (assert (<= (abs (- (sb-impl::max-chain-length (ash 1 n-bits))
                                  cutoff))
                          1)))))
 
-(defun sxstate-limit (sxstate)
-  (ldb (byte #+64-bit 31 #-64-bit (- sb-vm:n-fixnum-bits 4) 0) sxstate))
-
 (defun ht-limit (ht)
-  (sxstate-limit (sb-impl::hash-table-hash-fun-state ht)))
-
-(defun sxstate-max-chain-length (sxstate)
-  (ldb (byte 4 #+64-bit 31 #-64-bit (- sb-vm:n-fixnum-bits 4)) sxstate))
+  (sb-impl:sxstate-limit (sb-impl::hash-table-hash-fun-state ht)))
 
 (defun ht-max-chain-length (ht)
-  (sxstate-max-chain-length (sb-impl::hash-table-hash-fun-state ht)))
-
-(defconstant +truncated-hash-bit+ #-64-bit 29 #+64-bit 31)
-
-(defun truncated-hash-p (hash)
-  (logbitp +truncated-hash-bit+ hash))
+  (sb-impl:sxstate-max-chain-length (sb-impl::hash-table-hash-fun-state ht)))
 
 (defun check-sxstate-limit (ht)
   (let* ((kv-vector (sb-impl::hash-table-pairs ht))
@@ -699,12 +688,13 @@
       for i upfrom 1 upto hwm
       do (let ((key (aref kv-vector (* 2 i))))
            (unless (sb-impl::empty-ht-slot-p key)
-             (assert (eq (not (not (truncated-hash-p (aref hash-vector i))))
+             (assert (eq (not (not (sb-impl:truncated-hash-p
+                                    (aref hash-vector i))))
                          (not (not (< limit (length key)))))
                      () "~@<key: ~S, key length: ~S, limit: ~S, ~
                          stored hash: ~S (truncatedp: ~S)~:@>"
                      key (length key) limit (aref hash-vector i)
-                     (truncated-hash-p (aref hash-vector i))))))))
+                     (sb-impl:truncated-hash-p (aref hash-vector i))))))))
 
 (defun check-sxstate-max-chain-length (ht)
   (let ((hash-vector (sb-impl::hash-table-hash-vector ht))
@@ -716,7 +706,7 @@
       ;; truncated hash. This test could fail spuriously for some
       ;; orderings of truncated and non-truncated keys, but in our
       ;; tests we all keys of the same length.
-      (when (truncated-hash-p (aref hash-vector i))
+      (when (sb-impl:truncated-hash-p (aref hash-vector i))
         (let ((chain-length (loop for j = i then (aref next-vector j)
                                   until (zerop j)
                                   count 1)))
@@ -738,18 +728,19 @@
                 (loop for i below n-keys do
                   (let ((key (append constant-prefix (list i))))
                     (setf (gethash key h) t))
-                  (check-sxstate-limit h)
-                  (check-sxstate-max-chain-length h)
                   (let* ((must-have-raised-limit-p (< orig-max-chain-length
                                                       (hash-table-count h)))
                          (n-distinct-hashes
                            (count 0 (sb-impl::hash-table-index-vector h)
                                   :test-not #'eql)))
-                    #+nil (format t "at count ~S: max-chain-length: ~S, ~
+                    #+nil
+                    (format t "at count ~S: max-chain-length: ~S, ~
                              limit: ~S, n-distinct-hashes: ~S~%"
                             (hash-table-count h)
                             (ht-max-chain-length h) (ht-limit h)
                             n-distinct-hashes)
+                    (check-sxstate-limit h)
+                    (check-sxstate-max-chain-length h)
                     (cond (must-have-raised-limit-p
                            (assert (< n-constants (ht-limit h)))
                            (assert (> n-distinct-hashes 1)))
@@ -758,15 +749,15 @@
 
 (with-test (:name (:adaptive-equal-hash :truncate-list))
   (let ((hash-0 (sb-impl::perhaps-truncated-equal-hash () 1)))
-    (assert (not (truncated-hash-p hash-0)))
+    (assert (not (sb-impl:truncated-hash-p hash-0)))
     ;; The final NIL does not count towards the limit.
     (let ((hash-1 (sb-impl::perhaps-truncated-equal-hash '(1) 1)))
-      (assert (not (truncated-hash-p hash-1)))
+      (assert (not (sb-impl:truncated-hash-p hash-1)))
       (assert (/= hash-1 hash-0))
       ;; The final cons is not in the hash.
       (let ((hash-2 (sb-impl::perhaps-truncated-equal-hash '(1 2) 1))
             (hash-3 (sb-impl::perhaps-truncated-equal-hash '(1 3) 1)))
-        (assert (truncated-hash-p hash-2))
+        (assert (sb-impl:truncated-hash-p hash-2))
         (assert (= hash-2 hash-3))))))
 
 (with-test (:name (:adaptive-equal-hash :truncate-string))
@@ -775,15 +766,22 @@
     (let ((hash-0 (hash "1234" 4))
           (hash-1 (hash "12a34" 4))
           (hash-2 (hash "12a34" 5)))
-      (assert (not (truncated-hash-p hash-0)))
-      (assert (truncated-hash-p hash-1))
+      (assert (not (sb-impl:truncated-hash-p hash-0)))
+      (assert (sb-impl:truncated-hash-p hash-1))
       (assert (/= hash-0 hash-1))
-      (assert (not (truncated-hash-p hash-2)))
+      (assert (not (sb-impl:truncated-hash-p hash-2)))
       (assert (/= hash-1 hash-2)))))
 
 (with-test (:name (:adaptive-equal-hash :eql-hash-not-truncated))
-  (assert (not (truncated-hash-p (sb-impl::perhaps-truncated-equal-hash
-                                  (ash 1 +truncated-hash-bit+) 0)))))
+  (assert (not (sb-impl::truncated-hash-p
+                (sb-impl::perhaps-truncated-equal-hash
+                 most-positive-fixnum 0)))))
+
+(with-test (:name :sxstate-fixnum)
+  (let ((max-chain-length (1- (ash 1 sb-impl:+sxstate-max-chain-length-bits+))))
+    (assert (typep (sb-impl:make-sxstate sb-impl:+highest-sxstate-limit+
+                                         max-chain-length)
+                   'fixnum))))
 
 (with-test (:name (:user-defined-hash :range))
   (flet ((mpf (key)
