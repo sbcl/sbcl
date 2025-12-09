@@ -5,6 +5,13 @@
 (compile-load "test-data-1")
 (report-expect-failure)
 
+#+sb-unicode
+(let ((string (sb-cover::read-file (merge-pathnames "test-data-utf8.lisp"
+                                                    *load-pathname*)
+                                   :utf8)))
+  (assert (char/= #\nul (char string (1- (length string)))))
+  (format t "::: UTF8 input looks good~%"))
+
 ;;; Instrument the file, try again -- first with a non-directory pathname
 
 (proclaim '(optimize sb-cover:store-coverage-data))

@@ -657,12 +657,21 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
 (defun read-source (filename external-format)
   (detabify (read-file filename external-format)))
 
+;;; Character handling in this file is largely agnostic of external formats.
+;;; We achieve this feat by slurping each source file into a huge string and
+;;; performing all processing in terms of string positions, not file-position
+;;; on the underlying source file. That's the theory, but I would not be
+;;; surprised if there are some minor formatting glitches in the HTML output
+;;; whenever non-ASCII chars are present.
 (defun read-file (filename external-format)
   "Return the entire contents of FILENAME as a string."
   (with-open-file (s filename :direction :input
                      :external-format external-format)
-    (let ((string (make-string (file-length s))))
-      (read-sequence string s)
+    (let* ((string (make-string (file-length s)))
+           (nchars (read-sequence string s)))
+      ;; FILE-LENGTH was an upper bound on the length in characters.
+      (when (< nchars (length string))
+        (sb-kernel:%shrink-vector string nchars))
       string)))
 
 (defun make-source-recorder (fn source-map)
