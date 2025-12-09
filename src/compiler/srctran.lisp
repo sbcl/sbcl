@@ -5227,55 +5227,72 @@
                                 nil)
                                (test)
                                (t
-                                (loop for use in uses
-                                      do (negate-node use type nil))
-                                t))))
+                                (let (%negate)
+                                  (loop for use in uses
+                                        for kind = (negate-node use type nil)
+                                        when (eq kind '%negate)
+                                        do (setf %negate t))
+                                  (or %negate
+                                      t))))))
                      (negate-node uses type test))))
              (negate-node (node type test)
-               (multiple-value-bind (constant value) (constant-node-p node)
-                 (if constant
-                     (let ((negated (- value)))
-                       (unless test
-                         (replace-node-with-constant node negated)
-                         (erase-lvar-type (node-lvar node) nil outer-node))
-                       t)
-                     (combination-case (x type :node node)
-                       ;; (- (- x)) => x
-                       (%negate (*)
-                        (unless test
-                          (erase-node-type combination *wild-type* nil outer-node)
-                          (transform-call combination
-                                          `(lambda (x) x)
-                                          'negate-lvar))
-                        t)
-                       ;; (- (- x y)) => (- y x)
-                       (- (* *)
-                        (when (float-safe-p)
-                          (unless test
+               (flet ((negate-args (args type)
+                        ;; Prefer to remove %negate instead of turning constants negative
+                        (cond ((eq test t)
+                               (or (negate-lvar (first args) type test)
+                                   (negate-lvar (second args) type test)))
+                              (t
+                               (let ((%negate (negate-lvar (first args) type '%negate)))
+                                 (if (eq %negate '%negate)
+                                     %negate
+                                     (if (eq test '%negate)
+                                         (negate-lvar (second args) type test)
+                                         (or (negate-lvar (second args) type)
+                                             (and %negate
+                                                  (negate-lvar (first args) type))))))))))
+                 (multiple-value-bind (constant value) (constant-node-p node)
+                   (if constant
+                       (let ((negated (- value)))
+                         (unless test
+                           (replace-node-with-constant node negated)
+                           (erase-lvar-type (node-lvar node) nil outer-node))
+                         t)
+                       (combination-case (x type :node node)
+                         ;; (- (- x)) => x
+                         (%negate (*)
+                          (when (or (not test)
+                                    (eq test '%negate))
                             (erase-node-type combination *wild-type* nil outer-node)
                             (transform-call combination
-                                            `(lambda (x y)
-                                               (- y x))
+                                            `(lambda (x) x)
                                             'negate-lvar))
-                          t))
-                       ;; (- (+ x c)) => (- -c x)
-                       (+ (* constant)
-                        (when (float-safe-p)
-                          (unless test
-                            (erase-node-type combination *wild-type* nil outer-node)
-                            (transform-call combination
-                                            `(lambda (x y)
-                                               (- (- y) x))
-                                            'negate-lvar))
-                          t))
-                       ((* /) (* *)
-                        (or (negate-lvar (first args) nil test)
-                            (negate-lvar (second args) nil test)))
-                       (truncate (* *)
-                        (or (negate-lvar (first args) (specifier-type 'real) test)
-                            (negate-lvar (second args) (specifier-type 'real) test)))
-                       (ash (* (type unsigned-byte))
-                        (negate-lvar (first args) (specifier-type 'integer) test)))))))
+                          '%negate)
+                         ;; (- (- x y)) => (- y x)
+                         (- (* *)
+                          (when (float-safe-p)
+                            (unless test
+                              (erase-node-type combination *wild-type* nil outer-node)
+                              (transform-call combination
+                                              `(lambda (x y)
+                                                 (- y x))
+                                              'negate-lvar))
+                            t))
+                         ;; (- (+ x c)) => (- -c x)
+                         (+ (* constant)
+                          (when (float-safe-p)
+                            (unless test
+                              (erase-node-type combination *wild-type* nil outer-node)
+                              (transform-call combination
+                                              `(lambda (x y)
+                                                 (- (- y) x))
+                                              'negate-lvar))
+                            t))
+                         ((* /) (* *)
+                          (negate-args args nil))
+                         (truncate (* *)
+                          (negate-args args (specifier-type 'real)))
+                         (ash (* (type unsigned-byte))
+                          (negate-lvar (first args) (specifier-type 'integer) test))))))))
       (negate-lvar x nil test))))
 
 (deftransform %negate ((x) * * :node node)

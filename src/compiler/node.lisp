@@ -1643,7 +1643,10 @@
   (pass-nargs t :type boolean)
   (or-chain-computed nil :type boolean))
 (defprinter (combination :identity t)
-  (fun :prin1 (lvar-uses fun))
+  (fun :prin1 (let ((uses (lvar-uses fun)))
+                (or (and (ref-p uses)
+                         (ref-fun-name uses t))
+                    uses)))
   (args :prin1 (mapcar (lambda (x)
                          (if x
                              (lvar-uses x)
