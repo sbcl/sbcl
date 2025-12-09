@@ -453,11 +453,17 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                        (declare (ignore k))
                        (dolist (location locations)
                          (destructuring-bind (start end suppress) location
+                           ;; STATES array is 0-origin but locations are 1-origin, so the array
+                           ;; range to fill is (1- START) to (1- END) inclusive
                            (when suppress
                              (fill-with-state source states 15 (1- start) end)))))
                      (cdr map)))
           maps))
 
+;;; Change most elements of STATES between START (inclusive) and END (exclusive)
+;;; to STATE. Some elements will remain unaffected:
+;;; - those which initially contain a nonzero value
+;;; - those corresponding to a display column to to the left of the START column
 (defun fill-with-state (source states state start end)
   (let* ((pos (position #\Newline source :end start :from-end t))
          (start-column (if pos (- start 1 pos) 0)))
@@ -509,9 +515,9 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                    ;; For branches mode each record accounts for two paths
                    (incf (ok-of count)
                          (ecase state
-                           (5 2)
-                           ((6 9) 1)
-                           (10 0)))
+                           (5 2)      ; #b0101 = both ways taken
+                           ((6 9) 1)  ; #b0110 = taken/not-taken, #b1001 = not-taken/taken
+                           (10 0)))   ; #b1010 = neither way taken
                    (incf (all-of count) 2)))
                 (t
                  (let ((count (getf counts :expression)))
@@ -885,6 +891,33 @@ The source locations are stored in SOURCE-MAP."
                                       (return))))
   (assert (file-position stream end-position)))
 
+;;; A SOURCE-MAP is a hash-table which maps each subform of FORM to a list of
+;;; locations where it appears in the stream. Subforms other than cons cells are replaced
+;;; by unique gensyms.
+;;; In most situations, each subform will have exactly one location at which it appears,
+;;; however, indistinguishable objects have multiple locations.
+;;; Consider "(defvar v #(#x0 #x000 zot))". In it, the atoms #x0 and #x000 are identical,
+;;; so the source map will say that the integer 0 appears at locations 13-15 and 17-21.
+;;; Note also two conventions with regard to location representation:
+;;;  - indexing uses an origin of 1.  This is the same as for 'point' in Emacs.
+;;;  - ranges are _inclusive_ of the upper bound
+;;;
+;;; The full set of subforms for this example would resemble:
+;;;    #:G216 -> ((2 7 NIL))                    ; symbol DEFVAR
+;;;    #:G217 -> ((9 9 NIL))                    ; symbol V
+;;;    0 -> ((17 21 NIL) (13 15 NIL))           ; integer zero
+;;;    #(0 0 ZOT) -> ((11 26 NIL))              ; vector as read
+;;;    #:G218 -> ((11 26 NIL))                  ; same vector after gensym substitution
+;;;    (#:G216 #:G217 #:G218) -> ((1 27 NIL))   ; entire form
+;;;
+;;; Had the #x reader macro not been used - like in "(defvar v #(0 0 zot))" - then
+;;; there would be 1 fewer key in the hash table, something like:
+;;;    #:G219 -> ((2 7 NIL))                    ; symbol DEFVAR
+;;;    #:G220 -> ((9 9 NIL))                    ; symbol V
+;;;    #(0 0 ZOT) -> ((11 20 NIL))              ; vector as read
+;;;    #:G221 -> ((11 20 NIL))                  ; after gensym substitution
+;;;    (#:G219 #:G220 #:G221) -> ((1 21 NIL))   ; entire form
+;;;
 (defun read-and-record-source-map (stream)
   "Read the next object from STREAM.
 Return the object together with a hashtable that maps
@@ -934,3 +967,41 @@ of the deepest (i.e. smallest) possible form is returned."
           finally (destructuring-bind ((start end suppress)) (last positions)
                     (declare (ignore suppress))
                     (return (values (1- start) end))))))
+
+;;; Debugging helpers
+#+nil (progn
+(defun show-file-source-maps (pathname)
+  (let* ((source (read-source pathname :default))
+         (maps (read-and-record-source-maps source))
+         (i -1))
+    (dolist (cell maps)
+      (let ((form (car cell)))
+        (format t "TLF ~d:~%" (incf i))
+        (write form)
+        (terpri)
+        (maphash
+         (lambda (subform locs)
+           (let ((repr (substitute #\space #\newline
+                                   (write-to-string subform :pretty t)))
+                 (source
+                  (when (sb-int:singleton-p locs)
+                    (substitute #\space #\newline
+                                (subseq source (1- (caar locs)) (cadar locs))))))
+             (format t "  @ ~A = ~A~@[ = {~A}~]~%" locs repr source)))
+         (cdr cell))))))
+
+(defun show-fun-covg-paths (simple-fun)
+  (let ((branches (make-hash-table :test 'equal)))
+    (sb-int:binding* (((paths code) (%find-coverage-map simple-fun))
+                      (marks (code-coverage-marks code)))
+      (dotimes (i (length paths))
+        (let ((list (aref paths i)))
+          (format t "~3d~A = ~a~%"
+                  i
+                  (if (/= (sb-sys:sap-ref-8 marks i) 0) "*" " ")
+                  (mapcar #'reverse list))
+          (dolist (path list)
+            (when (member (car path) '(:then :else))
+              (push (car path) (gethash (cdr path) branches)))))))
+    (maphash (lambda (path ways) (format t "~a -> ~a~%" path ways))
+             branches))))
