@@ -5218,10 +5218,9 @@
                      (let (left negated %negate)
                        (loop for use in uses
                              do (if (and (not (node-next use))
-                                         (immediately-used-p x use)
                                          (let ((kind (negate-node use type t)))
                                            (when (eq kind '%negate)
-                                             (setf %negate t))
+                                             (setf %negate kind))
                                            kind))
                                     (push use negated)
                                     (setf left t)))
