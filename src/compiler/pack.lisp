@@ -374,9 +374,7 @@
          (unless (zerop ,bitmap)
            (loop named #:noname
                  do
-             (let ((.index. (truly-the
-                             (integer 0 (,sb-vm:n-word-bits))
-                             (%primitive sb-vm::unsigned-word-find-first-bit ,bitmap))))
+             (let ((.index. (count-trailing-zeros ,bitmap)))
                ;; BIAS is the bit index in the original LOCATIONS map
                ;; which is at index 0 in BITMAP
                (let ((,location (truly-the sb-vm:finite-sc-offset (+ .index. ,bias))))

@@ -717,14 +717,10 @@
                        (end-mask (compute-end-mask end)))
                   (declare (index last-word first-word))
                   (flet ((#+little-endian start-bit #+big-endian end-bit (x)
-                          (declare (word x))
-                          #+(or x86-64 x86)
-                          (truly-the (mod #.n-word-bits)
-                                     (%primitive unsigned-word-find-first-bit x))
-                          #-(or x86-64 x86)
-                          (- #+big-endian n-word-bits
-                             (integer-length (logand x (- x)))
-                             #+little-endian 1))
+                           #+big-endian
+                           (- n-word-bits (integer-length (logand x (- x))))
+                           #+little-endian
+                           (integer-length (ldb (byte sb-vm:n-word-bits 0) (1- (logand x (- x))))))
                          (#+little-endian end-bit #+big-endian start-bit (x)
                           (declare (word x))
                           (- #+big-endian n-word-bits

@@ -299,9 +299,9 @@
         (let ((set-bit (logand lowtag-mask (logandc2 lowtag set)))
               (clear-bit (logandc2 lowtag-mask (logior lowtag clear))))
           (cond ((plusp set-bit)
-                 (values (sb-kernel::first-bit-set set-bit) 1))
+                 (values (count-trailing-zeros set-bit) 1))
                 ((plusp clear-bit)
-                 (values (sb-kernel::first-bit-set clear-bit) 0))))))))
+                 (values (count-trailing-zeros clear-bit) 0))))))))
 
 (defun fun-or-other-pointer-tn-ref-p (tn-ref &optional permit-nil)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)

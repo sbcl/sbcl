@@ -798,7 +798,7 @@
                     ;; find the first set bit of the numerator and shift accordingly,
                     ;; as the denominator is a power of two.
                     (let* ((pexp (- exp))
-                           (set (first-bit-set bits)))
+                           (set (count-trailing-zeros bits)))
                       (if (> pexp set)
                           (%make-ratio (ash int (- set))
                                        (let ((shift (- pexp set)))

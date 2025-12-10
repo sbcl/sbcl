@@ -2916,20 +2916,6 @@
   (:generator 5
     (inst mov res 64)
     (inst tzcnt res arg)))
-
-;; The code on which this was based existed in no less than three varieties,
-;; differing in response to 0 input: produce NIL, -1, or signal an error.
-;; To avoid a thorny issue of proper semantics, this VOP is used only by
-;; %BIT-POSITION which happens to declare zero safety, but always pre-checks
-;; for zero. (the ltn-policy of :fast is actually irrelevant)
-(define-vop (unsigned-word-find-first-bit)
-  (:policy :fast)
-  (:args (arg :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:results (res :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:generator 1
-    (inst bsf res arg)))
 
 ;;;; binary conditional VOPs
 

@@ -1510,19 +1510,16 @@ NOTE: This interface is experimental and subject to change."
     (cons nil)
     (t t)))
 
-(declaim (inline first-bit-set))
-(defun first-bit-set (x)
-  #+(and x86-64 (not sb-xc-host))
-  (truly-the (values (mod #.sb-vm:n-word-bits) &optional)
-             (%primitive sb-vm::unsigned-word-find-first-bit (the word x)))
-  #-(and x86-64 (not sb-xc-host))
-  (1- (integer-length (logand x (- x)))))
+#+sb-xc-host (declaim (inline count-trailing-zeros))
+(defun count-trailing-zeros (integer)
+  (let ((integer (ldb (byte sb-vm:n-word-bits 0) integer)))
+    (integer-length (ldb (byte sb-vm:n-word-bits 0) (1- (logand integer (- integer)))))))
 
 (defun integer-float-p (float)
   (and (floatp float)
        (multiple-value-bind (significand exponent) (integer-decode-float float)
          (or (plusp exponent)
-             (<= (- exponent) (first-bit-set significand))))))
+             (<= (- exponent) (count-trailing-zeros significand))))))
 
 
 (defvar *top-level-form-p* nil)
