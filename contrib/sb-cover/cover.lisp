@@ -75,10 +75,11 @@
 (declaim (type (member :whole :car) *source-path-mode*))
 (defvar *source-path-mode* :whole)
 
-(defclass sample-count ()
-  ((mode :accessor mode-of :initarg :mode)
-   (all :accessor all-of :initform 0)
-   (ok :accessor ok-of :initform 0)))
+(defstruct (sample-count (:constructor make-sample-count (mode))
+                         (:conc-name ""))
+  (mode nil :read-only t) ; never read. Should we just delete the slot?
+  (all-of 0)
+  (ok-of 0))
 
 (defun clear-coverage ()
   "Clear all files from the coverage database. The files will be re-entered
@@ -409,8 +410,8 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          ;; Cache the source-maps
          (maps (read-and-record-source-maps source))
          (states (initial-states source maps))
-         (counts (list :branch (make-instance 'sample-count :mode :branch)
-                       :expression (make-instance 'sample-count :mode :expression)))
+         (counts (list :branch (make-sample-count :branch)
+                       :expression (make-sample-count ::expression)))
          (records (get-records file))
          ;; We do this in two stages: the first stage records the
          ;; character ranges, and the second stage does the update, in
