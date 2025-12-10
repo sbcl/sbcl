@@ -1286,4 +1286,12 @@
                  (if a 3 4)
                  -2)))
       ((nil) 16)
-      ((t) 6))))
+      ((t) 6))
+    (test `(lambda (a) (- (* a 0))) 1)
+    (test `(lambda (a) (- (* a 0.0))) 0)
+    (checked-compile-and-assert
+        ()
+        `(lambda (a)
+           (- (* a 0)))
+      ((10.0) -0.0)
+      ((10) 0))))

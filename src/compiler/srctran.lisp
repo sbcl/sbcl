@@ -5252,11 +5252,13 @@
                                                   (negate-lvar (first args) type))))))))))
                  (multiple-value-bind (constant value) (constant-node-p node)
                    (if constant
-                       (let ((negated (- value)))
-                         (unless test
-                           (replace-node-with-constant node negated)
-                           (erase-lvar-type (node-lvar node) nil outer-node))
-                         t)
+                       (unless (and (eql value 0) ;; can't negate a non-float zero
+                                    (not (float-safe-p)))
+                         (let ((negated (- value)))
+                           (unless test
+                             (replace-node-with-constant node negated)
+                             (erase-lvar-type (node-lvar node) nil outer-node))
+                           t))
                        (combination-case (x type :node node)
                          ;; (- (- x)) => x
                          (%negate (*)
