@@ -1512,8 +1512,8 @@ NOTE: This interface is experimental and subject to change."
 
 #+sb-xc-host (declaim (inline count-trailing-zeros))
 (defun count-trailing-zeros (integer)
-  (let ((integer (ldb (byte sb-vm:n-word-bits 0) integer)))
-    (integer-length (ldb (byte sb-vm:n-word-bits 0) (1- (logand integer (- integer)))))))
+  (let ((integer (ldb (byte 64 0) integer)))
+    (integer-length (ldb (byte 64 0) (1- (logand integer (- integer)))))))
 
 (defun integer-float-p (float)
   (and (floatp float)
