@@ -317,6 +317,19 @@ argument. ``Good'' widths are 32 on 32-bit CPUs and 64 on 64-bit CPUs.
 While it is possible to support smaller widths as well,
 currently this is not implemented.
 
+@subsection Signed modular arithmetic
+
+Sign-extending the result in the following way will be translated into
+signed modular arithmetic:
+
+@lisp
+(defun add (a b)
+  (declare (type (signed-byte 64) a b))
+  (let ((u (ldb (byte 64 0) (+ a b))))
+    (logior u (- (mask-field (byte 1 63) u)))))
+@end lisp
+
+
 @node  Recognized idioms
 @comment  node-name,  next,  previous,  up
 @section Recognized idioms
