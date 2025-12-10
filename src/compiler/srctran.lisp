@@ -3030,7 +3030,7 @@
                                                 (aver (splice-fun-args (node-lvar logand1) 'logand a-nth nil))
                                                 (aver (splice-fun-args (node-lvar -mod64) 'sb-vm::--mod64 #'first nil))
                                                 `(count-trailing-zeros x)))))))))))
-                               (sb-vm::%negate-mod64 (*)
+                               ((sb-vm::%negate-mod64 sb-vm::%negate-modfx) (*)
                                 (let ((var1 b)
                                       (var2 (first args)))
                                   (when (same-leaf-ref-p var1 var2)
