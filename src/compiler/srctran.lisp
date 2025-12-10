@@ -4631,7 +4631,7 @@
 
 (unless-vop-existsp (:translate count-trailing-zeros)
   (define-source-transform count-trailing-zeros (integer)
-    `(let ((integer (ldb (byte sb-vm:n-word-bits 0) integer)))
+    `(let ((integer (ldb (byte sb-vm:n-word-bits 0) ,integer)))
        (integer-length (ldb (byte sb-vm:n-word-bits 0) (1- (logand integer (- integer))))))))
 
 ;;; Return an expression to calculate the integer quotient of X and
