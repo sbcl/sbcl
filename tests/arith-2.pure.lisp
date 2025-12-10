@@ -1278,4 +1278,12 @@
           0)
     (test `(lambda (x y)
              (- (truncate (- y) (* x 4))))
-          0)))
+          0)
+    (checked-compile-and-assert
+        ()
+        `(lambda (a)
+           (- (* (if a 1 2)
+                 (if a 3 4)
+                 -2)))
+      ((nil) 16)
+      ((t) 6))))

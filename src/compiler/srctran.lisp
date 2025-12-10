@@ -5215,25 +5215,25 @@
     (labels ((negate-lvar (x &optional type test)
                (let ((uses (lvar-uses x)))
                  (if (listp uses)
-                     (let (left negated)
+                     (let (left negated %negate)
                        (loop for use in uses
                              do (if (and (not (node-next use))
                                          (immediately-used-p x use)
-                                         (negate-node use type t))
+                                         (let ((kind (negate-node use type t)))
+                                           (when (eq kind '%negate)
+                                             (setf %negate t))
+                                           kind))
                                     (push use negated)
                                     (setf left t)))
                        (when negated
                          (cond (left
                                 nil)
-                               (test)
-                               (t
-                                (let (%negate)
-                                  (loop for use in uses
-                                        for kind = (negate-node use type nil)
-                                        when (eq kind '%negate)
-                                        do (setf %negate t))
-                                  (or %negate
-                                      t))))))
+                               ((eq test t))
+                               ((or %negate
+                                    (not test))
+                                (loop for use in uses
+                                      do (negate-node use type nil))
+                                (or %negate t)))))
                      (negate-node uses type test))))
              (negate-node (node type test)
                (flet ((negate-args (args type)
