@@ -347,7 +347,7 @@
 (defmacro combination-case (lvar &body cases)
   (multiple-value-bind (node cast)
       (if (consp lvar)
-          (destructuring-bind (lvar cast &key node) lvar
+          (destructuring-bind (lvar &key cast node) lvar
             (values (or node
                         `(lvar-uses ,lvar)) cast))
           (values `(lvar-uses ,lvar) nil))

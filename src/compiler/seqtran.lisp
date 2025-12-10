@@ -2020,7 +2020,7 @@
              (copy-list nil)
              (list-copy-seq t)))
  (deftransform $fun ((seq) * * :node node)
-   (or (combination-case (seq (specifier-type 'list))
+   (or (combination-case (seq :cast (specifier-type 'list))
          (remove *
           (change-full-call combination 'copy-remove)
           'seq)

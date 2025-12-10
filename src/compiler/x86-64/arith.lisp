@@ -2906,6 +2906,17 @@
     (inst xor res arg) ;; invert if negative
     (inst bsr res res)))
 
+(define-vop ()
+  (:translate count-trailing-zeros)
+  (:policy :fast-safe)
+  (:args (arg :scs (signed-reg unsigned-reg) :to :save))
+  (:arg-types (:or signed-num unsigned-num))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (inst mov res 64)
+    (inst tzcnt res arg)))
+
 ;; The code on which this was based existed in no less than three varieties,
 ;; differing in response to 0 input: produce NIL, -1, or signal an error.
 ;; To avoid a thorny issue of proper semantics, this VOP is used only by

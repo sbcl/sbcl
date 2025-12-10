@@ -2489,3 +2489,7 @@
 (defknown check-ds-list/&key (t index index t t)
     t
     (movable foldable))
+
+(defknown count-trailing-zeros (integer)
+    (integer 0 #.sb-vm:n-word-bits)
+    (movable foldable flushable))

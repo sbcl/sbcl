@@ -966,6 +966,17 @@
     (inst mov res (fixnumize 64))
     (inst sub res res (lsl temp n-fixnum-tag-bits))))
 
+(define-vop ()
+  (:translate count-trailing-zeros)
+  (:policy :fast-safe)
+  (:args (arg :scs (signed-reg unsigned-reg)))
+  (:arg-types (:or signed-num unsigned-num))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (inst rbit res arg)
+    (inst clz res res)))
+
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")

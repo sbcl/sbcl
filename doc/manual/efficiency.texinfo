@@ -7,6 +7,7 @@
 * Slot access::
 * Stack allocation::
 * Modular arithmetic::
+* Recognized idioms::
 * Global and Always-Bound variables::
 * Miscellaneous Efficiency Issues::
 @end menu
@@ -315,6 +316,27 @@ combinations; and @code{ash} with the positive second
 argument. ``Good'' widths are 32 on 32-bit CPUs and 64 on 64-bit CPUs.
 While it is possible to support smaller widths as well,
 currently this is not implemented.
+
+@node  Recognized idioms
+@comment  node-name,  next,  previous,  up
+@section Recognized idioms
+@cindex Arithmetic, modular
+@cindex Arithmetic, hardware
+
+Common Lisp doesn't directly expose all features present in modern
+hardware. Some code patterns are recognized and turned into more
+efficient hardware instructions without requiring the use of internal
+features.
+
+@subsection Count trailing zeros
+
+@lisp
+(defun ctz (n)
+  (declare (type (unsigned-byte 64) n))
+  (integer-length (ldb (byte 64 0) (1- (logand n (- n))))))
+@end lisp
+is turned into hardware instructions on arm64 and x86-64. It returns 64 when @code{n} is 0. 
+@code{n} can also be @code{(signed-byte 64)} or @code{fixnum}.
 
 @node  Global and Always-Bound variables
 @comment  node-name,  next,  previous,  up

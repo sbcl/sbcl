@@ -1538,6 +1538,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%EXPF" "%EXPM1F"
            "ASH-RIGHT" "ASH-RIGHT-TWO-WORDS"
            "ASH-LEFT-ADD" "ASH-LEFT-WORD-ADD"
+           "COUNT-TRAILING-ZEROS"
            "FILL-POINTER-ERROR"
            "%FIND-POSITION"
            "%FIND-POSITION-VECTOR-MACRO" "%FIND-POSITION-IF"

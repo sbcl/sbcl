@@ -317,7 +317,7 @@
                 (args (loop for arg in args
                             for transform =
                             (when subseq
-                              (combination-case (arg (specifier-type 'sequence))
+                              (combination-case (arg :cast (specifier-type 'sequence))
                                 ((list vector) *
                                  (splice-fun-args arg :any nil)
                                  (list* ''sb-impl::%splice
@@ -3003,6 +3003,44 @@
                 (when (< hi 0)
                   (specifier-type `(integer ,(integer-length hi)))))))))))
 
+;; (integer-length (ldb (byte 64 0) (1- (logand n (- n))))) => ctz
+(when-vop-existsp (:translate count-trailing-zeros)
+  (deftransform integer-length ((x) (word) * :important nil :node node)
+    (delay-ir1-transform node :ir1-phases)
+    (or (combination-case x
+          (sb-vm::--mod64 (* 1)
+           (let ((-mod64 combination))
+             (combination-case ((first args))
+               (logand (* *)
+                (let ((logand1 combination))
+                  (destructuring-bind (a b) args
+                    (flet ((try (a b a-nth b-nth)
+                             (combination-case a
+                               (logand (* #.most-positive-word)
+                                (let ((logand2 combination)
+                                      (var1 (first args)))
+                                  (when (word-sized-lvar-p var1)
+                                    (combination-case b
+                                      (sb-vm::%negate-mod64 (*)
+                                       (combination-case ((first args))
+                                         (logand (* #.most-positive-word)
+                                          (let ((var2 (first args)))
+                                            (when (same-leaf-ref-p var1 var2)
+                                              (when (splice-fun-args (node-lvar logand2) 'logand #'first nil)
+                                                (aver (splice-fun-args (node-lvar logand1) 'logand a-nth nil))
+                                                (aver (splice-fun-args (node-lvar -mod64) 'sb-vm::--mod64 #'first nil))
+                                                `(count-trailing-zeros x)))))))))))
+                               (sb-vm::%negate-mod64 (*)
+                                (let ((var1 b)
+                                      (var2 (first args)))
+                                  (when (same-leaf-ref-p var1 var2)
+                                    (when (splice-fun-args (node-lvar logand1) 'logand b-nth nil)
+                                      (aver (splice-fun-args (node-lvar -mod64) 'sb-vm::--mod64 #'first nil))
+                                      `(count-trailing-zeros x))))))))
+                      (or (try a b #'first #'second)
+                          (try b a #'second #'first))))))))))
+        (give-up-ir1-transform))))
+
 (defoptimizer (%bignum-length derive-type) ((x))
   (one-arg-derive-type
    x
@@ -3710,7 +3748,7 @@
 
 ;;; (ash #b1 (+ n 2)) -> (ash #b100 n)
 (deftransform ash ((integer amount) ((constant-arg integer) integer))
-  (or (combination-case (amount (specifier-type 'integer))
+  (or (combination-case (amount :cast (specifier-type 'integer))
         ((+ -) (* constant)
          (let ((shift (funcall name (lvar-value (second args)))))
            (when (and (plusp shift)
@@ -4528,7 +4566,7 @@
   (deftransform $fun ((x y) (number (eql 1)) * :node node :result result :important nil)
     (or (and result
              (lvar-single-value-p result)
-             (combination-case (x (specifier-type 'real))
+             (combination-case (x :cast (specifier-type 'real))
                (/ (* *)
                 (splice-fun-args x '/ nil t (specifier-type 'real) t)
                 (erase-node-type node t 1)
@@ -4592,11 +4630,8 @@
     (logand mod x2)))
 
 (defun count-trailing-zeros (integer)
-  (declare (type (unsigned-byte 64) integer))
-  (loop for i below 64
-        until (logbitp 0 integer)
-        do (setf integer (ash integer -1))
-        finally (return i)))
+  (let ((integer (ldb (byte 64 0) integer)))
+    (integer-length (ldb (byte 64 0) (1- (logand integer (- integer)))))))
 
 ;;; Return an expression to calculate the integer quotient of X and
 ;;; constant Y, using multiplication, shift and add/sub instead of
@@ -4769,7 +4804,7 @@
                                         ,cmp)))))
                   ((when-vop-existsp (:translate rotate-right-word)
                      (let* ((max-x most-positive-word)
-                            (zeros (count-trailing-zeros abs-y))
+                            (zeros (count-trailing-zeros (the word abs-y)))
                             (odd (ash abs-y (- zeros)))
                             (inv (mulinv odd max-x))
                             (add (dpb 0 (byte zeros 0)
@@ -4859,7 +4894,7 @@
                                            ,(truncate max-x y))))))
                ((when-vop-existsp (:translate rotate-right-word)
                   (let* ((max-x most-positive-word)
-                         (zeros (count-trailing-zeros y))
+                         (zeros (count-trailing-zeros (the word y)))
                          (inv (mulinv (ash y (- zeros)) max-x)))
                     (erase-node-type node (values-specifier-type '(values integer boolean &optional)))
                     (transform-call rem
@@ -5258,7 +5293,7 @@
                              (replace-node-with-constant node negated)
                              (erase-lvar-type (node-lvar node) nil outer-node))
                            t))
-                       (combination-case (x type :node node)
+                       (combination-case (x :cast type :node node)
                          ;; (- (- x)) => x
                          (%negate (*)
                           (when (or (not test)
