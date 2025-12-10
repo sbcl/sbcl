@@ -2585,6 +2585,13 @@ is :ANY, the function name is not checked."
                  (flush-dest lvar)
                  inside-args)))))))
 
+(defun extract-lvar (lvar final-node)
+  (let ((dest (lvar-dest lvar)))
+    (or (eq final-node dest)
+        (let* ((next-lvar (node-lvar dest)))
+          (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
+          (extract-lvar lvar final-node)))))
+
 ;;; Eliminate keyword arguments from the call (leaving the
 ;;; parameters in place.
 ;;;
