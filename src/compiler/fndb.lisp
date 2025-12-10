@@ -2491,5 +2491,5 @@
     (movable foldable))
 
 (defknown count-trailing-zeros (integer)
-    (integer 0 64)
+    (integer 0 #.sb-vm:n-word-bits)
     (movable foldable flushable))

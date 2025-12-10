@@ -718,7 +718,8 @@
              (values (ldb (byte 1 6) size) ;; 64-bit patterns need to set the N bit to 1
                      (cond ((sequence-of-ones-p pattern)
                             ;; Simple case of consecutive ones, just needs shifting right
-                            (mod (- size (sb-c::count-trailing-zeros pattern)) size))
+                            (mod (- size (count-trailing-zeros pattern))
+                                 size))
                            ;; Invert the pattern and find consecutive ones there
                            ((not (sequence-of-ones-p (ldb (byte size 0)
                                                           (lognot pattern))))

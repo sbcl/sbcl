@@ -1510,16 +1510,16 @@ NOTE: This interface is experimental and subject to change."
     (cons nil)
     (t t)))
 
-#+sb-xc-host (declaim (inline count-trailing-zeros))
 (defun count-trailing-zeros (integer)
-  (let ((integer (ldb (byte 64 0) integer)))
-    (integer-length (ldb (byte 64 0) (1- (logand integer (- integer)))))))
+  (let ((integer (ldb (byte sb-vm:n-word-bits 0) integer)))
+    (integer-length (ldb (byte sb-vm:n-word-bits 0) (1- (logand integer (- integer)))))))
 
 (defun integer-float-p (float)
   (and (floatp float)
        (multiple-value-bind (significand exponent) (integer-decode-float float)
          (or (plusp exponent)
-             (<= (- exponent) (count-trailing-zeros significand))))))
-
+             (<= (- exponent)
+                 ;; count-trailing-zeros, but wider for 32-bit platforms
+                 (integer-length (ldb (byte 64 0) (1- (logand significand (- significand))))))))))
 
 (defvar *top-level-form-p* nil)
