@@ -3512,8 +3512,7 @@
                     `(logandc2 int
                                (ash (ldb (byte size 0) -1) posn)))
                    ((= (logcount new) size)
-                    `(logior int
-                             (ash new posn))))))
+                    `(logior int (ash ,new posn))))))
       `(let ((mask (ldb (byte size 0) -1)))
          (logior (truly-the word (ash (logand new mask) posn))
                  (logandc2 int (ash mask posn))))))
