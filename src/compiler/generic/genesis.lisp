@@ -1999,6 +1999,9 @@ core and return a descriptor to it."
   (cold-set 'sb-impl::*user-hash-table-tests* *nil-descriptor*)
   (cold-set 'sb-lockless:+tail+ *lflist-tail-atom*)
 
+  (cold-set '*!xc-covg-instrumented*
+            (vector-in-core (mapcar 'vector-in-core *!xc-covg-instrumented*)))
+
   #+immobile-code
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
@@ -2839,20 +2842,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (cond ((and (consp constant) (eq (car constant) :known-fun))
                  (push (list* (cdr constant) des header-index) *deferred-known-fun-refs*))
                 (t
-                 #+sb-cover-for-internals
-                 (when (and (= header-index (1- n-boxed-words))
-                            ;; (typep constant '(eql sb-c::coverage-map))
-                            (descriptor-p constant)
-                            (= (descriptor-lowtag constant) #.sb-vm:list-pointer-lowtag)
-                            (let ((car (cold-car constant)))
-                              (and (descriptor-p car)
-                                   (= (descriptor-lowtag car) #.sb-vm:other-pointer-lowtag)
-                                   (= (descriptor-widetag car) #.sb-vm:symbol-widetag)
-                                   (eql (warm-symbol car) 'sb-c::coverage-map))))
-                   (push (cold-cons :note-code-covered des) *!cold-toplevels*))
                  (write-wordindexed des header-index constant))))
         (incf header-index)
         (incf stack-index)))
+    ;; For simplicity when emitting coverage, save all code even if not instrumented
+    #+sb-cover-for-internals (push des (%fasl-input-codeblobs (fasl-input)))
     des))
 
 (defun resolve-deferred-known-funs ()

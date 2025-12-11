@@ -98,3 +98,12 @@
     ;; Duplicate form paths could sneak in, but repetition is meaningless
     (pushnew (lvar-value path) (car (ir2-block-covered-paths-ref block)) :test 'equal)
     (values)))
+
+#-sb-xc-host
+(defun code-coverage-map (code &aux (n (code-header-words code)))
+  (declare (type sb-kernel:code-component code))
+  (or (let ((map (code-header-ref code (1- n))))
+        (when (typep map '(cons (eql coverage-map))) (cdr map)))
+      (and (= code-boxed-words-align 2) ; try the next-to-last slot
+           (let ((map (code-header-ref code (- n 2))))
+             (when (typep map '(cons (eql coverage-map))) (cdr map))))))

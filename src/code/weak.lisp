@@ -83,3 +83,9 @@ returns the values NIL and NIL."
     (if (sb-vm::unbound-marker-p value)
         (values nil nil)
         (values value t))))
+
+(defun list-to-weak-vector (list)
+  (let ((v (make-weak-vector (length list)))
+        (i -1))
+    (dolist (object list v)
+      (setf (weak-vector-ref v (incf i)) object))))

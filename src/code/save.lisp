@@ -345,7 +345,14 @@ sufficiently motivated to do lengthy fixes."
     (setq sb-kernel::*forward-referenced-layouts* (make-hash-table :test 'equal)))
   ;; Clean up the simulated weak list of covered code components.
   (rplacd *code-coverage-info*
-          (delete-if-not #'weak-pointer-value (cdr *code-coverage-info*)))
+          (delete nil (mapl (lambda (cell)
+                              (let ((v (car cell)) (dead 0) live)
+                                (dotimes (i (weak-vector-len v))
+                                  (let ((code (weak-vector-ref v i)))
+                                    (if code (push code live) (incf dead))))
+                                (when (plusp dead) ; some cell was expunged
+                                  (rplaca cell (if live (list-to-weak-vector live))))))
+                            (cdr *code-coverage-info*))))
   (sb-kernel::rebuild-ctype-hashsets)
   (drop-all-hash-caches)
   (os-deinit)

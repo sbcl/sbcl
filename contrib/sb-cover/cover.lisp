@@ -33,25 +33,13 @@
 ;;;; x86[-64] use a slightly different but not significantly different
 ;;; representation of the marks from other architectures.
 (defun %find-coverage-map (code)
-  (declare (type (or sb-kernel:simple-fun
-                     sb-kernel:code-component
-                     symbol)
-                 code))
   (etypecase code
    (sb-kernel:simple-fun
     (%find-coverage-map (sb-kernel:fun-code-header code)))
    (symbol
     (%find-coverage-map (or (macro-function code) (fdefinition code))))
    (sb-kernel:code-component
-    (let ((n (sb-kernel:code-header-words code)))
-      (let ((map (sb-kernel:code-header-ref code (1- n))))
-        (when (typep map '(cons (eql sb-c::coverage-map)))
-          (return-from %find-coverage-map (values (cdr map) code))))
-      ;; if code-boxed-words can't be an odd number, try one more slot
-      #-(or x86 x86-64)
-      (let ((map (sb-kernel:code-header-ref code (- n 2))))
-        (when (typep map '(cons (eql sb-c::coverage-map)))
-          (return-from %find-coverage-map (values (cdr map) code))))))))
+    (values (sb-c::code-coverage-map code) code))))
 
 #+arm64
 (declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
@@ -90,17 +78,12 @@ image."
   (setf (cdr sb-int:*code-coverage-info*) nil))
 
 (macrolet
-    ((do-instrumented-code ((var &optional result) &body body)
-       ;; Scan list of weak-pointers to all coverage-instrumented code,
-       ;; binding VAR to each object, and removing broken weak-pointers.
-       `(let ((predecessor sb-int:*code-coverage-info*))
-          (loop
-           (let ((cell (cdr predecessor)))
-             (unless cell (return ,result))
-             (let ((,var (sb-ext:weak-pointer-value (car cell))))
-               (if ,var
-                   (progn ,@body (setq predecessor cell))
-                   (rplacd predecessor (cdr cell))))))))
+    ((do-instrumented-code ((var) &body body)
+       ;; Scan coverage-instrumented codeblobs, binding VAR to each
+       `(dolist (#1=#:v (cdr sb-int:*code-coverage-info*))
+          (dotimes (#2=#:i (sb-int:weak-vector-len #1#))
+            (let ((,var (sb-int:weak-vector-ref #1# #2#)))
+              (when ,var ,@body)))))
      ;; Using different values here isn't great, but a 1 bit seemed
      ;; the natural choice for "marked" which is fine for x86 which can
      ;; store any immediate byte. But the architectures which can't

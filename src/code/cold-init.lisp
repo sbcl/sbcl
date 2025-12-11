@@ -225,7 +225,11 @@
   (setq sb-pcl::*!docstrings* nil) ; needed before any documentation is set
   (setq sb-c::*queued-proclaims* nil) ; needed before any proclaims are run
   (setq *code-coverage-info* ; needed to note / record code coverage
-        (list (make-hash-table :test 'equal :synchronized t)))
+        (cons (make-hash-table :test 'equal :synchronized t)
+              (loop for v across (the simple-vector sb-fasl::*!xc-covg-instrumented*)
+                    collect (list-to-weak-vector
+                             (loop for c across (the simple-vector v)
+                                   when (sb-c::code-coverage-map c) collect c)))))
 
   (/show0 "calling cold toplevel forms and fixups")
   (let ((*package* *package*)) ; rebind to self, as if by LOAD
@@ -254,10 +258,6 @@
            (sb-fasl::named-constant-set object index name)))
         ((cons (eql :begin-file))
          (unless (!c-runtime-noinform-p) (print (cdr toplevel-thing))))
-        ((cons (eql :note-code-covered))
-         (aver (typep (cdr toplevel-thing) 'code-component))
-         (push (make-weak-pointer (cdr toplevel-thing))
-               (cdr *code-coverage-info*)))
         ((cons (eql :record-code-coverage))
          (setf (gethash (second toplevel-thing) (car *code-coverage-info*))
                (mapcar #'list (third toplevel-thing))))

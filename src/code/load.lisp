@@ -131,6 +131,9 @@
   (name-buffer (vector (make-string  1 :element-type 'character)
                        (make-string 31 :element-type 'base-char)))
   (print nil :type boolean)
+  ;; Accumulate fop-load-code results so that exactly 1 weak vector can be
+  ;; made pointing to all coverage-instrumented code per fasl.
+  (codeblobs nil)
   ;; We keep track of partial source info for the input in case
   ;; loading gets interrupted.
   (partial-source-info nil :type (or null sb-c::debug-source)))
@@ -645,6 +648,8 @@
                    :features faff-in-this-file)))))
     (values (nreverse results) freeform-bytes)))
 
+(defvar *!xc-covg-instrumented* nil)
+
 (defun load-as-fasl (stream verbose print)
   ;; In general we issue too damn many I/O syscalls. This used to precheck for an empty fasl,
   ;; via fstat() for no reason other than that the EOF condition would precede (thus suppress)
@@ -656,9 +661,17 @@
         (empty t))
     (with-loader-package-names
       (unwind-protect
-           (loop while (let ((success (load-fasl-group fasl-input)))
-                         (when success (setq empty nil))
-                         success))
+           (progn
+             (loop while (let ((success (load-fasl-group fasl-input)))
+                           (when success (setq empty nil))
+                           success))
+             ;; Transfer coverage-instrumented code to the global list.
+             ;; Not a cleanup, because if you NLX out of LOADing a file,
+             ;; you don't get to then ask for report on its coverage.
+             (awhen (%fasl-input-codeblobs fasl-input)
+               #+sb-xc-host (push it *!xc-covg-instrumented*)
+               #-sb-xc-host (atomic-push (list-to-weak-vector it)
+                                         (cdr *code-coverage-info*))))
         ;; Nuke the table and stack to avoid keeping garbage on
         ;; conservatively collected platforms.
         (nuke-fop-vector (%fasl-input-table fasl-input))
@@ -1139,7 +1152,7 @@
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
-          (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
+          (push code (%fasl-input-codeblobs (fasl-input))))
         (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)

@@ -1825,7 +1825,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "ANSI-STREAM-N-BIN"
            "ANSI-STREAM-COUT" "ANSI-STREAM-SOUT"
            "COMPLEX-VECTOR"
-           "LIST-TO-VECTOR" "VECTOR-TO-LIST"
+           "LIST-TO-VECTOR" "LIST-TO-WEAK-VECTOR" "VECTOR-TO-LIST"
            "LOGICAL-HOST" "LOGICAL-HOST-DESIGNATOR"
            "LRA" "LRA-CODE-HEADER" "LRA-P"
            "MAKE-ALIEN-TYPE-TYPE"
