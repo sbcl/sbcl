@@ -124,7 +124,10 @@
              ((nil) 'unsigned-byte)
              ((t) 'signed-byte))
           ,width)
-         (foldable flushable movable always-translatable)
+         (foldable flushable movable always-translatable
+                   ,@(and (ir1-attributep (fun-info-attributes (fun-info-or-lose prototype))
+                                          commutative)
+                          '(commutative)))
        :derive-type (make-modular-fun-type-deriver ',prototype ,width ',signedp))))
 
 (defun %define-good-modular-fun (name kind signedp)
