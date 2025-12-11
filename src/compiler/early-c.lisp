@@ -328,21 +328,6 @@ possible.")
          (= (logand status 3) #b01)
          (ash status -2)))) ; the call count as tracked by IR2
 
-;;; FIXME: the math here is very suspicious-looking. If the flag bits are #b11
-;;; then they can rollover into the counts. And we're ORing counts. Wtf is this doing???
-;;; Well, it doesn't matter really. This is used only in FOP-NOTE-FULL-CALLS which is called
-;;; only if DUMP-EMITTED-FULL-CALLS emits that fop. But that function is never invoked.
-(defun accumulate-full-calls (data)
-  (loop for (name status) in data
-        do
-        (let* ((table (cu-emitted-full-calls *compilation-unit*))
-               (existing (gethash name table 0)))
-          (setf (gethash name table)
-                (logior (+ (logand existing #b11) ; old flag bits
-                           (logand status #b11))  ; new flag bits
-                        (logand existing -4)      ; old count
-                        (logand status -4))))))   ; new count
-
 (declaim (type (simple-array (unsigned-byte 16) 1) *asm-routine-offsets*))
 (define-load-time-global *asm-routine-offsets*
   (make-array 0 :element-type '(unsigned-byte 16)))

@@ -2944,10 +2944,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                    :plist (host-object-from-core plist))))
   (values))
 
-(define-cold-fop (fop-note-full-calls)
-  (sb-c::accumulate-full-calls (host-object-from-core (pop-stack)))
-  (values))
-
 (define-cold-fop (fop-record-code-coverage)
   (let ((paths (pop-stack)))
     (push (cold-list :record-code-coverage

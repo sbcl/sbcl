@@ -1219,10 +1219,6 @@
                                  :plist plist))
   (values))
 
-(define-fop 125 :not-host (fop-note-full-calls (alist) nil)
-  (sb-c::accumulate-full-calls alist)
-  (values))
-
 ;;;; fops for code coverage
 
 (define-fop 120 :not-host (fop-record-code-coverage (paths) nil)
