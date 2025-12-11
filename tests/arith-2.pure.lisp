@@ -1412,4 +1412,16 @@
       ((nil t 5) -3)
       ((t nil 5) -7)
       ((t t 4) -1)
-      ((nil nil 4) -6))))
+      ((nil nil 4) -6))
+    (checked-compile-and-assert
+     ()
+     `(lambda (e f j)
+        (-
+         (if f
+             (truncate
+              (if e 0 100)
+              (if j j -96))
+             1)))
+     ((nil 2 3) -33)
+     ((nil nil 5) -1)
+     ((nil t nil) 1))))

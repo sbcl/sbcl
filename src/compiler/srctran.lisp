@@ -5260,7 +5260,8 @@
                                       (not test))
                                   (loop for use in uses
                                         do (aver (negate-node use type nil)))
-                                  (or %negate t)))))
+                                  (or %negate t))
+                                 (t))))
                        (negate-node uses type test))))
                (negate-node (node type test)
                  (flet ((negate-args (args type)
