@@ -407,7 +407,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (maps (read-and-record-source-maps source))
          (states (initial-states source maps))
          (counts (list :branch (make-sample-count :branch)
-                       :expression (make-sample-count ::expression)))
+                       :expression (make-sample-count :expression)))
          (records (get-records file))
          ;; We do this in two stages: the first stage records the
          ;; character ranges, and the second stage does the update, in
@@ -528,7 +528,8 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                     (when (and start end)
                       (push (list start end state) locations)))
                 (error (e)
-                  (warn "~@<Error finding source location for source path ~A in file ~A: ~2I~_~A~@:>" source-path file e)))
+                  (warn "~@<Error finding source location for source path ~A in file ~A: ~2I~_~A~@:>"
+                        source-path file e)))
               (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))))
 
 (defun fill-states-from-locations (source states locations)
@@ -756,7 +757,7 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
              (listtail thelist))
         (do ((firstchar (sb-impl::flush-whitespace stream rt)
                         (sb-impl::flush-whitespace stream rt)))
-            ((char= firstchar #\) ) (cdr thelist))
+            ((char= firstchar #\)) (cdr thelist))
           (when (char= firstchar #\.)
             (let ((nextchar (read-char stream t)))
               (cond ((sb-impl::token-delimiterp nextchar)
@@ -774,10 +775,9 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
                     ;; Put back NEXTCHAR so that we can read it normally.
                     (t (unread-char nextchar stream)))))
           ;; Next thing is not an isolated dot.
-          (sb-int:binding*
-              ((start (file-position stream))
-               ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
-               (end (file-position stream)))
+          (sb-int:binding* ((start (file-position stream))
+                            ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
+                            (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (unless (eql winp 0)
               (let ((listobj (list obj))
@@ -952,7 +952,7 @@ subexpressions of the object to stream positions."
     (t (nth-or-marker (1- n) (cdr list)))))
 
 (defun source-path-source-position (path form source-map)
-  "Return the start position of PATH from FORM and SOURCE-MAP.  All
+  "Return the start and end positions of PATH from FORM and SOURCE-MAP.  All
 subforms along the path are considered and the start and end position
 of the deepest (i.e. smallest) possible form is returned."
   ;; compute all subforms along path
@@ -996,6 +996,24 @@ As a quick way to view source maps, do:
 
 ;;; Debugging helpers
 #+nil (progn
+(defun show-states (source states &aux (srclen (length source)))
+  (let ((linecount (+ (count #\newline source)
+                      (if (char= (char source (1- srclen)) #\newline) 0 1)))
+        (lines))
+    (let ((line-start-pos 0))
+      (dotimes (i linecount)
+        (let* ((newline-pos (or (position #\newline source :start line-start-pos) srclen))
+               (count (- newline-pos line-start-pos)))
+          (push (cons line-start-pos count) lines)
+          (setq line-start-pos (1+ newline-pos)))))
+    (loop for line-num from 1 to linecount
+          for (start . char-count) in (nreverse lines)
+          do (format t "~4d |" line-num)
+             (loop for i from start repeat char-count do (format t " ~c" (char source i)))
+             (format t "~%      ")
+             (loop for i from start repeat char-count do (format t " ~X" (aref states i)))
+             (format t "~%"))))
+
 (defun show-file-source-maps (pathname)
   (let* ((source (read-source pathname :default))
          (maps (read-and-record-source-maps source))
