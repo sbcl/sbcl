@@ -374,6 +374,19 @@ report, otherwise ignored. The default value is CL:IDENTITY.
 ;; "IN-PACKAGE" forms.
 (defvar *current-package*)
 
+(defun gen-moniker (source-map+idgen)
+  ;; This is like GENSYM but cheaper and with no string-space pollution.
+  ;; A gensym is 6 or 8 words, plus at least 4 words for chars of its name.
+  ;; But we don't need these unique objects to be symbols necessarily- SAPs will
+  ;; work, and get at least 5x space reduction. Setting the high bit makes these
+  ;; SAPs somewhat unmistakable for genuine ones though it doesn't matter too much
+  ;; since they're just cheap substitutes for a source form.
+  ;; I'd like to use only integers, for futher shrinkage, but then a SOURCE-MAP
+  ;; may have to be split into two tables: one whose keys were created as unique
+  ;; identifiers, and one for literal integers as read.
+  (let ((sigil-bit (ash 1 (1- sb-vm:n-word-bits))))
+    (sb-sys:int-sap (logior sigil-bit (incf (cadr source-map+idgen))))))
+
 (defun report-file (file html-stream external-format)
   "Print a code coverage report of FILE into the stream HTML-STREAM."
   (format html-stream "<html><head>")
@@ -410,14 +423,14 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     (fill-states-from-locations source states locations)
     (values counts states source)))
 
-(defun read-and-record-source-maps (source)
+(defun read-and-record-source-maps (source &aux (id-generator (list 0)))
   (with-input-from-string (stream source)
     (loop with *current-package* = (find-package "CL-USER")
           with map = nil
           with form = nil
           for i from 0
           do (setf (values form map)
-                   (handler-case (read-and-record-source-map stream)
+                   (handler-case (read-and-record-source-map stream id-generator)
                      (error (error)
                        (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
                        (values nil (make-hash-table)))))
@@ -679,10 +692,12 @@ before and after of calling FN in the hashtable SOURCE-MAP."
               (gethash (car values) source-map)))
       (values-list values))))
 
-(defun make-source-recording-readtable (readtable source-map)
+(defun make-source-recording-readtable (readtable source-map+idgen)
   "Return a source position recording copy of READTABLE.
-The source locations are stored in SOURCE-MAP."
+The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
+  (declare (type (cons hash-table (cons integer null)) source-map+idgen))
   (let* ((tab (copy-readtable readtable))
+         (source-map (car source-map+idgen))
          (*readtable* tab))
     ;; Preserve sharp-dot in feature conditional expressions (so do
     ;; this before SUPPRESS-SHARP-DOT).
@@ -704,7 +719,7 @@ The source locations are stored in SOURCE-MAP."
     (set-macro-character #\, (make-source-recorder #'read-comma source-map))
     (set-macro-character #\(
                          (make-source-recorder
-                          (make-recording-read-list source-map)
+                          (make-recording-read-list source-map+idgen)
                           source-map))
     tab))
 
@@ -730,7 +745,7 @@ The source locations are stored in SOURCE-MAP."
 
 ;;; Ripped from SB-IMPL, since location recording on a cons-cell level
 ;;; can't be done just by simple read-table tricks.
-(defun make-recording-read-list (source-map)
+(defun make-recording-read-list (source-map+idgen)
   (lambda (stream ignore)
     (block return
       (when (eql *package* (find-package :keyword))
@@ -765,9 +780,10 @@ The source locations are stored in SOURCE-MAP."
                (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (unless (eql winp 0)
-              (let ((listobj (list obj)))
+              (let ((listobj (list obj))
+                    (source-map (car source-map+idgen)))
                 (unless (or (consp obj) (read-eval-marker-p obj))
-                  (setf (car listobj) (gensym))
+                  (setf (car listobj) (gen-moniker source-map+idgen))
                   (push (list* start end (if *read-suppress* '(t)))
                         (gethash (car listobj) source-map)))
                 (rplacd listtail listobj)
@@ -902,13 +918,21 @@ The source locations are stored in SOURCE-MAP."
 ;;;    #:G221 -> ((11 20 NIL))                  ; after gensym substitution
 ;;;    (#:G219 #:G220 #:G221) -> ((1 21 NIL))   ; entire form
 ;;;
-(defun read-and-record-source-map (stream)
+(defun read-and-record-source-map (stream id-generator)
   "Read the next object from STREAM.
 Return the object together with a hashtable that maps
 subexpressions of the object to stream positions."
   (let* ((source-map (make-hash-table :test #'eq))
+         ;; I suspect that we only need to ensure uniqueness of the subforms
+         ;; which represent original forms within a single hash-table,
+         ;; but by using an ID generator that increments monotonically
+         ;; across all hash-tables is probably a little easier to understand.
+         (source-map+idgen (cons source-map id-generator))
          (start (file-position stream))
-         (form (let ((*readtable* (make-source-recording-readtable *readtable* source-map))
+         ;; Maybe build just one readtable across this whole run?
+         ;; (This conses at least 2KiB just to make the readtable)
+         (form (let ((*readtable* (make-source-recording-readtable
+                                   *readtable* source-map+idgen))
                      (*package* *current-package*))
                  (read stream nil sb-int:*eof-object*)))
          (end (file-position stream)))
@@ -951,11 +975,31 @@ of the deepest (i.e. smallest) possible form is returned."
                     (declare (ignore suppress))
                     (return (values (1- start) end))))))
 
+#|
+As a quick way to view source maps, do:
+(progn (write (read-and-record-source-maps (read-source "myfile.lisp" :default))
+              :pprint-dispatch *ppd*)
+       (values))
+|#
+(sb-ext:define-load-time-global *ppd*
+    (let ((ppd (copy-pprint-dispatch)))
+      (set-pprint-dispatch
+       'sb-sys:system-area-pointer
+       (lambda (stream object)
+         (let ((int (sb-sys:sap-int object))
+               (sigil-bit (ash 1 (1- sb-vm:n-word-bits))))
+           (if (logtest int sigil-bit)
+               (format stream "s~d" (logxor int sigil-bit))
+               (write object :stream stream :pretty nil))))
+       1 ppd)
+      ppd))
+
 ;;; Debugging helpers
 #+nil (progn
 (defun show-file-source-maps (pathname)
   (let* ((source (read-source pathname :default))
          (maps (read-and-record-source-maps source))
+         (*print-pprint-dispatch* *ppd*)
          (i -1))
     (dolist (cell maps)
       (let ((form (car cell)))

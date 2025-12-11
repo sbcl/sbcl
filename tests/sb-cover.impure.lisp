@@ -40,7 +40,8 @@
       (error "Unexpected warning: ~A" condition))))
 
 (defun sb-cover-test:source-recording-readtable ()
-  (sb-cover::make-source-recording-readtable (copy-readtable nil) (make-hash-table :test 'eq)))
+  (sb-cover::make-source-recording-readtable (copy-readtable nil)
+                                             (list (make-hash-table :test 'eq) 0)))
 
 (defglobal *new-code* nil)
 (defun preserve-code (underlying-fun object reason)
