@@ -377,6 +377,86 @@
                  (loop while cases
                        collect (gen)))))))))
 
+
+(defun generate-combination-tree (lvar)
+  (let ((uses (lvar-uses lvar)))
+    (multiple-value-bind (name combination) (combination/cast-name uses)
+      (cond (combination
+             (list* name
+                    (mapcar #'generate-combination-tree (combination-args combination))))
+            ((constant-lvar-p lvar)
+             (lvar-value lvar))
+            ((ref-p uses)
+             (leaf-source-name (ref-leaf uses)))
+            (t
+             lvar)))))
+
+(defmacro combination-match (lvar spec &body body)
+  (let (bound-vars)
+    (labels ((ensure-or (x)
+               (if (typep x '(cons (eql :or)))
+                   (cdr x)
+                   (list x)))
+             (expand (lvars specs body)
+               (if lvars
+                   (let ((lvar (car lvars))
+                         (spec (car specs)))
+                     (cond ((symbolp spec)
+                            (cond ((member spec bound-vars)
+                                   `(when (same-leaf-ref-p ,spec ,lvar)
+                                      ,(expand (cdr lvars) (cdr specs)
+                                               body)))
+                                  (t
+                                   (push spec bound-vars)
+                                   `(let ((,spec ,lvar))
+                                      ,(expand (cdr lvars) (cdr specs)
+                                               body)))))
+                           ((atom spec)
+                            `(when (and (constant-lvar-p ,lvar)
+                                        (eql (lvar-value ,lvar) ',spec))
+                               ,(expand (cdr lvars) (cdr specs)
+                                        body)))
+                           (t
+                            (let ((spec (ensure-or spec)))
+                              `(multiple-value-bind (name combination) (combination/cast-name (lvar-uses ,lvar))
+                                 (when combination
+                                   (let ((args (combination-args combination)))
+                                     (case name
+                                       ,@(let ((old-bound-vars bound-vars))
+                                           (labels ((gen (&optional sub)
+                                                      (destructuring-bind (name . args) (pop spec)
+                                                        (let* ((vars (make-gensym-list (length args) "ARG"))
+                                                               (names (ensure-or name))
+                                                               (commutative (loop for name in names
+                                                                                  always (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
+                                                                                                         commutative))))
+                                                          (setf bound-vars old-bound-vars)
+                                                          `(,names
+                                                            (or (when (= (length args) ,(length args))
+                                                                  (destructuring-bind ,vars args
+                                                                    ,(expand (cdr lvars) (cdr specs)
+                                                                             (let ((old-bound-vars bound-vars))
+                                                                               (lambda ()
+                                                                                 (cond (commutative
+                                                                                        (assert (= (length vars) 2))
+                                                                                        `(or ,(expand vars args body)
+                                                                                             ,(progn
+                                                                                                (setf bound-vars old-bound-vars)
+                                                                                                (expand (list (second vars) (first vars)) args body))))
+                                                                                       (t
+                                                                                        (expand vars args body))))))))
+                                                                ,@(unless sub
+                                                                    (loop while (and spec
+                                                                                     (subsetp (ensure-or (caar spec))
+                                                                                              names))
+                                                                          collect
+                                                                          `(case name
+                                                                             ,(gen t))))))))))
+                                             (loop while spec
+                                                   collect (gen))))))))))))
+                   (funcall body))))
+      (expand (list lvar) (list spec) (lambda () `(progn ,@body))))))
+
 (defun erase-node-type (node type &optional nth-value erase-calls)
   (setf (node-derived-type node)
         (if (eq type t)

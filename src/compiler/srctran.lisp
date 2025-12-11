@@ -3008,29 +3008,17 @@
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
     (or
-     (combination-case x
-       (sb-vm::--mod64 (* 1)
-        (combination-case ((first args))
-          (logand (* *)
-           (destructuring-bind (a b) args
-             (flet ((try (a b)
-                      (combination-case a
-                        (logand (* #.most-positive-word)
-                         (let ((var1 (first args)))
-                           (when (word-sized-lvar-p var1)
-                             (combination-case b
-                               (sb-vm::%negate-mod64 (*)
-                                (combination-case ((first args))
-                                  (logand (* #.most-positive-word)
-                                   (when (same-leaf-ref-p var1 (first args))
-                                     (extract-lvar var1 node)
-                                     `(count-trailing-zeros x)))))))))
-                        ((sb-vm::%negate-mod64 sb-vm::%negate-modfx) (*)
-                         (when (same-leaf-ref-p b (first args))
-                           (extract-lvar b node)
-                           `(count-trailing-zeros x))))))
-               (or (try a b)
-                   (try b a))))))))
+     (combination-match x
+         (sb-vm::--mod64 (:or (logand n ((:or sb-vm::%negate-mod64 sb-vm::%negate-modfx) n))
+                              (logand (logand n #.most-positive-word)
+                                      (sb-vm::%negate-mod64 (logand n #.most-positive-word)))
+                              (logand (logand n #.(ash most-positive-word -1))
+                                      (logand (sb-vm::%negate-mod64 (logand n #.(ash most-positive-word -1)))
+                                              #.(ash most-positive-word -1))))
+                         1)
+       (when (word-sized-lvar-p n)
+         (extract-lvar n node)
+         `(count-trailing-zeros x)))
      (give-up-ir1-transform))))
 
 (defoptimizer (%bignum-length derive-type) ((x))
