@@ -3003,19 +3003,18 @@
                 (when (< hi 0)
                   (specifier-type `(integer ,(integer-length hi)))))))))))
 
-;; (integer-length (ldb (byte 64 0) (1- (logand n (- n))))) => ctz
+;; (integer-length (ldb (byte 64 0) (lognor n (- n)))) => ctz
 (when-vop-existsp (:translate count-trailing-zeros)
   (deftransform integer-length ((x) (word) * :important nil :node node)
     (delay-ir1-transform node :ir1-phases)
     (or
      (combination-match x
-         (sb-vm::--mod64 (:or (logand n ((:or sb-vm::%negate-mod64 sb-vm::%negate-modfx) n))
-                              (logand (logand n #.most-positive-word)
-                                      (sb-vm::%negate-mod64 (logand n #.most-positive-word)))
-                              (logand (logand n #.(ash most-positive-word -1))
-                                      (logand (sb-vm::%negate-mod64 (logand n #.(ash most-positive-word -1)))
-                                              #.(ash most-positive-word -1))))
-                         1)
+         (sb-vm::lognot-mod64 (:or
+                               (logior n (:or (sb-vm::%negate-mod64 n)
+                                              (logand (sb-vm::%negate-modfx n) #.most-positive-word)))
+                               (logior (logand n #.most-positive-word)
+                                       (:or (sb-vm::%negate-mod64 (logand n #.most-positive-word))
+                                            (logand (sb-vm::%negate-modfx n) #.most-positive-word)))))
        (when (word-sized-lvar-p n)
          (extract-lvar n node)
          `(count-trailing-zeros x)))

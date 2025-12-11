@@ -346,7 +346,7 @@ features.
 @lisp
 (defun ctz (n)
   (declare (type (unsigned-byte 64) n))
-  (integer-length (ldb (byte 64 0) (1- (logand n (- n))))))
+  (integer-length (ldb (byte 64 0) (lognor n (- n)))))
 @end lisp
 is turned into hardware instructions on arm64 and x86-64. It returns 64 when @code{n} is 0.
 @code{n} can also be @code{(signed-byte 64)} or @code{fixnum}.
