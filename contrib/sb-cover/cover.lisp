@@ -436,7 +436,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
             (maphash (lambda (k locations)
                        (declare (ignore k))
                        (dolist (location locations)
-                         (destructuring-bind (start end suppress) location
+                         (destructuring-bind (start end &optional suppress) location
                            ;; STATES array is 0-origin but locations are 1-origin, so the array
                            ;; range to fill is (1- START) to (1- END) inclusive
                            (when suppress
@@ -675,7 +675,7 @@ before and after of calling FN in the hashtable SOURCE-MAP."
           (values (multiple-value-list (funcall fn stream char)))
           (end (file-position stream)))
       (unless (null values)
-        (push (list start end *read-suppress*)
+        (push (list* start end (if *read-suppress* '(t)))
               (gethash (car values) source-map)))
       (values-list values))))
 
@@ -762,16 +762,16 @@ The source locations are stored in SOURCE-MAP."
           (sb-int:binding*
               ((start (file-position stream))
                ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
-               (listobj (if (not (zerop winp)) (list obj)))
                (end (file-position stream)))
             ;; allows the possibility that a comment was read
-            (when listobj
-              (unless (or (consp (car listobj)) (read-eval-marker-p (car listobj)))
-                (setf (car listobj) (gensym))
-                (push (list start end *read-suppress*)
-                      (gethash (car listobj) source-map)))
-              (rplacd listtail listobj)
-              (setq listtail listobj))))))))
+            (unless (eql winp 0)
+              (let ((listobj (list obj)))
+                (unless (or (consp obj) (read-eval-marker-p obj))
+                  (setf (car listobj) (gensym))
+                  (push (list* start end (if *read-suppress* '(t)))
+                        (gethash (car listobj) source-map)))
+                (rplacd listtail listobj)
+                (setq listtail listobj)))))))))
 
 (defun preserve-sharp-dot-in-sharp-plus-minus (readtable)
   (when (get-macro-character #\# readtable)
@@ -918,8 +918,7 @@ subexpressions of the object to stream positions."
     (look-for-in-package-form-in-stream stream start end)
     ;; ensure that at least FORM is in the source-map
     (unless (gethash form source-map)
-      (push (list start end nil)
-            (gethash form source-map)))
+      (push (list start end) (gethash form source-map)))
     (values form source-map)))
 
 (defun nth-or-marker (n list)
@@ -948,7 +947,7 @@ of the deepest (i.e. smallest) possible form is returned."
                          (car real-form))
           for positions = (gethash form source-map)
           until positions
-          finally (destructuring-bind ((start end suppress)) (last positions)
+          finally (destructuring-bind ((start end &optional suppress)) (last positions)
                     (declare (ignore suppress))
                     (return (values (1- start) end))))))
 
