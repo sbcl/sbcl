@@ -1389,7 +1389,7 @@
         (*print-level* 50)
         (*print-right-margin* 128)
         (*print-readably* nil))
-    (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
+    (format *trace-output* "~&xform (~a) ~S~@[ -> ~S~]~% => ~S~%"
             kind
             (if combination
                 (cons name
@@ -1398,6 +1398,8 @@
                                         (lvar-value arg)
                                         (type-specifier (lvar-type arg)))))
                 name)
+            (and combination
+                 (type-specifier (node-derived-type combination)))
             new-form)))
 
 (defun show-type-derivation (combination type)

@@ -1397,4 +1397,19 @@
                      (- b)
                      (- c)))))
       ((1 2 3) 8)
-      ((nil 2 3) 12))))
+      ((nil 2 3) 12))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a c d)
+           (declare ((integer 4 9) d))
+           (-
+            (if c
+                (+
+                 (if a 0 1)
+                 (if a 0 1)
+                 1)
+                (+ d 2))))
+      ((nil t 5) -3)
+      ((t nil 5) -7)
+      ((t t 4) -1)
+      ((nil nil 4) -6))))
