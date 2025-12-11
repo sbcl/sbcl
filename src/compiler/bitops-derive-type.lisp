@@ -366,13 +366,6 @@
         (t
          (specifier-type 'integer))))))
 
-(macrolet ((deffrob (logfun)
-             (let ((fun-aux (symbolicate logfun "-DERIVE-TYPE-AUX")))
-             `(defoptimizer (,logfun derive-type) ((x y))
-                (two-arg-derive-type x y #',fun-aux)))))
-  (deffrob logand)
-  (deffrob logior))
-
 (defoptimizer (logxor derive-type) ((x y))
   (let ((type (two-arg-derive-type x y #'logxor-derive-type-aux)))
     (flet ((try (x y)
@@ -400,7 +393,85 @@
                                     (specifier-type '(integer 1)))))
                          (if type
                              (type-intersection type r)
-                             (specifier-type r)))))))))
+                             (specifier-type r))))))
+                 ;; (logxor x (- x)) is negative
+                 (combination-case (x :cast (specifier-type 'integer))
+                   (%negate (*)
+                    (when (same-leaf-ref-p (car args) y)
+                      (let* ((len (integer-type-length (lvar-type y)))
+                             (int (if len
+                                      (make-numeric-type :class 'integer
+                                                         :complexp :real
+                                                         :low (ash -1 len)
+                                                         :high -1)
+                                      (specifier-type '(integer * -1)))))
+                        (if type
+                            (type-intersection type int)
+                            int))))))))
+      (or (try x y)
+          (try y x)
+          type))))
+
+(defoptimizer (logior derive-type) ((x y))
+  (let ((type (two-arg-derive-type x y #'logior-derive-type-aux)))
+    (flet ((try (x y)
+             ;; (logior x (- x)) has the same width as X and is <= 0
+             (combination-case (x :cast (specifier-type 'integer))
+               (%negate (*)
+                (when (same-leaf-ref-p (car args) y)
+                  (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
+                    (declare (ignore pos neg))
+                    (let ((int (if len
+                                   (make-numeric-type :class 'integer
+                                                      :complexp :real
+                                                      :low (let ((positive (if (plusp high)
+                                                                               (1- (integer-length high))
+                                                                               0))
+                                                                 (negative (if (minusp low)
+                                                                               (if (= low (- (ash 1 len)))
+                                                                                   len
+                                                                                   (1- len))
+                                                                               0)))
+                                                             (- (ash 1 (max positive negative))))
+                                                      :high 0)
+                                   (specifier-type '(integer * 0)))))
+                      (if type
+                          (type-intersection type int)
+                          int))))))))
+      (or (try x y)
+          (try y x)
+          type))))
+
+(defoptimizer (logand derive-type) ((x y))
+  (let ((type (two-arg-derive-type x y #'logand-derive-type-aux)))
+    (flet ((try (x y)
+             ;; (logand x (- x)) has the same width as (abs most-negative-X) and is >= 0
+             (combination-case (x :cast (specifier-type 'integer))
+               (%negate (*)
+                (when (same-leaf-ref-p (car args) y)
+                  (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
+                    (declare (ignore pos neg))
+                    (let ((int (if len
+                                   (make-numeric-type :class 'integer
+                                                      :complexp :real
+                                                      :low (if (<= low 0 high)
+                                                               0
+                                                               1)
+                                                      :high (let ((positive (if (plusp high)
+                                                                                (1- (integer-length high))
+                                                                                0))
+                                                                  (negative (if (minusp low)
+                                                                                (if (= low (- (ash 1 len)))
+                                                                                    (1+ len)
+                                                                                    (1- len))
+                                                                                0)))
+                                                              (ash 1 (max positive negative))))
+                                   (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
+                                       (specifier-type '(integer 0))
+                                       (specifier-type '(integer 1))))))
+                      (if type
+                          (type-intersection type int)
+                          int))))))))
       (or (try x y)
           (try y x)
           type))))

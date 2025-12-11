@@ -895,6 +895,99 @@
       (logxor x (1+ x))))
    (or null (integer 1))))
 
+(with-test (:name :logior--type)
+  (assert-type
+   (lambda (n)
+     (logior n (- n)))
+   (integer * 0))
+  (assert-type
+   (lambda (n)
+     (declare ((unsigned-byte 64) n))
+     (logior n (- n)))
+   (integer -9223372036854775808 0))
+  (assert-type
+   (lambda (n)
+     (declare ((signed-byte 64) n))
+     (logior n (- n)))
+   (integer -9223372036854775808 0))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -16 1024) n))
+     (logior n (- n)))
+   (integer -1024 0))
+  (assert-type
+   (lambda (n)
+     (declare ((integer #.(1+ (- (ash 1 63))) 0) n))
+     (logior n (- n)))
+   (integer -4611686018427387904 0))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -100 -10) n))
+     (logior n (- n)))
+   (integer -64 -1))
+  (assert-type
+   (lambda (n)
+     (declare ((integer 1) n))
+     (logior n (- n)))
+   (integer * -1)))
+
+(with-test (:name :logand--type)
+  (assert-type
+   (lambda (n)
+     (logand n (- n)))
+   (integer 0 *))
+  (assert-type
+   (lambda (n)
+     (declare ((unsigned-byte 64) n))
+     (logand n (- n)))
+   (integer 0 9223372036854775808))
+  (assert-type
+   (lambda (n)
+     (declare ((signed-byte 64) n))
+     (logand n (- n)))
+   (integer 0 9223372036854775808))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -16 1024) n))
+     (logand n (- n)))
+   (integer 0 1024))
+  (assert-type
+   (lambda (n)
+     (declare ((integer #.(1+ (- (ash 1 63))) 0) n))
+     (logand n (- n)))
+   (integer 0 4611686018427387904))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -100 -10) n))
+     (logand n (- n)))
+   (integer 1 64))
+  (assert-type
+   (lambda (n)
+     (declare ((integer 1) n))
+     (logand n (- n)))
+   (integer 1 *)))
+
+(with-test (:name :logxor--type)
+  (assert-type
+   (lambda (n)
+     (logxor n (- n)))
+   (integer * -1))
+  (assert-type
+   (lambda (n)
+     (declare ((unsigned-byte 64) n))
+     (logxor n (- n)))
+   (integer -18446744073709551616 -1))
+  (assert-type
+   (lambda (n)
+     (declare ((signed-byte 64) n))
+     (logxor n (- n)))
+   (integer -9223372036854775808 -1))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -16 1024) n))
+     (logxor n (- n)))
+   (integer -2048 -1)))
+
 (with-test (:name :unsigned-byte-x-p)
   (checked-compile-and-assert
    ()
@@ -953,6 +1046,7 @@
    (((expt 2 160)) nil)
    (((- (expt 2 160))) nil)
    (('a) nil)))
+
 
 (with-test (:name :signed-byte-x-p)
   (checked-compile-and-assert
