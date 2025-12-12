@@ -222,6 +222,12 @@
 
 (defun line/col-from-charpos
     (stream &optional (charpos (form-tracking-stream-current-char-pos stream)))
+  (unless charpos
+    ;; Because newlines are tracked by char position (not byte position), there's no
+    ;; way to know how many newlines precede the current position if FILE-POSITION
+    ;; has been used. We'd have to store both the byte and character index of newlines.
+    (simple-stream-perror "LINE/COL can not be determined because ~S was repositioned"
+                          stream))
   (track-newlines stream)
   (let ((newlines (form-tracking-stream-newlines stream)))
     (if charpos
@@ -2864,19 +2870,22 @@
   (incf (form-tracking-stream-input-char-pos stream) +ansi-stream-in-buffer-length+))
 
 (defun form-tracking-stream-current-char-pos (stream)
-  (+ (form-tracking-stream-input-char-pos stream)
-     (ansi-stream-in-index stream)))
+  (let ((input-char-pos (form-tracking-stream-input-char-pos stream)))
+    (if input-char-pos
+        (+ input-char-pos (ansi-stream-in-index stream)))))
 
 (defun tracking-stream-misc (stream operation arg1)
   ;; The :UNREAD operation will never be invoked because STREAM has a buffer,
   ;; so unreading is implemented entirely within ANSI-STREAM-UNREAD-CHAR.
   ;; But we do need to prevent attempts to change the absolute position.
   (stream-misc-case (operation)
-    (:set-file-position (simple-stream-perror "~S is not positionable" stream))
+    (:set-file-position
+     (setf (form-tracking-stream-input-char-pos stream) nil)
+     (fd-stream-misc-routine stream operation arg1))
     (t
      (stream-misc-case (operation :default nil)
        (:close
-        (track-newlines stream)))
+        (track-newlines stream))) ; I suspect we don't care at this point?
      ;; call next method
      (fd-stream-misc-routine stream operation arg1))))
 

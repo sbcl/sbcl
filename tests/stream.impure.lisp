@@ -1051,3 +1051,12 @@
         (test-tabulation ctor)
         (test-justification ctor)
         (test-pretty-printing ctor)))))
+
+(with-test (:name :form-tracking-set-file-position :skipped-on :win32)
+  (with-open-file (s "/dev/zero" :class 'sb-int:form-tracking-stream)
+    (assert (eql (read-char s) (code-char 0)))
+    (assert (equal (sb-impl::line/col-from-charpos
+                    s (sb-impl::form-tracking-stream-current-char-pos s))
+                   '(1 . 1)))
+    (file-position s 0); no error
+    (assert (null (sb-impl::form-tracking-stream-current-char-pos s)))))
