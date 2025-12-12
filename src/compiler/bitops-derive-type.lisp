@@ -394,20 +394,25 @@
                          (if type
                              (type-intersection type r)
                              (specifier-type r))))))
-                 ;; (logxor x (- x)) is negative
+                 ;; (logxor x (- x)) is <= 0
                  (combination-case (x :cast (specifier-type 'integer))
                    (%negate (*)
                     (when (same-leaf-ref-p (car args) y)
-                      (let* ((len (integer-type-length (lvar-type y)))
-                             (int (if len
-                                      (make-numeric-type :class 'integer
-                                                         :complexp :real
-                                                         :low (ash -1 len)
-                                                         :high -1)
-                                      (specifier-type '(integer * -1)))))
-                        (if type
-                            (type-intersection type int)
-                            int))))))))
+                      (multiple-value-bind (len pos neg low high) (integer-type-length (lvar-type y))
+                        (declare (ignore pos neg))
+                        (let* ((int (if len
+                                        (make-numeric-type :class 'integer
+                                                           :complexp :real
+                                                           :low (ash -1 (integer-length (max (abs low) (abs high))))
+                                                           :high (if (<= low 0 high)
+                                                                     0
+                                                                     -2))
+                                        (if (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))
+                                            (specifier-type '(integer * 0))
+                                            (specifier-type '(integer * -2))))))
+                          (if type
+                              (type-intersection type int)
+                              int)))))))))
       (or (try x y)
           (try y x)
           type))))

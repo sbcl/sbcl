@@ -971,22 +971,42 @@
   (assert-type
    (lambda (n)
      (logxor n (- n)))
-   (integer * -1))
+   (integer * 0))
   (assert-type
    (lambda (n)
      (declare ((unsigned-byte 64) n))
      (logxor n (- n)))
-   (integer -18446744073709551616 -1))
+   (integer -18446744073709551616 0))
   (assert-type
    (lambda (n)
      (declare ((signed-byte 64) n))
      (logxor n (- n)))
-   (integer -9223372036854775808 -1))
+   (integer -18446744073709551616 0))
   (assert-type
    (lambda (n)
      (declare ((integer -16 1024) n))
      (logxor n (- n)))
-   (integer -2048 -1)))
+   (integer -2048 0))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -1 0) n))
+     (logxor n (- n)))
+   (integer -2 0))
+  (assert-type
+   (lambda (n)
+     (declare ((integer -2 -1) n))
+     (logxor n (- n)))
+   (integer -4 -2))
+  (assert-type
+   (lambda (n)
+     (declare ((integer 1) n))
+     (logxor n (- n)))
+   (integer * -2))
+  (assert-type
+   (lambda (n)
+     (declare ((integer * -1) n))
+     (logxor n (- n)))
+   (integer * -2)))
 
 (with-test (:name :unsigned-byte-x-p)
   (checked-compile-and-assert
