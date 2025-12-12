@@ -1520,6 +1520,6 @@ NOTE: This interface is experimental and subject to change."
          (or (plusp exponent)
              (<= (- exponent)
                  ;; count-trailing-zeros, but wider for 32-bit platforms
-                 (integer-length (ldb (byte 64 0) (1- (logand significand (- significand))))))))))
+                 (integer-length (ldb (byte 64 0) (lognor significand (- significand)))))))))
 
 (defvar *top-level-form-p* nil)

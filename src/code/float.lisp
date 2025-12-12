@@ -799,7 +799,7 @@
                     ;; as the denominator is a power of two.
                     (let* ((pexp (- exp))
                            (set ;; count-trailing-zeros, but wider for 32-bit platforms
-                             (integer-length (ldb (byte 64 0) (1- (logand bits (- bits)))))))
+                             (integer-length (ldb (byte 64 0) (lognor bits (- bits))))))
                       (if (> pexp set)
                           (%make-ratio (ash int (- set))
                                        (let ((shift (- pexp set)))
