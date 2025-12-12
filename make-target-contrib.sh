@@ -29,8 +29,12 @@ if [ -z "$CC" ]; then
     fi
 fi
 
+if [ -z "${LD}" ]; then
+    LD=ld
+fi
+
 unset EXTRA_CFLAGS # avoid any potential interference 
-export CC LANG LC_ALL
+export CC LD LANG LC_ALL
 
 # Load our build configuration
 . output/build-config
