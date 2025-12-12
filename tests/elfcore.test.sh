@@ -56,11 +56,14 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-us
 
 ;; Test that CODE-SERIAL# is never 0 except for simple-fun-less objects
 (sb-vm:map-allocated-objects
- (lambda (obj type size)
-   (declare (ignore size))
-   (when (and (= type sb-vm:code-header-widetag)
-              (> (sb-kernel:code-n-entries obj) 0))
-     (assert (/= (sb-kernel:%code-serialno obj) 0))))
+ ;; Interpreted functions passed to map-allocated-objects can cause the heap walk
+ ;; not to terminate, due to a forever increasing frontier to scan.
+ (compile nil
+  '(lambda (obj type size)
+    (declare (ignore size))
+    (when (and (= type sb-vm:code-header-widetag)
+               (> (sb-kernel:code-n-entries obj) 0))
+      (assert (/= (sb-kernel:%code-serialno obj) 0)))))
  :all)
 
 ;; Test that lisp linkage cells were bypassed.
