@@ -391,6 +391,17 @@
             (t
              lvar)))))
 
+(declaim (ftype (function * (values t (or null combination) list &optional)) lvar-combination/cast-name-args))
+(defun lvar-combination/cast-name-args (lvar)
+  (multiple-value-bind (name combination) (combination/cast-name (lvar-uses lvar))
+    (if name
+        (values name combination (combination-args combination))
+        (values nil nil nil))))
+
+(defun check-args (args n-args)
+  (when (= (length args) n-args)
+    (values-list args)))
+
 (defmacro combination-match (lvar spec &body body)
   (let (bound-vars)
     (labels ((ensure-or (x)
@@ -412,48 +423,48 @@
                                       ,(expand (cdr lvars) (cdr specs)
                                                body)))))
                            ((atom spec)
-                            `(when (and (constant-lvar-p ,lvar)
-                                        (eql (lvar-value ,lvar) ',spec))
+                            `(when (lvar-value-is ,lvar ',spec)
                                ,(expand (cdr lvars) (cdr specs)
                                         body)))
                            (t
                             (let ((spec (ensure-or spec)))
-                              `(multiple-value-bind (name combination) (combination/cast-name (lvar-uses ,lvar))
+                              `(multiple-value-bind (name combination args) (lvar-combination/cast-name-args ,lvar)
+                                 (declare (notinline lvar-value-is))
                                  (when combination
-                                   (let ((args (combination-args combination)))
-                                     (case name
-                                       ,@(let ((old-bound-vars bound-vars))
-                                           (labels ((gen (&optional sub)
-                                                      (destructuring-bind (name . args) (pop spec)
-                                                        (let* ((vars (make-gensym-list (length args) "ARG"))
-                                                               (names (ensure-or name))
-                                                               (commutative (loop for name in names
-                                                                                  always (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
-                                                                                                         commutative))))
-                                                          (setf bound-vars old-bound-vars)
-                                                          `(,names
-                                                            (or (when (= (length args) ,(length args))
-                                                                  (destructuring-bind ,vars args
-                                                                    ,(expand (cdr lvars) (cdr specs)
-                                                                             (let ((old-bound-vars bound-vars))
-                                                                               (lambda ()
-                                                                                 (cond (commutative
-                                                                                        (assert (= (length vars) 2))
-                                                                                        `(or ,(expand vars args body)
-                                                                                             ,(progn
-                                                                                                (setf bound-vars old-bound-vars)
-                                                                                                (expand (list (second vars) (first vars)) args body))))
-                                                                                       (t
-                                                                                        (expand vars args body))))))))
-                                                                ,@(unless sub
-                                                                    (loop while (and spec
-                                                                                     (subsetp (ensure-or (caar spec))
-                                                                                              names))
-                                                                          collect
-                                                                          `(case name
-                                                                             ,(gen t))))))))))
-                                             (loop while spec
-                                                   collect (gen))))))))))))
+                                   (case name
+                                     ,@(let ((old-bound-vars bound-vars))
+                                         (labels ((gen (&optional sub)
+                                                    (destructuring-bind (name . args) (pop spec)
+                                                      (let* ((vars (make-gensym-list (length args) "ARG"))
+                                                             (names (ensure-or name))
+                                                             (commutative (and (loop for name in names
+                                                                                     always (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
+                                                                                                            commutative))
+                                                                               (not (integerp (car (last args)))))))
+                                                        (setf bound-vars old-bound-vars)
+                                                        `(,names
+                                                          (or (multiple-value-bind ,vars (check-args args ,(length args))
+                                                                (when ,(car vars)
+                                                                  ,(expand (cdr lvars) (cdr specs)
+                                                                           (let ((old-bound-vars bound-vars))
+                                                                             (lambda ()
+                                                                               (cond (commutative
+                                                                                      (assert (= (length vars) 2))
+                                                                                      `(or ,(expand vars args body)
+                                                                                           ,(progn
+                                                                                              (setf bound-vars old-bound-vars)
+                                                                                              (expand (list (second vars) (first vars)) args body))))
+                                                                                     (t
+                                                                                      (expand vars args body))))))))
+                                                              ,@(unless sub
+                                                                  (loop while (and spec
+                                                                                   (subsetp (ensure-or (caar spec))
+                                                                                            names))
+                                                                        collect
+                                                                        `(case name
+                                                                           ,(gen t))))))))))
+                                           (loop while spec
+                                                 collect (gen)))))))))))
                    (funcall body))))
       (expand (list lvar) (list spec) (lambda () `(progn ,@body))))))
 
