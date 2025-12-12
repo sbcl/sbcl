@@ -1444,4 +1444,10 @@
              1)))
      ((nil 2 3) -33)
      ((nil nil 5) -1)
-     ((nil t nil) 1))))
+     ((nil t nil) 1))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a b c)
+           (- (if a -3 (* (truncate 4 b) c))))
+      ((nil 2 3) -6)
+      ((t 4 5) 3))))

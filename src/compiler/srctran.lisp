@@ -5261,7 +5261,8 @@
                                    (if (eq %negate '%negate)
                                        %negate
                                        (if (eq test '%negate)
-                                           (negate-lvar (second args) type test)
+                                           (or (negate-lvar (second args) type test)
+                                               %negate)
                                            (or (negate-lvar (second args) type)
                                                (and %negate
                                                     (negate-lvar (first args) type))))))))))

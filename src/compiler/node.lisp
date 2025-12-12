@@ -1534,7 +1534,10 @@
   (same-refs nil :type (or null cons)))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
-  leaf)
+  (leaf :prin1 (if (and (constant-p leaf)
+                        (not (symbolp (constant-value leaf))))
+                   (constant-value leaf)
+                   leaf)))
 
 (defstruct (multiple-successors-node
             (:constructor nil)
