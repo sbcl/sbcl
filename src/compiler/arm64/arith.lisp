@@ -242,17 +242,21 @@
 (define-vop (fast-/unsigned-signed fast-safe-arith-op)
   (:translate -)
   (:args (x :scs (unsigned-reg signed-reg))
-         (y :scs (unsigned-reg signed-reg)))
+         (y :scs (unsigned-reg signed-reg (immediate (abs-add-sub-immediate-p (tn-value tn))))))
   (:arg-types (:or unsigned-num signed-num) (:or unsigned-num signed-num))
   (:results (r :scs (unsigned-reg signed-reg)))
   (:result-types (:or unsigned-num signed-num))
   (:generator 6
-    (inst sub r x y)))
+    (if (sc-is y immediate)
+        (inst add-sub r x (- (tn-value y)))
+        (inst sub r x y))))
 
 (define-vop (fast+/unsigned-signed fast-/unsigned-signed)
   (:translate +)
   (:generator 6
-    (inst add r x y)))
+    (if (sc-is y immediate)
+        (inst add-sub r x (tn-value y))
+        (inst add r x y))))
 
 (define-binop logandc2 2 bic
   :constant-test bic-encode-immediate
