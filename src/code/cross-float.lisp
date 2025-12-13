@@ -604,7 +604,7 @@
   (flet ((assert-not-number (x)
            (handler-case (rational x)
              (:no-error (x) (error "Expected an error, got ~S" x))
-             (simple-error (x) (declare (ignore x))))))
+             (floating-point-invalid-operation ()))))
     (let ((nan (make-single-float #b01111111101000000000000000000000)))
       ;;                             [ exp  ]
       (assert-not-number nan)

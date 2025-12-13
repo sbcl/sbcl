@@ -2493,3 +2493,6 @@
 (defknown count-trailing-zeros (integer)
     (integer 0 #.sb-vm:n-word-bits)
     (movable foldable flushable))
+
+(defknown sb-kernel::single-float-invalid-operation (t single-float) nil (fixed-args))
+(defknown sb-kernel::double-float-invalid-operation (t double-float) nil (fixed-args))

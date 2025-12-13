@@ -405,9 +405,6 @@
 
 ;;;; INTEGER-DECODE-FLOAT and DECODE-FLOAT
 
-(defconstant-eqx float-decoding-error "Can't decode NaN or infinity: ~S."
-  #'string=)
-
 (declaim (maybe-inline integer-decode-single-float
                        integer-decode-double-float))
 
@@ -430,11 +427,19 @@
     (cond ((= exp 0)
            (values frac (if (= frac 0) 0 subnormal-sfloat-exponent) sign))
           ((> exp sb-vm:single-float-normal-exponent-max)
-           (error float-decoding-error x))
+           (single-float-invalid-operation 'integer-decode-float x))
           (t
            (values (logior sb-vm:single-float-hidden-bit frac)
                    (- exp sb-vm:single-float-bias sb-vm:single-float-digits)
                    sign)))))
+
+(defun double-float-invalid-operation (op float)
+  #-sb-xc-host (declare (muffle-conditions compiler-note))
+  (error 'floating-point-invalid-operation :operation op :operands (list float)))
+
+(defun single-float-invalid-operation (op float)
+  #-sb-xc-host (declare (muffle-conditions compiler-note))
+  (error 'floating-point-invalid-operation :operation op :operands (list float)))
 
 ;;; like INTEGER-DECODE-SINGLE-FLOAT, only doubly so
 (defun integer-decode-double-float (x)
@@ -450,7 +455,8 @@
           ((< exp sb-vm:double-float-normal-exponent-min)
            (values mantissa subnormal-dfloat-exponent sign))
           ((> exp sb-vm:double-float-normal-exponent-max)
-           (error float-decoding-error x))
+           (error 'floating-point-invalid-operation :operation 'integer-decode-float
+                                                    :operands (list x)))
           (t
            (values (logior sb-vm:double-float-hidden-bit mantissa)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
@@ -463,7 +469,7 @@
     (cond ((= exp 0)
            (values frac (if (= frac 0) 0 subnormal-dfloat-exponent) sign))
           ((> exp sb-vm:double-float-normal-exponent-max)
-           (error float-decoding-error x))
+           (double-float-invalid-operation 'integer-decode-float x))
           (t
            (values (logior sb-vm:double-float-hidden-bit frac)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
@@ -493,7 +499,7 @@
   (let* ((bits (single-float-bits x))
          (biased-exp (ldb sb-vm:single-float-exponent-byte bits)))
     (if (> biased-exp sb-vm:single-float-normal-exponent-max)
-        (error float-decoding-error x)
+        (single-float-invalid-operation 'decode-float x)
         (let ((frac (ldb sb-vm:single-float-significand-byte bits)))
           (multiple-value-bind (new-exp new-frac lisp-exponent)
               (cond ((/= biased-exp 0) ; normal
@@ -522,7 +528,7 @@
         #-64-bit ((high (double-float-high-bits x))
                   (biased-exp (ldb sb-vm:double-float-hi-exponent-byte high)))
     (if (> biased-exp sb-vm:double-float-normal-exponent-max)
-        (error float-decoding-error x)
+        (double-float-invalid-operation 'decode-float x)
         (let ((frac #+64-bit (ldb sb-vm:double-float-significand-byte bits)
                     #-64-bit (logior (ash (ldb sb-vm:double-float-hi-significand-byte high) 32)
                                      (double-float-low-bits x))))

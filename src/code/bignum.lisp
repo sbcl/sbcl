@@ -1362,7 +1362,9 @@
 
 (declaim (inline bignum-negate-last-two))
 (defun bignum-negate-last-two (bignum &optional (len (%bignum-length bignum)))
-  (declare (bignum-length len))
+  (declare (bignum-length len)
+           #+sb-xc
+           (muffle-conditions compiler-note))
   (sb-c::if-vop-existsp (:named sb-vm::bignum-negate-last-two-loop)
     (sb-sys:%primitive sb-vm::bignum-negate-last-two-loop bignum len)
     (let* ((last1 0)
@@ -1817,7 +1819,9 @@
   (declare (type bit-index byte-pos)
            (type (integer 0 #.sb-vm:n-word-bits) byte-size-left)
            (bignum bignum)
-           (optimize speed))
+           (optimize speed)
+           #+sb-xc
+           (muffle-conditions compiler-note))
   (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
     (let ((one (%bignum-ref bignum word-index)))
       (cond ((<= bit-index byte-size-left) ; contained in one word
@@ -2318,8 +2322,9 @@
                `(defun ,(symbolicate 'unary-truncate- type '-to-bignum-div) (quot number divisor)
                   (declare (inline ,decode))
                   (if (zerop divisor)
-                      (error 'division-by-zero :operation 'truncate
-                                               :operands (list number divisor))
+                      (locally (declare (muffle-conditions compiler-note))
+                        (error 'division-by-zero :operation 'truncate
+                                                 :operands (list number divisor)))
                       (multiple-value-bind (bits exp sign) (,decode quot)
                         (let ((truncated ,(case type
                                             #-64-bit
