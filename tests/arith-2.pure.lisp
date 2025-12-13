@@ -1460,5 +1460,10 @@
   (assert-type
    (lambda (d)
      (* (the (double-float * 10d0) d) 0.0d0))
-   (double-float * 0d0)))
+   (double-float * 0d0))
+  (assert-type
+   (lambda (x y)
+     (* (the (single-float 0.0 0.0) x)
+        (the (single-float -5.0 5.0) y)))
+   (single-float 0.0 0.0)))
 

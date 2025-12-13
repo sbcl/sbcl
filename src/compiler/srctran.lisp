@@ -1003,10 +1003,16 @@
 (defun interval-split (p x &optional close-lower close-upper)
   (declare (type number p)
            (type interval x))
-  (values (make-interval :low (copy-interval-limit (interval-low x))
-                         :high (if close-lower p (list p)))
-          (make-interval :low (if close-upper (list p) p)
-                         :high (copy-interval-limit (interval-high x)))))
+  (if (or (eql p 0f0)
+          (eql p 0d0))
+      (values (make-interval :low (copy-interval-limit (interval-low x))
+                             :high (sb-xc:- p))
+              (make-interval :low p
+                             :high (copy-interval-limit (interval-high x))))
+      (values (make-interval :low (copy-interval-limit (interval-low x))
+                             :high (if close-lower p (list p)))
+              (make-interval :low (if close-upper (list p) p)
+                             :high (copy-interval-limit (interval-high x))))))
 
 ;;; Return the closure of the interval. That is, convert open bounds
 ;;; to closed bounds.
@@ -1247,8 +1253,8 @@
              (x-hi (copy-interval-limit (interval-high x)))
              (y-lo (copy-interval-limit (interval-low y)))
              (y-hi (copy-interval-limit (interval-high y))))
-        (make-interval :low (select-bound x-lo y-lo #'sb-xc:< #'sb-xc:>)
-                       :high (select-bound x-hi y-hi #'sb-xc:> #'sb-xc:<))))))
+        (make-interval :low (select-bound x-lo y-lo #'fp< #'fp>)
+                       :high (select-bound x-hi y-hi #'fp> #'fp<))))))
 
 ;;; return the minimal interval, containing X and Y
 (defun interval-approximate-union (x y)
