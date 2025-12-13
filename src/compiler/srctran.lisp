@@ -5441,38 +5441,54 @@
   (def * x (%negate x) float (member 1f0 -1f0))
   (def / x (%negate x) float (member 1f0 -1f0)))
 
-(deftransform + ((x y) (number number))
-  (cond ((splice-fun-args y '%negate 1 nil)
-         `(- x y))
-        ((splice-fun-args x '%negate 1 nil)
-         `(- y x))
-        (t
-         (give-up-ir1-transform))))
+(deftransform + ((x y) (number number) * :node node)
+  (let ((floats (or (policy node (zerop float-accuracy))
+                    (not (types-equal-or-intersect (single-value-type (node-derived-type node))
+                                                   (specifier-type '(or (float 0.0 0.0) (complex float))))))))
+    (cond ((and (or floats
+                    ;; Can't negate integer 0
+                    (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
+                (splice-fun-args y '%negate 1 nil))
+           `(- x y))
+          ((and
+            (or floats
+                (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))))
+            (splice-fun-args x '%negate 1 nil))
+           `(- y x))
+          (t
+           (give-up-ir1-transform)))))
 
-(deftransform - ((x y) (number number))
-  (or
-   (cond
-     ;; (- x (- y)) => (+ x y)
-     ((splice-fun-args y '%negate 1 nil)
-      `(+ x y))
-     ;; (- (- x) c) => (- -c x)
-     ((and (constant-lvar-p y)
-           (let ((y (lvar-value y)))
-             (cond ((eql y 0)
-                    ;; no float contagion
-                    'x)
-                   ((zerop y)
-                    (cond ((and (eql y 0f0)
-                                (csubtypep (lvar-type x) (specifier-type 'float)))
-                           'x)
-                          ((and (eql y 0d0)
-                                (csubtypep (lvar-type x) (specifier-type 'double-float)))
-                           'x)))
-                   ((not (typep y '(complex float)))
-                    (when (splice-fun-args x '%negate 1 nil)
-                      `(- ,(- y) x)))))))
-     (t
-      (give-up-ir1-transform)))))
+(deftransform - ((x y) (number number) * :node node)
+  (let ((floats (or (policy node (zerop float-accuracy))
+                    (not (types-equal-or-intersect (single-value-type (node-derived-type node))
+                                                   (specifier-type '(or (float 0.0 0.0) (complex float))))))))
+   (or
+    (cond
+      ;; (- x (- y)) => (+ x y)
+      ((and
+        (or floats
+            ;; Can't negate integer 0
+            (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
+        (splice-fun-args y '%negate 1 nil))
+       `(+ x y))
+      ;; (- (- x) c) => (- -c x)
+      ((and (constant-lvar-p y)
+            (let ((y (lvar-value y)))
+              (cond ((eql y 0)
+                     ;; no float contagion
+                     'x)
+                    ((zerop y)
+                     (cond ((and (eql y 0f0)
+                                 (csubtypep (lvar-type x) (specifier-type 'float)))
+                            'x)
+                           ((and (eql y 0d0)
+                                 (csubtypep (lvar-type x) (specifier-type 'double-float)))
+                            'x)))
+                    ((not (typep y '(complex float)))
+                     (when (splice-fun-args x '%negate 1 nil)
+                       `(- ,(- y) x)))))))
+      (t
+       (give-up-ir1-transform))))))
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.

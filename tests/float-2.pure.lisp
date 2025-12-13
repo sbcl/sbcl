@@ -669,3 +669,20 @@ fractional bits."
   (sb-int:with-float-traps-masked (:divide-by-zero)
     (assert-error (truncate 1 (opaque-identity 0d0)) division-by-zero)
     (assert-error (truncate 1f0 (opaque-identity 0f0)) division-by-zero)))
+
+(with-test (:name :+negative-zero)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (+ a (- b)))
+    ((-0.0 0) 0.0))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (+ (- a) b))
+    ((0 -0.0) 0.0))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (- a (- b)))
+    ((-0.0 0) -0.0)))
