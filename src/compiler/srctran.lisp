@@ -4379,7 +4379,8 @@
              (if (if (minusp divisor)
                      (> rem 0)
                      (< rem 0))
-                 (values (truly-the (and ,quot-type ,(type-specifier asserted-type)) (1- tru))
+                 (values (the* ((and ,quot-type ,(type-specifier asserted-type)) :derive-type-only t)
+                               (1- tru))
                          (truly-the ,rem-type (+ rem divisor)))
                  (values tru
                          (truly-the ,rem-type rem)))))
@@ -4423,7 +4424,7 @@
              (if (if (minusp divisor)
                      (< rem 0)
                      (> rem 0))
-                 (values (truly-the (and ,quot-type ,(type-specifier asserted-type)) (+ tru 1))
+                 (values (the* ((and ,quot-type ,(type-specifier asserted-type)) :derive-type-only t) (+ tru 1))
                          (truly-the ,rem-type (- rem divisor)))
                  (values tru
                          (truly-the ,rem-type rem)))))
