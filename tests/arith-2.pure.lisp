@@ -1451,3 +1451,14 @@
            (- (if a -3 (* (truncate 4 b) c))))
       ((nil 2 3) -6)
       ((t 4 5) 3))))
+
+(with-test (:name :*-by-zero-type)
+  (assert-type
+   (lambda (d)
+     (* (the (double-float -10d0 10d0) d) 0.0d0))
+   (double-float 0d0 0d0))
+  (assert-type
+   (lambda (d)
+     (* (the (double-float * 10d0) d) 0.0d0))
+   (double-float * 0d0)))
+

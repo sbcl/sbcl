@@ -968,6 +968,24 @@
                     interval)))))
     (values result complex)))
 
+(defun interval-zero (x)
+  (let ((number (or (type-bound-number (interval-low x))
+                    (type-bound-number (interval-high x)))))
+    (typecase number
+      (double-float 0d0)
+      (single-float 0f0)
+      (t 0))))
+
+(defun intervals-zero (x y)
+  (let ((number (or (type-bound-number (interval-low y))
+                    (type-bound-number (interval-high y))
+                    (type-bound-number (interval-low x))
+                    (type-bound-number (interval-high x)))))
+    (typecase number
+      (double-float 0d0)
+      (single-float 0f0)
+      (t 0))))
+
 (defun copy-interval-limit (limit)
   (if (numberp limit)
       limit
@@ -1288,15 +1306,16 @@
                   ;; General multiply. The result is open if either is open.
                   (bound-binop sb-xc:* x y)))))
     (let ((x-range (interval-range-info x))
-          (y-range (interval-range-info y)))
+          (y-range (interval-range-info y))
+          (zero (intervals-zero x y)))
       (cond ((null x-range)
              ;; Split x into two and multiply each separately
-             (multiple-value-bind (x- x+) (interval-split 0 x t t)
+             (multiple-value-bind (x- x+) (interval-split zero x t t)
                (interval-merge-pair (interval-mul x- y)
                                     (interval-mul x+ y))))
             ((null y-range)
              ;; Split y into two and multiply each separately
-             (multiple-value-bind (y- y+) (interval-split 0 y t t)
+             (multiple-value-bind (y- y+) (interval-split zero y t t)
                (interval-merge-pair (interval-mul x y-)
                                     (interval-mul x y+))))
             ((eq x-range '-)
@@ -1317,10 +1336,11 @@
   (declare (type interval n d))
   ;; Simply doing interval-mul will lose the (1- d) part in
   ;; (truncate (+ n (1- d)) d)
-  (let ((d-range (interval-range-info d)))
+  (let ((d-range (interval-range-info d))
+        (zero (intervals-zero n d)))
     (ecase d-range
       ((nil)
-       (multiple-value-bind (d- d+) (interval-split 0 d t t)
+       (multiple-value-bind (d- d+) (interval-split zero d t t)
          (interval-merge-pair (interval-untruncate n d-)
                               (interval-untruncate n d+))))
       ((-)
@@ -1373,10 +1393,11 @@
                             (t
                              (bound-binop sb-xc:/ x y)))))
                (let ((top-range (interval-range-info top))
-                     (bot-range (interval-range-info bot)))
+                     (bot-range (interval-range-info bot))
+                     (zero (intervals-zero top bot)))
                  (cond ((null bot-range)
                         (if integer
-                            (multiple-value-bind (bot- bot+) (interval-split 0 bot t t)
+                            (multiple-value-bind (bot- bot+) (interval-split zero bot t t)
                               (let ((r- (interval-div top bot-))
                                     (r+ (interval-div top bot+)))
                                 (or (interval-merge-pair r- r+)
@@ -1390,7 +1411,7 @@
                        ((null top-range)
                         ;; Split top into two positive and negative parts, and
                         ;; divide each separately
-                        (multiple-value-bind (top- top+) (interval-split 0 top t t)
+                        (multiple-value-bind (top- top+) (interval-split zero top t t)
                           (or (interval-merge-pair (interval-div top- bot)
                                                    (interval-div top+ bot))
                               (make-interval))))
@@ -1497,7 +1518,7 @@
     (-
      (interval-neg x))
     (t
-     (multiple-value-bind (x- x+) (interval-split 0 x t t)
+     (multiple-value-bind (x- x+) (interval-split (interval-zero x) x t t)
        (interval-merge-pair (interval-neg x-) x+)))))
 
 ;;; Compute the square of an interval.
@@ -2828,7 +2849,7 @@
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
-     (multiple-value-bind (neg pos) (interval-split 0 quot t t)
+     (multiple-value-bind (neg pos) (interval-split (interval-zero quot) quot t t)
        (interval-merge-pair (ceiling-quotient-bound neg)
                             (floor-quotient-bound pos))))))
 
@@ -2846,7 +2867,7 @@
     (otherwise
      ;; Split the interval into positive and negative pieces, compute
      ;; the result for each piece and put them back together.
-     (multiple-value-bind (neg pos) (interval-split 0 quot t t)
+     (multiple-value-bind (neg pos) (interval-split (interval-zero quot) quot t t)
        (interval-merge-pair (fceiling-quotient-bound neg divisor)
                             (ffloor-quotient-bound pos divisor))))))
 
@@ -2856,31 +2877,32 @@
   ;; basic idea is to split the ranges of NUM and DEN into positive
   ;; and negative pieces and deal with each of the four possibilities
   ;; in turn.
-  (case (interval-range-info num)
-    (+
-     (case (interval-range-info div)
-       (+
-        (floor-rem-bound num div))
-       (-
-        (ceiling-rem-bound num div))
-       (otherwise
-        (multiple-value-bind (neg pos) (interval-split 0 div t t)
-          (interval-merge-pair (truncate-rem-bound num neg)
-                               (truncate-rem-bound num pos))))))
-    (-
-     (case (interval-range-info div)
-       (+
-        (ceiling-rem-bound num div))
-       (-
-        (floor-rem-bound num div))
-       (otherwise
-        (multiple-value-bind (neg pos) (interval-split 0 div t t)
-          (interval-merge-pair (truncate-rem-bound num neg)
-                               (truncate-rem-bound num pos))))))
-    (otherwise
-     (multiple-value-bind (neg pos) (interval-split 0 num t t)
-       (interval-merge-pair (truncate-rem-bound neg div)
-                            (truncate-rem-bound pos div))))))
+  (let ((zero (intervals-zero num div)))
+   (case (interval-range-info num)
+     (+
+      (case (interval-range-info div)
+        (+
+         (floor-rem-bound num div))
+        (-
+         (ceiling-rem-bound num div))
+        (otherwise
+         (multiple-value-bind (neg pos) (interval-split zero div t t)
+           (interval-merge-pair (truncate-rem-bound num neg)
+                                (truncate-rem-bound num pos))))))
+     (-
+      (case (interval-range-info div)
+        (+
+         (ceiling-rem-bound num div))
+        (-
+         (floor-rem-bound num div))
+        (otherwise
+         (multiple-value-bind (neg pos) (interval-split zero div t t)
+           (interval-merge-pair (truncate-rem-bound num neg)
+                                (truncate-rem-bound num pos))))))
+     (otherwise
+      (multiple-value-bind (neg pos) (interval-split zero num t t)
+        (interval-merge-pair (truncate-rem-bound neg div)
+                             (truncate-rem-bound pos div)))))))
 
 ;;; Derive useful information about the range. Returns three values:
 ;;; - '+ if its positive, '- negative, or nil if it overlaps 0.

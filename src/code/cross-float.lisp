@@ -159,14 +159,19 @@
   (define ftruncate cl:truncate))
 
 (defun xfloat-expt (base power)
-  (if (not (integerp power))
-      (error "Unimplemented: EXPT with non-integer power")
-      (with-memoized-math-op (expt (list base power))
-        (if (zerop power)
-            (coerce 1 (type-of base))
-            (flonum-from-rational
-             (cl:expt (rational base) power)
-             (pick-result-format base power))))))
+  (cond ((sb-xc:= power 0f0)
+         1f0)
+        ((sb-xc:= power 0d0)
+         1d0)
+        ((not (integerp power))
+         (error "Unimplemented: EXPT with non-integer power"))
+        (t
+         (with-memoized-math-op (expt (list base power))
+           (if (zerop power)
+               (coerce 1 (type-of base))
+               (flonum-from-rational
+                (cl:expt (rational base) power)
+                (pick-result-format base power)))))))
 
 ;;; Four possible return values.  NIL if the numbers (rationals or
 ;;; flonums) are incomparable (either is a NaN).  Otherwise: -1, 0, 1

@@ -862,53 +862,54 @@
     (t
      ;; Split the interval in half.
      (multiple-value-bind (y- y+)
-         (interval-split 0 y t)
+         (interval-split (intervals-zero x y) y t)
        (list (interval-expt-> x y-)
              (interval-expt-> x y+))))))
 
 ;;; Handle the case when 0 <= x <= 1
 (defun interval-expt-< (x y)
-  (case (interval-range-info x 0d0)
-    (+
-     ;; The case of 0 <= x <= 1 is easy
-     (case (interval-range-info y)
-       (+
-        ;; Y is positive and log X <= 0. The range of exp(y * log(x)) is
-        ;; obviously [0, 1]. We just have to be careful for infinite bounds
-        ;; (given by nil).
-        (let ((lo (safe-expt (type-bound-number (interval-low x))
-                             (type-bound-number (interval-high y))))
-              (hi (safe-expt (type-bound-number (interval-high x))
-                             (type-bound-number (interval-low y)))))
-          (list (make-interval :low (or lo 0) :high (or hi 1)))))
-       (-
-        ;; Y is negative and log x <= 0. The range of exp(y * log(x)) is
-        ;; obviously [1, inf].
-        (let ((hi (safe-expt (type-bound-number (interval-low x))
-                             (type-bound-number (interval-low y))))
-              (lo (safe-expt (type-bound-number (interval-high x))
-                             (type-bound-number (interval-high y)))))
-          (list (make-interval :low (or lo 1) :high hi))))
-       (t
-        ;; Split the interval in half
-        (multiple-value-bind (y- y+)
-            (interval-split 0 y t)
-          (list (interval-expt-< x y-)
-                (interval-expt-< x y+))))))
-    (-
-     ;; The case where x <= 0. Y MUST be an INTEGER for this to work!
-     ;; The calling function must insure this!
-     (loop for interval in (flatten-list (interval-expt (interval-neg x) y))
-           for low = (interval-low interval)
-           for high = (interval-high interval)
-           collect interval
-           when (or high low)
-           collect (interval-neg interval)))
-    (t
-     (multiple-value-bind (neg pos)
-         (interval-split 0 x t t)
-       (list (interval-expt-< neg y)
-             (interval-expt-< pos y))))))
+  (let ((zero (intervals-zero x y)))
+    (case (interval-range-info x 0d0)
+      (+
+       ;; The case of 0 <= x <= 1 is easy
+       (case (interval-range-info y)
+         (+
+          ;; Y is positive and log X <= 0. The range of exp(y * log(x)) is
+          ;; obviously [0, 1]. We just have to be careful for infinite bounds
+          ;; (given by nil).
+          (let ((lo (safe-expt (type-bound-number (interval-low x))
+                               (type-bound-number (interval-high y))))
+                (hi (safe-expt (type-bound-number (interval-high x))
+                               (type-bound-number (interval-low y)))))
+            (list (make-interval :low (or lo 0) :high (or hi 1)))))
+         (-
+          ;; Y is negative and log x <= 0. The range of exp(y * log(x)) is
+          ;; obviously [1, inf].
+          (let ((hi (safe-expt (type-bound-number (interval-low x))
+                               (type-bound-number (interval-low y))))
+                (lo (safe-expt (type-bound-number (interval-high x))
+                               (type-bound-number (interval-high y)))))
+            (list (make-interval :low (or lo 1) :high hi))))
+         (t
+          ;; Split the interval in half
+          (multiple-value-bind (y- y+)
+              (interval-split zero y t)
+            (list (interval-expt-< x y-)
+                  (interval-expt-< x y+))))))
+      (-
+       ;; The case where x <= 0. Y MUST be an INTEGER for this to work!
+       ;; The calling function must insure this!
+       (loop for interval in (flatten-list (interval-expt (interval-neg x) y))
+             for low = (interval-low interval)
+             for high = (interval-high interval)
+             collect interval
+             when (or high low)
+             collect (interval-neg interval)))
+      (t
+       (multiple-value-bind (neg pos)
+           (interval-split zero x t t)
+         (list (interval-expt-< neg y)
+               (interval-expt-< pos y)))))))
 
 ;;; Compute bounds for (expt x y).
 (defun interval-expt (x y)
