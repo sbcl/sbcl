@@ -986,6 +986,36 @@
       (single-float 0f0)
       (t 0))))
 
+(defun interval-contagion (x y)
+  (flet ((coerce-interval (int current-type type)
+           (if (eq current-type type)
+               int
+               (make-interval :low (coerce-for-bound (interval-low int) type)
+                              :high (coerce-for-bound (interval-high int) type))))
+         (contagion (a b)
+           (cond ((not a)
+                  b)
+                 ((eq a 'double-float)
+                  'double-float)
+                 ((eq a 'single-float)
+                  (if (eq b 'double-float)
+                      'double-float
+                      'single-float))))
+         (float-type (x)
+           (typecase x
+             (double-float 'double-float)
+             (single-float 'single-float))))
+    (let ((x-type (float-type (or (type-bound-number (interval-low x))
+                                  (type-bound-number (interval-high x)))))
+          (y-type (float-type (or (type-bound-number (interval-low y))
+                                  (type-bound-number (interval-high y))))))
+
+      (if (eq x-type y-type)
+          (values x y)
+          (let ((contagion (contagion x-type y-type)))
+            (values (coerce-interval x x-type contagion)
+                    (coerce-interval y y-type contagion)))))))
+
 (defun copy-interval-limit (limit)
   (if (numberp limit)
       limit
@@ -1291,6 +1321,7 @@
 ;;; Multiply two intervals.
 (defun interval-mul (x y)
   (declare (type interval x y))
+  (setf (values x y) (interval-contagion x y))
   (flet ((bound-mul (x y)
            (cond ((or (null x) (null y))
                   ;; Multiply by infinity is infinity
@@ -1370,6 +1401,7 @@
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
   (declare (type interval top bot))
+  (setf (values top bot) (interval-contagion top bot))
   (labels ((interval-div (top bot)
              (flet ((bound-div (x y y-low-p)
                       ;; Compute x/y
