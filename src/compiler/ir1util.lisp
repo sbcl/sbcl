@@ -3116,7 +3116,7 @@ is :ANY, the function name is not checked."
 (defun careful-call (function args)
   (declare (type (or symbol function) function)
            (type list args))
-  (handler-case (values (multiple-value-list (apply function args)) t)
+  (handler-case (values (multiple-value-list (apply (cross function) args)) t)
     (error (condition)
       (values condition nil))))
 

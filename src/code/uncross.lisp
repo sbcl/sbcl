@@ -20,7 +20,9 @@
 #-sb-xc-host
 (progn
   (declaim (inline uncross))
-  (defun uncross (x) x))
+  (defun uncross (x) x)
+  (declaim (inline cross))
+  (defun cross (x) x))
 
 ;;; When cross-compiling, EVAL-WHEN :COMPILE-TOPLEVEL code is executed
 ;;; in the host Common Lisp, not the target. A certain amount of
@@ -54,3 +56,11 @@
                     (recons form (rcr (car form)) (rcr (cdr form))))
                    (t form))))
     (rcr form)))
+
+;;; For constant folding
+#+sb-xc-host
+(defun cross (symbol)
+  (or (if (symbolp symbol)
+          (and (eq (sb-xc:symbol-package symbol) *cl-package*)
+               (find-symbol (symbol-name symbol) #.(find-package "SB-XC"))))
+      symbol))

@@ -847,7 +847,7 @@ possibly temporarily, because it might be used internally.")
    ;; cross-compilation bootstrap hacks which turn into
    ;; placeholders in a target system
 
-   "UNCROSS"
+   "UNCROSS" "CROSS"
 
    ;; might as well be shared among the various files which
    ;; need it:
