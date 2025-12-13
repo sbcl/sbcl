@@ -159,16 +159,16 @@
   (define ftruncate cl:truncate))
 
 (defun xfloat-expt (base power)
-  (cond ((sb-xc:= power 0f0)
-         1f0)
-        ((sb-xc:= power 0d0)
-         1d0)
-        ((not (integerp power))
-         (error "Unimplemented: EXPT with non-integer power"))
+  (when (sb-kernel::integer-float-p power)
+    (setf power (truncate power)))
+  (cond ((not (integerp power))
+         (error "Unimplemented: EXPT with non-integer power ~a" power))
         (t
          (with-memoized-math-op (expt (list base power))
            (if (zerop power)
-               (coerce 1 (type-of base))
+               (if (integerp base)
+                   1
+                   (coerce 1 (type-of base)))
                (flonum-from-rational
                 (cl:expt (rational base) power)
                 (pick-result-format base power)))))))

@@ -1057,12 +1057,25 @@
   (declare (type interval x))
   (let ((lo (interval-low x))
         (hi (interval-high x)))
-    (cond ((and lo (sb-xc:>= (type-bound-number lo) point))
-           '+)
-          ((and hi (sb-xc:>= point (type-bound-number hi)))
-           '-)
-          (t
-           nil))))
+    (if (or (eql point 0f0)
+            (eql point 0d0))
+        ;; Separate -0.0 from 0.0
+        (cond ((and lo (if (consp lo)
+                           (zerop (car lo))
+                           (fp>= lo point)))
+               '+)
+              ((and hi (if (consp hi)
+                           (zerop (car hi))
+                           (fp< hi point)))
+               '-)
+              (t
+               nil))
+        (cond ((and lo (sb-xc:>= (type-bound-number lo) point))
+               '+)
+              ((and hi (sb-xc:<= (type-bound-number hi) point))
+               '-)
+              (t
+               nil)))))
 
 (defun interval-range-info> (x &optional (point 0))
   (declare (type interval x))
@@ -1342,9 +1355,9 @@
                  (t
                   ;; General multiply. The result is open if either is open.
                   (bound-binop sb-xc:* x y)))))
-    (let ((x-range (interval-range-info x))
-          (y-range (interval-range-info y))
-          (zero (intervals-zero x y)))
+    (let* ((zero (intervals-zero x y))
+           (x-range (interval-range-info x zero))
+           (y-range (interval-range-info y zero)))
       (cond ((null x-range)
              ;; Split x into two and multiply each separately
              (multiple-value-bind (x- x+) (interval-split zero x t t)
@@ -1430,9 +1443,9 @@
                              (sb-xc:/ x (signum (type-bound-number y))))
                             (t
                              (bound-binop sb-xc:/ x y)))))
-               (let ((top-range (interval-range-info top))
-                     (bot-range (interval-range-info bot))
-                     (zero (intervals-zero top bot)))
+               (let* ((zero (intervals-zero top bot))
+                     (top-range (interval-range-info top zero))
+                     (bot-range (interval-range-info bot zero)))
                  (cond ((null bot-range)
                         (if integer
                             (multiple-value-bind (bot- bot+) (interval-split zero bot t t)

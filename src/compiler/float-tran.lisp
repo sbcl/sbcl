@@ -840,36 +840,37 @@
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
-  (case (interval-range-info y 0d0)
-    (+
-     ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
-     ;; obviously non-negative. We just have to be careful for
-     ;; infinite bounds (given by nil).
-     (let ((lo (safe-expt (type-bound-number (interval-low x))
-                          (type-bound-number (interval-low y))))
-           (hi (safe-expt (type-bound-number (interval-high x))
-                          (type-bound-number (interval-high y)))))
-       (list (make-interval :low (or lo 1) :high hi))))
-    (-
-     ;; Y is negative and log x >= 0. The range of exp(y * log(x)) is
-     ;; obviously [0, 1]. However, underflow (nil) means 0 is the
-     ;; result.
-     (let ((lo (safe-expt (type-bound-number (interval-high x))
-                          (type-bound-number (interval-low y))))
-           (hi (safe-expt (type-bound-number (interval-low x))
-                          (type-bound-number (interval-high y)))))
-       (list (make-interval :low (or lo 0) :high (or hi 1)))))
-    (t
-     ;; Split the interval in half.
-     (multiple-value-bind (y- y+)
-         (interval-split (intervals-zero x y) y t)
-       (list (interval-expt-> x y-)
-             (interval-expt-> x y+))))))
+  (let ((zero (intervals-zero x y)))
+    (case (interval-range-info y zero)
+      (+
+       ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
+       ;; obviously non-negative. We just have to be careful for
+       ;; infinite bounds (given by nil).
+       (let ((lo (safe-expt (type-bound-number (interval-low x))
+                            (type-bound-number (interval-low y))))
+             (hi (safe-expt (type-bound-number (interval-high x))
+                            (type-bound-number (interval-high y)))))
+         (list (make-interval :low (or lo (sb-xc:+ zero 1)) :high hi))))
+      (-
+       ;; Y is negative and log x >= 0. The range of exp(y * log(x)) is
+       ;; obviously [0, 1]. However, underflow (nil) means 0 is the
+       ;; result.
+       (let ((lo (safe-expt (type-bound-number (interval-high x))
+                            (type-bound-number (interval-low y))))
+             (hi (safe-expt (type-bound-number (interval-low x))
+                            (type-bound-number (interval-high y)))))
+         (list (make-interval :low (or lo zero) :high (or hi (sb-xc:+ zero 1))))))
+      (t
+       ;; Split the interval in half.
+       (multiple-value-bind (y- y+)
+           (interval-split zero y t)
+         (list (interval-expt-> x y-)
+               (interval-expt-> x y+)))))))
 
 ;;; Handle the case when 0 <= x <= 1
 (defun interval-expt-< (x y)
   (let ((zero (intervals-zero x y)))
-    (case (interval-range-info x 0d0)
+    (case (interval-range-info x zero)
       (+
        ;; The case of 0 <= x <= 1 is easy
        (case (interval-range-info y)
@@ -881,7 +882,7 @@
                                (type-bound-number (interval-high y))))
                 (hi (safe-expt (type-bound-number (interval-high x))
                                (type-bound-number (interval-low y)))))
-            (list (make-interval :low (or lo 0) :high (or hi 1)))))
+            (list (make-interval :low (or lo zero) :high (or hi (sb-xc:+ zero 1))))))
          (-
           ;; Y is negative and log x <= 0. The range of exp(y * log(x)) is
           ;; obviously [1, inf].
@@ -889,7 +890,7 @@
                                (type-bound-number (interval-low y))))
                 (lo (safe-expt (type-bound-number (interval-high x))
                                (type-bound-number (interval-high y)))))
-            (list (make-interval :low (or lo 1) :high hi))))
+            (list (make-interval :low (or lo (sb-xc:+ zero 1)) :high hi))))
          (t
           ;; Split the interval in half
           (multiple-value-bind (y- y+)
@@ -913,6 +914,7 @@
 
 ;;; Compute bounds for (expt x y).
 (defun interval-expt (x y)
+  (setf (values x y) (interval-contagion x y))
   (case (interval-range-info x 1)
     (+
      ;; X >= 1
