@@ -1795,71 +1795,88 @@ many elements are copied."
                           value))))
 
 (defmacro list-reduce (function
-                             sequence
-                             key
-                             start
-                             end
-                             initial-value
-                             ivp)
-  `(let ((sequence (nthcdr ,start ,sequence)))
-     (do ((count (if ,ivp ,start (1+ ,start))
-                 (1+ count))
-          (sequence (if ,ivp sequence (cdr sequence))
-                    (cdr sequence))
-          (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
-                 (funcall ,function value (apply-key ,key (car sequence)))))
-         ((>= count ,end) value))))
-
-(defmacro list-reduce-from-end (function
-                                      sequence
-                                      key
-                                      start
-                                      end
-                                      initial-value
-                                      ivp)
-  `(let ((sequence (nthcdr (- (length ,sequence) ,end)
-                           (reverse ,sequence))))
-     (do ((count (if ,ivp ,start (1+ ,start))
-                 (1+ count))
-          (sequence (if ,ivp sequence (cdr sequence))
-                    (cdr sequence))
-          (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
-                 (funcall ,function (apply-key ,key (car sequence)) value)))
-         ((>= count ,end) value))))
+                       sequence
+                       key
+                       start
+                       end
+                       initial-value
+                       ivp)
+  `(do ((count (if ,ivp ,start (1+ ,start))
+               (1+ count))
+        (sequence (if ,ivp ,sequence (cdr ,sequence))
+                  (cdr sequence))
+        (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
+               (funcall ,function value (apply-key ,key (car sequence)))))
+       ((>= count ,end) value)))
 
 (define-sequence-traverser reduce (function sequence &rest args &key key
                                    from-end start end (initial-value nil ivp))
   (declare (type index start)
-           (dynamic-extent args))
+           (dynamic-extent args)
+           (inline nthcdr))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if (= end start)
-          (if ivp initial-value (funcall function))
-          (if from-end
-              (list-reduce-from-end function sequence key start end
-                                    initial-value ivp)
-              (list-reduce function sequence key start end
-                           initial-value ivp))))
-    (let ((end (or end length)))
-      (declare (type index end))
-      (if (= end start)
-          (if ivp initial-value (funcall function))
-          (if from-end
-              (progn
-                (when (not ivp)
-                  (setq end (1- (the fixnum end)))
-                  (setq initial-value (apply-key key (aref sequence end))))
-                (mumble-reduce-from-end function sequence key start end
-                                        initial-value aref))
-              (progn
-                (when (not ivp)
-                  (setq initial-value (apply-key key (aref sequence start)))
-                  (setq start (1+ start)))
-                (mumble-reduce function sequence key start end
-                               initial-value aref)))))
-    (apply #'sb-sequence:reduce function sequence args)))
+      (let ((sequence (nthcdr start sequence)))
+        (if end
+            (if (= end start)
+                (if ivp initial-value (funcall function))
+                (cond-dispatch key
+                  (if from-end
+                      (let ((sequence (nthcdr (the index (- length end))
+                                              (reverse sequence))))
+                        (do ((sequence (if ivp
+                                           sequence
+                                           (cdr sequence))
+                                       (cdr sequence))
+                             (value (if ivp
+                                        initial-value
+                                        (apply-key key (car sequence)))
+                                    (funcall function (apply-key key (car sequence)) value)))
+                            ((endp sequence) value)))
+                      (list-reduce function sequence key start end
+                                   initial-value ivp))))
+            (if (endp sequence)
+                (if ivp initial-value (funcall function))
+                (let ((sequence (nthcdr start sequence)))
+                  (cond-dispatch key
+                    (if from-end
+                        (let ((sequence (reverse sequence)))
+                          (do ((sequence (if ivp
+                                             sequence
+                                             (cdr sequence))
+                                         (cdr sequence))
+                               (value (if ivp
+                                          initial-value
+                                          (apply-key key (car sequence)))
+                                      (funcall function (apply-key key (car sequence)) value)))
+                              ((endp sequence) value)))
+                        (do ((sequence (if ivp
+                                           sequence
+                                           (cdr sequence))
+                                       (cdr sequence))
+                             (value (if ivp
+                                        initial-value
+                                        (apply-key key (car sequence)))
+                                    (funcall function value (apply-key key (car sequence)))))
+                            ((endp sequence) value))))))))
+      (let ((end (or end length)))
+        (declare (type index end))
+        (if (= end start)
+            (if ivp initial-value (funcall function))
+            (if from-end
+                (progn
+                  (when (not ivp)
+                    (setq end (1- (the fixnum end)))
+                    (setq initial-value (apply-key key (aref sequence end))))
+                  (mumble-reduce-from-end function sequence key start end
+                                          initial-value aref))
+                (progn
+                  (when (not ivp)
+                    (setq initial-value (apply-key key (aref sequence start)))
+                    (setq start (1+ start)))
+                  (mumble-reduce function sequence key start end
+                                 initial-value aref)))))
+      (apply #'sb-sequence:reduce function sequence args)))
 
 ;;;; DELETE
 
