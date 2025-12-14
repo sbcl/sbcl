@@ -686,3 +686,11 @@ fractional bits."
       `(lambda (a b)
          (- a (- b)))
     ((-0.0 0) -0.0)))
+
+(with-test (:name :expt-to-sqrt)
+  (assert (= (expt (opaque-identity 6) (opaque-identity 1/2))
+             (expt (opaque-identity 6) (opaque-identity 0.5))
+             (sqrt (opaque-identity 6))))
+  (assert (= (expt (opaque-identity -6) (opaque-identity 1/2))
+             (expt (opaque-identity -6) (opaque-identity 0.5))
+             (sqrt (opaque-identity -6)))))
