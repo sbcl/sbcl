@@ -6,7 +6,7 @@
 ;;; was placed under Public Domain
 
 (defpackage #:sb-cover
-  (:use #:cl #:sb-c)
+  (:use #:cl #:sb-c #:sb-int)
   (:export #:report
            #:get-coverage
            #:reset-coverage #:clear-coverage
@@ -17,16 +17,16 @@
 
 (in-package #:sb-cover)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf (sb-int:system-package-p *package*) t))
+  (setf (system-package-p *package*) t))
 
-(defmacro code-coverage-hashtable () `(car sb-int:*code-coverage-info*))
+(defmacro code-coverage-hashtable () `(car *code-coverage-info*))
 
 (defun reset-code-coverage ()
   (maphash (lambda (info cc)
              (declare (ignore info))
              (dolist (cc-entry cc)
                (setf (cdr cc-entry) nil)))
-           (car sb-int:*code-coverage-info*)))
+           (code-coverage-hashtable)))
 
 ;;;; New coverage representation.
 ;;;; One byte per coverage mark is stored in the unboxed constants of the code.
@@ -42,7 +42,7 @@
     (values (sb-c::code-coverage-map code) code))))
 
 #+arm64
-(declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
+(declaim (ftype (sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
 ;;; Coverage marks are in the raw bytes following the jump tables
 ;;; preceding any other unboxed constants. This way we don't have to store
 ;;; a pointer to the coverage marks since their location is implicit.
@@ -74,15 +74,15 @@
 into the database when the FASL files (produced by compiling
 STORE-COVERAGE-DATA optimization policy set to 3) are loaded again into the
 image."
-  (clrhash (car sb-int:*code-coverage-info*))
-  (setf (cdr sb-int:*code-coverage-info*) nil))
+  (clrhash (code-coverage-hashtable))
+  (setf (cdr *code-coverage-info*) nil))
 
 (macrolet
     ((do-instrumented-code ((var) &body body)
        ;; Scan coverage-instrumented codeblobs, binding VAR to each
-       `(dolist (#1=#:v (cdr sb-int:*code-coverage-info*))
-          (dotimes (#2=#:i (sb-int:weak-vector-len #1#))
-            (let ((,var (sb-int:weak-vector-ref #1# #2#)))
+       `(dolist (#1=#:v (cdr *code-coverage-info*))
+          (dotimes (#2=#:i (weak-vector-len #1#))
+            (let ((,var (weak-vector-ref #1# #2#)))
               (when ,var ,@body)))))
      ;; Using different values here isn't great, but a 1 bit seemed
      ;; the natural choice for "marked" which is fine for x86 which can
@@ -101,7 +101,7 @@ image."
 (defun get-coverage (code)
   (multiple-value-bind (map code) (%find-coverage-map code)
     (when map
-      (sb-int:collect ((paths))
+      (collect ((paths))
         #-arm64
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
@@ -149,16 +149,16 @@ image."
         (coverage-records (code-coverage-hashtable))
         (n-marks 0))
     (do-instrumented-code (code)
-      (sb-int:binding* ((map (%find-coverage-map code) :exit-if-null)
-                        (namestring
-                         (sb-c::debug-source-namestring
+      (binding* ((map (%find-coverage-map code) :exit-if-null)
+                 (namestring
+                  (sb-c::debug-source-namestring
                           (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))
                          :exit-if-null)
-                        (legacy-coverage-marks
-                         (and (or (null filename) (string= namestring filename))
-                              (gethash namestring coverage-records))
+                 (legacy-coverage-marks
+                  (and (or (null filename) (string= namestring filename))
+                       (gethash namestring coverage-records))
                          :exit-if-null)
-                        (path-lookup-table
+                 (path-lookup-table
                          (gethash namestring namestring->path-tables)))
         ;; Build the source path -> marked map for this file if not seen yet.
         ;; It is of course redundant to have both representations.
@@ -435,7 +435,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                        (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
                        (values nil (make-hash-table)))))
           when map collect (cons form map)
-          when (eql form sb-int:*eof-object*) do (loop-finish))))
+          when (eql form *eof-object*) do (loop-finish))))
 
 (defun initial-states (source maps)
   (let ((states (make-array (length source) :initial-element 0 :element-type '(unsigned-byte 4))))
@@ -445,17 +445,15 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     states))
 
 (defun note-suppressions (source states maps)
-  (mapcar (lambda (map)
-            (maphash (lambda (k locations)
-                       (declare (ignore k))
-                       (dolist (location locations)
-                         (destructuring-bind (start end &optional suppress) location
-                           ;; STATES array is 0-origin but locations are 1-origin, so the array
-                           ;; range to fill is (1- START) to (1- END) inclusive
-                           (when suppress
-                             (fill-with-state source states 15 (1- start) end)))))
-                     (cdr map)))
-          maps))
+  (dolist (tlf maps) ; = (form . hash-table)
+    (dohash ((k locations) (cdr tlf))
+      (declare (ignore k))
+      (dolist (location locations)
+        (destructuring-bind (start end &optional suppress) location
+          ;; STATES array is 0-origin but locations are 1-origin, so the array
+          ;; range to fill is (1- START) to (1- END) inclusive
+          (when suppress
+            (fill-with-state source states 15 (1- start) end)))))))
 
 ;;; Change most elements of STATES between START (inclusive) and END (exclusive)
 ;;; to STATE. Some elements will remain unaffected:
@@ -763,8 +761,7 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
               (cond ((sb-impl::token-delimiterp nextchar)
                      (cond ((eq listtail thelist)
                             (unless *read-suppress*
-                              (sb-int:simple-reader-error
-                               stream
+                              (simple-reader-error stream
                                "Nothing appears before . in list.")))
                            ((sb-impl::whitespace[2]p nextchar rt)
                             (setq nextchar (sb-impl::flush-whitespace stream rt))))
@@ -775,9 +772,9 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
                     ;; Put back NEXTCHAR so that we can read it normally.
                     (t (unread-char nextchar stream)))))
           ;; Next thing is not an isolated dot.
-          (sb-int:binding* ((start (file-position stream))
-                            ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
-                            (end (file-position stream)))
+          (binding* ((start (file-position stream))
+                     ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
+                     (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (unless (eql winp 0)
               (let ((listobj (list obj))
@@ -799,11 +796,11 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
           (flet ((sharp-plus-minus (stream sub-char numarg)
                    (declare (ignore numarg))
                    (if (char= sub-char
-                              (if (sb-int:featurep (let ((*package* sb-int:*keyword-package*)
-                                                         (sb-impl::*reader-package* nil)
-                                                         (*read-suppress* nil)
-                                                         (*readtable* copy))
-                                                     (read stream t nil t)))
+                              (if (featurep (let ((*package* *keyword-package*)
+                                                  (sb-impl::*reader-package* nil)
+                                                  (*read-suppress* nil)
+                                                  (*readtable* copy))
+                                              (read stream t nil t)))
                                   #\+ #\-))
                        (read stream t nil t)
                        (let ((*read-suppress* t))
@@ -837,7 +834,7 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
                    (cond
                      (*read-suppress* nil)
                      ((and (listp thing) (= (length thing) 2)) #c(1 1))
-                     (t (sb-int:simple-reader-error stream "illegal complex number format: #C~S" thing))))))
+                     (t (simple-reader-error stream "illegal complex number format: #C~S" thing))))))
           (set-dispatch-macro-character #\# #\c #'sharp-c-replacement readtable))))))
 
 (defun suppress-sharp-a (readtable)
@@ -853,8 +850,8 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
                      ((and numarg (typep thing 'sequence)) #())
                      ;; extended #A(dims element-type &rest contents) syntax
                      ((not numarg) #())
-                     (t (sb-int:simple-reader-error stream "illegal literal array format: #~DA~S"
-                                                    numarg thing))))))
+                     (t (simple-reader-error stream "illegal literal array format: #~DA~S"
+                                             numarg thing))))))
           (set-dispatch-macro-character #\# #\a #'sharp-a-replacement readtable))))))
 
 ;;; The detection logic for "IN-PACKAGE" is stolen from swank's
@@ -934,9 +931,9 @@ subexpressions of the object to stream positions."
          (form (let ((*readtable* (make-source-recording-readtable
                                    *readtable* source-map+idgen))
                      (*package* *current-package*))
-                 (read stream nil sb-int:*eof-object*)))
+                 (read stream nil *eof-object*)))
          (end (file-position stream)))
-    (when (eql form sb-int:*eof-object*)
+    (when (eql form *eof-object*)
       ;; we might have suppressed some content under #+ or similar
       (return-from read-and-record-source-map (values form source-map)))
     (look-for-in-package-form-in-stream stream start end)
@@ -1029,7 +1026,7 @@ As a quick way to view source maps, do:
            (let ((repr (substitute #\space #\newline
                                    (write-to-string subform :pretty t)))
                  (source
-                  (when (sb-int:singleton-p locs)
+                  (when (singleton-p locs)
                     (substitute #\space #\newline
                                 (subseq source (1- (caar locs)) (cadar locs))))))
              (format t "  @ ~A = ~A~@[ = {~A}~]~%" locs repr source)))
@@ -1037,8 +1034,8 @@ As a quick way to view source maps, do:
 
 (defun show-fun-covg-paths (simple-fun)
   (let ((branches (make-hash-table :test 'equal)))
-    (sb-int:binding* (((paths code) (%find-coverage-map simple-fun))
-                      (marks (code-coverage-marks code)))
+    (binding* (((paths code) (%find-coverage-map simple-fun))
+               (marks (code-coverage-marks code)))
       (dotimes (i (length paths))
         (let ((list (aref paths i)))
           (format t "~3d~A = ~a~%"
