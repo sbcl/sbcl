@@ -1473,4 +1473,8 @@
   (assert-type
    (lambda (x)
      (* -0.0 (the (single-float 0.0 0.0) x)))
-   (single-float 0.0 0.0)))
+   (single-float 0.0 0.0))
+  (assert-type
+   (lambda (x)
+     (abs (the (or (single-float -2.0 -1.0) (member -0.0)) x)))
+   (or (single-float 1.0 2.0) (member 0.0))))

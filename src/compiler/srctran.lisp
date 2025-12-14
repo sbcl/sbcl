@@ -1563,14 +1563,15 @@
 ;;; X = [-1 10], the result is [0, 10].
 (defun interval-abs (x)
   (declare (type interval x))
-  (case (interval-range-info x)
-    (+
-     (copy-interval x))
-    (-
-     (interval-neg x))
-    (t
-     (multiple-value-bind (x- x+) (interval-split (interval-zero x) x t t)
-       (interval-merge-pair (interval-neg x-) x+)))))
+  (let ((zero (interval-zero x)))
+    (case (interval-range-info x zero)
+      (+
+       (copy-interval x))
+      (-
+       (interval-neg x))
+      (t
+       (multiple-value-bind (x- x+) (interval-split zero x t t)
+         (interval-merge-pair (interval-neg x-) x+))))))
 
 ;;; Compute the square of an interval.
 (defun interval-sqr (x)
