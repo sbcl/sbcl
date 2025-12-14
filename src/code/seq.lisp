@@ -1809,35 +1809,61 @@ many elements are copied."
                (funcall ,function value (apply-key ,key (car sequence)))))
        ((>= count ,end) value)))
 
-(define-sequence-traverser reduce (function sequence &rest args &key key
-                                   from-end start end (initial-value nil ivp))
+(defun reduce (function sequence &rest args
+               &key key from-end (start 0) end (initial-value nil ivp))
   (declare (type index start)
-           (dynamic-extent args)
-           (inline nthcdr))
+           (dynamic-extent args))
   (declare (explicit-check sequence))
-  (seq-dispatch-checking sequence
-      (let ((sequence (nthcdr start sequence)))
-        (if end
-            (if (= end start)
-                (if ivp initial-value (funcall function))
-                (cond-dispatch key
-                  (if from-end
-                      (let ((sequence (nthcdr (the index (- length end))
-                                              (reverse sequence))))
-                        (do ((sequence (if ivp
-                                           sequence
-                                           (cdr sequence))
-                                       (cdr sequence))
-                             (value (if ivp
-                                        initial-value
-                                        (apply-key key (car sequence)))
-                                    (funcall function (apply-key key (car sequence)) value)))
-                            ((endp sequence) value)))
-                      (list-reduce function sequence key start end
-                                   initial-value ivp))))
-            (if (endp sequence)
-                (if ivp initial-value (funcall function))
-                (let ((sequence (nthcdr start sequence)))
+  (declare (dynamic-extent function key))
+  (let* ((function (%coerce-callable-to-fun function))
+         (key (and key (%coerce-callable-to-fun key))))
+    (declare (type (or null function) key)
+             (type index start)
+             (type (or null index) end))
+    (seq-dispatch-checking sequence
+        (let ((sequence (nthcdr-check-bounds start sequence
+                                             start end sequence)))
+          (if end
+              (cond ((> start end)
+                     (sequence-bounding-indices-bad-error sequence start end))
+                    ((= end start)
+
+                     (if ivp
+                         initial-value
+                         (funcall function)))
+                    (t
+                     (cond-dispatch key
+                       (if from-end
+                           (let ((sequence (reverse-to-nthcdr-check-bounds (the index (- end start)) sequence
+                                                                           start end sequence)))
+                             (do ((sequence (if ivp
+                                                sequence
+                                                (cdr sequence))
+                                            (cdr sequence))
+                                  (value (if ivp
+                                             initial-value
+                                             (apply-key key (car sequence)))
+                                         (funcall function (apply-key key (car sequence)) value)))
+                                 ((endp sequence) value)))
+                           (do ((count (if ivp
+                                           start
+                                           (1+ start))
+                                       (1+ count))
+                                (sequence (if ivp
+                                              sequence
+                                              (cdr sequence))
+                                          (cdr sequence))
+                                (value (if ivp
+                                           initial-value
+                                           (apply-key key (car sequence)))
+                                       (funcall function value (apply-key key (car sequence)))))
+                               ((>= count end) value)
+                             (when (endp sequence)
+                               (sequence-bounding-indices-bad-error sequence start end)))))))
+              (if (endp sequence)
+                  (if ivp
+                      initial-value
+                      (funcall function))
                   (cond-dispatch key
                     (if from-end
                         (let ((sequence (reverse sequence)))
@@ -1858,25 +1884,32 @@ many elements are copied."
                                         initial-value
                                         (apply-key key (car sequence)))
                                     (funcall function value (apply-key key (car sequence)))))
-                            ((endp sequence) value))))))))
-      (let ((end (or end length)))
-        (declare (type index end))
-        (if (= end start)
-            (if ivp initial-value (funcall function))
-            (if from-end
-                (progn
-                  (when (not ivp)
-                    (setq end (1- (the fixnum end)))
-                    (setq initial-value (apply-key key (aref sequence end))))
-                  (mumble-reduce-from-end function sequence key start end
-                                          initial-value aref))
-                (progn
-                  (when (not ivp)
-                    (setq initial-value (apply-key key (aref sequence start)))
-                    (setq start (1+ start)))
-                  (mumble-reduce function sequence key start end
-                                 initial-value aref)))))
-      (apply #'sb-sequence:reduce function sequence args)))
+                            ((endp sequence) value)))))))
+        (let* ((length (length sequence))
+               (start
+                 (if (<= 0 start length)
+                     start
+                     (sequence-bounding-indices-bad-error sequence start end)))
+               (end
+                 (cond ((null end)
+                        length)
+                       ((<= start end length)
+                        end)
+                       (t
+                        (sequence-bounding-indices-bad-error sequence start end)))))
+          (declare (type index end))
+          (if (= end start)
+              (if ivp
+                  initial-value
+                  (funcall function))
+              (if from-end
+                  (progn
+                    (when (not ivp) (setq end (1- (the fixnum end))) (setq initial-value (apply-key key (aref sequence end))))
+                    (mumble-reduce-from-end function sequence key start end initial-value aref))
+                  (progn
+                    (when (not ivp) (setq initial-value (apply-key key (aref sequence start))) (setq start (1+ start)))
+                    (mumble-reduce function sequence key start end initial-value aref)))))
+        (apply #'sb-sequence:reduce function sequence args))))
 
 ;;;; DELETE
 
