@@ -1773,7 +1773,7 @@ many elements are copied."
                                end
                                initial-value
                                ref)
-  `(do ((index ,start (1+ index))
+  `(do ((index ,start (truly-the index (1+ index)))
         (value ,initial-value))
        ((>= index ,end) value)
      (setq value (funcall ,function value
@@ -1786,9 +1786,9 @@ many elements are copied."
                                         end
                                         initial-value
                                         ref)
-  `(do ((index (1- ,end) (1- index))
+  `(do ((index (truly-the index (1- ,end)) (truly-the index (1- index)))
         (value ,initial-value)
-        (terminus (1- ,start)))
+        (terminus (truly-the index (1- ,start))))
        ((<= index terminus) value)
      (setq value (funcall ,function
                           (apply-key ,key (,ref ,sequence index))
@@ -1885,30 +1885,28 @@ many elements are copied."
                                         (apply-key key (car sequence)))
                                     (funcall function value (apply-key key (car sequence)))))
                             ((endp sequence) value)))))))
-        (let* ((length (length sequence))
-               (start
-                 (if (<= 0 start length)
-                     start
-                     (sequence-bounding-indices-bad-error sequence start end)))
-               (end
-                 (cond ((null end)
-                        length)
-                       ((<= start end length)
-                        end)
-                       (t
-                        (sequence-bounding-indices-bad-error sequence start end)))))
-          (declare (type index end))
+        (with-array-data ((vector sequence) (start start) (end end) :check-fill-pointer t
+                          :force-inline t)
+          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (if (= end start)
               (if ivp
                   initial-value
                   (funcall function))
-              (if from-end
-                  (progn
-                    (when (not ivp) (setq end (1- (the fixnum end))) (setq initial-value (apply-key key (aref sequence end))))
-                    (mumble-reduce-from-end function sequence key start end initial-value aref))
-                  (progn
-                    (when (not ivp) (setq initial-value (apply-key key (aref sequence start))) (setq start (1+ start)))
-                    (mumble-reduce function sequence key start end initial-value aref)))))
+              (sb-vm::vector-dispatch vector
+                  ((declare (ignore vector))
+                   (sb-c::%type-check-error/c sequence 'nil-array-accessed-error nil))
+                (cond-dispatch key
+                  (if from-end
+                      (progn
+                        (when (not ivp)
+                          (setq end (truly-the index (1- (the fixnum end))))
+                          (setq initial-value (apply-key key (aref vector end))))
+                        (mumble-reduce-from-end function vector key start end initial-value aref))
+                      (progn
+                        (when (not ivp)
+                          (setq initial-value (apply-key key (aref vector start)))
+                          (setq start (1+ start)))
+                        (mumble-reduce function vector key start end initial-value aref)))))))
         (apply #'sb-sequence:reduce function sequence args))))
 
 ;;;; DELETE

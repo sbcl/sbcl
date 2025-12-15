@@ -2052,3 +2052,16 @@ function to be removed without further warning."
 ;;; Horrible kludge for the "static-vectors" system
 ;;; which uses an internal symbol in SB-IMPL.
 (import '%vector-widetag-and-n-bits-shift 'sb-impl)
+
+(defmacro vector-dispatch (vector nil-array &body body)
+  `(case (ash (%other-pointer-widetag (the vector ,vector)) -2)
+     ,@(loop
+         for info across *specialized-array-element-type-properties*
+         for specifier = (saetp-specifier info)
+         collect `(,(ash (saetp-typecode info) -2)
+                   (let ((,vector (truly-the (simple-array ,specifier (*)) ,vector)))
+                     ,@(if (null specifier)
+                           nil-array
+                           body))))
+     (t
+      (sb-impl::unreachable))))
