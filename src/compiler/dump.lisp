@@ -1480,6 +1480,6 @@
 ;;;; code coverage
 
 (defun dump-code-coverage-records (cc file)
-  (declare (type list cc))
+  (declare (type simple-vector cc))
   (dump-object cc file)
   (dump-fop 'fop-record-code-coverage file))

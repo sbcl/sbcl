@@ -21,13 +21,6 @@
 
 (defmacro code-coverage-hashtable () `(car *code-coverage-info*))
 
-(defun reset-code-coverage ()
-  (maphash (lambda (info cc)
-             (declare (ignore info))
-             (dolist (cc-entry cc)
-               (setf (cdr cc-entry) nil)))
-           (code-coverage-hashtable)))
-
 ;;;; New coverage representation.
 ;;;; One byte per coverage mark is stored in the unboxed constants of the code.
 ;;;; x86[-64] use a slightly different but not significantly different
@@ -98,7 +91,7 @@ image."
        #-(or x86-64 x86) `(/= ,byte #xFF)))
 
 ;;; Retun just the list of soure paths in CODE that are marked covered.
-(defun get-coverage (code)
+(defun get-coverage (code) ; UNUSED. Can we delete this?
   (multiple-value-bind (map code) (%find-coverage-map code)
     (when map
       (collect ((paths))
@@ -132,52 +125,47 @@ image."
              #+arm64
              (fill (code-coverage-marks code) #xFF))))
         (t                              ; reset everything
+         (maphash (lambda (filename file-coverage)
+                    (declare (ignore filename))
+                    (fill (covered-file-executed file-coverage) 0))
+                  (code-coverage-hashtable))
          (do-instrumented-code (code)
-           (reset-coverage code))
-         (reset-code-coverage))))
+           (reset-coverage code)))))
 
-;;; Transfer data from new-style coverage marks into old-style.
-;;; Update only data for FILENAME if supplied, or all files if NIL.
-;;; Ideally we could report directly from the new data where applicable,
-;;; however this is, for the time being, perfectly backward-compatibile.
-(defun refresh-coverage-info (&optional filename)
-  (declare (ignorable filename))
+;;; Transfer marks from code-component into a per-file bitmap, making subsequent steps simpler.
+;;; An unnecessarily inefficient detail is that the mapping from index in a code header's byte
+;;; array to the bit array is predetermined at compile-time, yet we wait until now to do it.
+;;; The fact is that paths should not be stored in the code headers- just bit indices.
+(defun refresh-coverage-bits ()
   ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
-  ;; source paths to the legacy coverage record for that path in that file,
-  ;;   e.g. (1 4 1) -> ((1 4 1) . NIL)
-  (let ((namestring->path-tables (make-hash-table :test 'equal))
-        (coverage-records (code-coverage-hashtable))
-        (n-marks 0))
+  ;; source paths to the per-file parallel arrays
+  ;;   e.g. (1 4 1) -> index into COVERED-FILE-PATHS, COVERED-FILE-EXECUTED
+  (let ((namestring->path-tables (make-hash-table :test 'equal)))
     (do-instrumented-code (code)
-      (binding* ((map (%find-coverage-map code) :exit-if-null)
+      (binding* ((map (the (not null) (%find-coverage-map code)))
                  (namestring
                   (sb-c::debug-source-namestring
                           (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))
                          :exit-if-null)
-                 (legacy-coverage-marks
-                  (and (or (null filename) (string= namestring filename))
-                       (gethash namestring coverage-records))
-                         :exit-if-null)
-                 (path-lookup-table
-                         (gethash namestring namestring->path-tables)))
-        ;; Build the source path -> marked map for this file if not seen yet.
-        ;; It is of course redundant to have both representations.
+                 (covered-file (gethash namestring (code-coverage-hashtable)) :exit-if-null)
+                 (path-lookup-table (gethash namestring namestring->path-tables)))
+        ;; Build the source path -> index table for this file if not seen yet.
         (unless path-lookup-table
           (setf path-lookup-table (make-hash-table :test 'equal)
                 (gethash namestring namestring->path-tables) path-lookup-table)
-          (dolist (item legacy-coverage-marks)
-            (setf (gethash (car item) path-lookup-table) item)))
+          (dotimes (i (length (covered-file-paths covered-file)))
+            (let ((path (svref (covered-file-paths covered-file) i)))
+              (setf (gethash path path-lookup-table) i))))
         #-arm64
         (sb-sys:with-pinned-objects (code)
           (let ((sap (code-coverage-marks code)))
             (dotimes (i (length map))   ; for each recorded mark
               (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
-                (incf n-marks)
-                ;; Set the legacy coverage mark for each path it touches
+                ;; Set the file's EXECUTED bit for each affected source path
                 (dolist (path (svref map i))
                   (let ((found (gethash path path-lookup-table)))
                     (if found
-                        (rplacd found t)
+                        (setf (bit (covered-file-executed covered-file) found) 1)
                         #+nil
                         (warn "Missing coverage entry for ~S in ~S"
                               path namestring))))))))
@@ -185,12 +173,10 @@ image."
         (let ((marks (code-coverage-marks code)))
           (dotimes (i (length map))     ; for each recorded mark
             (when (byte-marked-p (aref marks i))
-              (incf n-marks)
               (dolist (path (svref map i))
                 (let ((found (gethash path path-lookup-table)))
                   (if found
-                      (rplacd found t)))))))))
-    (values coverage-records n-marks)))
+                      (setf (bit (covered-file-executed covered-file) found) 1)))))))))))
 
 ) ; end MACROLET
 
@@ -200,41 +186,39 @@ The only operation that may be done on the state is passing it to
 RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
 A representation that has been printed and read back will work identically
 in RESTORE-COVERAGE."
-  (refresh-coverage-info)
+  (refresh-coverage-bits)
   (loop for file being the hash-keys of (code-coverage-hashtable)
         using (hash-value states)
-        collect (cons file (copy-tree states))))
+        ;; a regression test fails without a COPY-SEQ here even though IRL we expect
+        ;; to store these in a file right away (making the copy immaterial)
+        collect (list* file (covered-file-paths states)
+                       (copy-seq (covered-file-executed states)))))
+
+(flet ((set-image-states (coverage-state operation)
+         ;; This does not update coverage stored in code object headers
+         (loop for (filename paths . bits) in coverage-state
+               do (let ((image-states (gethash filename (code-coverage-hashtable))))
+                    (cond ((not image-states) ; use all the new data
+                           (let ((info (sb-c::make-coverage-instrumented-file paths)))
+                             (replace (covered-file-executed info) bits)
+                             (setf (gethash filename (code-coverage-hashtable)) info)))
+                          ((equal (covered-file-paths image-states) paths)
+                           (if (eq operation boole-ior)
+                               (bit-ior (covered-file-executed image-states) bits t)
+                               (replace (covered-file-executed image-states) bits)))
+                          (t
+                           (warn "Can't replace coverage for ~S - source has changed"
+                                 filename)))))))
 
 (defun merge-coverage (coverage-state)
   "Merge the code coverage data to include covered code from an earlier
 state produced by SAVE-COVERAGE."
-  ;; This does not update coverage stored in code object headers
-  (loop for (file . states) in coverage-state
-        do (let ((image-states (gethash file (code-coverage-hashtable)))
-                 (table (make-hash-table :test 'equal)))
-             (when image-states
-               (loop for cons in image-states
-                     do (setf (gethash (car cons) table) cons))
-               (loop for (key . value) in states
-                     if value
-                     do (let ((state (gethash key table)))
-                          (when state
-                            (setf (cdr state) value))))))))
+  (set-image-states coverage-state boole-ior))
 
 (defun restore-coverage (coverage-state)
   "Restore the code coverage data back to an earlier state produced by
 SAVE-COVERAGE."
-  ;; This does not update coverage stored in code object headers
-  (loop for (file . states) in coverage-state
-        do (let ((image-states (gethash file (code-coverage-hashtable)))
-                 (table (make-hash-table :test 'equal)))
-             (when image-states
-               (loop for cons in image-states
-                     do (setf (gethash (car cons) table) cons))
-               (loop for (key . value) in states
-                     do (let ((state (gethash key table)))
-                          (when state
-                            (setf (cdr state) value))))))))
+  (set-image-states coverage-state boole-2)))
 
 (defun save-coverage-in-file (pathname)
   "Call SAVE-COVERAGE and write the results of that operation into the
@@ -302,13 +286,10 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (directory (pathname-as-directory directory))
          (defaults (translate-logical-pathname directory)))
     (ensure-directories-exist defaults)
-    (when (eq if-matches 'identity)
-      (refresh-coverage-info)) ; update all
+    (refresh-coverage-bits)
     (maphash (lambda (k v)
                (declare (ignore v))
                (when (funcall if-matches k)
-                 (unless (eq if-matches 'identity)
-                   (refresh-coverage-info k)) ; update one file
                  (let* ((pk (translate-logical-pathname k))
                         (n (format nil "~(~{~2,'0X~}~)"
                                    (coerce (sb-md5:md5sum-string
@@ -625,29 +606,23 @@ table.summary tr.subheading { background-color: #aaaaff}
 table.summary tr.subheading td { text-align: left; font-weight: bold; padding-left: 5ex; }
 </style>"))
 
-(defun convert-records (records mode)
+(defun convert-records (records mode &aux (paths (covered-file-paths records))
+                                          (bits (covered-file-executed records)))
   (ecase mode
     (:expression
-     (loop for record in records
-           unless (member (caar record) '(:then :else))
-           collect (list mode
-                         (car record)
-                         (if (cdr record)
-                             1
-                             2))))
+     (loop for path across paths and bit across bits
+           unless (member (car path) '(:then :else))
+           collect (list mode path (if (= bit 1) 1 2))))
     (:branch
      (let ((hash (make-hash-table :test 'equal)))
-       (dolist (record records)
-         (let ((path (car record)))
-           (when (member (car path) '(:then :else))
-             (setf (gethash (cdr path) hash)
+       (loop for path across paths and bit across bits
+             when (member (car path) '(:then :else))
+          do (setf (gethash (cdr path) hash)
                    (logior (gethash (cdr path) hash 0)
-                           (ash (if (cdr record)
-                                    1
-                                    2)
+                           (ash (if (= bit 1) 1 2)
                                 (if (eql (car path) :then)
                                     0
-                                    2)))))))
+                                    2)))))
        (let ((list nil))
          (maphash (lambda (k v)
                     (push (list mode k v) list))

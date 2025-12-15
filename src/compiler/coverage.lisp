@@ -11,6 +11,21 @@
 
 (in-package "SB-C")
 
+;;; The vector of source PATHS is not too bad in terms of space consumption
+;;; due to all the sharing that occurs. Each vector element consumes typically at most
+;;; 1 cons cell, because it extends a prior element by 1 path component, e.g.
+;;;   :PATHS #((0) #1=(1) #2=(3 . #1#) #3=(1 . #2#) (1 . #3#) (2 . #3#)
+;;;            (:THEN . #3#) #4=(2 . #2#) (1 . #4#) (2 . #4#) (:ELSE . #3#)
+;;;            #5=(3 . #2#) #6=(2 . #5#) #7=(1 . #6#) #8=(0 . #9=(1 . #7#))
+;;;            (1 . #8#) (2 . #8#) (:THEN . #8#) #10=(1 . #9#) #11=(1 . #10#) ...)
+(defstruct (covered-file
+             (:constructor make-coverage-instrumented-file
+                           (paths &aux (executed (make-array (length paths)
+                                                             :element-type 'bit))))
+             (:copier nil) (:predicate nil))
+  (executed #* :type simple-bit-vector :read-only t)
+  (paths #() :type simple-vector :read-only t))
+
 (defknown %mark-covered (cons) t (always-translatable))
 
 ;;; Check the policy for whether we should generate code coverage

@@ -34,7 +34,7 @@
 (defun sb-cover-test:get-states (x)
   (handler-case
       (progn
-        (sb-cover::refresh-coverage-info)
+        (sb-cover::refresh-coverage-bits)
         (nth-value 1 (sb-cover::compute-file-info (namestring (sb-cover-test:source-pathname x)) :default)))
     (warning (condition)
       (error "Unexpected warning: ~A" condition))))

@@ -1661,13 +1661,15 @@ necessary, since type inference may take arbitrarily long to converge.")
                         #-sb-xc-host
                         (core-object (fix-core-source-info info object))
                         (null)))))
-                (let ((code-coverage-records (coverage-records *compilation*)))
-                  (unless (zerop (hash-table-count code-coverage-records))
+                (let ((hash-table (coverage-records *compilation*)))
+                  (unless (zerop (hash-table-count hash-table))
                     ;; Dump the code coverage records into the fasl.
-                    (dump-code-coverage-records
-                     (loop for k being each hash-key of code-coverage-records
-                           collect k)
-                     *compile-object*)))
+                    (let ((records (make-array (hash-table-count hash-table)))
+                          (i -1))
+                      (dohash ((k v) hash-table)
+                        (declare (ignore v))
+                        (setf (aref records (incf i)) k))
+                      (dump-code-coverage-records records *compile-object*))))
                 nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of

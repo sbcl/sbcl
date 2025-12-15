@@ -1225,8 +1225,7 @@
   (setf (gethash (sb-c::debug-source-namestring
                   (%fasl-input-partial-source-info (fasl-input)))
                  (car *code-coverage-info*))
-        (mapcar #'list paths))
-  (values))
+         (sb-c::make-coverage-instrumented-file paths)))
 
 ;;; Primordial layouts.
 (macrolet ((frob (&rest specs)
