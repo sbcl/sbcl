@@ -1833,33 +1833,34 @@ many elements are copied."
                          (funcall function)))
                     (t
                      (cond-dispatch key
-                       (if from-end
-                           (let ((sequence (reverse-to-nthcdr-check-bounds (the index (- end start)) sequence
-                                                                           start end sequence)))
-                             (do ((sequence (if ivp
+                       (let ((count (the index (- end start))))
+                         (if from-end
+                             (let ((sequence (reverse-to-nthcdr-check-bounds count sequence
+                                                                             start end sequence)))
+                               (do ((sequence (if ivp
+                                                  sequence
+                                                  (cdr sequence))
+                                              (cdr sequence))
+                                    (value (if ivp
+                                               initial-value
+                                               (apply-key key (car sequence)))
+                                           (funcall function (apply-key key (car sequence)) value)))
+                                   ((endp sequence) value)))
+                             (do ((count (if ivp
+                                             count
+                                             (1- count))
+                                         (1- count))
+                                  (sequence (if ivp
                                                 sequence
                                                 (cdr sequence))
                                             (cdr sequence))
                                   (value (if ivp
                                              initial-value
                                              (apply-key key (car sequence)))
-                                         (funcall function (apply-key key (car sequence)) value)))
-                                 ((endp sequence) value)))
-                           (do ((count (if ivp
-                                           start
-                                           (1+ start))
-                                       (1+ count))
-                                (sequence (if ivp
-                                              sequence
-                                              (cdr sequence))
-                                          (cdr sequence))
-                                (value (if ivp
-                                           initial-value
-                                           (apply-key key (car sequence)))
-                                       (funcall function value (apply-key key (car sequence)))))
-                               ((>= count end) value)
-                             (when (endp sequence)
-                               (sequence-bounding-indices-bad-error sequence start end)))))))
+                                         (funcall function value (apply-key key (car sequence)))))
+                                 ((<= count 0) value)
+                               (when (endp sequence)
+                                 (sequence-bounding-indices-bad-error sequence start end))))))))
               (if (endp sequence)
                   (if ivp
                       initial-value
