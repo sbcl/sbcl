@@ -217,7 +217,7 @@
          (t
           (values '%instance-ref '%instance-set))))
 
-;;;; typed (non-class) structures
+;;;; Typed (non-class) structures
 
 ;;; Return a type specifier we can use for testing :TYPE'd structures.
 (defun dd-lisp-type (defstruct)
@@ -225,14 +225,14 @@
     (list 'list)
     (vector `(simple-array ,(dd-%element-type defstruct) (*)))))
 
-;;;; shared machinery for inline and out-of-line slot accessor functions
+;;;; Shared machinery for inline and out-of-line slot accessor functions
 
 ;;; Classic comment preserved for entertainment value:
 ;;;
 ;;; "A lie can travel halfway round the world while the truth is
 ;;; putting on its shoes." -- Mark Twain
 
-;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
+;;;; The legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB-XC:DEFSTRUCT)
 
 (defun %defstruct-package-locks (dd)
@@ -273,7 +273,7 @@
                                 ,(slot-access-transform :setf '(instance value) key))))
                         (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
                                      ,(slot-access-transform :read '(instance) key))))))
-      ;; Return fragements of code that CLOS can use.  We don't return
+      ;; Return fragments of code that CLOS can use.  We don't return
       ;; the toplevel DEFUNs because those generally perform an
       ;; unneeded type-check unless in safety 0.  These CLOS-related
       ;; lambdas don't need to check the type of the instance because
@@ -281,7 +281,7 @@
       ;; unbound markers through for the CLOS machinery to handle.
       ;;
       ;; FIXME: it seems like all these fragments should be packed
-      ;; into a single codebob which will have less overhead than
+      ;; into a single codeblob which will have less overhead than
       ;; separate blobs.  Afaict, the only way to do that is to return
       ;; one lambda that returns all the lambdas.
       (collect ((result))
@@ -308,13 +308,13 @@
                                 ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
                                 ;; plus a rebinding of X with TRULY-THE.
                                 `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
-                                ;; Don't check X, but do check the the fetched value.
+                                ;; Don't check X, but do check the fetched value.
                                 (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
                                                        key :function t)))
                         `',accessor)))))))
 
-;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
-;;; cross-compiler macroexpansion for CL:DEFSTRUCT
+;;; Shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
+;;; cross-compiler macroexpansion for CL:DEFSTRUCT.
 ;;; This monster has exactly one inline use in the final image,
 ;;; and we can drop the definition.
 ;;;
@@ -329,7 +329,7 @@
 ;;; Some caveats: (1) a non-toplevel defstruct compiled after already seeing
 ;;; the same, due to repeated compilation of a file perhaps, will use the known
 ;;; definition, since technically structures must not be incompatibly redefined.
-;;; (2) delayed DEFUNS don't get the right TLF index in their debug info.
+;;; (2) delayed DEFUNs don't get the right TLF index in their debug info.
 ;;; We could expand into the internal expansion of DEFUN with an extra argument
 ;;; for the source location, which would get whatever "here" is instead of random.
 ;;; In other words: `(progn (sb-impl::%defun struct-slot (...) ... ,(source-location))
@@ -531,7 +531,7 @@
                                   name-and-options slot-descriptions
                                   :target))))
 
-;;;; functions to generate code for various parts of DEFSTRUCT definitions
+;;;; Functions to generate code for various parts of DEFSTRUCT definitions
 
 ;;; First, a helper to determine whether a name names an inherited
 ;;; accessor.
@@ -603,7 +603,7 @@
                             instead).~:@>" name (dsd-name slot))))))))
     (stuff)))
 
-;;;; parsing
+;;;; Parsing
 
 ;;; CLHS says that
 ;;;   A defstruct option can be either a keyword or a list of a keyword
@@ -657,7 +657,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
               (error "Invalid syntax in DEFSTRUCT option ~S" option)))))
     (case keyword
       (:conc-name
-       ;; unlike (:predicate) and (:copier) which mean "yes" if supplied
+       ;; Unlike (:predicate) and (:copier) which mean "yes" if supplied
        ;; without their argument, (:conc-name) and :conc-name mean no conc-name.
        ;; Also note a subtle difference in :conc-name "" vs :conc-name NIL.
        ;; The former re-interns each slot name into *PACKAGE* which might
@@ -860,7 +860,7 @@ unless :NAMED is also specified.")))
     ;;   (DEFTYPE X () 'SINGLE-FLOAT) and later (DEFSTRUCT X (A 0 :TYPE X)).
     ;; This is probably undefined behavior, but at least we'll not crash.
     ;; Also make self-referential definitions not signal PARSE-UNKNOWN-TYPE
-    ;; on slots whose :TYPE option allows an instance of itself
+    ;; on slots whose :TYPE option allows an instance of itself.
     (when (dd-include dd)
       (setq ancestor-slot-comparator-list
             (frob-dd-inclusion-stuff proto-classoid dd option-bits)))
@@ -879,7 +879,7 @@ unless :NAMED is also specified.")))
 
 (defmacro dd-has-raw-slot-p (dd) `(eq (dd-%element-type ,dd) '*))
 
-;;;; stuff to parse slot descriptions
+;;;; Stuff to parse slot descriptions
 
 ;;; Decide whether TYPE as stored in a structure can be a raw slot.
 ;;; Return the index of the matching RAW-SLOT-DATA if it should be, NIL if not.
@@ -917,7 +917,7 @@ unless :NAMED is also specified.")))
                      &key (type nil type-p) (read-only nil ro-p))
              spec
            (when (dd-conc-name defstruct)
-             ;; the warning here is useful, but in principle we cannot
+             ;; The warning here is useful, but in principle we cannot
              ;; distinguish between legitimate and erroneous use of
              ;; these names when :CONC-NAME is NIL.  In the common
              ;; case (CONC-NAME non-NIL), there are alternative ways
@@ -1182,7 +1182,7 @@ unless :NAMED is also specified.")))
                 ;; XXX: notify?
                 ))))))))
 
-;;;; various helper functions for setting up DEFSTRUCTs
+;;;; Various helper functions for setting up DEFSTRUCTs
 
 ;;; This function is called at macroexpand time to compute the INHERITS
 ;;; vector for a structure type definition.
@@ -1243,7 +1243,7 @@ unless :NAMED is also specified.")))
                  (unless (dsd-read-only slot)
                    (fmakunbound `(setf ,(dsd-accessor-name slot)))))))
            (setq layout (classoid-layout classoid))))
-    ;; Don't want to (setf find-classoid) on a a built-in-classoid
+    ;; Don't want to (setf find-classoid) on a built-in-classoid
     (unless (and (built-in-classoid-p classoid)
                  (eq (find-classoid (dd-name dd) nil) classoid))
       (setf (find-classoid (dd-name dd)) classoid))
@@ -1384,7 +1384,7 @@ unless :NAMED is also specified.")))
         (warn "undeclaring functions for old subclasses of ~S:~%  ~S"
               (classoid-name classoid) (subs))))))
 
-;;; core compile-time setup of any class with a LAYOUT, used even by
+;;; Core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
 (defun %compiler-set-up-layout (dd inherits)
   (multiple-value-bind (classoid layout old-layout)
@@ -1501,7 +1501,7 @@ DEFSTRUCT should precede references to the affected functions, ~
 or they must be declared locally notinline at each call site.~@:>"
        :format-arguments (list (length it) (nreverse it) (dd-name dd))))))
 
-;;;; redefinition stuff
+;;;; Redefinition stuff
 
 ;;; Compare the slots of OLD and NEW, returning 3 lists of slot names:
 ;;;   1. Slots which have moved,
@@ -1700,7 +1700,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;      word1: (u) raw slots ...
 ;;;
 ;;; Notes:
-;;; 1. LAYOUT has to be scanned separately regardless of where stored.
+;;; 1. LAYOUT has to be scanned separately regardless of where stored
 ;;;    (compact header or not). Hence it is regarded as an untagged slot.
 ;;; 2. For funcallable objects these examples are exhaustive of all
 ;;;    possible bitmaps. The instance length can be anything,
@@ -1737,7 +1737,7 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; If the structure has a custom GC scavenging method then always return
     ;; the minimal bitmap, and disallow arbitrary trailing slots.
     ;; The optimization for all-tagged (avoiding use of the bitmap)
-    ;; indicates in addition to no raw slots, no custom GC method either.
+    ;; indicates, in addition to no raw slots, no custom GC method either.
     ;; As of now this only pertains to lockfree-singly-linked-list nodes
     ;; and descendant types. (The lockfree list uses one pointer bit
     ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
@@ -1800,7 +1800,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (setf (classoid-direct-superclasses classoid)
           (case (dd-name info)
             ;; Argh, could this case be any more opaque???
-            ;; It's ostensibly the set of types whose superclasse would come out wrong
+            ;; It's ostensibly the set of types whose superclasses would come out wrong
             ;; if we didn't fudge them manually. But the computation of the superclass
             ;; list is obfuscated. I think we have assertions about this somewhere.
             ;; But ideally we remove this junky case from the target image somehow
@@ -1898,7 +1898,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; have processed the arglist. The correct variant (according to the
 ;;; DD-TYPE) should be called. The function is defined with the
 ;;; specified name and arglist. VARS and TYPES are used for argument
-;;; type declarations. VALUES are the values for the slots (in order.)
+;;; type declarations. VALUES are the values for the slots (in order).
 ;;;
 ;;; This is split into two functions:
 ;;;   * INSTANCE-CONSTRUCTOR-FORM has to deal with raw slots
@@ -2179,7 +2179,7 @@ or they must be declared locally notinline at each call site.~@:>"
                          (if (eq type t) initform `(the ,type ,initform)))))
                  (dd-slots dd))))))))))
 
-;;;; instances with ALTERNATE-METACLASS
+;;;; Instances with ALTERNATE-METACLASS
 ;;;;
 ;;;; The CMU CL support for structures with ALTERNATE-METACLASS was a
 ;;;; fairly general extension embedded in the main DEFSTRUCT code, and
@@ -2319,7 +2319,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun !target-defstruct-altmetaclass (&rest args)
   (declare (ignore args)))
 
-;;;; finalizing bootstrapping
+;;;; Finalizing bootstrapping
 
 ;;; Set up DD and LAYOUT for STRUCTURE-OBJECT class itself.
 ;;;
