@@ -379,23 +379,23 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     (format html-stream "</body></html>")
     (list (getf counts :expression) (getf counts :branch))))
 
-(defun compute-file-info (file external-format)
+(defun compute-file-info (filename external-format)
   ;; Go through all records, find the matching source in the file,
   ;; and update STATES to contain the state of the record in the
   ;; indexes matching the source location.
-  (let* ((source (read-source file external-format))
+  (let* ((source (read-source filename external-format))
          ;; Cache the source-maps
          (maps (read-and-record-source-maps source))
          (states (initial-states source maps))
          (counts (list :branch (make-sample-count :branch)
                        :expression (make-sample-count :expression)))
-         (records (get-records file))
+         (records (get-records filename counts))
          ;; We do this in two stages: the first stage records the
          ;; character ranges, and the second stage does the update, in
          ;; order from shortest to longest ranges. This ensures that
          ;; for each index in STATES will reflect the state of the
          ;; innermost containing form.
-         (locations (get-locations-recording-counts records maps counts file)))
+         (locations (get-locations records maps filename)))
     ;; Now process the locations, from the shortest range to the longest
     ;; one. If two locations have the same range, the one with the higher
     ;; state takes precedence. The latter condition ensures that if
@@ -403,6 +403,36 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     ;; the branch-state will be used.
     (fill-states-from-locations source states locations)
     (values counts states source)))
+
+(defun get-records (filename counts)
+  (let* ((file (gethash filename (code-coverage-hashtable)))
+         (paths (covered-file-paths file))
+         (bits (covered-file-executed file))
+         (branch-recs (make-hash-table :test 'equal))
+         (branch-count (getf counts :branch))
+         (expression-count (getf counts :expression)))
+    (collect ((records))
+      (dotimes (i (length paths))
+        (let ((state (if (zerop (sbit bits i)) 2 1)) (path (aref paths i)))
+          (cond ((member (car path) '(:then :else))
+                 (setf (gethash (cdr path) branch-recs)
+                       (logior (gethash (cdr path) branch-recs 0)
+                               (ash state (if (eql (car path) :then) 0 2)))))
+                (t
+                 (when (eql state 1) (incf (ok-of expression-count)))
+                 (incf (all-of expression-count))
+                 (records (list path state))))))
+      (maphash (lambda (path state)
+                 ;; Each branch record accounts for two paths
+                 (incf (ok-of branch-count)
+                       (ecase state
+                         (5 2)      ; #b0101 = both ways taken
+                         ((6 9) 1)  ; #b0110 = taken/not-taken, #b1001 = not-taken/taken
+                         (10 0)))   ; #b1010 = neither way taken
+                 (incf (all-of branch-count) 2)
+                 (records (list path state)))
+               branch-recs)
+      (records))))
 
 (defun read-and-record-source-maps (source &aux (id-generator (list 0)))
   (with-input-from-string (stream source)
@@ -470,36 +500,15 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                      (setf col -1))
                    (write-char char stream))))))
 
-(defun get-records (file)
-  (let ((hashtable (code-coverage-hashtable)))
-    ;; Convert the code coverage records to a more suitable format for
-    ;; this function.
-    (append (convert-records (gethash file hashtable) :expression)
-            (convert-records (gethash file hashtable) :branch))))
-
-(defun get-locations-recording-counts (records maps counts file)
+(defun get-locations (records maps filename)
   (let (locations)
     (dolist (record records locations)
-      (destructuring-bind (mode path state) record
+      (destructuring-bind (path state) record
         (let* ((path (reverse path))
                (tlf (car path))
                (source-form (car (nth tlf maps)))
                (source-map (cdr (nth tlf maps)))
                (source-path (cdr path)))
-          (cond ((eql mode :branch)
-                 (let ((count (getf counts :branch)))
-                   ;; For branches mode each record accounts for two paths
-                   (incf (ok-of count)
-                         (ecase state
-                           (5 2)      ; #b0101 = both ways taken
-                           ((6 9) 1)  ; #b0110 = taken/not-taken, #b1001 = not-taken/taken
-                           (10 0)))   ; #b1010 = neither way taken
-                   (incf (all-of count) 2)))
-                (t
-                 (let ((count (getf counts :expression)))
-                   (when (eql state 1)
-                     (incf (ok-of count)))
-                   (incf (all-of count)))))
           (if source-map
               (handler-case
                   (multiple-value-bind (start end)
@@ -508,8 +517,9 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                       (push (list start end state) locations)))
                 (error (e)
                   (warn "~@<Error finding source location for source path ~A in file ~A: ~2I~_~A~@:>"
-                        source-path file e)))
-              (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))))
+                        source-path filename e)))
+              (warn "Unable to find a source map for toplevel form ~A in file ~A~%"
+                    tlf filename)))))))
 
 (defun fill-states-from-locations (source states locations)
   (setf locations (sort (copy-list locations) #'> :key #'third))
@@ -605,29 +615,6 @@ table.summary tr.even { background-color: #eeeeff }
 table.summary tr.subheading { background-color: #aaaaff}
 table.summary tr.subheading td { text-align: left; font-weight: bold; padding-left: 5ex; }
 </style>"))
-
-(defun convert-records (records mode &aux (paths (covered-file-paths records))
-                                          (bits (covered-file-executed records)))
-  (ecase mode
-    (:expression
-     (loop for path across paths and bit across bits
-           unless (member (car path) '(:then :else))
-           collect (list mode path (if (= bit 1) 1 2))))
-    (:branch
-     (let ((hash (make-hash-table :test 'equal)))
-       (loop for path across paths and bit across bits
-             when (member (car path) '(:then :else))
-          do (setf (gethash (cdr path) hash)
-                   (logior (gethash (cdr path) hash 0)
-                           (ash (if (= bit 1) 1 2)
-                                (if (eql (car path) :then)
-                                    0
-                                    2)))))
-       (let ((list nil))
-         (maphash (lambda (k v)
-                    (push (list mode k v) list))
-                  hash)
-         list)))))
 
 ;;;; A mutant version of swank-source-path-parser from Swank/Slime.
 
