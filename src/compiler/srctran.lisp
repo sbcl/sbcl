@@ -5296,13 +5296,23 @@
   0)
 
 (defun negate-lvar (x outer-node &optional test)
-  (let ((initial-lvar-type (lvar-type x))) ;; before it's erased by erase-lvar-type
+  (let ((return-type (single-value-type (node-derived-type outer-node))))
     (flet ((float-safe-p ()
              (or (policy outer-node (zerop float-accuracy))
                  (not (types-equal-or-intersect
-                       initial-lvar-type
-                       (specifier-type '(or float (complex float))))))))
-      (labels ((negate-lvar (x &optional type test)
+                       return-type
+                       (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float))))))))
+      (labels ((float-contagion (a b)
+                 ;; Don't allow mixing integer 0 and float zero, which have different negations
+                 (cond ((float-safe-p))
+                       ((and (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
+                             (csubtypep (lvar-type b) (specifier-type '(or rational (complex rational))))))
+                       ((csubtypep (lvar-type a) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+                        (or (csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+                            a))
+                       ((csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+                        b)))
+               (negate-lvar (x type test)
                  (let ((uses (lvar-uses x)))
                    (if (listp uses)
                        (let (left negated %negate)
@@ -5326,30 +5336,38 @@
                                  (t))))
                        (negate-node uses type test))))
                (negate-node (node type test)
-                 (flet ((negate-args (args type)
-                          ;; Prefer to remove %negate instead of turning constants negative
-                          (cond ((eq test t)
-                                 (or (negate-lvar (first args) type test)
-                                     (negate-lvar (second args) type test)))
-                                (t
-                                 (let ((%negate (negate-lvar (first args) type '%negate)))
-                                   (if (eq %negate '%negate)
-                                       %negate
-                                       (if (eq test '%negate)
-                                           (or (negate-lvar (second args) type test)
-                                               %negate)
-                                           (or (negate-lvar (second args) type)
-                                               (and %negate
-                                                    (negate-lvar (first args) type))))))))))
+                 (flet ((negate-args (args type &optional contagion)
+                          (destructuring-bind (first second) args
+                            (when contagion
+                              (let ((contagion (float-contagion first second)))
+                                (case contagion
+                                  ((t))
+                                  ((nil) (return-from negate-args))
+                                  (t
+                                   (return-from negate-args (negate-lvar contagion type test))))))
+                            ;; Prefer to remove %negate instead of turning constants negative
+                            (cond ((eq test t)
+                                   (or (negate-lvar first type test)
+                                       (negate-lvar second type test)))
+                                  (t
+                                   (let ((%negate (negate-lvar first type '%negate)))
+                                     (if (eq %negate '%negate)
+                                         %negate
+                                         (if (eq test '%negate)
+                                             (or (negate-lvar second type test)
+                                                 %negate)
+                                             (or (negate-lvar second type nil)
+                                                 (and %negate
+                                                      (negate-lvar first type nil)))))))))))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
                          (unless (and (eql value 0) ;; can't negate a non-float zero
                                       (not (float-safe-p)))
-                           (let ((negated (- value)))
-                             (unless test
+                           (unless test
+                             (let ((negated (- value)))
                                (replace-node-with-constant node negated)
-                               (erase-lvar-type (node-lvar node) nil outer-node))
-                             t))
+                               (erase-lvar-type (node-lvar node) nil outer-node)))
+                           t)
                          (combination-case (x :cast type :node node)
                            ;; (- (- x)) => x
                            (%negate (*)
@@ -5381,7 +5399,7 @@
                                                 'negate-lvar))
                               t))
                            ((* /) (* *)
-                            (negate-args args nil))
+                            (negate-args args nil t))
                            (truncate (* *)
                             (negate-args args (specifier-type 'real)))
                            (ash (* (type unsigned-byte))

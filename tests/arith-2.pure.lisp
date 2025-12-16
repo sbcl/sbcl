@@ -1388,6 +1388,7 @@
                     (- y))))
           0)
     (test `(lambda (x y)
+             (declare (optimize (sb-c::float-accuracy 0)))
              (- (* (/ x 4) (- y))))
           0)
     (test `(lambda (x y)
@@ -1450,7 +1451,17 @@
         `(lambda (a b c)
            (- (if a -3 (* (truncate 4 b) c))))
       ((nil 2 3) -6)
-      ((t 4 5) 3))))
+      ((t 4 5) 3))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a b)
+           (- (* (* a 3) b)))
+      ((0 4.0) -0.0))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a b)
+           (- (* a (- b))))
+      ((4.0 0) -0.0))))
 
 (with-test (:name :*-by-zero-type)
   (assert-type
