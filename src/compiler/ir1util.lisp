@@ -175,6 +175,53 @@
                      (funcall function use)))))
      (recurse-lvar lvar))))
 
+(defun map-all-dests (function node &optional (nth-value 0))
+  (let (seen)
+    (labels ((call (node lvar nth-value)
+               (let ((continue (funcall function node lvar nth-value)))
+                 (when continue
+                   (recurse node (if (eq continue t)
+                                     0
+                                     continue)))))
+             (recurse-node (node lvar nth-value)
+               (cond ((and (combination-p node)
+                           ;; Only the first value is used
+                           (and nth-value
+                                (> nth-value 0))))
+                     ((and (basic-combination-p node)
+                           (eq (basic-combination-kind node) :local)
+                           (not (memq node seen)))
+                      (push node seen)
+                      (let ((fun (combination-lambda node)))
+                        (flet ((map-var (var)
+                                 (loop for ref in (leaf-refs var)
+                                       do
+                                       (recurse ref 0))))
+                          (if (functional-kind-eq fun mv-let)
+                              (if nth-value
+                                  (map-var (nth nth-value (lambda-vars fun)))
+                                  (mapc #'map-var (lambda-vars fun)))
+                              (map-var
+                               (nth (position-or-lose lvar
+                                                      (basic-combination-args node))
+                                    (lambda-vars fun)))))))
+                     ((and (combination-p node)
+                           (lvar-fun-is (combination-fun node) '(values)))
+                      (let* ((next-lvar (node-lvar node))
+                             (next-dest (lvar-dest next-lvar)))
+                        (when next-dest
+                          (recurse-node next-dest next-lvar
+                                        (position lvar (combination-args node))))))
+                     (t
+                      (call node lvar nth-value))))
+             (recurse (node nth-value)
+               (let ((lvar (node-lvar node)))
+                 (when lvar
+                   (let ((dest (lvar-dest lvar)))
+                     (recurse-node dest lvar nth-value))))))
+      (recurse node nth-value))))
+
+
 (defun mv-principal-lvar-ref-use (lvar &optional no-casts single-ref)
   (labels ((recurse (lvar)
              (let ((use (lvar-uses lvar)))

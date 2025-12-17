@@ -909,10 +909,13 @@
                do (res rest))))
         (res))))
 
-(defun values-type-nth (n type)
+(defun values-type-nth (n type &optional (null t))
   (declare (fixnum n) (type ctype type))
-  (if (eq type *wild-type*)
-      *universal-type*
+  (if (not (values-type-p type))
+      (if (and (not (eq type *wild-type*))
+               (zerop n))
+          type
+          *universal-type*)
       (progn
         (loop for type in (values-type-required type)
               when (minusp (decf n))
@@ -920,10 +923,16 @@
         (loop for type in (values-type-optional type)
               when (minusp (decf n))
               do (return-from values-type-nth
-                   (type-union type (specifier-type 'null))))
+                   (if null
+                       (type-union type (specifier-type 'null))
+                       type)))
         (if (values-type-rest type)
-            (type-union (values-type-rest type) (specifier-type 'null))
-            (specifier-type 'null)))))
+            (if null
+                (type-union (values-type-rest type) (specifier-type 'null))
+                (values-type-rest type))
+            (if null
+                (specifier-type 'null)
+                *universal-type*)))))
 
 ;;; Return a list of OPERATION applied to the types in TYPES1 and
 ;;; TYPES2, padding with REST2 as needed. TYPES1 must not be shorter

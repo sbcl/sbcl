@@ -1394,6 +1394,36 @@
     (test `(lambda (x y)
              (- (truncate (- y) (* x 4))))
           0)
+    (test `(lambda (a b)
+             (the integer (- (* a (- b)))))
+          0)
+    (test `(lambda (a b)
+             (+ (- (* a (- b))) 10))
+          0)
+    (test `(lambda (x a b)
+             (multiple-value-bind (a b) (if x
+                                            (funcall x)
+                                            (values 10 (- (* a (- b)))))
+               (values a
+                       (+ b 10))))
+          0)
+    (test `(lambda (x a b)
+             (multiple-value-bind (a b)
+                 (the (values t real)
+                      (if x
+                          (funcall x)
+                          (values 10 (- (* a (- b))))))
+               (values a
+                       (+ b 10))))
+          0)
+    (test `(lambda (x a b)
+             (multiple-value-bind (a b)
+                 (the (values t integer)
+                      (if x
+                          (funcall x)
+                          (values 10 (- (* a (- b))))))
+               (values a b)))
+          0)
     (checked-compile-and-assert
         ()
         `(lambda (a)

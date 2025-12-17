@@ -5295,13 +5295,52 @@
   "convert (* x 0) to 0"
   0)
 
+;;; Can it be detected when NODE returns minus zero?
+;;; E.g. (+ -0.0 0) is 0.0
+(defun minus-zero-ignored-p (node)
+  (block nil
+    (map-all-dests (lambda (node lvar nth-value)
+                     (block ok
+                       (typecase node
+                         (combination
+                          (or (combination-case (nil :node node)
+                                (+ (* *)
+                                 (destructuring-bind (a b) args
+                                   (let ((other (if (eq a lvar)
+                                                    b
+                                                    a)))
+                                     (or (types-equal-or-intersect (lvar-type other)
+                                                                   (specifier-type '(or (member -0f0 -0d0) (complex float))))
+                                         (return-from ok)))))
+                                ((truncate floor ceiling) (* *)
+                                 (if (eq lvar (second args))
+                                     (return-from ok)
+                                     1)))
+                              (return)))
+                         (cast
+                          (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
+                                         (specifier-type '(or rational (complex rational))))
+                              (return-from ok)
+                              nth-value))
+                         (t
+                          (return)))))
+                   node)
+    t))
+
 (defun negate-lvar (x outer-node &optional test)
-  (let ((return-type (single-value-type (node-derived-type outer-node))))
+  (let ((return-type (single-value-type (node-derived-type outer-node)))
+        float-safe-computed
+        float-safe)
     (flet ((float-safe-p ()
-             (or (policy outer-node (zerop float-accuracy))
-                 (not (types-equal-or-intersect
-                       return-type
-                       (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float))))))))
+             (if float-safe-computed
+                 float-safe
+                 (setf float-safe-computed t
+                       float-safe
+                       (or (policy outer-node (zerop float-accuracy))
+                           (not (types-equal-or-intersect
+                                 return-type
+                                 (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
+                           (minus-zero-ignored-p outer-node))))))
       (labels ((float-contagion (a b)
                  ;; Don't allow mixing integer 0 and float zero, which have different negations
                  (cond ((float-safe-p))
