@@ -510,6 +510,22 @@
       (assert (= (sb-sys:sap-int (symbol-value s))
                  (ash 1 i))))))
 
+(defun data-containing-bignums ()
+  (macrolet ((e (&aux (i (ash 1 (1- sb-vm:n-word-bits)))) `'(foo ,i ,i)))
+    (e)))
+(defun data-containing-saps ()
+  (macrolet ((e (&aux (sap (sb-sys:int-sap #xb33b0bee))) `'(foo ,sap ,sap)))
+    (e)))
+
+(with-test (:name :saps-should-preserve-eqness :fails-on :sbcl)
+  (let ((form (data-containing-bignums)))
+    (assert (= (second form) (third form)))
+    (assert (eq (second form) (third form))))
+  ;; This isn't technically a bug, but I found it surprising
+  (let ((form (data-containing-saps)))
+    (assert (sb-sys:sap= (second form) (third form)))
+    (assert (eq (second form) (third form)))))
+
 (eval-when (:compile-toplevel :load-toplevel)
   (defstruct monkey
     (x t)
