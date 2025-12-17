@@ -5312,14 +5312,55 @@
                                      (or (types-equal-or-intersect (lvar-type other)
                                                                    (specifier-type '(or (member -0f0 -0d0) (complex float))))
                                          (return-from ok)))))
-                                ((truncate floor ceiling) (* *)
+                                (- (* *)
+                                 (destructuring-bind (a b) args
+                                   (let ((other (if (eq a lvar)
+                                                    b
+                                                    a)))
+                                     (if (or (not (types-equal-or-intersect (lvar-type other)
+                                                                            (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float)))))
+                                             (and (not (types-equal-or-intersect (single-value-type (node-derived-type combination))
+                                                                                 (specifier-type '(complex float))))
+                                                  (if (eq lvar b)
+                                                      (not (types-equal-or-intersect (lvar-type a)
+                                                                                     (specifier-type '(member -0f0 -0d0))))
+                                                      (not (types-equal-or-intersect (lvar-type b)
+                                                                                     (specifier-type '(member 0f0 0d0)))))))
+                                         (return-from ok)
+                                         t))))
+                                (eql (* *)
+                                 (destructuring-bind (a b) args
+                                   (let ((other (if (eq a lvar)
+                                                    b
+                                                    a)))
+                                     (or (types-equal-or-intersect (lvar-type other)
+                                                                   (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float))))
+                                         (return-from ok)))))
+                                ((abs <= >= < > =) *
+                                 (return-from ok))
+                                ((truncate floor ceiling round) (* *)
                                  (if (eq lvar (second args))
                                      (return-from ok)
-                                     1)))
+                                     1))
+                                (expt (* *)
+                                 (if (eq lvar (second args))
+                                     (return-from ok)
+                                     t))
+                                ((acos) *
+                                 (return-from ok))
+                                ((exp cos) (*)
+                                 (or (types-equal-or-intersect (first args) (specifier-type 'complex))
+                                     (return-from ok)))
+                                (atan (*)
+                                 t)
+                                ((* / ftruncate ffloor fceiling fround sqrt
+                                    sin asin sinh tan atanh) *
+                                 t))
                               (return)))
                          (cast
                           (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
-                                         (specifier-type '(or rational (complex rational))))
+                                         (specifier-type '(or (and float (not (member 0f0 0d0 -0f0 -0d0)))
+                                                           rational (complex rational))))
                               (return-from ok)
                               nth-value))
                          (t

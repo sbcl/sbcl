@@ -176,6 +176,7 @@
      (recurse-lvar lvar))))
 
 (defun map-all-dests (function node &optional (nth-value 0))
+  (declare (dynamic-extent function))
   (let (seen)
     (labels ((call (node lvar nth-value)
                (let ((continue (funcall function node lvar nth-value)))
