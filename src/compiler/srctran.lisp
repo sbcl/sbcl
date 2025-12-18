@@ -4303,14 +4303,16 @@
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
   ;; (* (- x) (- y)) => (* x y)
-  (let ((nx (negate-lvar x node :test t)))
-    (when nx
-      (let ((ny (negate-lvar y node :test t)))
-        (when (and nx ny
-                   (or (eq nx '%negate)
-                       (eq ny '%negate)))
-          (aver (and (negate-lvar x node)
-                     (negate-lvar y node)))))))
+  (when (or (minus-zero-ignored-p node)
+            (eq (float-contagion-for-negate x y) t))
+    (let ((nx (negate-lvar x node :test t)))
+      (when nx
+        (let ((ny (negate-lvar y node :test t)))
+          (when (and nx ny
+                     (or (eq nx '%negate)
+                         (eq ny '%negate)))
+            (aver (and (negate-lvar x node)
+                       (negate-lvar y node))))))))
   (or
    (combination-match (node-lvar node) (* (abs (:type real x))
                                           (abs (:type real y)))
@@ -5350,80 +5352,95 @@
 ;;; Can it be detected when NODE returns minus zero?
 ;;; E.g. (+ -0.0 0) is 0.0
 (defun minus-zero-ignored-p (node)
-  (block nil
-    (map-all-dests (lambda (node lvar nth-value)
-                     (block ok
-                       (typecase node
-                         (combination
-                          (or (combination-case (nil :node node)
-                                (+ (* *)
-                                 (destructuring-bind (a b) args
-                                   (let ((other (if (eq a lvar)
-                                                    b
-                                                    a)))
-                                     (or (types-equal-or-intersect (lvar-type other)
-                                                                   (specifier-type '(or (member -0f0 -0d0) (complex float))))
-                                         (return-from ok)))))
-                                (- (* *)
-                                 (destructuring-bind (a b) args
-                                   (let ((other (if (eq a lvar)
-                                                    b
-                                                    a)))
-                                     (if (or (not (types-equal-or-intersect (lvar-type other)
-                                                                            (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float)))))
-                                             (and (not (types-equal-or-intersect (single-value-type (node-derived-type combination))
-                                                                                 (specifier-type '(complex float))))
-                                                  (if (eq lvar b)
-                                                      (not (types-equal-or-intersect (lvar-type a)
-                                                                                     (specifier-type '(member -0f0 -0d0))))
-                                                      (not (types-equal-or-intersect (lvar-type b)
-                                                                                     (specifier-type '(member 0f0 0d0)))))))
+  (or (policy node (zerop float-accuracy))
+      (not (types-equal-or-intersect
+            (single-value-type (node-derived-type node))
+            (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
+      (block nil
+        (map-all-dests (lambda (node lvar nth-value)
+                         (block ok
+                           (typecase node
+                             (combination
+                              (or (combination-case (nil :node node)
+                                    (+ (* *)
+                                     (destructuring-bind (a b) args
+                                       (let ((other (if (eq a lvar)
+                                                        b
+                                                        a)))
+                                         (or (types-equal-or-intersect (lvar-type other)
+                                                                       (specifier-type '(or (member -0f0 -0d0) (complex float))))
+                                             (return-from ok)))))
+                                    (- (* *)
+                                     (destructuring-bind (a b) args
+                                       (let ((other (if (eq a lvar)
+                                                        b
+                                                        a)))
+                                         (if (or (not (types-equal-or-intersect (lvar-type other)
+                                                                                (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float)))))
+                                                 (and (not (types-equal-or-intersect (single-value-type (node-derived-type combination))
+                                                                                     (specifier-type '(complex float))))
+                                                      (if (eq lvar b)
+                                                          (not (types-equal-or-intersect (lvar-type a)
+                                                                                         (specifier-type '(member -0f0 -0d0))))
+                                                          (not (types-equal-or-intersect (lvar-type b)
+                                                                                         (specifier-type '(member 0f0 0d0)))))))
+                                             (return-from ok)
+                                             t))))
+                                    (eql (* *)
+                                     (destructuring-bind (a b) args
+                                       (let ((other (if (eq a lvar)
+                                                        b
+                                                        a)))
+                                         (or (types-equal-or-intersect (lvar-type other)
+                                                                       (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float))))
+                                             (return-from ok)))))
+                                    ((abs <= >= < > =) *
+                                     (return-from ok))
+                                    ((truncate floor ceiling round) (* *)
+                                     (if (eq lvar (second args))
                                          (return-from ok)
-                                         t))))
-                                (eql (* *)
-                                 (destructuring-bind (a b) args
-                                   (let ((other (if (eq a lvar)
-                                                    b
-                                                    a)))
-                                     (or (types-equal-or-intersect (lvar-type other)
-                                                                   (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float))))
-                                         (return-from ok)))))
-                                ((abs <= >= < > =) *
-                                 (return-from ok))
-                                ((truncate floor ceiling round) (* *)
-                                 (if (eq lvar (second args))
-                                     (return-from ok)
-                                     1))
-                                (expt (* *)
-                                 (if (eq lvar (second args))
-                                     (return-from ok)
+                                         1))
+                                    (expt (* *)
+                                     (if (eq lvar (second args))
+                                         (return-from ok)
+                                         t))
+                                    ((acos) *
+                                     (return-from ok))
+                                    ((exp cos) (*)
+                                     (or (types-equal-or-intersect (lvar-type (first args)) (specifier-type 'complex))
+                                         (return-from ok)))
+                                    (atan (*)
+                                     t)
+                                    ((* / ftruncate ffloor fceiling fround sqrt
+                                        sin asin sinh tan atanh) *
                                      t))
-                                ((acos) *
-                                 (return-from ok))
-                                ((exp cos) (*)
-                                 (or (types-equal-or-intersect (lvar-type (first args)) (specifier-type 'complex))
-                                     (return-from ok)))
-                                (atan (*)
-                                 t)
-                                ((* / ftruncate ffloor fceiling fround sqrt
-                                    sin asin sinh tan atanh) *
-                                 t))
-                              (return)))
-                         (cast
-                          (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
-                                         (specifier-type '(or (and float (not (member 0f0 0d0 -0f0 -0d0)))
-                                                           rational (complex rational))))
-                              (return-from ok)
-                              nth-value))
-                         (t
-                          (return)))))
-                   node)
-    t))
+                                  (return)))
+                             (cast
+                              (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
+                                             (specifier-type '(or (and float (not (member 0f0 0d0 -0f0 -0d0)))
+                                                               rational (complex rational))))
+                                  (return-from ok)
+                                  nth-value))
+                             (t
+                              (return)))))
+                       node)
+        t)))
+
+;; Don't allow mixing integer 0 and float zero, which have different negations
+(defun float-contagion-for-negate (a b)
+  (cond ((and (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
+              (csubtypep (lvar-type b) (specifier-type '(or rational (complex rational))))))
+        ((or (csubtypep (lvar-type a) (specifier-type '(and rational (not (eql 0)))))
+             (csubtypep (lvar-type b) (specifier-type '(and rational (not (eql 0)))))))
+        ((csubtypep (lvar-type a) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+         (or (csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+             a))
+        ((csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
+         b)))
 
 (defun negate-lvar (x outer-node &key test type minus-zero-ignored
                                       any-branch)
-  (let ((return-type (single-value-type (node-derived-type outer-node)))
-        float-safe-computed
+  (let (float-safe-computed
         float-safe)
     (flet ((float-safe-p ()
              (if float-safe-computed
@@ -5431,21 +5448,11 @@
                  (setf float-safe-computed t
                        float-safe
                        (or minus-zero-ignored
-                           (policy outer-node (zerop float-accuracy))
-                           (not (types-equal-or-intersect
-                                 return-type
-                                 (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
                            (minus-zero-ignored-p outer-node))))))
       (labels ((float-contagion (a b)
-                 ;; Don't allow mixing integer 0 and float zero, which have different negations
                  (cond ((float-safe-p))
-                       ((and (csubtypep (lvar-type a) (specifier-type '(or rational (complex rational))))
-                             (csubtypep (lvar-type b) (specifier-type '(or rational (complex rational))))))
-                       ((csubtypep (lvar-type a) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
-                        (or (csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
-                            a))
-                       ((csubtypep (lvar-type b) (specifier-type '(and number (not (or (eql 0) (complex rational))))))
-                        b)))
+                       (t
+                        (float-contagion-for-negate a b))))
                (negate-lvar (x type test)
                  (let ((uses (lvar-uses x)))
                    (if (listp uses)
