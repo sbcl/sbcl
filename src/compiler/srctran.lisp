@@ -4265,6 +4265,15 @@
   (unknown-*-transform x y node))
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
+  ;; (* (- x) (- y)) => (* x y)
+  (let ((nx (negate-lvar x node t)))
+    (when nx
+      (let ((ny (negate-lvar y node t)))
+        (when (and nx ny
+                   (or (eq nx '%negate)
+                       (eq ny '%negate)))
+          (aver (and (negate-lvar x node)
+                     (negate-lvar y node)))))))
   (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
                   (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
                   (csubtypep (lvar-type x) (specifier-type '(or complex float)))

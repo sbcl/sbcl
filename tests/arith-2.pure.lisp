@@ -1493,6 +1493,13 @@
            (- (* a (- b))))
       ((4.0 0) -0.0))))
 
+(with-test (:name :remove-negate.2)
+  (flet ((test (form count)
+           (assert (= (count 'sb-kernel:%negate
+                             (ctu:ir1-named-calls form nil))
+                      count))))
+    (test `(lambda (x y) (* (- x) (- y))) 0)))
+
 (with-test (:name :*-by-zero-type)
   (assert-type
    (lambda (d)
