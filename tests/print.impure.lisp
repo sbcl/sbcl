@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(setq *random-state* (make-random-state t))
+
 ;;; We should be able to output X readably (at least when *READ-EVAL*).
 (defun assert-readable-output (x)
   (assert (eql x

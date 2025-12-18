@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(setq *random-state* (make-random-state t))
+
 ;;; As reported by Paul Dietz from his ansi-test suite for gcl, REMOVE
 ;;; malfunctioned when given :START, :END and :FROM-END arguments.
 ;;; Make sure it doesn't happen again.
