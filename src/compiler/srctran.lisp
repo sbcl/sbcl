@@ -2223,13 +2223,33 @@
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux))
 
-(deftransform abs ((x) (number) * :node node)
+(defun remove-abs (x outer-node)
+  (labels ((abs-lvar (x &optional (type (specifier-type 'real)))
+             (let (did-something)
+               (do-uses (use x)
+                 (when (abs-node use type)
+                   (setf did-something t)))
+               did-something))
+           (abs-node (node type)
+             (combination-case (x :cast type :node node)
+               (abs ((type real))
+                (extract-lvar-n (first args) 1 outer-node)
+                t)
+               ((* / %unary-truncate truncate floor ceiling round
+                   ftruncate ffloor fceiling fround
+                   cos sin tan) (* *)
+                (let (did-something)
+                  (loop for arg in args
+                        when (abs-lvar arg)
+                        do (setf did-something t))
+                  did-something))
+               (ash (* (type unsigned-byte))
+                (abs-lvar (first args) (specifier-type 'integer))))))
+    (abs-lvar x)))
+
+(defoptimizer (abs optimizer) ((x) node)
   (negate-lvar x node '%negate nil t)
-  (or (combination-match x ((:or * (:commutative /))
-                            * (abs y))
-        (extract-lvar-n y 1 node)
-        nil)
-      (give-up-ir1-transform)))
+  (remove-abs x node))
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -4267,7 +4287,7 @@
 
 (deftransform / ((x y) (t t) * :node node)
   (or
-   (combination-match (node-lvar node) (/ (abs x) (abs y))
+   (combination-match (node-lvar node) (/ (abs (:type real x)) (abs (:type real y)))
      (extract-lvar-n x 1 node)
      (extract-lvar-n y 1 node)
      `(abs (/ x y)))
@@ -4284,7 +4304,8 @@
           (aver (and (negate-lvar x node)
                      (negate-lvar y node)))))))
   (or
-   (combination-match (node-lvar node) (* (abs x) (abs y))
+   (combination-match (node-lvar node) (* (abs (:type real x))
+                                          (abs (:type real y)))
      (extract-lvar-n x 1 node)
      (extract-lvar-n y 1 node)
      `(abs (* x y)))
