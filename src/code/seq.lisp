@@ -1063,6 +1063,7 @@ many elements are copied."
   vector)
 
 (sb-c::when-vop-existsp (:translate sb-vm::reverse-bits-64)
+  (declaim (inline nreverse-word-aligned-simple-bit-vector))
   (defun nreverse-word-aligned-simple-bit-vector (vector start end)
     (do ((left-index start (1+ left-index))
          (right-index (1- end) (1- right-index)))
@@ -1097,9 +1098,8 @@ many elements are copied."
                (nreverse-word-specialized-vector vector start end))
               #+(or arm64 x86-64)
               ((and (simple-bit-vector-p vector) (= (mod start 64) 0) (= (mod end 64) 0))
-               (return-from vector-nreverse
-                 (nreverse-word-aligned-simple-bit-vector
-                  vector (floor start 64) (floor end 64)))) ; pass START,END in words
+               (nreverse-word-aligned-simple-bit-vector
+                vector (floor start 64) (floor end 64))) ; pass START,END in words
               #+(or arm64 x86-64)
               ((typep vector '(or (simple-array base-char (*))
                                (simple-array (signed-byte 8) (*))
