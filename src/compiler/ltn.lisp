@@ -940,9 +940,13 @@
 ;;; full call.
 (defun ltn-analyze-known-call (call)
   (declare (type combination call))
-  (let ((ltn-policy (node-ltn-policy call))
-        (method (fun-info-ltn-annotate (basic-combination-fun-info call)))
-        (args (basic-combination-args call)))
+  (let* ((ltn-policy (node-ltn-policy call))
+         (info (basic-combination-fun-info call))
+         (method (fun-info-ltn-annotate info))
+         (args (basic-combination-args call))
+         (hook (fun-info-ir2-hook info)))
+    (when hook
+      (funcall hook call))
     (when method
       (funcall method call ltn-policy)
       (return-from ltn-analyze-known-call (values)))

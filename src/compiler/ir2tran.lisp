@@ -2514,10 +2514,7 @@
               (ir2-convert-full-call node 2block))
              (:known
               (let* ((info (basic-combination-fun-info node))
-                     (fun (fun-info-ir2-convert info))
-                     (hook (fun-info-ir2-hook info)))
-                (when hook
-                  (funcall hook node 2block))
+                     (fun (fun-info-ir2-convert info)))
                 (cond (fun
                        (funcall fun node 2block))
                       ((eq (basic-combination-info node) :full)
