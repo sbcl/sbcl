@@ -2223,7 +2223,7 @@
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux))
 
-(defun remove-abs (x outer-node)
+(defun remove-abs (x outer-node &optional (top-level t))
   (labels ((abs-lvar (x top-level &optional (type (specifier-type 'real)))
              (let (did-something)
                (do-uses (use x)
@@ -2247,11 +2247,15 @@
                   did-something))
                (ash (* (type unsigned-byte))
                 (abs-lvar (first args) (specifier-type 'integer))))))
-    (abs-lvar x t)))
+    (abs-lvar x top-level)))
 
 (defoptimizer (abs optimizer) ((x) node)
-  (negate-lvar x node '%negate nil t)
+  (negate-lvar x node :test '%negate :minus-zero-ignored t)
   (remove-abs x node))
+
+(defoptimizer (cos optimizer) ((x) node)
+  (negate-lvar x node :test '%negate :minus-zero-ignored t)
+  (remove-abs x node nil))
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -4297,9 +4301,9 @@
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
   ;; (* (- x) (- y)) => (* x y)
-  (let ((nx (negate-lvar x node t)))
+  (let ((nx (negate-lvar x node :test t)))
     (when nx
-      (let ((ny (negate-lvar y node t)))
+      (let ((ny (negate-lvar y node :test t)))
         (when (and nx ny
                    (or (eq nx '%negate)
                        (eq ny '%negate)))
@@ -5414,7 +5418,7 @@
                    node)
     t))
 
-(defun negate-lvar (x outer-node &optional test type minus-zero-ignored)
+(defun negate-lvar (x outer-node &key test type minus-zero-ignored)
   (let ((return-type (single-value-type (node-derived-type outer-node)))
         float-safe-computed
         float-safe)
@@ -5527,12 +5531,14 @@
                               t))
                            ((* /) (* *)
                             (negate-args args nil t))
-                           (truncate (* *)
+                           ((truncate ftruncate round fround) (* *)
                             (negate-args args (specifier-type 'real)))
                            (%unary-truncate (*)
                             (negate-lvar (first args) (specifier-type 'real) test))
                            (ash (* (type unsigned-byte))
-                            (negate-lvar (first args) (specifier-type 'integer) test))))))))
+                            (negate-lvar (first args) (specifier-type 'integer) test))
+                           (sin (*)
+                            (negate-lvar (first args) nil test))))))))
         (negate-lvar x type test)))))
 
 (deftransform %negate ((x) * * :node node)
@@ -5596,12 +5602,12 @@
     (cond ((and (or floats
                     ;; Can't negate integer 0
                     (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
-                (eq (negate-lvar y node '%negate) '%negate))
+                (eq (negate-lvar y node :test '%negate) '%negate))
            `(- x y))
           ((and
             (or floats
                 (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))))
-            (eq (negate-lvar x node '%negate) '%negate))
+            (eq (negate-lvar x node :test '%negate) '%negate))
            `(- y x))
           (t
            (give-up-ir1-transform)))))
@@ -5617,7 +5623,7 @@
         (or floats
             ;; Can't negate integer 0
             (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
-        (eq (negate-lvar y node '%negate) '%negate))
+        (eq (negate-lvar y node :test '%negate) '%negate))
        `(+ x y))
       ;; (- (- x) c) => (- -c x)
       ((and (constant-lvar-p y)
@@ -5633,7 +5639,7 @@
                                  (csubtypep (lvar-type x) (specifier-type 'double-float)))
                             'x)))
                     ((not (typep y '(complex float)))
-                     (when (eq (negate-lvar x node '%negate) '%negate)
+                     (when (eq (negate-lvar x node :test '%negate) '%negate)
                        `(- ,(- y) x)))))))
       (t
        (give-up-ir1-transform))))))

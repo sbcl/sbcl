@@ -1640,5 +1640,17 @@
   (let ((b (& (>> val 27) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(25698D2C 4928B1E4 73D42188 937BB764 9CF559D2 A4528420 C1980643 CA743403 D0F360C2 D5F368A1 E0CC2047 EDCB9528)
+ "(ASH TAN SIN COS FROUND ROUND FTRUNCATE TRUNCATE %UNARY-TRUNCATE / * ABS)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 13 0 8 0 2 2 0)))
+  (let ((b (& (>> val 12) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(25698D2C 4928B1E4 6A3E03D5 73D42188 9CF559D2 A4528420 CA743403 D0F360C2 D1F36255 D5F368A1 D7F36BC7 EDCB9528)
+ "(SIN ASH %UNARY-TRUNCATE FROUND ROUND FTRUNCATE TRUNCATE / * + - %NEGATE)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 8 0 0 2 12 13 0)))
+  (let ((b (& (>> val 9) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF
