@@ -1498,7 +1498,11 @@
            (assert (= (count 'sb-kernel:%negate
                              (ctu:ir1-named-calls form nil))
                       count))))
-    (test `(lambda (x y) (* (- x) (- y))) 0)))
+    (test `(lambda (x y) (* (- x) (- y))) 0)
+    (test `(lambda (a b d)
+             (declare (optimize (sb-c::float-accuracy 0)))
+             (- d (* a (- b))))
+          0)))
 
 (with-test (:name :*-by-zero-type)
   (assert-type

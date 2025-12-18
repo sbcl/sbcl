@@ -5556,12 +5556,12 @@
     (cond ((and (or floats
                     ;; Can't negate integer 0
                     (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
-                (splice-fun-args y '%negate 1 nil))
+                (eq (negate-lvar y node '%negate) '%negate))
            `(- x y))
           ((and
             (or floats
                 (not (types-equal-or-intersect (lvar-type x) (specifier-type '(eql 0)))))
-            (splice-fun-args x '%negate 1 nil))
+            (eq (negate-lvar x node '%negate) '%negate))
            `(- y x))
           (t
            (give-up-ir1-transform)))))
@@ -5577,7 +5577,7 @@
         (or floats
             ;; Can't negate integer 0
             (not (types-equal-or-intersect (lvar-type y) (specifier-type '(eql 0)))))
-        (splice-fun-args y '%negate 1 nil))
+        (eq (negate-lvar y node '%negate) '%negate))
        `(+ x y))
       ;; (- (- x) c) => (- -c x)
       ((and (constant-lvar-p y)
@@ -5593,7 +5593,7 @@
                                  (csubtypep (lvar-type x) (specifier-type 'double-float)))
                             'x)))
                     ((not (typep y '(complex float)))
-                     (when (splice-fun-args x '%negate 1 nil)
+                     (when (eq (negate-lvar x node '%negate) '%negate)
                        `(- ,(- y) x)))))))
       (t
        (give-up-ir1-transform))))))
