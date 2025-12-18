@@ -1504,6 +1504,17 @@
              (- d (* a (- b))))
           0)))
 
+(with-test (:name :abs-match)
+  (flet ((test (form count)
+           (assert (= (count 'abs
+                             (ctu:ir1-named-calls form nil))
+                      count))))
+    (test `(lambda (x y) (abs (* (abs x) y)))
+          1)
+    (test `(lambda (a b d)
+             (/ (abs y) (abs x)))
+          1)))
+
 (with-test (:name :*-by-zero-type)
   (assert-type
    (lambda (d)

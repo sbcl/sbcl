@@ -2228,6 +2228,10 @@
         ((%negate) (*)
          (splice-fun-args x name 1)
          nil))
+      (combination-match x ((:or * (:commutative /))
+                            * (abs y))
+        (extract-lvar-n y 1)
+        nil)
       (give-up-ir1-transform)))
 
 (defun rem-result-type (number-type divisor-type)
@@ -4264,6 +4268,14 @@
 (deftransform * ((y x) (fixnum t) * :node node :priority :last :important nil)
   (unknown-*-transform x y node))
 
+(deftransform / ((x y) (t t) * :node node)
+  (or
+   (combination-match (node-lvar node) (/ (abs x) (abs y))
+     (extract-lvar-n x 1)
+     (extract-lvar-n y 1)
+     `(abs (/ x y)))
+   (give-up-ir1-transform)))
+
 (deftransform * ((x y) (t t) * :node node :priority :last)
   ;; (* (- x) (- y)) => (* x y)
   (let ((nx (negate-lvar x node t)))
@@ -4274,7 +4286,12 @@
                        (eq ny '%negate)))
           (aver (and (negate-lvar x node)
                      (negate-lvar y node)))))))
-  (or (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
+  (or
+   (combination-match (node-lvar node) (* (abs x) (abs y))
+     (extract-lvar-n x 1)
+     (extract-lvar-n y 1)
+     `(abs (* x y)))
+   (unless (or (csubtypep (lvar-type x) (specifier-type 'word))
                   (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word))
                   (csubtypep (lvar-type x) (specifier-type '(or complex float)))
                   (csubtypep (lvar-type y) (specifier-type 'word))

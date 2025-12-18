@@ -441,10 +441,12 @@
 
 (declaim (ftype (function * (values t (or null combination) list &optional)) lvar-combination/cast-name-args))
 (defun lvar-combination/cast-name-args (lvar)
-  (multiple-value-bind (name combination) (combination/cast-name (lvar-uses lvar))
-    (if name
-        (values name combination (combination-args combination))
-        (values nil nil nil))))
+  (if lvar
+      (multiple-value-bind (name combination) (combination/cast-name (lvar-uses lvar))
+        (if name
+            (values name combination (combination-args combination))
+            (values nil nil nil)))
+      (values nil nil nil)))
 
 (defun check-args (args n-args)
   (when (= (length args) n-args)
@@ -456,12 +458,28 @@
                (if (typep x '(cons (eql :or)))
                    (cdr x)
                    (list x)))
+             (equal-spec (a b)
+               (cond ((eq a b))
+                     ((symbolp a)
+                      (and (symbolp b)
+                           (not (eq a '*))
+                           (not (eq b '*))))
+                     ((and (consp a)
+                           (consp b))
+                      (and (equal (car a)
+                                  (car b))
+                           (= (length a)
+                              (length b))
+                           (every #'equal-spec a b)))))
              (expand (lvars specs body)
                (if lvars
                    (let ((lvar (car lvars))
                          (spec (car specs)))
                      (cond ((symbolp spec)
-                            (cond ((member spec bound-vars)
+                            (cond ((eq spec '*)
+                                   (expand (cdr lvars) (cdr specs)
+                                           body))
+                                  ((member spec bound-vars)
                                    `(when (same-leaf-ref-p ,spec ,lvar)
                                       ,(expand (cdr lvars) (cdr specs)
                                                body)))
@@ -486,9 +504,16 @@
                                                       (let* ((vars (make-gensym-list (length args) "ARG"))
                                                              (names (ensure-or name))
                                                              (commutative (and (loop for name in names
-                                                                                     always (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
-                                                                                                            commutative))
-                                                                               (not (integerp (car (last args)))))))
+                                                                                     always (or (typep name '(cons (eql :commutative)))
+                                                                                                (ir1-attributep (fun-info-attributes (fun-info-or-lose name))
+                                                                                                                commutative)))
+                                                                               (or (not (integerp (car (last args))))
+                                                                                   (not (equal-spec (first args)
+                                                                                                    (second args))))))
+                                                             (names (loop for name in names
+                                                                          collect (if (typep name '(cons (eql :commutative)))
+                                                                                      (second name)
+                                                                                      name))))
                                                         (setf bound-vars old-bound-vars)
                                                         `(,names
                                                           (or (multiple-value-bind ,vars (check-args args ,(length args))
@@ -2729,6 +2754,13 @@ is :ANY, the function name is not checked."
         (let* ((next-lvar (node-lvar dest)))
           (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
           (extract-lvar lvar final-node)))))
+
+(defun extract-lvar-n (lvar n)
+  (let ((dest (lvar-dest lvar)))
+    (or (= n 0)
+        (let* ((next-lvar (node-lvar dest)))
+          (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
+          (extract-lvar-n lvar (1- n))))))
 
 ;;; Eliminate keyword arguments from the call (leaving the
 ;;; parameters in place.
