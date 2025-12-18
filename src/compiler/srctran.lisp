@@ -5487,28 +5487,30 @@
                        (negate-node uses type test))))
                (negate-node (node type test)
                  (flet ((negate-args (args type &optional contagion)
-                          (destructuring-bind (first second) args
-                            (when contagion
-                              (let ((contagion (float-contagion first second)))
-                                (case contagion
-                                  ((t))
-                                  ((nil) (return-from negate-args))
-                                  (t
-                                   (return-from negate-args (negate-lvar contagion type test))))))
-                            ;; Prefer to remove %negate instead of turning constants negative
-                            (cond ((eq test t)
-                                   (or (negate-lvar first type test)
-                                       (negate-lvar second type test)))
-                                  (t
-                                   (let ((%negate (negate-lvar first type '%negate)))
-                                     (if (eq %negate '%negate)
-                                         %negate
-                                         (if (eq test '%negate)
-                                             (or (negate-lvar second type test)
-                                                 %negate)
-                                             (or (negate-lvar second type nil)
-                                                 (and %negate
-                                                      (negate-lvar first type nil)))))))))))
+                          (if (cdr args)
+                              (destructuring-bind (first second) args
+                                (when contagion
+                                  (let ((contagion (float-contagion first second)))
+                                    (case contagion
+                                      ((t))
+                                      ((nil) (return-from negate-args))
+                                      (t
+                                       (return-from negate-args (negate-lvar contagion type test))))))
+                                ;; Prefer to remove %negate instead of turning constants negative
+                                (cond ((eq test t)
+                                       (or (negate-lvar first type test)
+                                           (negate-lvar second type test)))
+                                      (t
+                                       (let ((%negate (negate-lvar first type '%negate)))
+                                         (if (eq %negate '%negate)
+                                             %negate
+                                             (if (eq test '%negate)
+                                                 (or (negate-lvar second type test)
+                                                     %negate)
+                                                 (or (negate-lvar second type nil)
+                                                     (and %negate
+                                                          (negate-lvar first type nil)))))))))
+                              (negate-lvar (first args) type test))))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
                          (unless (and (eql value 0) ;; can't negate a non-float zero
@@ -5550,14 +5552,31 @@
                               t))
                            ((* /) (* *)
                             (negate-args args nil t))
-                           ((truncate ftruncate round fround) (* *)
+                           ((truncate round) (* *)
                             (negate-args args (specifier-type 'real)))
-                           (%unary-truncate (*)
+                           ((%unary-truncate %unary-round) (*)
                             (negate-lvar (first args) (specifier-type 'real) test))
+                           ((fround ftruncate) *
+                            (let ((all-good t)
+                                  good)
+                              (cond ((or (float-safe-p)
+                                         (loop for arg in args
+                                               do
+                                               (if (csubtypep (lvar-type arg)
+                                                              (specifier-type '(and number (not (or (eql 0) (complex ratio))))))
+                                                   (setf good arg)
+                                                   (setf all-good nil))
+                                               finally (return all-good)))
+                                     (negate-args args (specifier-type 'real)))
+                                    (good
+                                     (negate-lvar good (specifier-type 'real) test)))))
                            (ash (* (type unsigned-byte))
                             (negate-lvar (first args) (specifier-type 'integer) test))
                            (sin (*)
-                            (negate-lvar (first args) nil test))))))))
+                            (when (or (float-safe-p)
+                                      (csubtypep (lvar-type (first args))
+                                                 (specifier-type '(and number (not (or (eql 0) (complex ratio)))))))
+                              (negate-lvar (first args) nil test)))))))))
         (negate-lvar x type test)))))
 
 (deftransform %negate ((x) * * :node node)
