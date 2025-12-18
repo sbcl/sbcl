@@ -580,7 +580,8 @@
                                            (aver (not (eq int *empty-type*)))
                                            int)
                                          declared)
-                                     :from-scratch t))))
+                                     :from-scratch t)
+                   (erase (node-lvar combination) nil))))
              (erase (lvar nth-value)
                (when lvar
                  (setf (lvar-%derived-type lvar) nil)
