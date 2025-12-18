@@ -980,16 +980,17 @@ many elements are copied."
 
 ;;; Could use another version of this for byte-aligned-.
 ;;; If neither is applicable then just use the general case.
-(defun reverse-word-aligned-simple-bit-vector (from to end)
-  (do ((length (floor (length (truly-the simple-bit-vector to)) 64))
-       (left-index 0 (1+ left-index))
-       (right-index end))
-      ((= left-index length))
-    (declare (type index left-index right-index))
-    (decf right-index)
-    (setf (%vector-raw-bits to left-index)
-          (sb-vm::reverse-bits-64 (%vector-raw-bits from right-index))))
-  to)
+(sb-c::when-vop-existsp (:translate sb-vm::reverse-bits-64)
+  (defun reverse-word-aligned-simple-bit-vector (from to end)
+    (do ((length (floor (length (truly-the simple-bit-vector to)) 64))
+         (left-index 0 (1+ left-index))
+         (right-index end))
+        ((= left-index length))
+      (declare (type index left-index right-index))
+      (decf right-index)
+      (setf (%vector-raw-bits to left-index)
+            (sb-vm::reverse-bits-64 (%vector-raw-bits from right-index))))
+    to))
 
 (defun vector-reverse (vector)
   (declare (vector vector))
@@ -1061,19 +1062,20 @@ many elements are copied."
             (%vector-raw-bits vector right-index) left)))
   vector)
 
-(defun nreverse-word-aligned-simple-bit-vector (vector start end)
-  (do ((left-index start (1+ left-index))
-       (right-index (1- end) (1- right-index)))
-      ((<= right-index left-index)
-       (when (= right-index left-index) ; the odd  element was missed
-         (setf (%vector-raw-bits vector left-index)
-               (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))))
-    (declare (type index left-index right-index))
-    (let ((left (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))
-          (right (sb-vm::reverse-bits-64 (%vector-raw-bits vector right-index))))
-      (setf (%vector-raw-bits vector left-index) right
-            (%vector-raw-bits vector right-index) left)))
-  vector)
+(sb-c::when-vop-existsp (:translate sb-vm::reverse-bits-64)
+  (defun nreverse-word-aligned-simple-bit-vector (vector start end)
+    (do ((left-index start (1+ left-index))
+         (right-index (1- end) (1- right-index)))
+        ((<= right-index left-index)
+         (when (= right-index left-index) ; the odd  element was missed
+           (setf (%vector-raw-bits vector left-index)
+                 (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))))
+      (declare (type index left-index right-index))
+      (let ((left (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))
+            (right (sb-vm::reverse-bits-64 (%vector-raw-bits vector right-index))))
+        (setf (%vector-raw-bits vector left-index) right
+              (%vector-raw-bits vector right-index) left)))
+    vector))
 
 (defun vector-nreverse (original-vector)
   (declare (vector original-vector))
