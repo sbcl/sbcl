@@ -3881,3 +3881,12 @@
     (inst lslv tmp-tn a tmp-tn)
     (inst lsrv result b count)
     (inst orr result result (lsl tmp-tn 1))))
+
+(define-vop ()
+  (:translate reverse-bits-64)
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1 (inst rbit res arg)))

@@ -968,7 +968,7 @@ many elements are copied."
 
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
-  (do ((length (length to))
+  (do ((length (length (truly-the (simple-unboxed-array 1) to)))
        (left-index 0 (1+ left-index))
        (right-index end))
       ((= left-index length))
@@ -976,6 +976,19 @@ many elements are copied."
     (decf right-index)
     (setf (%vector-raw-bits to left-index)
           (%vector-raw-bits from right-index)))
+  to)
+
+;;; Could use another version of this for byte-aligned-.
+;;; If neither is applicable then just use the general case.
+(defun reverse-word-aligned-simple-bit-vector (from to end)
+  (do ((length (floor (length (truly-the simple-bit-vector to)) 64))
+       (left-index 0 (1+ left-index))
+       (right-index end))
+      ((= left-index length))
+    (declare (type index left-index right-index))
+    (decf right-index)
+    (setf (%vector-raw-bits to left-index)
+          (sb-vm::reverse-bits-64 (%vector-raw-bits from right-index))))
   to)
 
 (defun vector-reverse (vector)
@@ -998,6 +1011,11 @@ many elements are copied."
                        (svref vector right-index))))
               ((word-specialized-vector-tag-p tag)
                (reverse-word-specialized-vector vector new-vector end))
+              #+(or arm64 x86-64)
+              ((and (simple-bit-vector-p vector)
+                    (= (mod length 64) 0) (= (mod end 64) 0))
+               (reverse-word-aligned-simple-bit-vector
+                vector new-vector (floor end 64))) ; pass END in words
               #+(or arm64 x86-64)
               ((typep vector '(or (simple-array base-char (*))
                                (simple-array (signed-byte 8) (*))
@@ -1043,6 +1061,20 @@ many elements are copied."
             (%vector-raw-bits vector right-index) left)))
   vector)
 
+(defun nreverse-word-aligned-simple-bit-vector (vector start end)
+  (do ((left-index start (1+ left-index))
+       (right-index (1- end) (1- right-index)))
+      ((<= right-index left-index)
+       (when (= right-index left-index) ; the odd  element was missed
+         (setf (%vector-raw-bits vector left-index)
+               (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))))
+    (declare (type index left-index right-index))
+    (let ((left (sb-vm::reverse-bits-64 (%vector-raw-bits vector left-index)))
+          (right (sb-vm::reverse-bits-64 (%vector-raw-bits vector right-index))))
+      (setf (%vector-raw-bits vector left-index) right
+            (%vector-raw-bits vector right-index) left)))
+  vector)
+
 (defun vector-nreverse (original-vector)
   (declare (vector original-vector))
   (when (> (length original-vector) 1)
@@ -1061,6 +1093,11 @@ many elements are copied."
                          (svref vector right-index) left))))
               ((word-specialized-vector-tag-p tag)
                (nreverse-word-specialized-vector vector start end))
+              #+(or arm64 x86-64)
+              ((and (simple-bit-vector-p vector) (= (mod start 64) 0) (= (mod end 64) 0))
+               (return-from vector-nreverse
+                 (nreverse-word-aligned-simple-bit-vector
+                  vector (floor start 64) (floor end 64)))) ; pass START,END in words
               #+(or arm64 x86-64)
               ((typep vector '(or (simple-array base-char (*))
                                (simple-array (signed-byte 8) (*))

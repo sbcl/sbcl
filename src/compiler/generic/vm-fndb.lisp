@@ -896,6 +896,8 @@
 (defknown sb-vm::fastrem-64 ((unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64))
   (unsigned-byte 64)
   (flushable))
+(defknown sb-vm::reverse-bits-64 ((unsigned-byte 64)) (unsigned-byte 64)
+  (flushable always-translatable))
 
 ;;; +-modfx is useful for computing a hash that is commutative in its inputs.
 ;;; These architectures lack a complete set of modular operations; they have operations

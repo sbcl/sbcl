@@ -237,7 +237,7 @@
              (case safety
                (0 (= speed 0))
                (t t)))
-           (extra-safe (&key speed safety &allow-other-keys)
+           (extra-safe (&key safety &allow-other-keys)
              (>= safety 2))
            (test (type expr &key (filter #'safe))
              (checked-compile-and-assert
