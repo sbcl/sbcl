@@ -271,16 +271,16 @@
     (when (endp result)
       (sequence-bounding-indices-bad-error sequence start end))))
 
-(declaim (inline reverse-to-nthcdr-check-bounds))
-(defun reverse-to-nthcdr-check-bounds (n list start end sequence)
+(declaim (inline reverse-into-vector-to-nthcdr-check-bounds))
+(defun reverse-into-vector-to-nthcdr-check-bounds (n list start end sequence)
   (declare (index n))
-  (do ((result)
-       (i n (1- i))
+  (do ((result (make-array n))
+       (i (1- n) (1- i))
        (cdr list (cdr cdr)))
-      ((not (plusp i)) result)
+      ((< i 0) result)
     (when (endp cdr)
       (sequence-bounding-indices-bad-error sequence start end))
-    (push (car cdr) result)))
+    (setf (aref result i) (car cdr))))
 
 ;;; For [n]butlast
 (defun dotted-nthcdr (n list)

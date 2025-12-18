@@ -1794,21 +1794,6 @@ many elements are copied."
                           (apply-key ,key (,ref ,sequence index))
                           value))))
 
-(defmacro list-reduce (function
-                       sequence
-                       key
-                       start
-                       end
-                       initial-value
-                       ivp)
-  `(do ((count (if ,ivp ,start (1+ ,start))
-               (1+ count))
-        (sequence (if ,ivp ,sequence (cdr ,sequence))
-                  (cdr sequence))
-        (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
-               (funcall ,function value (apply-key ,key (car sequence)))))
-       ((>= count ,end) value)))
-
 (defun reduce (function sequence &rest args
                &key key from-end (start 0) end (initial-value nil ivp))
   (declare (type index start)
@@ -1835,17 +1820,17 @@ many elements are copied."
                      (cond-dispatch key
                        (let ((count (the index (- end start))))
                          (if from-end
-                             (let ((sequence (reverse-to-nthcdr-check-bounds count sequence
-                                                                             start end sequence)))
-                               (do ((sequence (if ivp
-                                                  sequence
-                                                  (cdr sequence))
-                                              (cdr sequence))
-                                    (value (if ivp
-                                               initial-value
-                                               (apply-key key (car sequence)))
-                                           (funcall function (apply-key key (car sequence)) value)))
-                                   ((endp sequence) value)))
+                             (let ((vector (reverse-into-vector-to-nthcdr-check-bounds
+                                            count sequence start end sequence))
+                                   (end count)
+                                   (start 0))
+                               (when (not ivp)
+                                 (setq initial-value (apply-key key (aref vector 0)))
+                                 (setq start 1))
+                               (do ((index start (truly-the index (1+ index)))
+                                    (value initial-value))
+                                   ((>= index end) value)
+                                 (setq value (funcall function (apply-key key (aref vector index)) value))))
                              (do ((count (if ivp
                                              count
                                              (1- count))
@@ -1867,16 +1852,16 @@ many elements are copied."
                       (funcall function))
                   (cond-dispatch key
                     (if from-end
-                        (let ((sequence (reverse sequence)))
-                          (do ((sequence (if ivp
-                                             sequence
-                                             (cdr sequence))
-                                         (cdr sequence))
-                               (value (if ivp
-                                          initial-value
-                                          (apply-key key (car sequence)))
-                                      (funcall function (apply-key key (car sequence)) value)))
-                              ((endp sequence) value)))
+                        (let* ((vector (list-reverse-into-vector sequence))
+                               (end (length vector))
+                               (start 0))
+                          (when (not ivp)
+                            (setq initial-value (apply-key key (aref vector 0)))
+                            (setq start 1))
+                          (do ((index start (truly-the index (1+ index)))
+                               (value initial-value))
+                              ((>= index end) value)
+                            (setq value (funcall function (apply-key key (aref vector index)) value))))
                         (do ((sequence (if ivp
                                            sequence
                                            (cdr sequence))
