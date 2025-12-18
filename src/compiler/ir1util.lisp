@@ -569,16 +569,18 @@
                (when (and erase-calls
                           (not (eq combination erase-calls))
                           (eq (combination-kind combination) :known))
-                 (let ((type (derive-combination-type combination)))
-                   (aver (not (eq type *empty-type*)))
+                 (let* ((derived (derive-combination-type combination))
+                        (fun-type (lvar-type (combination-fun combination)))
+                        (declared (if (fun-type-p fun-type)
+                                      (fun-type-returns fun-type)
+                                      *wild-type*)))
                    (derive-node-type combination
-                                     (or type
-                                         (let ((type (lvar-type (combination-fun combination))))
-                                           (if (fun-type-p type)
-                                               (fun-type-returns type)
-                                               *wild-type*)))
-                                     :from-scratch t)
-                   (erase (node-lvar combination) nil))))
+                                     (if derived
+                                         (let ((int (values-type-intersection derived declared)))
+                                           (aver (not (eq int *empty-type*)))
+                                           int)
+                                         declared)
+                                     :from-scratch t))))
              (erase (lvar nth-value)
                (when lvar
                  (setf (lvar-%derived-type lvar) nil)
