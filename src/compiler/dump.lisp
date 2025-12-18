@@ -1479,7 +1479,12 @@
 
 ;;;; code coverage
 
-(defun dump-code-coverage-records (cc file)
+;;; SB-COVER can override this dumping function, outputting more metadata.
+;;; If it does, the resulting functions in FILE can produce descriptions of forms
+;;; hit by line & column without needing to re-read their source files.
+;;; Presentation still needs to read files - only as strings - for display.
+(defun dump-code-coverage-records (cc augmentation file)
   (declare (type simple-vector cc))
   (dump-object cc file)
+  (dump-object augmentation file)
   (dump-fop 'fop-record-code-coverage file))

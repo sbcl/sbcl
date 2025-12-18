@@ -1221,11 +1221,11 @@
 
 ;;;; fops for code coverage
 
-(define-fop 120 :not-host (fop-record-code-coverage (paths) nil)
+(define-fop 120 :not-host (fop-record-code-coverage (paths extra) nil)
   (setf (gethash (sb-c::debug-source-namestring
                   (%fasl-input-partial-source-info (fasl-input)))
                  (car *code-coverage-info*))
-         (sb-c::make-coverage-instrumented-file paths)))
+        (sb-c::make-coverage-instrumented-file paths (car extra) (cdr extra))))
 
 ;;; Primordial layouts.
 (macrolet ((frob (&rest specs)

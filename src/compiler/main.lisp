@@ -1598,6 +1598,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (lexenv-handled-conditions *lexenv*))))
       (and ctype (handle-p condition (car ctype))))))
 
+(defglobal *coverage-augmentation-hook* nil)
 ;;; Read all forms from INFO and compile them, with output to
 ;;; *COMPILE-OBJECT*. Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info cfasl)
@@ -1669,7 +1670,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                       (dohash ((k v) hash-table)
                         (declare (ignore v))
                         (setf (aref records (incf i)) k))
-                      (dump-code-coverage-records records *compile-object*))))
+                      (let ((extra (awhen *coverage-augmentation-hook*
+                                     (funcall it (source-info-stream info) records))))
+                      (dump-code-coverage-records records extra *compile-object*)))))
                 nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of

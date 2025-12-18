@@ -8,6 +8,7 @@
 (defpackage #:sb-cover
   (:use #:cl #:sb-c #:sb-int)
   (:export #:report
+           #:enable-coverage-logging
            #:get-coverage
            #:reset-coverage #:clear-coverage
            #:merge-coverage #:merge-coverage-from-file
@@ -199,7 +200,7 @@ in RESTORE-COVERAGE."
          (loop for (filename paths . bits) in coverage-state
                do (let ((image-states (gethash filename (code-coverage-hashtable))))
                     (cond ((not image-states) ; use all the new data
-                           (let ((info (sb-c::make-coverage-instrumented-file paths)))
+                           (let ((info (sb-c::make-coverage-instrumented-file paths nil nil)))
                              (replace (covered-file-executed info) bits)
                              (setf (gethash filename (code-coverage-hashtable)) info)))
                           ((equal (covered-file-paths image-states) paths)
@@ -375,6 +376,11 @@ report, otherwise ignored. The default value is CL:IDENTITY.
   (format html-stream "</head><body>")
   (multiple-value-bind (counts states source)
       (compute-file-info file external-format)
+    #+nil ; maybe cross-check both techniques for producing states
+    (multiple-value-bind (counts2 states2) (compute-file-states file)
+      (when states2
+        (assert (equalp counts counts2))
+        (assert (equalp states states2))))
     (print-report html-stream file counts states source)
     (format html-stream "</body></html>")
     (list (getf counts :expression) (getf counts :branch))))
@@ -404,24 +410,86 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     (fill-states-from-locations source states locations)
     (values counts states source)))
 
+;;; Two varint-encoded integers can usually be stuffed into one fixnum.
+;;; For 30-bit fixnums it's slightly more likely to be a bignum, but if
+;;; the START is under 1MiB, it's very possibly a fixnum.
+(defun pack-pair (start end &optional octets)
+  (aver (>= end start))
+  (unless octets ; a convenience for manual use and testing
+    (setf octets (make-array 4 :element-type '(unsigned-byte 8) :fill-pointer 0)))
+  ;; Delta-encoded as with code fixups, biased up by 1 because 0 signifies no data
+  (write-var-integer (1+ start) octets)
+  (write-var-integer (- end start) octets)
+  (prog1 (sb-c::integer-from-octets octets) (setf (fill-pointer octets) 0)))
+
+(defun unpack-pair (packed-pair)
+  (let ((list (sb-c::unpack-code-fixup-locs packed-pair)))
+    (values (1- (car list)) ; 1 as encoded means 0, etc
+            ;; If START and END were =, then the delta is 0, which can't be encoded,
+            ;; so the pair reads back as only one integer, which we just repeat.
+            (1- (if (singleton-p list) (car list) (cadr list))))))
+
+(defconstant +suppressed+ 15)
+;;; Produce the STATES array without re-reading FILENAME.
+(defun compute-file-states (filename)
+  (binding* ((file (gethash filename (code-coverage-hashtable)) :exit-if-null)
+             (loc-vec (covered-file-locations file) :exit-if-null)
+             (linelengths (covered-file-lines file))
+             (mock-source ; there is 1 fewer #\newline than there are lines
+              (make-string (+ (reduce #'+ linelengths) (1- (length linelengths)))
+                           :initial-element #\z))
+             (states (make-array (length mock-source) :element-type '(unsigned-byte 4)
+                                                      :initial-element 0))
+             (counts (list :branch (make-sample-count :branch)
+                           :expression (make-sample-count :expression)))
+             (records (get-records filename counts)))
+    ;; Insert #\newline chars. These are the only characters that FILL-WITH-STATE
+    ;; cares about. Revision b40ce7df50 did away with looking for #\Space, possibly
+    ;; a relic of an abandoned attempt to avoid coloring leading whitespace.
+    (let ((pos 0))
+      (dotimes (i (1- (length linelengths)))
+        (let ((len (aref linelengths i)))
+          (setf (char mock-source (incf pos len)) #\newline)
+          (incf pos))))
+    ;; Elements of LOC-VEC at indices exceeding the length of COVERED-FILE-PATHS
+    ;; are infeasible to execute.
+    (loop for i from (length (covered-file-paths file)) below (length loc-vec)
+          do (multiple-value-bind (start end) (unpack-pair (aref loc-vec i))
+               (fill-with-state mock-source states +suppressed+ (1- start) end)))
+    (fill-states-from-locations
+     mock-source states
+     (mapcan (lambda (record)
+               (destructuring-bind (state . loc) (cdr record)
+                 (if (/= loc 0)
+                     (multiple-value-bind (start end) (unpack-pair loc)
+                       (list (list start end state))))))
+             records))
+    (values counts states)))
+
 (defun get-records (filename counts)
   (let* ((file (gethash filename (code-coverage-hashtable)))
          (paths (covered-file-paths file))
          (bits (covered-file-executed file))
+         (locs (covered-file-locations file))
+         (branch-locs (make-hash-table :test 'equal))
          (branch-recs (make-hash-table :test 'equal))
          (branch-count (getf counts :branch))
          (expression-count (getf counts :expression)))
     (collect ((records))
       (dotimes (i (length paths))
-        (let ((state (if (zerop (sbit bits i)) 2 1)) (path (aref paths i)))
+        (let ((state (if (zerop (sbit bits i)) 2 1))
+              (path (aref paths i))
+              (location (if (< i (length locs)) (aref locs i))))
           (cond ((member (car path) '(:then :else))
+                 (when location
+                   (pushnew location (gethash (cdr path) branch-locs)))
                  (setf (gethash (cdr path) branch-recs)
                        (logior (gethash (cdr path) branch-recs 0)
                                (ash state (if (eql (car path) :then) 0 2)))))
                 (t
                  (when (eql state 1) (incf (ok-of expression-count)))
                  (incf (all-of expression-count))
-                 (records (list path state))))))
+                 (records (list* path state location))))))
       (maphash (lambda (path state)
                  ;; Each branch record accounts for two paths
                  (incf (ok-of branch-count)
@@ -430,7 +498,11 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                          ((6 9) 1)  ; #b0110 = taken/not-taken, #b1001 = not-taken/taken
                          (10 0)))   ; #b1010 = neither way taken
                  (incf (all-of branch-count) 2)
-                 (records (list path state)))
+                 (let ((location (gethash path branch-locs)))
+                   ;; :THEN and :ELSE must have the identical locations
+                   ;; (it's the location of the value that picks the branch direction)
+                   (aver (or (not location) (singleton-p location)))
+                   (records (list* path state (car location)))))
                branch-recs)
       (records))))
 
@@ -464,7 +536,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
           ;; STATES array is 0-origin but locations are 1-origin, so the array
           ;; range to fill is (1- START) to (1- END) inclusive
           (when suppress
-            (fill-with-state source states 15 (1- start) end)))))))
+            (fill-with-state source states +suppressed+ (1- start) end)))))))
 
 ;;; Change most elements of STATES between START (inclusive) and END (exclusive)
 ;;; to STATE. Some elements will remain unaffected:
@@ -503,11 +575,13 @@ report, otherwise ignored. The default value is CL:IDENTITY.
 (defun get-locations (records maps filename)
   (let (locations)
     (dolist (record records locations)
-      (destructuring-bind (path state) record
-        (let* ((path (reverse path))
-               (tlf (car path))
-               (source-form (car (nth tlf maps)))
-               (source-map (cdr (nth tlf maps)))
+      (destructuring-bind (rpath state . dummy) record
+        (declare (ignore dummy))
+        (let* ((path (reverse rpath))
+               (tlf-num (car path))
+               (tlf (nth tlf-num maps))
+               (source-form (car tlf))
+               (source-map (cdr tlf))
                (source-path (cdr path)))
           (if source-map
               (handler-case
@@ -519,7 +593,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                   (warn "~@<Error finding source location for source path ~A in file ~A: ~2I~_~A~@:>"
                         source-path filename e)))
               (warn "Unable to find a source map for toplevel form ~A in file ~A~%"
-                    tlf filename)))))))
+                    tlf-num filename)))))))
 
 (defun fill-states-from-locations (source states locations)
   (setf locations (sort (copy-list locations) #'> :key #'third))
@@ -637,6 +711,70 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
       (when (< nchars (length string))
         (sb-kernel:%shrink-vector string nchars))
       string)))
+
+;;; Return a cons of (LOCATIONS . LINE-LENGTHS) where each element of LOCATIONS
+;;; describes the bounding box of a corresponding element in PATHS, and
+;;; elements of LINE-LENGTHS indicate where all the #\newline chars go.
+(defun coverage-augmentation (stream paths)
+  (file-position stream 0)
+  (let* ((string (make-string (file-length stream)))
+         (nchars (read-sequence string stream)))
+    (when (< nchars (length string))
+      (sb-kernel:%shrink-vector string nchars))
+    (setq string (detabify string))
+    (let* ((source-maps (let ((*package* (find-package "CL-USER")))
+                          (read-and-record-source-maps string)))
+           (lines
+            (collect ((lines))
+             (let ((start 0))
+               (loop
+                 (let ((end (position #\newline string :start start)))
+                   (lines (- (or end (length string)) start))
+                   (if end (setq start (1+ end)) (return (lines))))))))
+           (locations (make-array (length paths) :initial-element 0))
+           (suppressions)
+           (octets (make-array 4 :element-type '(unsigned-byte 8) :fill-pointer 0)))
+      ;; just like NOTE-SUPPRESSIONS but different
+      (dolist (tlf source-maps) ; = (form . hash-table)
+        (dohash ((k locations) (cdr tlf))
+          (declare (ignore k))
+          (dolist (location locations)
+            (when (third location)
+              (push (pack-pair (first location) (second location) octets) suppressions)))))
+      ;; just like GET-LOCATIONS but different
+      (dotimes (i (length paths))
+        (binding* ((rpath (aref paths i))
+                   (path (reverse (if (fixnump (car rpath)) rpath (cdr rpath))))
+                   (tlf-num (car path))
+                   (tlf (nth tlf-num source-maps))
+                   (source-form (car tlf))
+                   (source-map (cdr tlf))
+                   (source-path (cdr path))
+                   ((start end)
+                    (source-path-source-position (cons 0 source-path) source-form source-map)))
+          (when (and start end)
+            (setf (aref locations i) (pack-pair start end)))))
+      (cons (sb-c::coerce-to-smallest-eltype (concatenate 'vector locations suppressions))
+            (sb-c::coerce-to-smallest-eltype lines)))))
+
+;;; In the usual way of invoking SB-COVER:REPORT, it first re-reads all source files,
+;;; without which, we lack a way for code under test to produce side-channel artifacts
+;;; describing source forms hit in a way that most coverage aggregation tooling expects.
+;;; (e.g. "lines 1 through 9 are comments; lines 10 through 20 were executed")
+;;; At best we could output source paths reached. Those tend to be not user-friendly.
+;;; To improve things so that tests can emit descriptive files usable for later
+;;; consumption by non-Lisp tooling (think LCOV,GCOV), we have a few options:
+;;; (1) in the code being run, feed it all ita sources (from in-memory streams perhaps?)
+;;;     to re-parse and derive so-called "source maps" just-in-time, OR
+;;; (2) invent a compact way to represent source-maps in the code under test, OR
+;;; (3) translate source paths to physical bounding boxes at compile-time.
+;;; This enhacement takess the third approach, storing more data in *CODE-COVERAGE-INFO*
+;;; if SB-COVER:ENABLE-COVERAGE-LOGGING is called prior to compiling anything.
+;;; Coverage-instrumented functions gain enough metadata to describe the forms reached
+;;; by line and column. Thus we separate analysim from presentation, and only the UI needs
+;;; access to the source code for purposes of rendering it in different colors.
+(defun enable-coverage-logging ()
+  (setq sb-c::*coverage-augmentation-hook* #'coverage-augmentation))
 
 (defun make-source-recorder (fn source-map)
   "Return a macro character function that does the same as FN, but
@@ -973,12 +1111,12 @@ As a quick way to view source maps, do:
              (loop for i from start repeat char-count do (format t " ~X" (aref states i)))
              (format t "~%"))))
 
-(defun show-file-source-maps (pathname)
+(defun show-file-source-maps (pathname &optional tlf-num)
   (let* ((source (read-source pathname :default))
          (maps (read-and-record-source-maps source))
          (*print-pprint-dispatch* *ppd*)
          (i -1))
-    (dolist (cell maps)
+    (dolist (cell (if tlf-num (list (nth tlf-num maps)) maps))
       (let ((form (car cell)))
         (format t "TLF ~d:~%" (incf i))
         (write form)

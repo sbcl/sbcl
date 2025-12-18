@@ -20,11 +20,15 @@
 ;;;            (1 . #8#) (2 . #8#) (:THEN . #8#) #10=(1 . #9#) #11=(1 . #10#) ...)
 (defstruct (covered-file
              (:constructor make-coverage-instrumented-file
-                           (paths &aux (executed (make-array (length paths)
-                                                             :element-type 'bit))))
+                 (paths locations lines
+                  &aux (executed (make-array (length paths) :element-type 'bit))))
              (:copier nil) (:predicate nil))
   (executed #* :type simple-bit-vector :read-only t)
-  (paths #() :type simple-vector :read-only t))
+  (paths #() :type simple-vector :read-only t)
+  ;; The following slots are only for displayless (non-HTML) output.
+  ;; They allow computing coverage "states" without re-reading source files.
+  (locations nil :type (or null vector) :read-only t)
+  (lines nil :type (or null vector) :read-only t))
 
 (defknown %mark-covered (cons) t (always-translatable))
 

@@ -2945,6 +2945,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (values))
 
 (define-cold-fop (fop-record-code-coverage)
+  (pop-stack) ; don't need the augmentation during cross-compile
   (let ((paths (pop-stack)))
     (push (cold-list :record-code-coverage
                      (host-constant-to-core

@@ -52,6 +52,12 @@
 ;; Weak pointers to toplevel forms need to survive the entire test run
 (sb-int:encapsulate 'sb-fasl::possibly-log-new-code 'override #'preserve-code)
 
+(with-test (:name :location-codec)
+  (dotimes (i 100) (dotimes (j 100)
+    (let* ((start i) (end (+ i j)) (packed (sb-cover::pack-pair start end)))
+      (multiple-value-bind (first second) (sb-cover::unpack-pair packed)
+        (assert (= start first)) (assert (= end second)))))))
+
 (with-test (:name :sb-cover)
   (test-util:with-test-directory (sb-cover-test:*output-directory*)
     (load (merge-pathnames "tests.lisp" sb-cover-test:*source-directory*))

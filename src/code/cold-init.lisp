@@ -260,7 +260,7 @@
          (unless (!c-runtime-noinform-p) (print (cdr toplevel-thing))))
         ((cons (eql :record-code-coverage))
          (setf (gethash (second toplevel-thing) (car *code-coverage-info*))
-               (sb-c::make-coverage-instrumented-file (third toplevel-thing))))
+               (sb-c::make-coverage-instrumented-file (third toplevel-thing) nil nil)))
         (t
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
