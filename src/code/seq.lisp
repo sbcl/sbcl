@@ -1794,6 +1794,89 @@ many elements are copied."
                           (apply-key ,key (,ref ,sequence index))
                           value))))
 
+(defun reduce-append (function sequence &rest args
+                      &key key from-end (start 0) end (initial-value nil ivp))
+  (declare (type index start)
+           (dynamic-extent args))
+  (declare (explicit-check sequence))
+  (declare (ignore from-end)
+           (type index start)
+           (type (or null index) end))
+  (let ((key (and key (%coerce-callable-to-fun key))))
+   (seq-dispatch-checking sequence
+       (let ((sequence (nthcdr-check-bounds start sequence
+                                            start end sequence)))
+         (if end
+             (cond ((> start end)
+                    (sequence-bounding-indices-bad-error sequence start end))
+                   ((= end start)
+                    (if ivp
+                        initial-value))
+                   (t
+                    (let ((count (the index (- end start))))
+                      (let* ((l sequence)
+                             (head (list nil))
+                             (tail head))
+                        (declare (dynamic-extent head))
+                        (loop with i fixnum = count
+                              do
+                              (when (endp l)
+                                (sequence-bounding-indices-bad-error sequence start end))
+                              (let ((e (apply-key key (pop l))))
+                                (when (<= i 1)
+                                  (cond (ivp
+                                         (setq tail (copy-list-to e tail))
+                                         (setf (cdr tail) initial-value))
+                                        (t
+                                         (setf (cdr tail) e)))
+                                  (return))
+                                (setq tail (copy-list-to e tail)))
+                              (decf i))
+                        (truly-the list (cdr head))))))
+             (if (endp sequence)
+                 (if ivp
+                     initial-value)
+                 (let* ((l sequence)
+                        (head (list nil))
+                        (tail head))
+                   (declare (dynamic-extent head))
+                   (loop
+                    (let ((e (apply-key key (pop l))))
+                      (when (endp l)
+                        (cond (ivp
+                               (setq tail (copy-list-to e tail))
+                               (setf (cdr tail) initial-value))
+                              (t
+                               (setf (cdr tail) e)))
+                        (return))
+                      (setq tail (copy-list-to e tail))))
+                   (truly-the list (cdr head))))))
+       (with-array-data ((vector sequence) (start start) (end end) :check-fill-pointer t
+                                                                   :force-inline t)
+         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+         (if (= end start)
+             (if ivp
+                 initial-value)
+             (let* ((head (list nil))
+                    (tail head))
+               (declare (dynamic-extent head))
+               (cond-dispatch key
+                 (cond-dispatch (simple-vector-p vector)
+                   (loop with i fixnum = start
+                         do
+                         (let ((e (apply-key key (aref vector i))))
+                           (incf i)
+                           (when (= i end)
+                             (cond (ivp
+                                    (setq tail (copy-list-to e tail))
+                                    (setf (cdr tail) initial-value))
+                                   (t
+                                    (setf (cdr tail) e)))
+                             (return))
+                           (setq tail (copy-list-to e tail))))))
+               (truly-the list (cdr head)))))
+       (apply #'sb-sequence:reduce function sequence args))))
+
 (defun reduce (function sequence &rest args
                &key key from-end (start 0) end (initial-value nil ivp))
   (declare (type index start)

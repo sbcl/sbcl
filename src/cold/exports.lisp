@@ -1545,6 +1545,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%FIND-POSITION-IF-VECTOR-MACRO" "%FIND-POSITION-IF-NOT"
            "%FIND-POSITION-IF-NOT-VECTOR-MACRO"
            "FP>" "FP>=" "FP<" "FP<="
+           "REDUCE-APPEND"
            "%HYPOT" "%HYPOTF"
            "%INSTANCE-CAS"
            "%LDB"

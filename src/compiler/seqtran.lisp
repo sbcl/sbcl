@@ -4097,6 +4097,14 @@
                  (element-type
                   (type-union fun-result element-type)))))))))
 
+(defoptimizer (reduce rewrite-full-call)
+    ((function sequence &key key from-end start end (initial-value nil ivp)) node)
+  (when (and (lvar-fun-is function '(append))
+             (or (not key)
+                 (unsupplied-or-nil from-end)
+                 (flushable-callable-arg-p (lvar-fun-name key) 1 nil)))
+    'reduce-append))
+
 (defoptimizer (nth derive-type) ((n list))
   (when (constant-lvar-p list)
     (let* ((list (lvar-value list))

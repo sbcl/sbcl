@@ -1310,10 +1310,9 @@
               (not (or (always-boundp (leaf-source-name leaf) node)
                        (policy node (< safety 3))))))))
 
-(defun flushable-callable-arg-p (name arg-count)
+(defun flushable-callable-arg-p (name arg-count &optional (check-type t))
   (typecase name
-    (null
-     t)
+    (null nil)
     (symbol
      (let* ((info (info :function :info name))
             (attributes (and info
@@ -1331,6 +1330,7 @@
                         nil)
                        ((and max (> arg-count max))
                         nil)
+                       ((not check-type))
                        (t
                         ;; Just check for T to ensure it won't signal type errors.
                         (not (find *universal-type*
@@ -1345,8 +1345,7 @@
        (case (car annotation)
          ((function-designator function)
           (flet ((flushable-fun-p (fun)
-                   (unless (and fun
-                                (flushable-callable-arg-p fun (length (cadr annotation))))
+                   (unless (flushable-callable-arg-p fun (length (cadr annotation)))
                      (return))))
             (let ((uses (lvar-uses arg)))
               (if (consp uses)
