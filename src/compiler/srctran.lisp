@@ -5375,7 +5375,7 @@
                                 ((acos) *
                                  (return-from ok))
                                 ((exp cos) (*)
-                                 (or (types-equal-or-intersect (first args) (specifier-type 'complex))
+                                 (or (types-equal-or-intersect (lvar-type (first args)) (specifier-type 'complex))
                                      (return-from ok)))
                                 (atan (*)
                                  t)

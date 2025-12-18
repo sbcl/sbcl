@@ -209,7 +209,8 @@
                      ((and (combination-p node)
                            (lvar-fun-is (combination-fun node) '(values)))
                       (let* ((next-lvar (node-lvar node))
-                             (next-dest (lvar-dest next-lvar)))
+                             (next-dest (and next-lvar
+                                             (lvar-dest next-lvar))))
                         (when next-dest
                           (recurse-node next-dest next-lvar
                                         (position lvar (combination-args node))))))
