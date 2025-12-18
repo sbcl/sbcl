@@ -1630,5 +1630,8 @@
   (let ((b (& (>> val 11) #xf)))
    (let ((a (>> (<< val 6) 28)))
     (^ a (aref tab b))))))")
+(#(6A3E03D5 73D42188 A4528420 CA743403 D0F360C2 D1F36255 D5F368A1 D7F36BC7)
+ "(ASH %UNARY-TRUNCATE TRUNCATE / * + - %NEGATE)"
+ "((& (- (>> val 1) (>> val 22)) 7))")
 )
 ;; EOF

@@ -1502,6 +1502,9 @@
     (test `(lambda (a b d)
              (declare (optimize (sb-c::float-accuracy 0)))
              (- d (* a (- b))))
+          0)
+    (test `(lambda (x y)
+             (abs (* (- x) y)))
           0)))
 
 (with-test (:name :abs-match)

@@ -2224,11 +2224,8 @@
   (one-arg-derive-type num #'abs-derive-type-aux))
 
 (deftransform abs ((x) (number) * :node node)
-  (or (combination-case x
-        ((%negate) (*)
-         (splice-fun-args x name 1)
-         nil))
-      (combination-match x ((:or * (:commutative /))
+  (negate-lvar x node '%negate nil t)
+  (or (combination-match x ((:or * (:commutative /))
                             * (abs y))
         (extract-lvar-n y 1 node)
         nil)
@@ -5394,7 +5391,7 @@
                    node)
     t))
 
-(defun negate-lvar (x outer-node &optional test)
+(defun negate-lvar (x outer-node &optional test type minus-zero-ignored)
   (let ((return-type (single-value-type (node-derived-type outer-node)))
         float-safe-computed
         float-safe)
@@ -5403,7 +5400,8 @@
                  float-safe
                  (setf float-safe-computed t
                        float-safe
-                       (or (policy outer-node (zerop float-accuracy))
+                       (or minus-zero-ignored
+                           (policy outer-node (zerop float-accuracy))
                            (not (types-equal-or-intersect
                                  return-type
                                  (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
@@ -5508,9 +5506,11 @@
                             (negate-args args nil t))
                            (truncate (* *)
                             (negate-args args (specifier-type 'real)))
+                           (%unary-truncate (*)
+                            (negate-lvar (first args) (specifier-type 'real) test))
                            (ash (* (type unsigned-byte))
                             (negate-lvar (first args) (specifier-type 'integer) test))))))))
-        (negate-lvar x nil test)))))
+        (negate-lvar x type test)))))
 
 (deftransform %negate ((x) * * :node node)
   "Combine - with +, -, *"
