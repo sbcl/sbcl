@@ -1511,9 +1511,13 @@
                       count))))
     (test `(lambda (x y) (abs (* (abs x) y)))
           1)
-    (test `(lambda (a b d)
+    (test `(lambda (x y)
              (/ (abs y) (abs x)))
-          1)))
+          1)
+    (test `(lambda (x)
+             (declare (real x))
+             (abs (* x x)))
+          0)))
 
 (with-test (:name :*-by-zero-type)
   (assert-type

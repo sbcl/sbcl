@@ -2755,12 +2755,15 @@ is :ANY, the function name is not checked."
           (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
           (extract-lvar lvar final-node)))))
 
-(defun extract-lvar-n (lvar n)
-  (let ((dest (lvar-dest lvar)))
-    (or (= n 0)
-        (let* ((next-lvar (node-lvar dest)))
-          (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
-          (extract-lvar-n lvar (1- n))))))
+(defun extract-lvar-n (lvar n &optional outer-node)
+  (labels ((extract (lvar n)
+             (let ((dest (lvar-dest lvar)))
+               (or (= n 0)
+                   (let* ((next-lvar (node-lvar dest)))
+                     (aver (splice-fun-args next-lvar :any (constantly lvar) nil))
+                     (extract lvar (1- n)))))))
+    (extract lvar n)
+    (erase-lvar-type lvar nil outer-node)))
 
 ;;; Eliminate keyword arguments from the call (leaving the
 ;;; parameters in place.
