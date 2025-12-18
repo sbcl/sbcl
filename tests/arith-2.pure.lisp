@@ -1527,6 +1527,12 @@
     (test `(lambda (x y)
              (declare (real x))
              (abs (/ (* (abs x) y) 4)))
+          1)
+    (test `(lambda (a b c)
+             (abs
+              (if a
+                  (abs b)
+                  c)))
           1)))
 
 (with-test (:name :*-by-zero-type)
