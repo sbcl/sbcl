@@ -1652,5 +1652,8 @@
   (let ((b (& (>> val 9) #x7)))
    (let ((a (>> (<< val 5) 29)))
     (^ a (aref tab b))))))")
+(#(42D83FFB 4541A84F 4D28C61A 753A8460 EBD01872)
+ "(:ALLOW-OTHER-KEYS :ANY-BRANCH :MINUS-ZERO-IGNORED :TYPE :TEST)"
+ "((& (>> val 12) 7))")
 )
 ;; EOF

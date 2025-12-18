@@ -2250,11 +2250,13 @@
     (abs-lvar x top-level)))
 
 (defoptimizer (abs optimizer) ((x) node)
-  (negate-lvar x node :test '%negate :minus-zero-ignored t)
+  (negate-lvar x node :test '%negate :minus-zero-ignored t
+               :any-branch t)
   (remove-abs x node))
 
 (defoptimizer (cos optimizer) ((x) node)
-  (negate-lvar x node :test '%negate :minus-zero-ignored t)
+  (negate-lvar x node :test '%negate :minus-zero-ignored t
+               :any-branch t)
   (remove-abs x node nil))
 
 (defun rem-result-type (number-type divisor-type)
@@ -5418,7 +5420,8 @@
                    node)
     t))
 
-(defun negate-lvar (x outer-node &key test type minus-zero-ignored)
+(defun negate-lvar (x outer-node &key test type minus-zero-ignored
+                                      any-branch)
   (let ((return-type (single-value-type (node-derived-type outer-node)))
         float-safe-computed
         float-safe)
@@ -5446,25 +5449,34 @@
                (negate-lvar (x type test)
                  (let ((uses (lvar-uses x)))
                    (if (listp uses)
-                       (let (left negated %negate)
-                         (loop for use in uses
-                               do (if (and (not (node-next use))
-                                           (let ((kind (negate-node use type t)))
-                                             (when (eq kind '%negate)
-                                               (setf %negate kind))
-                                             kind))
-                                      (push use negated)
-                                      (setf left t)))
-                         (when negated
-                           (cond (left
-                                  nil)
-                                 ((eq test t))
-                                 ((or %negate
-                                      (not test))
-                                  (loop for use in uses
-                                        do (aver (negate-node use type nil)))
-                                  (or %negate t))
-                                 (t))))
+                       (if any-branch
+                           (let (negated %negate)
+                             (loop for use in uses
+                                   do (let ((kind (negate-node use type test)))
+                                        (when kind
+                                          (when (eq kind '%negate)
+                                            (setf %negate kind))
+                                          (setf negated t))))
+                             (or %negate negated))
+                           (let (left negated %negate)
+                             (loop for use in uses
+                                   do (if (and (not (node-next use))
+                                               (let ((kind (negate-node use type t)))
+                                                 (when (eq kind '%negate)
+                                                   (setf %negate kind))
+                                                 kind))
+                                          (push use negated)
+                                          (setf left t)))
+                             (when negated
+                               (cond (left
+                                      nil)
+                                     ((eq test t))
+                                     ((or %negate
+                                          (not test))
+                                      (loop for use in uses
+                                            do (aver (negate-node use type nil)))
+                                      (or %negate t))
+                                     (t)))))
                        (negate-node uses type test))))
                (negate-node (node type test)
                  (flet ((negate-args (args type &optional contagion)

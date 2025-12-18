@@ -1505,6 +1505,11 @@
           0)
     (test `(lambda (x y)
              (abs (* (- x) y)))
+          0)
+    (test `(lambda (x y)
+             (abs (if x
+                      (- x)
+                      y)))
           0)))
 
 (with-test (:name :abs-match)
