@@ -2238,8 +2238,7 @@
                  (erase-node-type combination *wild-type* nil outer-node)
                  (transform-call combination `(lambda (x) x) 'remove-abs)
                  t))
-               ((* / %unary-truncate truncate floor ceiling round
-                   ftruncate ffloor fceiling fround
+               ((* / %unary-truncate truncate ftruncate round fround
                    cos sin tan) (* *)
                 (let (did-something)
                   (loop for arg in args
