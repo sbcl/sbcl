@@ -1668,5 +1668,12 @@
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
+(#(25698D2C 32358F36 4928B1E4 4BCB0101 63C481C2 6A3E03D5 73D42188 9CF559D2 A4528420 B0E6341F CA743403 D0F360C2 D1F36255
+   D5F368A1 D7F36BC7 EDCB9528 F11A63E9 FB727973)
+ "(SIN FCEILING FFLOOR CEILING FLOOR ASH FTRUNCATE FROUND %UNARY-ROUND %UNARY-TRUNCATE ROUND TRUNCATE LOGNOT / * + - %NEGATE)"
+ "((let ((tab #a((16) (unsigned-byte 8) 0 1 0 13 0 13 0 5 0 0 0 0 18 0 0 26)))
+  (let ((b (& val #xf)))
+   (let ((a (>> val 28)))
+    (^ a (aref tab b))))))")
 )
 ;; EOF

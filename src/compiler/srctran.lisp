@@ -5588,6 +5588,14 @@
                               t))
                            ((* /) (* *)
                             (negate-args args nil t))
+                           (lognot (*)
+                            (unless test
+                              (erase-node-type combination *wild-type* nil outer-node)
+                              (transform-call combination
+                                              `(lambda (x)
+                                                 (+ x 1))
+                                              'negate-lvar))
+                            t)
                            ((truncate round) (* *)
                             (negate-args args (specifier-type 'real)))
                            ((%unary-truncate %unary-round) (*)
