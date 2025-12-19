@@ -9001,33 +9001,34 @@
   (range-transform '<= a b node))
 
 (when-vop-existsp (:translate check-range<=)
-  (deftransform check-range<= ((l x h) (t sb-vm:signed-word t) * :important nil)
-    `(range<= l x h))
-  (deftransform check-range<= ((l x h) (t sb-vm:word t) * :important nil)
-    `(range<= l x h))
-
-  (deftransform check-range<=
-      ((l x h) ((constant-arg fixnum) t (constant-arg fixnum)) * :important nil)
-    (let* ((type (lvar-type x))
-           (l (lvar-value l))
-           (h (lvar-value h))
-           (range-type (specifier-type `(integer ,l ,h)))
-           (intersect (type-intersection type (specifier-type 'fixnum))))
-      (cond ((eq intersect *empty-type*)
-             nil)
-            ((csubtypep intersect range-type)
-             `(fixnump x))
-            ((and (< l 0)
-                  (csubtypep intersect
-                             (specifier-type 'unsigned-byte)))
-             `(check-range<= 0 x ,h))
-            ((let ((int (type-approximate-interval intersect)))
-               (when int
-                 (let ((power-of-two (1- (ash 1 (integer-length (interval-high int))))))
-                   (when (< 0 power-of-two h)
-                     `(check-range<= l x ,power-of-two))))))
-            (t
-             (give-up-ir1-transform)))))
+  (macrolet ((def (name ld hd)
+               (let ((check-name (symbolicate "CHECK-" name) ))
+                 `(progn
+                    (deftransform ,check-name ((l x h) (t sb-vm:signed-word t) * :important nil)
+                      `(,',name l x h))
+                    (deftransform ,check-name ((l x h) (t sb-vm:word t) * :important nil)
+                      `(,',name l x h))
+                    (deftransform ,check-name
+                        ((l x h) ((constant-arg fixnum) t (constant-arg fixnum)) * :important nil)
+                      (let* ((type (lvar-type x))
+                             (l (+ (lvar-value l) ,ld))
+                             (h (+ (lvar-value h) ,hd))
+                             (range-type (specifier-type `(integer ,l ,h)))
+                             (intersect (type-intersection type (specifier-type 'fixnum))))
+                        (cond ((eq intersect *empty-type*)
+                               nil)
+                              ((csubtypep intersect range-type)
+                               `(fixnump x))
+                              ((and (< l 0)
+                                    (csubtypep intersect
+                                               (specifier-type 'unsigned-byte)))
+                               `(check-range<= 0 x ,h))
+                              (t
+                               (give-up-ir1-transform)))))))))
+    (def range<= 0 0)
+    (when-vop-existsp (:translate check-range<=<)
+      (def range<<= 1 0)
+      (def range<=< 0 -1)))
 
   (macrolet ((def (name ld hd)
                `(deftransform ,name ((l x h) ((constant-arg fixnum) integer (constant-arg fixnum)) * :important nil)
@@ -9043,9 +9044,8 @@
                                      (numeric-type-high diff)))
                            `(not (eql x ,(numeric-type-low diff))))
                           ((and (neq unsigned-type *empty-type*)
-                                (csubtypep unsigned-type
-                                           range-type))
-                           `(>= x l))
+                                (csubtypep unsigned-type range-type))
+                           `(>= x ,l))
                           ((and (< l 0)
                                 (csubtypep type
                                            (specifier-type 'unsigned-byte)))
