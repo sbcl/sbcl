@@ -3,4 +3,5 @@
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-cover"
-  :components ((:file "cover")))
+  :components ((:file "cover")
+               (:file "genhtml")))
