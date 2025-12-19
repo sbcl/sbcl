@@ -3890,3 +3890,39 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1 (inst rbit res arg)))
+
+(deftransform abs ((x) (:or ((signed-word) signed-word)) * :vop t)
+  t)
+
+(define-vop (abs)
+  (:translate abs)
+  (:policy :fast-safe)
+  (:args (x :scs (signed-reg) :to :save))
+  (:arg-types signed-num)
+  (:results (res :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 2
+    (inst negs res x)
+    (inst csel res x res :lt)))
+
+(define-vop (abs-fixnum abs)
+  (:args (x :scs (any-reg) :to :save))
+  (:arg-types tagged-num)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+  (:variant-cost 1))
+
+;;; Doesn't work well with comparisons, require-gengc-barrier-p
+#+nil
+(define-vop (abs-fixnum)
+  (:translate abs)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg) :to :save))
+  (:arg-types tagged-num)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:vop-var vop)
+  (:generator 3
+    (inst negs res x)
+    (inst csel res x res :lt)
+    (load-constant vop (emit-constant (1+ most-positive-fixnum)) tmp-tn)
+    (inst csel res res tmp-tn :vc)))

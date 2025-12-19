@@ -618,11 +618,11 @@
 ;;; Handle some simple transformations.
 
 (deftransform abs ((x) ((and (real 0)
-                             (not (member -0f0 -0d0)))) * :important nil)
+                             (not (member -0f0 -0d0)))) * :important nil :before-vop t)
   'x)
 
 (deftransform abs ((x) ((and (real * 0)
-                             (not (member 0f0 0d0)))) * :important nil)
+                             (not (member 0f0 0d0)))) * :important nil :before-vop t)
   '(%negate x))
 
 (deftransform abs ((x) ((complex double-float)) double-float)

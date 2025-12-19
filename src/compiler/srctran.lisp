@@ -6974,7 +6974,7 @@
         (give-up-ir1-transform))))
 
 (make-defs (($fun = eq eql))
-  (deftransform $fun ((x y) (real (constant-arg real)) * :important nil)
+  (deftransform $fun ((x y) (real (constant-arg real)) * :node node :important nil)
     (or (combination-case x
           (abs ((type real))
            (let ((y (lvar-value y)))
@@ -6984,11 +6984,13 @@
                     (splice-fun-args x name 1)
                     nil)
                    ((and (/= y 0)
-                         ;; Floats usually have a dedicated abs instruction
                          (not (or (csubtypep (lvar-type (first args)) (specifier-type 'single-float))
-                                  (csubtypep (lvar-type (first args)) (specifier-type 'double-float)))))
+                                  (csubtypep (lvar-type (first args)) (specifier-type 'double-float))
+                                  (word-sized-lvar-p (first args)))))
+                    (delay-ir1-transform node :ir1-phases)
                     (splice-fun-args x name 1)
-                    `(or ($fun x ,y)
+                    `(if ($fun x ,y)
+                         t
                          ($fun x ,(- y))))))))
         (give-up-ir1-transform))))
 

@@ -4966,3 +4966,28 @@
     (inst shr temp2 1)
     (inst and temp2 temp3)
     (inst lea res (ea temp2 res 2))))
+
+(deftransform abs ((x) (:or ((signed-word) signed-word)) * :vop t)
+  t)
+
+(define-vop (abs)
+  (:translate abs)
+  (:policy :fast-safe)
+  (:args (x :scs (signed-reg)))
+  (:arg-refs x-ref)
+  (:arg-types signed-num)
+  (:results (res :scs (signed-reg)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:result-types signed-num)
+   (:generator 2
+    (move res x)
+    (move temp x)
+    (inst neg temp)
+    (inst cmov :g res temp)))
+
+(define-vop (abs-fixnum abs)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num)
+  (:results (res :scs (any-reg)))
+  (:result-types tagged-num)
+   (:variant-cost 1))
