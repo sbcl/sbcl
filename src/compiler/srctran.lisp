@@ -4305,7 +4305,8 @@
                      (or (eq nx '%negate)
                          (eq ny '%negate)))
             (aver (and (negate-lvar x node :type (specifier-type 'real))
-                       (negate-lvar y node :type (specifier-type 'real))))))))))
+                       (negate-lvar y node :type (specifier-type 'real))))
+            t))))))
 
 ;;; Remove negate and abs
 (make-defs (($fun / * truncate ftruncate fround round))
@@ -4314,14 +4315,18 @@
                    (or (lvar-single-value-p (node-lvar node))
                        (mv-bind-unused-p (node-lvar node) 1))
                    t)
-          (remove-paired-negate x y node ($when (member '$fun '(truncate round))
-                                                t))
+          (when (remove-paired-negate x y node ($when (member '$fun '(truncate round))
+                                                      t))
+            ($when (member '$fun '(truncate ftruncate fround round))
+                   (erase-node-type node t 1)))
           (combination-match (node-lvar node) ($fun (abs (:type real x)) (abs (:type real y)))
             (extract-lvar-n x 1 node)
             (extract-lvar-n y 1 node)
-            ($when (member '$fun '(truncate ftruncate fround round))
-                   (erase-node-type node *wild-type*))
-            `(abs ($fun x y))))
+            `(values (abs ($fun x y))
+                     ($when (member '$fun '(truncate ftruncate fround round))
+                            (progn
+                              (erase-node-type node *wild-type*)
+                              0)))))
         (give-up-ir1-transform))))
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
