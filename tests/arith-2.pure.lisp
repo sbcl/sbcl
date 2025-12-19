@@ -1522,6 +1522,9 @@
              (abs (if x
                       (- x)
                       y)))
+          0)
+    (test `(lambda (x)
+             (lognot (- x)))
           0)))
 
 (with-test (:name :abs-match)

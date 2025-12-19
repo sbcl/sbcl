@@ -5617,6 +5617,12 @@
       'x
       (give-up-ir1-transform)))
 
+(deftransform lognot ((x) * * :node node)
+  (if (eq (negate-lvar x node :test '%negate :type (specifier-type 'integer))
+          '%negate)
+      '(- x 1)
+      (give-up-ir1-transform)))
+
 ;;; Return T if in an arithmetic op including lvars X and Y, the
 ;;; result type is not affected by the type of X. That is, Y is at
 ;;; least as contagious as X.
