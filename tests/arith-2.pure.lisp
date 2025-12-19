@@ -1544,7 +1544,11 @@
               (if a
                   (abs b)
                   c)))
-          1)))
+          1)
+    (test `(lambda (a)
+             (declare (real a))
+             (= (abs a) 10))
+          0)))
 
 (with-test (:name :*-by-zero-type)
   (assert-type

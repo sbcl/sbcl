@@ -426,19 +426,31 @@
                  (loop while cases
                        collect (gen)))))))))
 
-
 (defun generate-combination-tree (lvar)
-  (let ((uses (lvar-uses lvar)))
-    (multiple-value-bind (name combination) (combination/cast-name uses)
-      (cond (combination
-             (list* name
-                    (mapcar #'generate-combination-tree (combination-args combination))))
-            ((constant-lvar-p lvar)
-             (lvar-value lvar))
-            ((ref-p uses)
-             (leaf-source-name (ref-leaf uses)))
-            (t
-             lvar)))))
+  (let ((vars '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+        (lvar-count 0))
+    (labels ((gen-lvar (lvar)
+               (labels ((gen-use (node)
+                          (multiple-value-bind (name combination) (combination/cast-name node)
+                            (cond (combination
+                                   (list* name
+                                          (mapcar #'gen-lvar (combination-args combination))))
+                                  ((ref-p node)
+                                   (let ((leaf (ref-leaf node)))
+                                     (if (constant-p leaf)
+                                         (constant-value leaf)
+                                         (cons (pop vars)
+                                               (type-specifier (single-value-type (node-derived-type node)))))))
+                                  ((cast-p node)
+                                   (list 'the (type-specifier (cast-asserted-type node)) (gen-lvar (cast-value node))))
+                                  (t
+                                   (cons (format nil "LVAR~a" (incf lvar-count))
+                                         (type-specifier (single-value-type (node-derived-type node)))))))))
+                 (let ((uses (lvar-uses lvar)))
+                   (if (listp uses)
+                       (list* 'or (mapcar #'gen-use uses))
+                       (gen-use uses))))))
+      (gen-lvar lvar))))
 
 (declaim (ftype (function * (values t (or null combination) list &optional)) lvar-combination/cast-name-args))
 (defun lvar-combination/cast-name-args (lvar)
