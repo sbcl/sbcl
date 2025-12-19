@@ -3299,7 +3299,8 @@
                                                      (cast-context cast)
                                                      t))))
                  (setf (cast-silent-conflict new-cast) :style-warning
-                       (node-source-path new-cast) (node-source-path cast)))
+                       (node-source-path new-cast) (node-source-path cast)
+                       (node-derived-type new-cast) (node-derived-type cast)))
                (delete-filter cast lvar value)
                t))))))
 
