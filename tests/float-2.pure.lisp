@@ -694,3 +694,8 @@ fractional bits."
   (assert (= (expt (opaque-identity -6) (opaque-identity 1/2))
              (expt (opaque-identity -6) (opaque-identity 0.5))
              (sqrt (opaque-identity -6)))))
+
+(with-test (:name :truncate-bignum-remainder)
+  (assert (equal (multiple-value-list (truncate (opaque-identity 4503599627370495.5d0)
+                                                (opaque-identity 1d0)))
+                 (opaque-identity '(4503599627370495 0.5d0)))))

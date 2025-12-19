@@ -2345,6 +2345,22 @@
   (def double-float)
   (def single-float))
 
+#-64-bit ;; quot can be fractional with 32 bits
+(defun truncate-double-float-to-bignum-truncating-div (quot number divisor)
+  (declare (inline sb-kernel:integer-decode-double-float))
+  (if (zerop divisor)
+      (locally (declare (muffle-conditions compiler-note)) (error 'division-by-zero :operation 'truncate :operands (list number divisor)))
+      (multiple-value-bind (bits exp sign)
+          (sb-kernel:integer-decode-double-float quot)
+        (let ((truncated
+                (let ((truncated (ash bits exp)))
+                  (if (minusp sign)
+                      (- truncated)
+                      truncated))))
+          (values truncated (- number
+                               (* (sb-kernel:round-double quot :truncate)
+                                  divisor)))))))
+
 #-64-bit
 (defun round-double-float-to-bignum (number)
   (declare (double-float number))

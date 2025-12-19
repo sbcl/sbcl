@@ -1866,7 +1866,8 @@
                                                                  bignum-rounder
                                                                  '-div))
                                        (symbolicate 'unary-truncate- type '-to-bignum-div)))
-                    (to-bignum (or bignum-rounder
+                    (to-bignum (or (and (neq fun 'truncate)
+                                        bignum-rounder)
                                    (symbolicate 'unary-truncate- type '-to-bignum)))
                     (coerce (symbolicate "%" type))
                     (fixnum-type `(,type
@@ -1905,7 +1906,7 @@
                                          `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
                                          `(,',to-bignum-div div x f))))))))))
   (def truncate single-float ())
-  (def truncate double-float (single-float))
+  (def truncate double-float (single-float) #-64-bit sb-bignum::truncate-double-float-to-bignum-truncating)
   (def round single-float ())
   (def round double-float (single-float) #-64-bit sb-bignum::round-double-float-to-bignum #-64-bit t))
 
