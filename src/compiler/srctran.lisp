@@ -5720,6 +5720,9 @@
       (t
        (give-up-ir1-transform))))))
 
+(deftransform - ((x y) ((eql -1) sb-vm:signed-word) * :important nil)
+  `(lognot y))
+
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
 (deftransform expt ((x y) (t (constant-arg real)) *)
