@@ -4309,24 +4309,27 @@
             t))))))
 
 ;;; Remove negate and abs
-(make-defs (($fun / * truncate ftruncate fround round))
+(make-defs (($fun / * truncate ftruncate fround round
+                  floor ceiling ffloor fceiling))
   (deftransform $fun ((x y) (number number) * :node node :important nil)
-    (or (when ($if (member '$fun '(truncate ftruncate fround round))
+    (or (when ($if (member '$fun '(* /))
+                   t
                    (or (lvar-single-value-p (node-lvar node))
-                       (mv-bind-unused-p (node-lvar node) 1))
-                   t)
-          (when (remove-paired-negate x y node ($when (member '$fun '(truncate round))
-                                                      t))
-            ($when (member '$fun '(truncate ftruncate fround round))
-                   (erase-node-type node t 1)))
-          (combination-match (node-lvar node) ($fun (abs (:type real x)) (abs (:type real y)))
-            (extract-lvar-n x 1 node)
-            (extract-lvar-n y 1 node)
-            `(values (abs ($fun x y))
-                     ($when (member '$fun '(truncate ftruncate fround round))
-                            ,(progn
-                              (erase-node-type node *wild-type*)
-                              0)))))
+                       (mv-bind-unused-p (node-lvar node) 1)))
+          (when (remove-paired-negate x y node
+                                      ($when (member '$fun '(truncate round floor ceiling))
+                                             t))
+            ($unless (member '$fun '(* /))
+              (erase-node-type node t 1)))
+          ($unless (member '$fun '(floor ceiling ffloor fceiling))
+           (combination-match (node-lvar node) ($fun (abs (:type real x)) (abs (:type real y)))
+             (extract-lvar-n x 1 node)
+             (extract-lvar-n y 1 node)
+             `(values (abs ($fun x y))
+                      ($unless (member '$fun '(* /))
+                               ,(progn
+                                  (erase-node-type node *wild-type*)
+                                  0))))))
         (give-up-ir1-transform))))
 
 (deftransform * ((x y) (t t) * :node node :priority :last)
