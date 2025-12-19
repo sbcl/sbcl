@@ -4324,7 +4324,7 @@
             (extract-lvar-n y 1 node)
             `(values (abs ($fun x y))
                      ($when (member '$fun '(truncate ftruncate fround round))
-                            (progn
+                            ,(progn
                               (erase-node-type node *wild-type*)
                               0)))))
         (give-up-ir1-transform))))
