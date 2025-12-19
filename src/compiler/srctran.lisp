@@ -1061,11 +1061,11 @@
             (eql point 0d0))
         ;; Separate -0.0 from 0.0
         (cond ((and lo (if (consp lo)
-                           (zerop (car lo))
+                           (sb-xc:>= (car lo) point)
                            (fp>= lo point)))
                '+)
               ((and hi (if (consp hi)
-                           (zerop (car hi))
+                           (sb-xc:<= (car hi) point)
                            (fp< hi point)))
                '-)
               (t
