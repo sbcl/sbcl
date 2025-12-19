@@ -5458,13 +5458,13 @@
                  (cond ((float-safe-p))
                        (t
                         (float-contagion-for-negate a b))))
-               (negate-lvar (x type test)
+               (negate-lvar (x type test any-branch)
                  (let ((uses (lvar-uses x)))
                    (if (listp uses)
                        (if any-branch
                            (let (negated %negate)
                              (loop for use in uses
-                                   do (let ((kind (negate-node use type test)))
+                                   do (let ((kind (negate-node use type test any-branch)))
                                         (when kind
                                           (when (eq kind '%negate)
                                             (setf %negate kind))
@@ -5473,7 +5473,7 @@
                            (let (left negated %negate)
                              (loop for use in uses
                                    do (if (and (not (node-next use))
-                                               (let ((kind (negate-node use type t)))
+                                               (let ((kind (negate-node use type t any-branch)))
                                                  (when (eq kind '%negate)
                                                    (setf %negate kind))
                                                  kind))
@@ -5486,36 +5486,64 @@
                                      ((or %negate
                                           (not test))
                                       (loop for use in uses
-                                            do (aver (negate-node use type nil)))
+                                            do (aver (negate-node use type nil any-branch)))
                                       (or %negate t))
                                      (t)))))
-                       (negate-node uses type test))))
-               (negate-node (node type test)
-                 (flet ((negate-args (args type &optional contagion)
-                          (if (cdr args)
-                              (destructuring-bind (first second) args
-                                (when contagion
-                                  (let ((contagion (float-contagion first second)))
-                                    (case contagion
-                                      ((t))
-                                      ((nil) (return-from negate-args))
-                                      (t
-                                       (return-from negate-args (negate-lvar contagion type test))))))
-                                ;; Prefer to remove %negate instead of turning constants negative
-                                (cond ((eq test t)
-                                       (or (negate-lvar first type test)
-                                           (negate-lvar second type test)))
-                                      (t
-                                       (let ((%negate (negate-lvar first type '%negate)))
-                                         (if (eq %negate '%negate)
-                                             %negate
-                                             (if (eq test '%negate)
-                                                 (or (negate-lvar second type test)
-                                                     %negate)
-                                                 (or (negate-lvar second type nil)
-                                                     (and %negate
-                                                          (negate-lvar first type nil)))))))))
-                              (negate-lvar (first args) type test))))
+                       (negate-node uses type test any-branch))))
+               (negate-node (node type test any-branch)
+                 (labels ((negate-args (args type &optional contagion any-branch)
+                            (if (cdr args)
+                                (destructuring-bind (first second) args
+                                  (when contagion
+                                    (let ((contagion (float-contagion first second)))
+                                      (case contagion
+                                        ((t))
+                                        ((nil) (return-from negate-args))
+                                        (t
+                                         (return-from negate-args (negate-lvar contagion type test any-branch))))))
+                                  ;; Prefer to remove %negate instead of turning constants negative
+                                  (cond ((eq test t)
+                                         (or (negate-lvar first type test any-branch)
+                                             (negate-lvar second type test any-branch)))
+                                        (t
+                                         (let ((%negate (negate-lvar first type '%negate any-branch)))
+                                           (if (eq %negate '%negate)
+                                               %negate
+                                               (if (eq test '%negate)
+                                                   (or (negate-lvar second type test any-branch)
+                                                       %negate)
+                                                   (or (negate-lvar second type nil any-branch)
+                                                       (and %negate
+                                                            (negate-lvar first type nil any-branch)))))))))
+                                (negate-lvar (first args) type test any-branch)))
+                          (negate-non-zero-args (args &optional any-branch)
+                            (let ((all-good t)
+                                  good)
+                              (cond ((or (float-safe-p)
+                                         (loop for arg in args
+                                               do
+                                               (if (csubtypep (lvar-type arg)
+                                                              (specifier-type '(and number (not (or (eql 0) (complex ratio))))))
+                                                   (setf good arg)
+                                                   (setf all-good nil))
+                                               finally (return all-good)))
+                                     (negate-args args (specifier-type 'real) nil any-branch))
+                                    (good
+                                     (negate-lvar good (specifier-type 'real) test any-branch)))))
+                          (negate-truncation (combination args new-function &optional non-zero)
+                            (let ((negated (if non-zero
+                                               (negate-non-zero-args args nil)
+                                               (negate-args args (specifier-type 'real) nil nil))))
+                              (when (and negated
+                                         (or (not test)
+                                             (and (eq test negated)
+                                                  (eq negated '%negate))))
+                                (erase-node-type combination *wild-type* nil outer-node)
+                                (transform-call combination
+                                                `(lambda (x y) (,new-function x y))
+                                                'negate-lvar))
+
+                              negated)))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
                          (unless (and (eql value 0) ;; can't negate a non-float zero
@@ -5560,29 +5588,25 @@
                            ((truncate round) (* *)
                             (negate-args args (specifier-type 'real)))
                            ((%unary-truncate %unary-round) (*)
-                            (negate-lvar (first args) (specifier-type 'real) test))
+                            (negate-lvar (first args) (specifier-type 'real) test any-branch))
                            ((fround ftruncate) *
-                            (let ((all-good t)
-                                  good)
-                              (cond ((or (float-safe-p)
-                                         (loop for arg in args
-                                               do
-                                               (if (csubtypep (lvar-type arg)
-                                                              (specifier-type '(and number (not (or (eql 0) (complex ratio))))))
-                                                   (setf good arg)
-                                                   (setf all-good nil))
-                                               finally (return all-good)))
-                                     (negate-args args (specifier-type 'real)))
-                                    (good
-                                     (negate-lvar good (specifier-type 'real) test)))))
+                            (negate-non-zero-args args))
                            (ash (* (type unsigned-byte))
-                            (negate-lvar (first args) (specifier-type 'integer) test))
+                            (negate-lvar (first args) (specifier-type 'integer) test any-branch))
+                           (floor (* *)
+                            (negate-truncation combination args 'ceiling))
+                           (ceiling (* *)
+                            (negate-truncation combination args 'floor))
+                           (ffloor (* *)
+                            (negate-truncation combination args 'fceiling t))
+                           (fceiling (* *)
+                            (negate-truncation combination args 'ffloor t))
                            (sin (*)
                             (when (or (float-safe-p)
                                       (csubtypep (lvar-type (first args))
                                                  (specifier-type '(and number (not (or (eql 0) (complex ratio)))))))
-                              (negate-lvar (first args) nil test)))))))))
-        (negate-lvar x type test)))))
+                              (negate-lvar (first args) nil test any-branch)))))))))
+        (negate-lvar x type test any-branch)))))
 
 (deftransform %negate ((x) * * :node node)
   "Combine - with +, -, *"
