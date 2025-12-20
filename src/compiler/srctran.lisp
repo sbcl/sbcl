@@ -5367,72 +5367,81 @@
 ;;; Can it be detected when NODE returns minus zero?
 ;;; E.g. (+ -0.0 0) is 0.0
 (defun minus-zero-ignored-p (node)
-  (or (policy node (zerop float-accuracy))
-      (not (types-equal-or-intersect
-            (single-value-type (node-derived-type node))
-            (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
-      (block nil
-        (map-all-dests (lambda (node lvar nth-value)
-                         (block ok
-                           (typecase node
-                             (combination
-                              (or (combination-case (nil :node node)
-                                    (+ (* *)
-                                     (destructuring-bind (a b) args
-                                       (let ((other (if (eq a lvar)
-                                                        b
-                                                        a)))
-                                         (or (types-equal-or-intersect (lvar-type other)
-                                                                       (specifier-type '(or (member -0f0 -0d0) (complex float))))
-                                             (return-from ok)))))
-                                    (- (* *)
-                                     (destructuring-bind (a b) args
-                                       (if (if (eq lvar b)
-                                               (not (types-equal-or-intersect (lvar-type a)
-                                                                              (specifier-type '(or (member -0f0 -0d0) (complex float)))))
-                                               (not (types-equal-or-intersect (lvar-type b)
-                                                                              (specifier-type '(or (member 0 0f0 0d0) complex)))))
-                                           (return-from ok)
-                                           t)))
-                                    (eql (* *)
-                                     (destructuring-bind (a b) args
-                                       (let ((other (if (eq a lvar)
-                                                        b
-                                                        a)))
-                                         (or (types-equal-or-intersect (lvar-type other)
-                                                                       (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float))))
-                                             (return-from ok)))))
-                                    ((abs <= >= < > =) *
-                                     (return-from ok))
-                                    ((truncate floor ceiling round) (* *)
-                                     (if (eq lvar (second args))
-                                         (return-from ok)
-                                         1))
-                                    (expt (* *)
-                                     (if (eq lvar (second args))
-                                         (return-from ok)
+  (let* ((type (single-value-type (node-derived-type node)))
+         (splus (types-equal-or-intersect type (specifier-type '(eql 0f0))))
+         (sminus (types-equal-or-intersect type (specifier-type '(eql -0f0))))
+         (dplus (types-equal-or-intersect type (specifier-type '(eql 0d0))))
+         (dminus (types-equal-or-intersect type (specifier-type '(eql -0d0))))
+         (all-zeros-included (and (eq splus sminus)
+                                  (eq dplus dminus))))
+    ;; If the derived type includes only one zero erasing it everywhere might be too difficult
+    (when all-zeros-included
+      (or (policy node (zerop float-accuracy))
+          (not (types-equal-or-intersect
+                type
+                (specifier-type '(or (member -0f0 0f0 -0d0 0d0) (complex float)))))
+          (block nil
+            (map-all-dests (lambda (node lvar nth-value)
+                             (block ok
+                               (typecase node
+                                 (combination
+                                  (or (combination-case (nil :node node)
+                                        (+ (* *)
+                                         (destructuring-bind (a b) args
+                                           (let ((other (if (eq a lvar)
+                                                            b
+                                                            a)))
+                                             (or (types-equal-or-intersect (lvar-type other)
+                                                                           (specifier-type '(or (member -0f0 -0d0) (complex float))))
+                                                 (return-from ok)))))
+                                        (- (* *)
+                                         (destructuring-bind (a b) args
+                                           (if (if (eq lvar b)
+                                                   (not (types-equal-or-intersect (lvar-type a)
+                                                                                  (specifier-type '(or (member -0f0 -0d0) (complex float)))))
+                                                   (not (types-equal-or-intersect (lvar-type b)
+                                                                                  (specifier-type '(or (member 0 0f0 0d0) complex)))))
+                                               (return-from ok)
+                                               t)))
+                                        (eql (* *)
+                                         (destructuring-bind (a b) args
+                                           (let ((other (if (eq a lvar)
+                                                            b
+                                                            a)))
+                                             (or (types-equal-or-intersect (lvar-type other)
+                                                                           (specifier-type '(or (member 0f0 0d0 -0f0 -0d0) (complex float))))
+                                                 (return-from ok)))))
+                                        ((abs <= >= < > =) *
+                                         (return-from ok))
+                                        ((truncate floor ceiling round) (* *)
+                                         (if (eq lvar (second args))
+                                             (return-from ok)
+                                             1))
+                                        (expt (* *)
+                                         (if (eq lvar (second args))
+                                             (return-from ok)
+                                             t))
+                                        ((acos) *
+                                         (return-from ok))
+                                        ((exp cos) (*)
+                                         (or (types-equal-or-intersect (lvar-type (first args)) (specifier-type 'complex))
+                                             (return-from ok)))
+                                        (atan (*)
+                                         t)
+                                        ((* / ftruncate ffloor fceiling fround sqrt
+                                            sin asin sinh tan atanh) *
                                          t))
-                                    ((acos) *
-                                     (return-from ok))
-                                    ((exp cos) (*)
-                                     (or (types-equal-or-intersect (lvar-type (first args)) (specifier-type 'complex))
-                                         (return-from ok)))
-                                    (atan (*)
-                                     t)
-                                    ((* / ftruncate ffloor fceiling fround sqrt
-                                        sin asin sinh tan atanh) *
-                                     t))
-                                  (return)))
-                             (cast
-                              (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
-                                             (specifier-type '(or (and float (not (member 0f0 0d0 -0f0 -0d0)))
-                                                               rational (complex rational))))
-                                  (return-from ok)
-                                  nth-value))
-                             (t
-                              (return)))))
-                       node)
-        t)))
+                                      (return)))
+                                 (cast
+                                  (if (csubtypep (values-type-nth nth-value (cast-asserted-type node))
+                                                 (specifier-type '(or (and float (not (member 0f0 0d0 -0f0 -0d0)))
+                                                                   rational (complex rational))))
+                                      (return-from ok)
+                                      nth-value))
+                                 (t
+                                  (return)))))
+                           node)
+            t)))))
 
 ;; Don't allow mixing integer 0 and float zero, which have different negations
 (defun float-contagion-for-negate (a b)
