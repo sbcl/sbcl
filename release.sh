@@ -66,7 +66,8 @@ MONTH=$(date +%m)
 
 if [ "$MONTH" = "12" ]
 then
-   MONTH=0
+    MONTH==0
+    YEAR=$((YEAR+1))
 fi
 
 EXPECTED_VERSION="${YEAR:0:1}.${YEAR:1:1}.${MONTH}"
