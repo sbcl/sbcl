@@ -1593,7 +1593,7 @@
   (checked-compile-and-assert
    ()
    `(lambda (s u)
-      (declare (word u))
+      (declare ((unsigned-byte 64) u))
       (logior (the fixnum s) u))
    ((-543271322126317345 138) -543271322126317345)
    ((543271322126317345 15028999435905310454) 15536221894880460791)))
