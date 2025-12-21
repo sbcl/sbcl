@@ -8,7 +8,6 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-
 #ifdef __linux__
 #define _GNU_SOURCE // for pthread_setname_np()
 #endif
@@ -133,86 +132,9 @@ char* vm_thread_name(struct thread* th)
     return "?";
 }
 
-#define get_thread_state(thread) \
- (int)__sync_val_compare_and_swap(&thread->state_word.state, -1, -1)
-
 #if HAVE_GC_STW_SIGNAL
 
-void
-set_thread_state(struct thread *thread,
-                 char state,
-                 bool signals_already_blocked) // for foreign thread
-{
-    struct extra_thread_data *semaphores = thread_extra_data(thread);
-    int i, waitcount = 0;
-    sigset_t old;
-    // If we've already masked the blockable signals we can avoid two syscalls here.
-    if (!signals_already_blocked)
-        block_blockable_signals(&old);
-    os_sem_wait(&semaphores->state_sem);
-    if (thread->state_word.state != state) {
-        if ((STATE_STOPPED==state) ||
-            (STATE_DEAD==state)) {
-            waitcount = semaphores->state_not_running_waitcount;
-            semaphores->state_not_running_waitcount = 0;
-            for (i=0; i<waitcount; i++)
-                os_sem_post(&semaphores->state_not_running_sem);
-        }
-        if ((STATE_RUNNING==state) ||
-            (STATE_DEAD==state)) {
-            waitcount = semaphores->state_not_stopped_waitcount;
-            semaphores->state_not_stopped_waitcount = 0;
-            for (i=0; i<waitcount; i++)
-                os_sem_post(&semaphores->state_not_stopped_sem);
-        }
-        thread->state_word.state = state;
-    }
-    os_sem_post(&semaphores->state_sem);
-    if (!signals_already_blocked)
-        thread_sigmask(SIG_SETMASK, &old, NULL);
-}
 
-// Wait until "thread's" state is something other than 'undesired_state'
-// and return whatever the new state is.
-int thread_wait_until_not(int undesired_state,
-                          struct thread *thread)
-{
-    struct extra_thread_data *semaphores = thread_extra_data(thread);
-    sigset_t old;
-    os_sem_t *wait_sem;
-    block_blockable_signals(&old);
-  start:
-    os_sem_wait(&semaphores->state_sem);
-    /* "The following functions synchronize memory with respect to other threads:
-     *  ... pthread_mutex_lock() ... "
-     * https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_11
-     * But we still have to ensure no compiler reordering.
-     */
-    int ending_state = get_thread_state(thread);
-    if (ending_state == undesired_state) {
-        switch (undesired_state) {
-        case STATE_RUNNING:
-            wait_sem = &semaphores->state_not_running_sem;
-            semaphores->state_not_running_waitcount++;
-            break;
-        case STATE_STOPPED:
-            wait_sem = &semaphores->state_not_stopped_sem;
-            semaphores->state_not_stopped_waitcount++;
-            break;
-        default:
-            lose("thread_wait_until_not: invalid argument %x", ending_state);
-        }
-    } else {
-        wait_sem = NULL;
-    }
-    os_sem_post(&semaphores->state_sem);
-    if (wait_sem) {
-        os_sem_wait(wait_sem);
-        goto start;
-    }
-    thread_sigmask(SIG_SETMASK, &old, NULL);
-    return ending_state;
-}
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
@@ -469,7 +391,6 @@ init_new_thread(struct thread *th,
         /* FIXME: handle error */
         lose("arch_os_thread_init failed");
     }
-
 #define GUARD_CONTROL_STACK 1
 #define GUARD_BINDING_STACK 2
 #define GUARD_ALIEN_STACK   4
@@ -968,189 +889,7 @@ int sb_thread_kill (pthread_t thread, int sig) {
     return ret;
 }
 #endif
-
-/* stopping the world is a two-stage process.  From this thread we signal
- * all the others with SIG_STOP_FOR_GC.  The handler for this signal does
- * the usual pseudo-atomic checks (we don't want to stop a thread while
- * it's in the middle of allocation) then waits for another SIG_STOP_FOR_GC.
- */
-/*
- * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
- */
-#if HAVE_GC_STW_SIGNAL
-
-/* To avoid deadlocks when gc stops the world all clients of each
- * mutex must enable or disable SIG_STOP_FOR_GC for the duration of
- * holding the lock, but they must agree on which.
- * [The preceding remark is probably wrong - STOP_FOR_GC is a signal
- * that is directed to a thread, so the "wrong" thread would never
- * respond to someone else's STOP_FOR_GC. I'm leaving the comment
- * just case someone can decipher it and decide to delete it]
- *
- * A note about ESRCH: tchnically ESRCH can happen if an OS thread ceases
- * to exist, while the thread library has a representation of the thread
- * because pthread_join() wasn't invoked on it yet.
- * ESRCH can't oocur for us because:
- * - if a thread was still linked in all_threads at the acquire of all_threads lock,
- *   then that thread can't make progress in its termination code, because it's
- *   waiting on the lock. If it changed its state to DEAD, but we perceived it as
- *   RUNNING, it now must be blocked on the all_threads_lock and it can't disappear.
- * - ESRCH is not guaranteed to be returned anyway, and Linux man page doesn't even
- *   list it as a possible outcome of pthread_kill.
- * Also, there used to be assertion that "thread_state(p)==STATE_DEAD)" on ESRCH
- * error, but that's saying that there is still memory backing 'struct thread'
- * (so that dereferencing was valid), but if dereferencing was valid, then the thread
- * can't have died (i.e. if ESRCH could be returned, then that implies that
- * the memory shouldn't be there) */
-
-static __attribute__((unused)) struct timespec stw_begin_realtime, stw_begin_cputime;
-void gc_stop_the_world()
-{
-#ifdef MEASURE_STOP_THE_WORLD_PAUSE
-    /* The thread performing stop-the-world does not use sig_stop_for_gc_handler on itself,
-     * so it would not accrue time spent stopped. Force it to, by considering it "paused"
-     * from the moment it wants to stop all other threads. */
-    clock_gettime(CLOCK_MONOTONIC, &stw_begin_realtime);
-# ifdef CLOCK_THREAD_CPUTIME_ID
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &stw_begin_cputime);
-# endif
 #endif
-    struct thread *th, *me = get_sb_vm_thread();
-    int rc;
-
-    /* Keep threads from registering with GC while the world is stopped. */
-    rc = mutex_acquire(&all_threads_lock);
-    gc_assert(rc);
-
-    /* stop all other threads by sending them SIG_STOP_FOR_GC */
-    for_each_thread(th) {
-        if (th != me) {
-            gc_assert(th->os_thread != 0);
-            struct extra_thread_data *semaphores = thread_extra_data(th);
-            bool foreign = 0;
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-            pthread_mutex_t *exit_lock = &semaphores->foreign_exit_lock;
-            gc_assert(mutex_acquire(exit_lock));
-            lispobj csp = set_thread_foreign_call_trigger(th, 0);
-            foreign = csp != 0;
-#endif
-
-            os_sem_wait(&semaphores->state_sem);
-            int state = get_thread_state(th);
-            if (state == STATE_RUNNING) {
-                if (!foreign) {
-                    rc = pthread_kill(th->os_thread,SIG_STOP_FOR_GC);
-                    /* This used to bogusly check for ESRCH.
-                     * I changed the ESRCH case to just fall into lose() */
-                    if (rc) lose("cannot suspend thread %p: %d, %s",
-                                 // KLUDGE: assume that os_thread can be cast as pointer.
-                                 // See comment in 'interr.h' about that.
-                                 (void*)th->os_thread, rc, strerror(rc));
-
-                }
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-                else {
-                    if (read_TLS(GC_INHIBIT,th) != NIL) {
-                        /* It's a foreign call but inside without-gcing,
-                           handle_foreign_call_trigger will set
-                           *stop-for-gc-pending*, need to unlock the exit
-                           lock to reach the end of without-gcing* */
-                        semaphores->gc_inhibited = 2;
-                        gc_assert(mutex_release(exit_lock));
-                    } else {
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-                        th->control_stack_pointer = (lispobj*)csp;
-#endif
-                        semaphores->gc_inhibited = 1;
-                    }
-                }
-#endif
-            }
-            os_sem_post(&semaphores->state_sem);
-        }
-    }
-    for_each_thread(th) {
-        if (th != me) {
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-            if (thread_extra_data(th)->gc_inhibited != 1)
-#endif
-            {
-                thread_wait_until_not(STATE_RUNNING, th);
-            }
-        }
-    }
-    event0("/gc_stop_the_world:end");
-}
-
-void gc_start_the_world()
-{
-#ifdef COLLECT_GC_STATS
-    struct timespec gc_end_time;
-    clock_gettime(CLOCK_MONOTONIC, &gc_end_time);
-    long gc_elapsed = (gc_end_time.tv_sec - gc_start_time.tv_sec)*1000000000L
-                      + (gc_end_time.tv_nsec - gc_start_time.tv_nsec);
-    if (stw_elapsed < 0 || gc_elapsed < 0) {
-        char errmsg[] = "GC: Negative times?\n";
-        ignore_value(write(2, errmsg, sizeof errmsg-1));
-    } else {
-        stw_sum_duration += stw_elapsed;
-        if (stw_elapsed < stw_min_duration) stw_min_duration = stw_elapsed;
-        if (stw_elapsed > stw_max_duration) stw_max_duration = stw_elapsed;
-        gc_sum_duration += gc_elapsed;
-        if (gc_elapsed < gc_min_duration) gc_min_duration = gc_elapsed;
-        if (gc_elapsed > gc_max_duration) gc_max_duration = gc_elapsed;
-        ++n_gcs_done;
-    }
-#endif
-    struct thread *th, *me = get_sb_vm_thread();
-    __attribute__((unused)) int lock_ret;
-    /* if a resumed thread creates a new thread before we're done with
-     * this loop, the new thread will be suspended waiting to acquire
-     * the all_threads lock */
-    for_each_thread(th) {
-        gc_assert(th->os_thread);
-        if (th != me) {
-            /* I don't know if a normal load is fine here. I think we can't read
-             * any value other than what was already observed?
-             * No harm in being cautious though with regard to compiler reordering */
-            int state = get_thread_state(th);
-#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-            bool foreign = csp_around_foreign_call(th);
-            set_thread_foreign_call_trigger(th, 1);
-
-            if (thread_extra_data(th)->gc_inhibited != 2) // already released
-                gc_assert(mutex_release(&thread_extra_data(th)->foreign_exit_lock));
-
-            thread_extra_data(th)->gc_inhibited = 0;
-
-            if (foreign) {
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-                th->control_stack_pointer = 0;
-#endif
-            }
-            else
-#endif
-            {
-                if (state != STATE_DEAD) {
-                    if (state != STATE_STOPPED)
-                        lose("gc_start_the_world: bad thread state %x", state);
-                    set_thread_state(th, STATE_RUNNING, 0);
-                }
-            }
-        }
-    }
-
-    lock_ret = mutex_release(&all_threads_lock);
-    gc_assert(lock_ret);
-    thread_accrue_stw_time(me, &stw_begin_realtime, &stw_begin_cputime);
-}
-
-#endif /* !LISP_FEATURE_SB_SAFEPOINT */
-#else
-// no threads
-void gc_stop_the_world() {}
-void gc_start_the_world() {}
-#endif /* !LISP_FEATURE_SB_THREAD */
 
 int
 thread_yield()

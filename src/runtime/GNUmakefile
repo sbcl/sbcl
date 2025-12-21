@@ -74,9 +74,9 @@ COMMON_SRC = alloc.c arena.c backtrace.c breakpoint.c coalesce.c	\
 	coreparse.c dynbind.c funcall.c gc-common.c globals.c		\
 	hopscotch.c interr.c interrupt.c largefile.c main.c		\
 	math.c monitor.c murmur_hash.c os-common.c parse.c              \
-	perfecthash.c print.c                                           \
+	perfecthash.c print.c time.c                                    \
 	regnames.c runtime.c safepoint.c save.c                         \
-	sc-offset.c search.c stringspace.c thread.c time.c              \
+	sc-offset.c search.c stringspace.c thread.c stop-the-world.c    \
 	validate.c var-io.c vars.c wrap.c
 
 ifndef LISP_FEATURE_WIN32
@@ -99,7 +99,7 @@ endif
 
 targets: $(TARGET) $(OBJTARGET) $(LDB_TARGET) sbcl.mk
 
-LDB_OBJS = $(filter-out main.o interr.o runtime.o monitor.o thread.o safepoint.o,$(OBJS))
+LDB_OBJS = $(filter-out main.o interr.o runtime.o monitor.o thread.o stop-the-world.o safepoint.o,$(OBJS))
 ldb: $(LIBSBCL)
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
 	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-interr.o interr.c

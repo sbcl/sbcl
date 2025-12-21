@@ -152,4 +152,19 @@ void thruption_handler(int signal, siginfo_t *info, os_context_t *context);
 # endif
 #endif
 
+#ifdef LISP_FEATURE_WIN32
+# define REAL_SIGSET_SIZE_BYTES (4)
+#else
+/* FIXME: do not rely on NSIG being a multiple of 8.
+ * In fact it is *not* a multiple of 8 - it it 65 on x86-64-linux */
+# define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
+#endif
+
+static inline void sigcopyset(sigset_t *to, sigset_t *from) {
+#ifdef ADDRESS_SANITIZER
+    sigemptyset(to);
+#endif
+    memcpy(to, from, REAL_SIGSET_SIZE_BYTES);
+}
+
 #endif

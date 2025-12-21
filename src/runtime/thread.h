@@ -21,7 +21,6 @@ enum threadstate {STATE_RUNNING=1, STATE_STOPPED, STATE_DEAD};
 
 #ifdef LISP_FEATURE_SB_THREAD
 void set_thread_state(struct thread *thread, char state, bool);
-int thread_wait_until_not(int state, struct thread *thread);
 #endif
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -279,7 +278,6 @@ typedef struct init_thread_data {
 #define csp_around_foreign_call(thread) *(((lispobj*)thread)-1)
 #endif
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
-lispobj set_thread_foreign_call_trigger(struct thread* th, bool writable);
 int handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_address);
 #endif
 

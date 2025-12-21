@@ -1286,6 +1286,16 @@ int thread_wait_until_not(int undesired_state, struct thread *thread) {
 }
 void gc_stop_the_world() { } // do nothing
 void gc_start_the_world() { } // do nothing
+
+void sig_stop_for_gc_handler(int __attribute__((unused)) signal,
+                             siginfo_t __attribute__((unused)) *info,
+                             os_context_t __attribute__((unused)) *context) {
+}
+int
+handle_foreign_call_trigger (os_context_t __attribute__((unused)) *context, 
+                             os_vm_address_t __attribute__((unused)) fault_address) {
+    return 0;
+}
 #include <errno.h>
 #include <setjmp.h>
 #include "core.h"
