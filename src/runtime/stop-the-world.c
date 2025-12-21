@@ -25,6 +25,12 @@
 #endif
 #endif
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+#include <stdatomic.h>
+atomic_bool stopping_the_world = 0;
+
+#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
 
 #define get_thread_state(thread) \
@@ -113,6 +119,14 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
                         siginfo_t __attribute__((unused)) *info,
                         os_context_t *context)
 {
+
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    /* The stop signal was already processed by
+       handle_foreign_call_trigger */
+    if (!atomic_load(&stopping_the_world))
+        return;
+#endif
+
     struct thread *thread = get_sb_vm_thread();
     bool was_in_lisp;
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
@@ -200,6 +214,11 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         protect_control_stack_return_guard_page(1, thread);
     }
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    /* Might have been blocked in handle_foreign_call_trigger */
+    sigdelset(os_context_sigmask_addr(context), SIG_STOP_FOR_GC);
+#endif    
+
     event0("resumed");
 
     /* The state can't go from STOPPED to DEAD because it's this thread is reading
@@ -232,7 +251,6 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
 
     if ((lispobj*)fault_address == &csp_around_foreign_call(th)) {
         int exiting = csp_around_foreign_call(th) != 0;
-        sigset_t mask;
 
         if (read_TLS(GC_INHIBIT,th) == NIL) {
             if (exiting) {
@@ -248,9 +266,9 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
                 th->control_stack_pointer = (lispobj*)*os_context_register_addr(context, reg_SP);
 #endif
-                sigfillset(&mask);
-                sigdelset(&mask, SIG_STOP_FOR_GC);
-                sigsuspend(&mask);
+                /* sigsuspend appears to be broken on macOS, call the
+                   handler directly and then ignore it outside of stop_the_world */
+                sig_stop_for_gc_handler(0, NULL, context);
             }
         } else { /* Inside without-gcing */
             /* Unprotect the page to be able to proceed */
@@ -262,11 +280,11 @@ handle_foreign_call_trigger (os_context_t *context, os_vm_address_t fault_addres
                 gc_assert(mutex_acquire(exit_lock));
                 gc_assert(mutex_release(exit_lock));
             } else {
-                gc_assert(!thread_extra_data(th)->gc_inhibited);
                 if (read_TLS(STOP_FOR_GC_PENDING, th) == NIL) {
-                    sigfillset(&mask);
-                    sigdelset(&mask, SIG_STOP_FOR_GC);
-                    sigsuspend(&mask);
+                    /* Block SIG_STOP_FOR_GC and exit,
+                     * interrupt_handle_pending will reset it */
+                    sigaddset(os_context_sigmask_addr(context),SIG_STOP_FOR_GC);
+                    write_TLS(STOP_FOR_GC_PENDING, LISP_T, th);
                 }
 
             }
@@ -331,6 +349,10 @@ void gc_stop_the_world()
     rc = mutex_acquire(&all_threads_lock);
     gc_assert(rc);
 
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    atomic_store(&stopping_the_world, 1);
+#endif
+
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     for_each_thread(th) {
         if (th != me) {
@@ -388,6 +410,9 @@ void gc_stop_the_world()
             }
         }
     }
+#ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
+    atomic_store(&stopping_the_world, 0);
+#endif
     event0("/gc_stop_the_world:end");
 }
 
