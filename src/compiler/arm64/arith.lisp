@@ -302,7 +302,7 @@
     (inst orr r x y)))
 
 (define-vop (logior-signed-unsigned=>integer)
-  (:args (x :scs (signed-reg))
+  (:args (x :scs (signed-reg any-reg) :to :save)
          (y :scs (unsigned-reg)))
   (:arg-refs x-ref)
   (:arg-types signed-num unsigned-num)
@@ -316,7 +316,11 @@
   (:generator 10
     (let ((fixnum (csubtypep (tn-ref-type x-ref) (specifier-type 'fixnum))))
       (assemble ()
-        (inst orr low x y)
+        ;; Untag here or instcombine thinks all logior VOPs
+        ;; use their operands once
+        (inst orr low y (if (sc-is x any-reg)
+                            (asr x n-fixnum-tag-bits)
+                            x))
         (if fixnum
             (inst add r low low)
             (inst adds r low low))

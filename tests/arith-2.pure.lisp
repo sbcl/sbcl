@@ -1588,3 +1588,12 @@
    (lambda (x)
      (abs (the (or (single-float -2.0 -1.0) (member -0.0)) x)))
    (or (single-float 1.0 2.0) (member 0.0))))
+
+(with-test (:name :logior-signed-unsigned=>integer)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s u)
+      (declare (word u))
+      (logior (the fixnum s) u))
+   ((-543271322126317345 138) -543271322126317345)
+   ((543271322126317345 15028999435905310454) 15536221894880460791)))
