@@ -1292,7 +1292,7 @@ void sig_stop_for_gc_handler(int __attribute__((unused)) signal,
                              os_context_t __attribute__((unused)) *context) {
 }
 int
-handle_foreign_call_trigger (os_context_t __attribute__((unused)) *context, 
+handle_foreign_call_trigger (os_context_t __attribute__((unused)) *context,
                              os_vm_address_t __attribute__((unused)) fault_address) {
     return 0;
 }

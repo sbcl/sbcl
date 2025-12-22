@@ -217,7 +217,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 #ifdef LISP_FEATURE_NONSTOP_FOREIGN_CALL
     /* Might have been blocked in handle_foreign_call_trigger */
     sigdelset(os_context_sigmask_addr(context), SIG_STOP_FOR_GC);
-#endif    
+#endif
 
     event0("resumed");
 

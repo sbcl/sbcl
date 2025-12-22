@@ -1849,8 +1849,7 @@
 
 (make-defs (($float single-float double-float))
   (deftransform unary-truncate-$float-to-bignum-div ((quot number divisor) * * :result result)
-    (if (or (and result
-                 (lvar-single-value-p result))
+    (if (or (lvar-single-value-p result)
             #+64-bit
             (and (constant-lvar-p divisor) (sb-xc:= 1 (lvar-value divisor))))
         `(values (unary-truncate-$float-to-bignum quot) (coerce 0 '$float))
@@ -1880,7 +1879,7 @@
                `(deftransform ,fun ((x &optional y)
                                     (,type
                                      &optional (or ,type ,@other-float-arg-types integer))
-                                    * :result result :node node)
+                                    * :node node)
                   (let ((one-p (or (not y)
                                    (and (constant-lvar-p y) (sb-xc:= 1 (lvar-value y))))))
                     (if one-p
@@ -1890,9 +1889,8 @@
                                        (- x (locally
                                                 (declare (flushable ,',coerce))
                                               (,',coerce r)))))
-                             ,(wrap-if result
-                                       `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
-                                       `(,',to-bignum x)))
+                             (truly-the (values ,(type-specifier (single-value-type (node-derived-type node))) t &optional)
+                                        (,',to-bignum x)))
                         `(let* ((f (,',coerce y))
                                 (div (/ x f)))
                            (if (typep div ',',fixnum-type)
@@ -1902,9 +1900,8 @@
                                                  (locally
                                                      (declare (flushable ,',coerce))
                                                    (,',coerce r))))))
-                               ,(wrap-if result
-                                         `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
-                                         `(,',to-bignum-div div x f))))))))))
+                               (truly-the (values ,(type-specifier (single-value-type (node-derived-type node))) t &optional)
+                                          (,',to-bignum-div div x f))))))))))
   (def truncate single-float ())
   (def truncate double-float (single-float) #-64-bit sb-bignum::truncate-double-float-to-bignum-truncating)
   (def round single-float ())

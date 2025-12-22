@@ -3975,9 +3975,8 @@
 
 ;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
 (when-vop-existsp (:translate ash-left-add)
-  (deftransform + ((a b) (integer integer) * :node node :result result :important nil)
-    (or (when (and result
-                   (not (word-sized-lvar-p result)))
+  (deftransform + ((a b) (integer integer) * :node node :important nil)
+    (or (unless (word-sized-result-p node)
           (flet ((try (a b ll)
                    (combination-case a
                      ((ash *) (* constant)
@@ -4574,9 +4573,8 @@
           (mask (1- y-abs))
           (delta (* (signum y) (1- y-abs))))
       (cond ((and (plusp y)
-                  result
                   (lvar-single-value-p result)
-                  (csubtypep (lvar-type result) (specifier-type 'word))
+                  (csubtypep (single-value-type (node-derived-type node)) (specifier-type 'word))
                   (not (csubtypep (lvar-type x)
                                   (make-numeric-type :class 'integer :low 0 :high (- sb-ext:most-positive-word delta)))))
              ;; Avoid overflowing word-sized arithmetic
@@ -4678,16 +4676,14 @@
 
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (integer ratio) * :result result :node node :important nil)
-    (unless (and result
-                 (lvar-single-value-p result))
+    (unless (lvar-single-value-p result)
       (give-up-ir1-transform))
     (erase-node-type node t 1)
     `($fun (* x (%denominator y)) (%numerator y))))
 
 (make-defs (($fun truncate floor ceiling))
   (deftransform $fun ((x y) (number (eql 1)) * :node node :result result :important nil)
-    (or (and result
-             (lvar-single-value-p result)
+    (or (and (lvar-single-value-p result)
              (combination-case (x :cast (specifier-type 'real))
                (/ (* *)
                 (splice-fun-args x '/ nil t (specifier-type 'real) t)
@@ -7067,6 +7063,9 @@
 
 (defun word-sized-lvar-p (lvar)
   (word-sized-type-p (lvar-type lvar)))
+
+(defun word-sized-result-p (lvar)
+  (word-sized-type-p (single-value-type (node-derived-type lvar))))
 
 (defun word-interval-p (interval)
   (let ((low (interval-low interval))
