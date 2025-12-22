@@ -1917,7 +1917,7 @@
                `(deftransform ,name ((number &optional divisor)
                                      (,type
                                       &optional (or ,type ,@other-float-arg-types integer))
-                                     * :result result)
+                                     * :node node)
                   (let ((one-p (or (not divisor)
                                    (and (constant-lvar-p divisor) (sb-xc:= (lvar-value divisor) 1)))))
                     `(let* (,@(if one-p
@@ -1940,13 +1940,12 @@
                                                    ,,(ecase type
                                                        (double-float 0.0d0)
                                                        (single-float 0.0f0))))))
-                           ,(wrap-if result
-                                     `(truly-the (values ,(type-specifier (lvar-type result)) t &optional))
-                                     (if one-p
-                                         `(,',to-bignum #+64-bit div
-                                                        #-64-bit quot)
-                                         `(,',to-bignum-div #+64-bit div
-                                                            #-64-bit quot number f-divisor))))))))))
+                           (truly-the (values ,(type-specifier (single-value-type (node-derived-type node))) t &optional)
+                                      ,(if one-p
+                                           `(,',to-bignum #+64-bit div
+                                                          #-64-bit quot)
+                                           `(,',to-bignum-div #+64-bit div
+                                                              #-64-bit quot number f-divisor))))))))))
   (def floor single-float ())
   (def floor double-float (single-float))
   (def ceiling single-float ())
