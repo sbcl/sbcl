@@ -124,7 +124,7 @@
 (defknown (mapcan mapcon) (function-designator list &rest list) t
   (call))
 
-(defknown (mapc mapl) (function-designator list &rest list) list (foldable call))
+(defknown (mapc mapl) (function-designator list &rest list) list (call))
 
 ;;; We let VALUES-LIST be foldable, since constant-folding will turn
 ;;; it into VALUES. VALUES is not foldable, since MV constants are
@@ -694,7 +694,9 @@
     (call foldable-read-only mv-deriver)
   :derive-type (creation-result-type-specifier-nth-arg 0 t))
 
-(defknown %map (type-specifier function-designator &rest sequence) consed-sequence
+(defknown %map (type-specifier (function-designator ((rest-args :sequence t))
+                                                    (nth-arg 0 :sequence-type t))
+                               &rest sequence) consed-sequence
   (call no-verify-arg-count foldable-read-only))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
   (call no-verify-arg-count))
@@ -724,10 +726,10 @@
 
 ;;; returns the result from the predicate...
 (defknown some (function-designator proper-sequence &rest proper-sequence) t
-  (foldable unsafely-flushable call))
+  (unsafely-flushable call))
 
 (defknown (every notany notevery) (function-designator proper-sequence &rest proper-sequence) boolean
-  (foldable unsafely-flushable call))
+  (unsafely-flushable call))
 
 (defknown (reduce reduce-append)
     ((function-designator ((nth-arg 1 :sequence t :key :key :value (:initial-value :from-end nil))
@@ -767,7 +769,7 @@
                                           :preserve-vector-type t)
   :result-arg 0)
 
-(defknown (remove copy-remove)
+(defknown remove
     (t proper-sequence &rest t &key (:from-end t)
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
@@ -777,6 +779,18 @@
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (foldable flushable call mv-deriver)
+  :derive-type (sequence-result-nth-arg 1))
+
+(defknown copy-remove
+    (t proper-sequence &rest t &key (:from-end t)
+     (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
+     (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
+     (:count sequence-count)
+     (:key (function-designator ((nth-arg 1 :sequence t)))))
+  consed-sequence
+  (foldable-read-only flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown substitute
@@ -791,7 +805,7 @@
   (foldable flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 2))
 
-(defknown (remove-if remove-if-not copy-remove-if copy-remove-if-not)
+(defknown (remove-if remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) proper-sequence
    &rest t &key (:from-end t)
    (:count sequence-count)
@@ -800,6 +814,17 @@
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (foldable flushable call mv-deriver)
+  :derive-type (sequence-result-nth-arg 1))
+
+(defknown (copy-remove-if copy-remove-if-not)
+  ((function-designator ((nth-arg 1 :sequence t :key :key))) proper-sequence
+   &rest t &key (:from-end t)
+   (:count sequence-count)
+   (:start (inhibit-flushing index 0))
+   (:end (inhibit-flushing sequence-end nil))
+   (:key (function-designator ((nth-arg 1 :sequence t)))))
+  consed-sequence
+  (foldable-read-only flushable call mv-deriver)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown (substitute-if substitute-if-not)
@@ -2191,7 +2216,8 @@
   (values t (or index null))
   (flushable foldable call no-verify-arg-count))
 (defknown (%find-position-if %find-position-if-not)
-  (function sequence t index sequence-end function)
+  ((function ((nth-arg 1 :sequence t :key (nth-arg 5))))
+   sequence t index sequence-end (function ((nth-arg 1 :sequence t))))
   (values t (or index null))
   (foldable flushable call no-verify-arg-count))
 (defknown effective-find-position-test (function-designator function-designator)

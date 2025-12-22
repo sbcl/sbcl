@@ -228,7 +228,9 @@
     (pushnew 'no-verify-arg-count attributes))
 
   (multiple-value-bind (type annotation read-only)
-      (split-type-info arg-types result-type)
+      (split-type-info name arg-types result-type (and (member 'call attributes)
+                                                       (or (member 'foldable attributes)
+                                                           (member 'foldable-read-only attributes))))
     `(%defknown ',(if (and (consp name)
                            (not (legal-fun-name-p name)))
                       name
@@ -255,7 +257,7 @@
   key
   returns)
 
-(defun split-type-info (arg-types result-type)
+(defun split-type-info (name arg-types result-type foldable-call)
   (if (eq arg-types '*)
       `(sfunction ,arg-types ,result-type)
       (multiple-value-bind (llks required optional rest keys)
@@ -272,10 +274,13 @@
               return-annotation
               (read-only 0))
           (labels ((annotation-p (x)
-                     (typep x '(or (cons (member function function-designator modifying
-                                          inhibit-flushing))
-                                (member type-specifier proper-sequence proper-list
-                                 proper-or-dotted-list proper-or-circular-list))))
+                     (or (typep x '(or (cons (member function function-designator modifying
+                                              inhibit-flushing))
+                                    (member type-specifier proper-sequence proper-list
+                                     proper-or-dotted-list proper-or-circular-list)))
+                         (when (and foldable-call
+                                    (member x '(function-designator function)))
+                           (error "Missing function annotation for a foldable function: ~a" name))))
                    (strip-annotation (x)
                      (if (consp x)
                          (ecase (car x)
