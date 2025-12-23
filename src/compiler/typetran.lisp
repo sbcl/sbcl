@@ -1022,6 +1022,10 @@
                 (t
                  `(and (consp ,object) ,@car-test ,@cdr-test))))))))
 
+(defoptimizer (car-eq-if-listp derive-type) ((cons car))
+  (unless (types-equal-or-intersect (lvar-type cons) (specifier-type 'cons))
+    (specifier-type 'null)))
+
 (defun source-transform-character-set-typep (object type)
   (let ((pairs (character-set-type-pairs type)))
     (or (and (= (length pairs) 1)
