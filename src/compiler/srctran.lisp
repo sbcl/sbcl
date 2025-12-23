@@ -3976,7 +3976,7 @@
 ;;; (+ (ash x 8) (unsigned-byte 8)) can avoid allocating two bignums
 (when-vop-existsp (:translate ash-left-add)
   (deftransform + ((a b) (integer integer) * :node node :important nil)
-    (or (unless (word-sized-result-p node)
+    (or (unless (word-sized-result-p node t)
           (flet ((try (a b ll)
                    (combination-case a
                      ((ash *) (* constant)
@@ -7064,8 +7064,10 @@
 (defun word-sized-lvar-p (lvar)
   (word-sized-type-p (lvar-type lvar)))
 
-(defun word-sized-result-p (lvar)
-  (word-sized-type-p (single-value-type (node-derived-type lvar))))
+(defun word-sized-result-p (node &optional asserted)
+  (word-sized-type-p (single-value-type (if asserted
+                                            (node-asserted-type node)
+                                            (node-derived-type node)))))
 
 (defun word-interval-p (interval)
   (let ((low (interval-low interval))
