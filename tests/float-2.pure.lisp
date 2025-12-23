@@ -699,3 +699,11 @@ fractional bits."
   (assert (equal (multiple-value-list (truncate (opaque-identity 4503599627370495.5d0)
                                                 (opaque-identity 1d0)))
                  (opaque-identity '(4503599627370495 0.5d0)))))
+
+(with-test (:name :phase--0-derive-type)
+  (assert-type (lambda (p1)
+                 (declare ((single-float 0.0) p1))
+                 (phase p1))
+               (or (member 0.0) (single-float 3.1415927 3.1415927)))
+  (assert (= (phase (opaque-identity -0.0))
+             (opaque-identity 3.1415927))))

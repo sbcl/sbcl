@@ -1077,15 +1077,6 @@
               (t
                nil)))))
 
-(defun interval-range-info> (x &optional (point 0))
-  (declare (type interval x))
-  (let ((lo (interval-low x))
-        (hi (interval-high x)))
-    (cond ((and lo (sb-xc:>= (type-bound-number lo) point))
-           '+)
-          ((and hi (sb-xc:> point (type-bound-number hi)))
-           '-))))
-
 (defun interval-range-info>> (x &optional (point 0))
   (declare (type interval x))
   (let ((lo (interval-low x))
