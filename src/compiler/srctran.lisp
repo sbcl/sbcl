@@ -3604,7 +3604,7 @@
                    ((= (logcount new) size)
                     `(logior int (ash ,new posn))))))
       `(let ((mask (ldb (byte size 0) -1)))
-         (logior (truly-the word (ash (logand new mask) posn))
+         (logior (ash (logand new mask) posn)
                  (logandc2 int (ash mask posn))))))
 
 (deftransform %deposit-field ((new size posn int) (:or (* word)
