@@ -1597,3 +1597,27 @@
       (logior (the fixnum s) u))
    ((-54327132 24) -54327108)
    ((54327132 15028999435905310454) 15028999435923161086)))
+
+(with-test (:name :dpb-bit-overshoot)
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (dpb 0 (byte 1 (the (mod 95) p)) #xFFFFFFFFFFF))
+   ((0) #xFFFFFFFFFFE)
+   ((63) #xFFFFFFFFFFF)
+   ((64) #xFFFFFFFFFFF)
+   ((79) #xFFFFFFFFFFF))
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (dpb 0 (byte 1 (the (mod 95) p)) #xFFFFFFFFFFFFFFFF))
+   ((0) #xFFFFFFFFFFFFFFFE)
+   ((63) #x7FFFFFFFFFFFFFFF)
+   ((64) #xFFFFFFFFFFFFFFFF)
+   ((79) #xFFFFFFFFFFFFFFFF))
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (dpb 1 (byte 1 (the (mod 95) p)) -10))
+   ((0) -9)
+   ((79) -10)))
