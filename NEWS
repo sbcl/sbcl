@@ -1,9 +1,48 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.5.11:
+  * enhancement: the compiler will recognize certain combinations of
+    high-level optimizations as expressible by shorter machine instruction
+    sequences, documented in the manual under "Recognized idioms" in the
+    "Efficiency" section.
+  * enhancement: the SB-COVER code coverage tool can emit a report in a format
+    compatible with the LCOV open-source tool.
+  * bug fix: EXPT with an exponent of one half is implemented in terms of
+    SQRT.  (lp#1899969)
+  * bug fix: fix SCALE-FLOAT on denormal floats.  (lp#2000178, re-reported by
+    Barton Willis)
+  * bug fix: the system's test of constructing an ELF code is compatible with
+    storing code coverage information.  (lp#2131956)
+  * bug fix: inconsistent result from SUBTYPEP on array types.  (lp#2132250)
+  * bug fix: compiler error resulting from losing some already-computed
+    derived type information.  (lp#2136852)
+  * bug fix: miscompilation of DPB involving non-word-sized intermediate
+    results but a word-sized final result.  (lp#2137028)
+  * bug fix: compiler error when asserting the result of a known non-list to
+    be of a type union involving a CONS with a given CAR.  (lp#2137030)
+  * bug fix: miscompilation of DPB with constant byte positions above the
+    number of bits in a word.  (lp#2137046)
+  * bug fix: miscompilation of PHASE with a negative zero argument.
+    (lp#2137068)
   * bug fix: the SB-COVER reporting utilities can now annotate source files
     containing array literals using #A(<dims> <eltype> . <contents>) syntax.
     (lp#2134290)
+  * optimization: machine arithmetic can be used when bit-shifting bignum
+    inputs in a modular arithmetic context.
+  * optimization: extending an association list, including using backquote
+    notation, is recognized as ACONS and is potentially stack-allocatable.
+  * optimization: some intermediate copies of lists are elided for calls to
+    maybe-copying operations surrounded by a call to COPY-LIST.
+  * optimization: a number of comparison operations on rationals are
+    simplified where possible.
+  * optimization: a number of arithmetic operations recognize and elide double
+    negations or calls to ABS.
+  * optimization: tracking code with coverage information uses a weak vector
+    per fasl file, rather than a list of per-function weak pointers.
+  * optimization: REDUCE has been tweaked for better performance both on lists
+    and vectors.
+  * optimization: for simple-bit-vectors of the right alignment and length,
+    REVERSE will operate a word-at-a-time.
 
 changes in sbcl-2.5.11 relative to sbcl-2.5.10:
   * incompatible change: the compiler's internal representation of "source
