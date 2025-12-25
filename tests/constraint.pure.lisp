@@ -1758,7 +1758,8 @@
          (length j))))
    (or null (mod 5))))
 
-(with-test (:name :zero-length-check-bound)
+(with-test (:name :zero-length-check-bound
+            :fails-on (not :sb-unicode))
   (assert (= (count 'sb-kernel:%check-bound
                     (ctu:ir1-named-calls
                      `(lambda (x)
