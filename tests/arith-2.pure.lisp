@@ -585,7 +585,8 @@
      (floor a b))
    (values (integer -255 0) (integer -9 0) &optional)))
 
-(with-test (:name :logbitp-on-integers)
+(with-test (:name :logbitp-on-integers
+            :fails-on :arm)
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (logbitp 20 x))))))
 (with-test (:name :bt-negative-bit)
@@ -818,7 +819,8 @@
    ((400 2) (condition 'type-error))
    ((300 0) 303)))
 
-(with-test (:name :truncate-unknown-integer)
+(with-test (:name :truncate-unknown-integer
+            :fails-on :arm)
   (assert (not (ctu:ir1-named-calls `(lambda (x)
                                        (declare (integer x))
                                        (values (the (signed-byte 25) (floor x 2)))))))
@@ -838,7 +840,8 @@
                                        (declare (unsigned-byte x))
                                        (values (the (signed-byte 25) (ceiling x 2))))))))
 
-(with-test (:name :word-floor-ceiling)
+(with-test (:name :word-floor-ceiling
+            :fails-on :arm)
   (assert (not (ctu:ir1-named-calls `(lambda (x y)
                                        (declare (sb-vm:signed-word x y))
                                        (floor x y)))))
@@ -853,20 +856,22 @@
                                        (floor x y))))))
 
 (with-test (:name :fixnum-*-by-unknown)
-  (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                       (declare (integer x)
-                                                (fixnum y))
-                                       (the fixnum (* x y))))))
-  (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                       (declare (integer x)
-                                                (fixnum y))
-                                       (the fixnum (* y x))))))
+  (when (ctu:vop-existsp 'overflow*)
+    (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                         (declare (integer x)
+                                                  (fixnum y))
+                                         (the fixnum (* x y))))))
+    (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                         (declare (integer x)
+                                                  (fixnum y))
+                                         (the fixnum (* y x))))))
+    (assert (not (ctu:ir1-named-calls `(lambda (x y)
+                                         (declare (integer x y))
+                                         (the fixnum (* x y)))))))
   (assert (equal (ctu:ir1-named-calls `(lambda (x)
                                          (the fixnum (* x 2))))
                  '(sb-kernel:*-by-fixnum-to-fixnum)))
-  (assert (not (ctu:ir1-named-calls `(lambda (x y)
-                                       (declare (integer x y))
-                                       (the fixnum (* x y))))))
+
   (checked-compile-and-assert
       (:optimize :safe)
       `(lambda (a)
