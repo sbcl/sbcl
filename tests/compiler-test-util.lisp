@@ -28,7 +28,8 @@
            #:inspect-ir
            #:ir1-named-calls
            #:ir1-funargs
-           #:disassembly-lines))
+           #:disassembly-lines
+           #:vop-existsp))
 
 (cl:in-package :ctu)
 
@@ -301,3 +302,12 @@
                     (disassemble fun :stream s)))
                 #\newline)))
     (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)))
+
+(defun vop-existsp (name &optional (query :translate))
+  (ecase query
+    (:named
+     (gethash name sb-c::*backend-template-names*))
+    (:translate
+     (let ((info (sb-int:info :function :info name)))
+       (when info
+         (sb-c::fun-info-templates info))))))
