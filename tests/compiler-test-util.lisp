@@ -62,18 +62,49 @@
   (let ((*compile-component-hook* fun))
     (apply #'test-util:checked-compile form checked-compile-args)))
 
+(defmacro do-blocks ((block-var component &optional ends result) &body body)
+  (unless (member ends '(nil :head :tail :both))
+    (error "losing ENDS value: ~S" ends))
+  (let ((n-component (gensym))
+        (n-tail (gensym)))
+    `(let* ((,n-component ,component)
+            (,n-tail ,(if (member ends '(:both :tail))
+                          nil
+                          `(sb-c::component-tail ,n-component))))
+       (do ((,block-var ,(if (member ends '(:both :head))
+                             `(component-head ,n-component)
+                             `(sb-c::block-next (sb-c::component-head ,n-component)))
+                        (sb-c::block-next ,block-var)))
+           ((eq ,block-var ,n-tail) ,result)
+         ,@body))))
+
+(defmacro do-nodes ((node-var lvar-var block)
+                    &body body)
+  (sb-int:with-unique-names (n-block n-start)
+    `(do* ((,n-block ,block)
+           (,n-start (sb-c::block-start ,n-block))
+
+           (,node-var (sb-c::ctran-next ,n-start)
+                      (sb-int:acond ((sb-c::node-next ,node-var)
+                                     (sb-c::ctran-next sb-int:it))
+                                    (t (return))))
+           ,@(when lvar-var
+               `((,lvar-var (when (sb-c::valued-node-p ,node-var)
+                              (sb-c::node-lvar ,node-var))
+                            (when (sb-c::valued-node-p ,node-var)
+                              (sb-c::node-lvar ,node-var))))))
+          (nil)
+       ,@body)))
+
 (defun ir1-named-calls (lambda-expression &optional (full t))
   (declare (ignorable lambda-expression full))
-  #-sb-devel
-  (throw 'test-util::skip-test t)
-  #+sb-devel
   (let* ((calls)
          (compiled-fun
            (inspect-ir
             lambda-expression
             (lambda (component)
-              (sb-c::do-blocks (block component)
-                (sb-c::do-nodes (node nil block)
+              (do-blocks (block component)
+                (do-nodes (node nil block)
                   (when (and (sb-c::basic-combination-p node)
                              (if full
                                  (eq (sb-c::basic-combination-info node) :full)
@@ -85,16 +116,13 @@
 ;;; return the name of the caller and the names of all such funargs.
 (defun ir1-funargs (lambda-expression)
   (declare (ignorable lambda-expression))
-  #-sb-devel
-  (throw 'test-util::skip-test t)
-  #+sb-devel
   (let* ((calls)
          (compiled-fun
            (inspect-ir
             lambda-expression
             (lambda (component)
-              (sb-c::do-blocks (block component)
-                (sb-c::do-nodes (node nil block)
+              (do-blocks (block component)
+                (do-nodes (node nil block)
                   (when (and (sb-c::basic-combination-p node)
                              (eq (sb-c::basic-combination-info node) :full))
                     (let ((filtered
@@ -246,15 +274,12 @@
 ;;; to spelling mistakes or a change in how we name nodes.
 (defun count-full-calls (function-name lambda-expression)
   (declare (ignorable function-name lambda-expression))
-  #-sb-devel
-  (throw 'test-util::skip-test t)
-  #+sb-devel
   (let ((n 0))
     (inspect-ir
      lambda-expression
      (lambda (component)
-       (sb-c::do-blocks (block component)
-         (sb-c::do-nodes (node nil block)
+       (do-blocks (block component)
+         (do-nodes (node nil block)
            (when (and (sb-c::basic-combination-p node)
                       (eq (sb-c::basic-combination-info node) :full)
                       (equal (sb-c::combination-fun-debug-name node)
