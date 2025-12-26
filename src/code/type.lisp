@@ -4627,7 +4627,7 @@ expansion happened."
                 (high (numeric-type-high single)))
             (labels ((n= (x y)
                        (and (not (float-infinity-or-nan-p x))
-                            (sb-xc:= x y)))
+                            (fp= x y)))
                      (match (x y)
                        ;; equalp doesn't work on floats in sb-xc-host
                        (cond ((null x)
@@ -5965,6 +5965,18 @@ expansion happened."
          nil)
         (t
          (sb-xc:<= a b))))
+
+(defun fp= (a b)
+  (cond ((or (eql a -0f0)
+             (eql a -0d0))
+         (or (eql b -0f0)
+             (eql b -0d0)))
+        ((or (eql a 0f0)
+             (eql a 0d0))
+         (or (eql b 0f0)
+             (eql b 0d0)))
+        (t
+         (sb-xc:= a b))))
 
 (defun low-le-low-p (a b)
   (cond ((not a)

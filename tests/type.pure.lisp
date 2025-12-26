@@ -1259,3 +1259,9 @@
               (specifier-type '(and number (not double-float)))))
   (assert (eq (specifier-type '(or real complex))
               (specifier-type 'number))))
+
+(with-test (:name :float-zero-unparse)
+  (assert (member (type-specifier (specifier-type (opaque-identity '(member 0.0d0 -0.0))))
+                  '((or (member 0.0d0) (member -0.0))
+                    (or (member -0.0) (member 0.0d0)))
+                  :test #'equal)))
