@@ -1804,4 +1804,5 @@
       `(lambda (n)
          (declare (word n))
          (logand (sb-c::mask-signed-field sb-vm:n-fixnum-bits n) most-positive-word))
-    (((* most-positive-fixnum 2)) (+ (* most-positive-fixnum 4) 2))))
+    (((* most-positive-fixnum 2))
+     (logand -2 most-positive-word))))
