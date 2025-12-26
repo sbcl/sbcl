@@ -2007,7 +2007,7 @@
 
 (defparameter *show-peephole-transforms-p* nil)
 (defglobal *asm-pattern-matchers* nil)
-(defglobal *asm-pattern-matchers-invoked* (make-array 20 :initial-element 0))
+(defglobal *asm-pattern-matchers-invoked* (make-array 32 :initial-element 0))
 (defun %defpattern (name opcodes1 opcodes2 applicator)
   (let ((entry (find name *asm-pattern-matchers* :test #'string= :key #'fifth)))
     (if entry

@@ -4180,9 +4180,10 @@
                  (location= srca zr-tn)
                  (not (location= srcn2 srcm2))
                  (stmt-delete-safe-p dst1 dst2
-                                     '(- sb-vm::--mod64 sb-vm::--modfx)))
+                                     '(- sb-vm::--mod64 sb-vm::--modfx
+                                       %negate sb-vm::%negate-mod64 sb-vm::%negate-modfx)))
         (setf (stmt-mnemonic next) 'msub
-              (stmt-operands next) (list dst2  srcn1 srcm1 srcn2))
+              (stmt-operands next) (list dst2 srcn1 srcm1 srcn2))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
@@ -4203,6 +4204,26 @@
                                          (if (location= dst1 srcm2)
                                              srcn2
                                              srcm2)))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
+(defpattern "neg + mul -> nmul" ((sub) (madd)) (stmt next)
+  (destructuring-bind (dst1 srcn1 srcm1) (stmt-operands stmt)
+   (destructuring-bind (dst2 srcn2 srcm2 srca) (stmt-operands next)
+      (when (and (location= srca zr-tn)
+                 (location= srcn1 zr-tn)
+                 (tn-p srcm1)
+                 (or (location= dst1 srcn2)
+                     (location= dst1 srcm2))
+                 (stmt-delete-safe-p dst1 dst2 '(* sb-vm::*-mod64 sb-vm::*-modfx)))
+        (setf (stmt-mnemonic next) 'msub
+              (stmt-operands next) (list dst2
+                                         srcm1
+                                         (if (location= dst1 srcm2)
+                                             srcn2
+                                             srcm2)
+                                         zr-tn))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
@@ -4233,9 +4254,9 @@
                    (not (location= srcn2 srcm2))
                    (stmt-delete-safe-p dst1 dst2 '(+)))
           (setf (stmt-mnemonic next) 'fmadd
-                (stmt-operands next) (list* dst2 (if (location= dst1 srcm2)
-                                                     (list srcn1 srcm1 srcn2)
-                                                     (list srcn1 srcm1 srcm2))))
+                (stmt-operands next) (list dst2 srcn1 srcm1 (if (location= dst1 srcm2)
+                                                                srcn2
+                                                                srcm2)))
           (add-stmt-labels next (stmt-labels stmt))
           (delete-stmt stmt)
           next)))))
@@ -4258,10 +4279,11 @@
                      (location= dst1 srcm2))
                  (stmt-delete-safe-p dst1 dst2 '(*)))
         (setf (stmt-mnemonic next) 'fnmul
-              (stmt-operands next) (list* dst2
-                                          (if (location= dst1 srcm2)
-                                              (list srcn2 srcn1)
-                                              (list srcm2 srcn1))))
+              (stmt-operands next) (list dst2
+                                         (if (location= dst1 srcm2)
+                                             srcn2
+                                             srcm2)
+                                         srcn1))
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
