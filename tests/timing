@@ -328,4 +328,5 @@
 ("iso-8859-1.pure" 765)
 ("iso-8859-2.pure" 765)
 ("iso-8859-3.pure" 765)
+("fifo-slow.impure" 2070)
 ("utf-8.pure" 700))

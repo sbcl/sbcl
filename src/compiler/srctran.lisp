@@ -968,13 +968,13 @@
                     interval)))))
     (values result complex)))
 
-(defun interval-zero (x)
+(defun interval-zero (x &optional (integer-zero 0))
   (let ((number (or (type-bound-number (interval-low x))
                     (type-bound-number (interval-high x)))))
     (typecase number
       (double-float 0d0)
       (single-float 0f0)
-      (t 0))))
+      (t integer-zero))))
 
 (defun intervals-zero (x y)
   (let ((number (or (type-bound-number (interval-low y))
