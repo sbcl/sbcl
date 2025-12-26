@@ -2287,7 +2287,7 @@
   (block nil
     (when (constant-lvar-p width)
       (case (lvar-value width)
-        (#.(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)
+        (#.sb-vm:n-fixnum-bits
          (when (or (csubtypep (lvar-type x)
                               (specifier-type 'word))
                    (csubtypep (lvar-type x)

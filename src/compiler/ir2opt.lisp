@@ -1085,6 +1085,8 @@
          (not (tn-ref-next writes))
          (neq (tn-vertex tn) :alias))))
 
+;;; Broken by mask-signed-field using move-from-word/fixnum to sign-extend words
+#+()
 (defoptimizer (vop-optimize sb-vm::move-from-word/fixnum)
     (vop)
   (vop-bind (in) (out) vop

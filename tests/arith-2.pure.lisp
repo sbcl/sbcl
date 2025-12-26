@@ -1796,3 +1796,12 @@
     (((ash 1 12) -10) (ash 1 2))
     (((ash -1 12) -10) (logand (ash -1 2) most-positive-word))
     ((325822690411775662515259164035444996112 -64) (logand 17662883439475955428 most-positive-word))))
+
+
+(with-test (:name :mask-signed-field-word-move)
+  (checked-compile-and-assert
+      ()
+      `(lambda (n)
+         (declare (word n))
+         (logand (sb-c::mask-signed-field sb-vm:n-fixnum-bits n) most-positive-word))
+    (((* most-positive-fixnum 2)) (+ (* most-positive-fixnum 4) 2))))
