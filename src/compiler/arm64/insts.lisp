@@ -4221,3 +4221,29 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+(defpattern "fmul + fneg -> fnmul" ((fmul) (fneg)) (stmt next)
+  (destructuring-bind (dst1 srcn1 srcm1) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn2) (stmt-operands next)
+      (when (and (location= dst1 srcn2)
+                 (stmt-delete-safe-p dst1 dst2 '(%negate)))
+        (setf (stmt-mnemonic next) 'fnmul
+              (stmt-operands next) (list dst2 srcn1 srcm1))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
+
+(defpattern "fneg + fmul -> fnmul" ((fneg) (fmul)) (stmt next)
+  (destructuring-bind (dst1 srcn1) (stmt-operands stmt)
+   (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
+      (when (and (or (location= dst1 srcn2)
+                     (location= dst1 srcm2))
+                 (stmt-delete-safe-p dst1 dst2 '(*)))
+        (setf (stmt-mnemonic next) 'fnmul
+              (stmt-operands next) (list* dst2 
+                                          (if (location= dst1 srcm2)
+                                              (list srcn2 srcn1)
+                                              (list srcm2 srcn1))))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
