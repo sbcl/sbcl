@@ -5756,7 +5756,7 @@
           ((= val 2) '(* x x))
           ((not (or
                  (policy node (= float-accuracy 0))
-                 (csubtypep (single-value-result-type node t) 
+                 (csubtypep (single-value-result-type node t)
                             (specifier-type '(or rational (complex rational))))))
            (give-up-ir1-transform))
           ((= val -2) '(/ (* x x)))
