@@ -5731,7 +5731,7 @@
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
-(deftransform expt ((x y) (t (constant-arg real)) *)
+(deftransform expt ((x y) (t (constant-arg real)) * :node node)
   "recode as multiplication or sqrt"
   (let ((val (lvar-value y)))
     ;; If Y would cause the result to be promoted to the same type as
@@ -5754,6 +5754,11 @@
                     `(1+ (* x ,val)))
                    (t (give-up-ir1-transform)))))
           ((= val 2) '(* x x))
+          ((not (or
+                 (policy node (= float-accuracy 0))
+                 (csubtypep (single-value-result-type node t) 
+                            (specifier-type '(or rational (complex rational))))))
+           (give-up-ir1-transform))
           ((= val -2) '(/ (* x x)))
           ((= val 3) '(* x x x))
           ((= val 4) '(let ((m (* x x)))
@@ -7057,10 +7062,13 @@
 (defun word-sized-lvar-p (lvar)
   (word-sized-type-p (lvar-type lvar)))
 
+(defun single-value-result-type (node &optional asserted)
+  (single-value-type (if asserted
+                         (node-asserted-type node)
+                         (node-derived-type node))))
+
 (defun word-sized-result-p (node &optional asserted)
-  (word-sized-type-p (single-value-type (if asserted
-                                            (node-asserted-type node)
-                                            (node-derived-type node)))))
+  (word-sized-type-p (single-value-result-type node asserted)))
 
 (defun word-interval-p (interval)
   (let ((low (interval-low interval))
