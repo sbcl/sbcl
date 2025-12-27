@@ -7,8 +7,6 @@ changes relative to sbcl-2.5.11:
     "Efficiency" section.
   * enhancement: the SB-COVER code coverage tool can emit a report in a format
     compatible with the LCOV open-source tool.
-  * bug fix: EXPT with an exponent of one half is implemented in terms of
-    SQRT.  (lp#1899969)
   * bug fix: fix SCALE-FLOAT on denormal floats.  (lp#2000178, re-reported by
     Barton Willis)
   * bug fix: the system's test of constructing an ELF code is compatible with
