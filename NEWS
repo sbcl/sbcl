@@ -14,6 +14,9 @@ changes relative to sbcl-2.5.11:
   * bug fix: the system's test of constructing an ELF code is compatible with
     storing code coverage information.  (lp#2131956)
   * bug fix: inconsistent result from SUBTYPEP on array types.  (lp#2132250)
+  * bug fix: the SB-COVER reporting utilities can now annotate source files
+    containing array literals using #A(<dims> <eltype> . <contents>) syntax.
+    (lp#2134290)
   * bug fix: compiler error resulting from losing some already-computed
     derived type information.  (lp#2136852)
   * bug fix: miscompilation of DPB involving non-word-sized intermediate
@@ -23,10 +26,9 @@ changes relative to sbcl-2.5.11:
   * bug fix: miscompilation of DPB with constant byte positions above the
     number of bits in a word.  (lp#2137046)
   * bug fix: miscompilation of PHASE with a negative zero argument.
-    (lp#2137068)
-  * bug fix: the SB-COVER reporting utilities can now annotate source files
-    containing array literals using #A(<dims> <eltype> . <contents>) syntax.
-    (lp#2134290)
+    (lp#2137068, lp#2137119)
+  * bug fix: failure to round-trip types involving positive and negative zeros
+    of different floating point representations.  (lp#2137140)
   * optimization: machine arithmetic can be used when bit-shifting bignum
     inputs in a modular arithmetic context.
   * optimization: extending an association list, including using backquote
