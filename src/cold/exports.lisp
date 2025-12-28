@@ -2823,10 +2823,7 @@ be submitted as a CDR")
 
 (defpackage "SB-REGALLOC"
   (:documentation "private: implementation of the compiler's register allocator")
-  (:use "CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
-        #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
-        "SB-KERNEL" "SB-SYS"
-        "SB-C")
+  (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-C")
   (:import-from "SB-C"
                 "BLOCK-INFO" "BLOCK-LAST" "BLOCK-LOOP" "BLOCK-NEXT"
                 "CLEAR-BIT-VECTOR" "COMPONENT-HEAD" "COMPONENT-TAIL"
