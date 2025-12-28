@@ -398,6 +398,7 @@ Please check that all strings which were not recognizable to the compiler
         (let ((name (string symbol)))
           (and (> (length name) 2)
                (string= name "M:" :end1 2)))))
+#-sb-devel
 (let ((counts
        (mapcar (lambda (x)
                  (list x
@@ -415,23 +416,12 @@ Please check that all strings which were not recognizable to the compiler
           sb-lockless::+hash-nbits+ sb-lockless::%make-so-set-node ; for tests
           sb-loop::*loop-epilogue* sb-loop::add-loop-path ; internals to keep CLSQL working
           sb-profile::make-counter)))) ; for a test
-  #-sb-devel
   ;; Remove inline expansions
   (do-symbols (symbol #.(find-package "SB-C"))
     (when (equal (symbol-package symbol) #.(find-package "SB-C"))
       (sb-int:clear-info :function :inlining-data symbol)
       (sb-int:clear-info :function :inlinep symbol)))
   (sb-impl::shake-packages
-   ;; Development mode: retain all symbols with any system-related properties
-   #+sb-devel
-   (lambda (symbol accessibility)
-     (declare (ignore accessibility))
-     (or (gethash symbol precious-internals)
-         (sb-kernel:symbol-%info symbol)
-         (sb-kernel:%symbol-function symbol)
-         (and (boundp symbol) (not (keywordp symbol)))))
-   ;; Release mode: retain all symbols satisfying this intricate test
-   #-sb-devel
    (lambda (symbol accessibility)
     (or
      (gethash symbol precious-internals) ; prevails over any condition below
