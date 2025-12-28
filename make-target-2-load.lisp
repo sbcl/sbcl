@@ -337,7 +337,6 @@ Please check that all strings which were not recognizable to the compiler
   ;; SAVE-LISP-AND-DIE.
   #-sb-devel (!unintern-init-only-stuff)
 
-
   (do-all-symbols (symbol)
     ;; Don't futz with the header of static symbols.
     ;; Technically LOGIOR-HEADER-BITS can only be used on an OTHER-POINTER-LOWTAG
@@ -411,7 +410,17 @@ Please check that all strings which were not recognizable to the compiler
                  (list x
                        (sb-impl::package-external-symbol-count x)
                        (sb-impl::package-internal-symbol-count x)))
-               (sort (list-all-packages) #'string< :key 'package-name))))
+               (sort (list-all-packages) #'string< :key 'package-name)))
+      (precious-internals
+       ((lambda (list &aux (ht (make-hash-table)))
+          (dolist (sym list ht) (setf (gethash sym ht) t)))
+        '(sb-alien::alien-callback-p sb-alien::alien-lambda ; the API uses internals, really?
+          sb-c::tab sb-c::scramble ; for perfecthash
+          sb-impl::%default-comma-constructor
+          sb-kernel::%%make-random-state
+          sb-lockless::+hash-nbits+ sb-lockless::%make-so-set-node ; for tests
+          sb-loop::*loop-epilogue* sb-loop::add-loop-path ; internals to keep CLSQL working
+          sb-profile::make-counter)))) ; for a test
   #-sb-devel
   ;; Remove inline expansions
   (do-symbols (symbol #.(find-package "SB-C"))
@@ -423,12 +432,15 @@ Please check that all strings which were not recognizable to the compiler
    #+sb-devel
    (lambda (symbol accessibility)
      (declare (ignore accessibility))
-     (or (sb-kernel:symbol-%info symbol)
+     (or (gethash symbol precious-internals)
+         (sb-kernel:symbol-%info symbol)
          (sb-kernel:%symbol-function symbol)
          (and (boundp symbol) (not (keywordp symbol)))))
    ;; Release mode: retain all symbols satisfying this intricate test
    #-sb-devel
    (lambda (symbol accessibility)
+    (or
+     (gethash symbol precious-internals) ; prevails over any condition below
      (case (symbol-package symbol)
       (#.(find-package "SB-VM")
        (or (eq accessibility :external)
@@ -448,26 +460,13 @@ Please check that all strings which were not recognizable to the compiler
            (let ((s (string symbol))) (and (search "THREAD-" s) (search "-SLOT" s)))
            (search "-OFFSET" (string symbol))
            (search "-TN" (string symbol))))
-      (#.(find-package "SB-ALIEN")
-       (or (eq accessibility :external) (member symbol '(sb-alien::alien-callback-p
-                                                         sb-alien::alien-lambda))))
       (#.(mapcar 'find-package
-                 '("SB-ASSEM" "SB-BROTHERTREE" "SB-DISASSEM" "SB-FORMAT"
-                   "SB-IMPL" "SB-KERNEL" "SB-MOP" "SB-PCL" "SB-PRETTY" "SB-PROFILE"
+                 '("SB-ALIEN" "SB-ASSEM" "SB-BROTHERTREE" "SB-C" "SB-DISASSEM" "SB-FORMAT"
+                   "SB-IMPL" "SB-KERNEL" "SB-LOCKLESS" "SB-LOOP" "SB-MOP" "SB-PCL"
+                   "SB-PRETTY" "SB-PROFILE"
                    "SB-REGALLOC" "SB-SYS" "SB-UNICODE" "SB-UNIX" "SB-WALKER"))
        ;; Assume all and only external symbols must be retained
          (eq accessibility :external))
-      (#.(find-package "SB-C")
-       (or (eq accessibility :external)
-           (member symbol '(sb-c::tab sb-c::scramble))))
-      (#.(find-package "SB-LOOP")
-       (or (eq accessibility :external)
-           ;; Retain some internals to keep CLSQL working.
-           (member symbol '(sb-loop::*loop-epilogue*
-                            sb-loop::add-loop-path))))
-      (#.(find-package "SB-LOCKLESS")
-       (or (eq accessibility :external)
-           (member symbol '(sb-lockless::+hash-nbits+)))) ; for a test
       (#.(find-package "SB-THREAD")
        (or (eq accessibility :external)
            ;; for some reason a recent change caused the tree-shaker to drop MAKE-SPINLOCK
@@ -495,7 +494,7 @@ Please check that all strings which were not recognizable to the compiler
            ;; By default, retain any symbol with any attachments
            (or (sb-kernel:symbol-%info symbol)
                (sb-kernel:%symbol-function symbol)
-               (and (boundp symbol) (not (keywordp symbol))))))))
+               (and (boundp symbol) (not (keywordp symbol)))))))))
    :verbose nil :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl)
   (let ((sum-delta-ext 0)
