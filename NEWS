@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.5.11:
+changes in sbcl-2.6.0 relative to sbcl-2.5.11:
   * enhancement: the compiler will recognize certain combinations of
     high-level optimizations as expressible by shorter machine instruction
     sequences, documented in the manual under "Recognized idioms" in the
