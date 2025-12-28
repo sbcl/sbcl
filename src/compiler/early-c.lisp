@@ -40,14 +40,12 @@
 
 (defstruct (dxable-args (:constructor make-dxable-args (list))
                         (:predicate nil)
-                        (:copier nil)
-                        #-sb-xc-host :no-constructor-defun)
+                        (:copier nil))
   (list nil :read-only t))
 (defstruct (inlining-data (:include dxable-args)
                           (:constructor make-inlining-data (expansion list))
                           (:predicate nil)
-                          (:copier nil)
-                          #-sb-xc-host :no-constructor-defun)
+                          (:copier nil))
   (expansion nil :read-only t))
 (declaim (freeze-type dxable-args))
 

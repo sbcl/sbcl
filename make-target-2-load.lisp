@@ -142,20 +142,13 @@
     ;; So loop over all structure classoids and clobber any
     ;; symbol that should be uninternable.
     (maphash (lambda (classoid layout)
-               (when (structure-classoid-p classoid)
-                 (let ((dd (layout-%info layout)))
-                   (setf (dd-constructors dd)
-                         (delete-if (lambda (x)
-                                      (and (consp x) (uninternable-p (car x))))
-                                    (dd-constructors dd))))))
+               (declare (ignore classoid))
+               (binding* ((dd (layout-info layout) :exit-if-null))
+                 (setf (dd-constructors dd)
+                       (delete-if (lambda (x) (and (consp x) (uninternable-p (car x))))
+                                  (dd-constructors dd)))))
              (classoid-subclasses (find-classoid t)))
 
-    (loop for type in '(pathname ;; PATHNAME is not a structure-classoid
-                        sb-c:storage-class
-                        sb-c:storage-base)
-          do
-          (setf (sb-kernel:dd-constructors (sb-kernel:find-defstruct-description type))
-                nil))
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
     ;; it worked. It should be an error if any uninternable symbols remain,
     ;; but at present there are about 7 symbols with referrers.
@@ -416,6 +409,7 @@ Please check that all strings which were not recognizable to the compiler
           (dolist (sym list ht) (setf (gethash sym ht) t)))
         '(sb-alien::alien-callback-p sb-alien::alien-lambda ; the API uses internals, really?
           sb-c::tab sb-c::scramble ; for perfecthash
+          sb-c::make-transform ; cl-protobufs uses this
           sb-impl::%default-comma-constructor
           sb-kernel::%%make-random-state
           sb-lockless::+hash-nbits+ sb-lockless::%make-so-set-node ; for tests

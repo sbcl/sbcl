@@ -1675,5 +1675,14 @@
   (let ((b (& val #xf)))
    (let ((a (>> val 28)))
     (^ a (aref tab b))))))")
+(#(359CB801 5DAB18D0 625827B9 7D5DAB1C BF38ADF8 C2B3EDA3 C7436840 D2821F1C E391E233 EBD01872 F1F25102)
+ "(:PURE :INITIAL-OFFSET :NAMED :TYPE :PRINT-OBJECT :PRINT-FUNCTION :INCLUDE :PREDICATE :COPIER :CONSTRUCTOR :CONC-NAME)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 5 8 11 4 1 0 5)))
+  (let ((b (& (>> val 4) #x7)))
+   (let ((a (>> (<< val 5) 29)))
+    (^ a (aref tab b))))))")
+(#(359CB801 5DAB18D0 D2821F1C E391E233)
+ "(:CONC-NAME :CONSTRUCTOR :COPIER :PREDICATE)"
+ "((& (>> val 15) 3))")
 )
 ;; EOF

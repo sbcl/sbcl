@@ -20,8 +20,7 @@
 
 ;;; an IR1 transform
 (defstruct (transform (:copier nil)
-                      (:predicate nil)
-                      #-sb-xc-host :no-constructor-defun)
+                      (:predicate nil))
   ;; the function type which enables this transform.
   ;;
   ;; (Note that declaring this :TYPE FUN-TYPE probably wouldn't

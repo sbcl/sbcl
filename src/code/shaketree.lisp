@@ -25,7 +25,22 @@
                        (weaken (package-external-symbols package) :external)
                        package)
                 list))))
-    (gc :gen 7)
+
+    (flet ((visit-ctors (xform)
+             (maphash (lambda (classoid layout)
+                        (declare (ignore classoid))
+                        (binding* ((dd (layout-info layout) :exit-if-null))
+                          (setf (dd-constructors dd) (mapcan xform (dd-constructors dd)))))
+                      (classoid-subclasses (find-classoid t)))))
+      ;; Weaken references from a defstruct-descriptions to its constructors.
+      ;; No global def needed if every call site was inlined
+      (visit-ctors (lambda (x) `((,(make-weak-pointer (car x)) ,(string (car x)) . ,(cdr x)))))
+      (gc :gen 7)
+      ;; Unweaken dd constructor references ASAP because the compiler is in a fragile state.
+      ;; If FUN-NAME-INLINE-EXPANSION were to be called, it might fail an AVER.
+      (visit-ctors (lambda (x &aux (wpv (weak-pointer-value (car x))))
+                     (if wpv `((,wpv . ,(cddr x)))))))
+
     (when query
       (sb-ext:search-roots query :criterion :static))
     (let ((n-dropped 0))

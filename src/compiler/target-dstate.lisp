@@ -12,8 +12,7 @@
 (in-package "SB-DISASSEM")
 
 (defstruct (storage-info (:copier nil)
-                         (:predicate nil)
-                         #-sb-xc-host :no-constructor-defun)
+                         (:predicate nil))
   (groups nil :type list :read-only t)               ; alist of (name . location-group)
   (debug-vars #() :type vector :read-only t))
 
@@ -56,8 +55,7 @@
 (defstruct (disassem-state (:conc-name dstate-)
                            (:constructor %make-dstate
                                (alignment argument-column fun-hooks))
-                           (:copier nil)
-                           #-sb-xc-host :no-constructor-defun)
+                           (:copier nil))
   ;; to avoid buffer overrun at segment end, we might need to copy bytes
   ;; here first because we access memory in chunks larger than 1 byte.
   (scratch-buf 0 :type sb-vm:word)

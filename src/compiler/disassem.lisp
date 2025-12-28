@@ -167,8 +167,7 @@
 (defstruct (instruction-format (:conc-name format-)
                                (:constructor make-inst-format
                                              (name length default-printer args))
-                               (:copier nil)
-                               #-sb-xc-host :no-constructor-defun)
+                               (:copier nil))
   (name nil :read-only t)
   (args nil :type list :read-only t)
 
