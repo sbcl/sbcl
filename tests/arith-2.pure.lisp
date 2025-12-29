@@ -1806,3 +1806,31 @@
          (logand (sb-c::mask-signed-field sb-vm:n-fixnum-bits n) most-positive-word))
     (((* most-positive-fixnum 2))
      (logand -2 most-positive-word))))
+
+(with-test (:name :logand-cut-constants)
+  (assert (= (count 'logand
+                    (ctu:ir1-named-calls `(lambda (n m)
+                                            (declare ((unsigned-byte 64) n)
+                                                     ((unsigned-byte 8) m))
+                                            (logand m (logand n #xFFFF)))
+                                         nil))
+             1))
+  (assert (= (count 'logand
+                    (ctu:ir1-named-calls `(lambda (m)
+                                            (declare ((unsigned-byte 8) m))
+                                            (logand m #xFFFF))
+                                         nil))
+             0))
+  (assert (= (count 'sb-c::mask-signed-field
+                    (ctu:ir1-named-calls `(lambda (n m)
+                                            (declare ((unsigned-byte 64) n)
+                                                     ((unsigned-byte 8) m))
+                                            (logand m (sb-c::mask-signed-field 63 n)))
+                                         nil))
+             0))
+  (assert (= (count 'logior
+                    (ctu:ir1-named-calls `(lambda (n)
+                                            (declare ((unsigned-byte 64) n))
+                                            (logand #xF0 (logior n 1)))
+                                         nil))
+             0)))

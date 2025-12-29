@@ -11,8 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(when (find-symbol "COMPUTE-POLLFDS" "SB-IMPL")
-  (push :compute-pollfds-test *features*))
+#+os-provides-poll
+(push :compute-pollfds-test *features*)
+
 #+compute-pollfds-test
 (import '(sb-impl::make-handler
           sb-impl::handler-descriptor
