@@ -1808,12 +1808,13 @@
      (logand -2 most-positive-word))))
 
 (with-test (:name :logand-cut-constants)
-  (assert (= (count 'logand
-                    (ctu:ir1-named-calls `(lambda (n m)
-                                            (declare ((unsigned-byte 64) n)
-                                                     ((unsigned-byte 8) m))
-                                            (logand m (logand n #xFFFF)))
-                                         nil))
+  (assert (= (count-if (lambda (c)
+                         (member c '(logand sb-kernel:two-arg-and)))
+                       (ctu:ir1-named-calls `(lambda (n m)
+                                               (declare ((unsigned-byte 64) n)
+                                                        ((unsigned-byte 8) m))
+                                               (logand m (logand n #xFFFF)))
+                                            nil))
              1))
   (assert (= (count 'logand
                     (ctu:ir1-named-calls `(lambda (m)
@@ -1830,7 +1831,10 @@
              0))
   (assert (= (count 'logior
                     (ctu:ir1-named-calls `(lambda (n)
-                                            (declare ((unsigned-byte 64) n))
                                             (logand #xF0 (logior n 1)))
                                          nil))
-             0)))
+             0))
+  (assert-type
+   (lambda (n)
+     (logand #xFF (logior n #xFF)))
+   (eql #xFF)))

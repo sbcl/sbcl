@@ -5157,19 +5157,27 @@
         (block nil
           (let* ((width (or (unsigned-mask-width (lvar-type a))
                             (return)))
-                 (full-mask (if (constant-lvar-p a)
-                                (lvar-value a)
-                                (ldb (byte width 0) -1)))
+                 (full-mask (ldb (byte width 0) -1))
+                 (mask (if (constant-lvar-p a)
+                           (lvar-value a)
+                           full-mask))
                  (cut (logand b
-                              full-mask)))
-            (unless (= cut b)
-              (erase-node-type combination *wild-type* nil node)
-              (transform-call combination
-                              `(lambda (x y)
-                                 (declare (ignore y))
-                                 (logior x ,cut))
-                              'logand)
-              t))))
+                              mask)))
+            (cond ((= cut full-mask)
+                   ;; (logand #xFF (logior n #xFF)) => #xFF
+                   (return-from logand `(lambda (x y)
+                                          (declare (ignore x y))
+                                          ,cut)))
+                  ((= cut b)
+                   nil)
+                  (t
+                   (erase-node-type combination *wild-type* nil node)
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore y))
+                                      (logior x ,cut))
+                                   'logand)
+                   t)))))
       ;; Remove mask-signed-field
       (combination-match (node-lvar node)
           (logand (:type unsigned-byte a) (mask-signed-field (:constant sign) b))
