@@ -1533,6 +1533,9 @@
           0)
     (test `(lambda (x)
              (- (lognot x)))
+          0)
+    (test `(lambda (x)
+             (- (the integer (- x))))
           0)))
 
 (with-test (:name :abs-match)

@@ -381,7 +381,10 @@
        (values name node)))
     (cast
      (when (and cast-type
-                (eq (cast-type-to-check node) cast-type))
+                (let ((type (cast-type-to-check node)))
+                  (if (functionp cast-type)
+                      (funcall cast-type type)
+                      (eq type cast-type))))
        (combination/cast-name (lvar-uses (cast-value node)))))))
 
 (defun combination-matches* (names args combination &key cast-type)
