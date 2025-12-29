@@ -2723,7 +2723,8 @@ is :ANY, the function name is not checked."
       (aver (combination-p outside))
       (cond ((combination-p inside))
             ((and (cast-p inside)
-                  (eq (cast-type-to-check inside) cast-type)
+                  (or (eq cast-type :any)
+                      (eq (cast-type-to-check inside) cast-type))
                   (setf cast inside)
                   (combination-p (setf inside (lvar-uses (cast-value inside))))))
             (t

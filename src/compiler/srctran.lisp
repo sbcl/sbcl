@@ -5266,6 +5266,14 @@
       (give-up-ir1-transform))
     'x))
 
+(defun numeric-type-without-bounds-p (type)
+  (typecase type
+    (numeric-type type
+     (and (not (numeric-type-low type))
+          (not (numeric-type-high type))))
+    (union-type
+     (every #' numeric-type-without-bounds-p (union-type-types type)))))
+
 ;;; Pick off easy association opportunities for constant folding.
 ;;; More complicated stuff that also depends on commutativity
 ;;; (e.g. (f (f x k1) (f y k2)) => (f (f x y) (f k1 k2))) should
@@ -5276,13 +5284,9 @@
              `(deftransform ,operator ((x z) (,type (constant-arg ,type)) * :important nil :node n)
                 ,(format nil "associate ~A/~A of constants"
                          operator folded)
-                (binding* ((node (if (lvar-has-single-use-p x)
-                                     (lvar-use x)
-                                     (give-up-ir1-transform)))
-                           (folded (or (and (combination-p node)
-                                            (car (memq (lvar-fun-name
-                                                        (combination-fun node))
-                                                       ',folded)))
+                (binding* (((folded node) (combination/cast-name (lvar-uses x) #'numeric-type-without-bounds-p))
+                           (folded (if (memq folded ',folded)
+                                       folded
                                        (give-up-ir1-transform)))
                            (y   (second (combination-args node)))
                            (nil (or (constant-lvar-p y)
@@ -5300,9 +5304,9 @@
                                    (ratiop constant)
                                    (eq folded ',no-ratios))
                           (give-up-ir1-transform))))
-                  (splice-fun-args x folded 2)
-                  `(lambda (x y z)
-                     (declare (ignore y z))
+                  (splice-fun-args x folded #'first t :any)
+                  `(lambda (x y)
+                     (declare (ignore y))
                      ;; (operator (folded x y) z)
                      ;; == (operator x (folded z y))
                      (,',(if flip flip operator) x ,constant))))))
@@ -5315,28 +5319,28 @@
 
 (deftransform + ((x z) (rational (constant-arg rational)) * :important nil :node n)
   "associate +/(+ -) of constants"
-  (or (combination-case x
+  (or (combination-case (x :cast #'numeric-type-without-bounds-p)
         ((- +) (* constant)
          (let ((constant (funcall name (lvar-value z) (lvar-value (second args)))))
-           (splice-fun-args x name #'first)
+           (splice-fun-args x name #'first t :any)
            `(+ x ,constant)))
         (- (constant *)
          (let ((constant (+ (lvar-value z) (lvar-value (first args)))))
-           (splice-fun-args x name #'second)
+           (splice-fun-args x name #'second t :any)
            `(- ,constant x))))
       (give-up-ir1-transform)))
 
 (deftransform - ((x z) (rational (constant-arg rational)) * :important nil :node n)
   "associate -/(+ -) of constants"
-  (or (combination-case x
+  (or (combination-case (x :cast #'numeric-type-without-bounds-p)
         ((- +) (* constant)
          (let ((constant (- (funcall name (lvar-value (second args)))
                             (lvar-value z))))
-           (splice-fun-args x name #'first)
+           (splice-fun-args x name #'first t :any)
            `(+ x ,constant)))
         (- (constant *)
          (let ((constant (- (lvar-value (first args)) (lvar-value z))))
-           (splice-fun-args x name #'second)
+           (splice-fun-args x name #'second t :any)
            `(- ,constant x))))
       (give-up-ir1-transform)))
 
@@ -5656,14 +5660,7 @@
                                                 `(lambda (x y) (,new-function x y))
                                                 'negate-lvar))
 
-                              negated))
-                          (good-cast-p (type)
-                            (typecase type
-                              (numeric-type type
-                               (and (not (numeric-type-low type))
-                                    (not (numeric-type-high type))))
-                              (union-type
-                               (every #'good-cast-p (union-type-types type))))))
+                              negated)))
                    (multiple-value-bind (constant value) (constant-node-p node)
                      (if constant
                          (unless (and (eql value 0) ;; can't negate a non-float zero
@@ -5673,7 +5670,7 @@
                                (replace-node-with-constant node negated)
                                (erase-lvar-type (node-lvar node) nil outer-node)))
                            t)
-                         (combination-case (x :cast #'good-cast-p :node node)
+                         (combination-case (x :cast #'numeric-type-without-bounds-p :node node)
                            ;; (- (- x)) => x
                            (%negate (*)
                             (when (or (not test)

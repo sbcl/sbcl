@@ -1856,3 +1856,19 @@
                                             (lognot (lognot x)))
                                          nil))
              0)))
+
+(with-test (:name :constant-association)
+  (assert (= (count-if (lambda (c)
+                         (member c '(+ sb-kernel:two-arg-+)))
+                       (ctu:ir1-named-calls
+                        `(lambda (x)
+                           (+ (the integer (1+ x)) 20))
+                        nil))
+             1))
+  (assert (= (count-if (lambda (c)
+                         (member c '(* sb-kernel:two-arg-*)))
+                       (ctu:ir1-named-calls
+                        `(lambda (x)
+                           (* (the integer (* x 3)) 5))
+                        nil))
+             1)))
