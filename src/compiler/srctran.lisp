@@ -2159,6 +2159,28 @@
 (defoptimizer (lognot derive-type) ((int))
   (one-arg-derive-type int #'lognot-derive-type-aux))
 
+;;; For better matching with other arithmetic functions first
+;;; transform lognot to subtraction and then back to lognot.
+(define-source-transform lognot (x)
+  (if (and (boundp '*component-being-compiled*)
+           (> (component-phase-counter *component-being-compiled*) 0))
+      (values nil t)
+      `(- -1 (the integer ,x))))
+
+(deftransform - ((x y) ((eql -1) integer) * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(lognot y))
+
+(deftransform #.(package-symbolicate "SB-VM" "--MOD" sb-vm:n-word-bits)
+  ((x y) ((eql #.most-positive-word) integer) * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(#.(package-symbolicate "SB-VM" "LOGNOT-MOD" sb-vm:n-word-bits) y))
+
+(deftransform sb-vm::--modfx
+  ((x y) ((eql -1) integer) * :important nil :node node)
+  (delay-ir1-transform node :ir1-phases)
+  `(lognot y))
+
 (defun %negate-derive-type-aux (type)
   (flet ((negate-bound (b)
            (and b
@@ -5676,14 +5698,6 @@
                               t))
                            ((* /) (* *)
                             (negate-args args nil t))
-                           (lognot (*)
-                            (unless test
-                              (erase-node-type combination *wild-type* nil outer-node)
-                              (transform-call combination
-                                              `(lambda (x)
-                                                 (+ x 1))
-                                              'negate-lvar))
-                            t)
                            ((truncate round) (* *)
                             (negate-args args (specifier-type 'real)))
                            ((%unary-truncate %unary-round) (*)
@@ -5711,12 +5725,6 @@
   "Combine - with +, -, *"
   (if (negate-lvar x node)
       'x
-      (give-up-ir1-transform)))
-
-(deftransform lognot ((x) * * :node node)
-  (if (eq (negate-lvar x node :test '%negate :type (specifier-type 'integer))
-          '%negate)
-      '(- x 1)
       (give-up-ir1-transform)))
 
 ;;; Return T if in an arithmetic op including lvars X and Y, the
@@ -5815,9 +5823,6 @@
                        `(- ,(- y) x)))))))
       (t
        (give-up-ir1-transform))))))
-
-(deftransform - ((x y) ((eql -1) sb-vm:signed-word) * :important nil)
-  `(lognot y))
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.

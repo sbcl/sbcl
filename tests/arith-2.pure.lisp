@@ -1845,3 +1845,11 @@
    (lambda (n)
      (logand #xFF (logior n #xFF)))
    (eql #xFF)))
+
+(with-test (:name :lognot)
+  (assert (= (count 'lognot
+                    (ctu:ir1-named-calls `(lambda (x)
+                                            (declare (integer x))
+                                            (lognot (lognot x)))
+                                         nil))
+             0)))
