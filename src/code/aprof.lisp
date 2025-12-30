@@ -700,45 +700,49 @@
     (let ((emitted-newline t))
       (dolist (x sorted)
         (destructuring-bind (name bytes . data) x
-          (when detail
-            (when collapse
-              (setq data (collapse-by-type data)))
-            (setq data (sort data #'> :key #'alloc-bytes)))
-          (assert (eq bytes (reduce #'+ data :key #'alloc-bytes)))
-          (when (and detail (cdr data) (not emitted-newline))
-            (terpri stream))
-          (incf sum-pct (float (/ bytes total-bytes)))
-          ;; Show summary for the function
-          (cond ((not detail)
-                 (format stream " ~5,1,2f      ~5,1,2f ~12d~15d   ~s~%"
-                         (/ bytes total-bytes)
-                         sum-pct
-                         bytes
-                         (reduce #'+ data :key #'alloc-count)
-                         name))
-                (t
-                 (format stream " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~s~@[ - ~s~]~%"
-                         (/ bytes total-bytes)
-                         bytes
-                         (if (cdr data) nil (alloc-count (car data)))
-                         (cond (collapse nil)
-                               ((cdr data) "")
-                               (t (write-to-string (alloc-pc (car data)) :base 16)))
-                         name
-                         (if (cdr data) nil (alloc-type (car data)))
-                         )))
-          (when (and detail (cdr data))
-            (dolist (point data)
-              (format stream "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~s~]~%"
-                        (/ (alloc-bytes point) bytes) ; fraction within function
+          (let ((bytes/total-bytes (if (plusp total-bytes)
+                                       (/ bytes total-bytes)
+                                       0)))
+            (when detail
+              (when collapse
+                (setq data (collapse-by-type data)))
+              (setq data (sort data #'> :key #'alloc-bytes)))
+            (assert (eq bytes (reduce #'+ data :key #'alloc-bytes)))
+            (when (and detail (cdr data) (not emitted-newline))
+              (terpri stream))
+            (incf sum-pct (float bytes/total-bytes))
+            ;; Show summary for the function
+            (cond ((not detail)
+                   (format stream " ~5,1,2f      ~5,1,2f ~12d~15d   ~s~%"
+                           bytes/total-bytes
+                           sum-pct
+                           bytes
+                           (reduce #'+ data :key #'alloc-count)
+                           name))
+                  (t
+                   (format stream " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~s~@[ - ~s~]~%"
+                           bytes/total-bytes
+                           bytes
+                           (if (cdr data) nil (alloc-count (car data)))
+                           (cond (collapse nil)
+                                 ((cdr data) "")
+                                 (t (write-to-string (alloc-pc (car data)) :base 16)))
+                           name
+                           (if (cdr data) nil (alloc-type (car data))))))
+            (when (and detail (cdr data))
+              (dolist (point data)
+                (format stream "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~s~]~%"
+                        (if (zerop bytes)
+                            0
+                            (/ (alloc-bytes point) bytes)) ; fraction within function
                         (alloc-bytes point)
                         (alloc-count point)
                         (if collapse nil (alloc-pc point))
                         (alloc-type point))))
-          (incf sum-bytes bytes)
-          (when (and detail
-                     (setq emitted-newline (not (null (cdr data)))))
-            (terpri stream)))
+            (incf sum-bytes bytes)
+            (when (and detail
+                       (setq emitted-newline (not (null (cdr data)))))
+              (terpri stream))))
         (incf i)
         (if (and (neq top-n :all) (>= i top-n)) (return))))
 ;    (assert (= sum-bytes total-bytes))
