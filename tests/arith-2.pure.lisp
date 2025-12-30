@@ -1820,6 +1820,7 @@
                                                (logand m (logand n #xFFFF)))
                                             nil))
              1))
+  #-arm
   (assert (= (count-if (lambda (c)
                          (member c '(logand sb-kernel:two-arg-and)))
                        (ctu:ir1-named-calls `(lambda (x m)

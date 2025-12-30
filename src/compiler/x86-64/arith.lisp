@@ -4276,18 +4276,42 @@
  (define-vop (mask-signed-field-word/c)
    (:translate sb-c::mask-signed-field)
    (:policy :fast-safe)
-   (:args (x :scs (signed-reg unsigned-reg) :target r))
+   (:args (x :scs (signed-reg unsigned-reg any-reg) :target r))
    (:arg-types (:constant (integer 0 64)) untagged-num)
-   (:results (r :scs (signed-reg)))
-   (:result-types signed-num)
+   (:results (r :scs (any-reg signed-reg)))
+   (:result-types (:or tagged-num signed-num))
    (:info width)
    (:generator 3
      (case width
        ((8 16 32)
-        (inst movsx `(,(bits->size width) :qword) r x))
+        (when (sc-is x any-reg)
+          (move r x)
+          (setf x r)
+          (inst sar r n-fixnum-tag-bits))
+        (inst movsx `(,(bits->size width) :qword) r x)
+        (when (sc-is r any-reg)
+          (inst shl r n-fixnum-tag-bits)))
        (t
-        (move r x)
-        (shift-unshift r width)))))
+        (let* ((shift (- n-word-bits width))
+               (shift-left shift))
+          (when (sc-is x any-reg)
+            (decf shift-left))
+          ;; Shift of 64 is effectively a shift of 0 due to masking by the CPU.
+          ;; It can't happen, because size = 0 was dealt with in IR1
+          (aver (/= shift 64 0))
+          (cond
+            ((and (not (location= r x))
+                  (member shift-left '(1 2 3)))
+             (inst lea r (case shift-left
+                           (1 (ea x x))
+                           (t
+                            (ea nil x (ash 1 shift-left))))))
+            (t
+             (move r x)
+             (inst shl r shift-left)))
+          (inst sar r (if (sc-is r any-reg)
+                          (- shift n-fixnum-tag-bits)
+                          shift)))))))
 
  (define-vop (mask-signed-field-bignum/c)
    (:translate sb-c::mask-signed-field)
@@ -4312,8 +4336,8 @@
     (:args (x :scs (descriptor-reg) :to :save))
     (:arg-refs x-ref)
     (:arg-types (:constant (integer 0 64)) t)
-    (:results (r :scs (signed-reg)))
-    (:result-types signed-num)
+    (:results (r :scs (signed-reg any-reg)))
+    (:result-types (:or signed-num tagged-num))
     (:temporary (:sc unsigned-reg
                  :unused-if (csubtypep (tn-ref-type x-ref)
                                        (specifier-type 'integer)))
@@ -4325,7 +4349,9 @@
     (:generator 6
       (move r x)
       (inst sar r n-fixnum-tag-bits)
-      (inst jmp :nc DO)
+      (inst jmp :nc (if (> width n-fixnum-bits)
+                        DONE
+                        DO))
       (let* ((integerp (eq (tn-kind temp) :unused))
              (error (unless integerp
                       (generate-error-code vop 'object-not-integer-error x))))
@@ -4337,9 +4363,21 @@
       DO
       (case width
         ((8 16 32)
-         (inst movsx `(,(bits->size width) :qword) r r))
+         (inst movsx `(,(bits->size width) :qword) r r)
+         (when (sc-is r any-reg)
+           (inst shl r n-fixnum-tag-bits)))
         (t
-         (shift-unshift r width))))))
+         (let ((shift (- n-word-bits width)))
+           (cond
+             ((zerop shift)
+              (when (sc-is r any-reg)
+                (inst sar r n-fixnum-tag-bits)))
+             (t
+              (inst shl r shift)
+              (inst sar r (if (sc-is r any-reg)
+                              (- shift n-fixnum-tag-bits)
+                              shift)))))))
+      DONE)))
 
 (define-vop (mask-signed-field-fixnum)
   (:translate sb-c::mask-signed-field)
