@@ -583,9 +583,16 @@
             ;; (logtest (logand x #xFF) 1) => (logtest x 1)
             ((when (combination-matches 'logand '(* constant) (lvar-uses x))
                (destructuring-bind (l c) (combination-args (lvar-uses x))
-                 (declare (ignore l))
+                 (declare (ignorable l))
                  (let ((c (lvar-value c)))
-                   (cond ((= (logand y c) y)
+                   (cond ((or
+                           ;; unsigned cut-to-width always recuts to the minimum width
+                           (not (vop-existsp :translate sb-vm::*-modfx))
+                           (not (/= c most-positive-word
+                                    (ash most-positive-word -1))))
+                          ;; cut-to-width will insert these again
+                          nil)
+                         ((= (logand y c) y)
                           (splice-fun-args x :any #'first)
                           ;; Don't transform, just need to change the first argument.
                           nil))))))
@@ -2171,10 +2178,11 @@
   (delay-ir1-transform node :ir1-phases)
   `(lognot y))
 
-(deftransform #.(package-symbolicate "SB-VM" "--MOD" sb-vm:n-word-bits)
-  ((x y) ((eql #.most-positive-word) integer) * :important nil :node node)
-  (delay-ir1-transform node :ir1-phases)
-  `(#.(package-symbolicate "SB-VM" "LOGNOT-MOD" sb-vm:n-word-bits) y))
+(when-vop-existsp (:translate #.(package-symbolicate "SB-VM" "--MOD" sb-vm:n-word-bits))
+  (deftransform #.(package-symbolicate "SB-VM" "--MOD" sb-vm:n-word-bits)
+    ((x y) ((eql #.most-positive-word) integer) * :important nil :node node)
+    (delay-ir1-transform node :ir1-phases)
+    `(#.(package-symbolicate "SB-VM" "LOGNOT-MOD" sb-vm:n-word-bits) y)))
 (when-vop-existsp (:translate sb-vm::--modfx)
   (deftransform sb-vm::--modfx
       ((x y) ((eql -1) integer) * :important nil :node node)
@@ -5160,11 +5168,17 @@
                                 (ldb (byte width 0) -1)))
                  (cut (logand b
                               full-mask)))
-            (cond ((= cut b)
-                   nil)
-                  ((= cut full-mask)
+            (cond ((and
+                    ;; unsigned cut-to-width always recuts to the minimum width
+                    (vop-existsp :translate sb-vm::*-modfx)
+                    ;; cut-to-width will insert these again
+                    (/= cut most-positive-word
+                        (ash most-positive-word -1))
+                    (= cut full-mask))
                    (extract-lvar-n x 1 node)
                    t)
+                  ((= cut b)
+                   nil)
                   (t
                    (erase-node-type combination *wild-type* nil node)
                    (transform-call combination
