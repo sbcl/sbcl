@@ -2175,11 +2175,11 @@
   ((x y) ((eql #.most-positive-word) integer) * :important nil :node node)
   (delay-ir1-transform node :ir1-phases)
   `(#.(package-symbolicate "SB-VM" "LOGNOT-MOD" sb-vm:n-word-bits) y))
-
-(deftransform sb-vm::--modfx
-  ((x y) ((eql -1) integer) * :important nil :node node)
-  (delay-ir1-transform node :ir1-phases)
-  `(lognot y))
+(when-vop-existsp (:translate sb-vm::--modfx)
+  (deftransform sb-vm::--modfx
+      ((x y) ((eql -1) integer) * :important nil :node node)
+    (delay-ir1-transform node :ir1-phases)
+    `(lognot y)))
 
 (defun %negate-derive-type-aux (type)
   (flet ((negate-bound (b)
@@ -5187,9 +5187,12 @@
                               mask)))
             (cond ((= cut full-mask)
                    ;; (logand #xFF (logior n #xFF)) => #xFF
-                   (return-from logand `(lambda (x y)
-                                          (declare (ignore x y))
-                                          ,cut)))
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore x y))
+                                      ,cut)
+                                   'logand)
+                   t)
                   ((= cut b)
                    nil)
                   (t

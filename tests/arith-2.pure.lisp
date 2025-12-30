@@ -1820,6 +1820,23 @@
                                                (logand m (logand n #xFFFF)))
                                             nil))
              1))
+  ;; (assert (= (count-if (lambda (c)
+  ;;                        (member c '(logand sb-kernel:two-arg-and)))
+  ;;                      (ctu:ir1-named-calls `(lambda (x m)
+  ;;                                              (declare ((unsigned-byte 32) x)
+  ;;                                                       ((unsigned-byte 8) m))
+  ;;                                              (logand m (logand x #xFF)))
+  ;;                                           nil))
+  ;;            1))
+  ;; (assert (= (count-if
+  ;;             (lambda (c)
+  ;;               (member c '(logand logtest)))
+  ;;             (ctu:ir1-named-calls `(lambda (x m)
+  ;;                                     (declare ((unsigned-byte 32) x)
+  ;;                                              ((unsigned-byte 8) m))
+  ;;                                     (logtest m (logand x #xFF)))
+  ;;                                  nil))
+  ;;            1))
   (assert (= (count 'logand
                     (ctu:ir1-named-calls `(lambda (m)
                                             (declare ((unsigned-byte 8) m))
@@ -1847,7 +1864,15 @@
   (assert-type
    (lambda (n)
      (logand #xFF (logior n #xFF)))
-   (eql #xFF)))
+   (eql #xFF))
+  (checked-compile-and-assert
+      ()
+      `(lambda (b d)
+         (declare ((unsigned-byte 32) b d))
+         (logand (the bit b)
+                 (logior d 1)))
+    ((0 3) 0)
+    ((1 3) 1)))
 
 (with-test (:name :lognot)
   (assert (= (count 'lognot
