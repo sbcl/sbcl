@@ -1,0 +1,7 @@
+(defun transformed () (sb-kernel:get-lisp-obj-address -1))
+(defun not-transformed ()
+  (declare (notinline sb-kernel:get-lisp-obj-address))
+  (sb-kernel:get-lisp-obj-address -1))
+(compile 'transformed)
+(with-test (:name transform-get-lisp-obj-addresss)
+  (assert (eql (transformed) (not-transformed))))

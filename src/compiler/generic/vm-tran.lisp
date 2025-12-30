@@ -787,7 +787,8 @@
 ;;; VOP can't handle them.
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg fixnum)))
-  (ash (lvar-value obj) sb-vm:n-fixnum-tag-bits))
+  (logand (ash (lvar-value obj) sb-vm:n-fixnum-tag-bits)
+          sb-ext:most-positive-word))
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg character)))
   (logior sb-vm:character-widetag
