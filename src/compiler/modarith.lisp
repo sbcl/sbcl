@@ -449,23 +449,139 @@
               nil                ; After fixing above, replace with T.
               )))))))
 
+(defun logior-cut-width (node)
+  (multiple-value-bind (low high)
+      (integer-type-numeric-bounds (single-value-result-type node))
+    (when (and (numberp low)
+               (numberp high)
+               (<= high 0))
+      (let ((width (integer-length low)))
+        (best-modular-version (1+ width) t)))))
+
 (defoptimizer (logior optimizer) ((x y) node)
-  (let ((result-type (single-value-type (node-derived-type node))))
-    (multiple-value-bind (low high)
-        (integer-type-numeric-bounds result-type)
-      (when (and (numberp low)
-                 (numberp high)
-                 (<= high 0))
-        (let ((width (integer-length low)))
-          (multiple-value-bind (w kind)
-              (best-modular-version (1+ width) t)
-            (when w
-              ;; FIXME: see comment in LOGAND optimizer
-              (let ((xact (cut-to-width x kind w t))
-                    (yact (cut-to-width y kind w t)))
-                (declare (ignore xact yact))
-                nil) ; After fixing above, replace with T
-              )))))))
+  (multiple-value-bind (w kind)
+      (logior-cut-width node)
+    (when w
+      ;; FIXME: see comment in LOGAND optimizer
+      (let ((xact (cut-to-width x kind w t))
+            (yact (cut-to-width y kind w t)))
+        (declare (ignore xact yact))
+        nil) ; After fixing above, replace with T
+      )))
+
+
+(defun unsigned-mask-width (type)
+  (let* ((int (type-approximate-interval type))
+         (high (interval-high int)))
+    (when high
+      (integer-length high))))
+
+(deftransform logand ((x y) (t (constant-arg integer)) word
+                      :node node :important nil)
+  ;; Reduce constant width
+  (let* ((mask (lvar-value y))
+         (cut (ldb (byte (unsigned-mask-width (single-value-result-type node t)) 0)
+                   mask)))
+    (if (= cut mask)
+        (give-up-ir1-transform)
+        `(logand x ,cut))))
+
+;;; Remove the second logand or reduce its constant in
+;;; (logand m (logand n #xFFFF))
+(deftransform logand ((a b) (t t) * :important nil :node node)
+  (or (combination-match (node-lvar node)
+          (logand (:type unsigned-byte a) (logand x (:constant b)))
+        (block nil
+          (let* ((width (or (unsigned-mask-width (lvar-type a))
+                            (return)))
+                 (full-mask (if (constant-lvar-p a)
+                                (lvar-value a)
+                                (ldb (byte width 0) -1)))
+                 (cut (logand b
+                              full-mask)))
+            (cond ((and
+                    ;; unsigned cut-to-width always recuts to the minimum width
+                    (vop-existsp :translate sb-vm::*-modfx)
+                    ;; cut-to-width will insert these again
+                    (/= cut most-positive-word
+                        (ash most-positive-word -1))
+                    (= cut full-mask))
+                   (extract-lvar-n x 1 node)
+                   t)
+                  ((= cut b)
+                   nil)
+                  (t
+                   (erase-node-type combination *wild-type* nil node)
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore y))
+                                      (logand x ,cut))
+                                   'logand)
+                   t)))))
+      ;; Reduce the constant in logior
+      (combination-match (node-lvar node)
+          (logand (:type unsigned-byte a) (logior * (:constant b)))
+        (block nil
+          (let* ((width (or (unsigned-mask-width (lvar-type a))
+                            (return)))
+                 (full-mask (ldb (byte width 0) -1))
+                 (mask (if (constant-lvar-p a)
+                           (lvar-value a)
+                           full-mask))
+                 (cut (logand b
+                              mask))
+                 (cut-width (logior-cut-width combination)))
+            (when cut-width
+              (setf cut (mask-signed-field cut-width cut)))
+            (cond ((= cut full-mask)
+                   ;; (logand #xFF (logior n #xFF)) => #xFF
+                   (erase-node-type combination *wild-type* nil node)
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore x y))
+                                      ,cut)
+                                   'logand)
+                   t)
+                  ((= cut b)
+                   nil)
+                  (t
+                   (erase-node-type combination *wild-type* nil node)
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore y))
+                                      (logior x ,cut))
+                                   'logand)
+                   t)))))
+      (combination-match (node-lvar node)
+          (logand (:type unsigned-byte a) (logxor * (:constant b)))
+        (block nil
+          (let* ((width (or (unsigned-mask-width (lvar-type a))
+                            (return)))
+                 (full-mask (ldb (byte width 0) -1))
+                 (mask (if (constant-lvar-p a)
+                           (lvar-value a)
+                           full-mask))
+                 (cut (logand b
+                              mask)))
+            (cond ((= cut b)
+                   nil)
+                  (t
+                   (erase-node-type combination *wild-type* nil node)
+                   (transform-call combination
+                                   `(lambda (x y)
+                                      (declare (ignore y))
+                                      (logxor x ,cut))
+                                   'logand)
+                   t)))))
+      ;; Remove mask-signed-field
+      (combination-match (node-lvar node)
+          (logand (:type unsigned-byte a) (mask-signed-field (:constant sign) b))
+        (block nil
+          (let ((width (or (unsigned-mask-width (lvar-type a))
+                           (return))))
+            (when (> sign width)
+              (extract-lvar-n b 1 node))))))
+  (give-up-ir1-transform))
 
 ;;; Combine (ash (ash x 1) 1) into (ash x 2)
 (deftransform ash ((value amount))

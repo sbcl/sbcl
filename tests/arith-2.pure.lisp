@@ -1873,7 +1873,17 @@
          (logand (the bit b)
                  (logior d 1)))
     ((0 3) 0)
-    ((1 3) 1)))
+    ((1 3) 1))
+  (checked-compile-and-assert
+      ()
+      `(lambda (d)
+         (logand
+          73786976294838206461
+          (logior
+           (the (integer -3 -1) d)
+           -288230376562614601)))
+    ((-1) 73786976294838206461)
+    ((-3) 73786976294838206461)))
 
 (with-test (:name :lognot)
   (assert (= (count 'lognot
