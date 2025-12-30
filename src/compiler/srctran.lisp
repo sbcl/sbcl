@@ -5331,7 +5331,6 @@
   (def logand)
   (def logior)
   (def logxor)
-  (def logtest :folded (logand) :combine logand)
   (def * :type rational :folded (* /))
   (def / :type rational :folded (* /) :flip * :no-ratios *))
 
