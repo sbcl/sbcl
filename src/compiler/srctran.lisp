@@ -5201,6 +5201,7 @@
                               mask)))
             (cond ((= cut full-mask)
                    ;; (logand #xFF (logior n #xFF)) => #xFF
+                   (erase-node-type combination *wild-type* nil node)
                    (transform-call combination
                                    `(lambda (x y)
                                       (declare (ignore x y))
