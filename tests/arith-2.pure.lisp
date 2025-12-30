@@ -1898,3 +1898,8 @@
                            (* (the integer (* x 3)) 5))
                         nil))
              1)))
+
+(with-test (:name :0/0)
+  (assert-error
+      (/ (opaque-identity 0) (opaque-identity 0))
+      division-by-zero))

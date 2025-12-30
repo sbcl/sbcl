@@ -1769,7 +1769,11 @@ and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check)
            (inline fixnum-gcd))
   (if (and (typep x 'fixnum) (typep y 'fixnum))
-      (cond ((= x 0)
+      (cond ((= y 0)
+             (error 'division-by-zero
+                    :operands (list x y)
+                    :operation '/))
+            ((= x 0)
              0)
             (t
              (let ((abs-x (abs x))
