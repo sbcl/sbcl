@@ -528,11 +528,7 @@
                  (mask (if (constant-lvar-p a)
                            (lvar-value a)
                            full-mask))
-                 (cut (logand b
-                              mask))
-                 (cut-width (logior-cut-width combination)))
-            (when cut-width
-              (setf cut (mask-signed-field cut-width cut)))
+                 (cut (logand b mask)))
             (cond ((= cut full-mask)
                    ;; (logand #xFF (logior n #xFF)) => #xFF
                    (erase-node-type combination *wild-type* nil node)
@@ -542,7 +538,8 @@
                                       ,cut)
                                    'logand)
                    t)
-                  ((= cut b)
+                  ((or (>= (integer-length cut)
+                           (integer-length b)))
                    nil)
                   (t
                    (erase-node-type combination *wild-type* nil node)
