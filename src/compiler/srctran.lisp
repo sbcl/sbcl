@@ -5221,7 +5221,6 @@
   (def logand)
   (def logior)
   (def logxor)
-  (def * :type rational :folded (* /))
   (def / :type rational :folded (* /) :flip * :no-ratios *))
 
 (deftransform + ((x z) (rational (constant-arg rational)) * :important nil :node n)
@@ -5264,6 +5263,48 @@
            (splice-fun-args y name #'second)
            `(+ ,constant y))))
       (give-up-ir1-transform)))
+
+(defun associate-multiplication-constants (lvar constant outer-node)
+  (let (new)
+    (labels ((associate-lvar (lvar)
+               (let ((uses (lvar-uses lvar)))
+                 (if (listp uses)
+                     (progn)
+                     (associate-node uses))))
+             (associate-node (node)
+               (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
+                 (/ (* constant)
+                  (let* ((value (lvar-value (second args)))
+                         (div (/ constant value)))
+                    (when (or (ratiop constant)
+                              (integerp div))
+                      (setf new t
+                            constant div)
+                      (erase-node-type combination *wild-type* nil outer-node)
+                      (transform-call combination
+                                      `(lambda (x y) (declare (ignore y)) x)
+                                      'associate-multiplication-constants))))
+                 (* (* constant)
+                  (associate-lvar (first args))
+                  (setf new t
+                        constant (* constant (lvar-value (second args))))
+                  (erase-node-type combination *wild-type* nil outer-node)
+                  (transform-call combination
+                                  `(lambda (x y) (declare (ignore y)) x)
+                                  'associate-multiplication-constants))
+                 (* (* *)
+                  (loop for arg in args
+                        do (associate-lvar arg))))))
+      (associate-lvar lvar)
+      (when new
+        constant))))
+
+(deftransform * ((x c) (rational (constant-arg rational)) * :important nil :node node)
+  "associate */(* /) of constants"
+  (let ((new-c (associate-multiplication-constants x (lvar-value c) node)))
+   (if new-c
+       `(* x ,new-c)
+       (give-up-ir1-transform))))
 
 ;;; Transform (logior a (- (mask-field (byte 1 n) a)))
 ;;; to (mask-signed-field n a)
