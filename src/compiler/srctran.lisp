@@ -5283,6 +5283,7 @@
              (associate-node (node)
                (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
                  (/ (* constant)
+                  (associate-lvar (first args))
                   (let* ((value (value (second args)))
                          (div (/ constant value)))
                     (when (or (ratiop constant)
@@ -5293,6 +5294,9 @@
                       (transform-call combination
                                       `(lambda (x y) (declare (ignore y)) x)
                                       'associate-multiplication-constants))))
+                 (/ (* *)
+                  (loop for arg in args
+                        do (associate-lvar arg)))
                  (* (* constant)
                   (associate-lvar (first args))
                   (setf new t
