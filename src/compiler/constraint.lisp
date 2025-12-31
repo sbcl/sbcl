@@ -1500,8 +1500,9 @@
                                 (and (eq kind '=) (and (numeric-type-p y)
                                                        (not not-p)))))
                    (pushnew (constraint-x con) vars))
-                 (when (and (eq kind 'equality)
-                            (/= (equality-constraint-amount con) 0))
+                 (when (eq kind 'equality)
+                   ;; Removed check: (/= (equality-constraint-amount con) 0)
+                   ;; This check caused non-convergence when amounts oscillated between 0 and 1
                    (pushnew (constraint-x con) equality-vars :test #'eq)
                    (when (lambda-var/vector-length-p y)
                      (pushnew y equality-vars)))))))
