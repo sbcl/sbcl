@@ -5308,6 +5308,18 @@
                  (* (* *)
                   (loop for arg in args
                         do (associate-lvar arg)))
+                 (ash (* constant)
+                  (let ((shift (lvar-value (second args))))
+                    (when (plusp shift)
+                      (associate-lvar (first args))
+                      (setf new t
+                            constant (* constant (ash 1 shift)))
+                      (erase-node-type combination *wild-type* nil outer-node)
+                      (transform-call combination
+                                      `(lambda (x y) (declare (ignore y)) x)
+                                      'associate-multiplication-constants))))
+                 (ash (* (type unsigned-byte))
+                  (associate-lvar (first args)))
                  (abs (*)
                   (let ((*amc-abs* t))
                     (associate-lvar (first args)))))))
