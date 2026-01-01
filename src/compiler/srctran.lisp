@@ -5699,8 +5699,26 @@
                             (negate-args args t))
                            ((truncate round) (* *)
                             (negate-args args))
-                           ((%unary-truncate %unary-round) (*)
-                            (negate-lvar (first args) test any-branch))
+                           (%unary-truncate (*)
+                            (cond ((negate-lvar (first args) test any-branch))
+                                  (t
+                                   (unless test
+                                     (erase-node-type combination *wild-type* nil outer-node)
+                                     (transform-call combination
+                                                     `(lambda (x)
+                                                        (truncate x -1))
+                                                     'negate-lvar))
+                                   t)))
+                           (%unary-round (*)
+                            (cond ((negate-lvar (first args) test any-branch))
+                                  (t
+                                   (unless test
+                                     (erase-node-type combination *wild-type* nil outer-node)
+                                     (transform-call combination
+                                                     `(lambda (x)
+                                                        (round x -1))
+                                                     'negate-lvar))
+                                   t)))
                            ((fround ftruncate) *
                             (negate-non-zero-args args))
                            (ash (* (type unsigned-byte))
