@@ -116,11 +116,8 @@
  ;; anyone who wants to collect such statistics in the future.
  ; :sb-dyncount
 
- ;; Enable code for detecting concurrent accesses to the same hash-table
- ;; in multiple threads. Note that this implementation is currently
- ;; (2007-09-11) somewhat too eager: even though in the current implementation
- ;; multiple readers are thread safe as long as there are no writers, this
- ;; code will also trap multiple readers.
+ ;; Restrict the compiler policy for the hash table implementation for
+ ;; safety.
  ; :sb-hash-table-debug
 
  ;; Enabled automatically by make-config.sh for platforms which implement
