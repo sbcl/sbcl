@@ -588,8 +588,7 @@
                    (cond ((or
                            ;; unsigned cut-to-width always recuts to the minimum width
                            (not (vop-existsp :translate sb-vm::*-modfx))
-                           (not (/= c most-positive-word
-                                    (ash most-positive-word -1))))
+                           (not (word-sized-lvar-p l)))
                           ;; cut-to-width will insert these again
                           nil)
                          ((= (logand y c) y)
