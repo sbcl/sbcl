@@ -5341,8 +5341,15 @@
         constant))))
 
 (deftransform * ((x c) (rational (constant-arg rational)) * :important nil :node node)
-  "associate */(* /) of constants"
+  "associate * of constants"
   (let ((new-c (associate-multiplication-constants x (lvar-value c) node)))
+   (if new-c
+       `(* x ,new-c)
+       (give-up-ir1-transform))))
+
+(deftransform ash ((x c) (rational (constant-arg unsigned-byte)) * :important nil :node node)
+  "associate * of constants"
+  (let ((new-c (associate-multiplication-constants x (ash 1 (lvar-value c)) node)))
    (if new-c
        `(* x ,new-c)
        (give-up-ir1-transform))))
