@@ -549,6 +549,7 @@
                                                           (setf bound-vars old-bound-vars)
                                                           `(,names
                                                             (or (multiple-value-bind ,vars (check-args args ,(length args))
+                                                                  (declare (ignorable ,@vars))
                                                                   (when ,(car vars)
                                                                     ,(expand (cdr lvars) (cdr specs)
                                                                              (let ((old-bound-vars bound-vars))
@@ -3994,3 +3995,28 @@ is :ANY, the function name is not checked."
                                     (setf (lvar-%derived-type lvar) type)
                                     lvar))))
           (funcall deriver mock))))))
+
+(defun vop-transform-applicable-p (name combination &optional types)
+  (let ((info (fun-info-or-lose name)))
+    (let ((test-combination combination))
+      (when types
+        (setf test-combination (copy-structure combination)
+              (basic-combination-args test-combination)
+              (loop for type in types
+                    collect (if (lvar-p type)
+                                type
+                                (let ((lvar (make-lvar)))
+                                  (setf (lvar-%derived-type lvar) type)
+                                  lvar)))))
+      (loop for transform in (fun-info-transforms info)
+            for type = (transform-type transform)
+            thereis (and (typep transform 'vop-transform)
+                         (or (not (fun-type-p type))
+                             (valid-transform-fun test-combination type #'csubtypep #'values-subtypep))
+                         (eq (catch 'give-up-ir1-transform
+                               (funcall (transform-function transform) test-combination))
+                             :none))))))
+
+(defun after-ir1-phases-p ()
+  (and (boundp '*component-being-compiled*)
+       (> (component-phase-counter *component-being-compiled*) 0)))

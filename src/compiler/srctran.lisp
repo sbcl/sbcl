@@ -603,6 +603,20 @@
   (delay-ir1-transform node :ir1-phases)
   `(not (zerop (logand x y))))
 
+;;; (zerop (logand x y)) to (not (logtest x y)) if logtest has a VOP
+(deftransform eq ((x y) (integer (eql 0)) * :node node :important nil)
+  (or (when (or (combination-match x (logand * *)
+                  (vop-transform-applicable-p 'logtest combination))
+                ;; Will it work if cut-to-width is applied later?
+                (combination-match x (logand (:type word m) *)
+                  (vop-transform-applicable-p 'logtest combination
+                                              (list (lvar-type m) (specifier-type 'word)))))
+        (splice-fun-args x 'logand 2)
+        `(lambda (x y z)
+           (declare (ignore z))
+           (not (logtest x y))))
+      (give-up-ir1-transform)))
+
 (defoptimizer (logtest derive-type) ((x y))
   (let ((type (two-arg-derive-type x y #'logand-derive-type-aux)))
     (when type
@@ -2169,8 +2183,7 @@
 ;;; For better matching with other arithmetic functions first
 ;;; transform lognot to subtraction and then back to lognot.
 (define-source-transform lognot (x)
-  (if (and (boundp '*component-being-compiled*)
-           (> (component-phase-counter *component-being-compiled*) 0))
+  (if (after-ir1-phases-p)
       (values nil t)
       `(- -1 (the integer ,x))))
 
