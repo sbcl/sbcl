@@ -618,7 +618,7 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
             ((char= firstchar #\)) (cdr thelist))
           (when (char= firstchar #\.)
             (let ((nextchar (read-char stream t)))
-              (cond ((sb-impl::token-delimiterp nextchar)
+              (cond ((sb-impl:token-delimiterp nextchar rt)
                      (cond ((eq listtail thelist)
                             (unless *read-suppress*
                               (simple-reader-error stream

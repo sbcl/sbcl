@@ -179,7 +179,7 @@
 (defun multiple-escape-p (char rt)
   (test-attribute char +char-attr-multiple-escape+ rt))
 
-(defun token-delimiterp (char &optional (rt *readtable*))
+(defun token-delimiterp (char rt)
   ;; depends on actual attribute numbering in readtable.lisp.
   (<= (char-syntax char (base-char-syntax-array rt) (extended-char-table rt))
       +char-attr-terminating-macro+))
@@ -857,7 +857,7 @@ standard Lisp readtable when NIL."
     (with-list-reader (stream #\))
       (when (eq firstchar #\.)
         (let ((nextchar (read-char stream t)))
-          (cond ((token-delimiterp nextchar)
+          (cond ((token-delimiterp nextchar rt)
                  (cond ((eq listtail thelist)
                         (unless (zerop collectp)
                           (simple-reader-error
