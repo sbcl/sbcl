@@ -645,6 +645,9 @@
 (deftransform conjugate ((x) (real))
   'x)
 
+(deftransform conjugate ((x) (complex))
+  `(complex (realpart x) (- (imagpart x))))
+
 ;;; The number is of type REAL.
 (defun numeric-type-real-p (type)
   (and (numeric-type-p type)
