@@ -576,7 +576,7 @@
              (name (sb-disassem::find-assembler-routine contents)))
         (when name
           (return-from print-mem-ref
-            (note (lambda (s) (format s "[#~x] = #~x ; ~a" (sap-int ptr) contents name))
+            (note (lambda (s) (format s "[#x~x] = #x~x ; ~a" (sap-int ptr) contents name))
                   dstate)))))
 
     (flet ((guess-symbol (predicate)
