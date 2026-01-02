@@ -5322,7 +5322,7 @@
                         do (associate-lvar arg)))
                  (ash (* constant)
                   (let ((shift (lvar-value (second args))))
-                    (when (plusp shift)
+                    (when (typep shift '(mod 4096))
                       (associate-lvar (first args))
                       (setf new t
                             constant (* constant (ash 1 shift)))
@@ -5346,7 +5346,7 @@
        `(* x ,new-c)
        (give-up-ir1-transform))))
 
-(deftransform ash ((x c) (rational (constant-arg unsigned-byte)) * :important nil :node node)
+(deftransform ash ((x c) (rational (constant-arg (mod 4096))) * :important nil :node node)
   "associate * of constants"
   (let ((new-c (associate-multiplication-constants x (ash 1 (lvar-value c)) node)))
    (if new-c
@@ -7087,26 +7087,29 @@
                  (aver (splice-fun-args x name #'first nil))
                  `(,op x ,m))))))
           ((ash *) (* constant)
-           (let* ((constant (lvar-value (second args)))
-                  (multiplier (if (eq name 'ash)
-                                  (ash 1 constant)
-                                  constant)))
-             (unless (zerop multiplier)
-               (let* ((constant (/ (lvar-value y) multiplier))
-                      (arg1 'x)
-                      (arg2 constant))
-                 (when (minusp multiplier)
-                   (rotatef arg1 arg2))
-                 (splice-fun-args x name #'first)
-                 (cond ((or (integerp constant)
-                            (csubtypep (lvar-type x) (specifier-type 'integer)))
-                        `($fun ,arg1 ,arg2))
-                       (t
-                        ;; Do the fixnum case here, (two-arg< fixnum ratio)
-                        ;; is more expensive than an extra multiplication.
-                        `(if (fixnump x)
-                             ($fun ,arg1 ,arg2)
-                             ($fun ,arg1 ,arg2))))))))
+           (block nil
+             (let* ((constant (lvar-value (second args)))
+                    (multiplier (if (eq name 'ash)
+                                    (ash 1 (if (typep constant '(mod 4096))
+                                               constant
+                                               (return)))
+                                    constant)))
+               (unless (zerop multiplier)
+                 (let* ((constant (/ (lvar-value y) multiplier))
+                        (arg1 'x)
+                        (arg2 constant))
+                   (when (minusp multiplier)
+                     (rotatef arg1 arg2))
+                   (splice-fun-args x name #'first)
+                   (cond ((or (integerp constant)
+                              (csubtypep (lvar-type x) (specifier-type 'integer)))
+                          `($fun ,arg1 ,arg2))
+                         (t
+                          ;; Do the fixnum case here, (two-arg< fixnum ratio)
+                          ;; is more expensive than an extra multiplication.
+                          `(if (fixnump x)
+                               ($fun ,arg1 ,arg2)
+                               ($fun ,arg1 ,arg2)))))))))
           ;; (< (* x positive/negative) 0) => (< x 0)
           (* (* *)
            (when (zerop (lvar-value y))
