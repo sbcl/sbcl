@@ -642,6 +642,9 @@
        (float pi x)
        (float 0 x)))
 
+(deftransform conjugate ((x) (real))
+  'x)
+
 ;;; The number is of type REAL.
 (defun numeric-type-real-p (type)
   (and (numeric-type-p type)
