@@ -651,7 +651,10 @@
   (once-only ((node node))
     `(let ((*current-component* (node-component ,node))
            (*lexenv* (node-lexenv ,node))
-           (*current-path* (node-source-path ,node)))
+           (*current-path* (node-source-path ,node))
+           (*inline-expansions* (if (basic-combination-p ,node)
+                                    (basic-combination-inline-expansions ,node)
+                                    *inline-expansions*)))
        (aver-live-component *current-component*)
        ,@forms)))
 
