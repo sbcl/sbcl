@@ -128,12 +128,12 @@
                 (include (dd-include dd))
                 (all-slots (dd-slots dd)))
            (unless extra-data
-             (acond ((assoc (dd-name dd) sb-kernel::*struct-accesss-fragments-delayed*)
+             (acond ((assoc (dd-name dd) sb-kernel::*struct-access-fragments-delayed*)
                      (let ((fragments (cdr it)))
                        (dolist (dsd (dd-slots dd))
                          (push (list dsd (pop fragments) (pop fragments)) extra-data)))
-                     (setq sb-kernel::*struct-accesss-fragments-delayed*
-                           (delete it sb-kernel::*struct-accesss-fragments-delayed*)))
+                     (setq sb-kernel::*struct-access-fragments-delayed*
+                           (delete it sb-kernel::*struct-access-fragments-delayed*)))
                     (t
                      (dolist (dsd (dd-slots dd))
                        (push (cons dsd (accessor-closures dsd)) extra-data)))))

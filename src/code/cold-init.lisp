@@ -129,7 +129,7 @@
   (setq sb-vm::*immobile-codeblob-tree* nil
         sb-vm::*dynspace-codeblob-tree* nil)
   (setq sb-kernel::*defstruct-hooks* '(sb-kernel::!bootstrap-defstruct-hook)
-        sb-kernel::*struct-accesss-fragments-delayed* nil)
+        sb-kernel::*struct-access-fragments-delayed* nil)
   (let ((stream (!make-cold-stderr-stream)))
     (setq *error-output* stream
           *standard-output* stream
