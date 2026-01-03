@@ -633,7 +633,7 @@ The source locations are stored in (CAR SOURCE-MAP+IDGEN)"
                     (t (unread-char nextchar stream)))))
           ;; Next thing is not an isolated dot.
           (binding* ((start (file-position stream))
-                     ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
+                     ((winp obj) (sb-impl::read-object? rt stream firstchar))
                      (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (unless (eql winp 0)

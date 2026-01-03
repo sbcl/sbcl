@@ -108,6 +108,10 @@ types for the Common Lisp expression reader."
   ;; (":synchronized t" table would be waaay too much overhead per character)
   ;; Same goes for the secondary dispatch table of dispatching charmacros.
   (extended-char-table *empty-extended-char-table* :type hash-table)
+  ;; Function to call which starts construction of an object given the initial
+  ;; non-whitespace character. #\? in the name implies optionally an object.
+  (%readtable-read #'read-object?
+                   :type (sfunction (readtable stream character) (values bit t)))
   (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert))
   ;; Element type to use when reading a string literal with no extended-chars.
   ;; The system itself prefers base-string, but otherwise it is a contentious

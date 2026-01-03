@@ -703,7 +703,9 @@ standard Lisp readtable when NIL."
 ;;; so maybe we should. -- WHN 19991202
 (defvar *sharp-equal*)
 
-(declaim (ftype (sfunction (t t) (values bit t)) read-maybe-nothing))
+(defmacro readtable-read (readtable stream character)
+  `(let ((#1=#:rt (truly-the readtable ,readtable)))
+     (funcall (%readtable-read #1#) #1# ,stream ,character)))
 
 ;;; Like READ-PRESERVING-WHITESPACE, but doesn't check the read buffer
 ;;; for being set up properly.
@@ -728,8 +730,7 @@ standard Lisp readtable when NIL."
                           (form-tracking-stream-form-start-char-pos stream)
                           ;; likewise
                           (1- (form-tracking-stream-current-char-pos stream))))
-                  (multiple-value-bind (result-p result)
-                      (read-maybe-nothing stream char)
+                  (multiple-value-bind (result-p result) (readtable-read rt stream char)
                     (unless (zerop result-p)
                       (return (unless *read-suppress* result)))
                     ;; Repeat if macro returned nothing.
@@ -754,11 +755,11 @@ standard Lisp readtable when NIL."
     (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
     (%read-preserving-whitespace stream eof-error-p eof-value recursive-p)))
 
-;;; Read from STREAM given starting CHAR, returning 1 and the resulting
-;;; object, unless CHAR is a macro yielding no value, then 0 and NIL,
-;;; for functions that want comments to return so that they can look
-;;; past them. CHAR must not be whitespace.
-(defun read-maybe-nothing (stream char)
+;;; Read from STREAM given starting non-whitespace CHAR, returning 1 and the resulting
+;;; object, unless CHAR is a macro in READTABLE yielding no value, then 0 and NIL.
+;;; This is for functions that want to know whether they are consuming whitespace-equivalent
+;;; content such as (but not limited to) suppressed forms, #.(values), or comments.
+(defun read-object? (readtable stream char)
   (multiple-value-call
       (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
         (declare (ignore junk))         ; is this ANSI-specified?
@@ -772,7 +773,7 @@ standard Lisp readtable when NIL."
     (and (form-tracking-stream-p stream)
          ;; Subtract 1 because the position points _after_ CHAR.
          (1- (form-tracking-stream-current-char-pos stream)))
-    (invoke-cmt-entry ((get-cmt-entry char *readtable*) #'read-token) stream char)))
+    (invoke-cmt-entry ((get-cmt-entry char readtable) #'read-token) stream char)))
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
@@ -844,8 +845,7 @@ standard Lisp readtable when NIL."
                     (return (cdr thelist)))
                   ,@body))))
      (read-list-item (streamvar)
-       `(multiple-value-bind (winp obj)
-            (read-maybe-nothing ,streamvar firstchar)
+       `(multiple-value-bind (winp obj) (readtable-read rt ,streamvar firstchar)
           ;; allow for a character macro return to return nothing
           (unless (zerop (logand winp collectp))
             (setq listtail
@@ -900,6 +900,7 @@ standard Lisp readtable when NIL."
             (with-read-buffer () (%read-delimited-list))))))) ; end MACROLET
 
 (defun read-after-dot (stream firstchar collectp)
+  (declare (fixnum collectp))
   ;; FIRSTCHAR is non-whitespace!
   (let ((lastobj ())
         (rt *readtable*))
@@ -909,7 +910,7 @@ standard Lisp readtable when NIL."
              (return-from read-after-dot nil)
              (simple-reader-error stream "Nothing appears after . in list.")))
       ;; See whether there's something there.
-      (multiple-value-bind (winp obj) (read-maybe-nothing stream char)
+      (multiple-value-bind (winp obj) (readtable-read rt stream char)
         (unless (zerop winp) (return (setq lastobj obj)))))
     ;; At least one thing appears after the dot.
     ;; Check for more than one thing following dot.
@@ -917,8 +918,7 @@ standard Lisp readtable when NIL."
      (let ((char (flush-whitespace stream rt)))
        (cond ((eq char #\)) (return lastobj)) ;success!
              ;; Try reading virtual whitespace.
-             ((not (zerop (logand (read-maybe-nothing stream char)
-                                  (truly-the fixnum collectp))))
+             ((not (zerop (logand (readtable-read rt stream char) collectp)))
               (simple-reader-error
                stream "More than one object follows . in list.")))))))
 
