@@ -320,7 +320,7 @@
                     (lambda (a b)
                       (sb-impl::instance-equalp* comparators a b)))))))
 
-    (let ((*struct-accesss-fragments* accessors))
+    (let ((*struct-access-fragments* accessors))
       (dolist (fun *defstruct-hooks*)
         (funcall fun classoid))))
 
@@ -328,7 +328,7 @@
 (defun !target-defstruct-altmetaclass (dd &rest accessors)
   (declare (type defstruct-description dd))
   (let ((classoid (find-classoid (dd-name dd)))
-        (*struct-accesss-fragments* accessors))
+        (*struct-access-fragments* accessors))
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
   t)

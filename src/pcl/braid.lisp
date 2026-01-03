@@ -185,7 +185,7 @@
   ;; Create an association from the DSD to the reader and writer functions.
   (let* ((name (classoid-name classoid))
          (dd (find-defstruct-description name))
-         (fragments sb-kernel::*struct-accesss-fragments*))
+         (fragments sb-kernel::*struct-access-fragments*))
     (collect ((accessors))
       (dolist (dsd (dd-slots dd))
         (accessors (list dsd (pop fragments) (pop fragments))))
