@@ -196,16 +196,16 @@
                           (args (combination-args dest)))
                  (case name
                    (logand
-                    (when (= 2 (length args))
-                      (let ((other (if (eql (first args) lvar)
-                                       (second args)
-                                       (first args))))
+                    (when (and (= (length args) 2)
+                               (eq (first args) lvar))
+                      (let ((other (second args)))
                         (when (and (constant-lvar-p other)
+                                   (typep (lvar-value other) 'unsigned-byte)
                                    (ctypep (lvar-value other) type))
                           (return-from insert-lvar-cut)))))
                    (mask-signed-field
                     (when (and signedp
-                               (eql lvar (second args))
+                               (eq lvar (second args))
                                (constant-lvar-p (first args))
                                (<= (lvar-value (first args)) width))
                       (return-from insert-lvar-cut)))))
