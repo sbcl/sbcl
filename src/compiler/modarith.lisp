@@ -201,8 +201,7 @@
                                        (second args)
                                        (first args))))
                         (when (and (constant-lvar-p other)
-                                   (ctypep (lvar-value other) type)
-                                   (not signedp))
+                                   (ctypep (lvar-value other) type))
                           (return-from insert-lvar-cut)))))
                    (mask-signed-field
                     (when (and signedp
