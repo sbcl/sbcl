@@ -63,6 +63,16 @@
 (defun find-or-create-equality-constraint (operator x y not-p &optional (amount 0))
   (unless amount
     (setf amount 0))
+  (when (and (lambda-var-p x)
+             (lambda-var-p y))
+    ;; Normalize var-var constraints to < and <=
+    (case operator
+      (>
+       (rotatef x y)
+       (setf operator '<))
+      (>=
+       (rotatef x y)
+       (setf operator '<=))))
   (let ((x-var (constraint-var x))
         (cache-key (typecase y
                      (vector-length-constraint y
