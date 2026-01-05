@@ -792,12 +792,12 @@
                               (not (csubtypep count-type (specifier-type '(integer 0 *))))
                               (word-sized-type-p integer-type))
                          ',name)
+                        #+(or arm64 x86-64)
                         ((not (word-sized-type-p integer-type))
                          (cond ((csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum)))
                                 ;; Uses the bits from the first word when shifting right
                                 (cut-to-width integer ,kind width ,signedp)
                                 ',name)
-                               #+(or arm64 x86-64)
                                ((and (csubtypep count-type (specifier-type 'fixnum))
                                      (not (csubtypep count-type (specifier-type 'unsigned-byte))))
                                 ',(if signedp
