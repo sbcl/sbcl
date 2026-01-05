@@ -798,7 +798,11 @@
                                     (functional-kind-eq (setf fun (combination-lambda node)) let))
                            (setf node (lambda-bind fun))
                            (go :next))))
-                      ((or enclose entry)
+                      (entry
+                       ;; :tagbody may be left from an otherwise deleted loop
+                       (when (eq (cleanup-kind (entry-cleanup node)) :block)
+                         (go :next)))
+                      (enclose
                        (go :next))))))
              (t
               ;; Loops shouldn't cause a problem, either it will
