@@ -238,35 +238,43 @@ TAGS, and NIL is returned. If a statement contains a GO to a defined TAG
 within the lexical scope of the form, then control is transferred to the next
 statement following that tag. A TAG must be an integer or a symbol. A
 STATEMENT must be a list. Other objects are illegal within the body."
-  (ctran-starts-block next)
-  (let* ((dummy (make-ctran))
-         (entry (make-entry))
-         (segments (parse-tagbody statements))
-         (cleanup (make-cleanup :tagbody entry)))
-    (push entry (lambda-entries (lexenv-lambda *lexenv*)))
-    (setf (entry-cleanup entry) cleanup)
-    (link-node-to-previous-ctran entry start)
-    (use-ctran entry dummy)
+  (let ((segments (and statements
+                       (parse-tagbody statements))))
+    (cond
+      ((not (cdr segments))
+       ;; no tags, just a progn that ends in a NIL
+       (ir1-convert-progn-body start next
+                               result
+                               (append statements '(nil))))
+      (t
+       (ctran-starts-block next)
+       (let* ((dummy (make-ctran))
+              (entry (make-entry))
+              (cleanup (make-cleanup :tagbody entry)))
+         (push entry (lambda-entries (lexenv-lambda *lexenv*)))
+         (setf (entry-cleanup entry) cleanup)
+         (link-node-to-previous-ctran entry start)
+         (use-ctran entry dummy)
 
-    (collect ((tags)
-              (starts)
-              (ctrans))
-      (starts dummy)
-      (dolist (segment (rest segments))
-        (let* ((tag-ctran (make-ctran))
-               (tag (list (car segment) entry tag-ctran)))
-          (ctrans tag-ctran)
-          (starts tag-ctran)
-          (ctran-starts-block tag-ctran)
-          (tags tag)))
-      (ctrans next)
+         (collect ((tags)
+                   (starts)
+                   (ctrans))
+           (starts dummy)
+           (dolist (segment (rest segments))
+             (let* ((tag-ctran (make-ctran))
+                    (tag (list (car segment) entry tag-ctran)))
+               (ctrans tag-ctran)
+               (starts tag-ctran)
+               (ctran-starts-block tag-ctran)
+               (tags tag)))
+           (ctrans next)
 
-      (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
-        (mapc (lambda (segment start end)
-                (ir1-convert-progn-body start end
-                                        (when (eq end next) result)
-                                        (rest segment)))
-              segments (starts) (ctrans))))))
+           (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
+             (mapc (lambda (segment start end)
+                     (ir1-convert-progn-body start end
+                                             (when (eq end next) result)
+                                             (rest segment)))
+                   segments (starts) (ctrans)))))))))
 
 ;;; Emit an EXIT node without any value.
 (def-ir1-translator go ((tag) start next result)
