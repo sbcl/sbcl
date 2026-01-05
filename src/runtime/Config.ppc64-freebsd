@@ -1,0 +1,39 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -m64 -std=gnu99
+LINKFLAGS += -m64 -Wl,--export-dynamic
+
+ASSEM_SRC = ppc64-assem.S
+ARCH_SRC = ppc-arch.c
+
+OS_SRC = bsd-os.c ppc-bsd-os.c
+OS_LIBS = -ldl -Wl,-no-as-needed -lutil
+
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+endif
+
+# Until sbcl-0.6.7.3, we used "LINKFLAGS+=-static" here, which
+# worked fine for most things, but LOAD-FOREIGN & friends require
+# dlopen() etc., which in turn depend on dynamic linking of the
+# runtime.
+OS_LIBS += -lutil -L/usr/local/lib
+CPPFLAGS += -isystem/usr/local/include
+
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lzstd
+endif
+
+SBCL_PAXCTL=elfctl -e +noaslr
