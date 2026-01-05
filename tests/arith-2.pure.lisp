@@ -1988,3 +1988,13 @@
          (logtest p1 12115639945877374832))
     ((-845794755782386) t)
     ((145551) nil)))
+
+(with-test (:name :ash-mod)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare ((integer -3 3) b))
+         (logand #xF (+ (ash a b) 1)))
+    ((-1 3) 9)
+    ((-1 -3) 0)
+    ((1 -3) 1)))

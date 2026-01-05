@@ -790,14 +790,13 @@
                               ;; Unknown sign
                               (not (csubtypep count-type (specifier-type '(integer * 0))))
                               (not (csubtypep count-type (specifier-type '(integer 0 *))))
-                              (or (csubtypep integer-type (specifier-type `(unsigned-byte ,sb-vm:n-word-bits)))
-                                  (csubtypep integer-type (specifier-type `(signed-byte ,sb-vm:n-word-bits)))))
+                              (word-sized-type-p integer-type))
                          ',name)
-                        ((and (not (csubtypep integer-type (specifier-type 'word)))
-                              (not (csubtypep integer-type (specifier-type 'sb-vm:signed-word))))
+                        ((not (word-sized-type-p integer-type))
                          (cond ((csubtypep count-type (specifier-type `(integer ,(- result-width width) ,most-positive-fixnum)))
+                                ;; Uses the bits from the first word when shifting right
                                 (cut-to-width integer ,kind width ,signedp)
-                                t)
+                                ',name)
                                #+(or arm64 x86-64)
                                ((and (csubtypep count-type (specifier-type 'fixnum))
                                      (not (csubtypep count-type (specifier-type 'unsigned-byte))))
