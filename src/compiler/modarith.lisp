@@ -775,6 +775,7 @@
               :derive-type (make-modular-fun-type-deriver 'ash ',width ',signedp))
             (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width
                                                :result-width result-width)
+              (declare (ignorable result-width))
               (let ((integer-type (lvar-type integer))
                     (count-type (lvar-type count)))
                 (declare (ignorable integer-type))
