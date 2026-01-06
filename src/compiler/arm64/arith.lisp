@@ -665,13 +665,18 @@
       (cond
         ((csubtypep (tn-ref-type amount-ref)
                     (specifier-type `(integer -63 63)))
-         (inst neg temp amount)
-         (unless negative
-           (inst lsl result number amount)
-           (inst tbz amount 63 done))
-         (ecase variant
-           (:signed (inst asr result number temp))
-           (:unsigned (inst lsr result number temp))))
+         (cond (negative
+                (inst neg temp amount)
+                (ecase variant
+                  (:signed (inst asr result number temp))
+                  (:unsigned (inst lsr result number temp))))
+               (t
+                (inst negs temp amount)
+                (ecase variant
+                  (:signed (inst asr temp number temp))
+                  (:unsigned (inst lsr temp number temp)))
+                (inst lsl result number amount)
+                (inst csel result result temp :mi))))
         ((not negative)
          (inst cmp amount 0)
          (inst csneg temp amount amount :ge)
@@ -689,8 +694,8 @@
                               (specifier-type `(integer -63 *)))
                    (inst lsr result number temp))
                   (t
-                   (inst csel result number zr-tn :lo)
-                   (inst lsr result result temp))))))
+                   (inst lsr result number temp)
+                   (inst csel result result zr-tn :lo))))))
         (t
          (inst neg temp amount)
          (inst cmp temp n-word-bits)
@@ -699,8 +704,8 @@
             (inst csinv temp temp zr-tn :lo)
             (inst asr result number temp))
            (:unsigned
-            (inst csel result number zr-tn :lo)
-            (inst lsr result result temp))))))
+            (inst lsr result number temp)
+            (inst csel result result zr-tn :lo))))))
     done))
 
 (define-vop (ash-inverted/signed/unsigned)
