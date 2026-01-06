@@ -549,7 +549,7 @@
 ;;;; ALIEN-FUNCALL support
 
 ;;; Generate code to store struct register values to memory
-#+(and arm64 (not sb-xc-host))
+#-sb-xc-host
 (defun generate-struct-store-code (temps register-slots result-sap)
   "Generate SETF forms to store register values to struct memory."
   (let ((offset 0)
@@ -602,14 +602,14 @@
           ;; First, detect if this is a large struct return (ARM64 hidden pointer)
           (let* ((return-type (alien-fun-type-result-type alien-type))
                  ;; Check for large struct return (needs hidden pointer in x8)
-                 #+(and arm64 (not sb-xc-host))
+                 #-sb-xc-host
                  (large-struct-size
                    (multiple-value-bind (in-registers-p register-slots size)
                        (sb-alien::struct-return-info return-type)
                      (declare (ignore register-slots))
                      (when (and size (not in-registers-p))
                        size)))
-                 #-(and arm64 (not sb-xc-host))
+                 #+sb-xc-host
                  (large-struct-size nil)
                  ;; For large struct returns, we need a gensym for the sret pointer
                  (sret-sap (when large-struct-size (gensym "SRET-SAP")))
@@ -666,8 +666,8 @@
                  (setf body
                        `(multiple-value-bind ,(temps) ,body
                           (values ,@(results))))))
-              ;; Struct-by-value return handling (ARM64)
-              #+(and arm64 (not sb-xc-host))
+              ;; Struct-by-value return handling
+              #-sb-xc-host
               ((multiple-value-bind (in-registers-p register-slots size)
                    (sb-alien::struct-return-info return-type)
                  (cond
@@ -715,8 +715,8 @@
          (spec (compute-alien-rep-type result-type :result)))
     (cond
       ;; For struct-by-value returns, derive the multiple-values type
-      ;; based on the eightbyte classification (ARM64)
-      #+(and arm64 (not sb-xc-host))
+      ;; based on the register slot classification
+      #-sb-xc-host
       ((multiple-value-bind (in-registers-p register-slots)
            (sb-alien::struct-return-info result-type)
          (when in-registers-p

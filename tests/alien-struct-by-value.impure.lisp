@@ -47,22 +47,22 @@
 (define-alien-type nil (struct tiny-align-8 (m0 (integer 64))))
 
 (with-test (:name :struct-by-value-tiny-align-8-args)
-  #+arm64
+  #+(or x86-64 arm64)
   (progn
     (define-alien-routine tiny-align-8-get-m0 (integer 64) (m (struct tiny-align-8)))
     (define-alien-routine tiny-align-8-mutate void (m (struct tiny-align-8))))
-  #-arm64
+  #-(or x86-64 arm64)
   (progn
     (assert-unimplemented (define-alien-routine tiny-align-8-get-m0 (integer 64) (m (struct tiny-align-8))))
     (assert-unimplemented (define-alien-routine tiny-align-8-mutate void (m (struct tiny-align-8))))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-tiny-align-8-return)
   (define-alien-routine tiny-align-8-return (struct tiny-align-8) (val (integer 64)))
   (define-alien-routine tiny-align-8-identity (struct tiny-align-8) (m (struct tiny-align-8))))
 
 ;;; Runtime tests for tiny struct
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-tiny-align-8-runtime)
   ;; Test passing struct as argument
   (with-alien ((s (struct tiny-align-8)))
@@ -74,7 +74,7 @@
     (assert (= (tiny-align-8-get-m0 s) -123456789))))
 
 ;;; Runtime tests for tiny struct RETURN
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-tiny-align-8-return-runtime)
   ;; Test return from C function
   (let ((result (tiny-align-8-return 42)))
@@ -94,7 +94,7 @@
     (let ((result (tiny-align-8-identity s)))
       (assert (= (slot result 'm0) 12345)))))
 
-#-arm64
+#-(or x86-64 arm64)
 (with-test (:name :struct-by-value-tiny-align-8-return)
   (assert-unimplemented (define-alien-routine tiny-align-8-return (struct tiny-align-8))))
 
@@ -102,25 +102,25 @@
 (define-alien-type nil (struct small-align-8 (m0 (integer 64)) (m1 (integer 64))))
 
 (with-test (:name :struct-by-value-small-align-8-args)
-  #+arm64
+  #+(or x86-64 arm64)
   (progn
     (define-alien-routine small-align-8-get-m0 (integer 64) (m (struct small-align-8)))
     (define-alien-routine small-align-8-get-m1 (integer 64) (m (struct small-align-8)))
     (define-alien-routine small-align-8-mutate void (m (struct small-align-8))))
-  #-arm64
+  #-(or x86-64 arm64)
   (progn
     (assert-unimplemented (define-alien-routine small-align-8-get-m0 (integer 64) (m (struct small-align-8))))
     (assert-unimplemented (define-alien-routine small-align-8-get-m1 (integer 64) (m (struct small-align-8))))
     (assert-unimplemented (define-alien-routine small-align-8-mutate void (m (struct small-align-8))))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-small-align-8-return)
   (define-alien-routine small-align-8-return (struct small-align-8)
     (v0 (integer 64)) (v1 (integer 64)))
   (define-alien-routine small-align-8-identity (struct small-align-8) (m (struct small-align-8))))
 
 ;;; Runtime tests for small struct (2 registers)
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-small-align-8-runtime)
   ;; Test passing struct as argument
   (with-alien ((s (struct small-align-8)))
@@ -136,7 +136,7 @@
     (assert (= (small-align-8-get-m1 s) 888))))
 
 ;;; Runtime tests for small struct RETURN
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-small-align-8-return-runtime)
   ;; Test return from C function
   (let ((result (small-align-8-return 100 200)))
@@ -167,7 +167,7 @@
             (m3 (integer 64)) (m7 (integer 64)) (m11 (integer 64)) (m15 (integer 64))))
 
 (with-test (:name :struct-by-value-large-align-8-args)
-  #+arm64
+  #+(or x86-64 arm64)
   (macrolet
       ((def-large-align-8-get (i)
          (let ((lisp-name (sb-int:symbolicate "LARGE-ALIGN-8-GET-M" i)))
@@ -177,7 +177,7 @@
            `(progn ,@defs))))
     (defs-large-align-8-get)
     (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))
-  #-arm64
+  #-(or x86-64 arm64)
   (macrolet
       ((def-large-align-8-get (i)
          (let ((lisp-name (sb-int:symbolicate "LARGE-ALIGN-8-GET-M" i)))
@@ -190,7 +190,7 @@
     (assert-unimplemented
      (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-large-align-8-return)
   (define-alien-routine large-align-8-return (struct large-align-8)
     (v0 (integer 64)) (v1 (integer 64)))
@@ -199,7 +199,7 @@
 ;;; Runtime tests for large struct (uses hidden pointer for return)
 ;;; Large structs (>16 bytes) are returned via hidden pointer in x8 (ARM64) or
 ;;; implicit first arg (x86-64).
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-large-align-8-return-runtime)
   ;; Test return from C function
   (let ((result (large-align-8-return 1000 2000)))
@@ -222,7 +222,7 @@
 (define-alien-type nil (struct two-floats (f0 single-float) (f1 single-float)))
 (define-alien-type nil (struct int-double (i (integer 64)) (d double)))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-two-doubles)
   (define-alien-routine two-doubles-return (struct two-doubles)
     (d0 double) (d1 double))
@@ -230,7 +230,7 @@
   (define-alien-routine two-doubles-identity (struct two-doubles) (m (struct two-doubles))))
 
 ;;; Runtime tests for floating-point struct (passing as argument)
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-two-doubles-runtime)
   (with-alien ((s (struct two-doubles)))
     (setf (slot s 'd0) 1.5d0)
@@ -238,7 +238,7 @@
     (assert (= (two-doubles-sum s) 4.0d0))))
 
 ;;; Runtime tests for floating-point struct RETURN
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-two-doubles-return-runtime)
   ;; Test return from C function
   (let ((result (two-doubles-return 1.5d0 2.5d0)))
@@ -260,7 +260,7 @@
       (assert (= (slot result 'd0) 123.456d0))
       (assert (= (slot result 'd1) 789.012d0)))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-two-floats)
   (define-alien-routine two-floats-return (struct two-floats)
     (f0 single-float) (f1 single-float))
@@ -268,7 +268,7 @@
   (define-alien-routine two-floats-identity (struct two-floats) (m (struct two-floats))))
 
 ;;; Runtime tests for single-float struct RETURN
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-two-floats-return-runtime)
   ;; Test return from C function
   (let ((result (two-floats-return 1.5 2.5)))
@@ -286,7 +286,7 @@
       (assert (< (abs (- (slot result 'f0) 11.11)) 0.001))
       (assert (< (abs (- (slot result 'f1) 22.22)) 0.001)))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-int-double)
   (define-alien-routine int-double-return (struct int-double)
     (i (integer 64)) (d double))
@@ -295,7 +295,7 @@
   (define-alien-routine int-double-identity (struct int-double) (m (struct int-double))))
 
 ;;; Runtime tests for mixed int-double struct RETURN
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-int-double-return-runtime)
   ;; Test return from C function
   (let ((result (int-double-return 42 3.14159d0)))
@@ -316,7 +316,7 @@
 ;;; Medium struct (24 bytes) - tests boundary case (>16 bytes, uses hidden pointer)
 (define-alien-type nil (struct medium-align-8 (m0 (integer 64)) (m1 (integer 64)) (m2 (integer 64))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-medium-align-8)
   (define-alien-routine medium-align-8-return (struct medium-align-8)
     (v0 (integer 64)) (v1 (integer 64)) (v2 (integer 64)))
@@ -326,7 +326,7 @@
   (define-alien-routine medium-align-8-identity (struct medium-align-8) (m (struct medium-align-8))))
 
 ;;; Runtime tests for medium struct (24 bytes - uses hidden pointer)
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-medium-align-8-return-runtime)
   ;; Test return from C function
   (let ((result (medium-align-8-return 100 200 300)))
@@ -348,14 +348,14 @@
 (define-alien-type nil (struct four-floats (f0 single-float) (f1 single-float)
                                            (f2 single-float) (f3 single-float)))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-four-floats)
   (define-alien-routine four-floats-return (struct four-floats)
     (f0 single-float) (f1 single-float) (f2 single-float) (f3 single-float))
   (define-alien-routine four-floats-sum single-float (m (struct four-floats)))
   (define-alien-routine four-floats-identity (struct four-floats) (m (struct four-floats))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-four-floats-return-runtime)
   ;; Test return from C function
   (let ((result (four-floats-return 1.0 2.0 3.0 4.0)))
@@ -386,7 +386,7 @@
 ;;; But exceeds 16 bytes so may use memory return depending on ABI interpretation
 (define-alien-type nil (struct three-doubles (d0 double) (d1 double) (d2 double)))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-three-doubles)
   (define-alien-routine three-doubles-return (struct three-doubles)
     (d0 double) (d1 double) (d2 double))
@@ -394,7 +394,7 @@
   (define-alien-routine three-doubles-identity (struct three-doubles) (m (struct three-doubles))))
 
 ;;; Runtime tests for three doubles (24 bytes - uses hidden pointer)
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-three-doubles-return-runtime)
   ;; Test return from C function
   (let ((result (three-doubles-return 1.1d0 2.2d0 3.3d0)))
@@ -422,14 +422,14 @@
 ;;; On ARM64, this should be detected as an HFA with 4 single-float members
 (define-alien-type nil (struct float-array-4 (arr (array single-float 4))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-float-array-4)
   (define-alien-routine float-array-4-return (struct float-array-4)
     (f0 single-float) (f1 single-float) (f2 single-float) (f3 single-float))
   (define-alien-routine float-array-4-sum single-float (m (struct float-array-4)))
   (define-alien-routine float-array-4-identity (struct float-array-4) (m (struct float-array-4))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-float-array-4-return-runtime)
   ;; Test return from C function
   (let ((result (float-array-4-return 1.0 2.0 3.0 4.0)))
@@ -460,14 +460,14 @@
 ;;; This struct has a single field which is an array of 2 doubles (16 bytes total)
 (define-alien-type nil (struct double-array-2 (arr (array double 2))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-double-array-2)
   (define-alien-routine double-array-2-return (struct double-array-2)
     (d0 double) (d1 double))
   (define-alien-routine double-array-2-sum double (m (struct double-array-2)))
   (define-alien-routine double-array-2-identity (struct double-array-2) (m (struct double-array-2))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-double-array-2-return-runtime)
   ;; Test return from C function
   (let ((result (double-array-2-return 1.5d0 2.5d0)))
@@ -489,14 +489,14 @@
 ;;; HFA with array of 3 floats - tests odd-sized array HFA (12 bytes)
 (define-alien-type nil (struct float-array-3 (arr (array single-float 3))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-float-array-3)
   (define-alien-routine float-array-3-return (struct float-array-3)
     (f0 single-float) (f1 single-float) (f2 single-float))
   (define-alien-routine float-array-3-sum single-float (m (struct float-array-3)))
   (define-alien-routine float-array-3-identity (struct float-array-3) (m (struct float-array-3))))
 
-#+arm64
+#+(or x86-64 arm64)
 (with-test (:name :struct-by-value-float-array-3-return-runtime)
   ;; Test return from C function
   (let ((result (float-array-3-return 1.0 2.0 3.0)))
