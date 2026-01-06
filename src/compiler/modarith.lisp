@@ -144,19 +144,24 @@
                                                  (node (gensym "NODE")))
      &body body)
   (%check-modular-fun-macro-arguments name kind lambda-list)
-  (with-unique-names (args result-width-name)
-    `(setf (gethash ',name (modular-class-funs (find-modular-class ',kind ',signedp)))
-           (lambda (,node ,width ,(or result-width
-                                   result-width-name))
-             (declare (type basic-combination ,node)
-                      (type (integer 0) ,width)
-                      ,@(unless result-width
-                          `((ignore ,result-width-name))))
-             (let ((,args (basic-combination-args ,node)))
-               (when (= (length ,args) ,(length lambda-list))
-                 (destructuring-bind ,lambda-list ,args
-                   (declare (type lvar ,@lambda-list))
-                   ,@body)))))))
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    (multiple-value-bind (a-declarations b-declarations)
+        (extract-var-decls decls (and result-width (list result-width)))
+      (with-unique-names (args result-width-name)
+        `(setf (gethash ',name (modular-class-funs (find-modular-class ',kind ',signedp)))
+               (lambda (,node ,width ,(or result-width
+                                       result-width-name))
+                 (declare (type basic-combination ,node)
+                          (type (integer 0) ,width)
+                          ,@(unless result-width
+                              `((ignore ,result-width-name))))
+                 ,a-declarations
+                 (let ((,args (basic-combination-args ,node)))
+                   (when (= (length ,args) ,(length lambda-list))
+                     (destructuring-bind ,lambda-list ,args
+                       (declare (type lvar ,@lambda-list))
+                       ,@b-declarations
+                       ,@forms)))))))))
 
 ;;; (ldb (byte s 0) (foo                 x  y ...)) =
 ;;; (ldb (byte s 0) (foo (ldb (byte s 0) x) y ...))
