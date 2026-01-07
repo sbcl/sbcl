@@ -119,17 +119,239 @@
               (invoke-alien-type-method :result-tn type state))
             values)))
 
+;;;; Struct Return-by-Value Support for x86-64 (System V AMD64 ABI)
+
+;;; Classify a single field for x86-64 ABI
+(defun classify-field-x86-64 (type)
+  "Classify a single field type for x86-64 ABI.
+   Returns :INTEGER, :SSE, or :MEMORY."
+  (cond
+    ((sb-alien::alien-integer-type-p type) :integer)
+    ((sb-alien::alien-pointer-type-p type) :integer)
+    ((typep type 'sb-alien::alien-system-area-pointer-type) :integer)
+    ((sb-alien::alien-single-float-type-p type) :sse)
+    ((sb-alien::alien-double-float-type-p type) :sse)
+    ((sb-alien::alien-record-type-p type)
+     ;; Recursively classify nested struct - if it's MEMORY, propagate that
+     (let ((nested (classify-struct-x86-64 type)))
+       (if (sb-alien::struct-classification-memory-p nested)
+           :memory
+           ;; For nested structs that fit in registers, treat as INTEGER
+           ;; since the struct's fields have been merged
+           :integer)))
+    (t :memory)))
+
+;;; Merge two classes within an eightbyte per ABI rules
+(defun merge-classes (class1 class2)
+  "Merge two classes within an eightbyte per ABI rules.
+   INTEGER dominates SSE; MEMORY dominates everything."
+  (cond
+    ((eq class1 class2) class1)
+    ((eq class1 :no-class) class2)
+    ((eq class2 :no-class) class1)
+    ((or (eq class1 :memory) (eq class2 :memory)) :memory)
+    ((or (eq class1 :integer) (eq class2 :integer)) :integer)
+    (t :sse)))
+
+;;; Main classification function for x86-64
+(defun classify-struct-x86-64 (record-type)
+  "Classify struct for x86-64 System V ABI return.
+   Returns STRUCT-CLASSIFICATION."
+  (let* ((bits (sb-alien::alien-type-bits record-type))
+         (byte-size (ceiling bits 8))
+         (alignment (sb-alien::alien-type-alignment record-type)))
+    ;; Rule: Structs > 16 bytes always use memory (hidden pointer)
+    (when (> byte-size 16)
+      (return-from classify-struct-x86-64
+        (sb-alien::make-struct-classification
+         :register-slots '(:memory)
+         :size byte-size
+         :alignment alignment
+         :memory-p t)))
+
+    ;; Classify each eightbyte
+    (let* ((num-eightbytes (max 1 (ceiling byte-size 8)))
+           (eightbytes (make-list num-eightbytes :initial-element :no-class)))
+      ;; Iterate through fields and classify
+      (dolist (field (sb-alien::alien-record-type-fields record-type))
+        (let* ((field-offset-bits (sb-alien::alien-record-field-offset field))
+               (field-type (sb-alien::alien-record-field-type field))
+               (field-offset-bytes (floor field-offset-bits 8))
+               (eightbyte-index (floor field-offset-bytes 8))
+               (field-class (classify-field-x86-64 field-type)))
+          (when (< eightbyte-index num-eightbytes)
+            (setf (nth eightbyte-index eightbytes)
+                  (merge-classes (nth eightbyte-index eightbytes)
+                                 field-class)))))
+
+      ;; Post-merge cleanup per ABI: if second eightbyte is MEMORY, first must be too
+      (when (and (> num-eightbytes 1)
+                 (eq (second eightbytes) :memory))
+        (setf (first eightbytes) :memory))
+
+      ;; Convert remaining :no-class to :integer (padding bytes are treated as integer)
+      (setf eightbytes
+            (mapcar (lambda (c) (if (eq c :no-class) :integer c)) eightbytes))
+
+      (sb-alien::make-struct-classification
+       :register-slots eightbytes
+       :size byte-size
+       :alignment alignment
+       :memory-p (member :memory eightbytes)))))
+
+;;; Result TN generation for record types on x86-64
+;;; Called from src/code/c-call.lisp
+(defun record-result-tn-x86-64 (type state)
+  "Handle struct return values on x86-64."
+  (let ((classification (classify-struct-x86-64 type)))
+    (if (sb-alien::struct-classification-memory-p classification)
+        ;; Large struct: return via hidden pointer
+        ;; Caller passes pointer in RDI, callee returns it in RAX
+        (progn
+          (setf (result-state-num-results state) 1)
+          (make-wired-tn* 'system-area-pointer sap-reg-sc-number rax-offset))
+        ;; Small struct: return in registers
+        (let ((result-tns nil)
+              (int-results 0)
+              (sse-results 0))
+          (dolist (class (sb-alien::struct-classification-register-slots classification))
+            (case class
+              (:integer
+               (push (make-wired-tn* 'unsigned-byte-64
+                                     unsigned-reg-sc-number
+                                     (result-reg-offset int-results))
+                     result-tns)
+               (incf int-results))
+              (:sse
+               (push (make-wired-tn* 'double-float
+                                     double-reg-sc-number
+                                     sse-results)
+                     result-tns)
+               (incf sse-results))
+              (t))) ; :no-class - skip
+          (setf (result-state-num-results state) (+ int-results sse-results))
+          (nreverse result-tns)))))
+
+;;; VOPs for struct argument passing
+;;; These VOPs load eightbytes from a struct SAP into target registers
+
+(define-vop (load-struct-int-arg)
+  (:args (sap :scs (sap-reg)))
+  (:info offset)
+  (:results (target :scs (unsigned-reg signed-reg)))
+  (:generator 5
+    (inst mov :qword target (ea offset sap))))
+
+(define-vop (load-struct-sse-arg)
+  (:args (sap :scs (sap-reg)))
+  (:info offset)
+  (:results (target :scs (double-reg single-reg)))
+  (:generator 5
+    (inst movsd target (ea offset sap))))
+
+;;; VOPs for storing struct result registers to memory
+;;; These VOPs store result register values back to memory for struct-by-value returns
+
+(define-vop (store-struct-int-result)
+  (:args (value :scs (unsigned-reg signed-reg))
+         (sap :scs (sap-reg)))
+  (:info offset)
+  (:generator 5
+    (inst mov :qword (ea offset sap) value)))
+
+(define-vop (store-struct-sse-result)
+  (:args (value :scs (double-reg single-reg))
+         (sap :scs (sap-reg)))
+  (:info offset)
+  (:generator 5
+    (inst movsd (ea offset sap) value)))
+
+;;; Arg TN generation for record types on x86-64
+;;; Called from src/code/c-call.lisp
+(defun record-arg-tn-x86-64 (type state)
+  "Handle struct arguments on x86-64.
+   For large structs (>16 bytes), returns a SAP TN for pointer passing.
+   For small structs, returns a function that emits load VOPs."
+  (let ((classification (classify-struct-x86-64 type)))
+    (if (sb-alien::struct-classification-memory-p classification)
+        ;; Large struct: pass by hidden pointer (SAP)
+        (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number)
+        ;; Small struct: allocate target TNs and return a function to load into them
+        (let ((arg-tns nil)
+              (offsets nil)
+              (offset 0))
+          (dolist (class (sb-alien::struct-classification-register-slots classification))
+            (case class
+              (:integer
+               (push (int-arg state 'unsigned-byte-64
+                              unsigned-reg-sc-number
+                              unsigned-stack-sc-number)
+                     arg-tns)
+               (push (cons offset :integer) offsets))
+              (:sse
+               (push (float-arg state 'double-float
+                                double-reg-sc-number
+                                double-stack-sc-number)
+                     arg-tns)
+               (push (cons offset :sse) offsets))
+              (t)) ; :no-class - skip
+            (incf offset 8))
+          (setf arg-tns (nreverse arg-tns))
+          (setf offsets (nreverse offsets))
+          ;; Return a function that emits the load VOPs
+          (lambda (arg call block nsp)
+            (declare (ignore nsp))
+            (let ((sap-tn (sb-c::lvar-tn call block arg)))
+              (loop for target-tn in arg-tns
+                    for (off . class) in offsets
+                    do (ecase class
+                         (:integer
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose 'load-struct-int-arg)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil  ; insert at end
+                           (list off)))
+                         (:sse
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose 'load-struct-sse-arg)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil
+                           (list off)))))))))))
+
+;;; VOP to set up RDI with the hidden struct return pointer
+;;; On x86-64, large structs (>16 bytes) are returned via a hidden pointer in RDI
+;;; The caller allocates memory and passes the address in RDI (first arg register)
+(define-vop (set-struct-return-pointer)
+  (:args (sap :scs (sap-reg) :target rdi))
+  (:temporary (:sc sap-reg :offset rdi-offset) rdi)  ; RDI is the first arg register
+  (:generator 1
+    (move rdi sap)))
+
 (defun make-call-out-tns (type)
-  (let ((arg-state (make-arg-state)))
+  (let ((arg-state (make-arg-state))
+        (result-type (alien-fun-type-result-type type)))
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
-      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number rsp-offset)
-              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
-              (arg-tns)
-              (invoke-alien-type-method :result-tn
-                                        (alien-fun-type-result-type type)
-                                        (make-result-state))))))
+      ;; Check if result is a large struct that needs hidden pointer
+      (let* ((stack-frame-size (* (arg-state-stack-frame-size arg-state) n-word-bytes))
+             ;; For large struct returns, we don't allocate stack space here
+             ;; The IR1 transform allocates heap memory and passes it as first arg
+             ;; We just return a flag indicating this is a large struct return
+             (large-struct-return-p
+               (when (sb-alien::alien-record-type-p result-type)
+                 (let ((classification (classify-struct-x86-64 result-type)))
+                   (sb-alien::struct-classification-memory-p classification)))))
+        (values (make-wired-tn* 'positive-fixnum any-reg-sc-number rsp-offset)
+                stack-frame-size
+                (arg-tns)
+                (invoke-alien-type-method :result-tn result-type (make-result-state))
+                ;; 5th value: T if large struct return (sret pointer passed as first arg)
+                large-struct-return-p)))))
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
