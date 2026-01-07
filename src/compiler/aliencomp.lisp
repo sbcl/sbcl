@@ -548,6 +548,29 @@
 
 ;;;; ALIEN-FUNCALL support
 
+;;; Generate code to store struct register values to memory
+#+(and arm64 (not sb-xc-host))
+(defun generate-struct-store-code (temps register-slots result-sap)
+  "Generate SETF forms to store register values to struct memory."
+  (let ((offset 0)
+        (stores nil)
+        (temp-idx 0))
+    (dolist (class register-slots)
+      (case class
+        (:integer
+         (push `(setf (sb-sys:sap-ref-64 ,result-sap ,offset) ,(nth temp-idx temps)) stores)
+         (incf offset 8)
+         (incf temp-idx))
+        ((:sse :sse-double)
+         (push `(setf (sb-sys:sap-ref-double ,result-sap ,offset) ,(nth temp-idx temps)) stores)
+         (incf offset 8)
+         (incf temp-idx))
+        (:sse-single
+         (push `(setf (sb-sys:sap-ref-single ,result-sap ,offset) ,(nth temp-idx temps)) stores)
+         (incf offset 4)
+         (incf temp-idx))))
+    (nreverse stores)))
+
 (deftransform alien-funcall ((function &rest args)
                              ((alien (* t)) &rest t) *)
   (let ((names (make-gensym-list (length args))))
@@ -576,29 +599,45 @@
               (params param)
               (deports `(deport ,param ',arg-type))))
           ;; Build BODY from the inside out.
-          (let ((return-type (alien-fun-type-result-type alien-type))
-                ;; Innermost, we DEPORT the parameters (e.g. by taking SAPs
-                ;; to them) and do the call.
-                (body
-                 ;; If FUNCTION's source looks like
-                 ;;  (%SAP-ALIEN (FOREIGN-SYMBOL-SAP "sym") #<anything>)
-                 ;; then snarf out the string and use it as the funarg
-                 ;; unless the backend lacks the CALL-OUT-NAMED vop.
-                 `(%alien-funcall
-                   ,(or (when-vop-existsp (:named call-out-named)
-                          (when (lvar-matches function :fun-names '(%sap-alien)
-                                                       :arg-count 2)
-                            (let ((sap (first (combination-args (lvar-use function)))))
-                              (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
-                                                      :arg-count 1)
-                                (let ((sym (first (combination-args (lvar-use sap)))))
-                                  (when (and (constant-lvar-p sym)
-                                             (stringp (lvar-value sym)))
-                                    (setq ignore-fun t)
-                                    (lvar-value sym)))))))
-                        `(deport function ',alien-type))
-                   ',alien-type
-                   ,@(deports))))
+          ;; First, detect if this is a large struct return (ARM64 hidden pointer)
+          (let* ((return-type (alien-fun-type-result-type alien-type))
+                 ;; Check for large struct return (needs hidden pointer in x8)
+                 #+(and arm64 (not sb-xc-host))
+                 (large-struct-size
+                   (multiple-value-bind (in-registers-p register-slots size)
+                       (sb-alien::struct-return-info return-type)
+                     (declare (ignore register-slots))
+                     (when (and size (not in-registers-p))
+                       size)))
+                 #-(and arm64 (not sb-xc-host))
+                 (large-struct-size nil)
+                 ;; For large struct returns, we need a gensym for the sret pointer
+                 (sret-sap (when large-struct-size (gensym "SRET-SAP")))
+                 ;; Innermost, we DEPORT the parameters (e.g. by taking SAPs
+                 ;; to them) and do the call.
+                 (body
+                  ;; If FUNCTION's source looks like
+                  ;;  (%SAP-ALIEN (FOREIGN-SYMBOL-SAP "sym") #<anything>)
+                  ;; then snarf out the string and use it as the funarg
+                  ;; unless the backend lacks the CALL-OUT-NAMED vop.
+                  `(%alien-funcall
+                    ,(or (when-vop-existsp (:named call-out-named)
+                           (when (lvar-matches function :fun-names '(%sap-alien)
+                                                        :arg-count 2)
+                             (let ((sap (first (combination-args (lvar-use function)))))
+                               (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
+                                                       :arg-count 1)
+                                 (let ((sym (first (combination-args (lvar-use sap)))))
+                                   (when (and (constant-lvar-p sym)
+                                              (stringp (lvar-value sym)))
+                                     (setq ignore-fun t)
+                                     (lvar-value sym)))))))
+                         `(deport function ',alien-type))
+                    ',alien-type
+                    ;; For large struct returns, prepend sret-sap as first arg
+                    ;; IR2 will recognize this and put it in x8 (ARM64)
+                    ,@(when sret-sap (list sret-sap))
+                    ,@(deports))))
             ;; Wrap that in a WITH-PINNED-OBJECTS to ensure the values
             ;; the SAPs are taken for won't be moved by the GC. (If
             ;; needed: some alien types won't need it).
@@ -617,16 +656,45 @@
                   do (setf body
                            `(let ((,param (deport-alloc ,param ',arg-type)))
                               ,body)))
-            (if (alien-values-type-p return-type)
-                (collect ((temps) (results))
-                  (dolist (type (alien-values-type-values return-type))
-                    (let ((temp (gensym)))
-                      (temps temp)
-                      (results `(naturalize ,temp ',type))))
-                  (setf body
-                        `(multiple-value-bind ,(temps) ,body
-                           (values ,@(results)))))
-                (setf body `(naturalize ,body ',return-type)))
+            (cond
+              ((alien-values-type-p return-type)
+               (collect ((temps) (results))
+                 (dolist (type (alien-values-type-values return-type))
+                   (let ((temp (gensym)))
+                     (temps temp)
+                     (results `(naturalize ,temp ',type))))
+                 (setf body
+                       `(multiple-value-bind ,(temps) ,body
+                          (values ,@(results))))))
+              ;; Struct-by-value return handling (ARM64)
+              #+(and arm64 (not sb-xc-host))
+              ((multiple-value-bind (in-registers-p register-slots size)
+                   (sb-alien::struct-return-info return-type)
+                 (cond
+                   ;; Small struct: returned in registers, store to heap memory
+                   (in-registers-p
+                    (let* ((num-values (length register-slots))
+                           (temps (loop repeat num-values collect (gensym)))
+                           (result-sap (gensym "RESULT-SAP")))
+                      (setf body
+                            `(multiple-value-bind ,temps ,body
+                               (let ((,result-sap (sb-alien::%make-alien ,size)))
+                                 ,@(generate-struct-store-code temps register-slots result-sap)
+                                 (sb-alien::%sap-alien ,result-sap ',return-type))))
+                      t))
+                   ;; Large struct: C expects hidden pointer in x8, returns same in x0
+                   ;; sret-sap was already added to %alien-funcall args at the top
+                   ;; Here we wrap with allocation and return the sap-alien
+                   ((and size (not in-registers-p))
+                    ;; sret-sap was defined at the top of this let*
+                    (setf body
+                          `(let ((,sret-sap (sb-alien::%make-alien ,size)))
+                             ,body  ; %alien-funcall with sret-sap as first arg
+                             ;; The callee wrote to sret-sap, return it as alien
+                             (sb-alien::%sap-alien ,sret-sap ',return-type)))
+                    t))))  ; close inner cond clause, inner cond, m-v-b, outer cond clause
+              (t
+               (setf body `(naturalize ,body ',return-type))))
             ;; Remember this frame to make sure that we can get back
             ;; to it later regardless of how the foreign stack looks
             ;; like.
@@ -643,10 +711,26 @@
   (unless (and (constant-lvar-p type)
                (alien-fun-type-p (lvar-value type)))
     (error "Something is broken."))
-  (let ((spec (compute-alien-rep-type
-               (alien-fun-type-result-type (lvar-value type))
-               :result)))
-    (if (eq spec '*) *wild-type* (values-specifier-type spec))))
+  (let* ((result-type (alien-fun-type-result-type (lvar-value type)))
+         (spec (compute-alien-rep-type result-type :result)))
+    (cond
+      ;; For struct-by-value returns, derive the multiple-values type
+      ;; based on the eightbyte classification (ARM64)
+      #+(and arm64 (not sb-xc-host))
+      ((multiple-value-bind (in-registers-p register-slots)
+           (sb-alien::struct-return-info result-type)
+         (when in-registers-p
+           ;; Return VALUES type for the register values
+           (make-values-type
+            (mapcar (lambda (class)
+                      (case class
+                        (:integer (specifier-type '(unsigned-byte 64)))
+                        ((:sse :sse-double) (specifier-type 'double-float))
+                        (:sse-single (specifier-type 'single-float))
+                        (t *universal-type*)))
+                    register-slots)))))
+      (t
+       (if (eq spec '*) *wild-type* (values-specifier-type spec))))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
               ((function type &rest args) node)
@@ -679,8 +763,16 @@
         (args #-arm args #+arm (reverse args))
         #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
-    (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
+    (multiple-value-bind (nsp stack-frame-size arg-tns result-tns
+                          #+arm64 large-struct-return-p)
         (make-call-out-tns type)
+      ;; For ARM64 large struct returns, the first arg is the sret pointer
+      ;; Extract it from args now (so it's not processed as a regular arg)
+      ;; We'll emit the VOP to set x8 just before the call
+      (let ((sret-tn #+arm64 (when large-struct-return-p
+                               (lvar-tn call block (pop args)))
+                     #-arm64 nil))
+        (declare (ignorable sret-tn))
       #+x86
       (vop set-fpu-word-for-c call block)
       ;; Save the stack pointer, it will get aligned and subtracting
@@ -762,6 +854,10 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
+        ;; For ARM64 large struct returns, set x8 with the sret pointer
+        ;; right before making the call
+        (when sret-tn
+          (vop sb-vm::set-struct-return-pointer call block sret-tn))
         (cond #+#.(cl:if (sb-c::vop-existsp :named sb-vm::call-out-named) '(and) '(or))
               ((and (constant-lvar-p function) (stringp (lvar-value function)))
                (vop* call-out-named call block (arg-operands) (result-operands)
@@ -787,7 +883,7 @@
                           (reference-tn (car (last result-tns 2)) t))
            (move-lvar-result call block (list (car (last result-tns 2))) lvar))
           (t
-           (move-lvar-result call block result-tns lvar)))))))
+           (move-lvar-result call block result-tns lvar))))))))
 
 (deftransform sb-alien::c-string-external-format ((type)
                                                   ((constant-arg sb-alien::alien-c-string-type)))

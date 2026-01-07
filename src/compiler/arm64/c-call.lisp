@@ -183,8 +183,264 @@
               (invoke-alien-type-method :result-tn type state))
             values)))
 
+;;;; Struct Return-by-Value Support for ARM64 (AAPCS64)
+
+;;; Check if a record type is a Homogeneous Floating-point Aggregate (HFA)
+;;; An HFA is a struct with 1-4 floating-point members of the same type.
+;;; Members can be scalar floats, arrays of floats, or nested HFA structs.
+(defun hfa-member-info (alien-type)
+  "Return (values base-type count) for a potential HFA member, or NIL if not HFA-compatible.
+   BASE-TYPE is 'single-float or 'double-float, COUNT is the number of elements."
+  (cond
+    ;; Single-float scalar
+    ((sb-alien::alien-single-float-type-p alien-type)
+     (values 'single-float 1))
+    ;; Double-float scalar
+    ((sb-alien::alien-double-float-type-p alien-type)
+     (values 'double-float 1))
+    ;; Array type - check if element type is float
+    ((sb-alien::alien-array-type-p alien-type)
+     (let ((element-type (sb-alien::alien-array-type-element-type alien-type))
+           (dims (sb-alien::alien-array-type-dimensions alien-type)))
+       ;; Only 1-D arrays for HFA
+       (when (and (= (length dims) 1)
+                  (integerp (first dims)))
+         (let ((len (first dims)))
+           (cond
+             ((sb-alien::alien-single-float-type-p element-type)
+              (values 'single-float len))
+             ((sb-alien::alien-double-float-type-p element-type)
+              (values 'double-float len))
+             ;; Could also be an array of HFA structs
+             ((sb-alien::alien-record-type-p element-type)
+              (multiple-value-bind (nested-base nested-count)
+                  (hfa-base-type element-type)
+                (when nested-base
+                  (values nested-base (* len nested-count)))))
+             (t nil))))))
+    ;; Nested record - recursively check HFA
+    ((sb-alien::alien-record-type-p alien-type)
+     (hfa-base-type alien-type))
+    ;; Non-float field
+    (t nil)))
+
+(defun hfa-base-type (record-type)
+  "Check if record is an HFA. Returns (values base-type member-count) where
+   base-type is 'single-float or 'double-float, or NIL if not an HFA."
+  (let ((fields (sb-alien::alien-record-type-fields record-type))
+        (base-type nil)
+        (count 0))
+    (dolist (field fields)
+      (let ((field-type (sb-alien::alien-record-field-type field)))
+        (multiple-value-bind (member-base member-count)
+            (hfa-member-info field-type)
+          (cond
+            ;; Not HFA-compatible member
+            ((null member-base)
+             (return-from hfa-base-type nil))
+            ;; Compatible with existing base type (or first member)
+            ((or (null base-type) (eq base-type member-base))
+             (setf base-type member-base)
+             (incf count member-count))
+            ;; Mixed float types - not an HFA
+            (t (return-from hfa-base-type nil))))))
+    ;; HFA must have 1-4 members
+    (when (and base-type (<= 1 count 4))
+      (values base-type count))))
+
+;;; Main classification function for ARM64
+(defun classify-struct-arm64 (record-type)
+  "Classify struct for ARM64 AAPCS return."
+  (let* ((bits (sb-alien::alien-type-bits record-type))
+         (byte-size (ceiling bits 8))
+         (alignment (sb-alien::alien-type-alignment record-type)))
+    (multiple-value-bind (hfa-type hfa-count) (hfa-base-type record-type)
+      (cond
+        ;; HFA: return in floating-point registers
+        (hfa-type
+         (sb-alien::make-struct-classification
+          :register-slots (make-list hfa-count :initial-element
+                                 (if (eq hfa-type 'single-float) :sse-single :sse-double))
+          :size byte-size
+          :alignment alignment
+          :memory-p nil))
+        ;; Small non-HFA: return in x0 (and x1 if 9-16 bytes)
+        ((<= byte-size 16)
+         (sb-alien::make-struct-classification
+          :register-slots (make-list (max 1 (ceiling byte-size 8)) :initial-element :integer)
+          :size byte-size
+          :alignment alignment
+          :memory-p nil))
+        ;; Large struct: use x8 indirect result
+        (t
+         (sb-alien::make-struct-classification
+          :register-slots '(:memory)
+          :size byte-size
+          :alignment alignment
+          :memory-p t))))))
+
+;;; Result TN generation for record types on ARM64
+;;; Called from src/code/c-call.lisp
+(defun record-result-tn-arm64 (type state)
+  "Handle struct return values on ARM64."
+  (let ((classification (classify-struct-arm64 type)))
+    (if (sb-alien::struct-classification-memory-p classification)
+        ;; Large struct: return via hidden pointer in x8
+        ;; The caller allocates space and passes pointer in x8
+        (progn
+          (setf (result-state-num-results state) 1)
+          (make-wired-tn* 'system-area-pointer sap-reg-sc-number (result-reg-offset 0)))
+        ;; Small struct: return in registers
+        (let ((result-tns nil)
+              (int-results 0)
+              (fp-results 0))
+          (dolist (class (sb-alien::struct-classification-register-slots classification))
+            (case class
+              (:integer
+               (push (make-wired-tn* 'unsigned-byte-64
+                                     unsigned-reg-sc-number
+                                     (result-reg-offset int-results))
+                     result-tns)
+               (incf int-results))
+              (:sse-single
+               (push (make-wired-tn* 'single-float
+                                     single-reg-sc-number
+                                     fp-results)
+                     result-tns)
+               (incf fp-results))
+              (:sse-double
+               (push (make-wired-tn* 'double-float
+                                     double-reg-sc-number
+                                     fp-results)
+                     result-tns)
+               (incf fp-results))
+              (t))) ; skip unknown
+          (setf (result-state-num-results state) (+ int-results fp-results))
+          (nreverse result-tns)))))
+
+;;; VOPs for struct argument passing on ARM64
+;;; These VOPs load register slots from a struct SAP into target registers
+
+(define-vop (load-struct-int-arg)
+  (:args (sap :scs (sap-reg)))
+  (:info offset)
+  (:results (target :scs (unsigned-reg signed-reg)))
+  (:generator 5
+    (inst ldr target (@ sap offset))))
+
+(define-vop (load-struct-single-arg)
+  (:args (sap :scs (sap-reg)))
+  (:info offset)
+  (:results (target :scs (single-reg)))
+  (:generator 5
+    (inst ldr target (@ sap offset))))
+
+(define-vop (load-struct-double-arg)
+  (:args (sap :scs (sap-reg)))
+  (:info offset)
+  (:results (target :scs (double-reg)))
+  (:generator 5
+    (inst ldr target (@ sap offset))))
+
+;;; VOPs for storing struct result registers to memory
+;;; These VOPs store result register values back to memory for struct-by-value returns
+
+(define-vop (store-struct-int-result)
+  (:args (value :scs (unsigned-reg signed-reg))
+         (sap :scs (sap-reg)))
+  (:info offset)
+  (:generator 5
+    (inst str value (@ sap offset))))
+
+(define-vop (store-struct-single-result)
+  (:args (value :scs (single-reg))
+         (sap :scs (sap-reg)))
+  (:info offset)
+  (:generator 5
+    (inst str value (@ sap offset))))
+
+(define-vop (store-struct-double-result)
+  (:args (value :scs (double-reg))
+         (sap :scs (sap-reg)))
+  (:info offset)
+  (:generator 5
+    (inst str value (@ sap offset))))
+
+;;; Arg TN generation for record types on ARM64
+;;; Called from src/code/c-call.lisp
+(defun record-arg-tn-arm64 (type state)
+  "Handle struct arguments on ARM64.
+   For large structs (>16 bytes), returns a SAP TN for pointer passing.
+   For small structs, returns a function that emits load VOPs."
+  (let ((classification (classify-struct-arm64 type)))
+    (if (sb-alien::struct-classification-memory-p classification)
+        ;; Large struct: pass by pointer
+        (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number)
+        ;; Small struct: allocate target TNs and return a function to load into them
+        (let ((arg-tns nil)
+              (offsets nil)
+              (offset 0))
+          (dolist (class (sb-alien::struct-classification-register-slots classification))
+            (case class
+              (:integer
+               (push (int-arg state 'unsigned-byte-64
+                              unsigned-reg-sc-number
+                              unsigned-stack-sc-number)
+                     arg-tns)
+               (push (cons offset :integer) offsets)
+               (incf offset 8))
+              (:sse-single
+               (push (float-arg state 'single-float
+                                single-reg-sc-number
+                                single-stack-sc-number #+darwin 4)
+                     arg-tns)
+               (push (cons offset :sse-single) offsets)
+               (incf offset 4))
+              (:sse-double
+               (push (float-arg state 'double-float
+                                double-reg-sc-number
+                                double-stack-sc-number)
+                     arg-tns)
+               (push (cons offset :sse-double) offsets)
+               (incf offset 8))
+              (t))) ; skip unknown
+          (setf arg-tns (nreverse arg-tns))
+          (setf offsets (nreverse offsets))
+          ;; Return a function that emits the load VOPs
+          (lambda (arg call block nsp)
+            (declare (ignore nsp))
+            (let ((sap-tn (sb-c::lvar-tn call block arg)))
+              (loop for target-tn in arg-tns
+                    for (off . class) in offsets
+                    do (ecase class
+                         (:integer
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose 'load-struct-int-arg)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil
+                           (list off)))
+                         (:sse-single
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose 'load-struct-single-arg)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil
+                           (list off)))
+                         (:sse-double
+                          (sb-c::emit-and-insert-vop
+                           call block
+                           (sb-c::template-or-lose 'load-struct-double-arg)
+                           (sb-c::reference-tn sap-tn nil)
+                           (sb-c::reference-tn target-tn t)
+                           nil
+                           (list off)))))))))))
+
 (defun make-call-out-tns (type)
-  (let ((arg-state (make-arg-state)))
+  (let ((arg-state (make-arg-state))
+        (result-type (alien-fun-type-result-type type)))
     (collect ((arg-tns))
       (let (#+darwin (variadic (sb-alien::alien-fun-type-varargs type)))
         (loop for i from 0
@@ -195,13 +451,31 @@
                 (setf (arg-state-num-register-args arg-state) +max-register-args+
                       (arg-state-fp-registers arg-state) +max-register-args+))
               (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state))))
-      (values (make-normal-tn *fixnum-primitive-type*)
-              (arg-state-stack-frame-size arg-state)
-              (arg-tns)
-              (invoke-alien-type-method :result-tn
-                                        (alien-fun-type-result-type type)
-                                        (make-result-state))))))
+      ;; Check if result is a large struct that needs hidden pointer
+      (let* ((stack-frame-size (arg-state-stack-frame-size arg-state))
+             ;; For large struct returns, we don't allocate stack space here
+             ;; The IR1 transform allocates heap memory and passes it as first arg
+             ;; We just return a flag indicating this is a large struct return
+             (large-struct-return-p
+               (when (sb-alien::alien-record-type-p result-type)
+                 (let ((classification (classify-struct-arm64 result-type)))
+                   (sb-alien::struct-classification-memory-p classification)))))
+        (values (make-normal-tn *fixnum-primitive-type*)
+                stack-frame-size
+                (arg-tns)
+                (invoke-alien-type-method :result-tn result-type (make-result-state))
+                ;; 5th value: T if large struct return (sret pointer passed as first arg)
+                large-struct-return-p)))))
 
+;;; VOP to set up x8 with the hidden struct return pointer
+;;; On ARM64, large structs (>16 bytes) are returned via a hidden pointer in x8
+;;; The caller allocates memory and passes the address in x8
+(define-vop (set-struct-return-pointer)
+  (:args (sap :scs (sap-reg) :target x8))
+  (:temporary (:sc sap-reg :offset 8) x8)  ; x8 is the indirect result register
+  (:generator 1
+    (move x8 sap)))
+
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
