@@ -678,24 +678,31 @@
                 (inst lsl result number amount)
                 (inst csel result result temp :mi))))
         ((not negative)
-         (inst cmp amount 0)
-         (inst csneg temp amount amount :ge)
-         (inst cmp temp n-word-bits)
-         ;; Only the first 6 bits count for shifts.
-         ;; This sets all bits to 1 if AMOUNT is larger than 63,
-         ;; cutting the amount to 63.
-         (inst csinv temp temp zr-tn :lo)
-         (inst lsl result number temp)
-         (inst tbz amount 63 done)
-         (ecase variant
-           (:signed (inst asr result number temp))
-           (:unsigned
-            (cond ((csubtypep (tn-ref-type amount-ref)
-                              (specifier-type `(integer -63 *)))
-                   (inst lsr result number temp))
-                  (t
-                   (inst lsr result number temp)
-                   (inst csel result result zr-tn :lo))))))
+         (let ((right-fits (csubtypep (tn-ref-type amount-ref)
+                                      (specifier-type `(integer -63 *))))
+               (left-fits (csubtypep (tn-ref-type amount-ref)
+                                     (specifier-type `(integer * 63)))))
+           (inst cmp amount 0)
+           (inst csneg temp amount amount :ge)
+           (inst cmp temp n-word-bits)
+           (cond (left-fits
+                  (inst lsl result number temp))
+                 (t
+                  (inst csel result number zr-tn :lo)
+                  (inst lsl result result temp)))
+           (inst tbz amount 63 done)
+           (ecase variant
+             (:signed
+              ;; Only the first 6 bits count for shifts.
+              ;; This sets all bits to 1 if AMOUNT is larger than 63,
+              ;; cutting the amount to 63.
+              (unless right-fits
+                (inst csinv temp temp zr-tn :lo))
+              (inst asr result number temp))
+             (:unsigned
+              (inst lsr result number temp)
+              (unless right-fits
+                (inst csel result result zr-tn :lo))))))
         (t
          (inst neg temp amount)
          (inst cmp temp n-word-bits)
