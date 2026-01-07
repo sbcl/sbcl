@@ -359,8 +359,15 @@
   (let* ((type (sb-c:lvar-value type))
          (env (sb-c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
-         (result-type (alien-fun-type-result-type type)))
-    (aver (= (length arg-types) (length args)))
+         (result-type (alien-fun-type-result-type type))
+         ;; Large struct returns have a hidden first arg (sret pointer) added by IR1
+         (large-struct-return-p
+           (multiple-value-bind (in-registers-p register-slots size)
+               (sb-alien::struct-return-info result-type)
+             (declare (ignore register-slots))
+             (and size (not in-registers-p)))))
+    (aver (= (length arg-types)
+             (- (length args) (if large-struct-return-p 1 0))))
     (if (or (some #'(lambda (type)
                       (and (alien-integer-type-p type)
                            (> (sb-alien::alien-integer-type-bits type) 64)))
