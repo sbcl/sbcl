@@ -1838,8 +1838,7 @@ many elements are copied."
   (declare (type index start)
            (dynamic-extent args))
   (declare (explicit-check sequence))
-  (declare (ignore from-end)
-           (type index start)
+  (declare (type index start)
            (type (or null index) end))
   (let ((key (and key (%coerce-callable-to-fun key))))
    (seq-dispatch-checking sequence
@@ -1863,15 +1862,18 @@ many elements are copied."
                                 (sequence-bounding-indices-bad-error sequence start end))
                               (let ((e (apply-key key (pop l))))
                                 (when (<= i 1)
-                                  (cond (ivp
+                                  (cond ((not ivp)
+                                         (setf (cdr tail) e))
+                                        (from-end
                                          (setq tail (copy-list-to e tail))
                                          (setf (cdr tail) initial-value))
                                         (t
-                                         (setf (cdr tail) e)))
+                                         (setf (cdr tail) e)
+                                         (return-from reduce-append (append initial-value (cdr head)))))
                                   (return))
                                 (setq tail (copy-list-to e tail)))
                               (decf i))
-                        (truly-the list (cdr head))))))
+                        (cdr head)))))
              (if (endp sequence)
                  (if ivp
                      initial-value)
@@ -1882,14 +1884,17 @@ many elements are copied."
                    (loop
                     (let ((e (apply-key key (pop l))))
                       (when (endp l)
-                        (cond (ivp
+                        (cond ((not ivp)
+                               (setf (cdr tail) e))
+                              (from-end
                                (setq tail (copy-list-to e tail))
                                (setf (cdr tail) initial-value))
                               (t
-                               (setf (cdr tail) e)))
+                               (setf (cdr tail) e)
+                               (return-from reduce-append (append initial-value (cdr head)))))
                         (return))
                       (setq tail (copy-list-to e tail))))
-                   (truly-the list (cdr head))))))
+                   (cdr head)))))
        (with-array-data ((vector sequence) (start start) (end end) :check-fill-pointer t
                                                                    :force-inline t)
          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
@@ -1906,11 +1911,14 @@ many elements are copied."
                          (let ((e (apply-key key (aref vector i))))
                            (incf i)
                            (when (= i end)
-                             (cond (ivp
+                             (cond ((not ivp)
+                                    (setf (cdr tail) e))
+                                   (from-end
                                     (setq tail (copy-list-to e tail))
                                     (setf (cdr tail) initial-value))
                                    (t
-                                    (setf (cdr tail) e)))
+                                    (setf (cdr tail) e)
+                                    (return-from reduce-append (append initial-value (cdr head)))))
                              (return))
                            (setq tail (copy-list-to e tail))))))
                (truly-the list (cdr head)))))
