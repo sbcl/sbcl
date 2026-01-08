@@ -639,9 +639,10 @@
            (gprs (loop for i below 8
                        collect (make-tn i)))
            (fp-registers 0)
-           ;; Calculate frame size from argument types
+           ;; Calculate frame size from argument types (word-aligned)
            (frame-size (loop for type in argument-types
-                             sum (ceiling (sb-alien::alien-type-bits type) n-byte-bits))))
+                             sum (ceiling (sb-alien::alien-type-word-aligned-bits type)
+                                          n-byte-bits))))
       (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
                                  +number-stack-alignment-mask+))
       (assemble (segment 'nil)
@@ -713,6 +714,8 @@
                   ;; Handle struct-by-value arguments
                   ((sb-alien::alien-record-type-p type)
                    (let* ((struct-bytes (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
+                          (struct-bytes-aligned (ceiling (sb-alien::alien-type-word-aligned-bits type)
+                                                         n-byte-bits))
                           (classification (classify-struct-arm64 type))
                           ;; Use r11 as additional temp for struct pointer
                           (ptr-tn (make-tn 11)))
@@ -764,7 +767,8 @@
                             (let ((gpr (pop gprs)))
                               (when gpr
                                 (inst str gpr (@ nsp-tn (+ frame-offset (* i 8))))))))))
-                     (incf frame-offset struct-bytes)))
+                     ;; Use word-aligned size for frame offset to match Lisp side
+                     (incf frame-offset struct-bytes-aligned)))
                   (t
                    (bug "Unknown alien type: ~S" type)))))
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)

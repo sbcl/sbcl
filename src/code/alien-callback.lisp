@@ -105,11 +105,9 @@
                (alien-pointer-type-p type)
                (alien-system-area-pointer-type-p type))
            (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits))
+          ;; Struct types: return the struct size rounded up to word alignment
           ((alien-record-type-p type)
-           ;; For struct-by-value arguments, we need space for the struct data.
-           ;; The assembler wrapper will copy register contents or dereference
-           ;; the pointer for large structs.
-           (ceiling (alien-type-bits type) sb-vm:n-byte-bits))
+           (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits))
           (t
            (error "Unsupported callback argument type: ~A" type)))))
 
