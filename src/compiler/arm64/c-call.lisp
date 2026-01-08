@@ -624,10 +624,11 @@
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
   (flet ((make-tn (offset &optional (sc-name 'any-reg))
            (make-random-tn (sc-or-lose sc-name) offset)))
+    ;; Calculate frame size: sum of all argument sizes
     (let* ((segment (make-segment))
-           ;; How many arguments have been copied
-           (arg-count 0)
-           ;; How many arguments have been copied from the stack
+           ;; Current byte offset in the argument frame
+           (frame-offset 0)
+           ;; How many bytes have been read from the stack argument area
            (stack-argument-bytes 0)
            (r0-tn (make-tn 0))
            (r1-tn (make-tn 1))
@@ -638,7 +639,9 @@
            (gprs (loop for i below 8
                        collect (make-tn i)))
            (fp-registers 0)
-           (frame-size (* (length argument-types) n-word-bytes)))
+           ;; Calculate frame size from argument types
+           (frame-size (loop for type in argument-types
+                             sum (ceiling (sb-alien::alien-type-bits type) n-byte-bits))))
       (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
                                  +number-stack-alignment-mask+))
       (assemble (segment 'nil)
@@ -649,8 +652,8 @@
           (inst sub nsp-tn nsp-tn frame-size))
         ;; Copy arguments
         (dolist (type argument-types)
-          (let ((target-tn (@ nsp-tn (* arg-count n-word-bytes)))
-                (size #+darwin (truncate (alien-type-bits type) n-byte-bits)
+          (let ((target-tn (@ nsp-tn frame-offset))
+                (size #+darwin (truncate (sb-alien::alien-type-bits type) n-byte-bits)
                       #-darwin n-word-bytes))
             (cond ((or (alien-integer-type-p type)
                        (alien-pointer-type-p type)
@@ -684,7 +687,7 @@
                                      (inst ldr temp-tn addr)))
                               (inst str temp-tn target-tn))
                             (incf stack-argument-bytes size))))
-                   (incf arg-count))
+                   (incf frame-offset n-word-bytes))
                   ((alien-float-type-p type)
                    (cond ((< fp-registers 8)
                           (inst str (make-tn fp-registers
@@ -706,7 +709,62 @@
                              (inst str temp-tn target-tn)))
                           (incf stack-argument-bytes size)))
                    (incf fp-registers)
-                   (incf arg-count))
+                   (incf frame-offset (if (alien-single-float-type-p type) 4 8)))
+                  ;; Handle struct-by-value arguments
+                  ((sb-alien::alien-record-type-p type)
+                   (let* ((struct-bytes (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
+                          (classification (classify-struct-arm64 type))
+                          ;; Use r11 as additional temp for struct pointer
+                          (ptr-tn (make-tn 11)))
+                     (cond
+                       ;; Large struct (>16 bytes): passed by pointer in register
+                       ((sb-alien::struct-classification-memory-p classification)
+                        ;; The struct pointer is in a GPR; copy struct data to frame
+                        (let ((gpr (pop gprs)))
+                          (cond (gpr
+                                 ;; Move pointer from argument register to ptr-tn
+                                 (inst mov ptr-tn gpr))
+                                (t
+                                 ;; Pointer is on stack
+                                 (setf stack-argument-bytes (align-up stack-argument-bytes 8))
+                                 (inst ldr ptr-tn (@ nsp-save-tn stack-argument-bytes))
+                                 (incf stack-argument-bytes 8)))
+                          ;; Copy struct data from pointer to frame
+                          ;; Use temp-tn (r9) for copying, ptr-tn (r11) has source address
+                          (loop for off from 0 below struct-bytes by 8
+                                for remaining = (- struct-bytes off)
+                                do (cond ((>= remaining 8)
+                                          (inst ldr temp-tn (@ ptr-tn off))
+                                          (inst str temp-tn (@ nsp-tn (+ frame-offset off))))
+                                         ((>= remaining 4)
+                                          (inst ldr (32-bit-reg temp-tn) (@ ptr-tn off))
+                                          (inst str (32-bit-reg temp-tn) (@ nsp-tn (+ frame-offset off))))
+                                         (t
+                                          ;; Copy remaining bytes one by one
+                                          (loop for b from 0 below remaining
+                                                do (inst ldrb (32-bit-reg temp-tn) (@ ptr-tn (+ off b)))
+                                                   (inst strb (32-bit-reg temp-tn) (@ nsp-tn (+ frame-offset off b)))))))))
+                       ;; HFA: passed in floating-point registers
+                       ((multiple-value-bind (hfa-type hfa-count) (hfa-base-type type)
+                          (when hfa-type
+                            (let ((fp-size (if (eq hfa-type 'single-float) 4 8)))
+                              (dotimes (i hfa-count)
+                                (when (< fp-registers 8)
+                                  (inst str (make-tn fp-registers
+                                                     (if (eq hfa-type 'single-float)
+                                                         'single-reg
+                                                         'double-reg))
+                                        (@ nsp-tn (+ frame-offset (* i fp-size))))
+                                  (incf fp-registers))))
+                            t)))
+                       ;; Small non-HFA struct (<=16 bytes): passed in GPRs
+                       (t
+                        (let ((num-regs (ceiling struct-bytes 8)))
+                          (dotimes (i num-regs)
+                            (let ((gpr (pop gprs)))
+                              (when gpr
+                                (inst str gpr (@ nsp-tn (+ frame-offset (* i 8))))))))))
+                     (incf frame-offset struct-bytes)))
                   (t
                    (bug "Unknown alien type: ~S" type)))))
         ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
