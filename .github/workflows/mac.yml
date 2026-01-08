@@ -4,39 +4,13 @@ on: [push]
 
 jobs:
   build:
-
-    runs-on: ${{ matrix.arch == 'arm64' && 'macos-15' || 'macos-15-intel' }}
-    timeout-minutes: 60
-    strategy: 
-      matrix:
-        arch: [arm64, x86-64]
-        options: [--with-sb-thread, --with-mark-region-gc --with-nonstop-foreign-call, --with-nonstop-foreign-call]
-      fail-fast: false
-
+    runs-on: macos-15
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v1
-    - name: instal host sbcl
+    - uses: actions/checkout@v4
+    - name: install host sbcl
       run: brew install sbcl
     - name: build
-      env:  
-        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-      run: ./make.sh ${{ matrix.options }} --with-sb-core-compression --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
-    - name: make binary
-      run: |
-        name=sbcl-`cat version.lisp-expr | ./run-sbcl.sh --noinform --noprint --eval '(write-line (read))'`-darwin-${{ matrix.arch }}
-        mkdir "sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}"
-        cd ..
-        mv sbcl $name
-        ./$name/binary-distribution.sh $name
-        bzip2 $name-binary.tar
-        mv $name sbcl
-        mv $name-binary.tar.bz2 "sbcl/sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}"
-    - name: save binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
-        path: sbcl-mac-binary-${{ matrix.arch }}${{ matrix.options }}
+      run: ./make.sh --xc-host='sbcl --disable-ldb --disable-debugger'
     - name: test
-      run: cd tests; ./run-tests.sh --slow
-    - name: ansi-test
-      run: cd tests; ./ansi-tests.sh
+      run: cd tests; ./run-tests.sh

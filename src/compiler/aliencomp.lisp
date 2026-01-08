@@ -764,14 +764,14 @@
         #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns
-                          #+arm64 large-struct-return-p)
+                          #+(or arm64 x86-64) large-struct-return-p)
         (make-call-out-tns type)
-      ;; For ARM64 large struct returns, the first arg is the sret pointer
+      ;; For large struct returns, the first arg is the sret pointer
       ;; Extract it from args now (so it's not processed as a regular arg)
-      ;; We'll emit the VOP to set x8 just before the call
-      (let ((sret-tn #+arm64 (when large-struct-return-p
-                               (lvar-tn call block (pop args)))
-                     #-arm64 nil))
+      ;; We'll emit the VOP to set x8 (ARM64) or RDI (x86-64) just before the call
+      (let ((sret-tn #+(or arm64 x86-64) (when large-struct-return-p
+                                           (lvar-tn call block (pop args)))
+                     #-(or arm64 x86-64) nil))
         (declare (ignorable sret-tn))
       #+x86
       (vop set-fpu-word-for-c call block)
@@ -854,8 +854,8 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        ;; For ARM64 large struct returns, set x8 with the sret pointer
-        ;; right before making the call
+        ;; For large struct returns, set the sret pointer register
+        ;; (x8 on ARM64, RDI on x86-64) right before making the call
         (when sret-tn
           (vop sb-vm::set-struct-return-pointer call block sret-tn))
         (cond #+#.(cl:if (sb-c::vop-existsp :named sb-vm::call-out-named) '(and) '(or))
