@@ -743,7 +743,12 @@
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
   (labels ((make-tn-maker (sc-name)
              (lambda (offset)
-               (make-random-tn (sc-or-lose sc-name) offset))))
+               (make-random-tn (sc-or-lose sc-name) offset)))
+           (argument-byte-size (type)
+             "Return the number of bytes this argument occupies in the callback vector."
+             (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
+           (round-up-to-word (bytes)
+             (* n-word-bytes (ceiling bytes n-word-bytes))))
     (let* ((segment (make-segment))
            (rax rax-tn)
            #+win32 (rcx rcx-tn)
@@ -755,59 +760,115 @@
            #+(and win32 sb-thread) (r8 r8-tn)
            (xmm0 float0-tn)
            ([rsp] (ea rsp))
-           ;; How many arguments have been copied
-           (arg-count 0)
-           ;; How many arguments have been copied from the stack
+           ;; Calculate total argument vector size in bytes
+           (total-arg-bytes
+             (loop for type in argument-types
+                   sum (round-up-to-word (argument-byte-size type))))
+           ;; How many arguments have been copied from the C stack
            (stack-argument-count #-win32 0 #+win32 4)
+           ;; Byte offset into argument vector
+           (arg-offset 0)
+           ;; Count of 8-byte slots consumed (for stack offset calculation)
+           (arg-slot-count (ceiling total-arg-bytes n-word-bytes))
            (gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*))
            (fprs (mapcar (make-tn-maker 'double-reg)
                          ;; Only 8 first XMM registers are used for
                          ;; passing arguments
                          (subseq *float-regs* 0 #-win32 8 #+win32 4))))
       (assemble (segment 'nil)
-        ;; Make room on the stack for arguments.
-        (when argument-types
-          (inst sub rsp (* n-word-bytes (length argument-types))))
-        ;; Copy arguments from registers to stack
+        ;; Make room on the stack for argument vector.
+        (when (plusp total-arg-bytes)
+          (inst sub rsp total-arg-bytes))
+        ;; Copy arguments from registers/stack to argument vector
         (dolist (type argument-types)
-          (let ((integerp (not (alien-float-type-p type)))
-                ;; A TN pointing to the stack location where the
-                ;; current argument should be stored for the purposes
-                ;; of ENTER-ALIEN-CALLBACK.
-                (target-tn (ea (* arg-count n-word-bytes) rsp))
-                ;; A TN pointing to the stack location that contains
-                ;; the next argument passed on the stack.
-                (stack-arg-tn (ea (* (+ 1 (length argument-types) stack-argument-count)
-                                     n-word-bytes) rsp)))
-            (incf arg-count)
-            (cond (integerp
-                   (let ((gpr (pop gprs)))
-                     #+win32 (pop fprs)
-                     ;; Argument not in register, copy it from the old
-                     ;; stack location to a temporary register.
-                     (unless gpr
-                       (incf stack-argument-count)
-                       (setf gpr rax)
-                       (inst mov gpr stack-arg-tn))
-                     ;; Copy from either argument register or temporary
-                     ;; register to target.
-                     (inst mov target-tn gpr)))
-                  ((or (alien-single-float-type-p type)
-                       (alien-double-float-type-p type))
-                   (let ((fpr (pop fprs)))
-                     #+win32 (pop gprs)
-                     (cond (fpr
-                            ;; Copy from float register to target location.
-                            (inst movq target-tn fpr))
-                           (t
-                            ;; Not in float register. Copy from stack to
-                            ;; temporary (general purpose) register, and
-                            ;; from there to the target location.
-                            (incf stack-argument-count)
-                            (inst mov rax stack-arg-tn)
-                            (inst mov target-tn rax)))))
-                  (t
-                   (bug "Unknown alien floating point type: ~S" type)))))
+          (let* ((arg-size (round-up-to-word (argument-byte-size type)))
+                 ;; A TN pointing to the stack location where the
+                 ;; current argument should be stored for the purposes
+                 ;; of ENTER-ALIEN-CALLBACK.
+                 (target-tn (ea arg-offset rsp))
+                 ;; Offset to C stack args (past return address and our arg vector)
+                 (stack-arg-tn (ea (* (+ 1 arg-slot-count stack-argument-count)
+                                      n-word-bytes) rsp)))
+            (cond
+              ;; Struct types
+              ((sb-alien::alien-record-type-p type)
+               (let* ((classification (classify-struct-x86-64 type))
+                      (memory-p (sb-alien::struct-classification-memory-p classification))
+                      (slots (sb-alien::struct-classification-register-slots classification))
+                      (struct-size (sb-alien::struct-classification-size classification)))
+                 (cond
+                   ;; Large struct (MEMORY class): passed directly on the C stack
+                   ;; The caller copies the struct to its stack frame
+                   (memory-p
+                    (let ((num-words (ceiling struct-size n-word-bytes)))
+                      ;; Copy struct data from C stack to our argument vector
+                      (loop for i from 0 below num-words
+                            for src-off = (* (+ 1 arg-slot-count stack-argument-count i)
+                                             n-word-bytes)
+                            for dst-off from arg-offset by n-word-bytes
+                            do (inst mov rax (ea src-off rsp))
+                               (inst mov (ea dst-off rsp) rax))
+                      ;; Account for the stack slots consumed
+                      (incf stack-argument-count num-words)))
+                   ;; Small struct: passed in up to 2 registers per eightbyte
+                   (t
+                    (loop for class in slots
+                          for slot-offset from arg-offset by n-word-bytes
+                          do (ecase class
+                               (:integer
+                                (let ((gpr (pop gprs)))
+                                  #+win32 (pop fprs)
+                                  (unless gpr
+                                    (incf stack-argument-count)
+                                    (setf gpr rax)
+                                    (inst mov gpr (ea (* (+ 1 arg-slot-count stack-argument-count -1)
+                                                         n-word-bytes) rsp)))
+                                  (inst mov (ea slot-offset rsp) gpr)))
+                               (:sse
+                                (let ((fpr (pop fprs)))
+                                  #+win32 (pop gprs)
+                                  (cond (fpr
+                                         (inst movq (ea slot-offset rsp) fpr))
+                                        (t
+                                         (incf stack-argument-count)
+                                         (inst mov rax (ea (* (+ 1 arg-slot-count stack-argument-count -1)
+                                                              n-word-bytes) rsp))
+                                         (inst mov (ea slot-offset rsp) rax)))))))))))
+
+              ;; Integer/pointer types
+              ((not (alien-float-type-p type))
+               (let ((gpr (pop gprs)))
+                 #+win32 (pop fprs)
+                 ;; Argument not in register, copy it from the old
+                 ;; stack location to a temporary register.
+                 (unless gpr
+                   (incf stack-argument-count)
+                   (setf gpr rax)
+                   (inst mov gpr stack-arg-tn))
+                 ;; Copy from either argument register or temporary
+                 ;; register to target.
+                 (inst mov target-tn gpr)))
+
+              ;; Float types
+              ((or (alien-single-float-type-p type)
+                   (alien-double-float-type-p type))
+               (let ((fpr (pop fprs)))
+                 #+win32 (pop gprs)
+                 (cond (fpr
+                        ;; Copy from float register to target location.
+                        (inst movq target-tn fpr))
+                       (t
+                        ;; Not in float register. Copy from stack to
+                        ;; temporary (general purpose) register, and
+                        ;; from there to the target location.
+                        (incf stack-argument-count)
+                        (inst mov rax stack-arg-tn)
+                        (inst mov target-tn rax)))))
+
+              (t
+               (bug "Unknown alien callback argument type: ~S" type)))
+            ;; Advance to next argument slot
+            (incf arg-offset arg-size)))
 
         (macrolet
             ((call-wrapper ()
@@ -824,7 +885,7 @@
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
           (inst mov rdi rsp)
           ;; add room on stack for return value
-          (inst sub rsp (if (evenp arg-count)
+          (inst sub rsp (if (evenp arg-slot-count)
                             (* n-word-bytes 2)
                             n-word-bytes))
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
@@ -847,7 +908,7 @@
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
           (inst mov #-win32 rsi #+win32 rdx rsp)
           ;; add room on stack for return value
-          (inst sub rsp (if (evenp arg-count)
+          (inst sub rsp (if (evenp arg-slot-count)
                             (* n-word-bytes 2)
                             n-word-bytes))
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
@@ -880,9 +941,9 @@
         ;; Pop the arguments and the return value from the stack to get
         ;; the return address at top of stack.
 
-        (inst add rsp (* (+ arg-count
+        (inst add rsp (* (+ arg-slot-count
                             ;; Plus the return value and make sure it's aligned
-                            (if (evenp arg-count)
+                            (if (evenp arg-slot-count)
                                 2
                                 1))
                          n-word-bytes))
