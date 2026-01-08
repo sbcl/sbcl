@@ -519,5 +519,62 @@
       (assert (= (deref (slot result 'arr) 1) 20.0))
       (assert (= (deref (slot result 'arr) 2) 30.0)))))
 
+;;;; Callback tests for struct-by-value parameters
+;;;; These test receiving structs by value in Lisp callbacks called from C
+
+;;; Define alien routines that call callbacks with struct parameters
+#+x86-64
+(progn
+  (define-alien-routine call-with-small-struct (integer 64)
+    (cb system-area-pointer) (v0 (integer 64)) (v1 (integer 64)))
+  (define-alien-routine call-with-large-struct (integer 64)
+    (cb system-area-pointer)
+    (v0 (integer 64)) (v1 (integer 64)) (v2 (integer 64)) (v3 (integer 64)))
+  (define-alien-routine call-with-two-structs (integer 64)
+    (cb system-area-pointer)
+    (a0 (integer 64)) (a1 (integer 64)) (b0 (integer 64)) (b1 (integer 64)))
+  (define-alien-routine call-with-float-struct double
+    (cb system-area-pointer) (d0 double) (d1 double)))
+
+;;; Test callback with small struct parameter (16 bytes, passed in registers)
+#+x86-64
+(with-test (:name :callback-struct-small)
+  (with-alien-callable
+      ((cb (integer 64) ((s (struct small-align-8)))
+         (+ (slot s 'm0) (slot s 'm1))))
+    (assert (= (call-with-small-struct (alien-sap cb) 10 20) 30))
+    (assert (= (call-with-small-struct (alien-sap cb) -100 200) 100))
+    (assert (= (call-with-small-struct (alien-sap cb) 0 0) 0))))
+
+;;; Test callback with large struct parameter (128 bytes, passed on stack)
+#+x86-64
+(with-test (:name :callback-struct-large)
+  (with-alien-callable
+      ((cb (integer 64) ((s (struct large-align-8)))
+         (+ (slot s 'm0) (slot s 'm1) (slot s 'm2) (slot s 'm3))))
+    (assert (= (call-with-large-struct (alien-sap cb) 1 2 3 4) 10))
+    (assert (= (call-with-large-struct (alien-sap cb) 100 200 300 400) 1000))
+    (assert (= (call-with-large-struct (alien-sap cb) -1 -2 -3 -4) -10))))
+
+;;; Test callback with two struct parameters (like clang_visitChildren pattern)
+#+x86-64
+(with-test (:name :callback-struct-two-structs)
+  (with-alien-callable
+      ((cb (integer 64) ((s1 (struct small-align-8))
+                         (s2 (struct small-align-8)))
+         (+ (slot s1 'm0) (slot s1 'm1)
+            (slot s2 'm0) (slot s2 'm1))))
+    (assert (= (call-with-two-structs (alien-sap cb) 1 2 3 4) 10))
+    (assert (= (call-with-two-structs (alien-sap cb) 10 20 30 40) 100))))
+
+;;; Test callback with float struct parameter (SSE registers)
+#+x86-64
+(with-test (:name :callback-struct-floats)
+  (with-alien-callable
+      ((cb double ((s (struct two-doubles)))
+         (+ (slot s 'd0) (slot s 'd1))))
+    (assert (= (call-with-float-struct (alien-sap cb) 1.5d0 2.5d0) 4.0d0))
+    (assert (= (call-with-float-struct (alien-sap cb) 100.0d0 200.0d0) 300.0d0))))
+
 ;;; Clean up
 #-win32 (ignore-errors (delete-file *soname*))
