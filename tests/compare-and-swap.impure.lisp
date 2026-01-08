@@ -604,10 +604,11 @@
 
 (defun should-test-dblcas ()
   #+arm64
-  (with-open-file (f "/proc/cpuinfo")
-    (loop repeat 4
-          thereis (let ((line (read-line f)))
-                    (and (search "Features" line) (search " atomics " line)))))
+  (with-open-file (f "/proc/cpuinfo" :if-does-not-exist nil)
+    (and f
+         (loop repeat 4
+               thereis (let ((line (read-line f)))
+                         (and (search "Features" line) (search " atomics " line))))))
   #+(or x86 x86-64)
   (multiple-value-bind (a b c d) (%cpu-identification 0 0)
     (declare (ignore b c d))
