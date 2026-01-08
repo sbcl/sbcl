@@ -126,19 +126,24 @@
   "Classify a single field type for x86-64 ABI.
    Returns :INTEGER, :SSE, or :MEMORY."
   (cond
+    ;; Check specific types first, before general type checks
     ((sb-alien::alien-integer-type-p type) :integer)
     ((sb-alien::alien-pointer-type-p type) :integer)
-    ((typep type 'sb-alien::alien-system-area-pointer-type) :integer)
     ((sb-alien::alien-single-float-type-p type) :sse)
     ((sb-alien::alien-double-float-type-p type) :sse)
+    ;; Arrays are classified by their element type
+    ((sb-alien::alien-array-type-p type)
+     (let ((element-type (sb-alien::alien-array-type-element-type type)))
+       (classify-field-x86-64 element-type)))
+    ;; Nested struct - recursively classify
     ((sb-alien::alien-record-type-p type)
-     ;; Recursively classify nested struct - if it's MEMORY, propagate that
      (let ((nested (classify-struct-x86-64 type)))
        (if (sb-alien::struct-classification-memory-p nested)
            :memory
            ;; For nested structs that fit in registers, treat as INTEGER
-           ;; since the struct's fields have been merged
            :integer)))
+    ;; System-area-pointer (must come after array/record checks)
+    ((typep type 'sb-alien::alien-system-area-pointer-type) :integer)
     (t :memory)))
 
 ;;; Merge two classes within an eightbyte per ABI rules
@@ -176,13 +181,17 @@
       (dolist (field (sb-alien::alien-record-type-fields record-type))
         (let* ((field-offset-bits (sb-alien::alien-record-field-offset field))
                (field-type (sb-alien::alien-record-field-type field))
+               (field-bits (sb-alien::alien-type-bits field-type))
                (field-offset-bytes (floor field-offset-bits 8))
-               (eightbyte-index (floor field-offset-bytes 8))
+               (field-size-bytes (ceiling field-bits 8))
                (field-class (classify-field-x86-64 field-type)))
-          (when (< eightbyte-index num-eightbytes)
-            (setf (nth eightbyte-index eightbytes)
-                  (merge-classes (nth eightbyte-index eightbytes)
-                                 field-class)))))
+          ;; Apply class to all eightbytes this field spans
+          (loop for byte-offset from field-offset-bytes below (+ field-offset-bytes field-size-bytes) by 8
+                for eightbyte-index = (floor byte-offset 8)
+                when (< eightbyte-index num-eightbytes)
+                do (setf (nth eightbyte-index eightbytes)
+                         (merge-classes (nth eightbyte-index eightbytes)
+                                        field-class)))))
 
       ;; Post-merge cleanup per ABI: if second eightbyte is MEMORY, first must be too
       (when (and (> num-eightbytes 1)
@@ -266,16 +275,45 @@
   (:generator 5
     (inst movsd (ea offset sap) value)))
 
+;;; VOP to copy a qword from struct SAP to the C argument stack
+;;; Used for passing large structs (>16 bytes) by value on x86-64
+(define-vop (copy-struct-arg-to-stack)
+  (:args (sap :scs (sap-reg))
+         (nsp :scs (any-reg)))
+  (:info src-offset dst-offset)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 5
+    (inst mov :qword temp (ea src-offset sap))
+    (inst mov :qword (ea dst-offset nsp) temp)))
+
 ;;; Arg TN generation for record types on x86-64
 ;;; Called from src/code/c-call.lisp
 (defun record-arg-tn-x86-64 (type state)
   "Handle struct arguments on x86-64.
-   For large structs (>16 bytes), returns a SAP TN for pointer passing.
-   For small structs, returns a function that emits load VOPs."
+   For large structs (>16 bytes), copies to stack per System V AMD64 ABI.
+   For small structs, returns a function that emits load VOPs into registers."
   (let ((classification (classify-struct-x86-64 type)))
     (if (sb-alien::struct-classification-memory-p classification)
-        ;; Large struct: pass by hidden pointer (SAP)
-        (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number)
+        ;; Large struct: copy to stack (System V AMD64 ABI)
+        ;; The struct is passed by value on the stack, not by pointer
+        (let* ((size (sb-alien::struct-classification-size classification))
+               (words (ceiling size 8))
+               (stack-base (arg-state-stack-frame-size state)))
+          ;; Reserve stack slots for the struct
+          (incf (arg-state-stack-frame-size state) words)
+          ;; Return a function that copies the struct to the stack
+          (lambda (arg call block nsp)
+            (let ((sap-tn (sb-c::lvar-tn call block arg)))
+              (loop for i from 0 below words
+                    for src-offset = (* i 8)
+                    for dst-offset = (* (+ stack-base i) n-word-bytes)
+                    do (sb-c::emit-and-insert-vop
+                        call block
+                        (sb-c::template-or-lose 'copy-struct-arg-to-stack)
+                        (sb-c::reference-tn-list (list sap-tn nsp) nil)
+                        nil  ; no results
+                        nil  ; insert at end
+                        (list src-offset dst-offset))))))
         ;; Small struct: allocate target TNs and return a function to load into them
         (let ((arg-tns nil)
               (offsets nil)
@@ -334,24 +372,25 @@
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state))
         (result-type (alien-fun-type-result-type type)))
-    (collect ((arg-tns))
-      (dolist (arg-type (alien-fun-type-arg-types type))
-        (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
-      ;; Check if result is a large struct that needs hidden pointer
-      (let* ((stack-frame-size (* (arg-state-stack-frame-size arg-state) n-word-bytes))
-             ;; For large struct returns, we don't allocate stack space here
-             ;; The IR1 transform allocates heap memory and passes it as first arg
-             ;; We just return a flag indicating this is a large struct return
-             (large-struct-return-p
-               (when (sb-alien::alien-record-type-p result-type)
-                 (let ((classification (classify-struct-x86-64 result-type)))
-                   (sb-alien::struct-classification-memory-p classification)))))
-        (values (make-wired-tn* 'positive-fixnum any-reg-sc-number rsp-offset)
-                stack-frame-size
-                (arg-tns)
-                (invoke-alien-type-method :result-tn result-type (make-result-state))
-                ;; 5th value: T if large struct return (sret pointer passed as first arg)
-                large-struct-return-p)))))
+    ;; Check for large struct return FIRST - we need to reserve RDI for sret pointer
+    (let ((large-struct-return-p
+            (when (sb-alien::alien-record-type-p result-type)
+              (let ((classification (classify-struct-x86-64 result-type)))
+                (sb-alien::struct-classification-memory-p classification)))))
+      ;; For large struct returns, consume RDI (first int arg register)
+      ;; so regular arguments start from RSI
+      (when large-struct-return-p
+        (setf (arg-state-register-args arg-state) 1))
+      (collect ((arg-tns))
+        (dolist (arg-type (alien-fun-type-arg-types type))
+          (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
+        (let ((stack-frame-size (* (arg-state-stack-frame-size arg-state) n-word-bytes)))
+          (values (make-wired-tn* 'positive-fixnum any-reg-sc-number rsp-offset)
+                  stack-frame-size
+                  (arg-tns)
+                  (invoke-alien-type-method :result-tn result-type (make-result-state))
+                  ;; 5th value: T if large struct return (sret pointer passed as first arg)
+                  large-struct-return-p))))))
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
@@ -361,11 +400,14 @@
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type))
          ;; Large struct returns have a hidden first arg (sret pointer) added by IR1
+         #-sb-xc-host
          (large-struct-return-p
            (multiple-value-bind (in-registers-p register-slots size)
                (sb-alien::struct-return-info result-type)
              (declare (ignore register-slots))
-             (and size (not in-registers-p)))))
+             (and size (not in-registers-p))))
+         #+sb-xc-host
+         (large-struct-return-p nil))
     (aver (= (length arg-types)
              (- (length args) (if large-struct-return-p 1 0))))
     (if (or (some #'(lambda (type)

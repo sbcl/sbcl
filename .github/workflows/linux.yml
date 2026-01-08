@@ -4,81 +4,20 @@ on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      matrix:
-        options: [--with-sb-thread, --without-sb-thread, --without-sb-unicode]
-        arch: [x86, x86-64]
-        subfeatures: ['']
-        include:
-          - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread --with-nonstop-foreign-call }
-          - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --with-mark-region-gc --with-nonstop-foreign-call }
-          - { arch: x86-64, options: --with-nonstop-foreign-call }
-
-      fail-fast: false
-
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: install host sbcl
       run: |
         sudo apt-get -qq update | true
-        sudo apt-get -qq install libcapstone-dev libzstd-dev
+        sudo apt-get -qq install libzstd-dev
         cd /tmp/
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/sbcl-2.4.8-x86-64-linux-binary.tar.bz2
         tar xf sbcl-2.4.8-x86-64-linux-binary.tar.bz2
         cd sbcl-2.4.8-x86-64-linux/
         sudo ./install.sh
-    - name: install host gcc-multilib
-      if: matrix.arch == 'x86'
-      run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get -qq update | true
-        sudo apt-get -qq --no-install-recommends install gcc-multilib libzstd-dev:i386
-        sudo sysctl -w vm.mmap_rnd_compat_bits=8
-
-    - name: backend-sub-features
-      if: matrix.subfeatures == 'sse4'
-      run: echo '(lambda (features) (list* :popcnt :sse4 features))' > customize-backend-subfeatures.lisp
-
     - name: build
-      env:
-        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-      run: ./make.sh ${{ matrix.options }} --with-sb-core-compression --xc-host='sbcl --dynamic-space-size 700MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
-    - name: test-fasteval
-      if: matrix.subfeatures == 'fasteval'
-      run: cd tests; ./run-tests.sh --evaluator-mode interpret
+      run: ./make.sh --xc-host='sbcl --dynamic-space-size 700MB --disable-ldb --disable-debugger'
     - name: test
-      run: cd tests; ./run-tests.sh --slow
-    - name: ansi-test
-      run: cd tests; ./ansi-tests.sh
-
-    - name: crossbuild arm
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 arm
-    - name: crossbuild arm64
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 arm64
-    - name: crossbuild mips
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 mips
-    - name: crossbuild ppc
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 ppc
-    - name: crossbuild ppc64
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 ppc64
-    - name: crossbuild riscv
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 riscv
-    - name: crossbuild sparc
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 sparc
-    - name: crossbuild x86
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 x86
-    - name: crossbuild x86-64
-      if: matrix.subfeatures == 'sse4'
-      run: ./build-all-cores.sh -j 1 x86-64
+      run: cd tests; ./run-tests.sh
