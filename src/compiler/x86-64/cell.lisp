@@ -719,7 +719,6 @@
 ;;;;
 
 (defknown %cons-cas-pair (cons t t t t) (values t t))
-(defknown %vector-cas-pair (simple-vector index t t t t) (values t t))
 ;; %INSTANCE-CAS-PAIR only operates on tagged slots (for now)
 (defknown %instance-cas-pair (instance index t t t t) (values t t))
 
@@ -761,6 +760,7 @@
           ;; this is sufficiently confusing that I don't want to try reusing
           ;; one of the other declared temps as the EA for the store barrier.
           (:temporary (:sc unsigned-reg) temp)
+          ;; FIXME: these operand lifetimes are wrong for INDEXEDP = NIL.
           (:temporary (:sc unsigned-reg :offset rax-offset
                        :from (:argument 2) :to (:result 0)) eax)
           (:temporary (:sc unsigned-reg :offset rdx-offset
