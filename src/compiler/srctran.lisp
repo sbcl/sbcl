@@ -5297,16 +5297,18 @@
                      value)))
              (handle-multiplication (combination value)
                (cond (divide
-                      (let ((gcd (gcd constant value)))
-                        (unless (= gcd 1)
-                          (erase-node-type combination *wild-type* nil outer-node)
-                          (setf new t
-                                constant (truncate constant gcd))
-                          (transform-call combination
-                                          `(lambda (x y)
-                                             (declare (ignore y))
-                                             (* x ,(truncate value gcd)))
-                                          'associate-multiplication-constants))))
+                      (when (and (integerp constant)
+                                 (integerp value))
+                        (let ((gcd (gcd constant value)))
+                          (unless (= gcd 1)
+                            (erase-node-type combination *wild-type* nil outer-node)
+                            (setf new t
+                                  constant (truncate constant gcd))
+                            (transform-call combination
+                                            `(lambda (x y)
+                                               (declare (ignore y))
+                                               (* x ,(truncate value gcd)))
+                                            'associate-multiplication-constants)))))
                      (t
                       (erase-node-type combination *wild-type* nil outer-node)
                       (setf new t
