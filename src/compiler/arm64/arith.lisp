@@ -763,52 +763,6 @@
          (inst lsl result number temp))))
     done))
 
-#+nil
-(define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
-  (:note "inline ASH")
-  (:translate ash-modfx)
-  (:args (number :scs (signed-reg unsigned-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
-  (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (any-reg)))
-  (:arg-refs nil amount-ref)
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) temp temp-result)
-  (:generator 5
-    (inst subs temp amount zr-tn)
-    (inst b :ge LEFT)
-    (inst neg temp temp)
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer -63 *)))
-           (sc-case number
-             (signed-reg (inst asr temp-result number temp))
-             (unsigned-reg (inst lsr temp-result number temp))))
-          (t
-           (inst cmp temp n-word-bits)
-           (sc-case number
-             (signed-reg
-              ;; Only the first 6 bits count for shifts.
-              ;; This sets all bits to 1 if AMOUNT is larger than 63,
-              ;; cutting the amount to 63.
-              (inst csinv temp temp zr-tn :lo)
-              (inst asr temp-result number temp))
-             (unsigned-reg
-              (inst csel temp-result number zr-tn :lo)
-              (inst lsr temp-result temp-result temp)))))
-
-    (inst b END)
-    LEFT
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer * 63)))
-           (inst lsl temp-result number temp))
-          (t
-           (inst cmp temp n-word-bits)
-           (inst csel temp-result number zr-tn :lo)
-           (inst lsl temp-result temp-result temp)))
-    END
-    (inst lsl result temp-result n-fixnum-tag-bits)))
-
 (define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
   (:args (number :scs (signed-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
