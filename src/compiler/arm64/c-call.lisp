@@ -622,8 +622,13 @@
 
 #-sb-xc-host
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
-  (flet ((make-tn (offset &optional (sc-name 'any-reg))
-           (make-random-tn (sc-or-lose sc-name) offset)))
+  (labels ((make-tn (offset &optional (sc-name 'any-reg))
+             (make-random-tn (sc-or-lose sc-name) offset))
+           (argument-byte-size (type)
+             "Return the number of bytes this argument occupies in the callback vector."
+             (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
+           (round-up-to-word (bytes)
+             (* n-word-bytes (ceiling bytes n-word-bytes))))
     ;; Calculate frame size: sum of all argument sizes
     (let* ((segment (make-segment))
            ;; Current byte offset in the argument frame
@@ -641,8 +646,7 @@
            (fp-registers 0)
            ;; Calculate frame size from argument types (word-aligned)
            (frame-size (loop for type in argument-types
-                             sum (ceiling (sb-alien::alien-type-word-aligned-bits type)
-                                          n-byte-bits))))
+                             sum (round-up-to-word (argument-byte-size type)))))
       (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
                                  +number-stack-alignment-mask+))
       (assemble (segment 'nil)
@@ -713,9 +717,8 @@
                    (incf frame-offset (if (alien-single-float-type-p type) 4 8)))
                   ;; Handle struct-by-value arguments
                   ((sb-alien::alien-record-type-p type)
-                   (let* ((struct-bytes (ceiling (sb-alien::alien-type-bits type) n-byte-bits))
-                          (struct-bytes-aligned (ceiling (sb-alien::alien-type-word-aligned-bits type)
-                                                         n-byte-bits))
+                   (let* ((struct-bytes (argument-byte-size type))
+                          (struct-bytes-aligned (round-up-to-word struct-bytes))
                           (classification (classify-struct-arm64 type))
                           ;; Use r11 as additional temp for struct pointer
                           (ptr-tn (make-tn 11)))
