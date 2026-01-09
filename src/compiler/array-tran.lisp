@@ -1878,9 +1878,17 @@
 ;;; however, here we also need the -OR-GIVE-UP for the transforms, and
 ;;; maybe this is just too sloppy for actual type logic.  -- CSR,
 ;;; 2004-02-18
-(defun array-type-dimensions-or-give-up (type)
+(defun array-type-dimensions-or-give-up (type &optional (give-up t))
   (let ((no-dimension '#:no))
-    (labels ((maybe-array-type-dimensions (type)
+    (labels ((give-up (error)
+               (if give-up
+                   (give-up-ir1-transform error (type-specifier type))
+                   (return-from array-type-dimensions-or-give-up '*)))
+             (abort-ir1 (error)
+               (if give-up
+                   (abort-ir1-transform error (type-specifier type))
+                   (return-from array-type-dimensions-or-give-up '*)))
+             (maybe-array-type-dimensions (type)
                (typecase type
                  (array-type
                   (array-type-dimensions type))
@@ -1899,9 +1907,7 @@
                          (complete-match t))
                     (dolist (other (cdr types))
                       (when (/= length (length other))
-                        (give-up-ir1-transform
-                         "~@<dimensions of arrays in union type ~S do not match~:@>"
-                         (type-specifier type)))
+                        (give-up "~@<dimensions of arrays in union type ~S do not match~:@>"))
                       (unless (equal result other)
                         (setf complete-match nil)))
                     (if complete-match
@@ -1914,9 +1920,7 @@
                          (result (car types)))
                     (dolist (other (cdr types))
                       (unless (equal result other)
-                        (abort-ir1-transform
-                         "~@<dimensions of arrays in intersection type ~S do not match~:@>"
-                         (type-specifier type))))
+                        (abort-ir1 "~@<dimensions of arrays in intersection type ~S do not match~:@>")))
                     (if types
                         result
                         no-dimension)))
@@ -1924,9 +1928,7 @@
                   no-dimension))))
       (let ((dim (maybe-array-type-dimensions type)))
         (if (eq dim no-dimension)
-            (give-up-ir1-transform
-             "~@<don't know how to extract array dimensions from type ~S~:@>"
-             (type-specifier type))
+            (give-up "~@<don't know how to extract array dimensions from type ~S~:@>")
             dim)))))
 
 (defun conservative-array-type-complexp (type)
@@ -2037,6 +2039,21 @@
             (t
              '(%array-dimension array axis))))))
 
+(defoptimizer (array-dimension derive-type) ((array axis))
+  (let* ((array-type (lvar-conservative-type array))
+         (dims (array-type-dimensions-or-give-up array-type nil))
+         (axis-type (lvar-type axis))
+         results)
+    (when (listp dims)
+      (loop for i from 0
+            for dim in dims
+            when (ctypep i axis-type)
+            do
+            (when (eq dim '*)
+              (return-from array-dimension-derive-type-optimizer))
+            (push dim results))
+      (sb-kernel::member-rational results))))
+
 (deftransform %array-dimension ((array axis)
                                 (array (constant-arg index)))
   (let* ((array-type (lvar-conservative-type array))
@@ -2066,32 +2083,28 @@
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
 (defun vector-length-type (array-type)
-  (block nil
-    (catch 'give-up-ir1-transform
-      (return
-        (let ((dim (array-type-dimensions-or-give-up array-type)))
-          (if (and (typep dim '(cons integer))
-                   (not (conservative-array-type-complexp array-type)))
-              (specifier-type `(eql ,(first dim)))
-              (let (min-length
-                    max-length)
-                (when (and (union-type-p array-type)
-                           (loop for type in (union-type-types array-type)
-                                 for dim = (array-type-dimensions-or-give-up type)
-                                 always (typep dim '(cons integer null))
-                                 do (let ((length (car dim)))
-                                      (cond ((conservative-array-type-complexp type)
-                                             ;; fill-pointer can start from 0
-                                             (setf min-length 0))
-                                            ((or (not min-length)
-                                                 (< length min-length))
-                                             (setf min-length length)))
-                                      (when (or (not max-length)
-                                                (> length max-length))
-                                        (setf max-length length)))))
-                  (specifier-type `(integer ,(or min-length 0)
-                                            ,max-length))))))))
-    nil))
+  (let ((dim (array-type-dimensions-or-give-up array-type nil)))
+    (if (and (typep dim '(cons integer))
+             (not (conservative-array-type-complexp array-type)))
+        (specifier-type `(eql ,(first dim)))
+        (let (min-length
+              max-length)
+          (when (and (union-type-p array-type)
+                     (loop for type in (union-type-types array-type)
+                           for dim = (array-type-dimensions-or-give-up type nil)
+                           always (typep dim '(cons integer null))
+                           do (let ((length (car dim)))
+                                (cond ((conservative-array-type-complexp type)
+                                       ;; fill-pointer can start from 0
+                                       (setf min-length 0))
+                                      ((or (not min-length)
+                                           (< length min-length))
+                                       (setf min-length length)))
+                                (when (or (not max-length)
+                                          (> length max-length))
+                                  (setf max-length length)))))
+            (specifier-type `(integer ,(or min-length 0)
+                                      ,max-length)))))))
 
 (defoptimizer (vector-length derive-type) ((vector))
   (vector-length-type (lvar-conservative-type vector)))
