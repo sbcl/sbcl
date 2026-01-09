@@ -2003,43 +2003,32 @@
 (defoptimizer (array-rank derive-type) ((array))
   (derive-array-rank (lvar-type array)))
 
-;;; If we know the dimensions at compile time, just use it. Otherwise,
-;;; if we can tell that the axis is in bounds, convert to
-;;; %ARRAY-DIMENSION (which just indirects the array header) or length
-;;; (if it's simple and a vector).
-(deftransform array-dimension ((array axis)
-                               (array index))
-  (unless (constant-lvar-p axis)
-    (give-up-ir1-transform "The axis is not constant."))
-  ;; Dimensions may change thanks to ADJUST-ARRAY, so we need the
-  ;; conservative type.
-  (let* ((array-type (lvar-conservative-type array))
-         (axis (lvar-value axis))
-         (dims (array-type-dimensions-or-give-up array-type)))
-    (unless (listp dims)
-      (give-up-ir1-transform
-       "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
-    (unless (> (length dims) axis)
-      (abort-ir1-transform "The array has dimensions ~S, ~W is too large."
-                           dims
-                           axis))
-    (let ((dim (nth axis dims)))
-      (cond ((integerp dim)
-             dim)
-            ((= (length dims) 1)
-             (ecase (conservative-array-type-complexp array-type)
-               ((t)
-                '(%array-dimension array 0))
-               ((nil)
-                '(vector-length array))
-               ((:maybe)
-                `(if (array-header-p array)
-                     (%array-dimension array axis)
-                     (vector-length array)))))
-            (t
-             '(%array-dimension array axis))))))
+(deftransform array-dimension ((array axis))
+  (let* ((array-type (lvar-type array))
+         (dims (array-type-dimensions-or-give-up array-type nil))
+         (rank (and (listp dims)
+                    (length dims)))
+         (complexp (conservative-array-type-complexp array-type)))
+    (cond ((eql rank 1)
+           `(progn
+              (the (mod 1) axis)
+              ,(ecase (conservative-array-type-complexp array-type)
+                 ((t)
+                  '(%array-dimension array 0))
+                 ((nil)
+                  '(vector-length array))
+                 ((:maybe)
+                  `(if (array-header-p array)
+                       (%array-dimension array axis)
+                       (vector-length array))))))
+          ((and rank
+                (not (and (eql rank 1)
+                          (eq complexp :maybe))))
+           `(%array-dimension array (the (mod ,rank) axis)))
+          (t
+           (give-up-ir1-transform)))))
 
-(defoptimizer (array-dimension derive-type) ((array axis))
+(defoptimizers derive-type (array-dimension %array-dimension) ((array axis))
   (let* ((array-type (lvar-conservative-type array))
          (dims (array-type-dimensions-or-give-up array-type nil))
          (axis-type (lvar-type axis))
@@ -2053,17 +2042,6 @@
               (return-from array-dimension-derive-type-optimizer))
             (push dim results))
       (sb-kernel::member-rational results))))
-
-(deftransform %array-dimension ((array axis)
-                                (array (constant-arg index)))
-  (let* ((array-type (lvar-conservative-type array))
-         (dims (array-type-dimensions-or-give-up array-type))
-         (axis (lvar-value axis))
-         (dim (and (listp dims)
-                   (nth axis dims))))
-    (if (integerp dim)
-        dim
-        (give-up-ir1-transform))))
 
 ;;; All vectors can get their length by using VECTOR-LENGTH. If it's
 ;;; simple, it will extract the length slot from the vector. It it's
