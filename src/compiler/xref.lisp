@@ -184,13 +184,14 @@
 ;;;; {READ,WRITE}-VAR-INTEGER). The contained sequence of integers is
 ;;;; of the following form:
 ;;;;
-;;;;   packed-entries        ::= NAME-BITS NUMBER-BITS entries-for-xref-kind+
+;;;;   packed-entries        ::= NAME-BITS NUMBER-COUNT-BITS entries-for-xref-kind+
 ;;;;   entries-for-xref-kind ::= XREF-KIND-AND-ENTRY-COUNT entry+
-;;;;   entry                 ::= NAME-INDEX-AND-FORM-NUMBER
+;;;;   entry                 ::= NAME-INDEX-AND-FORM-NUMBER-COUNT
+;;;;   n-form-numbers+:  each number is an offset from the previous, starting from 0
 ;;;;
-;;;; where NAME-BITS and NUMBER-BITS are variable-width integers that
+;;;; where NAME-BITS and NUMBER-COUNT-BITS are variable-width integers that
 ;;;; encode the number of bits used for name indices in
-;;;; NAME-INDEX-AND-FORM-NUMBER and the number of bits used for form
+;;;; NAME-INDEX-AND-FORM-NUMBER-COUNT and the number of bits used for form
 ;;;; numbers in NAME-INDEX-AND-FORM-NUMBER respectively,
 ;;;;
 ;;;; XREF-KIND-AND-ENTRY-COUNT is a variable-width integer cc...kkk
@@ -219,7 +220,7 @@
 ;;;; determine the largest form number that will be encoded. Then:
 ;;;;
 ;;;;   name-bits   <- (integer-length LARGEST-NAME-INDEX)
-;;;;   number-bits <- (integer-length LARGEST-FORM-NUMBER)
+;;;;   number-bits <- (integer-length LARGEST-FORM-NUMBER-COUNT)
 
 ;;; Will be overwritten with 64 most frequently cross referenced
 ;;; names.
@@ -289,7 +290,7 @@
                                           cell))))
                           (pushnew number (cdr cell) :test #'=)
                           (setf max-index (max max-index index)
-                                max-number (max max-number number)))))
+                                max-number (max max-number (length (cdr cell)))))))
                     records))))
         (loop for (kind records) on xref-data by #'cddr
            when records do (collect-entries-for-kind kind records)))
@@ -303,13 +304,16 @@
         (write-var-integer name-bits vector)
         (write-var-integer number-bits vector)
         (loop for (kind-number . kind-entries) in entries
-           for kind-count = (reduce #'+ kind-entries
-                                    :key (lambda (entry) (length (cdr entry))))
-           do (write-var-integer
-               (encode-kind-and-count kind-number kind-count) vector)
-             (loop for (index . numbers) in kind-entries
-                do (dolist (number numbers)
-                     (write-var-integer (funcall encoder index number) vector))))
+              for kind-count = (length kind-entries)
+              do (write-var-integer
+                  (encode-kind-and-count kind-number kind-count) vector)
+                 (loop for (index . numbers) in kind-entries
+                       do
+                       (write-var-integer (funcall encoder index (length numbers)) vector)
+                       (let ((prev 0))
+                         (dolist (number (sort numbers #'<))
+                           (write-var-integer (- number prev) vector)
+                           (setf prev number)))))
         (setf (aref result 0)
               (coerce vector '(simple-array (unsigned-byte 8) 1))))
       ;; RESULT is adjustable. Make it simple.
@@ -333,11 +337,14 @@
                      (read-var-integerf packed offset)
                      (read-var-integerf packed offset))))
       (loop while (< offset (length packed))
-         do (binding* (((kind-number record-count)
-                        (decode-kind-and-count (read-var-integerf packed offset)))
-                       (kind (elt +xref-kinds+ kind-number)))
-              (loop repeat record-count
-                 do (binding* (((index number)
-                                (funcall decoder (read-var-integerf packed offset)))
-                               (name (funcall lookup index)))
-                      (funcall function kind name number))))))))
+            do (binding* (((kind-number record-count)
+                           (decode-kind-and-count (read-var-integerf packed offset)))
+                          (kind (elt +xref-kinds+ kind-number)))
+                 (loop repeat record-count
+                       do (binding* (((index number-count)
+                                      (funcall decoder (read-var-integerf packed offset)))
+                                     (name (funcall lookup index)))
+                            (loop repeat number-count
+                                  for form-number = (read-var-integerf packed offset)
+                                  do
+                                  (funcall function kind name form-number)))))))))
