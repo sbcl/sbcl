@@ -742,7 +742,7 @@
            ,right)
         `(if (minusp count)
              ,right
-             (logand most-positive-word (ash x (truly-the unsigned-byte count)))))))
+             (mask-signed-field sb-vm:n-fixnum-bits (ash x (truly-the unsigned-byte count)))))))
 
 (deftransform ash-into-word-modfx ((x count) (t (constant-arg (integer * (#.(- sb-vm:n-word-bits))))))
   (let ((count (- (lvar-value count))))
