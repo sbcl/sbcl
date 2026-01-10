@@ -549,7 +549,7 @@
 ;;;; ALIEN-FUNCALL support
 
 ;;; Generate code to store struct register values to memory
-#+(and arm64 (not sb-xc-host))
+#-sb-xc-host
 (defun generate-struct-store-code (temps register-slots result-sap)
   "Generate SETF forms to store register values to struct memory."
   (let ((offset 0)
@@ -561,11 +561,11 @@
          (push `(setf (sb-sys:sap-ref-64 ,result-sap ,offset) ,(nth temp-idx temps)) stores)
          (incf offset 8)
          (incf temp-idx))
-        ((:sse :sse-double)
+        (:double
          (push `(setf (sb-sys:sap-ref-double ,result-sap ,offset) ,(nth temp-idx temps)) stores)
          (incf offset 8)
          (incf temp-idx))
-        (:sse-single
+        (:single
          (push `(setf (sb-sys:sap-ref-single ,result-sap ,offset) ,(nth temp-idx temps)) stores)
          (incf offset 4)
          (incf temp-idx))))
@@ -599,17 +599,17 @@
               (params param)
               (deports `(deport ,param ',arg-type))))
           ;; Build BODY from the inside out.
-          ;; First, detect if this is a large struct return (ARM64 hidden pointer)
+          ;; First, detect if this is a large struct return (hidden pointer)
           (let* ((return-type (alien-fun-type-result-type alien-type))
-                 ;; Check for large struct return (needs hidden pointer in x8)
-                 #+(and arm64 (not sb-xc-host))
+                 ;; Check for large struct return (needs hidden pointer)
+                 #-sb-xc-host
                  (large-struct-size
                    (multiple-value-bind (in-registers-p register-slots size)
                        (sb-alien::struct-return-info return-type)
                      (declare (ignore register-slots))
                      (when (and size (not in-registers-p))
                        size)))
-                 #-(and arm64 (not sb-xc-host))
+                 #+sb-xc-host
                  (large-struct-size nil)
                  ;; For large struct returns, we need a gensym for the sret pointer
                  (sret-sap (when large-struct-size (gensym "SRET-SAP")))
@@ -635,7 +635,7 @@
                          `(deport function ',alien-type))
                     ',alien-type
                     ;; For large struct returns, prepend sret-sap as first arg
-                    ;; IR2 will recognize this and put it in x8 (ARM64)
+                    ;; IR2 will put it in the hidden pointer register (x8 on ARM64, RDI on x86-64)
                     ,@(when sret-sap (list sret-sap))
                     ,@(deports))))
             ;; Wrap that in a WITH-PINNED-OBJECTS to ensure the values
@@ -666,8 +666,8 @@
                  (setf body
                        `(multiple-value-bind ,(temps) ,body
                           (values ,@(results))))))
-              ;; Struct-by-value return handling (ARM64)
-              #+(and arm64 (not sb-xc-host))
+              ;; Struct-by-value return handling
+              #-sb-xc-host
               ((multiple-value-bind (in-registers-p register-slots size)
                    (sb-alien::struct-return-info return-type)
                  (cond
@@ -682,7 +682,7 @@
                                  ,@(generate-struct-store-code temps register-slots result-sap)
                                  (sb-alien::%sap-alien ,result-sap ',return-type))))
                       t))
-                   ;; Large struct: C expects hidden pointer in x8, returns same in x0
+                   ;; Large struct: C expects hidden pointer (x8/RDI), returns it (x0/RAX)
                    ;; sret-sap was already added to %alien-funcall args at the top
                    ;; Here we wrap with allocation and return the sap-alien
                    ((and size (not in-registers-p))
@@ -715,8 +715,8 @@
          (spec (compute-alien-rep-type result-type :result)))
     (cond
       ;; For struct-by-value returns, derive the multiple-values type
-      ;; based on the eightbyte classification (ARM64)
-      #+(and arm64 (not sb-xc-host))
+      ;; based on the register slot classification
+      #-sb-xc-host
       ((multiple-value-bind (in-registers-p register-slots)
            (sb-alien::struct-return-info result-type)
          (when in-registers-p
@@ -725,8 +725,8 @@
             (mapcar (lambda (class)
                       (case class
                         (:integer (specifier-type '(unsigned-byte 64)))
-                        ((:sse :sse-double) (specifier-type 'double-float))
-                        (:sse-single (specifier-type 'single-float))
+                        (:double (specifier-type 'double-float))
+                        (:single! (specifier-type 'single-float))
                         (t *universal-type*)))
                     register-slots)))))
       (t
@@ -764,14 +764,16 @@
         #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns
-                          #+arm64 large-struct-return-p)
+                          #+(or arm64 x86-64) large-struct-return-p)
         (make-call-out-tns type)
-      ;; For ARM64 large struct returns, the first arg is the sret pointer
-      ;; Extract it from args now (so it's not processed as a regular arg)
-      ;; We'll emit the VOP to set x8 just before the call
-      (let ((sret-tn #+arm64 (when large-struct-return-p
-                               (lvar-tn call block (pop args)))
-                     #-arm64 nil))
+      ;; For large struct returns, the first arg is the sret pointer
+      ;; Extract it from args so it's not processed as a regular arg
+      ;; Emit the VOP to set x8 (ARM64) or RDI (x86-64) just before
+      ;; the call. Watch out for the kludge above, if anyone comes
+      ;; along and writes sret for arm32.
+      (let ((sret-tn #+(or arm64 x86-64) (when large-struct-return-p
+                                           (lvar-tn call block (pop args)))
+                     #-(or arm64 x86-64) nil))
         (declare (ignorable sret-tn))
       #+x86
       (vop set-fpu-word-for-c call block)
@@ -854,8 +856,8 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        ;; For ARM64 large struct returns, set x8 with the sret pointer
-        ;; right before making the call
+        ;; For large struct returns, set the sret pointer register
+        ;; (x8 on ARM64, RDI on x86-64) right before making the call
         (when sret-tn
           (vop sb-vm::set-struct-return-pointer call block sret-tn))
         (cond #+#.(cl:if (sb-c::vop-existsp :named sb-vm::call-out-named) '(and) '(or))

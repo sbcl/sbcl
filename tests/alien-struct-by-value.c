@@ -259,3 +259,56 @@ float float_array_3_sum(struct float_array_3 m) {
 struct float_array_3 float_array_3_identity(struct float_array_3 m) {
   return m;
 }
+
+/** Callback tests for struct-by-value parameters */
+
+/* Callback type taking a small struct (16 bytes, passed in registers) */
+typedef long long (*small_struct_callback)(struct small_align_8 s);
+
+/* Callback type taking a large struct (32+ bytes, passed on stack) */
+typedef long long (*large_struct_callback)(struct large_align_8 s);
+
+/* Callback type taking two small structs (like CXCursor pattern) */
+typedef long long (*two_structs_callback)(struct small_align_8 s1, struct small_align_8 s2);
+
+/* Callback type taking a struct with floats */
+typedef double (*float_struct_callback)(struct two_doubles s);
+
+/* Function that calls a callback with a small struct */
+long long call_with_small_struct(small_struct_callback cb, long long v0, long long v1) {
+  struct small_align_8 s;
+  s.m0 = v0;
+  s.m1 = v1;
+  return cb(s);
+}
+
+/* Function that calls a callback with a large struct */
+long long call_with_large_struct(large_struct_callback cb,
+                                  long long v0, long long v1, long long v2, long long v3) {
+  struct large_align_8 s = {0};
+  s.m0 = v0;
+  s.m1 = v1;
+  s.m2 = v2;
+  s.m3 = v3;
+  return cb(s);
+}
+
+/* Function that calls a callback with two small structs */
+long long call_with_two_structs(two_structs_callback cb,
+                                 long long a0, long long a1,
+                                 long long b0, long long b1) {
+  struct small_align_8 s1, s2;
+  s1.m0 = a0;
+  s1.m1 = a1;
+  s2.m0 = b0;
+  s2.m1 = b1;
+  return cb(s1, s2);
+}
+
+/* Function that calls a callback with a float struct */
+double call_with_float_struct(float_struct_callback cb, double d0, double d1) {
+  struct two_doubles s;
+  s.d0 = d0;
+  s.d1 = d1;
+  return cb(s);
+}
