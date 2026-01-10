@@ -1037,3 +1037,29 @@
               ((simple-string 9) a))
      (mismatch a b :start1 5 :end1 e))
    (or (integer 5 9) null)))
+
+(with-test (:name :reduce-append)
+  (checked-compile-and-assert
+      ()
+      `(lambda (l)
+         (reduce #'append l :initial-value '(1)))
+    (('((a b c))) '(1 a b c) :test #'equal)
+    ((#((a b c))) '(1 a b c) :test #'equal))
+  (checked-compile-and-assert
+      ()
+      `(lambda (l)
+         (reduce #'append l :initial-value '(1) :from-end t))
+    (('((a b c))) '(a b c 1) :test #'equal)
+    ((#((a b c))) '(a b c 1) :test #'equal))
+  (checked-compile-and-assert
+      ()
+      `(lambda (l)
+         (reduce #'append l :end 1 :initial-value '(1)))
+    (('((a b c) (0))) '(1 a b c) :test #'equal)
+    ((#((a b c) (0))) '(1 a b c) :test #'equal))
+  (checked-compile-and-assert
+      ()
+      `(lambda (l)
+         (reduce #'append l :end 1 :initial-value '(1) :from-end t))
+    (('((a b c) (0))) '(a b c 1) :test #'equal)
+    ((#((a b c) (0))) '(a b c 1) :test #'equal)))

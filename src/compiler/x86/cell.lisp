@@ -655,7 +655,6 @@
 ;;;;
 
 (defknown %cons-cas-pair (cons t t t t) (values t t))
-(defknown %vector-cas-pair (simple-vector index t t t t) (values t t))
 ;; %INSTANCE-CAS-PAIR only operates on tagged slots (for now)
 (defknown %instance-cas-pair (instance index t t t t) (values t t))
 
@@ -690,6 +689,7 @@
                  (new-hi :scs (descriptor-reg any-reg) :target ecx))
           (:results (result-lo :scs (descriptor-reg any-reg))
                     (result-hi :scs (descriptor-reg any-reg)))
+          ;; FIXME: these operand lifetimes are wrong for INDEX-ARG = NIL
           (:temporary (:sc unsigned-reg :offset eax-offset
                        :from (:argument 2) :to (:result 0)) eax)
           (:temporary (:sc unsigned-reg :offset edx-offset

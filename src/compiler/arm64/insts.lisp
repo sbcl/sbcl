@@ -1728,6 +1728,27 @@
 (def-casb casalh 1 1 1)
 (def-casb caslh 1 1 0)
 
+;;;  32-bit CASP   (sz == 0 && L == 0 && o0 == 0)
+;;;  32-bit CASPA  (sz == 0 && L == 1 && o0 == 0)
+;;;  32-bit CASPAL (sz == 0 && L == 1 && o0 == 1)
+;;;  32-bit CASPL  (sz == 0 && L == 0 && o0 == 1)
+;;;  64-bit CASP   (sz == 1 && L == 0 && o0 == 0)
+;;;  64-bit CASPA  (sz == 1 && L == 1 && o0 == 0)
+;;;  64-bit CASPAL (sz == 1 && L == 1 && o0 == 1)
+;;;  64-bit CASPL  (sz == 1 && L == 0 && o0 == 1)
+
+;;; Given that memory ordering semantics are completely unknown to the compiler,
+;;; the full set of CASP instructions are not terribly interesting for us.
+;;; The strongest barrier is enough.
+(define-instruction caspal (segment rs rt rn) ; CAS pair acquire + release
+  (:printer cas ((size1 0) (o2 0) (L 1) (o0 1))
+            '(:name :tab rs ", " rt ", [" rn "]"))
+  (:emitter
+   (emit-ldr-str-exclusive segment #b01 0 1 1
+                           (gpr-offset rs)
+                           1 31
+                           (gpr-offset rn)
+                           (gpr-offset rt))))
 ;;;
 
 (def-emitter ldatomic

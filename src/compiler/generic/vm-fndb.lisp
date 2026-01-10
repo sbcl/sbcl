@@ -251,6 +251,9 @@
   sb-vm:signed-word ())
 (defknown %raw-instance-xchg/word (instance index sb-vm:word) sb-vm:word ())
 
+;; vector, index, old1, old2, new1, new2 -> old1, old2
+(defknown sb-vm::%vector-cas-pair (simple-vector index t t t t) (values t t))
+
 (macrolet ((define-raw-slot-defknowns ()
              `(progn
                 ,@(map 'list

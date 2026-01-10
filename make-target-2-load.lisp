@@ -436,9 +436,10 @@ Please check that all strings which were not recognizable to the compiler
                             ;; need this for defining a vop which
                             ;; tests the x86-64 allocation profiler
                             sb-vm::pseudo-atomic
-                            ,@(or #+(or x86 x86-64) '(sb-vm::%vector-cas-pair
-                                                      sb-vm::%instance-cas-pair
-                                                      sb-vm::%cons-cas-pair))
+                            ,@(or #+(or arm64 x86 x86-64)
+                                  '(sb-vm::%vector-cas-pair
+                                    sb-vm::%instance-cas-pair
+                                    sb-vm::%cons-cas-pair))
                             ;; Naughty outside-world code uses these.
                             #+x86-64 sb-vm::reg-in-size))
            (let ((s (string symbol))) (and (search "THREAD-" s) (search "-SLOT" s)))

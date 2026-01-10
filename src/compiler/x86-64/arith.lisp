@@ -1771,7 +1771,7 @@
                    (unless fits
                      (inst cmp amount-width ecx 63)
                      (inst jmp :be OKAY)
-                     (inst or amount-width ecx 63))
+                     (inst mov :byte ecx 63))
                    OKAY
                    (inst sar result :cl)
                    (inst jmp DONE)))
@@ -2574,7 +2574,7 @@
           (inst cmp amount-width ecx 63)
           (inst jmp :be OKAY)
           (cond (signed
-                 (inst or amount-width ecx 63))
+                 (inst mov :byte ecx 63))
                 (t
                  (zeroize result))))
         OKAY

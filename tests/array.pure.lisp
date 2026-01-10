@@ -1037,3 +1037,21 @@
       (make-array (if d 2 '(1))))
    ((t) #(0 0) :test #'equalp)
    ((nil) #(0) :test #'equalp)))
+
+(with-test (:name :array-dimensions-type-derivation)
+  (assert-type
+   (lambda (a n)
+     (declare ((simple-array * (1 2)) a))
+     (array-dimension a n))
+   (member 1 2))
+  (assert-type
+   (lambda (a n)
+     (declare ((simple-array * (1 *)) a))
+     (array-dimension a n))
+   sb-int:index)
+  (assert-type
+   (lambda (a n)
+     (declare ((simple-array * (1 * 3)) a)
+              ((member 0 2) n))
+     (array-dimension a n))
+   (member 1 3)))

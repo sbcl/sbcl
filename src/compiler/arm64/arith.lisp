@@ -678,24 +678,31 @@
                 (inst lsl result number amount)
                 (inst csel result result temp :mi))))
         ((not negative)
-         (inst cmp amount 0)
-         (inst csneg temp amount amount :ge)
-         (inst cmp temp n-word-bits)
-         ;; Only the first 6 bits count for shifts.
-         ;; This sets all bits to 1 if AMOUNT is larger than 63,
-         ;; cutting the amount to 63.
-         (inst csinv temp temp zr-tn :lo)
-         (inst lsl result number temp)
-         (inst tbz amount 63 done)
-         (ecase variant
-           (:signed (inst asr result number temp))
-           (:unsigned
-            (cond ((csubtypep (tn-ref-type amount-ref)
-                              (specifier-type `(integer -63 *)))
-                   (inst lsr result number temp))
-                  (t
-                   (inst lsr result number temp)
-                   (inst csel result result zr-tn :lo))))))
+         (let ((right-fits (csubtypep (tn-ref-type amount-ref)
+                                      (specifier-type `(integer -63 *))))
+               (left-fits (csubtypep (tn-ref-type amount-ref)
+                                     (specifier-type `(integer * 63)))))
+           (inst cmp amount 0)
+           (inst csneg temp amount amount :ge)
+           (inst cmp temp n-word-bits)
+           (cond (left-fits
+                  (inst lsl result number temp))
+                 (t
+                  (inst csel result number zr-tn :lo)
+                  (inst lsl result result temp)))
+           (inst tbz amount 63 done)
+           (ecase variant
+             (:signed
+              ;; Only the first 6 bits count for shifts.
+              ;; This sets all bits to 1 if AMOUNT is larger than 63,
+              ;; cutting the amount to 63.
+              (unless right-fits
+                (inst csinv temp temp zr-tn :lo))
+              (inst asr result number temp))
+             (:unsigned
+              (inst lsr result number temp)
+              (unless right-fits
+                (inst csel result result zr-tn :lo))))))
         (t
          (inst neg temp amount)
          (inst cmp temp n-word-bits)
@@ -755,52 +762,6 @@
          (inst tbz amount 63 done)
          (inst lsl result number temp))))
     done))
-
-#+nil
-(define-vop (fast-ash-modfx/signed/unsigned=>fixnum)
-  (:note "inline ASH")
-  (:translate ash-modfx)
-  (:args (number :scs (signed-reg unsigned-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
-  (:arg-types (:or signed-num unsigned-num) signed-num)
-  (:results (result :scs (any-reg)))
-  (:arg-refs nil amount-ref)
-  (:result-types tagged-num)
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) temp temp-result)
-  (:generator 5
-    (inst subs temp amount zr-tn)
-    (inst b :ge LEFT)
-    (inst neg temp temp)
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer -63 *)))
-           (sc-case number
-             (signed-reg (inst asr temp-result number temp))
-             (unsigned-reg (inst lsr temp-result number temp))))
-          (t
-           (inst cmp temp n-word-bits)
-           (sc-case number
-             (signed-reg
-              ;; Only the first 6 bits count for shifts.
-              ;; This sets all bits to 1 if AMOUNT is larger than 63,
-              ;; cutting the amount to 63.
-              (inst csinv temp temp zr-tn :lo)
-              (inst asr temp-result number temp))
-             (unsigned-reg
-              (inst csel temp-result number zr-tn :lo)
-              (inst lsr temp-result temp-result temp)))))
-
-    (inst b END)
-    LEFT
-    (cond ((csubtypep (tn-ref-type amount-ref)
-                      (specifier-type `(integer * 63)))
-           (inst lsl temp-result number temp))
-          (t
-           (inst cmp temp n-word-bits)
-           (inst csel temp-result number zr-tn :lo)
-           (inst lsl temp-result temp-result temp)))
-    END
-    (inst lsl result temp-result n-fixnum-tag-bits)))
 
 (define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
   (:args (number :scs (signed-reg) :to :save)

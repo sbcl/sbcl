@@ -579,6 +579,7 @@
     (%instance-cas-pair inst ind old1 old2 new1 new2))
 
   (defun test-wide-cmpxchg ()
+    #-arm64
     (let ((x (cons 'a 'b)))
       (multiple-value-bind (old1 old2) (test-a-cons x 'a 'b 'foo 'bar)
         (assert (and (eq old1 'a) (eq old2 'b) (equal x '(foo . bar)))))
@@ -591,6 +592,7 @@
       (multiple-value-bind (old1 old2) (test-a-vect x 2 nil nil 'foo 'bar)
         (assert (and (null old1) (null old2) (equalp x #(nil nil foo bar nil nil))))))
 
+    #-arm64
     ;; Same remark applies - just check that the offset to the slot is right.
     (let ((s (make-my-struct :three 'the :four 'floor)))
       ;; in slots 3 and 4 put your bootee (a baby shoe, i.e.) on the floor
@@ -600,19 +602,30 @@
                      (eq (my-struct-four s) 'bootee)))))
     t))
 
-(test-util:with-test (:name :wide-compare-and-exchange
-                      :skipped-on (not (or :x86 :x86-64)))
+(defun should-test-dblcas ()
+  #+arm64
+  (or (member :arm-v8.1 sb-c:*backend-subfeatures*)
+      (with-open-file (f "/proc/cpuinfo" :if-does-not-exist nil)
+        (and f
+             (loop repeat 4
+                   thereis (let ((line (read-line f)))
+                             (and (search "Features" line) (search " atomics " line)))))))
+  #+(or x86 x86-64)
   (multiple-value-bind (a b c d) (%cpu-identification 0 0)
     (declare (ignore b c d))
     ;; paranoidly check for whether we can execute function ID 1
-    (or (and (>= a 1) ; the highest function ID
-             (multiple-value-bind (a b c d) (%cpu-identification 1 0)
-               (declare (ignore a b) (ignorable c d))
-               ;; paranoidly check for CMPXCHGxB presence
-               ;; constants from Table 3-20 and 3-21 of Intel manual
-               (and #+x86(logbitp 8 d) #+x86-64(logbitp 13 c)
-                    (test-wide-cmpxchg))))
-        (format t "Double-width compare-and-swap NOT TESTED~%"))))
+    (and (>= a 1) ; the highest function ID
+         (multiple-value-bind (a b c d) (%cpu-identification 1 0)
+           (declare (ignore a b) (ignorable c d))
+           ;; paranoidly check for CMPXCHGxB presence
+           ;; constants from Table 3-20 and 3-21 of Intel manual
+           (and #+x86 (logbitp 8 d) #+x86-64 (logbitp 13 c))))))
+
+(test-util:with-test (:name :wide-compare-and-exchange
+                      :skipped-on (not (or :arm64 :x86 :x86-64)))
+  (if (should-test-dblcas)
+      (test-wide-cmpxchg)
+      (format t "Double-width compare-and-swap NOT TESTED~%")))
 
 (test-util:with-test (:name :cas-sap-ref-smoke-test
                             :fails-on :riscv ; unsigned-32-bit gets the wrong answer
