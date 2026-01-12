@@ -200,7 +200,8 @@
                                        (recurse ref 0))))
                           (if (functional-kind-eq fun mv-let)
                               (if nth-value
-                                  (map-var (nth nth-value (lambda-vars fun)))
+                                  (map-var (or (nth nth-value (lambda-vars fun))
+                                               (return-from recurse-node)))
                                   (mapc #'map-var (lambda-vars fun)))
                               (map-var
                                (nth (position-or-lose lvar
