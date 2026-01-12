@@ -1976,7 +1976,12 @@
           `(lambda (a)
              (declare (rational a))
              (values (truncate (* a 3) 9)))
-          0)))
+          0)
+    (assert-type
+     (lambda (a)
+       (declare (integer a))
+       (rem (* a 20) 10))
+     (eql 0))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
