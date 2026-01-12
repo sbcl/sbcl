@@ -835,11 +835,11 @@ standard Lisp readtable when NIL."
 ;;; because it the extra events can simply be ignored.
 (macrolet
     ((with-list-reader ((streamvar delimiter) &body body)
-       `(let* ((thelist (list nil))
+       `(let* ((thelist (unaligned-dx-cons nil))
                (listtail thelist)
                (rt *readtable*)
                (collectp (if *read-suppress* 0 -1)))
-          (declare (dynamic-extent thelist))
+          (declare (dynamic-extent thelist) (sb-c::no-debug thelist))
           (loop (let ((firstchar (flush-whitespace ,streamvar rt)))
                   (when (eq firstchar ,delimiter)
                     (return (cdr thelist)))
