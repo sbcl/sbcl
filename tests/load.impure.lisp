@@ -132,13 +132,11 @@
     `(let ((,before *counter*)
            *loaded-pathname* *loaded-truename*)
        (load ,load-argument :print 'yes :verbose t)
-       (assert (and (= (1+ ,before) *counter*)
-                    #-win32 ;kludge
-                    (equal ,(if pathname `(merge-pathnames ,pathname))
-                           *loaded-pathname*)
-                    #-win32 ;kludge
-                    (equal ,(if pathname `(merge-pathnames ,truename))
-                           *loaded-truename*))))))
+       (assert (= (1+ ,before) *counter*))
+       #-win32 ;kludge
+       (progn
+         (assert (equal ,(if pathname `(merge-pathnames ,pathname)) *loaded-pathname*))
+         (assert (equal ,(if truename `(merge-pathnames ,truename)) *loaded-truename*))))))
 
 (defmacro with-test-program (source fasl &body body)
   (let ((src (gensym))
@@ -205,6 +203,8 @@
 
 ;;; Loading from things named by pathname designators.
 
+(setq sb-c::*merge-pathnames* t) ; require standard setting of this variable
+
 (defvar *tmp-lisp-filename* (scratch-file-name "lisp"))
 
 ;; Test loading a source file by supplying a complete pathname.
@@ -225,7 +225,7 @@
 
 ;; Test loading a source file whose name lacks a type when supplying a
 ;; partial pathname.
-(with-test (:name :load-source-file-default-type :skipped-on :no-test-load-truename)
+(with-test (:name :load-source-file-default-type)
   (let ((source (make-pathname :type :unspecific
                                :defaults *tmp-lisp-filename*))
         (partial (make-pathname :defaults *tmp-lisp-filename*
@@ -325,7 +325,7 @@
          (fasl (compile-file-pathname source))
          (spec (make-pathname :type nil :defaults source)))
     (with-test-program source fasl
-      (sleep 1)
+      (sleep 1) ; for what purpose?
       (with-open-file (*standard-output* source :direction :output
                                          :if-exists :append)
         (write-line ";;comment"))
