@@ -14,7 +14,9 @@
   ;;     output where the DIRECTORY expression does not.
   ;;     So the fact is that something is *changing* the directory up 1 level,
   ;;     otherwise there is no way that run-sbcl.sh appears. But what?
-  (assert (equal (directory "*/**/*.*")
+  (let ((contents (directory "*/")))
+    (if contents
+      (assert (equal (directory "*/**/*.*")
                  ;; Each call to DIRECTORY sorts its results, but if
                  ;; our files' truenames are random (e.g., if files
                  ;; here are symlinks to hashes of file content), then
@@ -27,7 +29,8 @@
                     (merge 'list list1 list2 'string< :key 'namestring))
                   (mapcar (lambda (directory)
                             (directory (merge-pathnames "**/*.*" directory)))
-                          (directory "*/"))))))
+                          contents))))
+        (format *error-output* "~&::: INFO: Test preconditions not met~%"))))
 
 (defvar *scratchdir* (pathname (test-util:scratch-dir-name)))
 (ensure-directories-exist *scratchdir*)
