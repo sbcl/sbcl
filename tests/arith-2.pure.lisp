@@ -1981,7 +1981,12 @@
      (lambda (a)
        (declare (integer a))
        (rem (* a 20) 10))
-     (eql 0))))
+     (eql 0))
+    (test '(truncate sb-kernel::truncate1)
+          `(lambda (a)
+             (declare (rational a))
+             (values (truncate (truncate a 10) 20)))
+          1)))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)

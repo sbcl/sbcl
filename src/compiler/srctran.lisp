@@ -5280,16 +5280,17 @@
 
 (defvar *amc-abs*)
 
-(defun associate-multiplication-constants (lvar constant outer-node &key divide)
+(defun associate-multiplication-constants (lvar constant outer-node &key divide
+                                                                         single-value-truncate)
   (let (new
         *amc-abs*)
-    (labels ((associate-lvar (lvar)
+    (labels ((associate-lvar (lvar &key dividing)
                (unless (and divide
                             (eql (abs constant) 1))
                  (let ((uses (lvar-uses lvar)))
                    (if (listp uses)
                        (progn)
-                       (associate-node uses)))))
+                       (associate-node uses :dividing dividing)))))
              (value (lvar)
                (let ((value (lvar-value lvar)))
                  (if *amc-abs*
@@ -5316,7 +5317,7 @@
                       (transform-call combination
                                       `(lambda (x y) (declare (ignore y)) x)
                                       'associate-multiplication-constants))))
-             (associate-node (node)
+             (associate-node (node &key dividing)
                (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
                  (/ (* constant)
                   (associate-lvar (first args))
@@ -5349,8 +5350,20 @@
                   (associate-lvar (first args)))
                  (abs (*)
                   (let ((*amc-abs* t))
-                    (associate-lvar (first args)))))))
-      (associate-lvar lvar)
+                    (associate-lvar (first args) :dividing dividing)))
+                 (truncate ((type rational) constant)
+                  (when (and dividing
+                             single-value-truncate)
+                    (let ((d (value (second args))))
+                      (when (and (integerp d)
+                                 (not (eql d 0)))
+                        (setf new t
+                              constant (* constant d))
+                        (erase-node-type combination *wild-type* nil outer-node)
+                        (transform-call combination
+                                        `(lambda (x y) (declare (ignore y)) x)
+                                        'associate-multiplication-constants))))))))
+      (associate-lvar lvar :dividing divide)
       (when new
         constant))))
 
@@ -5365,12 +5378,19 @@
 (deftransform truncate ((x c) (rational (constant-arg (and rational (not (integer -1 1)))))
                         * :important nil :node node)
   (let* ((constant (lvar-value c))
-         (new-c (associate-multiplication-constants x constant node :divide t)))
-    (if (or (not new-c)
-            (eql constant new-c))
-        (give-up-ir1-transform)
-        `(multiple-value-bind (q r) (truncate x ,new-c)
-           (values q (* r ,(truncate constant new-c)))))))
+         (single-value (or (lvar-single-value-p (node-lvar node))
+                           (mv-bind-unused-p (node-lvar node) 1)))
+         (new-c (associate-multiplication-constants x constant node :divide t
+                                                                    :single-value-truncate single-value)))
+    (cond ((or (not new-c)
+               (eql constant new-c))
+           (give-up-ir1-transform))
+          (single-value
+           (erase-node-type node t 1)
+           `(truncate x ,new-c))
+          (t
+           `(multiple-value-bind (q r) (truncate x ,new-c)
+              (values q (* r ,(truncate constant new-c))))))))
 
 (deftransform ash ((x c) (rational (constant-arg (mod 4096))) * :important nil :node node)
   "associate * of constants"
