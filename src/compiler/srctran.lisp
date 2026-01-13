@@ -5351,8 +5351,9 @@
                  (abs (*)
                   (let ((*amc-abs* t))
                     (associate-lvar (first args) :dividing dividing)))
-                 (truncate ((type rational) constant)
+                 ((truncate floor ceiling round) ((type rational) constant)
                   (when (and dividing
+                             (eq name divide)
                              single-value-truncate)
                     (let ((d (value (second args))))
                       (when (and (integerp d)
@@ -5375,22 +5376,23 @@
        (give-up-ir1-transform))))
 
 ;;; (truncate (* a 10) 6) => (truncate (* a 5) 3)
-(deftransform truncate ((x c) (rational (constant-arg (and rational (not (integer -1 1)))))
-                        * :important nil :node node)
-  (let* ((constant (lvar-value c))
-         (single-value (or (lvar-single-value-p (node-lvar node))
-                           (mv-bind-unused-p (node-lvar node) 1)))
-         (new-c (associate-multiplication-constants x constant node :divide t
-                                                                    :single-value-truncate single-value)))
-    (cond ((or (not new-c)
-               (eql constant new-c))
-           (give-up-ir1-transform))
-          (single-value
-           (erase-node-type node t 1)
-           `(truncate x ,new-c))
-          (t
-           `(multiple-value-bind (q r) (truncate x ,new-c)
-              (values q (* r ,(truncate constant new-c))))))))
+(make-defs (($fun truncate floor ceiling round))
+ (deftransform $fun ((x c) (rational (constant-arg (and rational (not (integer -1 1)))))
+                         * :important nil :node node)
+   (let* ((constant (lvar-value c))
+          (single-value (or (lvar-single-value-p (node-lvar node))
+                            (mv-bind-unused-p (node-lvar node) 1)))
+          (new-c (associate-multiplication-constants x constant node :divide '$fun
+                                                                     :single-value-truncate single-value)))
+     (cond ((or (not new-c)
+                (eql constant new-c))
+            (give-up-ir1-transform))
+           (single-value
+            (erase-node-type node t 1)
+            `($fun x ,new-c))
+           (t
+            `(multiple-value-bind (q r) ($fun x ,new-c)
+               (values q (* r ,($fun constant new-c)))))))))
 
 (deftransform ash ((x c) (rational (constant-arg (mod 4096))) * :important nil :node node)
   "associate * of constants"
