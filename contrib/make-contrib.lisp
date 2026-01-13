@@ -85,11 +85,15 @@
                 (merge-pathnames "**/*.*" (truename "../../obj/")))
           (logical-pathname-translations "SYS"))
     (sb-int:collect ((alien-constants) (flattened-sources) (fasls))
-      (when *deps*
-        (let ((fasl (sb-c:compile-form-to-file
-                     `(progn ,@(mapcar (lambda (x) `(require ,(string x))) *deps*))
-                     (merge-pathnames "module-setup" objdir))))
-          (flattened-sources `(t ,fasl))))
+      ;; obviously this should be declarative, somehow, but meh.
+      (let ((runtime-deps
+             (cond ((string= (second defsystem) "sb-md5") nil)
+                   (t *deps*))))
+        (when runtime-deps
+          (let ((fasl (sb-c:compile-form-to-file
+                       `(progn ,@(mapcar (lambda (x) `(require ,(string x))) runtime-deps))
+                       (merge-pathnames "module-setup" objdir))))
+            (flattened-sources `(t ,fasl)))))
       ;; Compile all files serially. :depends-on is just documentation for the user
       (sb-int:named-let flatten ((prefix "") (sources specified-sources))
         (dolist (source sources)

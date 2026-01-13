@@ -215,20 +215,11 @@ where a is the intended low-order byte and d the high-order byte."
 
 (declaim (inline rol32)
          (ftype (function (ub32 (unsigned-byte 5)) ub32) rol32))
+(eval-when (:compile-toplevel :execute) ; no runtime dependence on rotate-byte
 (defun rol32 (a s)
   (declare (type ub32 a) (type (unsigned-byte 5) s)
            (optimize (speed 3) (safety 0) (space 0) (debug 0) #+lw-int32 (float 0)))
-  #+cmu
-  (kernel:32bit-logical-or #+little-endian (kernel:shift-towards-end a s)
-                           #+big-endian (kernel:shift-towards-start a s)
-                           (ash a (- s 32)))
-  #+sbcl
-  (sb-rotate-byte:rotate-byte s (byte 32 0) a)
-  #+lw-int32
-  (sys:int32-logior (lw-int32-no-overflow (sys:int32<< a s))
-                    (int32>>logical a (- 32 s)))
-  #-(or :cmu :sbcl :lw-int32)
-  (logior (ldb (byte 32 0) (ash a s)) (ash a (- s 32))))
+  (sb-rotate-byte:rotate-byte s (byte 32 0) a)))
 
 ;;; Section 3.4:  Table T
 
