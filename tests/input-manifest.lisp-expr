@@ -70,7 +70,6 @@
   "tests/data/compile-file-pos-utf16be.lisp")
  ("packages.impure.lisp"
   "contrib/sb-md5.fasl"
-  "contrib/sb-rotate-byte.fasl"
   "tests/package-test-1.lisp"
   "tests/package-test-2.lisp"
   "tests/package-test-3.lisp"
@@ -103,7 +102,7 @@
   "../contrib/sb-introspect/xref-test-data.lisp" "../contrib/sb-introspect/xref-test.lisp"
   "../contrib/sb-introspect/test.lisp" "../contrib/sb-introspect/test-driver.lisp"
   "../contrib/sb-introspect/load-test.lisp")
- ("sb-md5.impure.lisp" "contrib/sb-md5.fasl" "contrib/sb-rotate-byte.fasl"
+ ("sb-md5.impure.lisp" "contrib/sb-md5.fasl"
   "../contrib/sb-md5/md5-tests.lisp")
  ("sb-mpfr.impure.lisp" "contrib/sb-gmp.fasl" "contrib/sb-mpfr.fasl"
   "../contrib/sb-mpfr/tests.lisp")
