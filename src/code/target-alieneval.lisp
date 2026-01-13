@@ -103,6 +103,23 @@ This is SETFable."
          (datap (not (alien-fun-type-p alien-type))))
     `(%alien-value (foreign-symbol-sap ,alien-name ,datap) 0 ',alien-type)))
 
+;;; Allow callback struct returns to signal that inner WITH-ALIEN
+;;; forms should defer *alien-stack-pointer* cleanup. When a callback
+;;; returns a struct by value, the struct is typically constructed
+;;; using WITH-ALIEN. Without this mechanism, the WITH-ALIEN cleanup
+;;; would run before the struct data is copied to the return area,
+;;; causing corruption.
+;;;
+;;; WITH-OUTER-ALIEN-STACK-CLEANUP establishes a lexical marker (via
+;;; symbol-macrolet) that WITH-ALIEN detects during its macroexpansion
+;;; using macroexpand-1.
+(defmacro with-outer-alien-stack-cleanup (&body body)
+  "Establish an outer *alien-stack-pointer* binding and signal to inner WITH-ALIEN
+   forms that they should skip their own cleanup. Used by callback struct returns."
+  `(symbol-macrolet ((%in-outer-alien-stack-cleanup-context% t))
+     (let ((sb-c:*alien-stack-pointer* sb-c:*alien-stack-pointer*))
+       ,@body)))
+
 (defmacro with-alien (bindings &body body &environment env)
   "Establish some local alien variables. Each BINDING is of the form:
      VAR TYPE [ ALLOCATION ] [ INITIAL-VALUE | EXTERNAL-NAME ]
@@ -178,6 +195,15 @@ This is SETFable."
                            ,(append *new-auxiliary-types*
                                     (auxiliary-type-definitions env))))
          ,@(cond
+             ;; When in callback struct return context, skip the binding.
+             ;; The outer WITH-OUTER-ALIEN-STACK-CLEANUP already established
+             ;; a single *alien-stack-pointer* binding that will clean up all
+             ;; allocations after the struct is copied to the result area.
+             ;; Detect this by checking for the %in-outer-alien-stack-cleanup-context%
+             ;; symbol-macrolet marker in the lexical environment.
+             ((and bind-alien-stack-pointer
+                   (nth-value 1 (macroexpand-1 '%in-outer-alien-stack-cleanup-context% env)))
+              body)
              (bind-alien-stack-pointer
               ;; The LET IR1-translator will actually turn this into
               ;; RESTORING-NSP on #-c-stack-is-control-stack to avoid

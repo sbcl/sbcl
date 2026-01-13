@@ -100,12 +100,16 @@
 
 (defun alien-callback-argument-bytes (spec env)
   (let ((type (parse-alien-type spec env)))
-    (if (or (alien-integer-type-p type)
-            (alien-float-type-p type)
-            (alien-pointer-type-p type)
-            (alien-system-area-pointer-type-p type))
-        (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits)
-        (error "Unsupported callback argument type: ~A" type))))
+    (cond ((or (alien-integer-type-p type)
+               (alien-float-type-p type)
+               (alien-pointer-type-p type)
+               (alien-system-area-pointer-type-p type))
+           (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits))
+          ;; Struct types: return the struct size rounded up to word alignment
+          ((alien-record-type-p type)
+           (ceiling (alien-type-word-aligned-bits type) sb-vm:n-byte-bits))
+          (t
+           (error "Unsupported callback argument type: ~A" type)))))
 
 (defun enter-alien-callback (index arguments return)
   (declare (optimize speed (safety 0)))
@@ -201,6 +205,12 @@
                             `(unsigned
                               ,(alien-type-word-aligned-bits result-type))
                             `(unsigned-byte ,(alien-type-bits result-type)))))
+                      ;; For struct return types, wrap in WITH-OUTER-ALIEN-STACK-CLEANUP
+                      ;; so inner WITH-ALIEN forms defer cleanup to this outer binding.
+                      ;; This ensures allocations survive until the struct is copied.
+                      ((alien-record-type-p result-type)
+                       `(with-outer-alien-stack-cleanup
+                          ,(store (unparse-alien-type result-type) nil)))
                       (t
                        (store (unparse-alien-type result-type) nil))))))
          0))))

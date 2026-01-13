@@ -738,17 +738,11 @@ The type of @code{alien-function} must be @code{(alien (function
 ...))}  or @code{(alien (* (function ...)))}.  The function type is
 used to determine how to call the function (as though it was declared
 with a prototype.)  The type need not be known at compile time, but
-only known-type calls are efficiently compiled.  Limitations:
+only known-type calls are efficiently compiled.
 
-@itemize
-
-@item
-Structure type return values are not implemented.
-
-@item
-Passing of structures by value is not implemented.
-
-@end itemize
+On unix-like x86-64 and ARM64 systems, structures may be passed and
+returned by value.  The implementation follows the System V AMD64 ABI
+and AAPCS64 specifications respectively.
 
 @end defun
 
@@ -1034,6 +1028,8 @@ an interface for calling into Lisp as a shared library directly from C.
 
 The @code{define-alien-callable} macro wraps Lisp code and creates a C
 foreign function which can be called with the C calling convention.
+On x86-64 and ARM64, callbacks may receive and return structures by
+value.
 
 @include macro-sb-alien-define-alien-callable.texinfo
 
