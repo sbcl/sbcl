@@ -914,8 +914,9 @@
         :compile
         (let*
             ((disabled-package-locks
-              `((declare (disabled-package-locks
-                          ,@(sb-c::lexenv-disabled-package-locks lexenv)))))
+              (when (sb-c::lexenv-disabled-package-locks lexenv)
+                `((declare (disable-package-locks
+                            ,@(sb-c::lexenv-disabled-package-locks lexenv))))))
              (macro-env
               ;; Macros in an interpreter environment must look like interpreted
               ;; functions due to use of FUN-NAME to extract their name as a key
