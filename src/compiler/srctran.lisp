@@ -5278,6 +5278,12 @@
       (give-up-ir1-transform)))
 
 
+(defun integer-type-sign (type)
+  (cond ((csubtypep type (specifier-type '(integer 0)))
+         1)
+        ((csubtypep type (specifier-type '(integer * 0)))
+         -1)))
+
 (defvar *amc-abs*)
 
 (defun associate-multiplication-constants (lvar constant outer-node &key divide
@@ -5357,7 +5363,16 @@
                              (eq name divide)
                              (or (eq name 'truncate)
                                  ;; The outer divisor has to be positive
-                                 (plusp constant)))
+                                 (plusp constant))
+                             (or (not *amc-abs*)
+                                 (let ((sign (integer-type-sign (lvar-type (first args))))
+                                       (d-sign (signum (lvar-value (second args)))))
+                                   (case name
+                                     (ceiling
+                                      (eql sign d-sign))
+                                     (floor
+                                      (and sign
+                                           (/= sign d-sign)))))))
                     (let ((d (value (second args))))
                       (when (and (integerp d)
                                  (not (eql d 0)))
