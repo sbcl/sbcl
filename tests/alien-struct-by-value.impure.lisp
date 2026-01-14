@@ -542,8 +542,7 @@
       (assert (< (abs (- (slot result 'd1) 2.71d0)) 1d-10)))))
 
 ;;; Test callback returning large struct (24 bytes, via hidden pointer)
-(with-test (:name :callback-struct-return-large
-            :broken-on :x86-64)
+(with-test (:name :callback-struct-return-large)
   (with-alien-callable
       ((cb (struct medium-align-8) ((v0 (integer 64)) (v1 (integer 64)) (v2 (integer 64)))
          (with-alien ((s (struct medium-align-8)))

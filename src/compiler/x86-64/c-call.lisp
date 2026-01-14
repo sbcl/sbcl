@@ -823,9 +823,6 @@
                          ;; Only 8 first XMM registers are used for
                          ;; passing arguments
                          (subseq *float-regs* 0 #-win32 8 #+win32 4)))
-           ;; R11 is caller-saved and not used for arguments - use it to save hidden ptr
-           #-win32
-           (r11 (make-random-tn (sc-or-lose 'any-reg) r11-offset))
            ;; Calculate return value slot count (in 8-byte words)
            ;; For large struct returns, we need enough space for the entire struct
            ;; For small structs and primitives, 2 slots (16 bytes) is enough
@@ -835,15 +832,18 @@
                  2))
            ;; Adjust for alignment (must be even for 16-byte stack alignment)
            (return-slot-count-aligned
-             (if (evenp (+ arg-slot-count return-slot-count))
+             (if (evenp (+ arg-slot-count return-slot-count
+                           (if large-struct-return-p
+                               1 ;; rdi saved on the stack
+                               0)))
                  return-slot-count
                  (1+ return-slot-count))))
       (assemble (segment 'nil)
-        ;; For large struct returns, save the hidden pointer (in RDI) to R11
+        ;; For large struct returns, save the hidden pointer (in RDI)
         ;; before we use RDI for anything else
         #-win32
         (when large-struct-return-p
-          (inst mov r11 rdi))
+          (inst push rdi))
         ;; Make room on the stack for argument vector.
         (when (plusp total-arg-bytes)
           (inst sub rsp total-arg-bytes))
@@ -1006,12 +1006,12 @@
              ;; Large struct: copy result to hidden pointer location, return pointer
              (large-struct-return-p
               (let ((struct-size (sb-alien::struct-classification-size result-classification)))
+                ;; Return the hidden pointer in RAX
+                (inst mov rax (ea (* (+ arg-slot-count return-slot-count-aligned) n-word-bytes) rsp))
                 ;; Copy struct data from stack to hidden pointer destination
                 (loop for off from 0 below struct-size by 8
-                      do (inst mov rax (ea off rsp))
-                         (inst mov (ea off r11) rax))
-                ;; Return the hidden pointer in RAX
-                (inst mov rax r11)))
+                      do (inst mov rdx (ea off rsp))
+                         (inst mov (ea off rax) rdx))))
              ;; Small struct: copy to registers based on classification
              (t
               (let ((slots (sb-alien::struct-classification-register-slots result-classification))
@@ -1038,7 +1038,11 @@
         ;; Pop the arguments and the return value from the stack to get
         ;; the return address at top of stack.
 
-        (inst add rsp (* (+ arg-slot-count return-slot-count-aligned) n-word-bytes))
+        (inst add rsp (* (+ arg-slot-count return-slot-count-aligned
+                            (if large-struct-return-p
+                                1
+                                0))
+                         n-word-bytes))
         ;; Return
         (inst ret))
       (finalize-segment segment)
