@@ -5353,8 +5353,11 @@
                     (associate-lvar (first args) :dividing dividing)))
                  ((truncate floor ceiling) ((type rational) constant)
                   (when (and dividing
+                             single-value-truncate
                              (eq name divide)
-                             single-value-truncate)
+                             (or (eq name 'truncate)
+                                 ;; The outer divisor has to be positive
+                                 (plusp constant)))
                     (let ((d (value (second args))))
                       (when (and (integerp d)
                                  (not (eql d 0)))

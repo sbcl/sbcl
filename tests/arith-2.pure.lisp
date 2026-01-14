@@ -2002,7 +2002,13 @@
         `(lambda (v)
            (declare (integer v))
            (values (round (round v -94) 40)))
-      ((2396371438047407363) -637332829267928))))
+      ((2396371438047407363) -637332829267928))
+    (checked-compile-and-assert
+        ()
+        `(lambda (v)
+           (declare (integer v))
+           (values (ceiling (ceiling v 7) -3)))
+      ((15) -1))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
