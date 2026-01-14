@@ -125,9 +125,9 @@
 
 ;;;; Struct Return-by-Value Support (System V AMD64 ABI)
 
-;;; Classify a single field
-(defun classify-field-x86-64 (type)
-  "Classify a single field type for x86-64 ABI.
+#-win32
+(defun classify-field-sysv-amd64 (type)
+  "Classify a single field type for SysV AMD64 ABI.
    Returns :INTEGER, :DOUBLE, or :MEMORY."
   (cond
     ;; Check specific types first, before general type checks
@@ -138,10 +138,10 @@
     ;; Arrays are classified by their element type
     ((sb-alien::alien-array-type-p type)
      (let ((element-type (sb-alien::alien-array-type-element-type type)))
-       (classify-field-x86-64 element-type)))
+       (classify-field-sysv-amd64 element-type)))
     ;; Nested struct - recursively classify and inherit eightbyte classes
     ((sb-alien::alien-record-type-p type)
-     (let ((nested (classify-struct-sysv-amd64 type)))
+     (let ((nested (classify-struct type)))
        (if (sb-alien::struct-classification-memory-p nested)
            :memory
            ;; Merge all slots from nested struct to get dominant class
@@ -154,6 +154,7 @@
     (t :memory)))
 
 ;;; Merge two classes within an eightbyte per ABI rules
+#-win32
 (defun merge-classes (class1 class2)
   "Merge two classes within an eightbyte per ABI rules.
    INTEGER dominates SSE; MEMORY dominates everything."
@@ -166,7 +167,8 @@
     (t :double)))
 
 ;;; Main classification function for x86-64 System V AMD64 ABI
-(defun classify-struct-sysv-amd64 (record-type)
+#-win32
+(defun classify-struct (record-type)
   "Classify struct for x86-64 System V ABI return.
    Returns STRUCT-CLASSIFICATION."
   (let* ((bits (sb-alien::alien-type-bits record-type))
@@ -174,7 +176,7 @@
          (alignment (sb-alien::alien-type-alignment record-type)))
     ;; Rule: Structs > 16 bytes always use memory (hidden pointer)
     (when (> byte-size 16)
-      (return-from classify-struct-sysv-amd64
+      (return-from classify-struct
         (sb-alien::make-struct-classification
          :register-slots '(:memory)
          :size byte-size
@@ -191,7 +193,7 @@
                (field-bits (sb-alien::alien-type-bits field-type))
                (field-offset-bytes (floor field-offset-bits 8))
                (field-size-bytes (ceiling field-bits 8))
-               (field-class (classify-field-x86-64 field-type)))
+               (field-class (classify-field-sysv-amd64 field-type)))
           ;; Apply class to all eightbytes this field spans
           (loop for byte-offset from field-offset-bytes below (+ field-offset-bytes field-size-bytes) by 8
                 for eightbyte-index = (floor byte-offset 8)
@@ -215,26 +217,52 @@
        :alignment alignment
        :memory-p (member :memory eightbytes)))))
 
+#+win32
+(defun classify-struct (record-type)
+  "Classify struct for Windows AMD64 ABI.
+Size-based only: <=8 bytes in single integer register, >8 bytes via pointer.
+Floats are passed in integer registers."
+  (let* ((bits (sb-alien::alien-type-bits record-type))
+         (byte-size (ceiling bits 8))
+         (alignment (sb-alien::alien-type-alignment record-type)))
+    (if (> byte-size 8)
+        ;; Large struct: hidden pointer
+        (sb-alien::make-struct-classification
+         :register-slots '(:memory)
+         :size byte-size
+         :alignment alignment
+         :memory-p t)
+        ;; Small struct: single integer
+        (sb-alien::make-struct-classification
+         :register-slots '(:integer)
+         :size byte-size
+         :alignment alignment
+         :memory-p nil))))
+
 ;;; Result TN generation for record types
 ;;; Called from src/code/c-call.lisp
+
+;;; Windows verison: large struct uses pointer in RAX, otherwise value in RAX
+
+#+win32
 (defun record-result-tn (type state)
   "Handle struct return values."
-  ;; Windows x64 uses Microsoft calling convention, not System V AMD64.
-  ;; To add Windows support:
-  ;;   1. Implement classify-struct-win64: structs of 1/2/4/8 bytes return in RAX,
-  ;;      larger structs use hidden pointer in RCX (not RDI)
-  ;;   2. Adapt this function to use the Windows classification
-  ;;   3. Update make-call-out-tns to reserve RCX instead of RDI for sret pointer
-  #+win32 (error "Struct-by-value return not implemented for Windows x64 ABI")
   (let ((classification (or *cached-struct-classification*
-                            (classify-struct-sysv-amd64 type))))
+                            (classify-struct type))))
+    (setf (result-state-num-results state) 1)
     (if (sb-alien::struct-classification-memory-p classification)
-        ;; Large struct: return via hidden pointer
-        ;; Caller passes pointer in RDI, callee returns it in RAX
+        (make-wired-tn* 'system-area-pointer sap-reg-sc-number rax-offset)
+        (make-wired-tn* 'unsigned-byte-64 unsigned-reg-sc-number rax-offset))))
+
+#-win32
+(defun record-result-tn (type state)
+  "Handle struct return values."
+  (let ((classification (or *cached-struct-classification*
+                            (classify-struct type))))
+    (if (sb-alien::struct-classification-memory-p classification)
         (progn
           (setf (result-state-num-results state) 1)
           (make-wired-tn* 'system-area-pointer sap-reg-sc-number rax-offset))
-        ;; Small struct: return in registers
         (let ((result-tns nil)
               (int-results 0)
               (sse-results 0))
@@ -300,20 +328,53 @@
     (inst mov :qword temp (ea src-offset sap))
     (inst mov :qword (ea dst-offset nsp) temp)))
 
+;;; VOP to move SAP value to integer register (for Windows struct-by-pointer)
+(define-vop (load-sap-int-arg)
+  (:args (sap :scs (sap-reg)))
+  (:results (target :scs (unsigned-reg)))
+  (:generator 1
+    (move target sap)))
+
 ;;; Arg TN generation for record types
 ;;; Called from src/code/c-call.lisp
+
+;;; Windows: structs >8 bytes passed by pointer, <=8 bytes in
+;;; integer register.
+#+win32
+(defun record-arg-tn (type state)
+  "Handle struct arguments."
+  (let ((classification (classify-struct type))
+        (arg-tn (int-arg state 'unsigned-byte-64
+                         unsigned-reg-sc-number unsigned-stack-sc-number)))
+    (if (sb-alien::struct-classification-memory-p classification)
+        (lambda (arg call block nsp)
+          (declare (ignore nsp))
+          (let ((sap-tn (sb-c::lvar-tn call block arg)))
+            (sb-c::emit-and-insert-vop
+             call block
+             (sb-c::template-or-lose 'load-sap-int-arg)
+             (sb-c::reference-tn sap-tn nil)
+             (sb-c::reference-tn arg-tn t)
+             nil
+             nil)))
+        (lambda (arg call block nsp)
+          (declare (ignore nsp))
+          (sb-c::emit-and-insert-vop
+           call block
+           (sb-c::template-or-lose 'load-struct-int-arg)
+           (sb-c::reference-tn (sb-c::lvar-tn call block arg) nil)
+           (sb-c::reference-tn arg-tn t)
+           nil
+           (list 0))))))
+
+;;; System V: structs >16 bytes copied to stack, <=16 bytes in up to 2
+;;; registers.
+#-win32
 (defun record-arg-tn (type state)
   "Handle struct arguments.
    For large structs (>16 bytes), copies to stack per System V AMD64 ABI.
    For small structs, returns a function that emits load VOPs into registers."
-  ;; Windows x64 uses Microsoft calling convention, not System V AMD64.
-  ;; To add Windows support:
-  ;;   1. Implement classify-struct-win64: structs >8 bytes are passed by pointer
-  ;;      (caller allocates, passes address in integer register)
-  ;;   2. Structs of 1/2/4/8 bytes are passed in a single integer register
-  ;;   3. Adapt this function to handle both cases
-  #+win32 (error "Struct-by-value arguments not implemented for Windows x64 ABI")
-  (let ((classification (classify-struct-sysv-amd64 type)))
+  (let ((classification (classify-struct type)))
     (if (sb-alien::struct-classification-memory-p classification)
         ;; Large struct: copy to stack (System V AMD64 ABI)
         ;; The struct is passed by value on the stack, not by pointer
@@ -362,26 +423,26 @@
             (let ((sap-tn (sb-c::lvar-tn call block arg)))
               (loop for target-tn in arg-tns
                     for (off . class) in offsets
-                    do (ecase class
-                         (:integer
-                          (sb-c::emit-and-insert-vop
-                           call block
-                           (sb-c::template-or-lose 'load-struct-int-arg)
-                           (sb-c::reference-tn sap-tn nil)
-                           (sb-c::reference-tn target-tn t)
-                           nil  ; insert at end
-                           (list off)))
-                         (:double
-                          (sb-c::emit-and-insert-vop
-                           call block
-                           (sb-c::template-or-lose 'load-struct-sse-arg)
-                           (sb-c::reference-tn sap-tn nil)
-                           (sb-c::reference-tn target-tn t)
-                           nil
-                           (list off)))))))))))
+                    do (let ((vop (ecase class
+                                    (:integer 'load-struct-int-arg)
+                                    (:double 'load-struct-sse-arg))))
+                         (sb-c::emit-and-insert-vop
+                          call block
+                          (sb-c::template-or-lose vop)
+                          (sb-c::reference-tn sap-tn nil)
+                          (sb-c::reference-tn target-tn t)
+                          nil
+                          (list off))))))))))
 
-;;; VOP to set up RDI: large structs (>16 bytes) are returned via a hidden pointer.
-;;; The caller allocates memory and passes the address in RDI (first arg register)
+;;; VOP to set up hidden struct return pointer in first arg register.
+#+win32
+(define-vop (set-struct-return-pointer)
+  (:args (sap :scs (sap-reg) :target rcx))
+  (:temporary (:sc sap-reg :offset rcx-offset) rcx)
+  (:generator 1
+    (move rcx sap)))
+
+#-win32
 (define-vop (set-struct-return-pointer)
   (:args (sap :scs (sap-reg) :target rdi))
   (:temporary (:sc sap-reg :offset rdi-offset :from (:argument 0)) rdi)  ; RDI is the first arg register
@@ -391,16 +452,17 @@
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state))
         (result-type (alien-fun-type-result-type type)))
-    ;; Check for large struct return FIRST - we need to reserve RDI for sret pointer
+    ;; Check for large struct return and reserve first arg register
+    ;; for sret pointer
     ;; Cache the classification to avoid recomputing it in record-result-tn
     (let* ((result-classification
              (when (alien-record-type-p result-type)
-               (classify-struct-sysv-amd64 result-type)))
+               (classify-struct result-type)))
            (large-struct-return-p
              (and result-classification
                   (sb-alien::struct-classification-memory-p result-classification))))
-      ;; For large struct returns, consume RDI (first int arg register)
-      ;; so regular arguments start from RSI
+      ;; For large struct returns, consume first int arg register
+      ;; so regular arguments start from the second register
       (when large-struct-return-p
         (setf (arg-state-register-args arg-state) 1))
       (collect ((arg-tns))
@@ -765,16 +827,11 @@
 
 #-sb-xc-host
 (defun alien-callback-assembler-wrapper (index result-type argument-types)
-  ;; Windows x64 uses Microsoft calling convention, not System V AMD64.
-  ;; To add Windows struct-by-value callback support:
-  ;;   1. Struct arguments >8 bytes: caller passes pointer, not value
-  ;;   2. Struct arguments 1/2/4/8 bytes: passed in integer register as if integer
+  ;; Windows x64 struct-by-value callback rules:
+  ;;   1. Struct arguments >8 bytes: caller passes pointer in register
+  ;;   2. Struct arguments <=8 bytes: passed in integer register as value
   ;;   3. Struct returns >8 bytes: hidden pointer in RCX (first arg register)
-  ;;   4. Struct returns 1/2/4/8 bytes: returned in RAX
-  #+win32
-  (when (or (alien-record-type-p result-type)
-            (some #'sb-alien::alien-record-type-p argument-types))
-    (error "Struct-by-value callbacks not implemented for Windows x64 ABI"))
+  ;;   4. Struct returns <=8 bytes: returned in RAX
   (labels ((make-tn-maker (sc-name)
              (lambda (offset)
                (make-random-tn (sc-or-lose sc-name) offset)))
@@ -786,7 +843,7 @@
     ;; Check for struct return type and classify it
     (let* ((result-classification
              (when (alien-record-type-p result-type)
-               (classify-struct-sysv-amd64 result-type)))
+               (classify-struct result-type)))
            (large-struct-return-p
              (and result-classification
                   (sb-alien::struct-classification-memory-p result-classification)))
@@ -799,6 +856,7 @@
            (rbp rbp-tn)
            (rsp rsp-tn)
            #+(and win32 sb-thread) (r8 r8-tn)
+           #+win32 (r11 r11-tn)  ; scratch register for struct copy (not an arg register)
            (xmm0 float0-tn)
            #-win32
            (xmm1 float1-tn)
@@ -813,16 +871,26 @@
            (arg-offset 0)
            ;; Count of 8-byte slots consumed (for stack offset calculation)
            (arg-slot-count (ceiling total-arg-bytes n-word-bytes))
-           ;; For large struct returns, RDI contains the hidden pointer, not an argument
-           ;; Skip it in the GPR list so arguments start at RSI
+           ;; For large struct returns, the hidden pointer is in the first arg register
+           ;; (RCX on Windows, RDI on SysV). Skip it in the GPR list.
+           ;; On Windows, this also consumes argument slot 0, so skip XMM0 too.
            (gprs (let ((all-gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*)))
                    (if large-struct-return-p
-                       (rest all-gprs)  ; Skip RDI
+                       (rest all-gprs)  ; Skip RCX (win32) or RDI (SysV)
                        all-gprs)))
-           (fprs (mapcar (make-tn-maker 'double-reg)
-                         ;; Only 8 first XMM registers are used for
-                         ;; passing arguments
-                         (subseq *float-regs* 0 #-win32 8 #+win32 4)))
+           (fprs (let ((all-fprs (mapcar (make-tn-maker 'double-reg)
+                                         ;; Only 8 first XMM registers are used for
+                                         ;; passing arguments
+                                         (subseq *float-regs* 0 #-win32 8 #+win32 4))))
+                   ;; On Windows, when there's a hidden return pointer in RCX (slot 0),
+                   ;; the float arguments shift: XMM0 is "consumed" by slot 0, so
+                   ;; actual float args start at XMM1.
+                   #+win32
+                   (if large-struct-return-p
+                       (rest all-fprs)
+                       all-fprs)
+                   #-win32
+                   all-fprs))
            ;; Calculate return value slot count (in 8-byte words)
            ;; For large struct returns, we need enough space for the entire struct
            ;; For small structs and primitives, 2 slots (16 bytes) is enough
@@ -834,16 +902,16 @@
            (return-slot-count-aligned
              (if (evenp (+ arg-slot-count return-slot-count
                            (if large-struct-return-p
-                               1 ;; rdi saved on the stack
+                               1 ;; hidden pointer register saved on the stack
                                0)))
                  return-slot-count
                  (1+ return-slot-count))))
       (assemble (segment 'nil)
-        ;; For large struct returns, save the hidden pointer (in RDI)
-        ;; before we use RDI for anything else
-        #-win32
+        ;; For large struct returns, save the hidden pointer before using it
+        ;; Windows: RCX (first arg register), SysV: RDI (first arg register)
         (when large-struct-return-p
-          (inst push rdi))
+          #+win32 (inst push rcx)
+          #-win32 (inst push rdi))
         ;; Make room on the stack for argument vector.
         (when (plusp total-arg-bytes)
           (inst sub rsp total-arg-bytes))
@@ -860,7 +928,37 @@
             (cond
               ;; Struct types
               ((sb-alien::alien-record-type-p type)
-               (let* ((classification (classify-struct-sysv-amd64 type))
+               #+win32
+               (let* ((classification (classify-struct type))
+                      (memory-p (sb-alien::struct-classification-memory-p classification))
+                      (struct-size (sb-alien::struct-classification-size classification)))
+                 (cond
+                   ;; Large struct: pointer passed in register
+                   (memory-p
+                    (let ((gpr (pop gprs)))
+                      (pop fprs) ; Windows: consume paired FPR slot
+                      (unless gpr
+                        (incf stack-argument-count)
+                        (setf gpr rax)
+                        (inst mov gpr stack-arg-tn))
+                      ;; gpr now contains pointer to struct; copy struct data to arg vector
+                      ;; Use r11 as scratch (not an arg register) to avoid clobbering other args
+                      (let ((num-words (ceiling struct-size n-word-bytes)))
+                        (loop for i from 0 below num-words
+                              for dst-off from arg-offset by n-word-bytes
+                              do (inst mov r11 (ea (* i n-word-bytes) gpr))
+                                 (inst mov (ea dst-off rsp) r11)))))
+                   ;; Small struct: single integer register
+                   (t
+                    (let ((gpr (pop gprs)))
+                      (pop fprs)
+                      (unless gpr
+                        (incf stack-argument-count)
+                        (setf gpr rax)
+                        (inst mov gpr stack-arg-tn))
+                      (inst mov (ea arg-offset rsp) gpr)))))
+               #-win32
+               (let* ((classification (classify-struct type))
                       (memory-p (sb-alien::struct-classification-memory-p classification))
                       (slots (sb-alien::struct-classification-register-slots classification))
                       (struct-size (sb-alien::struct-classification-size classification)))
@@ -885,7 +983,6 @@
                           do (ecase class
                                (:integer
                                 (let ((gpr (pop gprs)))
-                                  #+win32 (pop fprs)
                                   (unless gpr
                                     (incf stack-argument-count)
                                     (setf gpr rax)
@@ -894,7 +991,6 @@
                                   (inst mov (ea slot-offset rsp) gpr)))
                                (:double
                                 (let ((fpr (pop fprs)))
-                                  #+win32 (pop gprs)
                                   (cond (fpr
                                          (inst movq (ea slot-offset rsp) fpr))
                                         (t
@@ -1001,14 +1097,27 @@
           ((alien-void-type-p result-type))
           ;; Struct return types
           ((alien-record-type-p result-type)
-           #-win32
+           #+win32
+           ;; Windows: large structs via hidden pointer (from RCX), small structs in RAX
            (cond
              ;; Large struct: copy result to hidden pointer location, return pointer
              (large-struct-return-p
               (let ((struct-size (sb-alien::struct-classification-size result-classification)))
-                ;; Return the hidden pointer in RAX
+                ;; Retrieve saved hidden pointer (was pushed at start from RCX)
                 (inst mov rax (ea (* (+ arg-slot-count return-slot-count-aligned) n-word-bytes) rsp))
                 ;; Copy struct data from stack to hidden pointer destination
+                (loop for off from 0 below struct-size by 8
+                      do (inst mov rdx (ea off rsp))
+                         (inst mov (ea off rax) rdx))))
+             ;; Small struct (<=8 bytes): just load into RAX
+             (t
+              (inst mov rax [rsp])))
+           #-win32
+           ;; SysV: large structs via hidden pointer (from RDI), small structs in RAX/RDX/XMM0/XMM1
+           (cond
+             (large-struct-return-p
+              (let ((struct-size (sb-alien::struct-classification-size result-classification)))
+                (inst mov rax (ea (* (+ arg-slot-count return-slot-count-aligned) n-word-bytes) rsp))
                 (loop for off from 0 below struct-size by 8
                       do (inst mov rdx (ea off rsp))
                          (inst mov (ea off rax) rdx))))

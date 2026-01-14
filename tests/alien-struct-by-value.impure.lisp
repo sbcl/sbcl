@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(or (and x86-64 (not win32)) arm64) (invoke-restart 'run-tests::skip-file)
+#-(or x86-64 arm64) (invoke-restart 'run-tests::skip-file)
 
 ;;; Compile and load shared library
 

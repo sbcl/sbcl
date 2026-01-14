@@ -177,20 +177,11 @@
   "Classify how a struct should be returned according to platform ABI.
    Returns (values in-registers-p register-slots size) or (values nil nil nil) for non-structs."
   (declare (ignorable alien-type))
-  #+(and arm64 (not sb-xc-host))
+  #+(and (or arm64 x86-64) (not sb-xc-host))
   (progn
     (unless (alien-record-type-p alien-type)
       (return-from struct-return-info (values nil nil nil)))
-    (let ((classification (sb-vm::classify-struct-aapcs64 alien-type)))
-      (when classification
-        (values (not (struct-classification-memory-p classification))
-                (struct-classification-register-slots classification)
-                (struct-classification-size classification)))))
-  #+(and x86-64 (not sb-xc-host))
-  (progn
-    (unless (alien-record-type-p alien-type)
-      (return-from struct-return-info (values nil nil nil)))
-    (let ((classification (sb-vm::classify-struct-sysv-amd64 alien-type)))
+    (let ((classification (sb-vm::classify-struct alien-type)))
       (when classification
         (values (not (struct-classification-memory-p classification))
                 (struct-classification-register-slots classification)

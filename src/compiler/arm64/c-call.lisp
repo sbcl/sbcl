@@ -249,7 +249,7 @@
       (values base-type count))))
 
 ;;; Main classification function for ARM64 AAPCS64.
-(defun classify-struct-aapcs64 (record-type)
+(defun classify-struct (record-type)
   "Classify struct for ARM64 AAPCS64 return."
   (let* ((bits (sb-alien::alien-type-bits record-type))
          (byte-size (ceiling bits 8))
@@ -283,7 +283,7 @@
 ;;; Called from src/code/c-call.lisp
 (defun record-result-tn (type state)
   "Handle struct return values."
-  (let ((classification (classify-struct-aapcs64 type)))
+  (let ((classification (classify-struct type)))
     (if (sb-alien::struct-classification-memory-p classification)
         ;; Large struct: return via hidden pointer in x8
         ;; The caller allocates space and passes pointer in x8
@@ -323,7 +323,7 @@
   "Handle struct arguments.
    For large structs (>16 bytes), returns a SAP TN for pointer passing.
    For small structs, returns a function that emits load VOPs."
-  (let ((classification (classify-struct-aapcs64 type)))
+  (let ((classification (classify-struct type)))
     (if (sb-alien::struct-classification-memory-p classification)
         ;; Large struct: pass by pointer
         (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number)
@@ -394,7 +394,7 @@
              ;; We just return a flag indicating this is a large struct return
              (large-struct-return-p
                (when (sb-alien::alien-record-type-p result-type)
-                 (let ((classification (classify-struct-aapcs64 result-type)))
+                 (let ((classification (classify-struct result-type)))
                    (sb-alien::struct-classification-memory-p classification)))))
         (values (make-normal-tn *fixnum-primitive-type*)
                 stack-frame-size
@@ -568,7 +568,7 @@
     ;; Check for struct return type and classify it
     (let* ((result-classification
              (when (alien-record-type-p result-type)
-               (classify-struct-aapcs64 result-type)))
+               (classify-struct result-type)))
            (large-struct-return-p
              (and result-classification
                   (sb-alien::struct-classification-memory-p result-classification))))
@@ -678,7 +678,7 @@
                   ((sb-alien::alien-record-type-p type)
                    (let* ((struct-bytes (argument-byte-size type))
                           (struct-bytes-aligned (round-up-to-word struct-bytes))
-                          (classification (classify-struct-aapcs64 type))
+                          (classification (classify-struct type))
                           ;; Use r11 as additional temp for struct pointer
                           (ptr-tn (make-tn 11)))
                      (cond
