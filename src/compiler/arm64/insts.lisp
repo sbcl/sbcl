@@ -3928,10 +3928,12 @@
          (and vop
               (or
                (memq (vop-name vop) safe-vops)
-               (and vop
-                    (loop for fun in safe-translates
+               (and (loop for fun in safe-translates
                           thereis (memq (sb-c::vop-info vop)
-                                        (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun)))))
+                                        (sb-c::fun-info-templates (sb-c::fun-info-or-lose fun))))
+                    ;; descriptor-allocating VOPs often read the arguments multiple times
+                    (not (sc-is (tn-ref-tn (sb-c::vop-results vop))
+                                sb-vm::descriptor-reg)))
                (and (not safe-vops)
                     (not safe-translates))))))))
 
