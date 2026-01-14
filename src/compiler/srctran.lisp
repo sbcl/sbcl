@@ -5351,7 +5351,7 @@
                  (abs (*)
                   (let ((*amc-abs* t))
                     (associate-lvar (first args) :dividing dividing)))
-                 ((truncate floor ceiling round) ((type rational) constant)
+                 ((truncate floor ceiling) ((type rational) constant)
                   (when (and dividing
                              (eq name divide)
                              single-value-truncate)
