@@ -2088,10 +2088,11 @@
                (inst asr high x (- 64 shift))))
             (t
              (when value
-               (load-immediate-word high value)
-               (setf y high))
-             (inst mul low x y)
-             (inst smulh high x y))))
+               (load-immediate-word low value)
+               (setf y low))
+             ;; Put SMULH first, avoids the madd peephole optimizers
+             (inst smulh high x y)
+             (inst mul low x y))))
     (inst mov header (bignum-header-for-length 2))
     (inst cmp high (asr low 63))
     (inst b :ne allocate)
@@ -2129,10 +2130,11 @@
                  (inst lsr high x (- n-word-bits shift))))
               (t
                (when (sc-is y immediate)
-                 (load-immediate-word high value)
-                 (setf y high))
-               (inst mul low x y)
-               (inst umulh high x y))))
+                 (load-immediate-word low value)
+                 (setf y low))
+               ;; Put UMULH first, avoids the madd peephole optimizers
+               (inst umulh high x y)
+               (inst mul low x y))))
     (inst mov header (bignum-header-for-length 3))
     (inst tbnz high 63 allocate)
     (inst mov header (bignum-header-for-length 2))
