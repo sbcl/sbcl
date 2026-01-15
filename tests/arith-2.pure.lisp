@@ -2109,3 +2109,10 @@
     ((-1 (- sb-vm:n-word-bits)) 0)
     ((1 sb-vm:n-word-bits) 0)
     ((-1 sb-vm:n-word-bits) most-positive-word)))
+
+(with-test (:name :division-float-0-type)
+  (assert-type
+     (lambda (x y)
+       (declare ((real 0) x y))
+       (/ x y))
+     (real 0)))

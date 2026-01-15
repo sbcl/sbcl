@@ -1423,6 +1423,10 @@
            (interval-add (interval-mul d (interval-add n add))
                          sub)))))))
 
+(defun minus-zero-p (x)
+  (or (eql x -0f0)
+      (eql x -0d0)))
+
 ;;; Divide two intervals.
 (defun interval-div (top bot &optional integer)
   (declare (type interval top bot))
@@ -1456,8 +1460,8 @@
                             (t
                              (bound-binop sb-xc:/ x y)))))
                (let* ((zero (intervals-zero top bot))
-                     (top-range (interval-range-info top zero))
-                     (bot-range (interval-range-info bot zero)))
+                      (top-range (interval-range-info top zero))
+                      (bot-range (interval-range-info bot zero)))
                  (cond ((null bot-range)
                         (if integer
                             (multiple-value-bind (bot- bot+) (interval-split zero bot t t)
@@ -1465,8 +1469,15 @@
                                     (r+ (interval-div top bot+)))
                                 (or (interval-merge-pair r- r+)
                                     (list r- r+))))
-                            ;; The denominator contains zero, so anything goes!
-                            (make-interval)))
+                            ;; Make a signed result but including all zeros
+                            (let* ((top-range (interval-range-info top))
+                                   (bot-range (interval-range-info bot)))
+                              (cond ((not (and top-range bot-range))
+                                     (make-interval))
+                                    ((eq top-range bot-range)
+                                     (make-interval :low (sb-xc:- zero)))
+                                    (t
+                                     (make-interval :high zero))))))
                        ((eq bot-range '-)
                         ;; Denominator is negative so flip the sign, compute the
                         ;; result, and flip it back.
@@ -1486,7 +1497,11 @@
                         ;; the easy case
                         (make-interval
                          :low (bound-div (interval-low top) (interval-high bot) t)
-                         :high (bound-div (interval-high top) (interval-low bot) nil)))
+                         :high (let ((top-high (interval-high top)))
+                                   (if (and (numberp top-high)
+                                            (zerop top-high))
+                                       zero
+                                       (bound-div top-high (interval-low bot) nil)))))
                        (t
                         (bug "excluded case in INTERVAL-DIV")))))))
     (let ((interval (interval-div top bot)))
