@@ -5327,66 +5327,78 @@
                                         `(lambda (x y) (declare (ignore y)) x)
                                         'associate-multiplication-constants)))))
              (associate-node (node &key dividing)
-               (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
-                 (/ (* constant)
-                  (associate-lvar (first args))
-                  (unless divide
-                    (let* ((value (value (second args)))
-                           (div (/ constant value)))
-                      (when (or (ratiop constant)
-                                (integerp div))
-                        (setf new t
-                              constant div)
-                        (unless test
-                          (erase-node-type combination *wild-type* nil outer-node)
-                          (transform-call combination
-                                          `(lambda (x y) (declare (ignore y)) x)
-                                          'associate-multiplication-constants))))))
-                 (/ (* *)
-                  (loop for arg in args
-                        do (associate-lvar arg)))
-                 (* (* constant)
-                  (associate-lvar (first args))
-                  (handle-multiplication combination (value (second args))))
-                 (* (* *)
-                  (loop for arg in args
-                        do (associate-lvar arg)))
-                 (ash (* constant)
-                  (let ((shift (lvar-value (second args))))
-                    (when (typep shift '(mod 4096))
-                      (associate-lvar (first args))
-                      (handle-multiplication combination (ash 1 shift)))))
-                 (ash (* (type unsigned-byte))
-                  (associate-lvar (first args)))
-                 (abs (*)
-                  (let ((*amc-abs* t))
-                    (associate-lvar (first args) :dividing dividing)))
-                 ((truncate floor ceiling) ((type rational) constant)
-                  (when (and dividing
-                             single-value-truncate
-                             (eq name divide)
-                             (or (eq name 'truncate)
-                                 ;; The outer divisor has to be positive
-                                 (plusp constant))
-                             (or (not *amc-abs*)
-                                 (let ((sign (integer-type-sign (lvar-type (first args))))
-                                       (d-sign (signum (lvar-value (second args)))))
-                                   (case name
-                                     (ceiling
-                                      (eql sign d-sign))
-                                     (floor
-                                      (and sign
-                                           (/= sign d-sign)))))))
-                    (let ((d (value (second args))))
-                      (when (and (integerp d)
-                                 (not (eql d 0)))
-                        (setf new t
-                              constant (* constant d))
-                        (unless test
-                          (erase-node-type combination *wild-type* nil outer-node)
-                          (transform-call combination
-                                          `(lambda (x y) (declare (ignore y)) x)
-                                          'associate-multiplication-constants)))))))))
+               (flet ((handle-truncation (a d name combination)
+                        (when (and dividing
+                                   single-value-truncate
+                                   (and (integerp d)
+                                        (not (eql d 0)))
+                                   (eq name divide)
+                                   (or (eq name 'truncate)
+                                       ;; The outer divisor has to be positive
+                                       (plusp constant))
+                                   (or (not *amc-abs*)
+                                       (let ((sign (integer-type-sign (lvar-type a)))
+                                             (d-sign (signum d)))
+                                         (case name
+                                           (ceiling
+                                            (eql sign d-sign))
+                                           (floor
+                                            (and sign
+                                                 (/= sign d-sign)))))))
+                          (setf new t
+                                constant (* constant d))
+                          (unless test
+                            (erase-node-type combination *wild-type* nil outer-node)
+                            (transform-call combination
+                                            `(lambda (x y) (declare (ignore y)) x)
+                                            'associate-multiplication-constants)))))
+                 (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
+                   (/ (* constant)
+                    (associate-lvar (first args))
+                    (unless divide
+                      (let* ((value (value (second args)))
+                             (div (/ constant value)))
+                        (when (or (ratiop constant)
+                                  (integerp div))
+                          (setf new t
+                                constant div)
+                          (unless test
+                            (erase-node-type combination *wild-type* nil outer-node)
+                            (transform-call combination
+                                            `(lambda (x y) (declare (ignore y)) x)
+                                            'associate-multiplication-constants))))))
+                   (/ (* *)
+                    (loop for arg in args
+                          do (associate-lvar arg)))
+                   (* (* constant)
+                    (associate-lvar (first args))
+                    (handle-multiplication combination (value (second args))))
+                   (* (* *)
+                    (loop for arg in args
+                          do (associate-lvar arg)))
+                   (ash (* constant)
+                    (let ((shift (lvar-value (second args))))
+                      (cond
+                        ((typep shift '(mod 4096))
+                         (associate-lvar (first args))
+                         (handle-multiplication combination (ash 1 shift)))
+                        ((typep shift '(integer -4096 -1))
+                         (let ((a (first args)))
+                           (handle-truncation a
+                                              (ash 1 (- shift))
+                                              (if (csubtypep (lvar-type a) (specifier-type 'unsigned-byte))
+                                                  'truncate
+                                                  'floor)
+                                              combination))))))
+                   (ash (* (type unsigned-byte))
+                    (associate-lvar (first args)))
+                   (abs (*)
+                    (let ((*amc-abs* t))
+                      (associate-lvar (first args) :dividing dividing)))
+                   ((truncate floor ceiling) ((type rational) constant)
+                    (handle-truncation (first args)
+                                       (value (second args))
+                                       name combination))))))
       (associate-lvar lvar :dividing divide)
       (when new
         constant))))

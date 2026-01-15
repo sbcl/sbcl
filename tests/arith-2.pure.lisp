@@ -2037,6 +2037,22 @@
              (values (ceiling (abs (ceiling a 10)) 20)))
           1)))
 
+(with-test (:name :assoc-*-const.2)
+  (flet ((test (names form count)
+           (assert (= (count-if (lambda (c)
+                                  (member c names))
+                                (ctu:ir1-named-calls form nil))
+                      count))))
+    (test '(truncate sb-kernel::truncate1 ash sb-c::ash-right)
+          `(lambda (a)
+             (declare (unsigned-byte a))
+             (values (truncate (ash a -2) 5)))
+          1)
+    (test '(floor sb-kernel::floor1 ash sb-c::ash-right)
+          `(lambda (a)
+             (values (floor (ash a -2) 5)))
+          1)))
+
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
     (assert (= (count 'logtest
