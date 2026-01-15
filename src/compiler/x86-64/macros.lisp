@@ -139,6 +139,15 @@
 (defmacro store-binding-stack-pointer (reg)
   `(store-tl-symbol-value ,reg *binding-stack-pointer*))
 
+
+;; Return the EA for the alien stack pointer thread slot.
+;; This is used by VOPs that need to both read and modify the alien stack.
+#+sb-thread
+(defmacro alien-stack-pointer-ea ()
+  `(thread-slot-ea ,(symbol-thread-slot '*alien-stack-pointer*)))
+#-sb-thread
+(defmacro alien-stack-pointer-ea ()
+  `(static-symbol-value-ea '*alien-stack-pointer*))
 ;;;; error code
 (defun emit-error-break (vop kind code values)
   (assemble ()

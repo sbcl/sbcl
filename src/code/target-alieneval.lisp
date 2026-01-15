@@ -337,6 +337,12 @@ Examples:
         (malloc-error bytes)
         sap)))
 
+;;; Fallback function for %allocate-struct-alien when the transform doesn't
+;;; apply or the IR2 converter doesn't exist (platforms without the VOP).
+;;; This performs heap allocation via %make-alien and wraps in alien-value.
+(defun sb-c::%allocate-struct-alien (size type)
+  (sb-kernel::%sap-alien (%make-alien size) type))
+
 #+c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp))
 ;;; On :c-stack-is-control-stack platforms, this DEFUN must appear prior to the
@@ -760,7 +766,8 @@ type specifies the argument and result types."
 (defmacro define-alien-routine (name result-type
                                      &rest args
                                      &environment lexenv)
-  "DEFINE-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
+  "DEFINE-ALIEN-ROUTINE Name Result-Type [:INLINE {NIL | T | :MAYBE-INLINE}]
+                        {(Arg-Name Arg-Type [Style])}*
 
 Define a foreign interface function for the routine with the specified NAME.
 Also automatically DECLAIM the FTYPE of the defined function.
@@ -769,6 +776,13 @@ NAME may be either a string, a symbol, or a list of the form (string symbol).
 
 RETURN-TYPE is the alien type for the function return value. VOID may be
 used to specify a function with no result.
+
+:INLINE
+      When :INLINE is T, declares the function inline, allowing the wrapper
+      to be inlined at call sites. This enables stack allocation of struct-
+      by-value returns when the caller uses DYNAMIC-EXTENT. When :INLINE is
+      :MAYBE-INLINE, uses MAYBE-INLINE instead, which inlines only when
+      space optimization is not prioritized.
 
 The remaining forms specify individual arguments that are passed to the
 routine. ARG-NAME is a symbol that names the argument, primarily for
@@ -803,7 +817,15 @@ way that the argument is passed.
              ;;   (define-alien-routine "kill" int (pid int) (sig int))
              ;; which, if we didn't hide the local name, would get:
              ;;  "Attempt to bind a constant variable with SYMBOL-MACROLET: KILL"
-             (local-name (copy-symbol lisp-name)))
+             (local-name (copy-symbol lisp-name))
+             ;; Parse :inline option if present (must appear before argument specs)
+             (inline-option (when (eq (car args) :inline)
+                              (pop args)
+                              (let ((value (pop args)))
+                                (unless (member value '(nil t :maybe-inline))
+                                  (error "Invalid :INLINE value ~S; expected NIL, T, or :MAYBE-INLINE"
+                                         value))
+                                value))))
     (collect ((docs) (lisp-args) (lisp-arg-types)
               (lisp-result-types
                (cond ((eql result-type 'void)
@@ -853,6 +875,11 @@ way that the argument is passed.
                    (results name)
                    (lisp-result-types `(alien ,type)))))))
       `(progn
+         ,@(when inline-option
+             `((declaim (,(if (eq inline-option :maybe-inline)
+                              'maybe-inline
+                              'inline)
+                         ,lisp-name))))
          ;; The theory behind this automatic DECLAIM is that (1) if
          ;; you're calling C, static typing is what you're doing
          ;; anyway, and (2) such a declamation can be (especially for

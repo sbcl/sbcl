@@ -551,6 +551,58 @@
                              +number-stack-alignment-mask+)))
         (inst add nsp-tn nsp-tn (add-sub-immediate delta))))))
 
+;; Allocate struct memory on number stack, SAP object on Lisp stack,
+;; and alien-value wrapper on Lisp stack. This allows dynamic-extent
+;; to stack-allocate all three at once.
+(define-vop (alloc-struct-alien-stack)
+  (:info struct-size)
+  (:args (layout-arg :scs (constant))
+         (type-arg :scs (constant)))
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:sc sap-reg) struct-sap)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:temporary (:sc descriptor-reg) sap-object)
+  (:vop-var vop)
+  (:generator 10
+    ;; Allocate struct memory on number stack
+    (unless (zerop struct-size)
+      (let ((delta (logandc2 (+ struct-size +number-stack-alignment-mask+)
+                             +number-stack-alignment-mask+)))
+        (inst sub nsp-tn nsp-tn (add-sub-immediate delta))))
+    (inst mov-sp struct-sap nsp-tn)
+    ;; Allocate SAP object on Lisp stack
+    (with-fixed-allocation (sap-object temp sap-widetag sap-size
+                            :lowtag other-pointer-lowtag
+                            :stack-allocate-p t
+                            :store-type-code nil)
+      ;; Store raw pointer in SAP object's pointer slot
+      (storew-pair temp 0 struct-sap sap-pointer-slot tmp-tn))
+    ;; Allocate alien-value wrapper on Lisp stack
+    ;; Total words = 1 (header) + instance-data-start + 2 data slots
+    (with-fixed-allocation (result temp instance-widetag
+                            (+ 1 instance-data-start 2)
+                            :lowtag instance-pointer-lowtag
+                            :stack-allocate-p t)
+      ;; Store layout for alien-value
+      (load-constant vop layout-arg temp)
+      #+compact-instance-header
+      ;; Layout goes in high 32 bits of header word
+      (inst str (32-bit-reg temp) (@ result (- 4 instance-pointer-lowtag)))
+      #-compact-instance-header
+      ;; Layout goes in first slot after header
+      (storew temp result instance-slots-offset instance-pointer-lowtag)
+      ;; Store SAP object in alien-value's sap slot
+      (storew sap-object result
+              (+ instance-slots-offset
+                 (get-dsd-index sb-alien-internals:alien-value sb-kernel::sap))
+              instance-pointer-lowtag)
+      ;; Store type slot
+      (load-constant vop type-arg temp)
+      (storew temp result
+              (+ instance-slots-offset
+                 (get-dsd-index sb-alien-internals:alien-value sb-kernel::type))
+              instance-pointer-lowtag))))
+
 ;;; Callback
 #-sb-xc-host
 (defun alien-callback-accessor-form (type sap offset)

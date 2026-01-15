@@ -52,6 +52,75 @@
   (tagify alloc-tn rsp-tn lowtag)
   (values))
 
+;; Allocate struct memory on alien stack, SAP object on Lisp stack,
+;; and alien-value wrapper on Lisp stack. This allows dynamic-extent
+;; to properly stack-allocate all three at once.
+(define-vop (alloc-struct-alien-stack)
+  (:info struct-size)
+  ;; On x86-64 with compact-instance-header, layouts are classified as
+  ;; immediate SC rather than constant SC. Accept both.
+  ;; Type-arg is always constant since alien type descriptors are lists.
+  (:args (layout-arg :scs (constant immediate))
+         (type-arg :scs (constant)))
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:sc sap-reg) struct-sap)
+  (:temporary (:sc descriptor-reg) temp)
+  (:temporary (:sc descriptor-reg) sap-object)
+  (:generator 10
+    ;; Allocate struct memory on alien stack
+    (unless (zerop struct-size)
+      (let ((delta (align-up struct-size 8)))
+        (inst sub :qword (alien-stack-pointer-ea) delta)))
+    (inst mov struct-sap (alien-stack-pointer-ea))
+    ;; Allocate SAP object on Lisp stack (header + pointer slot)
+    (stack-allocation (pad-data-block sap-size) other-pointer-lowtag sap-object)
+    ;; Initialize SAP header
+    (inst mov :dword (ea (- other-pointer-lowtag) sap-object)
+          (compute-object-header sap-size sap-widetag))
+    ;; Store raw pointer in SAP object's pointer slot
+    (storew struct-sap sap-object sap-pointer-slot other-pointer-lowtag)
+    ;; Allocate alien-value wrapper on Lisp stack
+    ;; Total words = 1 (header) + instance-data-start + 2 data slots
+    (let ((total-words (+ 1 instance-data-start 2)))
+      (stack-allocation (pad-data-block total-words) instance-pointer-lowtag result)
+      ;; Initialize header - encodes payload length (total-words - 1)
+      (inst mov :dword (ea (- instance-pointer-lowtag) result)
+            (compute-object-header total-words instance-widetag)))
+    ;; Store layout for alien-value
+    ;; With compact-instance-header, layout is stored as a 32-bit value in the
+    ;; high 32 bits of the header word. Use make-fixup for immediate layouts.
+    #+compact-instance-header
+    (inst mov :dword (ea (- 4 instance-pointer-lowtag) result)
+          (sc-case layout-arg
+            (immediate (make-fixup (tn-value layout-arg) :layout))
+            (constant layout-arg)))
+    #-compact-instance-header
+    (progn
+      ;; Layout goes in first slot after header - need full 64-bit value
+      (sc-case layout-arg
+        (immediate (inst mov temp (make-fixup (tn-value layout-arg) :layout)))
+        (constant (inst mov temp layout-arg)))
+      (inst mov (ea (- (ash instance-slots-offset word-shift)
+                       instance-pointer-lowtag)
+                    result)
+            temp))
+    ;; Store SAP object in alien-value's sap slot
+    (inst mov (ea (- (ash (+ (get-dsd-index sb-alien-internals:alien-value sb-kernel::sap)
+                             instance-slots-offset)
+                          word-shift)
+                     instance-pointer-lowtag)
+                  result)
+          sap-object)
+    ;; Store type slot - type is an alien type descriptor (a list), which is
+    ;; always in constant SC since lists can't be immediate constants.
+    (inst mov temp type-arg)
+    (inst mov (ea (- (ash (+ (get-dsd-index sb-alien-internals:alien-value sb-kernel::type)
+                             instance-slots-offset)
+                          word-shift)
+                     instance-pointer-lowtag)
+                  result)
+          temp)))
+
 (defun alloc-unboxed-p (type)
   (case type
     ((unboxed-array

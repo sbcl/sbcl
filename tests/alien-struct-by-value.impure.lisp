@@ -691,5 +691,109 @@
     (let ((result (call-returning-small-union (alien-sap cb) -54321)))
       (assert (= (slot result 'as-int) -54321)))))
 
+;;; struct-by-value returns
+
+(defun struct-return-test-1 (val)
+  (declare (optimize speed))
+  (let ((result (tiny-align-8-return val)))
+    (slot result 'm0)))
+
+(defun struct-return-test-2 (val)
+  (declare (optimize speed))
+  (let ((result (tiny-align-8-return val)))
+    (declare (dynamic-extent result))
+    (slot result 'm0)))
+
+(with-test (:name :struct-by-value-return-correctness)
+  ;; Verify struct returns work correctly
+  (assert (= (struct-return-test-1 42) 42))
+  (assert (= (struct-return-test-1 -123) -123))
+  ;; dynamic-extent declared version should also work
+  (assert (= (struct-return-test-2 42) 42))
+  (assert (= (struct-return-test-2 -123) -123)))
+
+;;; Test that %allocate-struct-alien with dynamic-extent uses stack allocation
+;;; This directly tests the stack allocation VOP (only available on x86-64 and arm64)
+#+(or x86-64 arm64)
+(progn
+;;; Helper macro to get alien-type at compile time (required for constant-lvar-p)
+(defmacro %allocate-struct-alien-for-test (size type-spec)
+  `(sb-c::%allocate-struct-alien
+    ,size
+    ',(sb-alien-internals:parse-alien-type type-spec nil)))
+
+(defun test-stack-alloc-struct-alien ()
+  (declare (optimize speed))
+  (let ((alien (%allocate-struct-alien-for-test 8 (struct tiny-align-8))))
+    (declare (dynamic-extent alien))
+    (sb-alien:alien-sap alien)))
+
+;;; Test that with stack allocation, the allocation is inlined
+(with-test (:name :struct-alien-stack-allocation)
+  (let ((output (with-output-to-string (s)
+                  (disassemble #'test-stack-alloc-struct-alien :stream s))))
+    (assert (not (search "%ALLOCATE-STRUCT-ALIEN" output))
+            () "Stack-allocated struct-alien should not call %allocate-struct-alien~%~A" output)))
+
+;;; Behavioral test: verify stack allocation reuses memory
+;;; Stack-allocated structs should use the same address range across calls,
+;;; while heap-allocated ones should use different addresses.
+(defun get-heap-alloc-sap ()
+  (declare (optimize speed))
+  (let ((alien (%allocate-struct-alien-for-test 8 (struct tiny-align-8))))
+    ;; No dynamic-extent - heap allocated
+    (sb-sys:sap-int (sb-alien:alien-sap alien))))
+
+(with-test (:name :struct-alien-stack-vs-heap-behavior)
+  ;; Stack allocation: addresses should be in same region (within 4KB)
+  (let* ((stack-addr1 (sb-sys:sap-int (test-stack-alloc-struct-alien)))
+         (stack-addr2 (sb-sys:sap-int (test-stack-alloc-struct-alien))))
+    (assert (< (abs (- stack-addr1 stack-addr2)) 4096)
+            () "Stack-allocated struct SAPs should be in same region: ~X vs ~X"
+            stack-addr1 stack-addr2))
+  ;; Heap allocation: addresses should be different (separate malloc calls)
+  (let* ((heap-addr1 (get-heap-alloc-sap))
+         (heap-addr2 (get-heap-alloc-sap)))
+    (assert (/= heap-addr1 heap-addr2)
+            () "Heap-allocated struct SAPs should be different: ~X vs ~X"
+            heap-addr1 heap-addr2)))
+) ; end progn for #+(or x86-64 arm64)
+
+;;; Test :inline option for define-alien-routine
+;;; This enables stack allocation of struct-by-value returns via inlining.
+(define-alien-routine ("tiny_align_8_return" tiny-align-8-return-inline)
+    (struct tiny-align-8)
+  :inline t
+  (val (integer 64)))
+
+;;; Test that the inline wrapper has an inline expansion recorded
+(with-test (:name :struct-by-value-inline-expansion)
+  (assert (eq (sb-int:info :function :inlinep 'tiny-align-8-return-inline) 'inline)
+          () "Inline wrapper should be declared inline")
+  (assert (sb-c::fun-name-inline-expansion 'tiny-align-8-return-inline)
+          () "Inline wrapper should have inline expansion recorded"))
+
+;;; Test that inlined wrapper with dynamic-extent uses stack allocation
+;;; (Only on platforms with the stack allocation VOP)
+#+(or x86-64 arm64)
+(progn
+(defun test-inline-stack-alloc (val)
+  (declare (optimize speed))
+  (let ((result (tiny-align-8-return-inline val)))
+    (declare (dynamic-extent result))
+    (slot result 'm0)))
+
+(with-test (:name :struct-by-value-inline-stack-allocation)
+  ;; First verify the function works correctly
+  (assert (= (test-inline-stack-alloc 42) 42))
+  (assert (= (test-inline-stack-alloc -123) -123))
+  ;; Check that disassembly shows stack allocation (no call to %ALLOCATE-STRUCT-ALIEN)
+  (let ((output (with-output-to-string (s)
+                  (disassemble #'test-inline-stack-alloc :stream s))))
+    (assert (not (search "%ALLOCATE-STRUCT-ALIEN" output))
+            () "Inlined wrapper with dynamic-extent should use stack allocation~%~A"
+            output)))
+) ; end progn for #+(or x86-64 arm64)
+
 ;;; Clean up
 #-win32 (ignore-errors (delete-file *soname*))

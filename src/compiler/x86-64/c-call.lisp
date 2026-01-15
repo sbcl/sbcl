@@ -805,19 +805,16 @@ Floats are passed in integer registers."
     (inst and rsp-tn -16)
     (move result rsp-tn)))
 
-(macrolet ((alien-stack-ptr ()
-             #+sb-thread `(thread-slot-ea ,(symbol-thread-slot '*alien-stack-pointer*))
-             #-sb-thread '(static-symbol-value-ea '*alien-stack-pointer*)))
-  (define-vop (alloc-alien-stack-space)
-    (:info amount)
-    (:results (result :scs (sap-reg any-reg)))
-    (:result-types system-area-pointer)
-    (:generator 0
-      (aver (not (location= result rsp-tn)))
-      (unless (zerop amount)
-        (let ((delta (align-up amount 8)))
-          (inst sub :qword (alien-stack-ptr) delta)))
-      (inst mov result (alien-stack-ptr)))))
+(define-vop (alloc-alien-stack-space)
+  (:info amount)
+  (:results (result :scs (sap-reg any-reg)))
+  (:result-types system-area-pointer)
+  (:generator 0
+    (aver (not (location= result rsp-tn)))
+    (unless (zerop amount)
+      (let ((delta (align-up amount 8)))
+        (inst sub :qword (alien-stack-pointer-ea) delta)))
+    (inst mov result (alien-stack-pointer-ea))))
 
 ;;; Callbacks
 

@@ -911,3 +911,8 @@
 
 (defknown sb-vm::%weakvec-ref (weak-pointer index) t (flushable))
 (defknown sb-vm::%weakvec-set (weak-pointer index t) (values) ())
+
+;;; %allocate-struct-alien allocates memory for struct-by-value returns
+;;; and wraps it in an alien-value in order to support stack allocation via
+;;; dynamic-extent declarations.
+(defknown %allocate-struct-alien (index t) sb-alien-internals:alien-value (flushable))

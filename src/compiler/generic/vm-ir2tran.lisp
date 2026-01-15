@@ -35,6 +35,32 @@
 (defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node)
   t)
 
+#+(or x86-64 arm64)
+(defoptimizer (%allocate-struct-alien stack-allocate-result) ((size type) node)
+  ;; Stack allocation requires constant size and type for the VOP
+  (and (constant-lvar-p size) (constant-lvar-p type)))
+
+#+(or x86-64 arm64)
+(defoptimizer (%allocate-struct-alien ir2-convert) ((size type) node block)
+  (when (node-stack-allocate-p node)
+    (let* ((lvar (node-lvar node))
+           (locs (lvar-result-tns lvar (list *universal-type*)))
+           (result (first locs))
+           (size-value (and (constant-lvar-p size) (lvar-value size)))
+           (type-value (and (constant-lvar-p type) (lvar-value type)))
+           (layout (sb-kernel::find-layout 'sb-alien-internals:alien-value)))
+      (unless size-value
+        (error "~S requires constant size argument" '%allocate-struct-alien))
+      (unless type-value
+        (error "~S requires constant type argument" '%allocate-struct-alien))
+      ;; vop macro expects: args, info, results (see meta-vmdef.lisp line 2100)
+      ;; args: layout, type; info: size; results: result
+      (vop sb-vm::alloc-struct-alien-stack node block
+           (emit-constant layout) (emit-constant type-value)
+           size-value result)
+      (move-lvar-result node block locs lvar)
+      t)))
+
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list (if lvar
