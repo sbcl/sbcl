@@ -5817,6 +5817,25 @@
                             (negate-non-zero-args args))
                            (ash (* (type unsigned-byte))
                             (negate-lvar (first args) test any-branch))
+                           (ash (* constant)
+                            ;; (ash x -n) is (floor x (ash 1 n))
+                            (let ((shift (lvar-value (second args))))
+                              (when (and (typep shift '(integer -4096 -1))
+                                         ;; Turning ash into ceiling might not be a win
+                                         (not (word-sized-result-p combination t)))
+                                (let ((negated (negate-lvar (first args) test any-branch)))
+                                  (when (and negated
+                                             (or (not test)
+                                                 (and (eq test negated)
+                                                      (eq negated '%negate))))
+                                    (erase-node-type combination *wild-type* nil outer-node)
+                                    (transform-call combination
+                                                    `(lambda (x y)
+                                                       (declare (ignore y))
+                                                       (ceiling x ,(ash 1 (- shift))))
+                                                    'negate-lvar))
+
+                                  negated))))
                            (floor (* *)
                             (negate-truncation combination args 'ceiling))
                            (ceiling (* *)

@@ -1539,6 +1539,10 @@
           0)
     (test `(lambda (a)
              (- (truncate a)))
+          0)
+    (test `(lambda (a)
+             (declare (integer a))
+             (- (ash (- a) -2)))
           0)))
 
 (with-test (:name :abs-match)
