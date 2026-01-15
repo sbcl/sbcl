@@ -128,7 +128,7 @@
             (m3 (integer 64)) (m7 (integer 64)) (m11 (integer 64)) (m15 (integer 64))))
 
 (with-test (:name :struct-by-value-large-align-8-args)
-    (macrolet
+  (macrolet
       ((def-large-align-8-get (i)
          (let ((lisp-name (sb-int:symbolicate "LARGE-ALIGN-8-GET-M" i)))
            `(define-alien-routine ,lisp-name (integer 64) (m (struct large-align-8)))))
@@ -137,18 +137,7 @@
          (let ((defs (loop for i upto 15 collect `(def-large-align-8-get ,i))))
            `(progn ,@defs))))
     (defs-large-align-8-get)
-    (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))
-  (macrolet
-      ((def-large-align-8-get (i)
-         (let ((lisp-name (sb-int:symbolicate "LARGE-ALIGN-8-GET-M" i)))
-           `(assert-unimplemented
-             (define-alien-routine ,lisp-name (integer 64) (m (struct large-align-8))))))
-       (defs-large-align-8-get ()
-         (let ((defs (loop for i upto 15 collect `(def-large-align-8-get ,i))))
-           `(progn ,@defs))))
-    (defs-large-align-8-get)
-    (assert-unimplemented
-     (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))))
+    (define-alien-routine large-align-8-mutate void (m (struct large-align-8)))))
 
 
 (define-alien-routine large-align-8-return (struct large-align-8)
