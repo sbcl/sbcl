@@ -317,54 +317,6 @@
           (setf (result-state-num-results state) (+ int-results fp-results))
           (nreverse result-tns)))))
 
-;;; VOPs for struct argument passing
-;;; These VOPs load register slots from a struct SAP into target registers
-
-(define-vop (load-struct-int-arg)
-  (:args (sap :scs (sap-reg)))
-  (:info offset)
-  (:results (target :scs (unsigned-reg signed-reg)))
-  (:generator 5
-    (inst ldr target (@ sap offset))))
-
-(define-vop (load-struct-single-arg)
-  (:args (sap :scs (sap-reg)))
-  (:info offset)
-  (:results (target :scs (single-reg)))
-  (:generator 5
-    (inst ldr target (@ sap offset))))
-
-(define-vop (load-struct-double-arg)
-  (:args (sap :scs (sap-reg)))
-  (:info offset)
-  (:results (target :scs (double-reg)))
-  (:generator 5
-    (inst ldr target (@ sap offset))))
-
-;;; VOPs for storing struct result registers to memory
-;;; These VOPs store result register values back to memory for struct-by-value returns
-
-(define-vop (store-struct-int-result)
-  (:args (value :scs (unsigned-reg signed-reg))
-         (sap :scs (sap-reg)))
-  (:info offset)
-  (:generator 5
-    (inst str value (@ sap offset))))
-
-(define-vop (store-struct-single-result)
-  (:args (value :scs (single-reg))
-         (sap :scs (sap-reg)))
-  (:info offset)
-  (:generator 5
-    (inst str value (@ sap offset))))
-
-(define-vop (store-struct-double-result)
-  (:args (value :scs (double-reg))
-         (sap :scs (sap-reg)))
-  (:info offset)
-  (:generator 5
-    (inst str value (@ sap offset))))
-
 ;;; Arg TN generation for record types
 ;;; Called from src/code/c-call.lisp
 (defun record-arg-tn (type state)
@@ -410,31 +362,17 @@
             (let ((sap-tn (sb-c::lvar-tn call block arg)))
               (loop for target-tn in arg-tns
                     for (off . class) in offsets
-                    do (ecase class
-                         (:integer
-                          (sb-c::emit-and-insert-vop
+                    do (sb-c::emit-and-insert-vop
                            call block
-                           (sb-c::template-or-lose 'load-struct-int-arg)
+                           (sb-c::template-or-lose
+                            (ecase class
+                              (:integer 'sap-ref-64-c)
+                              (:single 'sap-ref-single-c)
+                              (:double 'sap-ref-double-c)))
                            (sb-c::reference-tn sap-tn nil)
                            (sb-c::reference-tn target-tn t)
                            nil
-                           (list off)))
-                         (:single
-                          (sb-c::emit-and-insert-vop
-                           call block
-                           (sb-c::template-or-lose 'load-struct-single-arg)
-                           (sb-c::reference-tn sap-tn nil)
-                           (sb-c::reference-tn target-tn t)
-                           nil
-                           (list off)))
-                         (:double
-                          (sb-c::emit-and-insert-vop
-                           call block
-                           (sb-c::template-or-lose 'load-struct-double-arg)
-                           (sb-c::reference-tn sap-tn nil)
-                           (sb-c::reference-tn target-tn t)
-                           nil
-                           (list off)))))))))))
+                           (list off)))))))))
 
 (defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state))
@@ -470,7 +408,7 @@
 ;;; x8.
 (define-vop (set-struct-return-pointer)
   (:args (sap :scs (sap-reg) :target x8))
-  (:temporary (:sc sap-reg :offset 8) x8)  ; x8 is the indirect result register
+  (:temporary (:sc sap-reg :from (:argument 0) :offset 8) x8)  ; x8 is the indirect result register
   (:generator 1
     (move x8 sap)))
 

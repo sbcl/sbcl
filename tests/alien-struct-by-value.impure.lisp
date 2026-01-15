@@ -138,7 +138,6 @@
            `(progn ,@defs))))
     (defs-large-align-8-get)
     (define-alien-routine large-align-8-mutate void (m (struct large-align-8))))
-  #-(or x86-64 arm64)
   (macrolet
       ((def-large-align-8-get (i)
          (let ((lisp-name (sb-int:symbolicate "LARGE-ALIGN-8-GET-M" i)))

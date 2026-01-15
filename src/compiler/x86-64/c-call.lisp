@@ -295,7 +295,7 @@
   (:args (sap :scs (sap-reg))
          (nsp :scs (any-reg)))
   (:info src-offset dst-offset)
-  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:generator 5
     (inst mov :qword temp (ea src-offset sap))
     (inst mov :qword (ea dst-offset nsp) temp)))
@@ -384,7 +384,7 @@
 ;;; The caller allocates memory and passes the address in RDI (first arg register)
 (define-vop (set-struct-return-pointer)
   (:args (sap :scs (sap-reg) :target rdi))
-  (:temporary (:sc sap-reg :offset rdi-offset) rdi)  ; RDI is the first arg register
+  (:temporary (:sc sap-reg :offset rdi-offset :from (:argument 0)) rdi)  ; RDI is the first arg register
   (:generator 1
     (move rdi sap)))
 

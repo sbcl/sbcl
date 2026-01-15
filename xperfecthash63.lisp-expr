@@ -1652,5 +1652,8 @@
 (#(A49305EF D0241AE7 E55E7F8C EE9A5410)
  "(SB-PCL::%CLASS SB-PCL::%PARAMETER SB-PCL::%VARIABLE-REBINDING SPECIAL)"
  "((& (>> val 8) 3))")
+(#(8 E 10 16 18 26 28)
+ "(12 11 19 20 8 7 4)"
+ "((& (- (>> val 2) (>> val 5)) 7))")
 )
 ;; EOF
