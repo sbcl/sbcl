@@ -5369,7 +5369,25 @@
                             (erase-node-type combination *wild-type* nil outer-node)
                             (transform-call combination
                                             `(lambda (x y) (declare (ignore y)) x)
-                                            'associate-multiplication-constants)))))
+                                            'associate-multiplication-constants))))
+                      (handle-truncation-2 (n name combination &optional (transform-to name))
+                        (when (and (eq name divide)
+                                   dividing
+                                   single-value-truncate
+                                   (integerp n)
+                                   (integerp constant)
+                                   (or (eq name 'truncate)
+                                       ;; The outer divisor has to be positive
+                                       (plusp constant)))
+                          (let ((n (funcall name n constant)))
+                            (setf new t
+                                  constant 1)
+                            (unless test
+                              (erase-node-type combination *wild-type* nil outer-node)
+                              (transform-call combination
+                                              `(lambda (x y) (declare (ignore x))
+                                                 (,transform-to ,n y))
+                                              'associate-multiplication-constants))))))
                  (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
                    (/ (* constant)
                     (associate-lvar (first args))
@@ -5410,13 +5428,17 @@
                                               combination))))))
                    (ash (* (type unsigned-byte))
                     (associate-lvar (first args)))
+                   (ash (constant (type (integer * 0)))
+                    (handle-truncation-2 (value (first args)) 'floor combination 'ash))
                    (abs (*)
                     (let ((*amc-abs* t))
                       (associate-lvar (first args) :dividing dividing)))
                    ((truncate floor ceiling) ((type rational) constant)
                     (handle-truncation (first args)
                                        (value (second args))
-                                       name combination))))))
+                                       name combination))
+                   ((truncate floor ceiling) (constant (type rational))
+                    (handle-truncation-2 (value (first args)) (second args) name combination))))))
       (associate-lvar lvar :dividing divide)
       (when new
         constant))))

@@ -2065,7 +2065,12 @@
           `(lambda (n)
              (declare (unsigned-byte n))
              (ash (truncate n 5) -2))
-          0)))
+          0)
+    (test '(truncate sb-kernel::truncate1)
+          `(lambda (a)
+             (declare (integer a))
+             (values (truncate (truncate 9 a) 3)))
+          1)))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
