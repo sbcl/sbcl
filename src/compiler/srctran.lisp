@@ -5458,12 +5458,22 @@
             `(multiple-value-bind (q r) ($fun x ,new-c)
                (values q (* r ,($fun constant new-c)))))))))
 
-(deftransform ash ((x c) (rational (constant-arg (mod 4096))) * :important nil :node node)
-  "associate * of constants"
-  (let ((new-c (associate-multiplication-constants x (ash 1 (lvar-value c)) node)))
-   (if new-c
-       `(* x ,new-c)
-       (give-up-ir1-transform))))
+(deftransform ash ((x s) (t (constant-arg (and (integer -4096 4096) (not (eql 0))))) * :important nil :node node)
+  (let* ((shift (lvar-value s))
+         (m (ash 1 (abs shift))))
+    (or (if (plusp shift)
+            (let ((new-c (associate-multiplication-constants x m node)))
+              (when new-c
+                `(* x ,new-c)))
+            (let* ((divider (if (csubtypep (lvar-type x) (specifier-type 'unsigned-byte))
+                                'truncate
+                                'floor))
+                   (new-c (associate-multiplication-constants x m node
+                                                              :divide divider
+                                                              :single-value-truncate t)))
+              (when new-c
+                `(values (,divider x ,new-c)))))
+        (give-up-ir1-transform))))
 
 ;;; Transform (logior a (- (mask-field (byte 1 n) a)))
 ;;; to (mask-signed-field n a)
