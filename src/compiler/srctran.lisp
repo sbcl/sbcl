@@ -5383,7 +5383,10 @@
                                           (plusp constant)
                                           (zerop r))))
                             (setf new t
-                                  constant 1)
+                                  constant (if (and (minusp constant)
+                                                    *amc-abs*)
+                                               -1
+                                               1))
                             (unless test
                               (erase-node-type combination *wild-type* nil outer-node)
                               (transform-call combination

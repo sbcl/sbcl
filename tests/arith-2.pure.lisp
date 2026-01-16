@@ -2070,7 +2070,14 @@
           `(lambda (a)
              (declare (integer a))
              (values (truncate (truncate 9 a) 3)))
-          1)))
+          1)
+    (checked-compile-and-assert
+        ()
+        `(lambda (v)
+           (declare (integer v))
+           (values (truncate (abs (truncate 9 v)) -3)))
+      ((2) -1)
+      ((-10) 0))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
