@@ -1655,5 +1655,14 @@
 (#(8 E 10 16 18 26 28)
  "(12 11 19 20 8 7 4)"
  "((& (- (>> val 2) (>> val 5)) 7))")
+(#(63C481C2 73D42188 937BB764 A4528420 B0E6341F D0F360C2 D1F36255 D5F368A1 D7F36BC7)
+ "(- + CEILING FLOOR TRUNCATE ABS ASH * /)"
+ "((let ((tab #a((8) (unsigned-byte 8) 0 12 2 2 0 3 7 5)))
+  (let ((b (& (>> val 6) #x7)))
+   (let ((a (>> (<< val 31) 29)))
+    (^ a (aref tab b))))))")
+(#(937BB764 A4528420 D0F360C2 D1F36255 D7F36BC7)
+ "(ABS ASH * - +)"
+ "((& (- val (>> val 1)) 7))")
 )
 ;; EOF

@@ -2079,6 +2079,23 @@
       ((2) -1)
       ((-10) 0))))
 
+(with-test (:name :assoc-*-const.3)
+  (flet ((test (names form count)
+           (assert (= (count-if (lambda (c)
+                                  (member c names))
+                                (ctu:ir1-named-calls form nil))
+                      count))))
+    (test '(* sb-kernel:two-arg-*)
+          `(lambda (a)
+             (declare (rational a))
+             (* (+ (* a 3) 3) 5))
+          1)
+    (test '(* sb-kernel:two-arg-*)
+          `(lambda (a)
+             (declare (rational a))
+             (* (abs (- (* a 3) 3)) 5))
+          1)))
+
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
     (assert (= (count 'logtest

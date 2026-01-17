@@ -5443,10 +5443,67 @@
                                        (value (second args))
                                        name combination))
                    ((truncate floor ceiling) (constant (type rational))
-                    (handle-truncation-2 (value (first args)) name combination))))))
+                    (handle-truncation-2 (value (first args)) name combination))
+                   ((+ -) *
+                    (unless divide
+                      (when (multiply-lvar-constants (node-lvar node) constant outer-node :test test)
+                        (unless test
+                          (setf new t
+                                constant (if (and (minusp constant)
+                                                  *amc-abs*)
+                                             -1
+                                             1)))
+                        t)))))))
       (associate-lvar lvar :dividing divide)
       (when new
         constant))))
+
+;;; Turn (* (+ (* a 3) 3) 5) into (+ (* a (* 3 5)) (* 3 5))
+(defun multiply-lvar-constants (lvar constant outer-node &key test)
+  (labels ((multiply-lvar (lvar &key test)
+             (unless (eql (abs constant) 1)
+               (let ((uses (lvar-uses lvar)))
+                 (if (listp uses)
+                     (progn)
+                     (multiply-node uses :test test)))))
+           (multiply-node (node &key test)
+             (flet ((multiply-all-args (args)
+                      (when (loop for arg in args
+                                  always (multiply-lvar arg :test t))
+                        (unless test
+                          (loop for arg in args
+                                do (aver (multiply-lvar arg))))
+                        t))
+                    (multiply-some-args (args)
+                      (loop for arg in args
+                            thereis (multiply-lvar arg :test test))))
+               (multiple-value-bind (constantp value) (constant-node-p node)
+                 (if constantp
+                     (progn
+                       (unless test
+                         (replace-node-with-constant node (* constant value))
+                         (erase-lvar-type (node-lvar node) nil outer-node))
+                       t)
+                     (combination-case (lvar :cast #'numeric-type-without-bounds-p :node node)
+                       ((+ -) *
+                        (multiply-all-args args))
+                       (* *
+                        (multiply-some-args args))
+                       (ash (* constant)
+                        (let ((shift (lvar-value (second args))))
+                          (when (typep shift '(mod 4096))
+                            (unless test
+                              (erase-node-type combination *wild-type* nil outer-node)
+                              (transform-call combination
+                                              `(lambda (x y) (declare (ignore y))
+                                                 (* x ,(* constant (ash 1 shift))))
+                                              'multiply-lvar-constants))
+                            t)))
+                       (ash (* (type unsigned-byte))
+                        (multiply-lvar (first args)))
+                       (abs *
+                        (multiply-lvar (first args) :test test))))))))
+    (multiply-lvar lvar :test test)))
 
 (deftransform * ((x y) (rational rational) * :important nil :node node)
   "associate * of constants"
@@ -5462,9 +5519,11 @@
 (deftransform * ((x c) (rational (constant-arg rational)) * :important nil :node node)
   "associate * of constants"
   (let ((new-c (associate-multiplication-constants x (lvar-value c) node)))
-   (if new-c
-       `(* x ,new-c)
-       (give-up-ir1-transform))))
+    (or (when new-c
+          (if (eql new-c 1)
+              'x
+              `(* x ,new-c)))
+        (give-up-ir1-transform))))
 
 ;;; (truncate (* a 10) 6) => (truncate (* a 5) 3)
 (make-defs (($fun truncate floor ceiling round))
@@ -5491,7 +5550,9 @@
     (or (if (plusp shift)
             (let ((new-c (associate-multiplication-constants x m node)))
               (when new-c
-                `(* x ,new-c)))
+                (if (eql new-c 1)
+                    'x
+                    `(* x ,new-c))))
             (let* ((divider (if (csubtypep (lvar-type x) (specifier-type 'unsigned-byte))
                                 'truncate
                                 'floor))
