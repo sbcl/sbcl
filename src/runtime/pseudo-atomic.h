@@ -39,7 +39,8 @@
 # define clear_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 0
 
 #elif defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 \
-  || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_RISCV
+  || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_RISCV \
+  || defined LISP_FEATURE_LOONGARCH64
 #include "thread.h" // for SymbolValue
 
 /* These architectures use a thread slot if #+sb-thread,

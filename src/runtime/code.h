@@ -157,7 +157,7 @@ extern int simple_fun_index(struct code*, struct simple_fun*);
 // For those of us who are too memory-impaired to know how to use the value:
 //  - it is the amount to ADD to a tagged simple-fun pointer to get its entry address
 //  - or the amount to SUBTRACT from an entry address to get a tagged fun pointer
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV) || defined(LISP_FEATURE_LOONGARCH64)
 #define FUN_RAW_ADDR_OFFSET 0
 #else
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, insts) - FUN_POINTER_LOWTAG)

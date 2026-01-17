@@ -159,6 +159,10 @@ extern void globals_init(void);
 #   define EXTERN(name) .globl name
 # endif
 
+# if defined(LISP_FEATURE_LOONGARCH64)
+#   define EXTERN(name) .globl name
+# endif
+
 #ifndef LISP_FEATURE_SB_THREAD
 EXTERN(foreign_function_call_active)
 #endif

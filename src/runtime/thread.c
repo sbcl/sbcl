@@ -324,7 +324,7 @@ void create_main_lisp_thread(lispobj function) {
     ASSOCIATE_OS_THREAD(th);
     ASSIGN_CURRENT_THREAD(th);
 #if THREADS_USING_GCSIGNAL && \
-    (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
+    (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV) || defined(LISP_FEATURE_LOONGARCH64)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
     unblock_gc_stop_signal();
 #endif
