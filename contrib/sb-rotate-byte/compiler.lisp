@@ -69,7 +69,7 @@
 
 ;; Generic implementation for platforms that don't supply VOPs for 32-bit
 ;; rotate.
-#-(or x86 x86-64 ppc arm arm64 riscv)
+#-(or x86 x86-64 ppc arm arm64 riscv loongarch64)
 (deftransform %unsigned-32-rotate-byte ((.count. .integer.)
                                         ((integer -31 31)
                                          (unsigned-byte 32)) *)

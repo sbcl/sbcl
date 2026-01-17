@@ -377,7 +377,7 @@
 (setq sb-ext:*evaluator-mode* :compile)
 (sb-ext:defglobal *large-obj* nil)
 
-#+(and generational (or riscv x86 x86-64 ppc) (not win32) (not ubsan))
+#+(and generational (or riscv x86 x86-64 ppc loongarch64) (not win32) (not ubsan))
 (progn
   (setq *print-array* nil)
   (setq *large-obj* (make-array (* sb-vm:gencgc-page-bytes 4)

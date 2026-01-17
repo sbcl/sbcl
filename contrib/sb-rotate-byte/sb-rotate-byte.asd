@@ -17,5 +17,6 @@
      (:file "x86-64-vm" :if-feature :x86-64)
      (:file "riscv-vm" :if-feature :riscv)
      (:file "ppc-vm" :if-feature :ppc)
-     (:file "ppc64-vm" :if-feature :ppc64)))
+     (:file "ppc64-vm" :if-feature :ppc64)
+     (:file "loongarch64-vm" :if-feature :loongarch64)))
    (:file "rotate-byte" :depends-on ("vm"))))

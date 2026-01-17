@@ -114,7 +114,7 @@
 (eval-when (:compile-toplevel :load-toplevel)
   (setf *c-functions-in-runtime*
         (append #+netbsd '("stat" "lstat" "fstat" "readdir" "opendir")
-                #+(and (or arm64 riscv ppc ppc64) linux) '("stat" "lstat" "fstat"))))
+                #+(and (or arm64 riscv ppc ppc64 loongarch64) linux) '("stat" "lstat" "fstat"))))
 
 
 ;;; filesystem access
