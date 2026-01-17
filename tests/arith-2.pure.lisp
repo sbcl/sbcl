@@ -2100,7 +2100,13 @@
         `(lambda (a)
            (declare (integer a))
            (* (+ (abs (* -3 a)) 3) -5))
-      ((5) -90))))
+      ((5) -90))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a)
+           (declare (integer a))
+           (values (floor (abs (floor 10 a)) 5)))
+      ((-9) 0))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)

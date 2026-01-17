@@ -5381,6 +5381,7 @@
                                          ;; The outer divisor has to be positive
                                          (and
                                           (plusp constant)
+                                          (not *amc-abs*)
                                           (zerop r))))
                             (setf new t
                                   constant (if (and (minusp constant)
