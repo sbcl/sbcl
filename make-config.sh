@@ -409,6 +409,7 @@ case $uname_arch in
     aarch64) guessed_sbcl_arch=arm64 ;;
     riscv32) guessed_sbcl_arch=riscv xlen=32;;
     riscv64) guessed_sbcl_arch=riscv xlen=64;;
+    loongarch64) guessed_sbcl_arch=loongarch64;;
     *)
         # If we're not building on a supported target architecture, we
         # we have no guess, but it's not an error yet, since maybe
@@ -495,7 +496,7 @@ if $fancy
 then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
-        x86|x86-64|ppc|arm64|riscv)
+        x86|x86-64|ppc|arm64|riscv|loongarch64)
 	    if [ "$sbcl_os" = "dragonflybsd" ]
 	    then
 		echo "No threads on this platform."
@@ -517,7 +518,7 @@ else
             esac
     esac
     case $sbcl_arch in
-        arm64|riscv)
+        arm64|riscv|loongarch64)
             WITH_FEATURES="$WITH_FEATURES :sb-thread"
     esac
 fi
@@ -764,6 +765,8 @@ case "$sbcl_arch" in
         echo 'Architecture word width unspecified. (Either 32-bit or 64-bit.)'
         exit 1
     fi
+    ;;
+  loongarch64)
     ;;
 esac
 
