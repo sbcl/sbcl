@@ -2094,7 +2094,13 @@
           `(lambda (a)
              (declare (rational a))
              (* (abs (- (* a 3) 3)) 5))
-          1)))
+          1)
+    (checked-compile-and-assert
+        ()
+        `(lambda (a)
+           (declare (integer a))
+           (* (+ (abs (* -3 a)) 3) -5))
+      ((5) -90))))
 
 (with-test (:name :logtest)
   (when (ctu:vop-existsp 'logtest)
