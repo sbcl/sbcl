@@ -1,0 +1,219 @@
+;;;; type testing and checking VOPs for the LoongArch VM
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB-VM")
+
+;;; Test generation utilities.
+(defun %test-fixnum (value temp target not-p)
+  (assemble ()
+    (inst s_andi temp value fixnum-tag-mask)
+    (if not-p
+        (inst bne temp zero-tn target)
+        (inst beq temp zero-tn target))))
+
+(defun %test-fixnum-and-headers (value temp target not-p headers
+                                 &key value-tn-ref
+                                      immediate-tested)
+  (let ((drop-through (gen-label)))
+    (assemble ()
+      (inst s_andi temp value fixnum-tag-mask)
+      (inst beq temp zero-tn (if not-p drop-through target)))
+    (%test-headers value temp target not-p nil headers
+                   :drop-through drop-through
+                   :value-tn-ref value-tn-ref
+                   :immediate-tested immediate-tested)))
+
+(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate
+                                           headers &key value-tn-ref
+                                                        immediate-tested)
+  (let ((drop-through (gen-label)))
+    (inst s_andi temp value fixnum-tag-mask)
+    (inst beq temp zero-tn (if not-p drop-through target))
+    (%test-immediate-and-headers value temp target not-p immediate headers
+                                 :drop-through drop-through
+                                 :value-tn-ref value-tn-ref
+                                 :immediate-tested immediate-tested)))
+
+(defun %test-immediate (value temp target not-p immediate &key value-tn-ref)
+  (declare (ignore value-tn-ref))
+  (assemble ()
+
+    (inst s_andi temp value widetag-mask)
+    (inst s_xori temp temp immediate)
+    (if not-p
+        (inst bne temp zero-tn target)
+        (inst beq temp zero-tn target))))
+
+(defun %test-lowtag (value temp target not-p lowtag &key value-tn-ref)
+  (declare (ignore value-tn-ref))
+  (assemble ()
+    (inst s_andi temp value lowtag-mask)
+    (inst s_xori temp temp lowtag)
+    (if not-p
+        (inst bne temp zero-tn target)
+        (inst beq temp zero-tn target))))
+
+(defun %test-headers (value temp target not-p function-p headers
+                      &key (drop-through (gen-label)) value-tn-ref immediate-tested)
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
+    (multiple-value-bind
+        (when-true when-false)
+        ;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when
+        ;; we know it's true and when we know it's false respectively.
+        (if not-p
+            (values drop-through target)
+            (values target drop-through))
+      (assemble ()
+        (unless (and value-tn-ref
+                     (eq lowtag other-pointer-lowtag)
+                     (other-pointer-tn-ref-p value-tn-ref nil immediate-tested))
+          (%test-lowtag value temp when-false t lowtag))
+        (load-type temp value (- lowtag))
+        (let ((delta 0))
+          (do ((remaining headers (cdr remaining)))
+              ((null remaining))
+            (let ((header (car remaining))
+                  (last (null (cdr remaining))))
+              (cond
+               ((atom header)
+                (inst subi temp temp (- header delta))
+                (setf delta header)
+                (if last
+                    (if not-p
+                        (inst bne temp zero-tn target)
+                        (inst beq temp zero-tn target))
+                    (inst beq temp zero-tn when-true)))
+               (t
+                (let ((start (car header))
+                      (end (cdr header)))
+                  (unless (= start bignum-widetag)
+                    (inst subi temp temp (- start delta))
+                    (setf delta start)
+                    (inst blt temp zero-tn when-false))
+                  (inst subi temp temp (- end delta))
+                  (setf delta end)
+                  (if last
+                      (if not-p
+                          (inst blt zero-tn temp target)
+                          (inst bge zero-tn temp target))
+                      (inst bge zero-tn temp when-true))))))))
+        (emit-label drop-through)))))
+
+(defun %test-immediate-and-headers (value temp target not-p immediate headers
+                                    &key (drop-through (gen-label))
+                                         value-tn-ref
+                                         immediate-tested)
+  (inst s_andi temp value widetag-mask)
+  (inst s_xori temp temp immediate)
+  (inst beq temp zero-tn (if not-p drop-through target))
+  (%test-headers value temp target not-p nil headers
+                 :drop-through drop-through
+                 :value-tn-ref value-tn-ref
+                 :immediate-tested immediate-tested))
+
+;;;; Other integer ranges.
+;;; A (SIGNED-BYTE N-WORD-BITS) can be represented with either fixnum or a
+;;; bignum with exactly one digit.
+(defun signed-byte-n-word-bits-test (value temp not-p target not-target)
+  (multiple-value-bind (yep nope)
+      (if not-p
+          (values not-target target)
+          (values target not-target))
+    (assemble ()
+      (inst s_andi temp value fixnum-tag-mask)
+      (inst beq temp zero-tn yep)
+      (test-type value temp nope t (other-pointer-lowtag))
+
+      (loadw temp value 0 other-pointer-lowtag)
+      (inst s_xori temp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (if not-p
+          (inst bne temp zero-tn target)
+          (inst beq temp zero-tn target))))
+  (values))
+
+(define-vop (signed-byte-64-p type-predicate)
+  (:translate signed-byte-64-p)
+  (:generator 10
+   (let ((not-target (gen-label)))
+     (signed-byte-n-word-bits-test value temp not-p target not-target)
+     (emit-label not-target))))
+
+;;; An (UNSIGNED-BYTE N-WORD-BITS) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
+(define-vop (unsigned-byte-64-p type-predicate)
+  (:translate unsigned-byte-64-p)
+  (:temporary (:scs (non-descriptor-reg)) temp1)
+  (:generator 10
+    (let ((not-target (gen-label)))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          ;; Is it a fixnum?
+          (inst s_andi temp1 value fixnum-tag-mask)
+          (move temp value)
+          (inst beq temp1 zero-tn fixnum)
+
+          ;; If not, is it an other pointer?
+          (test-type value temp nope t (other-pointer-lowtag))
+          ;; Get the header.
+          (loadw temp value 0 other-pointer-lowtag)
+          ;; Is it one?
+          (inst s_xori temp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (inst beq temp zero-tn single-word)
+          ;; If it's other than two, we can't be an (unsigned-byte n-word-bits)
+          (inst s_xori temp temp
+                (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
+                        (+ (ash 2 n-widetag-bits) bignum-widetag)))
+          (inst bne temp zero-tn nope)
+          ;; Get the second digit.
+          (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+          ;; All zeros, its an (unsigned-byte n-word-bits).
+          (inst beq temp zero-tn yep)
+          (inst j nope)
+
+          SINGLE-WORD
+          ;; Get the single digit.
+          (loadw temp value bignum-digits-offset other-pointer-lowtag)
+
+          ;; positive implies (unsigned-byte n-word-bits).
+          FIXNUM
+          (if not-p
+              (inst blt temp zero-tn target)
+              (inst bge temp zero-tn target))))
+      (emit-label not-target))))
+
+(define-vop (symbolp type-predicate)
+  (:translate symbolp)
+  (:generator 12
+    (inst beq value null-tn (if not-p drop-thru target))
+    (test-type value temp target not-p (symbol-widetag))
+    DROP-THRU))
+
+(define-vop (consp type-predicate)
+  (:translate consp)
+  (:generator 8
+    (inst beq value null-tn (if not-p target drop-thru))
+
+    (test-type value temp target not-p (list-pointer-lowtag))
+    DROP-THRU))
+
+(define-vop (pointerp type-predicate)
+  (:translate pointerp)
+  (:generator 3
+    (inst s_xori temp value 3)
+    (inst s_andi temp temp 3)
+    (if not-p
+        (inst bne temp zero-tn target)
+        (inst beq temp zero-tn target))
+    DROP-THRU))
