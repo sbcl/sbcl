@@ -2194,3 +2194,21 @@
                            (ceiling x y))
                         nil))
              1)))
+(with-test (:name :range<-empty)
+  (if (ctu:vop-existsp 'sb-kernel:range<<=)
+      (assert-type
+       (lambda (v)
+         (declare ((integer -50 0) v))
+         (> v
+            (if (> v -30)
+                1
+                -10)))
+       null)
+      (assert-type
+       (lambda (v)
+         (declare ((integer -50 0) v))
+         (> v
+            (if (> v -30)
+                1
+                -10)))
+       boolean)))
