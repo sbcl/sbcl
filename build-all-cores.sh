@@ -37,6 +37,8 @@
               ("arm64-reloc"  :little-endian :sb-thread :relocatable-static-space :immobile-space)
               ("arm64-immobile-space" :little-endian :sb-thread :immobile-space))
     ("mips"   ("mips" :largefile :little-endian))
+    ("loongarch64"
+	      ("loongarch64" :64-bit :little-endian :sb-thread))
     ("ppc"    ("ppc" :big-endian)
               ("ppc-thread" :big-endian :sb-thread))
     ("ppc64"  ("ppc64" :ppc64 :big-endian)) ; sb-thread is the default and required
