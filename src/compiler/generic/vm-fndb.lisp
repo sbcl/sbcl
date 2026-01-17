@@ -243,10 +243,10 @@
 (defknown %instance-set (instance index t) (values) (always-translatable))
 (defknown update-object-layout (t) layout)
 
-#+(or arm64 ppc ppc64 riscv x86 x86-64)
+#+(or arm64 loongarch64 ppc ppc64 riscv x86 x86-64)
 (defknown %raw-instance-cas/word (instance index sb-vm:word sb-vm:word)
   sb-vm:word ())
-#+(or arm64 riscv x86 x86-64)
+#+(or arm64 loongarch64 riscv x86 x86-64)
 (defknown %raw-instance-cas/signed-word (instance index sb-vm:signed-word sb-vm:signed-word)
   sb-vm:signed-word ())
 (defknown %raw-instance-xchg/word (instance index sb-vm:word) sb-vm:word ())

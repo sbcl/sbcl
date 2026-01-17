@@ -2202,7 +2202,7 @@ core and return a descriptor to it."
     (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)
     (write-wordindexed/raw
      fdefn sb-vm:fdefn-raw-addr-slot
-     (or #+(or sparc arm riscv) ; raw addr is the function descriptor
+     (or #+(or sparc arm riscv loongarch64) ; raw addr is the function descriptor
          (descriptor-bits function)
          ;; For all others raw addr is the starting address
          (+ (descriptor-base-address function)

@@ -211,7 +211,7 @@
     ;; NLX variables are thread slots on x86-64 and RISC-V.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
     ;; so must lookup the TLS index given the symbol.
-    #+(and sb-thread (not x86-64) (not riscv))
+    #+(and sb-thread (not x86-64) (not riscv) (not loongarch64))
     ,@'(*current-catch-block*
         *current-unwind-protect-block*)
 

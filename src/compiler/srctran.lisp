@@ -749,7 +749,7 @@
 (declaim (inline bad-float-p))
 (defun bad-float-p (value)
   (declare (ignorable value))
-  #+(or arm (and arm64 (not darwin)) riscv sb-xc-host)
+  #+(or arm (and arm64 (not darwin)) riscv loongarch64 sb-xc-host)
   (or (and (floatp value)
            (float-infinity-or-nan-p value))
       (and (complex-float-p value)
@@ -7801,7 +7801,7 @@
   (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1 'integer))
-#-(or arm arm64 mips x86 x86-64 riscv) ; defined in compiler/{arch}/arith.lisp
+#-(or arm arm64 mips x86 x86-64 riscv loongarch64) ; defined in compiler/{arch}/arith.lisp
 (define-source-transform logeqv (&rest args)
   (source-transform-transitive 'logeqv args -1 'integer))
 (define-source-transform gcd (&rest args)

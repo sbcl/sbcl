@@ -510,7 +510,7 @@
 ;;; This vop is safe even if the user calls ALIEN-SAP by hand - the compiler will assert
 ;;; the arg to be of type SB-ALIEN-INTERNALS:ALIEN-VALUE (unless checking is dsabled).
 ;;; *** produces a bad build on ppc and ppc64 - why? ***
-#+(or arm64 riscv x86 x86-64)
+#+(or arm64 loongarch64 riscv x86 x86-64)
 (define-vop (alien-sap)
   (:translate alien-sap)
   (:policy :fast-safe)
