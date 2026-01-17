@@ -201,14 +201,14 @@
                        max)
                  (sb-vm::incf-context-pc *current-internal-error-context*
                                          restart)))
-             #+(or x86-64 arm64)
+             #+(or x86-64 arm64 loongarch64)
              (replace-function (value)
                :report (lambda (stream)
                          (format stream "Call a different function with the same arguments"))
                :interactive read-evaluated-form
                (sb-vm::context-call-function *current-internal-error-context*
                                              (fdefinition value)))
-             #+(or x86-64 arm64)
+             #+(or x86-64 arm64 loongarch64)
              (call-form (form)
                :report (lambda (stream)
                          (format stream "Call a different form"))

@@ -111,7 +111,7 @@
            ;; For 8 byte words, this should be 1 since double-floats are 8 bytes.
            ;; It can be 1 if the word size is 4 bytes and the machine permits
            ;; double-floats to be unnaturally aligned (x86 and ppc).
-           (or #+(or x86 x86-64 ppc ppc64 arm64 riscv) 1
+           (or #+(or x86 x86-64 ppc ppc64 arm64 riscv loongarch64) 1
                ;; other architectures align double-floats to twice the
                ;; machine word size
                2)))

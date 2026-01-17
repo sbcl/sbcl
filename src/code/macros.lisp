@@ -612,7 +612,7 @@ evaluated as a PROGN."
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
   (let ((val (and (constantp n env) (constant-form-value n env))))
-    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64 riscv) ;; better DEFAULT-UNKNOWN-VALUES
+    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64 riscv loongarch64) ;; better DEFAULT-UNKNOWN-VALUES
                                           1000
                                           10))) ; Arbitrary limit.
         (let ((dummy-list (make-gensym-list val))
@@ -1765,9 +1765,9 @@ invoked. In that case it will store into PLACE and start over."
          (casser
            (case (dsd-raw-type slotd)
              ((t) '%instance-cas)
-             #+(or arm64 ppc ppc64 riscv x86 x86-64)
+             #+(or arm64 loongarch64 ppc ppc64 riscv x86 x86-64)
              ((word) '%raw-instance-cas/word)
-             #+(or arm64 riscv x86 x86-64)
+             #+(or arm64 loongarch64 riscv x86 x86-64)
              ((sb-vm:signed-word) '%raw-instance-cas/signed-word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~

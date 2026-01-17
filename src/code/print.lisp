@@ -1992,7 +1992,7 @@ variable: an unreadable object representing the error is printed instead.")
       (format stream " {~X..~X}"
               a (+ (logandc2 a sb-vm:lowtag-mask) (code-object-size component))))))
 
-#-(or x86 x86-64 arm64 riscv)
+#-(or x86 x86-64 arm64 riscv loongarch64)
 (defmethod print-object ((lra lra) stream)
   (print-unreadable-object (lra stream :identity t)
     (write-string "return PC object" stream)))

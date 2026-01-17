@@ -74,7 +74,7 @@
        ,(make-fun name)
        ,(make-fun name t))))
 
-#+(or x86 x86-64 arm-vfp arm64 riscv) ;; for constant folding
+#+(or x86 x86-64 arm-vfp arm64 riscv loongarch64) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x))
@@ -105,7 +105,7 @@
 (def-math-rtn "log" 1)
 (def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
-#-(or x86 x86-64 arm-vfp arm64 riscv)
+#-(or x86 x86-64 arm-vfp arm64 riscv loongarch64)
 (def-math-rtn "sqrt" 1 nil #+ppc64 t)
 (def-math-rtn "log1p" 1)
 (def-math-rtn "log2" 1)

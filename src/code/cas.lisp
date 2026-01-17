@@ -31,11 +31,11 @@
   ;; because it is used for effect. And if compare-and-swap vops exist,
   ;; then the setter isn't used at all.
   (def %instance-cas (instance index) %instance-ref %instance-set)
-  #+(or x86-64 x86 riscv)
+  #+(or x86-64 x86 riscv loongarch64)
   (def %raw-instance-cas/word (instance index)
        %raw-instance-ref/word
        %raw-instance-set/word)
-  #+(or arm64 riscv x86 x86-64)
+  #+(or arm64 riscv x86 x86-64 loongarch64)
   (def %raw-instance-cas/signed-word (instance index)
        %raw-instance-ref/signed-word
        %raw-instance-set/signed-word)
