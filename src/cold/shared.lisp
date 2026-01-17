@@ -368,7 +368,7 @@
 ;;; failure is (not always obvious from when the build fails).
 (let ((feature-compatibility-tests
        '(("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
-         ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
+         ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64 loongarch64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and mark-region-gc (not (or x86-64 arm64)))"
           "mark-region is not supported on selected architecture")

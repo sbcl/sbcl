@@ -503,6 +503,7 @@
  #+arm   ("src/code/arm-vm" :not-host)
  #+arm64 ("src/code/arm64-vm" :not-host)
  #+riscv ("src/code/riscv-vm" :not-host)
+ #+loongarch64 ("src/code/loongarch64-vm" :not-host)
 
  #+(or arm64 x86-64)
  ("src/code/simd-fndb")

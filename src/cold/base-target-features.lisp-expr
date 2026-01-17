@@ -353,6 +353,8 @@
  ;;     an ARMv8 AArch64 CPU
  ;;   :riscv
  ;;      A RISC-V CPU.
+ ;;   :loongarch64
+ ;;      64-bit LoongArch CPU
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
  ;; documented in the CMU CL code that SBCL is derived from, and has

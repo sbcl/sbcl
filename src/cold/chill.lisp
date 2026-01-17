@@ -30,7 +30,7 @@
   (package-name sb-assem::*backend-instruction-set-package*))
 
 (defun target-platform-keyword ()
-  (let ((arch (intersection '(:arm :arm64 :mips :ppc :ppc64 :riscv :sparc :x86 :x86-64) *features*)))
+  (let ((arch (intersection '(:arm :arm64 :loongarch64 :mips :ppc :ppc64 :riscv :sparc :x86 :x86-64) *features*)))
     (assert (= (length arch) 1))
     (car arch)))
 
