@@ -1,0 +1,4 @@
+#ifndef _LOONGARCH64_ARCH_H
+#define _LOONGARCH64_ARCH_H
+
+#endif /* _LOONGARCH64_ARCH_H */
