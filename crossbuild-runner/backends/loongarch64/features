@@ -1,0 +1,5 @@
+:little-endian
+:gencgc
+:64-bit
+:linux
+:compare-and-swap-vops :memory-barrier-vops
