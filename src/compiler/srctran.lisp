@@ -4372,7 +4372,7 @@
             ($unless (member '$fun '(* /))
               (erase-node-type node t 1)))
           ($unless (member '$fun '(floor ceiling ffloor fceiling))
-           (combination-match (node-lvar node) ($fun (abs (:type real x)) (abs (:type real y)))
+           (combination-match (:node node) ($fun (abs (:type real x)) (abs (:type real y)))
              (extract-lvar-n x 1 node)
              (extract-lvar-n y 1 node)
              `(values (abs ($fun x y))
@@ -6549,10 +6549,80 @@
                     (type-difference y a-y))))))
     (values x y)))
 
+(defun transform-array-dimensions-equal (node &optional equalp)
+  (or (combination-match (:node node)
+          (equal (array-dimensions x) (array-dimensions y))
+        (extract-lvar-n x 1 node)
+        (extract-lvar-n y 1 node)
+        `(array-dimensions-equal x y))
+      (if equalp
+          (combination-match (:node node)
+              (equal (array-dimensions a) (:constant b))
+            (when (and (proper-list-p b)
+                       (every #'integerp b))
+             (extract-lvar-n a 1 node)
+             `(array-dimensions-equal-list x y)))
+          (combination-match (:node node)
+              (equal (array-dimensions a) *)
+            (extract-lvar-n a 1 node)
+            (if rotated
+                `(array-dimensions-equal-list y x)
+                `(array-dimensions-equal-list x y))))))
+
+(deftransform array-dimensions-equal-list ((array list) * * :node node)
+  (or (combination-match (:node node)
+          (array-dimensions-equal-list * (array-dimensions y))
+        (extract-lvar-n y 1 node)
+        `(array-dimensions-equal array list))
+      (let ((spliced (splice-fun-args list 'list nil)))
+        (when spliced
+          (let* ((rank (length spliced))
+                 (dims (make-gensym-list rank)))
+            `(lambda (array ,@dims)
+               (and (eql (array-rank array) ,rank)
+                    ,@(loop for i from 0
+                            for dim in dims
+                            collect `(eql (array-dimension array ,i) ,dim)))))))
+      (give-up-ir1-transform)))
+
+(defun array-dimensions-equal-deriver (dims1 dims2)
+  (when (and (listp dims1)
+             (listp dims2))
+    (if (= (length dims1)
+           (length dims2))
+        (let ((no* t))
+          (or (loop for dim1 in dims1
+                    for dim2 in dims2
+                    do
+                    (cond ((or (eq dim1 '*)
+                               (eq dim2 '*))
+                           (setf no* nil))
+                          ((/= dim1 dim2)
+                           (return (specifier-type 'null)))))
+              (and no*
+                   (specifier-type 't))))
+        (specifier-type 'null))))
+
+(defoptimizer (array-dimensions-equal derive-type) ((array1 array2) node)
+  (let* ((array1-type (lvar-conservative-type array1))
+         (array2-type (lvar-conservative-type array2))
+         (dims1 (array-type-dimensions-or-give-up array1-type nil))
+         (dims2 (array-type-dimensions-or-give-up array2-type nil)))
+    (array-dimensions-equal-deriver dims1 dims2)))
+
+(defoptimizer (array-dimensions-equal-list derive-type) ((array list) node)
+  (when (constant-lvar-p list)
+    (let ((dims2 (lvar-value list)))
+      (when (and (proper-list-p dims2)
+                 (every #'integerp dims2))
+        (let* ((array-type (lvar-conservative-type array))
+               (dims1 (array-type-dimensions-or-give-up array-type nil)))
+          (array-dimensions-equal-deriver dims1 dims2))))))
+
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
 ;;; with strings and bit-vectors.
-(deftransform equal ((x y) * *)
+(deftransform equal ((x y) * * :node node)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y)))
@@ -6589,6 +6659,7 @@
             ((unroll-constant y 'x))
             ((unroll-list x 'x 'y))
             ((unroll-list y 'y 'x))
+            ((transform-array-dimensions-equal node))
             (t
              (flet ((try (x-type y-type)
                       (flet ((both-csubtypep (type)
@@ -6657,7 +6728,7 @@
                                              (give-up-ir1-transform)))))))))
                      r))))))))
 
-(deftransform equalp ((x y) * *)
+(deftransform equalp ((x y) * * :node node)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y)))
@@ -6724,6 +6795,7 @@
             ((unroll-constant y 'x x-type))
             ((unroll-list x 'x 'y))
             ((unroll-list y 'y 'x))
+            ((transform-array-dimensions-equal node t))
             (t
              (flet ((try (x-type y-type)
                       (flet ((both-csubtypep (type)

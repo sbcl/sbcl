@@ -1231,6 +1231,34 @@ of specialized arrays is supported."
         (t
          (sb-c::%type-check-error/c array 'object-not-array-error nil))))
 
+(defun array-dimensions-equal (array1 array2)
+  (cond ((vectorp array1)
+         (when (vectorp array2)
+           (= (array-total-size array1)
+              (array-total-size array2))))
+        ((array-header-p array1)
+         (let ((rank1 (array-rank array1))
+               (rank2 (array-rank array2)))
+           (and (= rank1 rank2)
+                (loop for i below rank1
+                      always (= (%array-dimension array1 i)
+                                (%array-dimension array2 i))))))))
+
+(defun array-dimensions-equal-list (array list)
+  (cond ((not (listp list))
+         nil)
+        ((vectorp array)
+            (and (typep list '(cons t null))
+                 (eql (array-total-size array)
+                      (car list))))
+        ((array-header-p array)
+         (and (loop for i below (array-rank array)
+                    for dim = (pop list)
+                    always (and (listp list)
+                                (eql (%array-dimension array i)
+                                     dim)))
+              (not list)))))
+
 (defun array-total-size (array)
   "Return the total number of elements in the Array."
   (declare (explicit-check))

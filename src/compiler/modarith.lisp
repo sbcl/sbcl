@@ -493,7 +493,7 @@
 ;;; Remove the second logand or reduce its constant in
 ;;; (logand m (logand n #xFFFF))
 (deftransform logand ((a b) (t t) * :important nil :node node)
-  (or (combination-match (node-lvar node)
+  (or (combination-match (:node node)
           (logand (:type unsigned-byte a) (logand x (:constant b)))
         (block nil
           (let* ((width (or (unsigned-mask-width (lvar-type a))
@@ -523,7 +523,7 @@
                                    'logand)
                    t)))))
       ;; Reduce the constant in logior
-      (combination-match (node-lvar node)
+      (combination-match (:node node)
           (logand (:type unsigned-byte a) (logior * (:constant b)))
         (block nil
           (let* ((width (or (unsigned-mask-width (lvar-type a))
@@ -553,7 +553,7 @@
                                       (logior x ,cut))
                                    'logand)
                    t)))))
-      (combination-match (node-lvar node)
+      (combination-match (:node node)
           (logand (:type unsigned-byte a) (logxor * (:constant b)))
         (block nil
           (let* ((width (or (unsigned-mask-width (lvar-type a))
@@ -575,7 +575,7 @@
                                    'logand)
                    t)))))
       ;; Remove mask-signed-field
-      (combination-match (node-lvar node)
+      (combination-match (:node node)
           (logand (:type unsigned-byte a) (mask-signed-field (:constant sign) b))
         (block nil
           (let ((width (or (unsigned-mask-width (lvar-type a))

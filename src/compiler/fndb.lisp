@@ -64,7 +64,7 @@
 
 (defknown (eq eql) (t t) boolean
   (movable foldable flushable commutative))
-(defknown (equal equalp) (t t) boolean (foldable flushable recursive))
+(defknown (equal equalp) (t t) boolean (foldable flushable commutative recursive))
 
 ;;;; classes
 
@@ -1407,6 +1407,9 @@
 ;; be in the range 0 through 6, not 0 through 7.
 (defknown array-dimension (array %array-rank) index (foldable flushable))
 (defknown array-dimensions (array) list (foldable flushable))
+(defknown array-dimensions-equal (array array) boolean (foldable flushable))
+(defknown array-dimensions-equal-list (array t) boolean (foldable flushable))
+
 (defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable)
   :call-type-deriver #'array-call-type-deriver)
 (defknown array-row-major-index (array &rest index) sb-kernel::%array-total-size
