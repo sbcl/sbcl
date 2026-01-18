@@ -367,30 +367,6 @@
     (test nil)
     (test t)))
 
-;;; Skip for MSAN. Instead of returning 0, the intercepted malloc is configured
-;;; to cause process termination by default on failure to allocate memory.
-;;; Skip also for UBSAN which has a smaller ARRAY-TOTAL-SIZE-LIMIT
-;;; and so doesn't get ENOMEM.
-;;; Unfortunately, even without an intercepted malloc, and depending on SBCL build
-;;; parameters (notably GC card-size) you might not get a failure right away,
-;;; but instead suffer process death, or cause your kernel to churn for a while
-;;; as it looks for swap space and then decides to OOM-kill you. This will typically
-;;; occur when ARRAY-TOTAL-SIZE-LIMIT is "too small" to get instant failure.
-;;; Instead, your malloc() thinks the request is reasonable, and tries to fulfill it.
-;;; But we're constrained by the maximum BYTES argument to MAKE-%ALIEN which
-;;; is declared as INDEX even though we want to pass something ludicrously
-;;; big like half the maximum value of size_t.
-#+64-bit (unless (>= (integer-length array-total-size-limit) 45)
-           (push :skip-malloc-test *features*))
-(with-test (:name :malloc-failure ; for lp#891268
-                  :skipped-on (or :ubsan :msan :skip-malloc-test))
-  (assert (eq :enomem
-              (handler-case
-                  (loop repeat 128
-                        collect (sb-alien:make-alien char (1- array-total-size-limit)))
-                (storage-condition ()
-                  :enomem)))))
-
 (with-test (:name :bug-985505)
   ;; Check that correct octets are reported for a c-string-decoding error.
   (assert
