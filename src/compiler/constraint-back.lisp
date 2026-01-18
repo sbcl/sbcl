@@ -10,12 +10,18 @@
 (in-package "SB-C")
 
 (defun constraint-propagate-back (lvar kind constraint gen consequent alternative)
-  (multiple-value-bind (node nth-value) (mv-principal-lvar-ref-use lvar)
-    (when (combination-p node)
-      (binding* ((info (combination-fun-info node) :exit-if-null)
-                 (propagate (fun-info-constraint-propagate-back info)
-                            :exit-if-null))
-        (funcall propagate node nth-value kind constraint gen consequent alternative)))))
+  (flet ((try (kind lvar constraint)
+           (multiple-value-bind (node nth-value) (mv-principal-lvar-ref-use lvar)
+             (when (combination-p node)
+               (binding* ((info (combination-fun-info node) :exit-if-null)
+                          (propagate (fun-info-constraint-propagate-back info)
+                                     :exit-if-null))
+                 (funcall propagate node nth-value kind constraint gen consequent alternative)
+                 t)))))
+    (or (try kind lvar constraint)
+        (when (and (lvar-p constraint)
+                   (memq kind '(eq < >)))
+          (try (invert-operator kind) constraint lvar)))))
 
 (defun add-back-constraint (gen kind x y target)
   (when x
@@ -482,3 +488,31 @@
                 (when alternative
                   (conset-add-constraint-to-eql gen 'typep var (specifier-type '(not null))
                                                 nil alternative)))))))))
+
+(defoptimizer (array-rank constraint-propagate-back) ((x) node nth-value kind constraint gen consequent alternative)
+  (declare (ignore nth-value))
+  (case kind
+    (>
+     (when (csubtypep (lvar-type constraint) (specifier-type '(integer 1)))
+       (let ((var (ok-lvar-lambda-var x gen)))
+         (when var
+           (conset-add-constraint-to-eql gen 'typep var (specifier-type '(and array (not vector)))
+                                         nil consequent)))))
+    (eq
+     (let ((rank (nth-value 1 (type-singleton-p (lvar-type constraint)))))
+       (cond (rank
+              (let ((var (ok-lvar-lambda-var x gen))
+                    (type (make-array-type (make-list rank :initial-element '*)
+                                           :element-type *wild-type*)))
+                (when var
+                  (conset-add-constraint-to-eql gen 'typep var type
+                                                nil consequent)
+                  (when alternative
+                    (conset-add-constraint-to-eql gen 'typep var (type-difference (specifier-type 'array)
+                                                                                  type)
+                                                  nil alternative)))))
+             ((not (types-equal-or-intersect (lvar-type constraint) (specifier-type '(eql 1))))
+              (let ((var (ok-lvar-lambda-var x gen)))
+                (when var
+                  (conset-add-constraint-to-eql gen 'typep var (specifier-type '(and array (not vector)))
+                                                nil consequent)))))))))

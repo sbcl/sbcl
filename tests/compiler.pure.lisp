@@ -4960,8 +4960,9 @@
                       (typecase a
                         ((array t 2)
                          (when (= (array-rank a) 3)
-                           (array-dimension a 2)))))))))
-    (assert (= 1 (length notes)))))
+                           (array-dimension a 2)))))
+                   :allow-notes 'code-deletion-note))))
+    (assert notes)))
 
 (with-test (:name (upgraded-array-element-type :undefined-type))
   (checked-compile-and-assert (:allow-style-warnings t :optimize nil)

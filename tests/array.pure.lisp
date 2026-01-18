@@ -1055,3 +1055,31 @@
               ((member 0 2) n))
      (array-dimension a n))
    (member 1 3)))
+
+(with-test (:name :array-rank-type-derivation)
+  (assert-type
+   (lambda (a)
+     (if (eql (array-rank a) 3)
+         a
+         (error "")))
+   (array * (* * *)))
+  (assert-type
+   (lambda (a)
+     (if (eql (array-rank a) 1)
+         (error "")
+         a))
+   (and array (not vector)))
+  (assert-type
+   (lambda (a r)
+     (declare ((integer 2) r))
+     (if (= (array-rank a) r)
+         a
+         (error "")))
+   (and array (not vector)))
+  (assert-type
+   (lambda (a r)
+     (declare ((integer 2) r))
+     (if (> (array-rank a) r)
+         a
+         (error "")))
+   (and array (not vector))))
