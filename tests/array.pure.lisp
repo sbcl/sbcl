@@ -1090,6 +1090,15 @@
          (error "")))
    (and array (not vector))))
 
+(with-test (:name :array-dimensions-equal)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b n)
+         (let ((d1 (array-dimensions a)))
+           (adjust-array a n)
+           (equal d1 (array-dimensions b))))
+    (((make-array 6 :adjustable t) #6(0) 5) t)))
+
 (with-test (:name :array-dimensions-equal-type-derivation)
   (assert-type
    (lambda (a b)

@@ -776,7 +776,12 @@
 (defun almost-immediately-used-p (lvar node &key flushable
                                                  no-multiple-value-lvars)
   (declare (type lvar lvar)
-           (type node node))
+           (type (or null node) node))
+  (unless node
+    (let ((uses (lvar-uses lvar)))
+      (when (consp uses)
+        (return-from almost-immediately-used-p nil))
+      (setf node uses)))
   (unless (bind-p node)
     (aver (eq (node-lvar node) lvar)))
   (let ((dest (lvar-dest lvar))
