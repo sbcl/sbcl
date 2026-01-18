@@ -5510,7 +5510,7 @@
                                                'multiply-lvar-constants))
                              t)))
                         (ash (* (type unsigned-byte))
-                         (multiply-lvar (first args)))
+                         (multiply-lvar (first args) :test test))
                         (abs *
                          (let ((*amc-abs* t))
                            (multiply-lvar (first args) :test test)))))))))
