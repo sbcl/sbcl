@@ -2689,6 +2689,11 @@
           ;; vectors have fill-pointers.
           t))
 
+(defoptimizer (%array-displaced-p constraint-propagate-if)
+    ((array))
+  (values array (specifier-type '(and array (not simple-array)))
+          nil nil t))
+
 ;;; I am highly reluctant to add a transform on MAKE-WEAK-VECTOR which allows it to inline,
 ;;; because frankly we may need to cease supporting weak-vectors as they currently exist.
 ;;; Instead it would be just a vector of weak pointers. The problem stems from allowing

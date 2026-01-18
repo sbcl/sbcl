@@ -1090,7 +1090,6 @@
          (error "")))
    (and array (not vector))))
 
-
 (with-test (:name :array-dimensions-equal-type-derivation)
   (assert-type
    (lambda (a b)
@@ -1132,3 +1131,11 @@
          a
          (error "")))
    (array * (* *))))
+
+(with-test (:name :array-displaced-type)
+  (assert-type
+   (lambda (a)
+     (if (array-displacement a)
+         a
+         (error "")))
+    (and array (not simple-array))))

@@ -1342,7 +1342,7 @@
                                          (make-list (length dims2) :initial-element '*)
                                          dims2)
                                      :element-type *wild-type*)))
-          (values array1 new))))))
+          (values array1 new nil nil t))))))
 
 (defoptimizer (array-dimension constraint-propagate) ((array axis) node gen)
   (unless (types-equal-or-intersect (lvar-type axis) (specifier-type '(eql 0)))
