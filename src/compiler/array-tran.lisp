@@ -1481,29 +1481,30 @@
       ;; (make-array (array-dimensions x)): avoid consing a list in
       ;; ARRAY-DIMENSIONS if the rank is known.
       (array-dimensions (*)
-        (catch 'give-up-ir1-transform
-          (let ((dimensions (array-type-dimensions-or-give-up
-                             (lvar-type (car args))))
-                (simple (csubtypep (lvar-type (car args)) (specifier-type 'simple-array))))
-            (when (and (listp dimensions)
-                       (splice-fun-args dims 'array-dimensions 1 nil))
-              (let ((dims (loop for axis from 0
-                                for dim in dimensions
-                                collect (if (and simple
-                                                 (neq dim '*))
-                                            dim
-                                            `(array-dimension dims ,axis)))))
-                (delete-lvar-cast-if (specifier-type 'type-specifier) element-type)
-                (return-from make-array
-                  `(make-array
-                    ,(if (cdr dims)
-                         `(list ,@dims)
-                         (car dims))
-                    ,@(build-key-args initial-element initial-contents
-                                      element-type
-                                      adjustable fill-pointer
-                                      displaced-to
-                                      displaced-index-offset))))))))
+       (let* ((array-type (lvar-type (car args)))
+              (simple (csubtypep array-type (specifier-type 'simple-array))))
+         (when (or (almost-immediately-used-p dims nil :flushable t)
+                   simple)
+           (let ((dimensions (array-type-dimensions-or-give-up array-type nil)))
+             (when (and (consp dimensions)
+                        (splice-fun-args dims 'array-dimensions 1 nil))
+               (let ((dims (loop for axis from 0
+                                 for dim in dimensions
+                                 collect (if (and simple
+                                                  (neq dim '*))
+                                             dim
+                                             `(array-dimension dims ,axis)))))
+                 (delete-lvar-cast-if (specifier-type 'type-specifier) element-type)
+                 (return-from make-array
+                   `(make-array
+                     ,(if (cdr dims)
+                          `(list ,@dims)
+                          (car dims))
+                     ,@(build-key-args initial-element initial-contents
+                                       element-type
+                                       adjustable fill-pointer
+                                       displaced-to
+                                       displaced-index-offset)))))))))
       (list (*)
         (when (splice-fun-args dims 'list 1 nil)
           (return-from make-array

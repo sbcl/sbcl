@@ -980,7 +980,15 @@
   (assert-type
    (lambda (e)
      (make-array (list* 10 nil) :element-type e))
-   (simple-array * (10))))
+   (simple-array * (10)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (a n)
+         (declare ((array * (* *)) a))
+         (let ((d (array-dimensions a)))
+           (adjust-array a n)
+           (make-array d)))
+    (((make-array '(1 2) :adjustable t) '(2 1)) #2A((0 0)) :test #'equalp)))
 
 (with-test (:name :make-array-list-adjustable)
   (assert-type
