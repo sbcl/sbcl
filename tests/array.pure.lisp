@@ -1083,3 +1083,46 @@
          a
          (error "")))
    (and array (not vector))))
+
+
+(with-test (:name :array-dimensions-equal-type-derivation)
+  (assert-type
+   (lambda (a b)
+     (declare ((simple-array * (* 1)) a)
+              ((simple-array * (2 *)) b))
+     (if (equal (array-dimensions a)
+                (array-dimensions b))
+         b
+         (error "")))
+   (simple-array * (2 1)))
+  (assert-type
+   (lambda (a b)
+     (declare ((simple-array * (1 *)) a))
+     (if (equal (array-dimensions a)
+                (array-dimensions b))
+         b
+         (error "")))
+   (array * (* *)))
+  (assert-type
+   (lambda (a b)
+     (declare ((simple-array * (1 2)) a)
+              (simple-array b))
+     (if (equal (array-dimensions a)
+                (array-dimensions b))
+         b
+         (error "")))
+   (simple-array * (1 2)))
+  (assert-type
+   (lambda (a b)
+     (declare ((simple-array * (1 2)) a))
+     (if (equal (array-dimensions a)
+                (array-dimensions b))
+         b
+         (error "")))
+   (array * (* *)))
+  (assert-type
+   (lambda (a n m)
+     (if (equal (array-dimensions a) (list n m))
+         a
+         (error "")))
+   (array * (* *))))
