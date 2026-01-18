@@ -587,6 +587,24 @@
                (populate-dimensions array dimensions array-rank)
                array))))))
 
+(defun %make-simple-array-array-dimensions (array widetag n-bits)
+  (let* ((total-size (array-total-size array))
+         (array-rank (array-rank array))
+         (data (allocate-vector-with-widetag #+ubsan t widetag total-size n-bits)))
+    (cond ((eq array-rank 1)
+           data)
+          (t
+           (let* ((header (make-array-header simple-array-widetag array-rank)))
+             (reset-array-flags header +array-fill-pointer-p+)
+             (setf (%array-fill-pointer header) total-size)
+             (setf (%array-available-elements header) total-size)
+             (setf (%array-data header) data)
+             (setf (%array-displaced-from header) nil)
+             (setf (%array-displaced-p header) nil)
+             (dotimes (axis array-rank)
+               (%set-array-dimension header axis (%array-dimension array axis)))
+             header)))))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits

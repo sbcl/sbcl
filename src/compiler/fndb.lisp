@@ -1345,6 +1345,12 @@
                                      (mod #.sb-vm:n-word-bits))
     simple-array (flushable foldable-read-only no-verify-arg-count))
 
+(defknown sb-vm::%make-simple-array-array-dimensions
+    (array
+     (unsigned-byte #.sb-vm:n-widetag-bits)
+     (mod #.sb-vm:n-word-bits))
+    simple-array (flushable foldable-read-only no-verify-arg-count))
+
 (defknown sb-vm::array-underlying-widetag-and-shift (array)
     (values (integer 128 255) (integer 0 7))
     (flushable foldable))

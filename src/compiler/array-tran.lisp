@@ -1795,6 +1795,26 @@
                                                 (give-up-ir1-transform)))
                                         n-bits))
 
+(deftransform sb-vm::%make-simple-array ((dims widetag n-bits) * * :node node)
+  (or (combination-match (:node node)
+          (sb-vm::%make-simple-array (array-dimensions array) * *)
+        (when (or (almost-immediately-used-p dims nil :flushable t)
+                  (csubtypep (lvar-type array) (specifier-type 'simple-array)))
+          (extract-lvar-n array 1 node)
+          `(sb-vm::%make-simple-array-array-dimensions dims widetag n-bits)))
+      (give-up-ir1-transform)))
+
+(deftransform sb-vm::%make-simple-array-array-dimensions ((array widetag n-bits) (vector t t) * :node node)
+  `(sb-vm::%make-simple-array (array-total-size array) widetag n-bits))
+
+(deftransform sb-vm::%make-simple-array-array-dimensions ((array widetag n-bits) (t t t) * :node node)
+  (let* ((type (lvar-conservative-type array))
+         (dims (array-type-dimensions-or-give-up type)))
+    (if (and (listp dims)
+             (not (find '* dims)))
+        `(sb-vm::%make-simple-array ',dims widetag n-bits)
+        (give-up-ir1-transform))))
+
 
 ;;;; ADJUST-ARRAY
 (deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
