@@ -1343,3 +1343,11 @@
                                          dims2)
                                      :element-type *wild-type*)))
           (values array1 new))))))
+
+(defoptimizer (array-dimension constraint-propagate) ((array axis) node gen)
+  (unless (types-equal-or-intersect (lvar-type axis) (specifier-type '(eql 0)))
+    (let ((var (ok-lvar-lambda-var array gen)))
+      (when var
+        (list (list 'typep var
+                    (specifier-type '(and array (not vector)))
+                    nil))))))

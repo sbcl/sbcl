@@ -1054,7 +1054,13 @@
      (declare ((simple-array * (1 * 3)) a)
               ((member 0 2) n))
      (array-dimension a n))
-   (member 1 3)))
+   (member 1 3))
+  (assert-type
+   (lambda (a n)
+     (if (= (array-dimension a 1) n)
+         (print n))
+     a)
+   (and array (not vector))))
 
 (with-test (:name :array-rank-type-derivation)
   (assert-type
