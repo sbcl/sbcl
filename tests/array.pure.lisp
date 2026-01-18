@@ -963,7 +963,7 @@
      (declare ((or (array single-float (1 2))
                    (array double-float (1 2))) x))
      (make-array (array-dimensions x) :element-type 'fixnum))
-   (simple-array fixnum (* *)))
+   (simple-array fixnum (1 2)))
   (assert-type
    (lambda (x e)
      (declare ((array * (*)) x))

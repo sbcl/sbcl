@@ -2043,6 +2043,15 @@
             (push dim results))
       (sb-kernel::member-rational results))))
 
+(deftransform array-dimensions ((array))
+  (let* ((type (lvar-conservative-type array))
+         (dims (array-type-dimensions-or-give-up type)))
+    (if (listp dims)
+       (if (find '* dims)
+           (give-up-ir1-transform)
+           `',dims)
+       (give-up-ir1-transform))))
+
 ;;; All vectors can get their length by using VECTOR-LENGTH. If it's
 ;;; simple, it will extract the length slot from the vector. It it's
 ;;; complex, it will extract the fill pointer slot from the array
