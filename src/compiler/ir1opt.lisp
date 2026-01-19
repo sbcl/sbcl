@@ -112,6 +112,10 @@
 (defun lvar-value-is (lvar value)
   (and (constant-lvar-p lvar) (eql (lvar-value lvar) value)))
 
+(defun lvar-value-equal (lvar value)
+  (and (constant-lvar-p lvar)
+       (equal (lvar-value lvar) value)))
+
 ;;; Return true if ARG is NIL, or is a constant-lvar whose
 ;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)

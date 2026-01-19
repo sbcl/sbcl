@@ -1106,9 +1106,7 @@
   (flet ((literal (s1 s2 string2)
            (when (constant-lvar-p s1)
              (let* ((str (string (lvar-value s1)))
-                    (check (cond ((equal str "")
-                                  `(zerop (length ,string2)))
-                                 ((< (length str)
+                    (check (cond ((< (length str)
                                      (let ((type (type-intersection (lvar-type s2) (specifier-type 'string))))
                                        (cond ((or (csubtypep type (specifier-type 'simple-base-string))
                                                   (csubtypep type (specifier-type '(simple-array character (*)))))
@@ -1189,20 +1187,33 @@
          (lengths2 (vector-type-lengths (lvar-type string2)))
          (end1 (and end1 (lvar-value end1)))
          (end2 (and end2 (lvar-value end2))))
-    (if (and lengths1
-             lengths2
-             (loop for length1 in lengths1
-                   never
-                   (loop for length2 in lengths2
-                         thereis
-                         (let ((end1 (or end1 length1))
-                               (end2 (or end2 length2)))
-                           (or (not (and (<= start1 end1 length1)
-                                         (<= start2 end2 length2)))
-                               (= (- end1 start1)
-                                  (- end2 start2)))))))
-        nil
-        (give-up-ir1-transform))))
+    (cond ((and lengths1
+                lengths2
+                (loop for length1 in lengths1
+                      never
+                      (loop for length2 in lengths2
+                            thereis
+                            (let ((end1 (or end1 length1))
+                                  (end2 (or end2 length2)))
+                              (or (not (and (<= start1 end1 length1)
+                                            (<= start2 end2 length2)))
+                                  (= (- end1 start1)
+                                     (- end2 start2)))))))
+           nil)
+          ((and (zerop start1)
+                (zerop start2)
+                (not end1)
+                (not end2)
+                (cond ((lvar-value-equal string2 "")
+                       `(if (characterp string1)
+                            nil
+                            (eq (vector-length (string string1)) 0)))
+                      ((lvar-value-equal string1 "")
+                       `(if (characterp string2)
+                            nil
+                            (eq (vector-length (string string2)) 0))))))
+          (t
+           (give-up-ir1-transform)))))
 
 (deftransforms (string=* simple-base-string=
                          simple-character-string=)

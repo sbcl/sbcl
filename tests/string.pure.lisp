@@ -389,3 +389,8 @@ claim that any particular result from these edge cases constitutes a bug.
                   `(lambda (x)
                      (make-string 2 :element-type x :initial-element #\a)))
                  '(sb-vm::%string-widetag-and-n-bits-shift))))
+
+(with-test (:name :inline-fill)
+  (assert (not (ctu:ir1-named-calls
+                `(lambda (x)
+                   (string= x ""))))))
