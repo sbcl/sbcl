@@ -297,7 +297,7 @@
     ;; treats as generating SIGTRAP.
     (inst debug-trap)
     (emit-internal-error kind code values)
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*

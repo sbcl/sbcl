@@ -214,7 +214,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
     (emit-internal-error kind code values
                          :trap-emitter (lambda (tramp-number)
                                          (inst break 0 tramp-number)))
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*

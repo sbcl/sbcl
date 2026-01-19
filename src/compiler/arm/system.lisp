@@ -218,7 +218,7 @@
   (:generator 1
     (inst debug-trap)
     (inst byte pending-interrupt-trap)
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 (define-vop (halt)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
@@ -229,7 +229,7 @@
     (inst swi 0)
     (inst byte halt-trap)
     ;; Re-align to the next instruction boundary.
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop ()

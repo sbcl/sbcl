@@ -933,7 +933,7 @@
                       (inst debug-trap)
                       (inst byte single-step-around-trap)
                       (inst byte (tn-offset callable-tn))
-                      (emit-alignment word-shift)
+                      (emit-alignment 2)
 
                       STEP-DONE-LABEL))))
            (declare (ignorable #'insert-step-instrumenting))
@@ -1175,5 +1175,5 @@
     ;; single-step-before-trap.
     (inst debug-trap)
     (inst byte single-step-before-trap)
-    (emit-alignment word-shift)
+    (emit-alignment 2)
     DONE))

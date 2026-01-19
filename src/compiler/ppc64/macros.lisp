@@ -175,7 +175,7 @@
     (emit-internal-error kind code values
                          :trap-emitter (lambda (tramp-number)
                                          (inst unimp tramp-number)))
-    (emit-alignment word-shift)))
+    (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*
