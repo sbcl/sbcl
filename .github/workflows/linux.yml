@@ -76,6 +76,9 @@ jobs:
     - name: crossbuild sparc
       if: matrix.subfeatures == 'sse4'
       run: ./build-all-cores.sh -j 1 sparc
+    - name: crossbuild loongarch64
+      if: matrix.subfeatures == 'sse4'
+      run: ./build-all-cores.sh -j 1 loongarch64
     - name: crossbuild x86
       if: matrix.subfeatures == 'sse4'
       run: ./build-all-cores.sh -j 1 x86
