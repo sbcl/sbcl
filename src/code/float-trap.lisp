@@ -201,10 +201,8 @@ sets the floating point modes to their current values (and thus is a no-op)."
   (let ((code (sb-unix::siginfo-code info)))
     (multiple-value-bind (op operands) (sb-di::decode-arithmetic-error-operands context)
       (with-interrupts
-        ;; Reset the accumulated exceptions, may be needed on other
-        ;; platforms too, at least Linux doesn't seem to require it.
-        #+sunos (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
-        (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
+        ;; Reset the accumulated exceptions
+        (setf (ldb float-sticky-bits (floating-point-modes)) 0)
         (destructuring-bind (&optional (condition 'floating-point-exception) trap-mask)
             (cdr (assoc code +sigfpe-code-error-alist+))
           (declare (ignorable trap-mask))
